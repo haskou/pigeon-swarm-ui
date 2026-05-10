@@ -1,0 +1,138 @@
+import type {
+  ChatMessage,
+  ConversationResource,
+  Session,
+} from '../../domain/types';
+
+import { conversationTitle, shortId } from '../../utils/formatting';
+import { Composer } from '../chat/Composer';
+import { MessageBubble } from '../chat/MessageBubble';
+
+type LoadState = 'idle' | 'loading' | 'error';
+
+interface ChatColumnProps {
+  session: Session;
+  activeConversation?: ConversationResource;
+  messages: ChatMessage[];
+  messageState: LoadState;
+  sendError: string | null;
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+  bottomRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+  onSend: (content: string) => Promise<void>;
+  onOpenSidebar: () => void;
+  onCreate: () => void;
+}
+
+export function ChatColumn({
+  activeConversation,
+  bottomRef,
+  messages,
+  messageState,
+  onCreate,
+  onOpenSidebar,
+  onScroll,
+  onSend,
+  scrollerRef,
+  sendError,
+  session,
+}: ChatColumnProps) {
+  return (
+    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-[2rem]">
+      <header className="border-b border-white/10 p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenSidebar}
+            className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 font-black lg:hidden"
+          >
+            ☰
+          </button>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
+            {activeConversation
+              ? conversationTitle(activeConversation).slice(0, 1).toUpperCase()
+              : '∅'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-2xl font-black tracking-tight">
+              {activeConversation
+                ? conversationTitle(activeConversation)
+                : 'Sin conversación'}
+            </div>
+            <div className="truncate text-sm text-white/50">
+              {activeConversation
+                ? `1to1 · ${shortId(activeConversation.id)} · keychain local`
+                : 'Crea una conversación para empezar'}
+            </div>
+          </div>
+          <button
+            onClick={onCreate}
+            className="hidden rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 sm:block"
+          >
+            New 1to1
+          </button>
+        </div>
+      </header>
+
+      {!activeConversation ? (
+        <div className="grid flex-1 place-items-center p-6 text-center">
+          <div className="max-w-md">
+            <img
+              src="/logo.png"
+              alt="Pigeon Swarm"
+              className="mx-auto h-24 w-24 rounded-[2rem] shadow-2xl"
+            />
+            <h2 className="mt-6 text-3xl font-black tracking-tight">
+              No hay conversaciones
+            </h2>
+            <p className="mt-3 text-white/55">
+              Crea un 1to1 introduciendo el ID de la identidad remota. Súper
+              romántico, si tu idea de romance incluye claves privadas.
+            </p>
+            <button
+              onClick={onCreate}
+              className="mt-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 font-black"
+            >
+              Crear conversación
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
+            ref={scrollerRef}
+            onScroll={onScroll}
+            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+          >
+            {messageState === 'loading' && (
+              <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+                Cargando eventos...
+              </div>
+            )}
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  currentIdentityId={session.identity.id}
+                />
+              ))}
+              {messages.length === 0 && messageState !== 'loading' && (
+                <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                  No hay mensajes visibles. Enviar el primero suele ayudar,
+                  brutal hallazgo de producto.
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+          </div>
+
+          <Composer
+            disabled={messageState === 'loading'}
+            error={sendError}
+            onSend={onSend}
+          />
+        </>
+      )}
+    </section>
+  );
+}
