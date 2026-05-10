@@ -1,0 +1,42 @@
+{
+  "name": "pigeon-swarm-glass-api",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite --host 0.0.0.0",
+    "lint": "eslint \"src/domain/**/*.ts\"",
+    "lint:fix": "eslint \"src/domain/**/*.ts\" --fix",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "jest --runInBand",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@haskou/value-objects": "^2.6.0",
+    "@tailwindcss/vite": "^4.1.17",
+    "@vitejs/plugin-react": "^4.7.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.1.17",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^6.3.7"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-perfectionist": "^4.15.0",
+    "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-sonarjs": "^3.0.4",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "jest": "^30.4.2",
+    "prettier": "^3.8.3",
+    "ts-jest": "^29.4.9"
+  }
+}
