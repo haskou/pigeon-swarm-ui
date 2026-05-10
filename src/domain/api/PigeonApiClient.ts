@@ -2,8 +2,10 @@ import {
   EncryptedKeyPair,
   EncryptedPrivateKey,
   KeyPair,
+  PrivateKey,
   PublicKey,
   StringValueObject,
+  UUID,
 } from '@haskou/value-objects';
 
 import type {
@@ -65,6 +67,20 @@ export class PigeonApiClient {
 
   public apiUrl(path: string): string {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
+  }
+
+  public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
+    return await this.http.request<{ id: string; owner: string | null }>(
+      '/node/',
+    );
+  }
+
+  public async getNodeNetworks(): Promise<{ id: string; name: string }[]> {
+    const result = await this.http.request<{
+      networks: { id: string; name: string }[];
+    }>('/node/networks/');
+
+    return result.networks;
   }
 
   public async createConversation(
@@ -142,6 +158,28 @@ export class PigeonApiClient {
     return await this.http.request<IdentityResource>(
       `/identities/${encodeURIComponent(identityId)}`,
     );
+  }
+
+  public async createNetwork(name: string): Promise<void> {
+    await this.http.request('/node/networks/', {
+      body: JSON.stringify({
+        id: UUID.generate().toString(),
+        key: PrivateKey.generate().toString(),
+        name,
+      }),
+      method: 'POST',
+    });
+  }
+
+  public async joinNetwork(
+    id: string,
+    name: string,
+    key: string,
+  ): Promise<void> {
+    await this.http.request('/node/networks/', {
+      body: JSON.stringify({ id, key, name }),
+      method: 'POST',
+    });
   }
 
   public async listConversations(

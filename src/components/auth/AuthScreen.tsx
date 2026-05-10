@@ -1,8 +1,9 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
+import { PigeonApiClient } from '../../domain/api/PigeonApiClient';
 import { login, register } from '../../domain/pigeonApi';
 import { cx } from '../../utils/classNameHelper';
 import { Field } from './Field';
@@ -24,13 +25,50 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [name, setName] = useState('');
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [availableNetworks, setAvailableNetworks] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedNetwork, setSelectedNetwork] = useState('');
+
+  useEffect(() => {
+    const fetchNetworks = async () => {
+      try {
+        const client = new PigeonApiClient();
+        const networks = await client.getNodeNetworks();
+        setAvailableNetworks(networks);
+
+        // If there are networks, pre-select the first one
+        if (networks.length > 0) {
+          setSelectedNetwork(networks[0].id);
+        }
+      } catch (err) {
+        console.error('Error fetching networks:', err);
+      }
+    };
+
+    fetchNetworks();
+  }, []);
+
+  useEffect(() => {
+    const savedCredentials = localStorage.getItem('pigeon-swarm-credentials');
+
+    if (savedCredentials) {
+      const { identityId, password } = JSON.parse(savedCredentials);
+      setIdentityId(identityId);
+      setPassword(password);
+      setRememberMe(true);
+    }
+  }, []);
 
   const canSubmit =
     mode === 'login'
       ? identityId.trim().length > 0 && password.length > 0
-      : name.trim().length > 0 && password.length > 0;
+      : name.trim().length > 0 &&
+        password.length > 0 &&
+        (availableNetworks.length === 0 || selectedNetwork !== '');
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -41,17 +79,42 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setError(null);
 
     try {
+      let networksToRegister: string[] = [];
+
+      if (mode === 'create') {
+        // For registration, use selected network or default to empty array
+        if (selectedNetwork) {
+          networksToRegister = [selectedNetwork];
+        } else if (availableNetworks.length === 0 && networks) {
+          // Fallback to comma-separated input if no networks available
+          networksToRegister = networks
+            .split(',')
+            .map((network) => network.trim())
+            .filter(Boolean);
+        } else if (availableNetworks.length === 0) {
+          // If no networks available and no comma-separated input, register with empty array
+          networksToRegister = [];
+        }
+      }
+
       const result =
         mode === 'login'
           ? await login(identityId, password)
-          : await register(
-              name,
-              password,
-              networks
-                .split(',')
-                .map((network) => network.trim())
-                .filter(Boolean),
-            );
+          : await register(name, password, networksToRegister);
+
+      // Handle "remember me" functionality
+      if (rememberMe && mode === 'login') {
+        localStorage.setItem(
+          'pigeon-swarm-credentials',
+          JSON.stringify({
+            identityId,
+            password,
+          }),
+        );
+      } else if (!rememberMe && mode === 'login') {
+        // Remove saved credentials if "remember me" is unchecked
+        localStorage.removeItem('pigeon-swarm-credentials');
+      }
 
       onAuthenticated(result.session, result.conversations);
     } catch (caught) {
@@ -165,14 +228,32 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                     autoComplete="name"
                   />
                 </Field>
-                <Field label="Networks, separados por coma">
-                  <input
-                    value={networks}
-                    onChange={(event) => setNetworks(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder="uuid-public, uuid-private"
-                  />
-                </Field>
+                {availableNetworks.length > 0 ? (
+                  <Field label="Network">
+                    <select
+                      value={selectedNetwork}
+                      onChange={(event) =>
+                        setSelectedNetwork(event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    >
+                      {availableNetworks.map((network) => (
+                        <option key={network.id} value={network.id}>
+                          {network.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Networks, separados por coma">
+                    <input
+                      value={networks}
+                      onChange={(event) => setNetworks(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                      placeholder="uuid-public, uuid-private"
+                    />
+                  </Field>
+                )}
               </>
             )}
 
@@ -195,6 +276,27 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               {error}
             </div>
           )}
+
+          <div className="mt-6 flex items-center">
+            <div
+              onClick={() => setRememberMe(!rememberMe)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full border border-white/10 transition-colors focus:outline-none ${
+                rememberMe ? 'bg-cyan-400/20' : 'bg-black/25'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  rememberMe ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </div>
+            <label
+              htmlFor="remember-me"
+              className="ml-2 block text-sm text-white/60"
+            >
+              Remember me
+            </label>
+          </div>
 
           <button
             disabled={!canSubmit || state === 'loading'}
