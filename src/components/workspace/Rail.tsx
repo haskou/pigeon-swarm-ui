@@ -1,6 +1,6 @@
 export function Rail() {
   return (
-    <aside className="hidden glass-panel rounded-[2rem] p-3 lg:flex lg:flex-col lg:items-center">
+    <aside className="glass-panel flex h-full items-center rounded-none px-4 py-2 sm:rounded-[2rem] lg:flex-col lg:items-center lg:p-3">
       <img
         src="/logo.png"
         alt="Pigeon Swarm"

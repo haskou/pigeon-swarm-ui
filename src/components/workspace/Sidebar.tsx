@@ -14,6 +14,7 @@ interface SidebarProps {
   nodeNetworks: NodeNetwork[];
   activeConversationId: string | null;
   onSelect: (id: string) => void;
+  onClose: () => void;
   onCreate: () => void;
   onLogout: () => void;
 }
@@ -22,6 +23,7 @@ export function Sidebar({
   activeConversationId,
   conversations,
   nodeNetworks,
+  onClose,
   onCreate,
   onLogout,
   onSelect,
@@ -63,6 +65,22 @@ export function Sidebar({
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+      <div className="mb-4 flex items-center justify-between lg:hidden">
+        <img
+          src="/logo.png"
+          alt="Pigeon Swarm"
+          className="h-11 w-11 rounded-2xl shadow-xl"
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={copy.workspace.closeSidebar}
+          className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
+        >
+          ×
+        </button>
+      </div>
+
       <button
         onClick={onCreate}
         className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
