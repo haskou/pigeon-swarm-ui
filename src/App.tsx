@@ -68,6 +68,7 @@ function App() {
       ) : (
         <GlassWorkspace
           session={session}
+          nodeNetworks={nodeNetworks.networks}
           setSession={setSession}
           conversations={conversations}
           setConversations={setConversations}

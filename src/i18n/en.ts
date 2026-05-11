@@ -46,6 +46,7 @@ export const copy = {
   connection: {
     body: 'The UI could not reach the local API. Check your connection and the status of your node server and retry.',
     endpointLabel: 'Endpoint',
+    imageAlt: 'Connection lost illustration',
     kicker: 'Connection lost',
     retry: 'Retry connection',
     title: 'No connection with the server',
@@ -113,7 +114,6 @@ export const copy = {
     logout: 'Log out',
     networks: 'Networks',
     noNetworks: 'No networks',
-    publicKey: 'Public key',
   },
   workspace: {
     closeSidebar: 'Close sidebar',

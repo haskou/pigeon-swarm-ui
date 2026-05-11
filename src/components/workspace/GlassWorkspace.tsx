@@ -5,6 +5,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -21,11 +22,13 @@ interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  nodeNetworks: NodeNetwork[];
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
 export function GlassWorkspace({
   conversations,
+  nodeNetworks,
   session,
   setConversations,
   setSession,
@@ -178,6 +181,7 @@ export function GlassWorkspace({
           <Sidebar
             session={session}
             conversations={conversations}
+            nodeNetworks={nodeNetworks}
             activeConversationId={activeConversation?.id ?? null}
             onSelect={(id) => {
               setActiveConversationId(id);

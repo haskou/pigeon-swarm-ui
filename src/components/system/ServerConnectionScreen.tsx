@@ -12,7 +12,12 @@ export function ServerConnectionScreen({
 }: ServerConnectionScreenProps) {
   return (
     <section className="relative z-10 grid min-h-screen place-items-center px-4 py-8">
-      <div className="glass-panel-strong w-full max-w-2xl rounded-[2.5rem] p-6 text-center sm:p-8">
+      <div className="glass-panel-strong w-full max-w-2xl overflow-hidden rounded-[2.5rem] p-6 text-center sm:p-8">
+        <img
+          src="/connectionLost.png"
+          alt={copy.connection.imageAlt}
+          className="mx-auto mb-6 aspect-[16/10] w-full max-w-md rounded-[2rem] border border-white/10 object-cover shadow-2xl shadow-indigo-950/40"
+        />
         <img
           src="/logo.png"
           alt="Pigeon Swarm"

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -10,6 +11,7 @@ import { SectionTitle } from '../common/SectionTitle';
 interface SidebarProps {
   session: Session;
   conversations: ConversationResource[];
+  nodeNetworks: NodeNetwork[];
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -19,6 +21,7 @@ interface SidebarProps {
 export function Sidebar({
   activeConversationId,
   conversations,
+  nodeNetworks,
   onCreate,
   onLogout,
   onSelect,
@@ -26,8 +29,11 @@ export function Sidebar({
 }: SidebarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
-  const networks = session.identity.networks;
-  const publicKey = session.identity.encryptedKeyPair.publicKey;
+  const networkNames = session.identity.networks.map(
+    (networkId) =>
+      nodeNetworks.find((network) => network.id === networkId)?.name ??
+      shortId(networkId),
+  );
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -40,107 +46,9 @@ export function Sidebar({
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-[2rem] p-4">
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setProfileOpen((isOpen) => !isOpen)}
-          className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
-          aria-expanded={profileOpen}
-        >
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-lg font-black text-slate-950">
-            {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-black">
-              {session.identity.profile.name}
-            </div>
-            <div className="truncate text-xs text-white/50">
-              {shortId(session.identity.id)}
-            </div>
-          </div>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            className={cx(
-              'h-5 w-5 shrink-0 text-white/45 transition-transform',
-              profileOpen && 'rotate-180',
-            )}
-          >
-            <path
-              d="M5 8l5 5 5-5"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-        </button>
-
-        {profileOpen && (
-          <div className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-base font-black text-slate-950">
-                {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate font-black">
-                  {session.identity.profile.name}
-                </div>
-                <div className="text-xs text-white/45">
-                  v{session.identity.version}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-3 text-xs">
-              <div>
-                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.profile.identityId}
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
-                  <span className="min-w-0 flex-1 truncate text-white/70">
-                    {session.identity.id}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyIdentityId}
-                    className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
-                  >
-                    {identityCopied ? copy.profile.copied : copy.profile.copy}
-                  </button>
-                </div>
-              </div>
-
-              <ProfileDetail label={copy.profile.publicKey} value={publicKey} />
-              <ProfileDetail
-                label={copy.profile.networks}
-                value={
-                  networks.length > 0
-                    ? networks.map((network) => shortId(network)).join(', ')
-                    : copy.profile.noNetworks
-                }
-              />
-              <ProfileDetail
-                label={copy.profile.keychainVersion}
-                value={`v${session.keychain.version}`}
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
-            >
-              {copy.profile.logout}
-            </button>
-          </div>
-        )}
-      </div>
-
       <button
         onClick={onCreate}
-        className="glass-button mt-4 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
+        className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
         {copy.sidebar.createConversation}
       </button>
@@ -200,6 +108,103 @@ export function Sidebar({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="relative mt-4">
+        <button
+          type="button"
+          onClick={() => setProfileOpen((isOpen) => !isOpen)}
+          className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+          aria-expanded={profileOpen}
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-lg font-black text-slate-950">
+            {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-black">
+              {session.identity.profile.name}
+            </div>
+            <div className="truncate text-xs text-white/50">
+              {shortId(session.identity.id)}
+            </div>
+          </div>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className={cx(
+              'h-5 w-5 shrink-0 text-white/45 transition-transform',
+              profileOpen && 'rotate-180',
+            )}
+          >
+            <path
+              d="M5 8l5 5 5-5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          </svg>
+        </button>
+
+        {profileOpen && (
+          <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-base font-black text-slate-950">
+                {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate font-black">
+                  {session.identity.profile.name}
+                </div>
+                <div className="text-xs text-white/45">
+                  v{session.identity.version}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3 text-xs">
+              <div>
+                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.profile.identityId}
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
+                  <span className="min-w-0 flex-1 truncate text-white/70">
+                    {session.identity.id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyIdentityId}
+                    className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  >
+                    {identityCopied ? copy.profile.copied : copy.profile.copy}
+                  </button>
+                </div>
+              </div>
+
+              <ProfileDetail
+                label={copy.profile.networks}
+                value={
+                  networkNames.length > 0
+                    ? networkNames.join(', ')
+                    : copy.profile.noNetworks
+                }
+              />
+              <ProfileDetail
+                label={copy.profile.keychainVersion}
+                value={`v${session.keychain.version}`}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
+            >
+              {copy.profile.logout}
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
