@@ -16,18 +16,11 @@ export function ServerConnectionScreen({
         <img
           src="/connectionLost.png"
           alt={copy.connection.imageAlt}
-          className="mx-auto mb-6 aspect-[16/10] w-full max-w-md rounded-[2rem] border border-white/10 object-cover shadow-2xl shadow-indigo-950/40"
+          className="mx-auto mb-6 aspect-[16/10] w-full max-w-md"
         />
-        <img
-          src="/logo.png"
-          alt="Pigeon Swarm"
-          className="mx-auto h-20 w-20 rounded-[1.75rem] border border-white/15 shadow-2xl shadow-indigo-950/40"
-        />
-        <p className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-cyan-200/70">
-          {copy.connection.kicker}
-        </p>
+
         <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-          {copy.connection.title}
+          {copy.connection.kicker}
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/65">
           {copy.connection.body}
