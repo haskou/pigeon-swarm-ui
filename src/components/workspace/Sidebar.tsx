@@ -65,12 +65,7 @@ export function Sidebar({
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
-      <div className="mb-4 flex items-center justify-between lg:hidden">
-        <img
-          src="/logo.png"
-          alt="Pigeon Swarm"
-          className="h-11 w-11 rounded-2xl shadow-xl"
-        />
+      <div className="mb-4 flex items-center justify-end lg:hidden">
         <button
           type="button"
           onClick={onClose}

@@ -1,6 +1,17 @@
-export function Rail() {
+import { cx } from '../../utils/classNameHelper';
+
+interface RailProps {
+  className?: string;
+}
+
+export function Rail({ className }: RailProps) {
   return (
-    <aside className="glass-panel flex h-full items-center rounded-none px-4 py-2 sm:rounded-[2rem] lg:flex-col lg:items-center lg:p-3">
+    <aside
+      className={cx(
+        'glass-panel flex h-full flex-col items-center rounded-none p-3 sm:rounded-[2rem]',
+        className,
+      )}
+    >
       <img
         src="/logo.png"
         alt="Pigeon Swarm"
