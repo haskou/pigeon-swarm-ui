@@ -38,6 +38,13 @@ export const copy = {
     noConversationHint: 'Create a conversation to start',
     you: 'You',
   },
+  attachments: {
+    closeViewer: 'Close image viewer',
+    download: 'Download attachment',
+    nextImage: 'Next image',
+    openImage: 'Open image',
+    previousImage: 'Previous image',
+  },
   composer: {
     attach: 'Attach files',
     attachmentDownloadError: 'The attachment could not be decrypted.',
