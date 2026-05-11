@@ -71,16 +71,6 @@ export function Inspector({
           {copy.inspector.eventsProjectedLocally}
         </div>
       </div>
-
-      <SectionTitle title={copy.inspector.future} className="mt-6" />
-      <div className="space-y-2 text-sm text-white/55">
-        <div className="rounded-2xl bg-white/8 p-3">
-          {copy.inspector.communitiesFuture}
-        </div>
-        <div className="rounded-2xl bg-white/8 p-3">
-          {copy.inspector.voiceFuture}
-        </div>
-      </div>
     </aside>
   );
 }

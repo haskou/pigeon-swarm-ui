@@ -167,7 +167,7 @@ export function GlassWorkspace({
   return (
     <section className="relative z-10 min-h-screen pt-3 sm:pt-4">
       <div className="mx-auto grid h-[calc(100vh-.75rem)] max-w-[1800px] grid-cols-1 gap-3 px-3 pb-3 sm:h-[calc(100vh-1rem)] sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
-        <Rail onLogout={() => setSession(null)} />
+        <Rail />
 
         <div
           className={cx(
@@ -184,6 +184,7 @@ export function GlassWorkspace({
               setSidebarOpen(false);
             }}
             onCreate={() => setIsCreateOpen(true)}
+            onLogout={() => setSession(null)}
           />
         </div>
 

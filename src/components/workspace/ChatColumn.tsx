@@ -66,12 +66,6 @@ export function ChatColumn({
                 : copy.chat.noConversationHint}
             </div>
           </div>
-          <button
-            onClick={onCreate}
-            className="hidden rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 sm:block"
-          >
-            {copy.chat.newOneToOne}
-          </button>
         </div>
       </header>
 

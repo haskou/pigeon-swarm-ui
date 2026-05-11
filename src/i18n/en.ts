@@ -24,12 +24,55 @@ export const copy = {
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
+  chat: {
+    createConversation: 'New conversation',
+    emptyBody:
+      'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
+    emptyMessages:
+      'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
+    emptyTitle: 'No conversations',
+    loadingEvents: 'Loading events...',
+    menu: 'Open sidebar',
+    noConversation: 'No conversation',
+    noConversationHint: 'Create a conversation to start',
+    subtitleKeychain: 'keychain local',
+    you: 'You',
+  },
+  composer: {
+    placeholder: 'Write, encrypt, sign, and push to the swarm...',
+    send: 'Send',
+    sending: 'Sending',
+  },
   connection: {
     body: 'The UI could not reach the local API. Check your connection and the status of your node server and retry.',
     endpointLabel: 'Endpoint',
     kicker: 'Connection lost',
     retry: 'Retry connection',
     title: 'No connection with the server',
+  },
+  dialog: {
+    cancel: 'Cancel',
+    close: 'Close dialog',
+    createConversation: 'Create conversation',
+    createConversationBody:
+      'Enter the remote identity ID. The client resolves that identity, creates the conversation, generates a conversation keypair, and stores the private key in your encrypted keychain.',
+    createConversationError:
+      'The conversation could not be created. The backend chose violence.',
+    createConversationLoading: 'Creating and publishing keychain...',
+    createConversationTitle: 'Create 1to1 conversation',
+    remoteIdentityId: 'Remote identity ID',
+  },
+  inspector: {
+    conversationKeychain: 'Conversation keychain',
+    eventsProjectedLocally: 'events projected locally',
+    identity: 'Identity',
+    keychainVersion: 'Keychain version',
+    loadedMessages: 'Loaded messages',
+    missing: 'missing',
+    nets: 'nets',
+    present: 'present',
+    privateKey: 'Private key',
+    storedOneToOneKeys: 'Stored 1to1 keys',
   },
   network: {
     create: 'Create network',
@@ -56,71 +99,27 @@ export const copy = {
     title: 'Network configuration',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
-  workspace: {
-    closeSidebar: 'Close sidebar',
-    loadOlderError: 'Older messages could not be loaded.',
-    loadMessagesError:
-      'Messages could not be loaded. Great, now we have a mystery.',
-    logout: 'Out',
-    rails: ['PS', '1:1', 'VO', 'ID', 'KC'],
-    sendError: 'The message was not sent. TLS had other plans.',
-  },
   sidebar: {
-    communitiesTitle: 'Communities',
-    createConversation: '+ Create 1to1 conversation',
+    createConversation: 'New conversation',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
-    privateNetworksSubtitle: 'future · channels',
-    privateNetworksTitle: 'Private networks',
-    publicSwarmSubtitle: 'future · communities',
-    publicSwarmTitle: 'Public Swarm',
     oneToOneTitle: '1to1 messages',
   },
-  chat: {
-    createConversation: 'Create conversation',
-    emptyBody:
-      'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
-    emptyMessages:
-      'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
-    emptyTitle: 'No conversations',
-    loadingEvents: 'Loading events...',
-    menu: 'Open sidebar',
-    newOneToOne: 'New 1to1',
-    noConversation: 'No conversation',
-    noConversationHint: 'Create a conversation to start',
-    subtitleKeychain: 'keychain local',
-    you: 'You',
+  profile: {
+    copied: 'Copied',
+    copy: 'Copy',
+    identityId: 'Identity ID',
+    keychainVersion: 'Keychain',
+    logout: 'Log out',
+    networks: 'Networks',
+    noNetworks: 'No networks',
+    publicKey: 'Public key',
   },
-  composer: {
-    placeholder: 'Write, encrypt, sign, and push to the swarm...',
-    send: 'Send',
-    sending: 'Sending',
-  },
-  dialog: {
-    cancel: 'Cancel',
-    close: 'Close dialog',
-    createConversation: 'Create conversation',
-    createConversationBody:
-      'Enter the remote identity ID. The client resolves that identity, creates the conversation, generates a conversation keypair, and stores the private key in your encrypted keychain.',
-    createConversationLoading: 'Creating and publishing keychain...',
-    createConversationTitle: 'Create 1to1 conversation',
-    createConversationError:
-      'The conversation could not be created. The backend chose violence.',
-    remoteIdentityId: 'Remote identity ID',
-  },
-  inspector: {
-    communitiesFuture: 'Communities: same sidebar slot, disabled for now.',
-    conversationKeychain: 'Conversation keychain',
-    eventsProjectedLocally: 'events projected locally',
-    future: 'Future',
-    identity: 'Identity',
-    keychainVersion: 'Keychain version',
-    loadedMessages: 'Loaded messages',
-    missing: 'missing',
-    nets: 'nets',
-    present: 'present',
-    privateKey: 'Private key',
-    storedOneToOneKeys: 'Stored 1to1 keys',
-    voiceFuture: 'Voice: channel model already has a home in the rail.',
+  workspace: {
+    closeSidebar: 'Close sidebar',
+    loadMessagesError:
+      'Messages could not be loaded. Great, now we have a mystery.',
+    loadOlderError: 'Older messages could not be loaded.',
+    sendError: 'The message was not sent. TLS had other plans.',
   },
 } as const;
