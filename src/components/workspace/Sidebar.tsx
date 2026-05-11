@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -29,6 +29,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const networkNames = session.identity.networks.map(
     (networkId) =>
       nodeNetworks.find((network) => network.id === networkId)?.name ??
@@ -43,6 +44,22 @@ export function Sidebar({
     setIdentityCopied(true);
     window.setTimeout(() => setIdentityCopied(false), 1800);
   };
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
+    };
+  }, [profileOpen]);
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-[2rem] p-4">
@@ -110,7 +127,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="relative mt-4">
+      <div ref={profileRef} className="relative mt-4">
         <button
           type="button"
           onClick={() => setProfileOpen((isOpen) => !isOpen)}

@@ -1,5 +1,3 @@
-import { StringValueObject } from '@haskou/value-objects';
-
 import type { Session } from '../../domain/types';
 
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
@@ -22,8 +20,8 @@ export class RequestSigner {
     const timestamp = `${this.clock()}`;
     const nonce = this.nonceFactory();
     const signature = await session.encryptedKeyPair.sign(
-      new StringValueObject(this.payload(method, path, timestamp, nonce, body)),
-      new StringValueObject(session.password),
+      this.payload(method, path, timestamp, nonce, body),
+      session.password,
     );
 
     return {

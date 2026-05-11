@@ -311,27 +311,23 @@ export class PigeonApiGateway {
     }
 
     const timestamp = Date.now();
-    const encryptedPayload = PublicKey.fromPEM(key.publicKey)
-      .encrypt(
-        new StringValueObject(
-          JSON.stringify({
-            authorIdentityId: session.identity.id,
-            content,
-            conversationId,
-            timestamp,
-            type: 'MessageSent',
-          }),
-        ),
-      )
-      .toString();
+    const encryptedPayload = PublicKey.fromPEM(key.publicKey).encrypt(
+      JSON.stringify({
+        authorIdentityId: session.identity.id,
+        content,
+        conversationId,
+        timestamp,
+        type: 'MessageSent',
+      }),
+    );
     const signature = await session.encryptedKeyPair.sign(
-      new StringValueObject(encryptedPayload),
-      new StringValueObject(session.password),
+      encryptedPayload.toString(),
+      session.password,
     );
     const body = {
       attachmentExternalIdentifiers: [],
       createdAt: timestamp,
-      encryptedPayload,
+      encryptedPayload: encryptedPayload.toString(),
       id: `${conversationId}:${timestamp}:${crypto.randomUUID()}`,
       signature: signature.toString(),
     };
