@@ -75,6 +75,8 @@ export const copy = {
   },
   messages: {
     decryptFailed: '[encrypted] This event could not be decrypted.',
+    missingConversationKey:
+      'This conversation key is missing from the local keychain.',
     missingKey:
       '[encrypted] This conversation key is missing from the local keychain.',
   },

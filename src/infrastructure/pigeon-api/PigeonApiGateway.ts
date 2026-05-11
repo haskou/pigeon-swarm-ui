@@ -335,9 +335,7 @@ export class PigeonApiGateway {
     const key = session.keychain.conversations[conversationId];
 
     if (!key) {
-      throw new Error(
-        'No hay clave privada de conversación en el keychain. Drama criptográfico, el peor tipo de drama.',
-      );
+      throw new Error(copy.messages.missingConversationKey);
     }
 
     const timestamp = Date.now();
