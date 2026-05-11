@@ -17,7 +17,14 @@ type PlainMessage = {
   timestamp?: number;
 };
 
+export type MessageProjectionCopy = {
+  decryptFailed: string;
+  missingKey: string;
+};
+
 export class MessageProjector {
+  public constructor(private readonly copy: MessageProjectionCopy) {}
+
   public list(value: unknown): {
     messages: MessageResource[];
     nextCursor?: null | string;
@@ -115,9 +122,7 @@ export class MessageProjector {
     reason: 'decrypt-failed' | 'missing-key',
   ): ChatMessage {
     const content =
-      reason === 'missing-key'
-        ? '[encrypted] Falta la clave privada de esta conversación en el keychain.'
-        : '[encrypted] No se ha podido desencriptar este evento. Qué sorpresa, la criptografía exige llaves correctas.';
+      reason === 'missing-key' ? this.copy.missingKey : this.copy.decryptFailed;
 
     return { ...base, content, encrypted: true, raw: message };
   }

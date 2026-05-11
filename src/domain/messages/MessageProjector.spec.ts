@@ -2,6 +2,11 @@ import type { Session } from '../types';
 
 import { MessageProjector } from './MessageProjector';
 
+const projectorCopy = {
+  decryptFailed: '[encrypted] decrypt failed',
+  missingKey: '[encrypted] missing key',
+};
+
 const session = {
   encryptedKeyPair: {},
   identity: {
@@ -25,7 +30,7 @@ const session = {
 
 describe(MessageProjector.name, () => {
   it('normalizes message envelopes and cursors', () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     expect(
       projector.list({
@@ -39,7 +44,7 @@ describe(MessageProjector.name, () => {
   });
 
   it('projects plain messages without requiring a keychain entry', async () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     await expect(
       projector.toChatMessage(session, 'conversation-1', {
@@ -56,7 +61,7 @@ describe(MessageProjector.name, () => {
   });
 
   it('returns a readable encrypted placeholder when the key is missing', async () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     await expect(
       projector.toChatMessage(session, 'conversation-1', {
@@ -66,6 +71,7 @@ describe(MessageProjector.name, () => {
         timestamp: 20,
       }),
     ).resolves.toMatchObject({
+      content: projectorCopy.missingKey,
       encrypted: true,
       mine: false,
     });

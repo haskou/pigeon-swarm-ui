@@ -27,6 +27,7 @@ import { ConversationIdFactory } from '../../domain/conversations/ConversationId
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
+import { copy } from '../../i18n/en';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { ConversationMapper } from './ConversationMapper';
@@ -58,7 +59,7 @@ export class PigeonApiGateway {
     ),
     signer: RequestSigner = new RequestSigner(),
     conversations: ConversationMapper = new ConversationMapper(),
-    messages: MessageProjector = new MessageProjector(),
+    messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),
     ids: ConversationIdFactory = new ConversationIdFactory(),
   ) {

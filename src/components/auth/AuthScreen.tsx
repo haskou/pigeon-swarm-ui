@@ -101,11 +101,12 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               networksToRegister,
             );
 
-      // Handle "remember me" functionality
-      if (rememberMe && mode === 'login') {
-        saveCredentials({ identityId, password });
-      } else if (!rememberMe && mode === 'login') {
-        // Remove saved credentials if "remember me" is unchecked
+      if (rememberMe) {
+        saveCredentials({
+          identityId: result.session.identity.id,
+          password,
+        });
+      } else {
         clearSavedCredentials();
       }
 

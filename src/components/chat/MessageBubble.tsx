@@ -2,15 +2,17 @@ import type { ChatMessage } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { formatTime, shortId } from '../../utils/formatting';
+import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   currentIdentityId: string;
+  authorName: string;
 }
 
 export function MessageBubble({
+  authorName,
   currentIdentityId,
   message,
 }: MessageBubbleProps) {
@@ -18,7 +20,7 @@ export function MessageBubble({
 
   return (
     <div className={cx('flex gap-3', mine && 'justify-end')}>
-      {!mine && <Avatar label={message.authorIdentityId} />}
+      {!mine && <Avatar label={authorName} />}
       <div
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
@@ -29,7 +31,7 @@ export function MessageBubble({
       >
         <div className="mb-1 flex items-center justify-between gap-4 text-xs font-black opacity-75">
           <span>
-            {mine ? copy.chat.you : shortId(message.authorIdentityId)}
+            {mine ? copy.chat.you : authorName}
           </span>
           <span>{formatTime(message.timestamp)}</span>
         </div>
@@ -37,7 +39,7 @@ export function MessageBubble({
           {message.content}
         </p>
       </div>
-      {mine && <Avatar label={copy.chat.you} mine />}
+      {mine && <Avatar label={authorName || copy.chat.you} mine />}
     </div>
   );
 }
