@@ -64,6 +64,14 @@ export function Sidebar({
     session.identity.id,
     identityNames,
   );
+  const ownProfileName =
+    session.identity.profile.name.trim() ||
+    (session.identity.profile.handle?.trim()
+      ? `@${session.identity.profile.handle.trim()}`
+      : ownDisplayName);
+  const ownProfileHandle = session.identity.profile.handle?.trim()
+    ? `@${session.identity.profile.handle.trim()}`
+    : shortId(session.identity.id);
   const ownPicture =
     session.identity.profile.picture ?? identityPictures[session.identity.id];
   const conversationPeerId = (conversation: ConversationResource) =>
@@ -229,9 +237,9 @@ export function Sidebar({
             size="lg"
           />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-black">{ownDisplayName}</div>
+            <div className="truncate font-black">{ownProfileName}</div>
             <div className="truncate text-xs text-white/50">
-              {shortId(session.identity.id)}
+              {ownProfileHandle}
             </div>
           </div>
           <svg
@@ -258,10 +266,9 @@ export function Sidebar({
             <div className="flex items-center gap-3 border-b border-white/10 pb-3">
               <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
               <div className="min-w-0">
-                <div className="truncate font-black">{ownDisplayName}</div>
-                <div className="text-xs text-white/45">
-                  {session.identity.profile.handle ||
-                    shortId(session.identity.id)}
+                <div className="truncate font-black">{ownProfileName}</div>
+                <div className="truncate text-xs text-white/45">
+                  {ownProfileHandle}
                 </div>
               </div>
             </div>

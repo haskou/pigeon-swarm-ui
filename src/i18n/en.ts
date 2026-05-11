@@ -6,7 +6,7 @@ export const copy = {
     apiLabel: 'API',
     createIdentity: 'Create identity',
     fallbackNetworksLabel: 'Networks, comma-separated',
-    handleLabel: 'Handle',
+    handleLabel: 'username',
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
@@ -139,7 +139,7 @@ export const copy = {
     logout: 'Log out',
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
-    name: 'Name',
+    name: 'Profile name',
     networks: 'Networks',
     noBiography: 'No bio',
     noNetworks: 'No networks',
@@ -152,7 +152,7 @@ export const copy = {
     createConversation: 'New conversation',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
-    oneToOneTitle: '1to1 messages',
+    oneToOneTitle: 'Direct messages',
   },
   workspace: {
     closeSidebar: 'Close sidebar',
