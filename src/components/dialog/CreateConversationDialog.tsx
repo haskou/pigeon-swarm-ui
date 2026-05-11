@@ -59,10 +59,10 @@ export function CreateConversationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong w-full max-w-xl rounded-[2rem] p-5 sm:p-6"
+        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-[2rem] sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

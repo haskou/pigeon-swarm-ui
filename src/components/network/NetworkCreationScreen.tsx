@@ -47,7 +47,7 @@ export function NetworkCreationScreen({
   };
 
   return (
-    <section className="relative z-10 grid min-h-screen place-items-center px-4 py-8">
+    <section className="relative z-10 grid min-h-screen place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
           <div className="glass-panel-strong rounded-[2.5rem] p-8">
@@ -81,7 +81,7 @@ export function NetworkCreationScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong rounded-[2.5rem] p-5 sm:p-7"
+          className="glass-panel-strong min-h-screen rounded-none p-5 sm:min-h-0 sm:rounded-[2.5rem] sm:p-7"
         >
           <div className="flex items-center gap-3">
             <img

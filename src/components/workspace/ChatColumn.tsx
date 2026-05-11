@@ -39,7 +39,7 @@ export function ChatColumn({
   session,
 }: ChatColumnProps) {
   return (
-    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-[2rem]">
+    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
       <header className="border-b border-white/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <button

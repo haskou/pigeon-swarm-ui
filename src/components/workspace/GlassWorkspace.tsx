@@ -168,13 +168,13 @@ export function GlassWorkspace({
   };
 
   return (
-    <section className="relative z-10 min-h-screen pt-3 sm:pt-4">
-      <div className="mx-auto grid h-[calc(100vh-.75rem)] max-w-[1800px] grid-cols-1 gap-3 px-3 pb-3 sm:h-[calc(100vh-1rem)] sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+    <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
+      <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail />
 
         <div
           className={cx(
-            'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[360px] translate-x-0 p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+            'fixed inset-y-0 left-0 z-40 w-full max-w-none translate-x-0 p-0 transition sm:w-[86vw] sm:max-w-[360px] sm:p-3 lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
             sidebarOpen ? 'block' : 'hidden lg:block',
           )}
         >

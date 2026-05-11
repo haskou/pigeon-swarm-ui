@@ -62,7 +62,7 @@ export function Sidebar({
   }, [profileOpen]);
 
   return (
-    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-[2rem] p-4">
+    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
       <button
         onClick={onCreate}
         className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
