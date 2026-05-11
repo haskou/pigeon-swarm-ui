@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
+  AttachmentProgress,
   ChatMessage,
   ConversationResource,
   IdentityResource,
@@ -41,6 +42,7 @@ interface ChatColumnProps {
   onSend: (content: string, attachments: File[]) => Promise<void>;
   onOpenSidebar: () => void;
   onCreate: () => void;
+  progress?: AttachmentProgress | null;
 }
 
 export function ChatColumn({
@@ -62,6 +64,7 @@ export function ChatColumn({
   scrollerRef,
   sendError,
   session,
+  progress,
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     identity?: IdentityResource;
@@ -104,15 +107,32 @@ export function ChatColumn({
       picture: identityPictures[message.authorIdentityId],
     });
   };
+  const loadAttachmentPreview = useCallback(
+    async (
+      attachment: MessageAttachment,
+      onProgress?: (progress: AttachmentProgress) => void,
+    ): Promise<string> => {
+      const blob = await pigeonApplication.downloadAttachment(
+        attachment,
+        onProgress,
+      );
+
+      return URL.createObjectURL(blob);
+    },
+    [],
+  );
   const openAttachment = async (attachment?: MessageAttachment) => {
     if (!attachment) return;
 
     setAttachmentError(null);
     try {
-      const blob = await pigeonApplication.downloadAttachment(attachment);
-      const url = URL.createObjectURL(blob);
+      const url = await loadAttachmentPreview(
+        attachment,
+        setAttachmentErrorProgress,
+      );
       const link = document.createElement('a');
 
+      setAttachmentError(null);
       link.href = url;
       link.download = attachment.filename;
       link.click();
@@ -120,6 +140,11 @@ export function ChatColumn({
     } catch {
       setAttachmentError(copy.composer.attachmentDownloadError);
     }
+  };
+  const setAttachmentErrorProgress = (nextProgress: AttachmentProgress) => {
+    setAttachmentError(
+      `${copy.composer.decryptingAttachment} ${nextProgress.filename} ${nextProgress.percent}%`,
+    );
   };
 
   return (
@@ -234,6 +259,7 @@ export function ChatColumn({
                     onAttachmentOpen={(attachmentIndex) =>
                       void openAttachment(message.attachments[attachmentIndex])
                     }
+                    onAttachmentPreview={loadAttachmentPreview}
                     onAvatarClick={() => openMessageAuthorProfile(message)}
                     showAvatar={showAvatar}
                   />
@@ -252,6 +278,7 @@ export function ChatColumn({
             disabled={messageState === 'loading' || !hasConversationKey}
             error={sendError ?? attachmentError}
             onSend={onSend}
+            progress={progress}
             placeholder={
               hasConversationKey
                 ? copy.composer.placeholder

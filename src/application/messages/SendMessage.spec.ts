@@ -21,6 +21,7 @@ describe(SendMessage.name, () => {
       'hello',
       ['previous'],
       [],
+      undefined,
     );
   });
 
@@ -42,6 +43,7 @@ describe(SendMessage.name, () => {
       'hello',
       [],
       [file],
+      undefined,
     );
   });
 });

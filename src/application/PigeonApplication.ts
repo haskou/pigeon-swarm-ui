@@ -1,6 +1,7 @@
 import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
+  AttachmentProgress,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
@@ -148,8 +149,9 @@ export class PigeonApplication {
 
   public async downloadAttachment(
     attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    return await this.gateway.downloadAttachment(attachment);
+    return await this.gateway.downloadAttachment(attachment, onProgress);
   }
 
   public async updateIdentityProfile(
@@ -221,6 +223,7 @@ export class PigeonApplication {
     content: string,
     previousMessageIds: string[] = [],
     attachments: File[] = [],
+    onAttachmentProgress?: (progress: AttachmentProgress) => void,
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
@@ -228,6 +231,7 @@ export class PigeonApplication {
       content,
       previousMessageIds,
       attachments,
+      onAttachmentProgress,
     );
   }
 

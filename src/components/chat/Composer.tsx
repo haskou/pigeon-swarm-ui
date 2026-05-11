@@ -1,4 +1,6 @@
-import { ChangeEvent, FormEvent, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+
+import type { AttachmentProgress } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -11,6 +13,7 @@ interface ComposerProps {
   error: string | null;
   onSend: (content: string, attachments: File[]) => Promise<void>;
   placeholder?: string;
+  progress?: AttachmentProgress | null;
 }
 
 export function Composer({
@@ -18,17 +21,34 @@ export function Composer({
   error,
   onSend,
   placeholder = copy.composer.placeholder,
+  progress,
 }: ComposerProps) {
   const [content, setContent] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<
+    { file: File; previewUrl: string }[]
+  >([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const attachmentsRef = useRef(attachments);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canSend =
     (content.trim().length > 0 || attachments.length > 0) &&
     content.trim().length <= MESSAGE_MAX_LENGTH &&
     !disabled &&
     !sending;
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(
+    () => () => {
+      attachmentsRef.current.forEach((attachment) =>
+        URL.revokeObjectURL(attachment.previewUrl),
+      );
+    },
+    [],
+  );
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -38,8 +58,14 @@ export function Composer({
 
     setSending(true);
     try {
-      await onSend(trimmed, attachments);
+      await onSend(
+        trimmed,
+        attachments.map((attachment) => attachment.file),
+      );
       setContent('');
+      attachments.forEach((attachment) =>
+        URL.revokeObjectURL(attachment.previewUrl),
+      );
       setAttachments([]);
       setAttachmentError(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -59,13 +85,26 @@ export function Composer({
         ? null
         : copy.composer.attachmentTooLarge,
     );
-    setAttachments((current) => [...current, ...acceptedFiles]);
+    setAttachments((current) => [
+      ...current,
+      ...acceptedFiles.map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })),
+    ]);
     event.target.value = '';
   };
 
   const removeAttachment = (indexToRemove: number) => {
     setAttachments((current) =>
-      current.filter((_, index) => index !== indexToRemove),
+      current.filter((attachment, index) => {
+        if (index === indexToRemove) {
+          URL.revokeObjectURL(attachment.previewUrl);
+          return false;
+        }
+
+        return true;
+      }),
     );
   };
 
@@ -83,24 +122,46 @@ export function Composer({
         <div className="mb-3 flex flex-wrap gap-2">
           {attachments.map((attachment, index) => (
             <div
-              key={`${attachment.name}-${attachment.size}-${index}`}
-              className="flex max-w-full items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70"
+              key={`${attachment.file.name}-${attachment.file.size}-${index}`}
+              className="max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 text-xs text-white/70"
             >
-              <span className="truncate">{attachment.name}</span>
-              <span className="shrink-0 text-white/35">
-                {formatFileSize(attachment.size)}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeAttachment(index)}
-                disabled={disabled || sending}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
-                aria-label={copy.composer.removeAttachment}
-              >
-                ×
-              </button>
+              <AttachmentPreview file={attachment.file} url={attachment.previewUrl} />
+              <div className="flex max-w-56 items-center gap-2 px-3 py-2">
+                <span className="truncate">{attachment.file.name}</span>
+                <span className="shrink-0 text-white/35">
+                  {formatFileSize(attachment.file.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  disabled={disabled || sending}
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+                  aria-label={copy.composer.removeAttachment}
+                >
+                  ×
+                </button>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+      {progress && (
+        <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs text-white/70">
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate">
+              {progress.phase === 'encrypt'
+                ? copy.composer.encryptingAttachment
+                : copy.composer.decryptingAttachment}{' '}
+              {progress.filename}
+            </span>
+            <span className="shrink-0 font-black">{progress.percent}%</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-fuchsia-400"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
         </div>
       )}
       <div
@@ -145,6 +206,29 @@ export function Composer({
       </div>
     </form>
   );
+}
+
+function AttachmentPreview({ file, url }: { file: File; url: string }) {
+  if (file.type.startsWith('image/')) {
+    return <img src={url} alt="" className="h-28 w-56 object-cover" />;
+  }
+
+  if (file.type.startsWith('video/')) {
+    return (
+      <video
+        src={url}
+        className="h-28 w-56 object-cover"
+        controls
+        muted
+      />
+    );
+  }
+
+  if (file.type.startsWith('audio/')) {
+    return <audio src={url} className="w-56 p-2" controls />;
+  }
+
+  return null;
 }
 
 function formatFileSize(bytes: number): string {

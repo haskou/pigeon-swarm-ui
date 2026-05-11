@@ -1,4 +1,10 @@
-import type { ChatMessage } from '../../domain/types';
+import { useEffect, useState } from 'react';
+
+import type {
+  AttachmentProgress,
+  ChatMessage,
+  MessageAttachment,
+} from '../../domain/types';
 
 import { cx } from '../../utils/classNameHelper';
 import { formatTime } from '../../utils/formatting';
@@ -9,6 +15,10 @@ interface MessageBubbleProps {
   currentIdentityId: string;
   authorName: string;
   authorPicture?: string | null;
+  onAttachmentPreview: (
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: () => void;
   showAvatar: boolean;
@@ -19,6 +29,7 @@ export function MessageBubble({
   authorPicture,
   currentIdentityId,
   message,
+  onAttachmentPreview,
   onAttachmentOpen,
   onAvatarClick,
   showAvatar,
@@ -59,29 +70,13 @@ export function MessageBubble({
         {message.attachments.length > 0 && (
           <div className={cx(message.content && 'mt-3', 'grid gap-2')}>
             {message.attachments.map((attachment, index) => (
-              <button
+              <AttachmentCard
+                attachment={attachment}
                 key={`${message.id}-${attachment.cid}`}
-                type="button"
+                mine={mine}
+                onPreview={onAttachmentPreview}
                 onClick={() => onAttachmentOpen(index)}
-                className={cx(
-                  'flex max-w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition',
-                  mine
-                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                    : 'border-white/10 bg-white/8 hover:bg-white/12',
-                )}
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/20 font-black">
-                  ↓
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-black">
-                    {attachment.filename}
-                  </span>
-                  <span className="block text-xs opacity-65">
-                    {formatFileSize(attachment.size)}
-                  </span>
-                </span>
-              </button>
+              />
             ))}
           </div>
         )}
@@ -107,6 +102,106 @@ export function MessageBubble({
         ) : (
           <div className="w-11 shrink-0" />
         ))}
+    </div>
+  );
+}
+
+function AttachmentCard({
+  attachment,
+  mine,
+  onClick,
+  onPreview,
+}: {
+  attachment: MessageAttachment;
+  mine: boolean;
+  onClick: () => void;
+  onPreview: (
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ) => Promise<string>;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState<AttachmentProgress | null>(null);
+  const isMedia =
+    attachment.contentType.startsWith('image/') ||
+    attachment.contentType.startsWith('video/') ||
+    attachment.contentType.startsWith('audio/');
+
+  useEffect(() => {
+    if (!isMedia) return undefined;
+
+    let cancelled = false;
+
+    void onPreview(attachment, setProgress)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        setPreviewUrl(url);
+        setProgress(null);
+      })
+      .catch(() => setProgress(null));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment, isMedia, onPreview]);
+
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
+
+  return (
+    <div
+      className={cx(
+        'overflow-hidden rounded-2xl border text-left transition',
+        mine
+          ? 'border-white/20 bg-white/10 hover:bg-white/15'
+          : 'border-white/10 bg-white/8 hover:bg-white/12',
+      )}
+    >
+      {previewUrl && attachment.contentType.startsWith('image/') && (
+        <img src={previewUrl} alt="" className="max-h-72 w-full object-cover" />
+      )}
+      {previewUrl && attachment.contentType.startsWith('video/') && (
+        <video src={previewUrl} className="max-h-72 w-full" controls />
+      )}
+      {previewUrl && attachment.contentType.startsWith('audio/') && (
+        <audio src={previewUrl} className="w-full p-2" controls />
+      )}
+      {progress && (
+        <div className="px-3 pt-3 text-xs font-black opacity-75">
+          {progress.percent}%
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-fuchsia-400"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full max-w-full items-center gap-3 px-3 py-2 text-left"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/20 font-black">
+          {isMedia ? '▶' : '↓'}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-black">
+            {attachment.filename}
+          </span>
+          <span className="block text-xs opacity-65">
+            {formatFileSize(attachment.size)}
+          </span>
+        </span>
+      </button>
     </div>
   );
 }

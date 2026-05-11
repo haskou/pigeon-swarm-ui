@@ -77,6 +77,8 @@ export type PrivateFileUpload = PublicFileUpload & {
 
 export type MessageAttachmentEncryption = {
   algorithm: 'AES-GCM';
+  chunks?: { iv: string; size: number }[];
+  chunkSize?: number;
   iv: string;
   key: string;
 };
@@ -94,6 +96,12 @@ export type PendingMessageAttachment = {
   encryptedBytes: ArrayBuffer;
   metadata: Omit<MessageAttachment, 'cid' | 'encryptedSize'>;
   uploadFilename: string;
+};
+
+export type AttachmentProgress = {
+  filename: string;
+  percent: number;
+  phase: 'decrypt' | 'encrypt';
 };
 
 export type LocalKeychain = {

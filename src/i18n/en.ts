@@ -42,6 +42,8 @@ export const copy = {
     attach: 'Attach files',
     attachmentDownloadError: 'The attachment could not be decrypted.',
     attachmentTooLarge: 'Attachments must be 50 MiB or smaller.',
+    decryptingAttachment: 'Decrypting',
+    encryptingAttachment: 'Encrypting',
     placeholder: 'Write, encrypt, sign, and push to the swarm...',
     removeAttachment: 'Remove attachment',
     send: 'Send',

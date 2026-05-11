@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   ChatMessage,
+  AttachmentProgress,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -78,6 +79,8 @@ export function GlassWorkspace({
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -377,6 +380,7 @@ export function GlassWorkspace({
   const handleSend = async (content: string, attachments: File[]) => {
     if (!activeConversation?.id) return;
     setSendError(null);
+    setAttachmentProgress(null);
 
     try {
       const lastMessageId = messages[messages.length - 1]?.id;
@@ -386,8 +390,10 @@ export function GlassWorkspace({
         content,
         lastMessageId ? [lastMessageId] : [],
         attachments,
+        setAttachmentProgress,
       );
       setMessages((current) => [...current, sent]);
+      setAttachmentProgress(null);
       queueMicrotask(() =>
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
       );
@@ -396,6 +402,7 @@ export function GlassWorkspace({
       setSendError(
         caught instanceof Error ? caught.message : copy.workspace.sendError,
       );
+      setAttachmentProgress(null);
     }
   };
 
@@ -606,6 +613,7 @@ export function GlassWorkspace({
           onSend={handleSend}
           onOpenSidebar={() => setSidebarOpen(true)}
           onCreate={() => setIsCreateOpen(true)}
+          progress={attachmentProgress}
         />
 
         <Inspector

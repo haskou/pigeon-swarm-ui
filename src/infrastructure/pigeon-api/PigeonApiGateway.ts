@@ -14,6 +14,7 @@ import type {
   ChatMessage,
   ConversationKeyEntry,
   ConversationResource,
+  AttachmentProgress,
   IdentityResource,
   KeychainResource,
   LocalKeychain,
@@ -292,6 +293,7 @@ export class PigeonApiGateway {
 
   public async downloadAttachment(
     attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     const content = await this.getPublicFile(attachment.cid);
     const encryptedBytes = this.attachmentCipher.base64ToBytes(content.data);
@@ -299,6 +301,7 @@ export class PigeonApiGateway {
     return await this.attachmentCipher.decrypt(
       attachment,
       this.attachmentCipher.bytesToArrayBuffer(encryptedBytes),
+      onProgress,
     );
   }
 
@@ -483,6 +486,7 @@ export class PigeonApiGateway {
     content: string,
     previousMessageIds: string[] = [],
     attachments: File[] = [],
+    onAttachmentProgress?: (progress: AttachmentProgress) => void,
   ): Promise<ChatMessage> {
     const key = conversationKeyEntry(
       session.keychain,
@@ -499,6 +503,7 @@ export class PigeonApiGateway {
     const messageAttachments = await this.publishMessageAttachments(
       session,
       attachments,
+      onAttachmentProgress,
     );
     const attachmentExternalIdentifiers = messageAttachments.map(
       (attachment) => attachment.cid,
@@ -593,12 +598,13 @@ export class PigeonApiGateway {
   private async publishMessageAttachments(
     session: Session,
     attachments: File[],
+    onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment[]> {
     if (attachments.length === 0) return [];
 
     return await Promise.all(
       attachments.map(async (file) => {
-        const pending = await this.attachmentCipher.encrypt(file);
+        const pending = await this.attachmentCipher.encrypt(file, onProgress);
         const upload = await this.uploadPrivateFile(session, pending);
 
         return {

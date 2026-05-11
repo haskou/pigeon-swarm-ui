@@ -1,4 +1,8 @@
-import type { ChatMessage, Session } from '../../domain/types';
+import type {
+  AttachmentProgress,
+  ChatMessage,
+  Session,
+} from '../../domain/types';
 
 import { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
 
@@ -11,6 +15,7 @@ export class SendMessage {
     content: string,
     previousMessageIds: string[] = [],
     attachments: File[] = [],
+    onAttachmentProgress?: (progress: AttachmentProgress) => void,
   ): Promise<ChatMessage> {
     return await this.gateway.sendMessage(
       session,
@@ -18,6 +23,7 @@ export class SendMessage {
       content,
       previousMessageIds,
       attachments,
+      onAttachmentProgress,
     );
   }
 }
