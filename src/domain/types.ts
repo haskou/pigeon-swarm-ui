@@ -8,6 +8,7 @@ export type IdentityResource = {
   };
   profile: {
     name: string;
+    handle?: string | null;
     biography?: string | null;
     picture?: string | null;
   };
@@ -16,7 +17,10 @@ export type IdentityResource = {
   signature: string;
   version: number;
   previousIdentityExternalIdentifier?: string | null;
+  identityExternalIdentifier?: string | null;
 };
+
+export type IdentityProfile = IdentityResource['profile'];
 
 export type KeychainResource = {
   encryptedPayload: string;

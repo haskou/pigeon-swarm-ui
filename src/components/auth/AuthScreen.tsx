@@ -11,6 +11,7 @@ import {
   saveCredentials,
 } from '../../presentation/auth/savedCredentials';
 import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
+import { isValidHandle, normalizeHandle } from '../../utils/identityDisplay';
 import { GlassSelect } from '../common/GlassSelect';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { Field } from './Field';
@@ -30,6 +31,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
   const [name, setName] = useState('');
+  const [handle, setHandle] = useState('');
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -62,6 +64,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     mode === 'login'
       ? identityId.trim().length > 0 && password.length > 0
       : name.trim().length > 0 &&
+        (!handle.trim() || isValidHandle(handle)) &&
         password.length > 0 &&
         (availableNetworks.length === 0 || selectedNetwork !== '');
 
@@ -99,6 +102,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               name,
               password,
               networksToRegister,
+              handle.trim() ? normalizeHandle(handle) : undefined,
             );
 
       if (rememberMe) {
@@ -173,7 +177,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   value={identityId}
                   onChange={(event) => setIdentityId(event.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="MCowBQYDK2VwAyEA..."
+                  placeholder="@ada or MCowBQYDK2VwAyEA..."
                   autoComplete="username"
                 />
               </Field>
@@ -186,6 +190,15 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="Ada"
                     autoComplete="name"
+                  />
+                </Field>
+                <Field label={copy.auth.handleLabel}>
+                  <input
+                    value={handle}
+                    onChange={(event) => setHandle(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder="@ada"
+                    autoComplete="username"
                   />
                 </Field>
                 {availableNetworks.length > 0 ? (

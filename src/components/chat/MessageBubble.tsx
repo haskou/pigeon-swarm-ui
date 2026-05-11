@@ -8,10 +8,12 @@ interface MessageBubbleProps {
   message: ChatMessage;
   currentIdentityId: string;
   authorName: string;
+  authorPicture?: string | null;
 }
 
 export function MessageBubble({
   authorName,
+  authorPicture,
   currentIdentityId,
   message,
 }: MessageBubbleProps) {
@@ -19,7 +21,7 @@ export function MessageBubble({
 
   return (
     <div className={cx('flex gap-3', mine && 'justify-end')}>
-      {!mine && <Avatar label={authorName} />}
+      {!mine && <Avatar label={authorName} picture={authorPicture} />}
       <div
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
@@ -35,7 +37,7 @@ export function MessageBubble({
           {formatTime(message.timestamp)}
         </div>
       </div>
-      {mine && <Avatar label={authorName} mine />}
+      {mine && <Avatar label={authorName} mine picture={authorPicture} />}
     </div>
   );
 }

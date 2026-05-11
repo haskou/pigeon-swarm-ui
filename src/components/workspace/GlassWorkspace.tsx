@@ -16,7 +16,9 @@ import { ArchivedNotifications } from '../../presentation/notifications/Archived
 import { cx } from '../../utils/classNameHelper';
 import {
   identityName,
+  identityPicture,
   type IdentityNames,
+  type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -67,7 +69,12 @@ export function GlassWorkspace({
     null,
   );
   const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
-    [session.identity.id]: session.identity.profile.name,
+    [session.identity.id]: identityName(session.identity) ?? session.identity.id,
+  }));
+  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(() => ({
+    ...(identityPicture(session.identity)
+      ? { [session.identity.id]: identityPicture(session.identity) as string }
+      : {}),
   }));
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -143,9 +150,13 @@ export function GlassWorkspace({
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
 
-          return [identityId, identityName(identity) ?? identityId] as const;
+          return [
+            identityId,
+            identityName(identity) ?? identityId,
+            identityPicture(identity),
+          ] as const;
         } catch {
-          return [identityId, identityId] as const;
+          return [identityId, identityId, null] as const;
         }
       }),
     ).then((resolvedIdentities) => {
@@ -153,7 +164,17 @@ export function GlassWorkspace({
 
       setIdentityNames((current) => ({
         ...current,
-        ...Object.fromEntries(resolvedIdentities),
+        ...Object.fromEntries(
+          resolvedIdentities.map(([identityId, name]) => [identityId, name]),
+        ),
+      }));
+      setIdentityPictures((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities
+            .filter(([, , picture]) => !!picture)
+            .map(([identityId, , picture]) => [identityId, picture as string]),
+        ),
       }));
     });
 
@@ -388,6 +409,7 @@ export function GlassWorkspace({
               session={session}
               conversations={conversations}
               identityNames={identityNames}
+              identityPictures={identityPictures}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
               onSelect={(id) => {
@@ -397,6 +419,24 @@ export function GlassWorkspace({
               onCreate={() => setIsCreateOpen(true)}
               onClose={() => setSidebarOpen(false)}
               onLogout={() => setSession(null)}
+              onSessionUpdated={(nextSession) => {
+                setSession(nextSession);
+                setIdentityNames((current) => ({
+                  ...current,
+                  [nextSession.identity.id]:
+                    identityName(nextSession.identity) ?? nextSession.identity.id,
+                }));
+                setIdentityPictures((current) => ({
+                  ...current,
+                  ...(identityPicture(nextSession.identity)
+                    ? {
+                        [nextSession.identity.id]: identityPicture(
+                          nextSession.identity,
+                        ) as string,
+                      }
+                    : {}),
+                }));
+              }}
             />
           </div>
         </div>
@@ -422,7 +462,19 @@ export function GlassWorkspace({
                 )
               : undefined
           }
+          peerPicture={
+            activeConversation
+              ? identityPictures[
+                  conversationPeerIdentityId(
+                    activeConversation,
+                    session.identity.id,
+                    session.keychain,
+                  ) ?? ''
+                ]
+              : undefined
+          }
           identityNames={identityNames}
+          identityPictures={identityPictures}
           messages={messages}
           messageState={messageState}
           sendError={sendError}

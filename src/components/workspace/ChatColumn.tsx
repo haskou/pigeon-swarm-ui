@@ -8,6 +8,7 @@ import { copy } from '../../i18n/en';
 import {
   identityDisplayName,
   type IdentityNames,
+  type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
@@ -18,7 +19,9 @@ interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
   peerIdentityId?: string;
+  peerPicture?: string;
   identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
   hasConversationKey: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
@@ -36,6 +39,7 @@ export function ChatColumn({
   bottomRef,
   hasConversationKey,
   identityNames,
+  identityPictures,
   messages,
   messageState,
   onCreate,
@@ -43,6 +47,7 @@ export function ChatColumn({
   onScroll,
   onSend,
   peerIdentityId,
+  peerPicture,
   scrollerRef,
   sendError,
   session,
@@ -62,12 +67,16 @@ export function ChatColumn({
           >
             ☰
           </button>
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
-            {activeConversation
-              ? (activeConversationName ?? activeConversation.id)
-                  .slice(0, 1)
-                  .toUpperCase()
-              : '∅'}
+          <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
+            {peerPicture ? (
+              <img src={peerPicture} alt="" className="h-full w-full object-cover" />
+            ) : activeConversation ? (
+              (activeConversationName ?? activeConversation.id)
+                .slice(0, 1)
+                .toUpperCase()
+            ) : (
+              '∅'
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-2xl font-black tracking-tight">
@@ -129,6 +138,11 @@ export function ChatColumn({
                           message.authorIdentityId,
                           identityNames,
                         )
+                  }
+                  authorPicture={
+                    message.mine
+                      ? session.identity.profile.picture
+                      : identityPictures[message.authorIdentityId]
                   }
                 />
               ))}

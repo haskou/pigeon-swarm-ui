@@ -9,7 +9,8 @@ export const copy = {
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
-    identityIdLabel: 'Identity ID',
+    handleLabel: 'Handle',
+    identityIdLabel: 'Identity ID or @handle',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
     loginSubmit: 'Decrypt identity & enter',
@@ -127,13 +128,23 @@ export const copy = {
     title: 'Notifications',
   },
   profile: {
+    biography: 'Bio',
     copied: 'Copied',
     copy: 'Copy',
+    edit: 'Edit profile',
+    handle: 'Handle',
     identityId: 'Identity ID',
     keychainVersion: 'Keychain',
     logout: 'Log out',
+    missingIdentityExternalIdentifier:
+      'The API did not provide the current identity reference required to publish profile updates.',
+    name: 'Name',
     networks: 'Networks',
     noNetworks: 'No networks',
+    picture: 'Profile picture',
+    save: 'Save profile',
+    saving: 'Saving...',
+    updateError: 'The profile could not be updated.',
   },
   sidebar: {
     createConversation: 'New conversation',

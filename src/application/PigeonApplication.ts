@@ -1,3 +1,4 @@
+import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
   ConversationResource,
@@ -114,6 +115,13 @@ export class PigeonApplication {
     return await this.gateway.getIdentity(identityId);
   }
 
+  public async updateIdentityProfile(
+    session: Session,
+    profile: IdentityUpdateProfileInput,
+  ): Promise<IdentityResource> {
+    return await this.gateway.updateIdentityProfile(session, profile);
+  }
+
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
@@ -153,8 +161,14 @@ export class PigeonApplication {
     name: string,
     password: string,
     networks: string[],
+    handle?: string,
   ): Promise<LoginResult> {
-    return await this.registerIdentityUseCase.execute(name, password, networks);
+    return await this.registerIdentityUseCase.execute(
+      name,
+      password,
+      networks,
+      handle,
+    );
   }
 
   public async sendMessage(
