@@ -45,7 +45,7 @@ export class RequestSigner {
       bodyHash: this.bodyHash(body),
       method: method.toUpperCase(),
       nonce,
-      path: ApiUrlBuilder.normalizePath(path),
+      path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
       timestamp,
     });
   }
@@ -55,7 +55,7 @@ export class RequestSigner {
   }
 
   private bodyToString(body?: unknown): string {
-    if (body === undefined || body === null) return '';
+    if (body === undefined || body === null) return JSON.stringify({});
 
     if (typeof body === 'string') return body;
 

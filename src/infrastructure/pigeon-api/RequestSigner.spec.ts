@@ -44,6 +44,25 @@ describe(RequestSigner.name, () => {
     });
   });
 
+  it('signs only the request path and leaves query params out', () => {
+    const signer = new RequestSigner(
+      () => 123,
+      () => 'nonce-1',
+    );
+
+    const payload = JSON.parse(
+      signer.payload('GET', '/notifications/?limit=30', '123', 'nonce-1'),
+    ) as SignedRequestPayload;
+
+    expect(payload).toEqual({
+      bodyHash: expect.any(String),
+      method: 'GET',
+      nonce: 'nonce-1',
+      path: '/notifications/',
+      timestamp: '123',
+    });
+  });
+
   it('signs headers with the session keypair', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(
