@@ -7,8 +7,8 @@ type NonceFactory = () => string;
 
 export class RequestSigner {
   public constructor(
-    private readonly clock: Clock = Date.now,
-    private readonly nonceFactory: NonceFactory = crypto.randomUUID,
+    private readonly clock: Clock = () => Date.now(),
+    private readonly nonceFactory: NonceFactory = () => crypto.randomUUID(),
   ) {}
 
   public async headers(

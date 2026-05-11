@@ -61,4 +61,22 @@ describe(RequestSigner.name, () => {
       'secret',
     );
   });
+
+  it('uses a bound crypto random UUID nonce by default', async () => {
+    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    await expect(
+      new RequestSigner(() => 123).headers(session, 'GET', '/messages'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        'X-Nonce': expect.any(String),
+        'X-Signature': 'signature',
+      }),
+    );
+  });
 });
