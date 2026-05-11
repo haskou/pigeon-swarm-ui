@@ -73,7 +73,7 @@ export const copy = {
     nets: 'nets',
     present: 'present',
     privateKey: 'Private key',
-    storedOneToOneKeys: 'Stored 1to1 keys',
+    storedOneKeys: 'Stored keys',
   },
   messages: {
     decryptFailed: '[encrypted] This event could not be decrypted.',

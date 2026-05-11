@@ -187,7 +187,10 @@ export class PigeonApiGateway {
     session: Session,
     profile: IdentityUpdateProfileInput,
   ): Promise<IdentityResource> {
+    const currentIdentity = await this.getIdentity(session.identity.id);
     const previousIdentityExternalIdentifier =
+      currentIdentity.identityExternalIdentifier ??
+      currentIdentity.previousIdentityExternalIdentifier ??
       session.identity.identityExternalIdentifier ??
       session.identity.previousIdentityExternalIdentifier;
 
@@ -197,7 +200,7 @@ export class PigeonApiGateway {
 
     const path = `/identities/${encodeURIComponent(session.identity.id)}`;
     const unsigned = this.identitySignatures.createUpdate({
-      identity: session.identity,
+      identity: currentIdentity,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: Date.now(),
