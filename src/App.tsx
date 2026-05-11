@@ -18,11 +18,14 @@ import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 type RestoreState = 'idle' | 'loading' | 'done';
 
 function App() {
+  const [hasSavedCredentials] = useState(() => loadSavedCredentials() !== null);
   const [session, setSession] = useState<Session | null>(null);
   const [conversations, setConversations] = useState<ConversationResource[]>(
     [],
   );
-  const [restoreState, setRestoreState] = useState<RestoreState>('idle');
+  const [restoreState, setRestoreState] = useState<RestoreState>(
+    hasSavedCredentials ? 'loading' : 'done',
+  );
   const nodeNetworks = useNodeNetworks();
 
   const handleAuthenticated = (
@@ -36,7 +39,7 @@ function App() {
   useEffect(() => {
     if (nodeNetworks.loading || nodeNetworks.error || session) return;
     if (nodeNetworks.networks.length === 0) return;
-    if (restoreState !== 'idle') return;
+    if (restoreState !== 'loading') return;
 
     const savedCredentials = loadSavedCredentials();
 
@@ -44,8 +47,6 @@ function App() {
       setRestoreState('done');
       return;
     }
-
-    setRestoreState('loading');
 
     void pigeonApplication
       .login(savedCredentials.identityId, savedCredentials.password)
