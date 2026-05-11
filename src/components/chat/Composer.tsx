@@ -6,11 +6,7 @@ interface ComposerProps {
   onSend: (content: string) => Promise<void>;
 }
 
-export function Composer({
-  disabled,
-  error,
-  onSend,
-}: ComposerProps): JSX.Element {
+export function Composer({ disabled, error, onSend }: ComposerProps) {
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
 

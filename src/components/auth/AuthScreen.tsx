@@ -2,9 +2,9 @@ import { FormEvent, useEffect, useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
 
+import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
-import { PigeonApiClient } from '../../domain/api/PigeonApiClient';
-import { login, register } from '../../domain/pigeonApi';
+import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
 import { cx } from '../../utils/classNameHelper';
 import { Field } from './Field';
 import { HeroMetric } from './HeroMetric';
@@ -28,29 +28,14 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [availableNetworks, setAvailableNetworks] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const { networks: availableNetworks } = useNodeNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState('');
 
   useEffect(() => {
-    const fetchNetworks = async () => {
-      try {
-        const client = new PigeonApiClient();
-        const networks = await client.getNodeNetworks();
-        setAvailableNetworks(networks);
-
-        // If there are networks, pre-select the first one
-        if (networks.length > 0) {
-          setSelectedNetwork(networks[0].id);
-        }
-      } catch (err) {
-        console.error('Error fetching networks:', err);
-      }
-    };
-
-    fetchNetworks();
-  }, []);
+    if (availableNetworks.length > 0 && !selectedNetwork) {
+      setSelectedNetwork(availableNetworks[0].id);
+    }
+  }, [availableNetworks, selectedNetwork]);
 
   useEffect(() => {
     const savedCredentials = localStorage.getItem('pigeon-swarm-credentials');
@@ -99,8 +84,12 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
       const result =
         mode === 'login'
-          ? await login(identityId, password)
-          : await register(name, password, networksToRegister);
+          ? await pigeonApplication.login(identityId, password)
+          : await pigeonApplication.register(
+              name,
+              password,
+              networksToRegister,
+            );
 
       // Handle "remember me" functionality
       if (rememberMe && mode === 'login') {

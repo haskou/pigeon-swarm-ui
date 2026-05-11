@@ -12,7 +12,7 @@ interface MessageBubbleProps {
 export function MessageBubble({
   currentIdentityId,
   message,
-}: MessageBubbleProps): JSX.Element {
+}: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
 
   return (

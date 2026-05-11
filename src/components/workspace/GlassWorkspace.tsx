@@ -6,11 +6,7 @@ import type {
   Session,
 } from '../../domain/types';
 
-import {
-  listConversations,
-  loadMessages,
-  sendMessage,
-} from '../../domain/pigeonApi';
+import { pigeonApplication } from '../../application/applicationContainer';
 import { cx } from '../../utils/classNameHelper';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -32,7 +28,7 @@ export function GlassWorkspace({
   session,
   setConversations,
   setSession,
-}: GlassWorkspaceProps): JSX.Element {
+}: GlassWorkspaceProps) {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversations[0]?.id ?? null);
@@ -59,7 +55,7 @@ export function GlassWorkspace({
   }, [activeConversationId, conversations]);
 
   const refreshConversations = useCallback(async () => {
-    const next = await listConversations(session);
+    const next = await pigeonApplication.listConversations(session);
     setConversations(next);
   }, [session, setConversations]);
 
@@ -68,7 +64,10 @@ export function GlassWorkspace({
       setMessageState('loading');
       setSendError(null);
       try {
-        const result = await loadMessages(session, conversationId);
+        const result = await pigeonApplication.loadMessages(
+          session,
+          conversationId,
+        );
         setMessages(result.messages);
         setMessageCursor(result.nextCursor ?? result.messages[0]?.id ?? null);
         queueMicrotask(() =>
@@ -100,7 +99,7 @@ export function GlassWorkspace({
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
     setMessageState('loading');
     try {
-      const result = await loadMessages(
+      const result = await pigeonApplication.loadMessages(
         session,
         activeConversation.id,
         messageCursor,
@@ -133,7 +132,11 @@ export function GlassWorkspace({
     setSendError(null);
 
     try {
-      const sent = await sendMessage(session, activeConversation.id, content);
+      const sent = await pigeonApplication.sendMessage(
+        session,
+        activeConversation.id,
+        content,
+      );
       setMessages((current) => [...current, sent]);
       queueMicrotask(() =>
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),

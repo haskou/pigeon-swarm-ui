@@ -1,8 +1,8 @@
 import { StringValueObject } from '@haskou/value-objects';
 
-import type { Session } from '../types';
+import type { Session } from '../../domain/types';
 
-import { ApiUrlBuilder } from './ApiUrlBuilder';
+import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 
 type Clock = () => number;
 type NonceFactory = () => string;

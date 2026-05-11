@@ -1,4 +1,4 @@
-import type { Session } from '../types';
+import type { Session } from '../../domain/types';
 
 import { RequestSigner } from './RequestSigner';
 

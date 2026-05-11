@@ -18,15 +18,15 @@ import type {
   LoginResult,
   MessageResource,
   Session,
-} from '../types';
+} from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
-import { ApiUrlBuilder } from './ApiUrlBuilder';
-import { ConversationIdFactory } from './ConversationIdFactory';
-import { ConversationProjector } from './ConversationProjector';
-import { HttpJsonClient } from './HttpJsonClient';
-import { KeychainCipher } from './KeychainCipher';
-import { MessageProjector } from './MessageProjector';
+import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
+import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
+import { MessageProjector } from '../../domain/messages/MessageProjector';
+import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
+import { HttpJsonClient } from '../http/HttpJsonClient';
+import { ConversationMapper } from './ConversationMapper';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
@@ -34,8 +34,8 @@ const defaultKeychain: LocalKeychain = {
   version: 0,
 };
 
-export class PigeonApiClient {
-  private readonly conversations: ConversationProjector;
+export class PigeonApiGateway {
+  private readonly conversations: ConversationMapper;
 
   private readonly http: HttpJsonClient;
 
@@ -52,7 +52,7 @@ export class PigeonApiClient {
       new ApiUrlBuilder(API_SERVER_URL),
     ),
     signer: RequestSigner = new RequestSigner(),
-    conversations: ConversationProjector = new ConversationProjector(),
+    conversations: ConversationMapper = new ConversationMapper(),
     messages: MessageProjector = new MessageProjector(),
     keychains: KeychainCipher = new KeychainCipher(),
     ids: ConversationIdFactory = new ConversationIdFactory(),

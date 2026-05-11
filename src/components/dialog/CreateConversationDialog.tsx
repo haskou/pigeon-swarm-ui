@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
 
-import { createConversation } from '../../domain/pigeonApi';
+import { pigeonApplication } from '../../application/applicationContainer';
 import { Field } from '../auth/Field';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -31,7 +31,10 @@ export function CreateConversationDialog({
     setError(null);
 
     try {
-      const result = await createConversation(session, peerIdentityId);
+      const result = await pigeonApplication.createConversation(
+        session,
+        peerIdentityId,
+      );
       onCreated(
         {
           ...session,
@@ -85,7 +88,7 @@ export function CreateConversationDialog({
             value={peerIdentityId}
             onChange={(event) => setPeerIdentityId(event.target.value)}
             className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="MCowBQYDK2VwAyEA..."
+            placeholder="MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
           />
         </Field>
 

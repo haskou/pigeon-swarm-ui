@@ -19,7 +19,7 @@ export function Sidebar({
   onCreate,
   onSelect,
   session,
-}: SidebarProps): JSX.Element {
+}: SidebarProps) {
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-[2rem] p-4">
       <div className="flex items-center gap-3 rounded-3xl bg-white/10 p-3">
