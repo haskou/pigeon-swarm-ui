@@ -25,14 +25,17 @@ export function MessageBubble({
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
           mine
-            ? 'bg-fuchsia-500 text-white shadow-xl shadow-fuchsia-950/20'
+            ? 'bg-fuchsia-500 text-right text-white shadow-xl shadow-fuchsia-950/20'
             : 'border border-white/10 bg-black/25 text-white',
         )}
       >
-        <div className="mb-1 flex items-center justify-between gap-4 text-xs font-black opacity-75">
-          <span>
-            {mine ? copy.chat.you : authorName}
-          </span>
+        <div
+          className={cx(
+            'mb-1 flex items-center gap-4 text-xs font-black opacity-75',
+            mine ? 'justify-end' : 'justify-between',
+          )}
+        >
+          <span>{mine ? copy.chat.you : authorName}</span>
           <span>{formatTime(message.timestamp)}</span>
         </div>
         <p className={cx(message.encrypted && 'text-white/55')}>
