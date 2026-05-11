@@ -96,7 +96,7 @@ export function Sidebar({
 
       <button
         onClick={onCreate}
-        className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
+        className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
         {copy.sidebar.createConversation}
       </button>

@@ -98,7 +98,7 @@ export function ChatColumn({
             <p className="mt-3 text-white/55">{copy.chat.emptyBody}</p>
             <button
               onClick={onCreate}
-              className="mt-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 font-black"
+              className="mt-6 rounded-2xl bg-fuchsia-500 px-5 py-3 font-black"
             >
               {copy.chat.createConversation}
             </button>

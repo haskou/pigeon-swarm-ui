@@ -108,7 +108,7 @@ export function CreateConversationDialog({
           </button>
           <button
             disabled={!peerIdentityId.trim() || state === 'loading'}
-            className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+            className="glass-button rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
           >
             {state === 'loading'
               ? copy.dialog.createConversationLoading

@@ -164,7 +164,7 @@ export function NetworkCreationScreen({
 
           <button
             disabled={loading}
-            className="glass-button mt-6 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
+            className="glass-button mt-6 w-full rounded-2xl bg-fuchsia-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
           >
             {loading
               ? copy.network.loadingSubmit
