@@ -5,6 +5,11 @@ import type { ConversationResource, Session } from '../../domain/types';
 import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
 import { copy } from '../../i18n/en';
+import {
+  clearSavedCredentials,
+  loadSavedCredentials,
+  saveCredentials,
+} from '../../presentation/auth/savedCredentials';
 import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
 import { GlassSelect } from '../common/GlassSelect';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -44,12 +49,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   }, [availableNetworks, selectedNetwork]);
 
   useEffect(() => {
-    const savedCredentials = localStorage.getItem('pigeon-swarm-credentials');
+    const savedCredentials = loadSavedCredentials();
 
     if (savedCredentials) {
-      const { identityId, password } = JSON.parse(savedCredentials);
-      setIdentityId(identityId);
-      setPassword(password);
+      setIdentityId(savedCredentials.identityId);
+      setPassword(savedCredentials.password);
       setRememberMe(true);
     }
   }, []);
@@ -99,16 +103,10 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
       // Handle "remember me" functionality
       if (rememberMe && mode === 'login') {
-        localStorage.setItem(
-          'pigeon-swarm-credentials',
-          JSON.stringify({
-            identityId,
-            password,
-          }),
-        );
+        saveCredentials({ identityId, password });
       } else if (!rememberMe && mode === 'login') {
         // Remove saved credentials if "remember me" is unchecked
-        localStorage.removeItem('pigeon-swarm-credentials');
+        clearSavedCredentials();
       }
 
       onAuthenticated(result.session, result.conversations);
