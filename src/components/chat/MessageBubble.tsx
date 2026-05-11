@@ -1,6 +1,5 @@
 import type { ChatMessage } from '../../domain/types';
 
-import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
@@ -29,20 +28,14 @@ export function MessageBubble({
             : 'border border-white/10 bg-black/25 text-white',
         )}
       >
-        <div
-          className={cx(
-            'mb-1 flex items-center gap-4 text-xs font-black opacity-75',
-            mine ? 'justify-end' : 'justify-between',
-          )}
-        >
-          <span>{mine ? copy.chat.you : authorName}</span>
-          <span>{formatTime(message.timestamp)}</span>
-        </div>
         <p className={cx(message.encrypted && 'text-white/55')}>
           {message.content}
         </p>
+        <div className="mt-1 text-right text-xs font-black opacity-65">
+          {formatTime(message.timestamp)}
+        </div>
       </div>
-      {mine && <Avatar label={authorName || copy.chat.you} mine />}
+      {mine && <Avatar label={authorName} mine />}
     </div>
   );
 }
