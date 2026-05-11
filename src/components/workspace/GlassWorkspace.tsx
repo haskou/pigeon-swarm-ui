@@ -82,6 +82,7 @@ export function GlassWorkspace({
   }));
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messageRequestRef = useRef(0);
 
   const activeConversation = useMemo(
     () =>
@@ -224,6 +225,9 @@ export function GlassWorkspace({
 
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
+      const requestId = messageRequestRef.current + 1;
+
+      messageRequestRef.current = requestId;
       setMessageState('loading');
       setSendError(null);
       try {
@@ -231,12 +235,17 @@ export function GlassWorkspace({
           session,
           conversationId,
         );
+
+        if (messageRequestRef.current !== requestId) return;
+
         setMessages(result.messages);
         setMessageCursor(result.nextCursor ?? result.messages[0]?.id ?? null);
         queueMicrotask(() =>
           bottomRef.current?.scrollIntoView({ block: 'end' }),
         );
       } catch (caught) {
+        if (messageRequestRef.current !== requestId) return;
+
         setMessages([]);
         setMessageState('error');
         setSendError(
@@ -247,6 +256,8 @@ export function GlassWorkspace({
 
         return;
       }
+      if (messageRequestRef.current !== requestId) return;
+
       setMessageState('idle');
     },
     [session],
@@ -259,6 +270,9 @@ export function GlassWorkspace({
   const handleLoadOlder = async () => {
     if (!activeConversation?.id || messageState === 'loading') return;
 
+    const requestId = messageRequestRef.current + 1;
+
+    messageRequestRef.current = requestId;
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
     setMessageState('loading');
     try {
@@ -267,6 +281,8 @@ export function GlassWorkspace({
         activeConversation.id,
         messageCursor,
       );
+      if (messageRequestRef.current !== requestId) return;
+
       setMessages((current) => [...result.messages, ...current]);
       setMessageCursor(
         result.nextCursor ?? result.messages[0]?.id ?? messageCursor,
@@ -283,6 +299,8 @@ export function GlassWorkspace({
           : copy.workspace.loadOlderError,
       );
     }
+    if (messageRequestRef.current !== requestId) return;
+
     setMessageState('idle');
   };
 
