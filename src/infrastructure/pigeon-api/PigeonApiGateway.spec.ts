@@ -319,4 +319,52 @@ describe(PigeonApiGateway.name, () => {
 
     expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
   });
+
+  it('downloads encrypted private attachment content', async () => {
+    const encryptedBytes = new Uint8Array([1, 2, 3]);
+    const decrypted = new Blob(['clear'], { type: 'image/png' });
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        cid: 'bafy/attachment',
+        contentType: 'application/octet-stream',
+        encrypted: true,
+        encryptedData: 'AQID',
+        filename: 'encrypted.bin',
+        size: 3,
+      }),
+    } as unknown as HttpJsonClient;
+    const attachmentCipher = {
+      base64ToBytes: jest.fn().mockReturnValue(encryptedBytes),
+      bytesToArrayBuffer: jest.fn().mockReturnValue(encryptedBytes.buffer),
+      decrypt: jest.fn().mockResolvedValue(decrypted),
+    } as unknown as AttachmentCipher;
+    const gateway = new PigeonApiGateway(
+      http,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      attachmentCipher,
+    );
+    const attachment = {
+      cid: 'bafy/attachment',
+      contentType: 'image/png',
+      encryption: { algorithm: 'AES-GCM', iv: 'iv', key: 'key' },
+      filename: 'photo.png',
+      size: 3,
+    } as const;
+
+    await expect(gateway.downloadAttachment(attachment)).resolves.toBe(
+      decrypted,
+    );
+
+    expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Fattachment');
+    expect(attachmentCipher.base64ToBytes).toHaveBeenCalledWith('AQID');
+    expect(attachmentCipher.decrypt).toHaveBeenCalledWith(
+      attachment,
+      encryptedBytes.buffer,
+      undefined,
+    );
+  });
 });

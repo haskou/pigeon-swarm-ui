@@ -23,6 +23,7 @@ import type {
   MessageResource,
   NotificationResource,
   PendingMessageAttachment,
+  PrivateFileContent,
   PrivateFileUpload,
   PublicFileContent,
   PublicFileUpload,
@@ -123,6 +124,12 @@ export class PigeonApiGateway {
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
     return await this.http.request<PublicFileContent>(
+      `/ipfs/${encodeURIComponent(cid)}`,
+    );
+  }
+
+  public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
+    return await this.http.request<PrivateFileContent>(
       `/ipfs/${encodeURIComponent(cid)}`,
     );
   }
@@ -295,8 +302,10 @@ export class PigeonApiGateway {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    const content = await this.getPublicFile(attachment.cid);
-    const encryptedBytes = this.attachmentCipher.base64ToBytes(content.data);
+    const content = await this.getPrivateFile(attachment.cid);
+    const encryptedBytes = this.attachmentCipher.base64ToBytes(
+      content.encryptedData,
+    );
 
     return await this.attachmentCipher.decrypt(
       attachment,

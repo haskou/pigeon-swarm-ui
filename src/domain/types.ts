@@ -75,6 +75,12 @@ export type PrivateFileUpload = PublicFileUpload & {
   encrypted: true;
 };
 
+export type PrivateFileContent = PrivateFileUpload & {
+  encryptedData: string;
+  uploadedAt?: number | string;
+  uploadedByIdentityId?: string;
+};
+
 export type MessageAttachmentEncryption = {
   algorithm: 'AES-GCM';
   chunks?: { iv: string; size: number }[];

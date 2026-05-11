@@ -253,7 +253,7 @@ export function ChatColumn({
                     }
                     authorPicture={
                       message.mine
-                        ? session.identity.profile.picture
+                        ? identityPictures[session.identity.id]
                         : identityPictures[message.authorIdentityId]
                     }
                     onAttachmentOpen={(attachmentIndex) =>
