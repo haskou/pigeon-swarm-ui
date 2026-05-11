@@ -9,6 +9,7 @@ interface MessageBubbleProps {
   currentIdentityId: string;
   authorName: string;
   authorPicture?: string | null;
+  onAvatarClick: () => void;
   showAvatar: boolean;
 }
 
@@ -17,6 +18,7 @@ export function MessageBubble({
   authorPicture,
   currentIdentityId,
   message,
+  onAvatarClick,
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
@@ -27,7 +29,11 @@ export function MessageBubble({
     <div className={cx('flex gap-3', mine && 'justify-end')}>
       {!mine && (
         showAvatar ? (
-          <Avatar label={authorName} picture={authorPicture} />
+          <Avatar
+            label={authorName}
+            onClick={onAvatarClick}
+            picture={authorPicture}
+          />
         ) : (
           <div className="w-11 shrink-0" />
         )
@@ -55,7 +61,12 @@ export function MessageBubble({
       </div>
       {mine &&
         (showAvatar ? (
-          <Avatar label={authorName} mine picture={authorPicture} />
+          <Avatar
+            label={authorName}
+            mine
+            onClick={onAvatarClick}
+            picture={authorPicture}
+          />
         ) : (
           <div className="w-11 shrink-0" />
         ))}

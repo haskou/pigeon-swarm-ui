@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { IdentityResource } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { IdentityResource } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
@@ -28,7 +28,8 @@ export function UserProfileDialog({
   const [copied, setCopied] = useState(false);
   const displayName = identity ? (identityName(identity) ?? name) : name;
   const displayPicture = identity ? identityPicture(identity) : picture;
-  const biography = identity?.profile.biography?.trim() || copy.profile.noBiography;
+  const biography =
+    identity?.profile.biography?.trim() || copy.profile.noBiography;
   const networks = identity?.networks ?? [];
   const networkNames = networks.map(
     (networkId) =>
@@ -84,17 +85,17 @@ export function UserProfileDialog({
           </button>
         </div>
 
-        <p className="mt-5 max-h-32 overflow-y-auto rounded-3xl bg-black/25 p-4 text-sm leading-6 text-white/70">
+        <p className="mt-1 max-h-32 overflow-y-auto rounded-3xl p-4 text-sm leading-6 text-white/70">
           {biography}
         </p>
 
-        <div className="mt-5 grid gap-3 text-xs">
+        <div className="mt-2 grid gap-3 text-xs">
           <div className="min-w-0">
             <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
               {copy.profile.identityId}
             </div>
             <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-black/25 p-2">
-              <span className="min-w-0 flex-1 break-all text-white/70">
+              <span className="block min-w-0 flex-1 truncate text-white/70">
                 {identityId}
               </span>
               <button

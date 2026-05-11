@@ -61,11 +61,46 @@ export function ChatColumn({
   sendError,
   session,
 }: ChatColumnProps) {
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileViewer, setProfileViewer] = useState<{
+    identity?: IdentityResource;
+    identityId: string;
+    name: string;
+    picture?: string | null;
+  } | null>(null);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
   const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
+  const openOwnProfile = () =>
+    setProfileViewer({
+      identity: session.identity,
+      identityId: session.identity.id,
+      name: session.identity.profile.name,
+      picture: session.identity.profile.picture,
+    });
+  const openPeerProfile = () => {
+    if (!peerIdentityId || !activeConversationName) return;
+
+    setProfileViewer({
+      identity: peerIdentity,
+      identityId: peerIdentityId,
+      name: activeConversationName,
+      picture: peerPicture,
+    });
+  };
+  const openMessageAuthorProfile = (message: ChatMessage) => {
+    if (message.mine || message.authorIdentityId === session.identity.id) {
+      openOwnProfile();
+      return;
+    }
+
+    setProfileViewer({
+      identity: peerIdentity,
+      identityId: message.authorIdentityId,
+      name: identityDisplayName(message.authorIdentityId, identityNames),
+      picture: identityPictures[message.authorIdentityId],
+    });
+  };
 
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
@@ -80,11 +115,9 @@ export function ChatColumn({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (canOpenPeerProfile) setProfileOpen(true);
-            }}
+            onClick={openPeerProfile}
             disabled={!canOpenPeerProfile}
-            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950 disabled:cursor-default"
+            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
             {peerPicture ? (
@@ -104,9 +137,7 @@ export function ChatColumn({
           <div className="min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => {
-                if (canOpenPeerProfile) setProfileOpen(true);
-              }}
+              onClick={openPeerProfile}
               disabled={!canOpenPeerProfile}
               className="block max-w-full truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
             >
@@ -180,6 +211,7 @@ export function ChatColumn({
                         ? session.identity.profile.picture
                         : identityPictures[message.authorIdentityId]
                     }
+                    onAvatarClick={() => openMessageAuthorProfile(message)}
                     showAvatar={showAvatar}
                   />
                 );
@@ -205,14 +237,14 @@ export function ChatColumn({
           />
         </>
       )}
-      {profileOpen && peerIdentityId && activeConversationName && (
+      {profileViewer && (
         <UserProfileDialog
-          identity={peerIdentity}
-          identityId={peerIdentityId}
-          name={activeConversationName}
+          identity={profileViewer.identity}
+          identityId={profileViewer.identityId}
+          name={profileViewer.name}
           nodeNetworks={nodeNetworks}
-          onClose={() => setProfileOpen(false)}
-          picture={peerPicture}
+          onClose={() => setProfileViewer(null)}
+          picture={profileViewer.picture}
         />
       )}
     </section>
