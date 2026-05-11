@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/logo.png">
+  <img src="./public/logo.png">
 </p>
 A weird little experiment in building a **fully decentralized chat**.
 
