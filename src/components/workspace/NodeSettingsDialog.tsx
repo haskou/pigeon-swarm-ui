@@ -207,7 +207,7 @@ export function NodeSettingsDialog({
                   </div>
                 </div>
               </div>
-              {node?.owner === null && (
+              {!node?.owner && (
                 <button
                   type="button"
                   onClick={() => void handleClaim()}
@@ -221,41 +221,44 @@ export function NodeSettingsDialog({
               )}
             </div>
 
+            <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+              {copy.nodeSettings.networks}
+            </div>
+            <div className="space-y-2">
+              {networks.map((network) => (
+                <button
+                  key={network.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isOwner) return;
+                    setSelectedNetworkId(network.id);
+                    setCopied(false);
+                  }}
+                  className={cx(
+                    'w-full rounded-2xl p-3 text-left transition',
+                    !isOwner && 'cursor-default',
+                    selectedNetwork?.id === network.id
+                      ? 'bg-white text-slate-950'
+                      : isOwner
+                        ? 'bg-black/25 text-white hover:bg-white/10'
+                        : 'bg-black/25 text-white',
+                  )}
+                >
+                  <div className="truncate font-black">{network.name}</div>
+                  <div
+                    className={cx(
+                      'truncate text-xs',
+                      selectedNetwork?.id === network.id
+                        ? 'text-slate-500'
+                        : 'text-white/45',
+                    )}
+                  >
+                    {shortId(network.id)}
+                  </div>
+                </button>
+              ))}
+            </div>
             {isOwner && (
-              <>
-                <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                  {copy.nodeSettings.networks}
-                </div>
-                <div className="space-y-2">
-                  {networks.map((network) => (
-                    <button
-                      key={network.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedNetworkId(network.id);
-                        setCopied(false);
-                      }}
-                      className={cx(
-                        'w-full rounded-2xl p-3 text-left transition',
-                        selectedNetwork?.id === network.id
-                          ? 'bg-white text-slate-950'
-                          : 'bg-black/25 text-white hover:bg-white/10',
-                      )}
-                    >
-                      <div className="truncate font-black">{network.name}</div>
-                      <div
-                        className={cx(
-                          'truncate text-xs',
-                          selectedNetwork?.id === network.id
-                            ? 'text-slate-500'
-                            : 'text-white/45',
-                        )}
-                      >
-                        {shortId(network.id)}
-                      </div>
-                    </button>
-                  ))}
-                </div>
                 <button
                   type="button"
                   disabled
@@ -263,7 +266,6 @@ export function NodeSettingsDialog({
                 >
                   {copy.nodeSettings.removeUnavailable}
                 </button>
-              </>
             )}
           </div>
 

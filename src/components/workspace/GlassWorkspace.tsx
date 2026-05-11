@@ -107,7 +107,7 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
-  const nodeUnclaimed = node?.owner === null;
+  const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
         session.keychain,
