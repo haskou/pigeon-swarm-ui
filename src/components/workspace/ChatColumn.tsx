@@ -73,9 +73,9 @@ export function ChatColumn({
         <div className="grid flex-1 place-items-center p-6 text-center">
           <div className="max-w-md">
             <img
-              src="/logo.png"
+              src="/noConversations.png"
               alt="Pigeon Swarm"
-              className="mx-auto h-24 w-24 rounded-[2rem] shadow-2xl"
+              className="mx-auto"
             />
             <h2 className="mt-6 text-3xl font-black tracking-tight">
               {copy.chat.emptyTitle}

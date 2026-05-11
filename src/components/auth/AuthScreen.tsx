@@ -146,12 +146,12 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 value={API_SERVER_URL.replace('http://', '')}
               />
               <HeroMetric
-                label={copy.auth.modeLabel}
-                value={copy.auth.modeValue}
+                label={copy.auth.networksLabel}
+                value={`${availableNetworks.length}`}
               />
               <HeroMetric
-                label={copy.auth.cryptoLabel}
-                value={copy.auth.cryptoValue}
+                label={copy.auth.peersLabel}
+                value={copy.auth.peersPlaceholder}
               />
             </div>
           </div>
@@ -161,22 +161,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           onSubmit={handleSubmit}
           className="glass-panel-strong min-h-screen rounded-none p-5 sm:min-h-0 sm:rounded-[2.5rem] sm:p-7"
         >
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Pigeon Swarm"
-              className="h-14 w-14 rounded-2xl border border-white/15 shadow-lg"
-            />
-            <div>
-              <div className="text-2xl font-black tracking-tight">
-                {copy.auth.title}
-              </div>
-              <div className="text-sm text-white/55">API: {API_SERVER_URL}</div>
-            </div>
-          </div>
-
           <SegmentedControl
-            className="mt-6"
             value={mode}
             onChange={setMode}
             options={modeOptions}

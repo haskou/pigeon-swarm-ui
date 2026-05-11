@@ -5,20 +5,19 @@ export const copy = {
   auth: {
     apiLabel: 'API',
     createIdentity: 'Create identity',
-    cryptoLabel: 'Crypto',
-    cryptoValue: 'local',
     fallbackNetworksLabel: 'Networks, comma-separated',
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
-    heroTitle: 'Pigeon swarm. P2P messaging for everyone.',
+    heroTitle: 'P2P messaging for everyone.',
     identityIdLabel: 'Identity ID',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
     loginSubmit: 'Decrypt identity & enter',
-    modeLabel: 'Mode',
-    modeValue: '1to1',
     networkLabel: 'Network',
+    networksLabel: 'Networks',
     passwordLabel: 'Password',
+    peersLabel: 'Peers',
+    peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
     rememberMe: 'Remember me',
     title: 'Pigeon Swarm',
@@ -100,12 +99,6 @@ export const copy = {
     title: 'Network configuration',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
-  sidebar: {
-    createConversation: 'New conversation',
-    emptyConversations:
-      'No conversations yet. Create one and we will finally have something to look at besides the void.',
-    oneToOneTitle: '1to1 messages',
-  },
   profile: {
     copied: 'Copied',
     copy: 'Copy',
@@ -114,6 +107,12 @@ export const copy = {
     logout: 'Log out',
     networks: 'Networks',
     noNetworks: 'No networks',
+  },
+  sidebar: {
+    createConversation: 'New conversation',
+    emptyConversations:
+      'No conversations yet. Create one and we will finally have something to look at besides the void.',
+    oneToOneTitle: '1to1 messages',
   },
   workspace: {
     closeSidebar: 'Close sidebar',
