@@ -10,6 +10,58 @@ import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
+  it('loads node networks anonymously when no session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-1', key: null, name: 'Public Swarm' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getNodeNetworks()).resolves.toBe(response.networks);
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/', {
+      headers: undefined,
+      method: 'GET',
+    });
+  });
+
+  it('loads node networks with signed identity headers when a session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-1', key: 'network-key', name: 'Private' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getNodeNetworks(session)).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/node/networks/',
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {

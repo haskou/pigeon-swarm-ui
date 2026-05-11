@@ -1,3 +1,5 @@
+import type { Session } from '../../domain/types';
+
 import { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
 
 export type NodeNetwork = {
@@ -9,7 +11,7 @@ export type NodeNetwork = {
 export class ListNodeNetworks {
   public constructor(private readonly gateway: PigeonApiGateway) {}
 
-  public async execute(): Promise<NodeNetwork[]> {
-    return await this.gateway.getNodeNetworks();
+  public async execute(session?: Session): Promise<NodeNetwork[]> {
+    return await this.gateway.getNodeNetworks(session);
   }
 }

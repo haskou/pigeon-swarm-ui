@@ -190,8 +190,8 @@ export class PigeonApplication {
     return await this.listConversationsUseCase.execute(session);
   }
 
-  public async listNodeNetworks(): Promise<NodeNetwork[]> {
-    return await this.listNodeNetworksUseCase.execute();
+  public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
+    return await this.listNodeNetworksUseCase.execute(session);
   }
 
   public async listNotifications(

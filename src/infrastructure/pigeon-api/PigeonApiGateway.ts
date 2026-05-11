@@ -113,12 +113,18 @@ export class PigeonApiGateway {
     });
   }
 
-  public async getNodeNetworks(): Promise<
-    { id: string; key?: null | string; name: string }[]
-  > {
+  public async getNodeNetworks(
+    session?: Session,
+  ): Promise<{ id: string; key?: null | string; name: string }[]> {
+    const path = '/node/networks/';
     const result = await this.http.request<{
       networks: { id: string; key?: null | string; name: string }[];
-    }>('/node/networks/');
+    }>(path, {
+      headers: session
+        ? await this.signer.headers(session, 'GET', path)
+        : undefined,
+      method: 'GET',
+    });
 
     return result.networks;
   }
