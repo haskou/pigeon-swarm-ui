@@ -7,6 +7,7 @@ import type {
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
@@ -395,7 +396,7 @@ function AttachmentCard({
 }
 
 function isImageAttachment(attachment: MessageAttachment): boolean {
-  return attachment.contentType.startsWith('image/');
+  return isBrowserPreviewImage(attachment.contentType);
 }
 
 function formatFileSize(bytes: number): string {

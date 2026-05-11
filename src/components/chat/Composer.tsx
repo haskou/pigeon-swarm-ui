@@ -3,6 +3,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import type { AttachmentProgress } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 
@@ -114,10 +115,10 @@ export function Composer({
   };
   const imageAttachments = attachments
     .map((attachment, index) => ({ ...attachment, index }))
-    .filter(({ file }) => file.type.startsWith('image/'));
+    .filter(({ file }) => isBrowserPreviewImage(file.type));
   const otherAttachments = attachments
     .map((attachment, index) => ({ ...attachment, index }))
-    .filter(({ file }) => !file.type.startsWith('image/'));
+    .filter(({ file }) => !isBrowserPreviewImage(file.type));
   const lightboxImages = imageAttachments.map(({ file, previewUrl }) => ({
     alt: file.name,
     filename: file.name,
@@ -329,7 +330,7 @@ function ComposerImageAlbum({
 }
 
 function AttachmentPreview({ file, url }: { file: File; url: string }) {
-  if (file.type.startsWith('image/')) {
+  if (isBrowserPreviewImage(file.type)) {
     return <img src={url} alt="" className="h-28 w-56 object-cover" />;
   }
 
