@@ -5,7 +5,7 @@ interface AvatarProps {
   mine?: boolean;
 }
 
-export function Avatar({ label, mine }: AvatarProps): JSX.Element {
+export function Avatar({ label, mine }: AvatarProps) {
   return (
     <div
       className={cx(

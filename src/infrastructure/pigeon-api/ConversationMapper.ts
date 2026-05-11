@@ -1,6 +1,6 @@
-import type { ConversationResource } from '../types';
+import type { ConversationResource } from '../../domain/types';
 
-import { ConversationIdFactory } from './ConversationIdFactory';
+import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
 
 type ConversationListEnvelope = {
   conversations?: ConversationResource[];
@@ -8,7 +8,7 @@ type ConversationListEnvelope = {
   items?: ConversationResource[];
 };
 
-export class ConversationProjector {
+export class ConversationMapper {
   private readonly idFactory: ConversationIdFactory;
 
   public constructor(

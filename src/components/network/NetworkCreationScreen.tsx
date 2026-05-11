@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 
-import { PigeonApiClient } from '../../domain/api/PigeonApiClient';
+import { pigeonApplication } from '../../application/applicationContainer';
 import { Field } from '../auth/Field';
 
 export function NetworkCreationScreen({
@@ -21,14 +21,12 @@ export function NetworkCreationScreen({
     setLoading(true);
 
     try {
-      const client = new PigeonApiClient();
-
       if (mode === 'create') {
         // For create mode, we only need name - UUID will be generated server-side
-        await client.createNetwork(name);
+        await pigeonApplication.createNetwork(name);
       } else {
         // For join mode, we need all three values: id, name, and key
-        await client.joinNetwork(id, name, key);
+        await pigeonApplication.joinNetwork(id, name, key);
       }
 
       onNetworkCreated();

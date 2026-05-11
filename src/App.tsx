@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import type { ConversationResource, Session } from './domain/types';
 
@@ -6,31 +6,14 @@ import { AuthScreen } from './components/auth/AuthScreen';
 import { BackgroundGlow } from './components/BackgroundGlow';
 import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
 import { GlassWorkspace } from './components/workspace/GlassWorkspace';
-import { PigeonApiClient } from './domain/api/PigeonApiClient';
+import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [conversations, setConversations] = useState<ConversationResource[]>(
     [],
   );
-  const [nodeHasOwner, setNodeHasNetworks] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkNodeNetworks = async () => {
-      try {
-        const client = new PigeonApiClient();
-        const nodeInfo = await client.getNodeNetworks();
-        setNodeHasNetworks(!!nodeInfo.length);
-      } catch (error) {
-        alert('Error checking node networks:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkNodeNetworks();
-  }, []);
+  const nodeNetworks = useNodeNetworks();
 
   const handleAuthenticated = (
     nextSession: Session,
@@ -41,7 +24,7 @@ function App() {
   };
 
   // If we're still loading, show a loading state
-  if (loading) {
+  if (nodeNetworks.loading) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white flex items-center justify-center">
         <BackgroundGlow />
@@ -56,7 +39,7 @@ function App() {
   };
 
   // If node has no owner, redirect to create network
-  if (nodeHasOwner === false) {
+  if (nodeNetworks.networks.length === 0 && !nodeNetworks.error) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
