@@ -85,6 +85,18 @@ export type MessageResource = {
   createdAt?: number;
 };
 
+export type MessageSignaturePayload = {
+  attachmentExternalIdentifiers: string[];
+  authorId: string;
+  conversationId: string;
+  createdAt: number;
+  encryptedPayload: string;
+  id: string;
+  previousMessageIds: string[];
+  targetMessageId?: string;
+  type: 'sent';
+};
+
 export type ChatMessage = {
   id: string;
   authorIdentityId: string;

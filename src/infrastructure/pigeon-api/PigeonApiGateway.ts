@@ -26,6 +26,7 @@ import { API_SERVER_URL } from '../../config';
 import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
+import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { ConversationMapper } from './ConversationMapper';
@@ -47,6 +48,8 @@ export class PigeonApiGateway {
 
   private readonly messages: MessageProjector;
 
+  private readonly messageSignatures: MessageSignaturePayloadFactory;
+
   private readonly signer: RequestSigner;
 
   public constructor(
@@ -63,6 +66,7 @@ export class PigeonApiGateway {
     this.http = http;
     this.ids = ids;
     this.keychains = keychains;
+    this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.signer = signer;
   }
@@ -335,6 +339,7 @@ export class PigeonApiGateway {
     }
 
     const timestamp = Date.now();
+    const attachmentExternalIdentifiers: string[] = [];
     const encryptedPayload = PublicKey.fromPEM(key.publicKey).encrypt(
       JSON.stringify({
         authorIdentityId: session.identity.id,
@@ -344,15 +349,25 @@ export class PigeonApiGateway {
         type: 'MessageSent',
       }),
     );
+    const id = `${conversationId}:${timestamp}:${crypto.randomUUID()}`;
     const signature = await session.encryptedKeyPair.sign(
-      encryptedPayload.toString(),
+      JSON.stringify(
+        this.messageSignatures.createSent({
+          attachmentExternalIdentifiers,
+          authorId: session.identity.id,
+          conversationId,
+          createdAt: timestamp,
+          encryptedPayload: encryptedPayload.toString(),
+          id,
+        }),
+      ),
       session.password,
     );
     const body = {
-      attachmentExternalIdentifiers: [],
+      attachmentExternalIdentifiers,
       createdAt: timestamp,
       encryptedPayload: encryptedPayload.toString(),
-      id: `${conversationId}:${timestamp}:${crypto.randomUUID()}`,
+      id,
       signature: signature.toString(),
     };
     const path = `/conversations/${encodeURIComponent(
