@@ -22,6 +22,7 @@ import {
   profilePictureUrl,
   normalizeHandle,
 } from '../../utils/identityDisplay';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { SectionTitle } from '../common/SectionTitle';
 
 interface SidebarProps {
@@ -441,9 +442,7 @@ function ProfileEditor({
 
       onUpdated({ ...session, identity });
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : copy.profile.updateError,
-      );
+      setError(toUserErrorMessage(caught, copy.profile.updateError));
     }
     setState('idle');
   };

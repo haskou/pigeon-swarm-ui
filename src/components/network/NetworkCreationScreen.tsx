@@ -4,6 +4,7 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
 import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 import { HeroMetric } from '../auth/HeroMetric';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -42,9 +43,7 @@ export function NetworkCreationScreen({
       onNetworkCreated();
     } catch (caught) {
       setLoading(false);
-      setError(
-        caught instanceof Error ? caught.message : copy.network.unknownError,
-      );
+      setError(toUserErrorMessage(caught, copy.network.unknownError));
     }
   };
 

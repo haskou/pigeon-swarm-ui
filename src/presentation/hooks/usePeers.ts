@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Peer } from '../../application/peers/ListPeers';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 
 type PeersState = {
   error: Error | null;
@@ -23,9 +25,7 @@ export function usePeers(): PeersState {
     try {
       setPeers(await pigeonApplication.listPeers());
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught : new Error('Unable to load peers'),
-      );
+      setError(new Error(toUserErrorMessage(caught, copy.peers.error)));
     } finally {
       setLoading(false);
     }

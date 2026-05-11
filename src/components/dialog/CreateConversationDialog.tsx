@@ -4,6 +4,7 @@ import type { ConversationResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -47,9 +48,7 @@ export function CreateConversationDialog({
     } catch (caught) {
       setState('error');
       setError(
-        caught instanceof Error
-          ? caught.message
-          : copy.dialog.createConversationError,
+        toUserErrorMessage(caught, copy.dialog.createConversationError),
       );
 
       return;

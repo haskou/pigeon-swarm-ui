@@ -64,6 +64,91 @@ export const copy = {
     retry: 'Retry connection',
     title: 'No connection with the server',
   },
+  errors: {
+    backend: {
+      401020: 'The signed request was rejected. Please reload and try again.',
+      401021:
+        'The request was missing authentication headers. Please reload and try again.',
+      403010: 'Only the node owner can do that.',
+      403020: 'Only the notification inviter can do that.',
+      422030: 'That file is too large for the node to accept.',
+      AuthenticatedIdentityIsNotInviterError:
+        'Only the notification inviter can do that.',
+      AuthenticatedIdentityIsNotNodeOwnerError:
+        'Only the node owner can do that.',
+      ConversationMustHaveTwoDifferentParticipantsError:
+        'Direct conversations need two different identities.',
+      ConversationNotFoundError: 'That conversation could not be found.',
+      ConversationParticipantNotFoundError:
+        'Only conversation participants can send messages here.',
+      IdentityMustHaveAtLeastOneNetworkError:
+        'The identity must belong to at least one network.',
+      IdentityNotFoundError: 'That identity could not be found.',
+      IdentityUpdateRequesterMismatchError:
+        'Only the identity owner can publish profile updates.',
+      IPFSBlockNotFoundOfflineError:
+        'That IPFS block is not available while the node is offline.',
+      IPFSBlockNotFoundPublicError:
+        'That public IPFS block could not be found.',
+      IPFSContentNotFoundError:
+        'That IPFS content could not be found on any network.',
+      IPFSNetworkNotFoundError: 'That IPFS network could not be found.',
+      IPFSNetworksNotFoundByIdsError:
+        'One or more selected IPFS networks could not be found.',
+      IPFSPeerIdDuplicatedError:
+        'That IPFS peer is already registered in another network.',
+      InvalidIdentityCandidateError:
+        'The identity data is not valid. Please review the profile and try again.',
+      InvalidIdentitySignatureError:
+        'The identity signature is not valid.',
+      InvalidIdentityVersionError:
+        'The identity version is not valid.',
+      InvalidKeychainCandidateError:
+        'The keychain data is not valid. Please reload and try again.',
+      InvalidKeychainVersionError:
+        'The keychain version is not valid.',
+      InvalidMessageSignatureError:
+        'The message signature is not valid. Please reload the chat and try again.',
+      InvalidNodeIdError: 'The node identifier is not valid.',
+      InvalidPasswordError: 'The password does not meet the required format.',
+      InvalidProfileHandleError:
+        'The username must be 3 to 32 lowercase letters, numbers, or underscores.',
+      InvalidProfileImageError:
+        'The profile image must be uploaded before it can be used.',
+      InvalidSignedRequestError:
+        'The signed request was rejected. Please reload and try again.',
+      InvalidStringLengthError:
+        'Some encrypted data is larger than the backend currently accepts.',
+      IPFSContentTooLargeError:
+        'That file is too large for the node to accept.',
+      KeychainNotFoundError:
+        'No keychain has been published for this identity yet.',
+      MessageTargetAlreadyDeletedError:
+        'That message has already been deleted.',
+      MessageTargetAuthorMismatchError:
+        'Only the original author can delete that message.',
+      MessageTargetNotFoundError:
+        'The message you are trying to reference could not be found.',
+      MissingSignedRequestHeaderError:
+        'The request was missing authentication headers. Please reload and try again.',
+      NodeCannotHaveMoreThanOnePublicNetworkError:
+        'A node cannot have more than one public network.',
+      NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
+        'Only the current owner can transfer this node.',
+      NotificationNotFoundError: 'That notification could not be found.',
+      NotificationRecipientMismatchError:
+        'This notification belongs to another identity.',
+      RemoteMessageCandidateMismatchError:
+        'The remote message does not match the announced message.',
+    },
+    fallback: 'The server rejected the request. Please try again.',
+    forbidden: 'You do not have permission to do that.',
+    network: 'The server could not be reached. Please check your node.',
+    notFound: 'The requested resource could not be found.',
+    unauthorized:
+      'The signed request was rejected. Please reload and try again.',
+    validation: 'The request data is not valid. Please review it and try again.',
+  },
   dialog: {
     cancel: 'Cancel',
     close: 'Close dialog',

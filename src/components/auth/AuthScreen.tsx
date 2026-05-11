@@ -12,6 +12,7 @@ import {
 } from '../../presentation/auth/savedCredentials';
 import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
 import { isValidHandle, normalizeHandle } from '../../utils/identityDisplay';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { Field } from './Field';
@@ -121,9 +122,7 @@ export function AuthScreen({
       onAuthenticated(result.session, result.conversations);
     } catch (caught) {
       setState('error');
-      setError(
-        caught instanceof Error ? caught.message : copy.auth.unknownError,
-      );
+      setError(toUserErrorMessage(caught, copy.auth.unknownError));
 
       return;
     }

@@ -26,6 +26,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
@@ -301,7 +302,7 @@ export function GlassWorkspace({
       setNotifications(await pigeonApplication.listNotifications(session));
     } catch (caught) {
       setNotificationError(
-        caught instanceof Error ? caught.message : copy.notifications.error,
+        toUserErrorMessage(caught, copy.notifications.error),
       );
     }
     setNotificationAction(null);
@@ -339,9 +340,7 @@ export function GlassWorkspace({
         setMessages([]);
         setMessageState('error');
         setSendError(
-          caught instanceof Error
-            ? caught.message
-            : copy.workspace.loadMessagesError,
+          toUserErrorMessage(caught, copy.workspace.loadMessagesError),
         );
 
         return;
@@ -404,9 +403,7 @@ export function GlassWorkspace({
       });
     } catch (caught) {
       setSendError(
-        caught instanceof Error
-          ? caught.message
-          : copy.workspace.loadOlderError,
+        toUserErrorMessage(caught, copy.workspace.loadOlderError),
       );
     }
     if (messageRequestRef.current !== requestId) return;
@@ -450,9 +447,7 @@ export function GlassWorkspace({
       );
       void refreshConversations().catch(() => undefined);
     } catch (caught) {
-      setSendError(
-        caught instanceof Error ? caught.message : copy.workspace.sendError,
-      );
+      setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
       setAttachmentProgress(null);
     }
   };
@@ -527,9 +522,7 @@ export function GlassWorkspace({
       setSendError(copy.messages.replyTargetNotFound);
     } catch (caught) {
       setSendError(
-        caught instanceof Error
-          ? caught.message
-          : copy.workspace.loadOlderError,
+        toUserErrorMessage(caught, copy.workspace.loadOlderError),
       );
     } finally {
       setMessageState('idle');
@@ -551,9 +544,7 @@ export function GlassWorkspace({
         current.filter((item) => item.id !== message.id),
       );
     } catch (caught) {
-      setSendError(
-        caught instanceof Error ? caught.message : copy.messages.deleteError,
-      );
+      setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
     }
   };
 
@@ -605,7 +596,7 @@ export function GlassWorkspace({
       setNotificationsOpen(false);
     } catch (caught) {
       setNotificationError(
-        caught instanceof Error ? caught.message : copy.notifications.error,
+        toUserErrorMessage(caught, copy.notifications.error),
       );
     }
     setNotificationAction(null);
@@ -625,7 +616,7 @@ export function GlassWorkspace({
       );
     } catch (caught) {
       setNotificationError(
-        caught instanceof Error ? caught.message : copy.notifications.error,
+        toUserErrorMessage(caught, copy.notifications.error),
       );
     }
     setNotificationAction(null);

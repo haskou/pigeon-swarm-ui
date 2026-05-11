@@ -9,6 +9,7 @@ import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 
 interface NodeSettingsDialogProps {
   node: { id: string; owner: null | string } | null;
@@ -96,9 +97,7 @@ export function NodeSettingsDialog({
       await pigeonApplication.claimNode(session);
       await onNetworksUpdated();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : copy.nodeSettings.error,
-      );
+      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
     setLoading(null);
   };
@@ -119,9 +118,7 @@ export function NodeSettingsDialog({
       setJoinCode('');
       await onNetworksUpdated();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : copy.nodeSettings.error,
-      );
+      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
     setLoading(null);
   };

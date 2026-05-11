@@ -4,6 +4,8 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 
 type NodeNetworksState = {
   error: Error | null;
@@ -34,11 +36,7 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
       setNode(nodeInfo);
       setNetworks(nodeNetworks);
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught
-          : new Error('Unable to load node networks'),
-      );
+      setError(new Error(toUserErrorMessage(caught, copy.nodeSettings.error)));
     } finally {
       setLoading(false);
     }
