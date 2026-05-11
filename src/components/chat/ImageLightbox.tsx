@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -21,6 +22,7 @@ export function ImageLightbox({
   onClose,
 }: ImageLightboxProps) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(1);
   const activeImage = images[activeIndex];
   const hasPrevious = activeIndex > 0;
   const hasNext = activeIndex < images.length - 1;
@@ -28,6 +30,10 @@ export function ImageLightbox({
   useEffect(() => {
     setActiveIndex(initialIndex);
   }, [initialIndex]);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [activeIndex]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -45,23 +51,21 @@ export function ImageLightbox({
 
   if (!activeImage) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[90] grid place-items-center bg-black/92 p-4 backdrop-blur-xl"
+      className="fixed inset-0 z-[1000] grid place-items-center bg-black/92 p-4 backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
+      onClick={onClose}
     >
-      <button
-        type="button"
-        className="absolute inset-0 cursor-zoom-out"
-        onClick={onClose}
-        aria-label={copy.attachments.closeViewer}
-      />
-      <div className="relative z-10 flex h-full w-full max-w-7xl items-center justify-center">
+      <div className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden">
         {hasPrevious && (
           <button
             type="button"
-            onClick={() => setActiveIndex((current) => current - 1)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setActiveIndex((current) => current - 1);
+            }}
             className="absolute left-0 z-20 grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-3xl font-black text-white transition hover:bg-white/20 sm:left-4"
             aria-label={copy.attachments.previousImage}
           >
@@ -71,12 +75,27 @@ export function ImageLightbox({
         <img
           src={activeImage.url}
           alt={activeImage.alt}
-          className="max-h-full max-w-full touch-auto select-none object-contain"
+          onClick={(event) => event.stopPropagation()}
+          onWheel={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setZoom((current) =>
+              clamp(current + (event.deltaY < 0 ? 0.18 : -0.18), 1, 4),
+            );
+          }}
+          className={cx(
+            'max-h-full max-w-full touch-auto select-none object-contain transition-transform',
+            zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in',
+          )}
+          style={{ transform: `scale(${zoom})` }}
         />
         {hasNext && (
           <button
             type="button"
-            onClick={() => setActiveIndex((current) => current + 1)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setActiveIndex((current) => current + 1);
+            }}
             className="absolute right-0 z-20 grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-3xl font-black text-white transition hover:bg-white/20 sm:right-4"
             aria-label={copy.attachments.nextImage}
           >
@@ -96,7 +115,10 @@ export function ImageLightbox({
       </div>
       <button
         type="button"
-        onClick={onClose}
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
         className={cx(
           'absolute right-4 top-4 z-30 grid h-11 w-11 place-items-center',
           'rounded-2xl bg-white/10 text-2xl font-black text-white transition hover:bg-white/20',
@@ -105,6 +127,11 @@ export function ImageLightbox({
       >
         ×
       </button>
-    </div>
+    </div>,
+    document.body,
   );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

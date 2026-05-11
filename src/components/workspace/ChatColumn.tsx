@@ -82,7 +82,7 @@ export function ChatColumn({
       identity: session.identity,
       identityId: session.identity.id,
       name: session.identity.profile.name,
-      picture: session.identity.profile.picture,
+      picture: identityPictures[session.identity.id],
     });
   const openPeerProfile = () => {
     if (!peerIdentityId || !activeConversationName) return;
