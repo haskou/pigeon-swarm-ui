@@ -1,4 +1,4 @@
-import { EncryptedPayload, StringValueObject } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/value-objects';
 
 import type { KeychainResource, LocalKeychain, Session } from '../types';
 
@@ -17,7 +17,7 @@ export class KeychainCipher {
   ): Promise<LocalKeychain> {
     const decrypted = await session.encryptedKeyPair.decrypt(
       new EncryptedPayload(keychain.encryptedPayload),
-      new StringValueObject(session.password),
+      session.password,
     );
 
     const parsed = JSON.parse(decrypted.toString()) as Partial<LocalKeychain>;
@@ -39,13 +39,11 @@ export class KeychainCipher {
     );
     const keychain = { ...nextKeychain, version };
     const encryptedPayload = session.encryptedKeyPair
-      .encrypt(new StringValueObject(JSON.stringify(keychain)))
+      .encrypt(JSON.stringify(keychain))
       .toString();
     const signature = await session.encryptedKeyPair.sign(
-      new StringValueObject(
-        JSON.stringify({ encryptedPayload, timestamp, version }),
-      ),
-      new StringValueObject(session.password),
+      JSON.stringify({ encryptedPayload, timestamp, version }),
+      session.password,
     );
 
     return {

@@ -5,8 +5,10 @@ import type {
   ConversationResource,
   Session,
 } from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -20,11 +22,13 @@ interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  nodeNetworks: NodeNetwork[];
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
 export function GlassWorkspace({
   conversations,
+  nodeNetworks,
   session,
   setConversations,
   setSession,
@@ -79,7 +83,7 @@ export function GlassWorkspace({
         setSendError(
           caught instanceof Error
             ? caught.message
-            : 'No se han podido cargar mensajes. Enhorabuena, ya tenemos misterio.',
+            : copy.workspace.loadMessagesError,
         );
 
         return;
@@ -117,7 +121,7 @@ export function GlassWorkspace({
       setSendError(
         caught instanceof Error
           ? caught.message
-          : 'No se han podido cargar mensajes antiguos.',
+          : copy.workspace.loadOlderError,
       );
     }
     setMessageState('idle');
@@ -144,9 +148,7 @@ export function GlassWorkspace({
       void refreshConversations().catch(() => undefined);
     } catch (caught) {
       setSendError(
-        caught instanceof Error
-          ? caught.message
-          : 'No se ha enviado. La paloma se ha estampado contra TLS.',
+        caught instanceof Error ? caught.message : copy.workspace.sendError,
       );
     }
   };
@@ -166,33 +168,39 @@ export function GlassWorkspace({
   };
 
   return (
-    <section className="relative z-10 min-h-screen pt-3 sm:pt-4">
-      <div className="mx-auto grid h-[calc(100vh-.75rem)] max-w-[1800px] grid-cols-1 gap-3 px-3 pb-3 sm:h-[calc(100vh-1rem)] sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
-        <Rail onLogout={() => setSession(null)} />
+    <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
+      <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+        <Rail className="hidden lg:flex" />
 
         <div
           className={cx(
-            'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[360px] translate-x-0 p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+            'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
             sidebarOpen ? 'block' : 'hidden lg:block',
           )}
         >
-          <Sidebar
-            session={session}
-            conversations={conversations}
-            activeConversationId={activeConversation?.id ?? null}
-            onSelect={(id) => {
-              setActiveConversationId(id);
-              setSidebarOpen(false);
-            }}
-            onCreate={() => setIsCreateOpen(true)}
-          />
+          <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+            <Rail className="lg:hidden" />
+            <Sidebar
+              session={session}
+              conversations={conversations}
+              nodeNetworks={nodeNetworks}
+              activeConversationId={activeConversation?.id ?? null}
+              onSelect={(id) => {
+                setActiveConversationId(id);
+                setSidebarOpen(false);
+              }}
+              onCreate={() => setIsCreateOpen(true)}
+              onClose={() => setSidebarOpen(false)}
+              onLogout={() => setSession(null)}
+            />
+          </div>
         </div>
 
         {sidebarOpen && (
           <button
             className="fixed inset-0 z-30 bg-black/50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
+            aria-label={copy.workspace.closeSidebar}
           />
         )}
 

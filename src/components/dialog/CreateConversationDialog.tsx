@@ -3,6 +3,7 @@ import { FormEvent, useState } from 'react';
 import type { ConversationResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
 import { Field } from '../auth/Field';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -48,7 +49,7 @@ export function CreateConversationDialog({
       setError(
         caught instanceof Error
           ? caught.message
-          : 'No se ha podido crear la conversación. El backend ha elegido violencia.',
+          : copy.dialog.createConversationError,
       );
 
       return;
@@ -58,32 +59,31 @@ export function CreateConversationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong w-full max-w-xl rounded-[2rem] p-5 sm:p-6"
+        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-[2rem] sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black tracking-tight">
-              Crear conversación 1to1
+              {copy.dialog.createConversationTitle}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-white/55">
-              Introduce el ID de la identidad remota. El cliente resuelve esa
-              identidad, crea la conversación, genera una keypair de
-              conversación y guarda la clave privada en tu keychain cifrado.
+              {copy.dialog.createConversationBody}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={copy.dialog.close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
           >
             ×
           </button>
         </div>
 
-        <Field label="Remote identity ID">
+        <Field label={copy.dialog.remoteIdentityId}>
           <textarea
             value={peerIdentityId}
             onChange={(event) => setPeerIdentityId(event.target.value)}
@@ -104,15 +104,15 @@ export function CreateConversationDialog({
             onClick={onClose}
             className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-black text-white/70"
           >
-            Cancelar
+            {copy.dialog.cancel}
           </button>
           <button
             disabled={!peerIdentityId.trim() || state === 'loading'}
             className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
           >
             {state === 'loading'
-              ? 'Creando y publicando keychain...'
-              : 'Crear conversación'}
+              ? copy.dialog.createConversationLoading
+              : copy.dialog.createConversation}
           </button>
         </div>
       </form>

@@ -6,6 +6,7 @@ export class HttpJsonClient {
   public async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(this.urls.build(path), {
       ...init,
+      cache: init.cache ?? 'no-store',
       headers: this.headers(init),
     });
 
@@ -13,7 +14,7 @@ export class HttpJsonClient {
       throw new Error(await this.errorMessage(response));
     }
 
-    if (response.status === 204) {
+    if (response.status === 204 || response.status === 304) {
       return undefined as T;
     }
 

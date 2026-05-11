@@ -1,17 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { ConversationResource, Session } from './domain/types';
 
+import { pigeonApplication } from './application/applicationContainer';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { BackgroundGlow } from './components/BackgroundGlow';
 import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
+import { ServerConnectionScreen } from './components/system/ServerConnectionScreen';
 import { GlassWorkspace } from './components/workspace/GlassWorkspace';
+import { copy } from './i18n/en';
+import {
+  clearSavedCredentials,
+  loadSavedCredentials,
+} from './presentation/auth/savedCredentials';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 
+type RestoreState = 'idle' | 'loading' | 'done';
+
 function App() {
+  const [hasSavedCredentials] = useState(() => loadSavedCredentials() !== null);
   const [session, setSession] = useState<Session | null>(null);
   const [conversations, setConversations] = useState<ConversationResource[]>(
     [],
+  );
+  const [restoreState, setRestoreState] = useState<RestoreState>(
+    hasSavedCredentials ? 'loading' : 'done',
   );
   const nodeNetworks = useNodeNetworks();
 
@@ -23,22 +36,56 @@ function App() {
     setConversations(nextConversations);
   };
 
+  useEffect(() => {
+    if (nodeNetworks.loading || nodeNetworks.error || session) return;
+    if (nodeNetworks.networks.length === 0) return;
+    if (restoreState !== 'loading') return;
+
+    const savedCredentials = loadSavedCredentials();
+
+    if (!savedCredentials) {
+      setRestoreState('done');
+      return;
+    }
+
+    void pigeonApplication
+      .login(savedCredentials.identityId, savedCredentials.password)
+      .then((result) => {
+        handleAuthenticated(result.session, result.conversations);
+        setRestoreState('done');
+      })
+      .catch(() => {
+        clearSavedCredentials();
+        setRestoreState('done');
+      });
+  }, [nodeNetworks, restoreState, session]);
+
   // If we're still loading, show a loading state
-  if (nodeNetworks.loading) {
+  if (nodeNetworks.loading || restoreState === 'loading') {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white flex items-center justify-center">
         <BackgroundGlow />
-        <div className="text-xl">Loading...</div>
+        <div className="text-xl">{copy.app.loading}</div>
       </main>
     );
   }
 
   const handleNetworkCreated = () => {
-    // After creating network, check if node now has an owner
     window.location.reload();
   };
 
-  // If node has no owner, redirect to create network
+  if (nodeNetworks.error) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
+        <BackgroundGlow />
+        <ServerConnectionScreen
+          error={nodeNetworks.error}
+          onRetry={nodeNetworks.reload}
+        />
+      </main>
+    );
+  }
+
   if (nodeNetworks.networks.length === 0 && !nodeNetworks.error) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
@@ -56,7 +103,11 @@ function App() {
       ) : (
         <GlassWorkspace
           session={session}
-          setSession={setSession}
+          nodeNetworks={nodeNetworks.networks}
+          setSession={(nextSession) => {
+            if (!nextSession) clearSavedCredentials();
+            setSession(nextSession);
+          }}
           conversations={conversations}
           setConversations={setConversations}
         />
