@@ -9,7 +9,6 @@ import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
-import { identityName } from '../../utils/identityDisplay';
 
 interface NodeSettingsDialogProps {
   node: { id: string; owner: null | string } | null;
@@ -40,16 +39,14 @@ export function NodeSettingsDialog({
     node?.owner === session.identity.id ? session.identity : null,
   );
   const isOwner = node?.owner === session.identity.id;
+  const ownerProfile = isOwner ? session.identity.profile : ownerIdentity?.profile;
+  const ownerName = ownerProfile?.name.trim();
   const ownerLabel = !node?.owner
     ? copy.nodeSettings.unclaimed
-    : node.owner === session.identity.id
-      ? identityName(session.identity) ?? shortId(node.owner)
-      : ownerIdentity
-        ? identityName(ownerIdentity) ?? shortId(node.owner)
-        : shortId(node.owner);
+    : ownerName || shortId(node.owner);
   const ownerHandle =
-    ownerIdentity?.profile.handle?.trim() && node?.owner
-      ? `@${ownerIdentity.profile.handle.trim()}`
+    ownerProfile?.handle?.trim() && node?.owner
+      ? `@${ownerProfile.handle.trim()}`
       : node?.owner
         ? shortId(node.owner)
         : copy.nodeSettings.claimAvailable;
@@ -259,13 +256,13 @@ export function NodeSettingsDialog({
               ))}
             </div>
             {isOwner && (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-3 w-full rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 opacity-55 disabled:cursor-not-allowed"
-                >
-                  {copy.nodeSettings.removeUnavailable}
-                </button>
+              <button
+                type="button"
+                disabled
+                className="mt-3 w-full rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 opacity-55 disabled:cursor-not-allowed"
+              >
+                {copy.nodeSettings.removeUnavailable}
+              </button>
             )}
           </div>
 
@@ -275,58 +272,58 @@ export function NodeSettingsDialog({
                 onSubmit={handleCreate}
                 className="rounded-3xl bg-black/20 p-4"
               >
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                  {copy.nodeSettings.createLabel}
-                </span>
-                <input
-                  value={createName}
-                  onChange={(event) => setCreateName(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.network.namePlaceholder}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading !== null}
-                className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {loading === 'create'
-                  ? copy.nodeSettings.saving
-                  : copy.nodeSettings.create}
-              </button>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    {copy.nodeSettings.createLabel}
+                  </span>
+                  <input
+                    value={createName}
+                    onChange={(event) => setCreateName(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder={copy.network.namePlaceholder}
+                    required
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading !== null}
+                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {loading === 'create'
+                    ? copy.nodeSettings.saving
+                    : copy.nodeSettings.create}
+                </button>
               </form>
 
-            <form onSubmit={handleJoin} className="rounded-3xl bg-black/20 p-4">
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                  {copy.nodeSettings.joinLabel}
-                </span>
-                <textarea
-                  value={joinCode}
-                  onChange={(event) => setJoinCode(event.target.value)}
-                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.network.inviteCodePlaceholder}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading !== null}
-                className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {loading === 'join'
-                  ? copy.nodeSettings.saving
-                  : copy.nodeSettings.join}
-              </button>
-            </form>
+              <form onSubmit={handleJoin} className="rounded-3xl bg-black/20 p-4">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    {copy.nodeSettings.joinLabel}
+                  </span>
+                  <textarea
+                    value={joinCode}
+                    onChange={(event) => setJoinCode(event.target.value)}
+                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder={copy.network.inviteCodePlaceholder}
+                    required
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading !== null}
+                  className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {loading === 'join'
+                    ? copy.nodeSettings.saving
+                    : copy.nodeSettings.join}
+                </button>
+              </form>
 
             <div className="rounded-3xl bg-black/20 p-4">
               <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                 {copy.nodeSettings.shareLabel}
               </div>
-              <div className="rounded-2xl bg-black/25 p-3 text-xs text-white/60">
+              <div className="truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
                 {selectedNetworkCode || copy.nodeSettings.missingNetworkKey}
               </div>
               <button
@@ -346,14 +343,11 @@ export function NodeSettingsDialog({
             )}
             </div>
           ) : (
-            <div className="rounded-3xl bg-black/20 p-4 text-sm leading-6 text-white/60">
-              {copy.nodeSettings.ownerOnly}
-              {error && (
-                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-                  {error}
-                </div>
-              )}
-            </div>
+            error && (
+              <div className="rounded-3xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
+                {error}
+              </div>
+            )
           )}
         </div>
       </section>
