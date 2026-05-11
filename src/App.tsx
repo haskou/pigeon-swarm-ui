@@ -59,16 +59,6 @@ function App() {
       });
   }, [nodeNetworks, restoreState, session]);
 
-  // If we're still loading, show a loading state
-  if (nodeNetworks.loading || restoreState === 'loading') {
-    return (
-      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white flex items-center justify-center">
-        <BackgroundGlow />
-        <div className="text-xl">{copy.app.loading}</div>
-      </main>
-    );
-  }
-
   const handleNetworkCreated = () => {
     window.location.reload();
   };
@@ -81,6 +71,16 @@ function App() {
           error={nodeNetworks.error}
           onRetry={nodeNetworks.reload}
         />
+      </main>
+    );
+  }
+
+  // If we're still loading, show a loading state
+  if (nodeNetworks.loading || restoreState === 'loading') {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white flex items-center justify-center">
+        <BackgroundGlow />
+        <div className="text-xl">{copy.app.loading}</div>
       </main>
     );
   }
