@@ -302,6 +302,63 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('deletes messages with a signed tombstone body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'delete-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.deleteMessage(
+        session,
+        'one-to-one:conversation',
+        'message/to-delete',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-delete';
+    const [, request] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(request.body as string) as {
+      createdAt: number;
+      id: string;
+      signature: string;
+    };
+    const [signaturePayload] = sign.mock.calls[0] as [string, string];
+
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: expect.any(String),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
+    });
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(body.signature).toBe('delete-signature');
+    expect(JSON.parse(signaturePayload)).toEqual({
+      attachmentExternalIdentifiers: [],
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: body.createdAt,
+      id: body.id,
+      previousMessageIds: ['message/to-delete'],
+      targetMessageId: 'message/to-delete',
+      type: 'deleted',
+    });
+  });
+
   it('loads public IPFS content by encoded cid', async () => {
     const content = {
       cid: 'bafy/avatar',

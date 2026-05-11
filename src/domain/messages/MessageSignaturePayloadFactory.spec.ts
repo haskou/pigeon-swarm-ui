@@ -1,6 +1,40 @@
 import { MessageSignaturePayloadFactory } from './MessageSignaturePayloadFactory';
 
 describe(MessageSignaturePayloadFactory.name, () => {
+  it('builds the canonical deleted-message payload expected by the backend', () => {
+    const payload = new MessageSignaturePayloadFactory().createDeleted({
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: 123,
+      id: 'delete-message-1',
+      targetMessageId: 'message-1',
+    });
+
+    expect(Object.keys(payload)).toEqual([
+      'attachmentExternalIdentifiers',
+      'authorId',
+      'conversationId',
+      'createdAt',
+      'encryptedPayload',
+      'id',
+      'previousMessageIds',
+      'targetMessageId',
+      'type',
+    ]);
+    expect(payload).toEqual({
+      attachmentExternalIdentifiers: [],
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: 123,
+      encryptedPayload: undefined,
+      id: 'delete-message-1',
+      previousMessageIds: ['message-1'],
+      targetMessageId: 'message-1',
+      type: 'deleted',
+    });
+    expect(JSON.stringify(payload)).not.toContain('encryptedPayload');
+  });
+
   it('builds the canonical sent-message payload expected by the backend', () => {
     const payload = new MessageSignaturePayloadFactory().createSent({
       attachmentExternalIdentifiers: [],

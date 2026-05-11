@@ -10,6 +10,7 @@ import type {
 } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
+import type { MouseEvent } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
@@ -34,6 +35,11 @@ import { Sidebar } from './Sidebar';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
+type MessageContextMenuState = {
+  message: ChatMessage;
+  x: number;
+  y: number;
+};
 
 const archivedNotifications = new ArchivedNotifications();
 
@@ -84,6 +90,9 @@ export function GlassWorkspace({
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
+  const [messageContextMenu, setMessageContextMenu] =
+    useState<MessageContextMenuState | null>(null);
+  const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
@@ -423,6 +432,39 @@ export function GlassWorkspace({
     }
   };
 
+  const handleMessageContextMenu = (
+    event: MouseEvent,
+    message: ChatMessage,
+  ) => {
+    event.preventDefault();
+    setMessageContextMenu({
+      message,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const handleDeleteMessage = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setSendError(null);
+    try {
+      await pigeonApplication.deleteMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setMessages((current) =>
+        current.filter((item) => item.id !== message.id),
+      );
+    } catch (caught) {
+      setSendError(
+        caught instanceof Error ? caught.message : copy.messages.deleteError,
+      );
+    }
+  };
+
   const handleConversationCreated = (
     nextSession: Session,
     conversation: ConversationResource,
@@ -630,6 +672,7 @@ export function GlassWorkspace({
           bottomRef={bottomRef}
           onScroll={handleScroll}
           onSend={handleSend}
+          onMessageContextMenu={handleMessageContextMenu}
           onOpenSidebar={() => setSidebarOpen(true)}
           onCreate={() => setIsCreateOpen(true)}
           progress={attachmentProgress}
@@ -662,6 +705,25 @@ export function GlassWorkspace({
             />
           </div>
         </>
+      )}
+
+      {messageContextMenu && (
+        <MessageContextMenu
+          menu={messageContextMenu}
+          onClose={() => setMessageContextMenu(null)}
+          onDelete={() => void handleDeleteMessage(messageContextMenu.message)}
+          onViewRaw={() => {
+            setRawMessage(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
+        />
+      )}
+
+      {rawMessage && (
+        <RawMessageDialog
+          message={rawMessage}
+          onClose={() => setRawMessage(null)}
+        />
       )}
 
       {isCreateOpen && (
@@ -698,5 +760,82 @@ export function GlassWorkspace({
         />
       )}
     </section>
+  );
+}
+
+function MessageContextMenu({
+  menu,
+  onClose,
+  onDelete,
+  onViewRaw,
+}: {
+  menu: MessageContextMenuState;
+  onClose: () => void;
+  onDelete: () => void;
+  onViewRaw: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[80] cursor-default"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <div
+        className="fixed z-[90] min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        style={{ left: menu.x, top: menu.y }}
+      >
+        <button
+          type="button"
+          onClick={onViewRaw}
+          className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+        >
+          {copy.messages.viewRaw}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15"
+        >
+          {copy.messages.delete}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function RawMessageDialog({
+  message,
+  onClose,
+}: {
+  message: ChatMessage;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">{copy.messages.rawTitle}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+        <pre className="mt-4 min-h-0 overflow-auto rounded-3xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+          {JSON.stringify(message.raw, null, 2)}
+        </pre>
+      </section>
+    </div>
   );
 }

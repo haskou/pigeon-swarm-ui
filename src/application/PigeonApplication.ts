@@ -18,6 +18,7 @@ import { CreateConversation } from './conversations/CreateConversation';
 import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
 import { RegisterIdentity } from './identities/RegisterIdentity';
+import { DeleteMessage } from './messages/DeleteMessage';
 import { LoadMessages } from './messages/LoadMessages';
 import { SendMessage } from './messages/SendMessage';
 import { CreateNetwork } from './networks/CreateNetwork';
@@ -44,6 +45,8 @@ export class PigeonApplication {
 
   private readonly joinNetworkUseCase: JoinNetwork;
 
+  private readonly deleteMessageUseCase: DeleteMessage;
+
   private readonly listConversationsUseCase: ListConversations;
 
   private readonly listNodeNetworksUseCase: ListNodeNetworks;
@@ -67,6 +70,7 @@ export class PigeonApplication {
     this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
+    this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.joinNetworkUseCase = new JoinNetwork(gateway);
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
@@ -156,6 +160,14 @@ export class PigeonApplication {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     return await this.gateway.downloadAttachment(attachment, onProgress);
+  }
+
+  public async deleteMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.deleteMessageUseCase.execute(session, conversationId, messageId);
   }
 
   public async updateIdentityProfile(

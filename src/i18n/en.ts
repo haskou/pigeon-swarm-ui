@@ -90,11 +90,15 @@ export const copy = {
     storedOneKeys: 'Stored keys',
   },
   messages: {
+    delete: 'Delete',
+    deleteError: 'The message could not be deleted.',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     missingConversationKey:
       'This conversation key is missing from the keychain.',
     missingKey:
       '[encrypted] This conversation key is missing from the keychain.',
+    rawTitle: 'Raw message',
+    viewRaw: 'View raw',
   },
   network: {
     create: 'Create network',
