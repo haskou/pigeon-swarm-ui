@@ -9,6 +9,7 @@ interface MessageBubbleProps {
   currentIdentityId: string;
   authorName: string;
   authorPicture?: string | null;
+  onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: () => void;
   showAvatar: boolean;
 }
@@ -18,6 +19,7 @@ export function MessageBubble({
   authorPicture,
   currentIdentityId,
   message,
+  onAttachmentOpen,
   onAvatarClick,
   showAvatar,
 }: MessageBubbleProps) {
@@ -41,19 +43,54 @@ export function MessageBubble({
       <div
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
-          compactTimestamp && 'flex items-end gap-2',
+          compactTimestamp &&
+            message.attachments.length === 0 &&
+            'flex items-end gap-2',
           mine
             ? 'bg-fuchsia-500 text-right text-white shadow-xl shadow-fuchsia-950/20'
             : 'border border-white/10 bg-black/25 text-white',
         )}
       >
-        <p className={cx(message.encrypted && 'text-white/55')}>
-          {message.content}
-        </p>
+        {message.content && (
+          <p className={cx(message.encrypted && 'text-white/55')}>
+            {message.content}
+          </p>
+        )}
+        {message.attachments.length > 0 && (
+          <div className={cx(message.content && 'mt-3', 'grid gap-2')}>
+            {message.attachments.map((attachment, index) => (
+              <button
+                key={`${message.id}-${attachment.cid}`}
+                type="button"
+                onClick={() => onAttachmentOpen(index)}
+                className={cx(
+                  'flex max-w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition',
+                  mine
+                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                    : 'border-white/10 bg-white/8 hover:bg-white/12',
+                )}
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/20 font-black">
+                  ↓
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-black">
+                    {attachment.filename}
+                  </span>
+                  <span className="block text-xs opacity-65">
+                    {formatFileSize(attachment.size)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <div
           className={cx(
             'text-right text-xs font-black opacity-65',
-            compactTimestamp ? 'shrink-0' : 'mt-1',
+            compactTimestamp && message.attachments.length === 0
+              ? 'shrink-0'
+              : 'mt-1',
           )}
         >
           {formatTime(message.timestamp)}
@@ -72,4 +109,14 @@ export function MessageBubble({
         ))}
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+
+  const kilobytes = bytes / 1024;
+
+  if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
+
+  return `${(kilobytes / 1024).toFixed(1)} MB`;
 }

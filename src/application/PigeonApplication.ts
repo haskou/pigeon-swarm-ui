@@ -5,6 +5,7 @@ import type {
   IdentityResource,
   LocalKeychain,
   LoginResult,
+  MessageAttachment,
   NotificationResource,
   PublicFileContent,
   PublicFileUpload,
@@ -145,6 +146,12 @@ export class PigeonApplication {
     return await this.gateway.getPublicFile(cid);
   }
 
+  public async downloadAttachment(
+    attachment: MessageAttachment,
+  ): Promise<Blob> {
+    return await this.gateway.downloadAttachment(attachment);
+  }
+
   public async updateIdentityProfile(
     session: Session,
     profile: IdentityUpdateProfileInput,
@@ -213,12 +220,14 @@ export class PigeonApplication {
     conversationId: string,
     content: string,
     previousMessageIds: string[] = [],
+    attachments: File[] = [],
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
       conversationId,
       content,
       previousMessageIds,
+      attachments,
     );
   }
 

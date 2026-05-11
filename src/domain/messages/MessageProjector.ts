@@ -1,6 +1,11 @@
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
-import type { ChatMessage, MessageResource, Session } from '../types';
+import type {
+  ChatMessage,
+  MessageAttachment,
+  MessageResource,
+  Session,
+} from '../types';
 
 import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
 import { conversationKeyEntry } from '../conversations/conversationKey';
@@ -15,6 +20,7 @@ type MessageListEnvelope = {
 };
 
 type PlainMessage = {
+  attachments?: MessageAttachment[];
   authorIdentityId?: string;
   content?: string;
   timestamp?: number;
@@ -86,6 +92,7 @@ export class MessageProjector {
       message.authorIdentityId ?? message.authorId ?? 'unknown';
 
     return {
+      attachments: [],
       authorIdentityId,
       id:
         message.id ??
@@ -140,7 +147,7 @@ export class MessageProjector {
     const content =
       reason === 'missing-key' ? this.copy.missingKey : this.copy.decryptFailed;
 
-    return { ...base, content, encrypted: true, raw: message };
+    return { ...base, attachments: [], content, encrypted: true, raw: message };
   }
 
   private plainMessage(
@@ -149,6 +156,7 @@ export class MessageProjector {
   ): ChatMessage {
     return {
       ...base,
+      attachments: [],
       content: message.content ?? '',
       encrypted: false,
       raw: message,
@@ -166,6 +174,7 @@ export class MessageProjector {
 
     return {
       ...base,
+      attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
       authorIdentityId,
       content: parsed.content ?? decryptedText,
       encrypted: false,

@@ -20,6 +20,28 @@ describe(SendMessage.name, () => {
       'conversation-1',
       'hello',
       ['previous'],
+      [],
+    );
+  });
+
+  it('passes selected attachments to the gateway', async () => {
+    const session = { password: 'secret' } as Session;
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    const expected = { content: 'hello' } as ChatMessage;
+    const gateway = {
+      sendMessage: jest.fn().mockResolvedValue(expected),
+    } as unknown as PigeonApiGateway;
+    const useCase = new SendMessage(gateway);
+
+    await expect(
+      useCase.execute(session, 'conversation-1', 'hello', [], [file]),
+    ).resolves.toBe(expected);
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      session,
+      'conversation-1',
+      'hello',
+      [],
+      [file],
     );
   });
 });

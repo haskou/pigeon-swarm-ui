@@ -1,7 +1,12 @@
-import type { IdentityResource, Session } from '../../domain/types';
+import type {
+  IdentityResource,
+  PendingMessageAttachment,
+  Session,
+} from '../../domain/types';
 import type { HttpJsonClient } from '../http/HttpJsonClient';
 import type { RequestSigner } from './RequestSigner';
 
+import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
@@ -138,6 +143,162 @@ describe(PigeonApiGateway.name, () => {
         'X-Signature': 'http-signature',
       },
       method: 'POST',
+    });
+  });
+
+  it('uploads private attachments as signed encrypted raw bytes', async () => {
+    const bytes = new Uint8Array([9, 8, 7]).buffer;
+    const upload = {
+      cid: 'bafy-attachment',
+      contentType: 'application/octet-stream',
+      encrypted: true,
+      filename: 'encrypted.bin',
+      size: 3,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(upload),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const attachment = {
+      encryptedBytes: bytes,
+      metadata: {
+        contentType: 'image/png',
+        encryption: { algorithm: 'AES-GCM', iv: 'iv', key: 'key' },
+        filename: 'photo.png',
+        size: 3,
+      },
+      uploadFilename: 'encrypted.bin',
+    } satisfies PendingMessageAttachment;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.uploadPrivateFile(session, attachment)).resolves.toBe(
+      upload,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/ipfs/private',
+      bytes,
+    );
+    expect(http.request).toHaveBeenCalledWith('/ipfs/private', {
+      body: bytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': 'encrypted.bin',
+        'X-Signature': 'http-signature',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('sends messages with encrypted attachment references', async () => {
+    const encryptedBytes = new Uint8Array([9, 8, 7]).buffer;
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          cid: 'bafy-attachment',
+          contentType: 'application/octet-stream',
+          encrypted: true,
+          filename: 'encrypted.bin',
+          size: 3,
+        })
+        .mockResolvedValueOnce({
+          authorIdentityId: 'identity-1',
+          content: 'sent',
+          id: 'message-1',
+          timestamp: 10,
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const attachmentCipher = {
+      encrypt: jest.fn().mockResolvedValue({
+        encryptedBytes,
+        metadata: {
+          contentType: 'image/png',
+          encryption: { algorithm: 'AES-GCM', iv: 'iv', key: 'key' },
+          filename: 'photo.png',
+          size: 10,
+        },
+        uploadFilename: 'encrypted.bin',
+      }),
+    } as unknown as AttachmentCipher;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'message-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          'conversation-1': {
+            conversationId: 'conversation-1',
+            createdAt: 1,
+            peerIdentityId: 'identity-2',
+            privateKey: 'private-key',
+            publicKey: 'public-key',
+          },
+        },
+        version: 1,
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const file = new File(['photo'], 'photo.png', { type: 'image/png' });
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      attachmentCipher,
+    );
+
+    await expect(
+      gateway.sendMessage(session, 'conversation-1', 'hello', [], [file]),
+    ).resolves.toMatchObject({ content: 'sent' });
+
+    const [, messageRequest] = (http.request as jest.Mock).mock.calls[1] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(messageRequest.body as string) as {
+      attachmentExternalIdentifiers: string[];
+      encryptedPayload: string;
+      signature: string;
+    };
+    const [signaturePayload] = sign.mock.calls[0] as [string, string];
+
+    expect(body.attachmentExternalIdentifiers).toEqual(['bafy-attachment']);
+    expect(body.signature).toBe('message-signature');
+    expect(JSON.parse(signaturePayload)).toMatchObject({
+      attachmentExternalIdentifiers: ['bafy-attachment'],
+      authorId: 'identity-1',
+      conversationId: 'conversation-1',
+      encryptedPayload: expect.stringContaining('bafy-attachment'),
+      previousMessageIds: [],
+      type: 'sent',
+    });
+    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+      attachments: [
+        {
+          cid: 'bafy-attachment',
+          contentType: 'image/png',
+          encryptedSize: 3,
+          filename: 'photo.png',
+          size: 10,
+        },
+      ],
+      content: 'hello',
     });
   });
 

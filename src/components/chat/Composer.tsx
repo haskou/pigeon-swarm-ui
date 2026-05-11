@@ -1,14 +1,15 @@
-import { FormEvent, useState } from 'react';
+import { ChangeEvent, FormEvent, useRef, useState } from 'react';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 
 const MESSAGE_MAX_LENGTH = 4000;
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 interface ComposerProps {
   disabled: boolean;
   error: string | null;
-  onSend: (content: string) => Promise<void>;
+  onSend: (content: string, attachments: File[]) => Promise<void>;
   placeholder?: string;
 }
 
@@ -19,21 +20,53 @@ export function Composer({
   placeholder = copy.composer.placeholder,
 }: ComposerProps) {
   const [content, setContent] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canSend =
+    (content.trim().length > 0 || attachments.length > 0) &&
+    content.trim().length <= MESSAGE_MAX_LENGTH &&
+    !disabled &&
+    !sending;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = content.trim();
 
-    if (!trimmed || trimmed.length > MESSAGE_MAX_LENGTH || sending) return;
+    if (!canSend) return;
 
     setSending(true);
     try {
-      await onSend(trimmed);
+      await onSend(trimmed, attachments);
       setContent('');
+      setAttachments([]);
+      setAttachmentError(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } finally {
       setSending(false);
     }
+  };
+
+  const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    const acceptedFiles = selectedFiles.filter(
+      (file) => file.size <= ATTACHMENT_MAX_BYTES,
+    );
+
+    setAttachmentError(
+      acceptedFiles.length === selectedFiles.length
+        ? null
+        : copy.composer.attachmentTooLarge,
+    );
+    setAttachments((current) => [...current, ...acceptedFiles]);
+    event.target.value = '';
+  };
+
+  const removeAttachment = (indexToRemove: number) => {
+    setAttachments((current) =>
+      current.filter((_, index) => index !== indexToRemove),
+    );
   };
 
   return (
@@ -41,9 +74,33 @@ export function Composer({
       onSubmit={handleSubmit}
       className="border-t border-white/10 p-4 sm:p-5"
     >
-      {error && (
+      {(error || attachmentError) && (
         <div className="mb-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-          {error}
+          {error ?? attachmentError}
+        </div>
+      )}
+      {attachments.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {attachments.map((attachment, index) => (
+            <div
+              key={`${attachment.name}-${attachment.size}-${index}`}
+              className="flex max-w-full items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70"
+            >
+              <span className="truncate">{attachment.name}</span>
+              <span className="shrink-0 text-white/35">
+                {formatFileSize(attachment.size)}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeAttachment(index)}
+                disabled={disabled || sending}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+                aria-label={copy.composer.removeAttachment}
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
       <div
@@ -54,11 +111,20 @@ export function Composer({
       >
         <button
           type="button"
+          onClick={() => fileInputRef.current?.click()}
           disabled={disabled || sending}
           className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 disabled:cursor-not-allowed"
+          aria-label={copy.composer.attach}
         >
           +
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFilesSelected}
+          className="hidden"
+        />
         <input
           value={content}
           onChange={(event) => setContent(event.target.value)}
@@ -71,12 +137,7 @@ export function Composer({
           {content.length}/{MESSAGE_MAX_LENGTH}
         </span>
         <button
-          disabled={
-            !content.trim() ||
-            content.trim().length > MESSAGE_MAX_LENGTH ||
-            disabled ||
-            sending
-          }
+          disabled={!canSend}
           className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {sending ? copy.composer.sending : copy.composer.send}
@@ -84,4 +145,14 @@ export function Composer({
       </div>
     </form>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+
+  const kilobytes = bytes / 1024;
+
+  if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
+
+  return `${(kilobytes / 1024).toFixed(1)} MB`;
 }

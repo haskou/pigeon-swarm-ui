@@ -18,14 +18,18 @@ import type {
   KeychainResource,
   LocalKeychain,
   LoginResult,
+  MessageAttachment,
   MessageResource,
   NotificationResource,
+  PendingMessageAttachment,
+  PrivateFileUpload,
   PublicFileContent,
   PublicFileUpload,
   Session,
 } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
+import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
 import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { IdentitySignaturePayloadFactory } from '../../domain/identities/IdentitySignaturePayloadFactory';
@@ -45,6 +49,8 @@ const defaultKeychain: LocalKeychain = {
 };
 
 export class PigeonApiGateway {
+  private readonly attachmentCipher: AttachmentCipher;
+
   private readonly conversations: ConversationMapper;
 
   private readonly http: HttpJsonClient;
@@ -70,7 +76,9 @@ export class PigeonApiGateway {
     messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),
     ids: ConversationIdFactory = new ConversationIdFactory(),
+    attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
+    this.attachmentCipher = attachmentCipher;
     this.conversations = conversations;
     this.http = http;
     this.ids = ids;
@@ -260,6 +268,40 @@ export class PigeonApiGateway {
     });
   }
 
+  public async uploadPrivateFile(
+    session: Session,
+    attachment: PendingMessageAttachment,
+  ): Promise<PrivateFileUpload> {
+    const path = '/ipfs/private';
+
+    return await this.http.request<PrivateFileUpload>(path, {
+      body: attachment.encryptedBytes,
+      headers: {
+        ...(await this.signer.headers(
+          session,
+          'POST',
+          path,
+          attachment.encryptedBytes,
+        )),
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': attachment.uploadFilename,
+      },
+      method: 'POST',
+    });
+  }
+
+  public async downloadAttachment(
+    attachment: MessageAttachment,
+  ): Promise<Blob> {
+    const content = await this.getPublicFile(attachment.cid);
+    const encryptedBytes = this.attachmentCipher.base64ToBytes(content.data);
+
+    return await this.attachmentCipher.decrypt(
+      attachment,
+      this.attachmentCipher.bytesToArrayBuffer(encryptedBytes),
+    );
+  }
+
   public async createNetwork(name: string, session?: Session): Promise<void> {
     const path = '/node/networks/';
     const body = {
@@ -440,6 +482,7 @@ export class PigeonApiGateway {
     conversationId: string,
     content: string,
     previousMessageIds: string[] = [],
+    attachments: File[] = [],
   ): Promise<ChatMessage> {
     const key = conversationKeyEntry(
       session.keychain,
@@ -453,9 +496,16 @@ export class PigeonApiGateway {
     }
 
     const timestamp = Date.now();
-    const attachmentExternalIdentifiers: string[] = [];
+    const messageAttachments = await this.publishMessageAttachments(
+      session,
+      attachments,
+    );
+    const attachmentExternalIdentifiers = messageAttachments.map(
+      (attachment) => attachment.cid,
+    );
     const encryptedPayload = PublicKey.fromPEM(key.publicKey).encrypt(
       JSON.stringify({
+        attachments: messageAttachments,
         authorIdentityId: session.identity.id,
         content,
         conversationId,
@@ -538,6 +588,26 @@ export class PigeonApiGateway {
     );
 
     return { ...published, notification: updated };
+  }
+
+  private async publishMessageAttachments(
+    session: Session,
+    attachments: File[],
+  ): Promise<MessageAttachment[]> {
+    if (attachments.length === 0) return [];
+
+    return await Promise.all(
+      attachments.map(async (file) => {
+        const pending = await this.attachmentCipher.encrypt(file);
+        const upload = await this.uploadPrivateFile(session, pending);
+
+        return {
+          ...pending.metadata,
+          cid: upload.cid,
+          encryptedSize: upload.size,
+        };
+      }),
+    );
   }
 
   private isMissingRemoteKeychain(caught: unknown): boolean {

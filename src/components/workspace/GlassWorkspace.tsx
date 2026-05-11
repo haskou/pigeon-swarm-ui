@@ -374,7 +374,7 @@ export function GlassWorkspace({
     if ((scrollerRef.current?.scrollTop ?? 0) < 80) void handleLoadOlder();
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachments: File[]) => {
     if (!activeConversation?.id) return;
     setSendError(null);
 
@@ -385,6 +385,7 @@ export function GlassWorkspace({
         activeConversation.id,
         content,
         lastMessageId ? [lastMessageId] : [],
+        attachments,
       );
       setMessages((current) => [...current, sent]);
       queueMicrotask(() =>

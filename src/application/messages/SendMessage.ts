@@ -10,12 +10,14 @@ export class SendMessage {
     conversationId: string,
     content: string,
     previousMessageIds: string[] = [],
+    attachments: File[] = [],
   ): Promise<ChatMessage> {
     return await this.gateway.sendMessage(
       session,
       conversationId,
       content,
       previousMessageIds,
+      attachments,
     );
   }
 }

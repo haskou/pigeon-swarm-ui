@@ -5,9 +5,11 @@ import type {
   ChatMessage,
   ConversationResource,
   IdentityResource,
+  MessageAttachment,
   Session,
 } from '../../domain/types';
 
+import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import {
   identityDisplayName,
@@ -36,7 +38,7 @@ interface ChatColumnProps {
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
-  onSend: (content: string) => Promise<void>;
+  onSend: (content: string, attachments: File[]) => Promise<void>;
   onOpenSidebar: () => void;
   onCreate: () => void;
 }
@@ -67,6 +69,7 @@ export function ChatColumn({
     name: string;
     picture?: string | null;
   } | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
@@ -100,6 +103,23 @@ export function ChatColumn({
       name: identityDisplayName(message.authorIdentityId, identityNames),
       picture: identityPictures[message.authorIdentityId],
     });
+  };
+  const openAttachment = async (attachment?: MessageAttachment) => {
+    if (!attachment) return;
+
+    setAttachmentError(null);
+    try {
+      const blob = await pigeonApplication.downloadAttachment(attachment);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = attachment.filename;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setAttachmentError(copy.composer.attachmentDownloadError);
+    }
   };
 
   return (
@@ -211,6 +231,9 @@ export function ChatColumn({
                         ? session.identity.profile.picture
                         : identityPictures[message.authorIdentityId]
                     }
+                    onAttachmentOpen={(attachmentIndex) =>
+                      void openAttachment(message.attachments[attachmentIndex])
+                    }
                     onAvatarClick={() => openMessageAuthorProfile(message)}
                     showAvatar={showAvatar}
                   />
@@ -227,7 +250,7 @@ export function ChatColumn({
 
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
-            error={sendError}
+            error={sendError ?? attachmentError}
             onSend={onSend}
             placeholder={
               hasConversationKey
