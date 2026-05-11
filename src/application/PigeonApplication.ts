@@ -3,6 +3,7 @@ import type {
   ConversationResource,
   LocalKeychain,
   LoginResult,
+  NotificationResource,
   Session,
 } from '../domain/types';
 
@@ -19,8 +20,15 @@ import {
   ListNodeNetworks,
   type NodeNetwork,
 } from './networks/ListNodeNetworks';
+import {
+  AcceptInvitation,
+  ListNotifications,
+  UpdateNotification,
+} from './notifications';
 
 export class PigeonApplication {
+  private readonly acceptConversationInvitationUseCase: AcceptInvitation;
+
   private readonly createConversationUseCase: CreateConversation;
 
   private readonly createNetworkUseCase: CreateNetwork;
@@ -31,6 +39,8 @@ export class PigeonApplication {
 
   private readonly listNodeNetworksUseCase: ListNodeNetworks;
 
+  private readonly listNotificationsUseCase: ListNotifications;
+
   private readonly loadMessagesUseCase: LoadMessages;
 
   private readonly loginIdentityUseCase: LoginIdentity;
@@ -39,16 +49,35 @@ export class PigeonApplication {
 
   private readonly sendMessageUseCase: SendMessage;
 
+  private readonly updateNotificationUseCase: UpdateNotification;
+
   public constructor(gateway: PigeonApiGateway = new PigeonApiGateway()) {
+    this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
     this.joinNetworkUseCase = new JoinNetwork(gateway);
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
+    this.listNotificationsUseCase = new ListNotifications(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.registerIdentityUseCase = new RegisterIdentity(gateway);
     this.sendMessageUseCase = new SendMessage(gateway);
+    this.updateNotificationUseCase = new UpdateNotification(gateway);
+  }
+
+  public async acceptConversationInvitation(
+    session: Session,
+    notification: NotificationResource,
+  ): Promise<{
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+    notification: NotificationResource;
+  }> {
+    return await this.acceptConversationInvitationUseCase.execute(
+      session,
+      notification,
+    );
   }
 
   public async createConversation(
@@ -87,6 +116,12 @@ export class PigeonApplication {
     return await this.listNodeNetworksUseCase.execute();
   }
 
+  public async listNotifications(
+    session: Session,
+  ): Promise<NotificationResource[]> {
+    return await this.listNotificationsUseCase.execute(session);
+  }
+
   public async loadMessages(
     session: Session,
     conversationId: string,
@@ -123,6 +158,18 @@ export class PigeonApplication {
       session,
       conversationId,
       content,
+    );
+  }
+
+  public async updateNotification(
+    session: Session,
+    notificationId: string,
+    state: 'accepted' | 'declined',
+  ): Promise<NotificationResource> {
+    return await this.updateNotificationUseCase.execute(
+      session,
+      notificationId,
+      state,
     );
   }
 }

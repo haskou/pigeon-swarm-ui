@@ -36,6 +36,24 @@ export type ConversationKeyEntry = {
   createdAt: number;
 };
 
+export type ConversationInvitationPayload = {
+  conversationId: string;
+  encryptedConversationKey: string;
+  inviterIdentityId: string;
+  inviterSignature: string;
+  recipientIdentityId: string;
+};
+
+export type NotificationResource = {
+  createdAt: string;
+  id: string;
+  payload: ConversationInvitationPayload;
+  recipientIdentityId: string;
+  state: 'accepted' | 'declined' | 'pending';
+  status: 'read' | 'unread';
+  type: 'conversation_invitation';
+};
+
 export type LocalKeychain = {
   version: number;
   conversations: Record<string, ConversationKeyEntry>;

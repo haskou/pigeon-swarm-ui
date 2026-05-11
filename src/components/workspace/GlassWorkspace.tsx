@@ -3,20 +3,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChatMessage,
   ConversationResource,
+  NotificationResource,
   Session,
 } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
+import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { cx } from '../../utils/classNameHelper';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
+import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
 import { Sidebar } from './Sidebar';
 
 type LoadState = 'idle' | 'loading' | 'error';
+type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
+
+const archivedNotifications = new ArchivedNotifications();
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -42,6 +48,18 @@ export function GlassWorkspace({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationResource[]>(
+    [],
+  );
+  const [archivedNotificationIds, setArchivedNotificationIds] = useState<
+    string[]
+  >(() => archivedNotifications.get(session.identity.id));
+  const [notificationAction, setNotificationAction] =
+    useState<NotificationAction | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(
+    null,
+  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -52,6 +70,16 @@ export function GlassWorkspace({
       ) ?? conversations[0],
     [activeConversationId, conversations],
   );
+  const visibleNotifications = useMemo(
+    () =>
+      notifications.filter(
+        (notification) => !archivedNotificationIds.includes(notification.id),
+      ),
+    [archivedNotificationIds, notifications],
+  );
+  const pendingNotificationCount = visibleNotifications.filter(
+    (notification) => notification.state === 'pending',
+  ).length;
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -62,6 +90,24 @@ export function GlassWorkspace({
     const next = await pigeonApplication.listConversations(session);
     setConversations(next);
   }, [session, setConversations]);
+
+  const refreshNotifications = useCallback(async () => {
+    setNotificationAction('refresh');
+    setNotificationError(null);
+    try {
+      setNotifications(await pigeonApplication.listNotifications(session));
+    } catch (caught) {
+      setNotificationError(
+        caught instanceof Error ? caught.message : copy.notifications.error,
+      );
+    }
+    setNotificationAction(null);
+  }, [session]);
+
+  useEffect(() => {
+    setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
+    void refreshNotifications();
+  }, [refreshNotifications, session.identity.id]);
 
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
@@ -167,10 +213,83 @@ export function GlassWorkspace({
     setSidebarOpen(false);
   };
 
+  const replaceNotification = (nextNotification: NotificationResource) => {
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === nextNotification.id ? nextNotification : notification,
+      ),
+    );
+  };
+
+  const handleAcceptNotification = async (
+    notification: NotificationResource,
+  ) => {
+    setNotificationAction('accept');
+    setNotificationError(null);
+
+    try {
+      const result = await pigeonApplication.acceptConversationInvitation(
+        session,
+        notification,
+      );
+      const nextSession = {
+        ...session,
+        keychain: result.keychain,
+        keychainExternalIdentifier: result.keychainExternalIdentifier,
+      };
+      const nextConversations =
+        await pigeonApplication.listConversations(nextSession);
+
+      setSession(nextSession);
+      setConversations(nextConversations);
+      replaceNotification(result.notification);
+      setActiveConversationId(notification.payload.conversationId);
+      setNotificationsOpen(false);
+    } catch (caught) {
+      setNotificationError(
+        caught instanceof Error ? caught.message : copy.notifications.error,
+      );
+    }
+    setNotificationAction(null);
+  };
+
+  const handleDeclineNotification = async (notificationId: string) => {
+    setNotificationAction('decline');
+    setNotificationError(null);
+
+    try {
+      replaceNotification(
+        await pigeonApplication.updateNotification(
+          session,
+          notificationId,
+          'declined',
+        ),
+      );
+    } catch (caught) {
+      setNotificationError(
+        caught instanceof Error ? caught.message : copy.notifications.error,
+      );
+    }
+    setNotificationAction(null);
+  };
+
+  const handleArchiveNotification = (notificationId: string) => {
+    setArchivedNotificationIds(
+      archivedNotifications.archive(session.identity.id, notificationId),
+    );
+  };
+
   return (
     <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
-        <Rail className="hidden lg:flex" />
+        <Rail
+          className="hidden lg:flex"
+          notificationCount={pendingNotificationCount}
+          onNotificationsClick={() => {
+            setNotificationsOpen(true);
+            void refreshNotifications();
+          }}
+        />
 
         <div
           className={cx(
@@ -179,7 +298,14 @@ export function GlassWorkspace({
           )}
         >
           <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
-            <Rail className="lg:hidden" />
+            <Rail
+              className="lg:hidden"
+              notificationCount={pendingNotificationCount}
+              onNotificationsClick={() => {
+                setNotificationsOpen(true);
+                void refreshNotifications();
+              }}
+            />
             <Sidebar
               session={session}
               conversations={conversations}
@@ -230,6 +356,21 @@ export function GlassWorkspace({
           session={session}
           onClose={() => setIsCreateOpen(false)}
           onCreated={handleConversationCreated}
+        />
+      )}
+
+      {notificationsOpen && (
+        <NotificationsPanel
+          action={notificationAction}
+          error={notificationError}
+          notifications={visibleNotifications}
+          onAccept={(notification) => void handleAcceptNotification(notification)}
+          onArchive={handleArchiveNotification}
+          onClose={() => setNotificationsOpen(false)}
+          onDecline={(notificationId) =>
+            void handleDeclineNotification(notificationId)
+          }
+          onRefresh={() => void refreshNotifications()}
         />
       )}
     </section>

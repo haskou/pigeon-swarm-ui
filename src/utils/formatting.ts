@@ -4,7 +4,7 @@ export function shortId(value: string): string {
   return `${value.slice(0, 8)}…${value.slice(-6)}`;
 }
 
-export function formatTime(timestamp: number): string {
+export function formatTime(timestamp: number | string): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',

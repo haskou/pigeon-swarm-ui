@@ -1,4 +1,5 @@
 import {
+  EncryptedPayload,
   EncryptedKeyPair,
   EncryptedPrivateKey,
   KeyPair,
@@ -17,6 +18,7 @@ import type {
   LocalKeychain,
   LoginResult,
   MessageResource,
+  NotificationResource,
   Session,
 } from '../../domain/types';
 
@@ -105,6 +107,13 @@ export class PigeonApiGateway {
       peerIdentity.id,
       published,
     );
+    const serverKeyEntry = { ...keyEntry, conversationId: conversation.id };
+
+    await this.createConversationInvitation(
+      session,
+      peerIdentity,
+      serverKeyEntry,
+    );
 
     return {
       conversation,
@@ -192,6 +201,21 @@ export class PigeonApiGateway {
     });
 
     return this.conversations.list(raw);
+  }
+
+  public async listNotifications(
+    session: Session,
+  ): Promise<NotificationResource[]> {
+    const path = '/notifications/?limit=30';
+    const result = await this.http.request<{ results: NotificationResource[] }>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
+    );
+
+    return result.results;
   }
 
   public async loadMessages(
@@ -341,6 +365,89 @@ export class PigeonApiGateway {
     });
 
     return await this.decryptMessage(session, conversationId, created);
+  }
+
+  public async updateNotification(
+    session: Session,
+    notificationId: string,
+    state: 'accepted' | 'declined',
+  ): Promise<NotificationResource> {
+    const path = `/notifications/${encodeURIComponent(notificationId)}`;
+    const body = { state };
+
+    return await this.http.request<NotificationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
+    });
+  }
+
+  public async acceptConversationInvitation(
+    session: Session,
+    notification: NotificationResource,
+  ): Promise<{
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+    notification: NotificationResource;
+  }> {
+    const decrypted = await session.encryptedKeyPair.decrypt(
+      new EncryptedPayload(notification.payload.encryptedConversationKey),
+      session.password,
+    );
+    const keyEntry = JSON.parse(decrypted.toString()) as ConversationKeyEntry;
+    const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
+    const published = await this.publishKeychain(session, nextKeychain);
+    const updated = await this.updateNotification(
+      {
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      },
+      notification.id,
+      'accepted',
+    );
+
+    return { ...published, notification: updated };
+  }
+
+  private async createConversationInvitation(
+    session: Session,
+    peerIdentity: IdentityResource,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<void> {
+    const path = '/notifications/';
+    const recipientKeyEntry = {
+      ...keyEntry,
+      peerIdentityId: session.identity.id,
+    };
+    const encryptedConversationKey = PublicKey.fromPEM(
+      peerIdentity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(JSON.stringify(recipientKeyEntry))
+      .toString();
+    const inviterSignature = await session.encryptedKeyPair.sign(
+      JSON.stringify({
+        conversationId: keyEntry.conversationId,
+        encryptedConversationKey,
+        inviterIdentityId: session.identity.id,
+        recipientIdentityId: peerIdentity.id,
+      }),
+      session.password,
+    );
+    const body = {
+      conversationId: keyEntry.conversationId,
+      encryptedConversationKey,
+      inviterIdentityId: session.identity.id,
+      inviterSignature: inviterSignature.toString(),
+      recipientIdentityId: peerIdentity.id,
+      type: 'conversation_invitation',
+    };
+
+    await this.http.request<NotificationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
   }
 
   private async createConversationKeyEntry(
