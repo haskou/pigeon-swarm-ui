@@ -31,6 +31,7 @@ import {
   ListNotifications,
   UpdateNotification,
 } from './notifications';
+import { ListPeers, type Peer } from './peers/ListPeers';
 
 export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
@@ -48,6 +49,8 @@ export class PigeonApplication {
   private readonly listNodeNetworksUseCase: ListNodeNetworks;
 
   private readonly listNotificationsUseCase: ListNotifications;
+
+  private readonly listPeersUseCase: ListPeers;
 
   private readonly loadMessagesUseCase: LoadMessages;
 
@@ -68,6 +71,7 @@ export class PigeonApplication {
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
     this.listNotificationsUseCase = new ListNotifications(gateway);
+    this.listPeersUseCase = new ListPeers(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.registerIdentityUseCase = new RegisterIdentity(gateway);
@@ -182,6 +186,10 @@ export class PigeonApplication {
     session: Session,
   ): Promise<NotificationResource[]> {
     return await this.listNotificationsUseCase.execute(session);
+  }
+
+  public async listPeers(): Promise<Peer[]> {
+    return await this.listPeersUseCase.execute();
   }
 
   public async loadMessages(

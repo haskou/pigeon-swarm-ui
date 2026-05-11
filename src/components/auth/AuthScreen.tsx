@@ -25,9 +25,13 @@ interface AuthScreenProps {
     session: Session,
     conversations: ConversationResource[],
   ) => void;
+  peerCount: number;
 }
 
-export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
+export function AuthScreen({
+  onAuthenticated,
+  peerCount,
+}: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
   const [name, setName] = useState('');
@@ -154,7 +158,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               />
               <HeroMetric
                 label={copy.auth.peersLabel}
-                value={copy.auth.peersPlaceholder}
+                value={`${peerCount}`}
               />
             </div>
           </div>
