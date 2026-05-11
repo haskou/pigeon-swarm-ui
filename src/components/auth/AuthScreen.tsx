@@ -34,7 +34,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const modeOptions = [
     { label: copy.auth.login, value: 'login' },
-    { label: copy.auth.createAccount, value: 'create' },
+    { label: copy.auth.createIdentity, value: 'create' },
   ] satisfies Array<{ label: string; value: AuthMode }>;
 
   useEffect(() => {

@@ -2,23 +2,15 @@ export const copy = {
   app: {
     loading: 'Loading...',
   },
-  connection: {
-    body: 'The UI could not reach the local API. Start the node server and retry; this screen is also ready to be reused when the connection drops later.',
-    endpointLabel: 'Endpoint',
-    kicker: 'Connection lost',
-    retry: 'Retry connection',
-    title: 'No connection with the server',
-  },
   auth: {
     apiLabel: 'API',
-    createAccount: 'Create account',
     createIdentity: 'Create identity',
     cryptoLabel: 'Crypto',
     cryptoValue: 'local',
     fallbackNetworksLabel: 'Networks, comma-separated',
     heroBody:
-      'Local login: the client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. The swarm stays useful without pretending the browser is not part of the protocol.',
-    heroTitle: 'Glass client for a serverless little menace.',
+      'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
+    heroTitle: 'Pigeon swarm. P2P messaging for everyone.',
     identityIdLabel: 'Identity ID',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
@@ -32,10 +24,17 @@ export const copy = {
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
+  connection: {
+    body: 'The UI could not reach the local API. Check your connection and the status of your node server and retry.',
+    endpointLabel: 'Endpoint',
+    kicker: 'Connection lost',
+    retry: 'Retry connection',
+    title: 'No connection with the server',
+  },
   network: {
     create: 'Create network',
     createBody:
-      'This is the first time this node has started. Create a local network so identities, keychains, and conversations have a place to sync.',
+      'This is the first time this node has started. Create a local network so your data have a place to sync.',
     createSubmit: 'Create network',
     firstRunMetricLabel: 'State',
     firstRunMetricValue: 'First run',
@@ -56,5 +55,72 @@ export const copy = {
     networkIdPlaceholder: 'Network UUID',
     title: 'Network configuration',
     unknownError: 'Unknown error. Poetic, but not useful.',
+  },
+  workspace: {
+    closeSidebar: 'Close sidebar',
+    loadOlderError: 'Older messages could not be loaded.',
+    loadMessagesError:
+      'Messages could not be loaded. Great, now we have a mystery.',
+    logout: 'Out',
+    rails: ['PS', '1:1', 'VO', 'ID', 'KC'],
+    sendError: 'The message was not sent. TLS had other plans.',
+  },
+  sidebar: {
+    communitiesTitle: 'Communities',
+    createConversation: '+ Create 1to1 conversation',
+    emptyConversations:
+      'No conversations yet. Create one and we will finally have something to look at besides the void.',
+    privateNetworksSubtitle: 'future · channels',
+    privateNetworksTitle: 'Private networks',
+    publicSwarmSubtitle: 'future · communities',
+    publicSwarmTitle: 'Public Swarm',
+    oneToOneTitle: '1to1 messages',
+  },
+  chat: {
+    createConversation: 'Create conversation',
+    emptyBody:
+      'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
+    emptyMessages:
+      'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
+    emptyTitle: 'No conversations',
+    loadingEvents: 'Loading events...',
+    menu: 'Open sidebar',
+    newOneToOne: 'New 1to1',
+    noConversation: 'No conversation',
+    noConversationHint: 'Create a conversation to start',
+    subtitleKeychain: 'keychain local',
+    you: 'You',
+  },
+  composer: {
+    placeholder: 'Write, encrypt, sign, and push to the swarm...',
+    send: 'Send',
+    sending: 'Sending',
+  },
+  dialog: {
+    cancel: 'Cancel',
+    close: 'Close dialog',
+    createConversation: 'Create conversation',
+    createConversationBody:
+      'Enter the remote identity ID. The client resolves that identity, creates the conversation, generates a conversation keypair, and stores the private key in your encrypted keychain.',
+    createConversationLoading: 'Creating and publishing keychain...',
+    createConversationTitle: 'Create 1to1 conversation',
+    createConversationError:
+      'The conversation could not be created. The backend chose violence.',
+    remoteIdentityId: 'Remote identity ID',
+  },
+  inspector: {
+    communitiesFuture: 'Communities: same sidebar slot, disabled for now.',
+    conversationKeychain: 'Conversation keychain',
+    eventsProjectedLocally: 'events projected locally',
+    future: 'Future',
+    identity: 'Identity',
+    keychainVersion: 'Keychain version',
+    loadedMessages: 'Loaded messages',
+    missing: 'missing',
+    nets: 'nets',
+    present: 'present',
+    privateKey: 'Private key',
+    storedOneToOneKeys: 'Stored 1to1 keys',
+    voiceFuture: 'Voice: channel model already has a home in the rail.',
   },
 } as const;

@@ -4,6 +4,7 @@ import type {
   Session,
 } from '../../domain/types';
 
+import { copy } from '../../i18n/en';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
@@ -43,6 +44,7 @@ export function ChatColumn({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenSidebar}
+            aria-label={copy.chat.menu}
             className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 font-black lg:hidden"
           >
             ☰
@@ -56,19 +58,19 @@ export function ChatColumn({
             <div className="truncate text-2xl font-black tracking-tight">
               {activeConversation
                 ? conversationTitle(activeConversation)
-                : 'Sin conversación'}
+                : copy.chat.noConversation}
             </div>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${shortId(activeConversation.id)} · keychain local`
-                : 'Crea una conversación para empezar'}
+                ? `1to1 · ${shortId(activeConversation.id)} · ${copy.chat.subtitleKeychain}`
+                : copy.chat.noConversationHint}
             </div>
           </div>
           <button
             onClick={onCreate}
             className="hidden rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 sm:block"
           >
-            New 1to1
+            {copy.chat.newOneToOne}
           </button>
         </div>
       </header>
@@ -82,17 +84,14 @@ export function ChatColumn({
               className="mx-auto h-24 w-24 rounded-[2rem] shadow-2xl"
             />
             <h2 className="mt-6 text-3xl font-black tracking-tight">
-              No hay conversaciones
+              {copy.chat.emptyTitle}
             </h2>
-            <p className="mt-3 text-white/55">
-              Crea un 1to1 introduciendo el ID de la identidad remota. Súper
-              romántico, si tu idea de romance incluye claves privadas.
-            </p>
+            <p className="mt-3 text-white/55">{copy.chat.emptyBody}</p>
             <button
               onClick={onCreate}
               className="mt-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 font-black"
             >
-              Crear conversación
+              {copy.chat.createConversation}
             </button>
           </div>
         </div>
@@ -105,7 +104,7 @@ export function ChatColumn({
           >
             {messageState === 'loading' && (
               <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
-                Cargando eventos...
+                {copy.chat.loadingEvents}
               </div>
             )}
             <div className="space-y-4">
@@ -118,8 +117,7 @@ export function ChatColumn({
               ))}
               {messages.length === 0 && messageState !== 'loading' && (
                 <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                  No hay mensajes visibles. Enviar el primero suele ayudar,
-                  brutal hallazgo de producto.
+                  {copy.chat.emptyMessages}
                 </div>
               )}
               <div ref={bottomRef} />

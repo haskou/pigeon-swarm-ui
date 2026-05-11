@@ -1,5 +1,6 @@
 import type { ConversationResource, Session } from '../../domain/types';
 
+import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import { PlaceholderRow } from '../common/PlaceholderRow';
@@ -40,28 +41,27 @@ export function Sidebar({
         onClick={onCreate}
         className="glass-button mt-4 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
-        + Crear conversación 1to1
+        {copy.sidebar.createConversation}
       </button>
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
-        <SectionTitle title="Comunidades" />
+        <SectionTitle title={copy.sidebar.communitiesTitle} />
         <div className="space-y-2 opacity-70">
           <PlaceholderRow
-            title="Public Swarm"
-            subtitle="future · communities"
+            title={copy.sidebar.publicSwarmTitle}
+            subtitle={copy.sidebar.publicSwarmSubtitle}
           />
           <PlaceholderRow
-            title="Private networks"
-            subtitle="future · channels"
+            title={copy.sidebar.privateNetworksTitle}
+            subtitle={copy.sidebar.privateNetworksSubtitle}
           />
         </div>
 
-        <SectionTitle title="Mensajes 1to1" className="mt-6" />
+        <SectionTitle title={copy.sidebar.oneToOneTitle} className="mt-6" />
         <div className="space-y-2">
           {conversations.length === 0 && (
             <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-              Aún no hay conversaciones. Crea una y por fin tendremos algo que
-              mirar además del vacío.
+              {copy.sidebar.emptyConversations}
             </div>
           )}
           {conversations.map((conversation) => (

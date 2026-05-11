@@ -1,3 +1,4 @@
+import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 
 interface RailProps {
@@ -13,7 +14,7 @@ export function Rail({ onLogout }: RailProps) {
         className="h-14 w-14 rounded-2xl shadow-xl"
       />
       <div className="h-px w-10 bg-white/10" />
-      {['PS', '1:1', 'VO', 'ID', 'KC'].map((item, index) => (
+      {copy.workspace.rails.map((item, index) => (
         <button
           key={item}
           className={cx(
@@ -30,7 +31,7 @@ export function Rail({ onLogout }: RailProps) {
         onClick={onLogout}
         className="mt-auto grid h-12 w-12 place-items-center rounded-2xl bg-rose-500/15 text-xs font-black text-rose-100 hover:bg-rose-500/25"
       >
-        Out
+        {copy.workspace.logout}
       </button>
     </aside>
   );

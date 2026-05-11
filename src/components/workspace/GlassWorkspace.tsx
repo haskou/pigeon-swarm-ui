@@ -7,6 +7,7 @@ import type {
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -79,7 +80,7 @@ export function GlassWorkspace({
         setSendError(
           caught instanceof Error
             ? caught.message
-            : 'No se han podido cargar mensajes. Enhorabuena, ya tenemos misterio.',
+            : copy.workspace.loadMessagesError,
         );
 
         return;
@@ -117,7 +118,7 @@ export function GlassWorkspace({
       setSendError(
         caught instanceof Error
           ? caught.message
-          : 'No se han podido cargar mensajes antiguos.',
+          : copy.workspace.loadOlderError,
       );
     }
     setMessageState('idle');
@@ -144,9 +145,7 @@ export function GlassWorkspace({
       void refreshConversations().catch(() => undefined);
     } catch (caught) {
       setSendError(
-        caught instanceof Error
-          ? caught.message
-          : 'No se ha enviado. La paloma se ha estampado contra TLS.',
+        caught instanceof Error ? caught.message : copy.workspace.sendError,
       );
     }
   };
@@ -192,7 +191,7 @@ export function GlassWorkspace({
           <button
             className="fixed inset-0 z-30 bg-black/50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
+            aria-label={copy.workspace.closeSidebar}
           />
         )}
 
