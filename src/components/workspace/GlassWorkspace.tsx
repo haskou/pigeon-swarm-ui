@@ -264,11 +264,25 @@ export function GlassWorkspace({
   );
 
   useEffect(() => {
-    if (activeConversation?.id) void loadActiveMessages(activeConversation.id);
-  }, [activeConversation?.id, loadActiveMessages]);
+    if (!activeConversation?.id) return;
+
+    if (!activeConversationKey) {
+      setMessages([]);
+      setMessageCursor(null);
+      setMessageState('idle');
+      return;
+    }
+
+    void loadActiveMessages(activeConversation.id);
+  }, [activeConversation?.id, activeConversationKey, loadActiveMessages]);
 
   const handleLoadOlder = async () => {
-    if (!activeConversation?.id || messageState === 'loading') return;
+    if (
+      !activeConversation?.id ||
+      !activeConversationKey ||
+      messageState === 'loading'
+    )
+      return;
 
     const requestId = messageRequestRef.current + 1;
 

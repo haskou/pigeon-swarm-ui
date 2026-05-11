@@ -6,7 +6,7 @@ import type { IdentityResource } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
-import { identityName, identityPicture } from '../../utils/identityDisplay';
+import { identityPicture } from '../../utils/identityDisplay';
 
 interface UserProfileDialogProps {
   identity?: IdentityResource;
@@ -26,7 +26,10 @@ export function UserProfileDialog({
   picture,
 }: UserProfileDialogProps) {
   const [copied, setCopied] = useState(false);
-  const displayName = identity ? (identityName(identity) ?? name) : name;
+  const profileName = identity?.profile.name.trim();
+  const profileHandle = identity?.profile.handle?.trim();
+  const displayName = profileName || (profileHandle ? `@${profileHandle}` : name);
+  const displayHandle = profileHandle ? `@${profileHandle}` : shortId(identityId);
   const displayPicture = identity ? identityPicture(identity) : picture;
   const biography =
     identity?.profile.biography?.trim() || copy.profile.noBiography;
@@ -70,9 +73,7 @@ export function UserProfileDialog({
             </div>
             <div className="min-w-0">
               <h2 className="truncate text-xl font-black">{displayName}</h2>
-              <p className="truncate text-sm text-white/45">
-                {shortId(identityId)}
-              </p>
+              <p className="truncate text-sm text-white/45">{displayHandle}</p>
             </div>
           </div>
           <button
