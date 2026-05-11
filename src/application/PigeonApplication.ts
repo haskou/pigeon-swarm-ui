@@ -6,6 +6,7 @@ import type {
   LocalKeychain,
   LoginResult,
   NotificationResource,
+  PublicFileContent,
   PublicFileUpload,
   Session,
 } from '../domain/types';
@@ -138,6 +139,10 @@ export class PigeonApplication {
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
     return await this.gateway.getIdentity(identityId);
+  }
+
+  public async getPublicFile(cid: string): Promise<PublicFileContent> {
+    return await this.gateway.getPublicFile(cid);
   }
 
   public async updateIdentityProfile(

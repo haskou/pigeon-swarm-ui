@@ -65,6 +65,12 @@ export type PublicFileUpload = {
   size: number;
 };
 
+export type PublicFileContent = PublicFileUpload & {
+  data: string;
+  uploadedAt?: string;
+  uploadedByIdentityId?: string;
+};
+
 export type LocalKeychain = {
   version: number;
   conversations: Record<string, ConversationKeyEntry>;

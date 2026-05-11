@@ -15,6 +15,7 @@ import { cx } from '../../utils/classNameHelper';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
+  identityPicture,
   type IdentityNames,
   type IdentityPictures,
   isValidHandle,
@@ -74,7 +75,7 @@ export function Sidebar({
     ? `@${session.identity.profile.handle.trim()}`
     : shortId(session.identity.id);
   const ownPicture =
-    session.identity.profile.picture ?? identityPictures[session.identity.id];
+    identityPictures[session.identity.id] ?? identityPicture(session.identity);
   const conversationPeerId = (conversation: ConversationResource) =>
     conversationPeerIdentityId(
       conversation,
@@ -333,6 +334,7 @@ export function Sidebar({
 
       {profileEditorOpen && (
         <ProfileEditor
+          currentPicture={ownPicture}
           session={session}
           onClose={() => setProfileEditorOpen(false)}
           onUpdated={(nextSession) => {
@@ -375,10 +377,12 @@ function ProfileAvatar({
 }
 
 function ProfileEditor({
+  currentPicture,
   onClose,
   onUpdated,
   session,
 }: {
+  currentPicture?: string | null;
   session: Session;
   onClose: () => void;
   onUpdated: (session: Session) => void;
@@ -389,9 +393,10 @@ function ProfileEditor({
     session.identity.profile.biography ?? '',
   );
   const [picturePreview, setPicturePreview] = useState(
-    session.identity.profile.picture
-      ? profilePictureUrl(session.identity.profile.picture)
-      : '',
+    currentPicture ??
+      (session.identity.profile.picture
+        ? profilePictureUrl(session.identity.profile.picture)
+        : null),
   );
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');

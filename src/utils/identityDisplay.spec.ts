@@ -1,6 +1,13 @@
 import type { IdentityResource } from '../domain/types';
 
-import { identityName, isValidHandle, normalizeHandle } from './identityDisplay';
+import {
+  identityPicture,
+  isValidHandle,
+  normalizeHandle,
+  profilePictureDataUrl,
+  profilePictureUrl,
+  identityName,
+} from './identityDisplay';
 
 const identity = {
   profile: {
@@ -22,5 +29,32 @@ describe('identity display helpers', () => {
     expect(isValidHandle('ada_42')).toBe(true);
     expect(isValidHandle('@al')).toBe(false);
     expect(isValidHandle('Ada!')).toBe(false);
+  });
+
+  it('uses direct picture urls as-is', () => {
+    expect(profilePictureUrl('data:image/png;base64,abc')).toBe(
+      'data:image/png;base64,abc',
+    );
+    expect(profilePictureUrl('https://example.com/avatar.png')).toBe(
+      'https://example.com/avatar.png',
+    );
+  });
+
+  it('does not treat IPFS cids as image urls', () => {
+    expect(profilePictureUrl('bafy-avatar')).toBeNull();
+    expect(
+      identityPicture({
+        profile: { name: 'Ada', picture: 'bafy-avatar' },
+      } as IdentityResource),
+    ).toBeNull();
+  });
+
+  it('builds data urls from public IPFS content', () => {
+    expect(
+      profilePictureDataUrl({
+        contentType: 'image/png',
+        data: 'abc',
+      }),
+    ).toBe('data:image/png;base64,abc');
   });
 });

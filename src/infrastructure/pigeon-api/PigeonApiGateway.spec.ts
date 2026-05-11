@@ -140,4 +140,22 @@ describe(PigeonApiGateway.name, () => {
       method: 'POST',
     });
   });
+
+  it('loads public IPFS content by encoded cid', async () => {
+    const content = {
+      cid: 'bafy/avatar',
+      contentType: 'image/png',
+      data: 'abc',
+      filename: 'avatar.png',
+      size: 3,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(content),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toBe(content);
+
+    expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+  });
 });

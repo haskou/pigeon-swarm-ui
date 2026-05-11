@@ -30,7 +30,7 @@ export function UserProfileDialog({
   const profileHandle = identity?.profile.handle?.trim();
   const displayName = profileName || (profileHandle ? `@${profileHandle}` : name);
   const displayHandle = profileHandle ? `@${profileHandle}` : shortId(identityId);
-  const displayPicture = identity ? identityPicture(identity) : picture;
+  const displayPicture = (identity ? identityPicture(identity) : null) ?? picture;
   const biography =
     identity?.profile.biography?.trim() || copy.profile.noBiography;
   const networks = identity?.networks ?? [];

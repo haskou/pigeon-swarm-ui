@@ -18,6 +18,7 @@ import { cx } from '../../utils/classNameHelper';
 import {
   identityName,
   identityPicture,
+  profilePictureDataUrl,
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
@@ -33,6 +34,22 @@ type LoadState = 'idle' | 'loading' | 'error';
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
 const archivedNotifications = new ArchivedNotifications();
+
+async function loadIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  const content = await pigeonApplication.getPublicFile(pictureCid);
+
+  return profilePictureDataUrl(content);
+}
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -81,11 +98,13 @@ export function GlassWorkspace({
   const [identityProfiles, setIdentityProfiles] = useState<
     Record<string, IdentityResource>
   >(() => ({ [session.identity.id]: session.identity }));
-  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(() => ({
-    ...(identityPicture(session.identity)
-      ? { [session.identity.id]: identityPicture(session.identity) as string }
-      : {}),
-  }));
+  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(
+    () => ({
+      ...(identityPicture(session.identity)
+        ? { [session.identity.id]: identityPicture(session.identity) as string }
+        : {}),
+    }),
+  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messageRequestRef = useRef(0);
@@ -153,6 +172,29 @@ export function GlassWorkspace({
   }, [activeConversationId, conversations]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void loadIdentityPicture(session.identity)
+      .then((picture) => {
+        if (cancelled) return;
+
+        setIdentityPictures((current) => {
+          const next = { ...current };
+
+          if (picture) next[session.identity.id] = picture;
+          else delete next[session.identity.id];
+
+          return next;
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.identity]);
+
+  useEffect(() => {
     if (identityIdsToResolve.length === 0) return;
 
     let cancelled = false;
@@ -161,11 +203,14 @@ export function GlassWorkspace({
       identityIdsToResolve.map(async (identityId) => {
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
+          const picture = await loadIdentityPicture(identity).catch(
+            () => null,
+          );
 
           return [
             identityId,
             identityName(identity) ?? identityId,
-            identityPicture(identity),
+            picture,
             identity,
           ] as const;
         } catch {

@@ -20,6 +20,7 @@ import type {
   LoginResult,
   MessageResource,
   NotificationResource,
+  PublicFileContent,
   PublicFileUpload,
   Session,
 } from '../../domain/types';
@@ -109,6 +110,12 @@ export class PigeonApiGateway {
     }>('/node/networks/');
 
     return result.networks;
+  }
+
+  public async getPublicFile(cid: string): Promise<PublicFileContent> {
+    return await this.http.request<PublicFileContent>(
+      `/ipfs/${encodeURIComponent(cid)}`,
+    );
   }
 
   public async createConversation(
