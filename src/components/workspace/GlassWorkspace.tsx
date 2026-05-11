@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   ChatMessage,
+  AttachmentProgress,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -78,6 +79,8 @@ export function GlassWorkspace({
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -107,6 +110,7 @@ export function GlassWorkspace({
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
   const messageRequestRef = useRef(0);
 
   const activeConversation = useMemo(
@@ -134,6 +138,7 @@ export function GlassWorkspace({
         activeConversation.id,
       )
     : undefined;
+  const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
   const identityIdsToResolve = useMemo(() => {
     const ids = new Set<string>();
 
@@ -291,10 +296,11 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         setMessages(result.messages);
-        setMessageCursor(result.nextCursor ?? result.messages[0]?.id ?? null);
-        queueMicrotask(() =>
-          bottomRef.current?.scrollIntoView({ block: 'end' }),
-        );
+        setMessageCursor(result.nextCursor ?? null);
+        queueMicrotask(() => {
+          bottomRef.current?.scrollIntoView({ block: 'end' });
+          lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
+        });
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
 
@@ -318,20 +324,22 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversation?.id) return;
 
-    if (!activeConversationKey) {
+    if (!activeConversationKeyId) {
       setMessages([]);
       setMessageCursor(null);
+      lastScrollTopRef.current = 0;
       setMessageState('idle');
       return;
     }
 
     void loadActiveMessages(activeConversation.id);
-  }, [activeConversation?.id, activeConversationKey, loadActiveMessages]);
+  }, [activeConversation?.id, activeConversationKeyId, loadActiveMessages]);
 
   const handleLoadOlder = async () => {
     if (
       !activeConversation?.id ||
       !activeConversationKey ||
+      !messageCursor ||
       messageState === 'loading'
     )
       return;
@@ -340,6 +348,7 @@ export function GlassWorkspace({
 
     messageRequestRef.current = requestId;
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
+    const previousTop = scrollerRef.current?.scrollTop ?? 0;
     setMessageState('loading');
     try {
       const result = await pigeonApplication.loadMessages(
@@ -350,13 +359,15 @@ export function GlassWorkspace({
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
-      setMessageCursor(
-        result.nextCursor ?? result.messages[0]?.id ?? messageCursor,
-      );
+      setMessageCursor(result.nextCursor ?? null);
       requestAnimationFrame(() => {
-        if (scrollerRef.current)
-          scrollerRef.current.scrollTop =
-            scrollerRef.current.scrollHeight - previousHeight;
+        if (!scrollerRef.current) return;
+
+        const nextTop =
+          scrollerRef.current.scrollHeight - previousHeight + previousTop;
+
+        scrollerRef.current.scrollTop = nextTop;
+        lastScrollTopRef.current = nextTop;
       });
     } catch (caught) {
       setSendError(
@@ -371,12 +382,18 @@ export function GlassWorkspace({
   };
 
   const handleScroll = () => {
-    if ((scrollerRef.current?.scrollTop ?? 0) < 80) void handleLoadOlder();
+    const scrollTop = scrollerRef.current?.scrollTop ?? 0;
+    const isScrollingUp = scrollTop < lastScrollTopRef.current;
+
+    lastScrollTopRef.current = scrollTop;
+
+    if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachments: File[]) => {
     if (!activeConversation?.id) return;
     setSendError(null);
+    setAttachmentProgress(null);
 
     try {
       const lastMessageId = messages[messages.length - 1]?.id;
@@ -385,8 +402,11 @@ export function GlassWorkspace({
         activeConversation.id,
         content,
         lastMessageId ? [lastMessageId] : [],
+        attachments,
+        setAttachmentProgress,
       );
       setMessages((current) => [...current, sent]);
+      setAttachmentProgress(null);
       queueMicrotask(() =>
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
       );
@@ -395,6 +415,7 @@ export function GlassWorkspace({
       setSendError(
         caught instanceof Error ? caught.message : copy.workspace.sendError,
       );
+      setAttachmentProgress(null);
     }
   };
 
@@ -605,6 +626,7 @@ export function GlassWorkspace({
           onSend={handleSend}
           onOpenSidebar={() => setSidebarOpen(true)}
           onCreate={() => setIsCreateOpen(true)}
+          progress={attachmentProgress}
         />
 
         <Inspector

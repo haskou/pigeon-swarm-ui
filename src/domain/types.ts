@@ -71,6 +71,45 @@ export type PublicFileContent = PublicFileUpload & {
   uploadedByIdentityId?: string;
 };
 
+export type PrivateFileUpload = PublicFileUpload & {
+  encrypted: true;
+};
+
+export type PrivateFileContent = PrivateFileUpload & {
+  encryptedData: string;
+  uploadedAt?: number | string;
+  uploadedByIdentityId?: string;
+};
+
+export type MessageAttachmentEncryption = {
+  algorithm: 'AES-GCM';
+  chunks?: { iv: string; size: number }[];
+  chunkSize?: number;
+  iv: string;
+  key: string;
+};
+
+export type MessageAttachment = {
+  cid: string;
+  contentType: string;
+  encryptedSize?: number;
+  encryption: MessageAttachmentEncryption;
+  filename: string;
+  size: number;
+};
+
+export type PendingMessageAttachment = {
+  encryptedBytes: ArrayBuffer;
+  metadata: Omit<MessageAttachment, 'cid' | 'encryptedSize'>;
+  uploadFilename: string;
+};
+
+export type AttachmentProgress = {
+  filename: string;
+  percent: number;
+  phase: 'decrypt' | 'encrypt';
+};
+
 export type LocalKeychain = {
   version: number;
   conversations: Record<string, ConversationKeyEntry>;
@@ -90,6 +129,7 @@ export type ConversationResource = {
 };
 
 export type MessageResource = {
+  attachmentExternalIdentifiers?: string[];
   id?: string;
   messageId?: string;
   authorId?: string;
@@ -119,6 +159,7 @@ export type MessageSignaturePayload = {
 };
 
 export type ChatMessage = {
+  attachments: MessageAttachment[];
   id: string;
   authorIdentityId: string;
   content: string;
