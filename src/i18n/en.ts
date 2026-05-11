@@ -34,7 +34,6 @@ export const copy = {
     menu: 'Open sidebar',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
-    subtitleKeychain: 'keychain local',
     you: 'You',
   },
   composer: {

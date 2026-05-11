@@ -330,6 +330,7 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
     content: string,
+    previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
     const key = session.keychain.conversations[conversationId];
 
@@ -360,6 +361,7 @@ export class PigeonApiGateway {
           createdAt: timestamp,
           encryptedPayload: encryptedPayload.toString(),
           id,
+          previousMessageIds,
         }),
       ),
       session.password,

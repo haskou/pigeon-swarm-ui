@@ -2,6 +2,8 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type { ChatMessage, MessageResource, Session } from '../types';
 
+import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
+
 type MessageListEnvelope = {
   cursor?: string | null;
   data?: MessageResource[];
@@ -23,7 +25,10 @@ export type MessageProjectionCopy = {
 };
 
 export class MessageProjector {
-  public constructor(private readonly copy: MessageProjectionCopy) {}
+  public constructor(
+    private readonly copy: MessageProjectionCopy,
+    private readonly ids: ConversationIdFactory = new ConversationIdFactory(),
+  ) {}
 
   public list(value: unknown): {
     messages: MessageResource[];
@@ -57,7 +62,7 @@ export class MessageProjector {
       return this.plainMessage(base, message);
     }
 
-    const key = session.keychain.conversations[conversationId];
+    const key = this.conversationKey(session, conversationId);
 
     if (!key) {
       return this.encryptedError(base, message, 'missing-key');
@@ -76,7 +81,8 @@ export class MessageProjector {
     session: Session,
     message: MessageResource,
   ): Omit<ChatMessage, 'content' | 'encrypted'> {
-    const authorIdentityId = message.authorIdentityId ?? 'unknown';
+    const authorIdentityId =
+      message.authorIdentityId ?? message.authorId ?? 'unknown';
 
     return {
       authorIdentityId,
@@ -88,6 +94,18 @@ export class MessageProjector {
       raw: message,
       timestamp: message.timestamp ?? message.createdAt ?? Date.now(),
     };
+  }
+
+  private conversationKey(session: Session, conversationId: string) {
+    return (
+      session.keychain.conversations[conversationId] ??
+      Object.values(session.keychain.conversations).find(
+        (key) =>
+          key.conversationId === conversationId ||
+          this.ids.create(session.identity.id, key.peerIdentityId) ===
+            conversationId,
+      )
+    );
   }
 
   private async decryptMessage(

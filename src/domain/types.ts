@@ -75,6 +75,7 @@ export type ConversationResource = {
 export type MessageResource = {
   id?: string;
   messageId?: string;
+  authorId?: string;
   conversationId?: string;
   authorIdentityId?: string;
   encryptedPayload?: string;
@@ -83,6 +84,9 @@ export type MessageResource = {
   signature?: string;
   timestamp?: number;
   createdAt?: number;
+  previousMessageIds?: string[];
+  targetMessageId?: string;
+  type?: string;
 };
 
 export type MessageSignaturePayload = {

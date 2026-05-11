@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
+import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { conversationTitle, shortId } from '../../utils/formatting';
@@ -44,7 +45,11 @@ export function Sidebar({
       shortId(networkId),
   );
   const conversationName = (conversation: ConversationResource) => {
-    const peerIdentityId = conversation.peerIdentityId;
+    const peerIdentityId = conversationPeerIdentityId(
+      conversation,
+      session.identity.id,
+      session.keychain,
+    );
 
     return peerIdentityId
       ? identityDisplayName(peerIdentityId, identityNames)

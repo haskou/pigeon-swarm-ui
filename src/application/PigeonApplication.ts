@@ -161,11 +161,13 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     content: string,
+    previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
       conversationId,
       content,
+      previousMessageIds,
     );
   }
 

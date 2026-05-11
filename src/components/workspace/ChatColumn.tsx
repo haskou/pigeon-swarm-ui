@@ -18,6 +18,7 @@ type LoadState = 'idle' | 'loading' | 'error';
 interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
+  peerIdentityId?: string;
   identityNames: IdentityNames;
   messages: ChatMessage[];
   messageState: LoadState;
@@ -40,14 +41,14 @@ export function ChatColumn({
   onOpenSidebar,
   onScroll,
   onSend,
+  peerIdentityId,
   scrollerRef,
   sendError,
   session,
 }: ChatColumnProps) {
-  const activeConversationName =
-    activeConversation?.peerIdentityId
-      ? identityDisplayName(activeConversation.peerIdentityId, identityNames)
-      : activeConversation?.title;
+  const activeConversationName = peerIdentityId
+    ? identityDisplayName(peerIdentityId, identityNames)
+    : activeConversation?.title;
 
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
@@ -75,7 +76,7 @@ export function ChatColumn({
             </div>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${shortId(activeConversation.id)} · ${copy.chat.subtitleKeychain}`
+                ? `1to1 · ${shortId(activeConversation.id)}`
                 : copy.chat.noConversationHint}
             </div>
           </div>

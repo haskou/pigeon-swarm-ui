@@ -9,6 +9,7 @@ import type {
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { cx } from '../../utils/classNameHelper';
@@ -91,7 +92,13 @@ export function GlassWorkspace({
     const ids = new Set<string>();
 
     conversations.forEach((conversation) => {
-      if (conversation.peerIdentityId) ids.add(conversation.peerIdentityId);
+      const peerIdentityId = conversationPeerIdentityId(
+        conversation,
+        session.identity.id,
+        session.keychain,
+      );
+
+      if (peerIdentityId) ids.add(peerIdentityId);
       conversation.participantIdentityIds?.forEach((identityId) =>
         ids.add(identityId),
       );
@@ -243,10 +250,12 @@ export function GlassWorkspace({
     setSendError(null);
 
     try {
+      const lastMessageId = messages[messages.length - 1]?.id;
       const sent = await pigeonApplication.sendMessage(
         session,
         activeConversation.id,
         content,
+        lastMessageId ? [lastMessageId] : [],
       );
       setMessages((current) => [...current, sent]);
       queueMicrotask(() =>
@@ -395,6 +404,15 @@ export function GlassWorkspace({
         <ChatColumn
           session={session}
           activeConversation={activeConversation}
+          peerIdentityId={
+            activeConversation
+              ? conversationPeerIdentityId(
+                  activeConversation,
+                  session.identity.id,
+                  session.keychain,
+                )
+              : undefined
+          }
           identityNames={identityNames}
           messages={messages}
           messageState={messageState}

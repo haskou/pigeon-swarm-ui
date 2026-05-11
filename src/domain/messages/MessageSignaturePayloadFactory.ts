@@ -8,6 +8,7 @@ export class MessageSignaturePayloadFactory {
     createdAt: number;
     encryptedPayload: string;
     id: string;
+    previousMessageIds?: string[];
   }): MessageSignaturePayload {
     return {
       attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
@@ -16,7 +17,7 @@ export class MessageSignaturePayloadFactory {
       createdAt: input.createdAt,
       encryptedPayload: input.encryptedPayload,
       id: input.id,
-      previousMessageIds: [],
+      previousMessageIds: input.previousMessageIds ?? [],
       targetMessageId: undefined,
       type: 'sent',
     };
