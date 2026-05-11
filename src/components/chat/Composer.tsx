@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 
-import type { AttachmentProgress } from '../../domain/types';
+import type { AttachmentProgress, ChatMessage } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -16,6 +16,9 @@ interface ComposerProps {
   onSend: (content: string, attachments: File[]) => Promise<void>;
   placeholder?: string;
   progress?: AttachmentProgress | null;
+  replyTo?: ChatMessage | null;
+  replyToAuthorName?: string;
+  onCancelReply?: () => void;
 }
 
 export function Composer({
@@ -24,6 +27,9 @@ export function Composer({
   onSend,
   placeholder = copy.composer.placeholder,
   progress,
+  replyTo,
+  replyToAuthorName,
+  onCancelReply,
 }: ComposerProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<
@@ -134,6 +140,29 @@ export function Composer({
         {(error || attachmentError) && (
           <div className="mb-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
             {error ?? attachmentError}
+          </div>
+        )}
+        {replyTo && (
+          <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase text-fuchsia-100/70">
+                {copy.messages.replyingTo}{' '}
+                {replyToAuthorName ?? replyTo.authorIdentityId}
+              </div>
+              {replyTo.content && (
+                <div className="mt-1 truncate text-white/80">
+                  {replyTo.content}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
+              aria-label={copy.messages.cancelReply}
+            >
+              ×
+            </button>
           </div>
         )}
         {attachments.length > 0 && (

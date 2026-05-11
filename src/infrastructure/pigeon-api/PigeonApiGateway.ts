@@ -403,9 +403,11 @@ export class PigeonApiGateway {
 
     return {
       messages: await Promise.all(
-        normalized.messages.map((message) =>
-          this.decryptMessage(session, conversationId, message),
-        ),
+        normalized.messages
+          .filter((message) => message.type !== 'deleted')
+          .map((message) =>
+            this.decryptMessage(session, conversationId, message),
+          ),
       ),
       nextCursor: normalized.nextCursor,
     };
@@ -509,6 +511,7 @@ export class PigeonApiGateway {
     previousMessageIds: string[] = [],
     attachments: File[] = [],
     onAttachmentProgress?: (progress: AttachmentProgress) => void,
+    replyToMessageId?: string,
   ): Promise<ChatMessage> {
     const key = conversationKeyEntry(
       session.keychain,
@@ -551,6 +554,7 @@ export class PigeonApiGateway {
           encryptedPayload: encryptedPayload.toString(),
           id,
           previousMessageIds,
+          replyToMessageId,
         }),
       ),
       session.password,
@@ -560,6 +564,8 @@ export class PigeonApiGateway {
       createdAt: timestamp,
       encryptedPayload: encryptedPayload.toString(),
       id,
+      previousMessageIds,
+      ...(replyToMessageId ? { replyToMessageId } : {}),
       signature: signature.toString(),
     };
     const path = `/conversations/${encodeURIComponent(

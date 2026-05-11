@@ -142,6 +142,7 @@ export type MessageResource = {
   timestamp?: number;
   createdAt?: number;
   previousMessageIds?: string[];
+  replyToMessageId?: string;
   targetMessageId?: string;
   type?: string;
 };
@@ -154,6 +155,7 @@ export type MessageSignaturePayload = {
   encryptedPayload?: string;
   id: string;
   previousMessageIds: string[];
+  replyToMessageId?: string;
   targetMessageId?: string;
   type: 'deleted' | 'sent';
 };
@@ -166,6 +168,7 @@ export type ChatMessage = {
   timestamp: number;
   mine: boolean;
   encrypted: boolean;
+  replyToMessageId?: string;
   raw: MessageResource;
 };
 

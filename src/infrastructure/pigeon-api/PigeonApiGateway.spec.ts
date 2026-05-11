@@ -62,6 +62,57 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('does not project deleted messages when loading conversation messages', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        messages: [
+          { id: 'deleted-message', type: 'deleted' },
+          {
+            authorIdentityId: 'identity-1',
+            content: 'visible',
+            id: 'sent-message',
+            type: 'sent',
+          },
+        ],
+        nextBeforeMessageId: null,
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const messages = {
+      list: jest.fn((value: unknown) => value as never),
+      toChatMessage: jest.fn().mockResolvedValue({
+        authorIdentityId: 'identity-1',
+        content: 'visible',
+        encrypted: false,
+        id: 'sent-message',
+        mine: true,
+        raw: { id: 'sent-message' },
+        timestamp: 1,
+      }),
+    };
+    const session = { identity: { id: 'identity-1' } } as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      messages as never,
+    );
+
+    await expect(
+      gateway.loadMessages(session, 'conversation-1'),
+    ).resolves.toMatchObject({
+      messages: [{ id: 'sent-message' }],
+    });
+    expect(messages.toChatMessage).toHaveBeenCalledTimes(1);
+    expect(messages.toChatMessage).toHaveBeenCalledWith(
+      session,
+      'conversation-1',
+      expect.objectContaining({ id: 'sent-message' }),
+    );
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -316,7 +367,15 @@ describe(PigeonApiGateway.name, () => {
     );
 
     await expect(
-      gateway.sendMessage(session, 'conversation-1', 'hello', [], [file]),
+      gateway.sendMessage(
+        session,
+        'conversation-1',
+        'hello',
+        ['previous-message'],
+        [file],
+        undefined,
+        'message-0',
+      ),
     ).resolves.toMatchObject({ content: 'sent' });
 
     const [, messageRequest] = (http.request as jest.Mock).mock.calls[1] as [
@@ -326,18 +385,23 @@ describe(PigeonApiGateway.name, () => {
     const body = JSON.parse(messageRequest.body as string) as {
       attachmentExternalIdentifiers: string[];
       encryptedPayload: string;
+      previousMessageIds: string[];
+      replyToMessageId?: string;
       signature: string;
     };
     const [signaturePayload] = sign.mock.calls[0] as [string, string];
 
     expect(body.attachmentExternalIdentifiers).toEqual(['bafy-attachment']);
+    expect(body.previousMessageIds).toEqual(['previous-message']);
+    expect(body.replyToMessageId).toBe('message-0');
     expect(body.signature).toBe('message-signature');
     expect(JSON.parse(signaturePayload)).toMatchObject({
       attachmentExternalIdentifiers: ['bafy-attachment'],
       authorId: 'identity-1',
       conversationId: 'conversation-1',
       encryptedPayload: expect.stringContaining('bafy-attachment'),
-      previousMessageIds: [],
+      previousMessageIds: ['previous-message'],
+      replyToMessageId: 'message-0',
       type: 'sent',
     });
     expect(JSON.parse(body.encryptedPayload)).toMatchObject({

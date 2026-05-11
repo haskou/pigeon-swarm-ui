@@ -90,6 +90,7 @@ export const copy = {
     storedOneKeys: 'Stored keys',
   },
   messages: {
+    cancelReply: 'Cancel reply',
     delete: 'Delete',
     deleteError: 'The message could not be deleted.',
     decryptFailed: '[encrypted] This event could not be decrypted.',
@@ -98,6 +99,10 @@ export const copy = {
     missingKey:
       '[encrypted] This conversation key is missing from the keychain.',
     rawTitle: 'Raw message',
+    reply: 'Reply',
+    replyTargetNotFound: 'The replied message could not be found.',
+    replyTo: 'Reply to',
+    replyingTo: 'Replying to',
     viewRaw: 'View raw',
   },
   network: {

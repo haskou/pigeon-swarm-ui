@@ -29,6 +29,7 @@ export class MessageSignaturePayloadFactory {
     encryptedPayload: string;
     id: string;
     previousMessageIds?: string[];
+    replyToMessageId?: string;
   }): MessageSignaturePayload {
     return {
       attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
@@ -38,6 +39,7 @@ export class MessageSignaturePayloadFactory {
       encryptedPayload: input.encryptedPayload,
       id: input.id,
       previousMessageIds: input.previousMessageIds ?? [],
+      replyToMessageId: input.replyToMessageId,
       targetMessageId: undefined,
       type: 'sent',
     };

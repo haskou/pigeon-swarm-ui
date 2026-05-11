@@ -85,5 +85,12 @@ textarea:disabled,
 
 .glass-button:hover::after { animation: sheen .85s ease-out; }
 
+.message-focus-ring {
+  border-radius: 1.5rem;
+  outline: 2px solid rgba(244, 114, 182, .9);
+  outline-offset: 4px;
+  transition: outline-color .3s ease;
+}
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

@@ -16,6 +16,7 @@ export class SendMessage {
     previousMessageIds: string[] = [],
     attachments: File[] = [],
     onAttachmentProgress?: (progress: AttachmentProgress) => void,
+    replyToMessageId?: string,
   ): Promise<ChatMessage> {
     return await this.gateway.sendMessage(
       session,
@@ -24,6 +25,7 @@ export class SendMessage {
       previousMessageIds,
       attachments,
       onAttachmentProgress,
+      replyToMessageId,
     );
   }
 }

@@ -93,6 +93,7 @@ export function GlassWorkspace({
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
@@ -336,6 +337,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     if (!activeConversation?.id) return;
+    setReplyTarget(null);
 
     if (!activeConversationKeyId) {
       setMessages([]);
@@ -417,8 +419,10 @@ export function GlassWorkspace({
         lastMessageId ? [lastMessageId] : [],
         attachments,
         setAttachmentProgress,
+        replyTarget?.id,
       );
       setMessages((current) => [...current, sent]);
+      setReplyTarget(null);
       setAttachmentProgress(null);
       queueMicrotask(() =>
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
@@ -442,6 +446,73 @@ export function GlassWorkspace({
       x: event.clientX,
       y: event.clientY,
     });
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    requestAnimationFrame(() => {
+      const element = scrollerRef.current?.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+
+      if (!element) return;
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('message-focus-ring');
+      window.setTimeout(
+        () => element.classList.remove('message-focus-ring'),
+        1600,
+      );
+    });
+  };
+
+  const handleReplyReferenceClick = async (messageId: string) => {
+    if (messages.some((message) => message.id === messageId)) {
+      scrollToMessage(messageId);
+      return;
+    }
+
+    if (!activeConversation?.id || !activeConversationKey) return;
+
+    setSendError(null);
+    setMessageState('loading');
+    try {
+      let cursor = messageCursor;
+
+      while (cursor) {
+        const result = await pigeonApplication.loadMessages(
+          session,
+          activeConversation.id,
+          cursor,
+        );
+
+        setMessages((current) => {
+          const knownIds = new Set(current.map((message) => message.id));
+          const nextMessages = result.messages.filter(
+            (message) => !knownIds.has(message.id),
+          );
+
+          return [...nextMessages, ...current];
+        });
+        setMessageCursor(result.nextCursor ?? null);
+
+        if (result.messages.some((message) => message.id === messageId)) {
+          scrollToMessage(messageId);
+          return;
+        }
+
+        cursor = result.nextCursor ?? null;
+      }
+
+      setSendError(copy.messages.replyTargetNotFound);
+    } catch (caught) {
+      setSendError(
+        caught instanceof Error
+          ? caught.message
+          : copy.workspace.loadOlderError,
+      );
+    } finally {
+      setMessageState('idle');
+    }
   };
 
   const handleDeleteMessage = async (message: ChatMessage) => {
@@ -673,9 +744,14 @@ export function GlassWorkspace({
           onScroll={handleScroll}
           onSend={handleSend}
           onMessageContextMenu={handleMessageContextMenu}
+          onReplyReferenceClick={(messageId) =>
+            void handleReplyReferenceClick(messageId)
+          }
           onOpenSidebar={() => setSidebarOpen(true)}
           onCreate={() => setIsCreateOpen(true)}
           progress={attachmentProgress}
+          replyToMessage={replyTarget}
+          onCancelReply={() => setReplyTarget(null)}
         />
 
         <Inspector
@@ -712,6 +788,10 @@ export function GlassWorkspace({
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
           onDelete={() => void handleDeleteMessage(messageContextMenu.message)}
+          onReply={() => {
+            setReplyTarget(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
@@ -767,11 +847,13 @@ function MessageContextMenu({
   menu,
   onClose,
   onDelete,
+  onReply,
   onViewRaw,
 }: {
   menu: MessageContextMenuState;
   onClose: () => void;
   onDelete: () => void;
+  onReply: () => void;
   onViewRaw: () => void;
 }) {
   return (
@@ -786,6 +868,13 @@ function MessageContextMenu({
         className="fixed z-[90] min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
         style={{ left: menu.x, top: menu.y }}
       >
+        <button
+          type="button"
+          onClick={onReply}
+          className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+        >
+          {copy.messages.reply}
+        </button>
         <button
           type="button"
           onClick={onViewRaw}

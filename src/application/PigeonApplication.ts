@@ -244,6 +244,7 @@ export class PigeonApplication {
     previousMessageIds: string[] = [],
     attachments: File[] = [],
     onAttachmentProgress?: (progress: AttachmentProgress) => void,
+    replyToMessageId?: string,
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
@@ -252,6 +253,7 @@ export class PigeonApplication {
       previousMessageIds,
       attachments,
       onAttachmentProgress,
+      replyToMessageId,
     );
   }
 
