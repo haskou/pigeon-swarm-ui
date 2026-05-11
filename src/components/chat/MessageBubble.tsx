@@ -20,6 +20,8 @@ export function MessageBubble({
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
+  const compactTimestamp =
+    message.content.length <= 36 && !message.content.includes('\n');
 
   return (
     <div className={cx('flex gap-3', mine && 'justify-end')}>
@@ -33,6 +35,7 @@ export function MessageBubble({
       <div
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
+          compactTimestamp && 'flex items-end gap-2',
           mine
             ? 'bg-fuchsia-500 text-right text-white shadow-xl shadow-fuchsia-950/20'
             : 'border border-white/10 bg-black/25 text-white',
@@ -41,7 +44,12 @@ export function MessageBubble({
         <p className={cx(message.encrypted && 'text-white/55')}>
           {message.content}
         </p>
-        <div className="mt-1 text-right text-xs font-black opacity-65">
+        <div
+          className={cx(
+            'text-right text-xs font-black opacity-65',
+            compactTimestamp ? 'shrink-0' : 'mt-1',
+          )}
+        >
           {formatTime(message.timestamp)}
         </div>
       </div>
