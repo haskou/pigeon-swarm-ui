@@ -29,10 +29,41 @@ export class HttpJsonClient {
   }
 
   private headers(init: RequestInit): HeadersInit {
+    const headers = init.headers ?? {};
+    const headerRecord = this.headerRecord(headers);
+
     return {
       Accept: 'application/json',
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init.headers ?? {}),
+      ...(init.body &&
+      typeof init.body === 'string' &&
+      !this.hasHeader(headers, 'Content-Type')
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+      ...headerRecord,
     };
+  }
+
+  private headerRecord(headers: HeadersInit): Record<string, string> {
+    if (headers instanceof Headers) {
+      return Object.fromEntries(headers.entries());
+    }
+
+    if (Array.isArray(headers)) return Object.fromEntries(headers);
+
+    return headers;
+  }
+
+  private hasHeader(headers: HeadersInit, name: string): boolean {
+    const normalizedName = name.toLowerCase();
+
+    if (headers instanceof Headers) return headers.has(name);
+
+    if (Array.isArray(headers)) {
+      return headers.some(([key]) => key.toLowerCase() === normalizedName);
+    }
+
+    return Object.keys(headers).some(
+      (key) => key.toLowerCase() === normalizedName,
+    );
   }
 }

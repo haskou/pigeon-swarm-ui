@@ -6,6 +6,8 @@ import type {
   LocalKeychain,
   LoginResult,
   NotificationResource,
+  PublicFileContent,
+  PublicFileUpload,
   Session,
 } from '../domain/types';
 
@@ -85,6 +87,10 @@ export class PigeonApplication {
     );
   }
 
+  public async claimNode(session: Session): Promise<void> {
+    await this.gateway.claimNode(session);
+  }
+
   public async createConversation(
     session: Session,
     peerIdentityId: string,
@@ -103,6 +109,13 @@ export class PigeonApplication {
     await this.createNetworkUseCase.execute(name);
   }
 
+  public async createNodeNetwork(
+    session: Session,
+    name: string,
+  ): Promise<void> {
+    await this.gateway.createNetwork(name, session);
+  }
+
   public async joinNetwork(
     id: string,
     name: string,
@@ -111,8 +124,25 @@ export class PigeonApplication {
     await this.joinNetworkUseCase.execute(id, name, key);
   }
 
+  public async joinNodeNetwork(
+    session: Session,
+    id: string,
+    name: string,
+    key: string,
+  ): Promise<void> {
+    await this.gateway.joinNetwork(id, name, key, session);
+  }
+
+  public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
+    return await this.gateway.getNodeInfo();
+  }
+
   public async getIdentity(identityId: string): Promise<IdentityResource> {
     return await this.gateway.getIdentity(identityId);
+  }
+
+  public async getPublicFile(cid: string): Promise<PublicFileContent> {
+    return await this.gateway.getPublicFile(cid);
   }
 
   public async updateIdentityProfile(
@@ -120,6 +150,13 @@ export class PigeonApplication {
     profile: IdentityUpdateProfileInput,
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(session, profile);
+  }
+
+  public async uploadPublicFile(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    return await this.gateway.uploadPublicFile(session, file);
   }
 
   public async listConversations(

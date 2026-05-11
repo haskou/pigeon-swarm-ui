@@ -7,12 +7,16 @@ import { pigeonApplication } from '../../application/applicationContainer';
 type NodeNetworksState = {
   error: Error | null;
   loading: boolean;
+  node: { id: string; owner: string | null } | null;
   networks: NodeNetwork[];
   reload: () => Promise<void>;
 };
 
 export function useNodeNetworks(): NodeNetworksState {
   const [networks, setNetworks] = useState<NodeNetwork[]>([]);
+  const [node, setNode] = useState<{ id: string; owner: string | null } | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -21,7 +25,13 @@ export function useNodeNetworks(): NodeNetworksState {
     setError(null);
 
     try {
-      setNetworks(await pigeonApplication.listNodeNetworks());
+      const [nodeInfo, nodeNetworks] = await Promise.all([
+        pigeonApplication.getNodeInfo(),
+        pigeonApplication.listNodeNetworks(),
+      ]);
+
+      setNode(nodeInfo);
+      setNetworks(nodeNetworks);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -37,5 +47,5 @@ export function useNodeNetworks(): NodeNetworksState {
     void reload();
   }, [reload]);
 
-  return { error, loading, networks, reload };
+  return { error, loading, networks, node, reload };
 }

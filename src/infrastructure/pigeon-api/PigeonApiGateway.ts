@@ -20,6 +20,8 @@ import type {
   LoginResult,
   MessageResource,
   NotificationResource,
+  PublicFileContent,
+  PublicFileUpload,
   Session,
 } from '../../domain/types';
 
@@ -89,12 +91,31 @@ export class PigeonApiGateway {
     );
   }
 
-  public async getNodeNetworks(): Promise<{ id: string; name: string }[]> {
+  public async claimNode(session: Session): Promise<void> {
+    const path = '/node/owner';
+    const body = { identityId: session.identity.id };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+  }
+
+  public async getNodeNetworks(): Promise<
+    { id: string; key?: null | string; name: string }[]
+  > {
     const result = await this.http.request<{
-      networks: { id: string; name: string }[];
+      networks: { id: string; key?: null | string; name: string }[];
     }>('/node/networks/');
 
     return result.networks;
+  }
+
+  public async getPublicFile(cid: string): Promise<PublicFileContent> {
+    return await this.http.request<PublicFileContent>(
+      `/ipfs/${encodeURIComponent(cid)}`,
+    );
   }
 
   public async createConversation(
@@ -221,13 +242,37 @@ export class PigeonApiGateway {
     });
   }
 
-  public async createNetwork(name: string): Promise<void> {
-    await this.http.request('/node/networks/', {
-      body: JSON.stringify({
-        id: UUID.generate().toString(),
-        key: PrivateKey.generate().toString(),
-        name,
-      }),
+  public async uploadPublicFile(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    const path = '/ipfs/public';
+    const bytes = await file.arrayBuffer();
+
+    return await this.http.request<PublicFileUpload>(path, {
+      body: bytes,
+      headers: {
+        ...(await this.signer.headers(session, 'POST', path, bytes)),
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Filename': file.name || 'upload',
+      },
+      method: 'POST',
+    });
+  }
+
+  public async createNetwork(name: string, session?: Session): Promise<void> {
+    const path = '/node/networks/';
+    const body = {
+      id: UUID.generate().toString(),
+      key: PrivateKey.generate().toString(),
+      name,
+    };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
       method: 'POST',
     });
   }
@@ -236,9 +281,16 @@ export class PigeonApiGateway {
     id: string,
     name: string,
     key: string,
+    session?: Session,
   ): Promise<void> {
-    await this.http.request('/node/networks/', {
-      body: JSON.stringify({ id, key, name }),
+    const path = '/node/networks/';
+    const body = { id, key, name };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
       method: 'POST',
     });
   }

@@ -18,12 +18,14 @@ import { cx } from '../../utils/classNameHelper';
 import {
   identityName,
   identityPicture,
+  profilePictureDataUrl,
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
+import { NodeSettingsDialog } from './NodeSettingsDialog';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
 import { Sidebar } from './Sidebar';
@@ -33,17 +35,37 @@ type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
 const archivedNotifications = new ArchivedNotifications();
 
+async function loadIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  const content = await pigeonApplication.getPublicFile(pictureCid);
+
+  return profilePictureDataUrl(content);
+}
+
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
+  onNodeNetworksReload: () => Promise<void>;
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
 export function GlassWorkspace({
   conversations,
+  node,
   nodeNetworks,
+  onNodeNetworksReload,
   session,
   setConversations,
   setSession,
@@ -57,6 +79,7 @@ export function GlassWorkspace({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResource[]>(
     [],
@@ -75,11 +98,13 @@ export function GlassWorkspace({
   const [identityProfiles, setIdentityProfiles] = useState<
     Record<string, IdentityResource>
   >(() => ({ [session.identity.id]: session.identity }));
-  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(() => ({
-    ...(identityPicture(session.identity)
-      ? { [session.identity.id]: identityPicture(session.identity) as string }
-      : {}),
-  }));
+  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(
+    () => ({
+      ...(identityPicture(session.identity)
+        ? { [session.identity.id]: identityPicture(session.identity) as string }
+        : {}),
+    }),
+  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messageRequestRef = useRef(0);
@@ -101,6 +126,7 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
+  const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
         session.keychain,
@@ -146,6 +172,29 @@ export function GlassWorkspace({
   }, [activeConversationId, conversations]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void loadIdentityPicture(session.identity)
+      .then((picture) => {
+        if (cancelled) return;
+
+        setIdentityPictures((current) => {
+          const next = { ...current };
+
+          if (picture) next[session.identity.id] = picture;
+          else delete next[session.identity.id];
+
+          return next;
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.identity]);
+
+  useEffect(() => {
     if (identityIdsToResolve.length === 0) return;
 
     let cancelled = false;
@@ -154,11 +203,14 @@ export function GlassWorkspace({
       identityIdsToResolve.map(async (identityId) => {
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
+          const picture = await loadIdentityPicture(identity).catch(
+            () => null,
+          );
 
           return [
             identityId,
             identityName(identity) ?? identityId,
-            identityPicture(identity),
+            picture,
             identity,
           ] as const;
         } catch {
@@ -436,6 +488,8 @@ export function GlassWorkspace({
             setNotificationsOpen(true);
             void refreshNotifications();
           }}
+          onSettingsClick={() => setNodeSettingsOpen(true)}
+          settingsAttention={nodeUnclaimed}
         />
 
         <div
@@ -452,6 +506,8 @@ export function GlassWorkspace({
                 setNotificationsOpen(true);
                 void refreshNotifications();
               }}
+              onSettingsClick={() => setNodeSettingsOpen(true)}
+              settingsAttention={nodeUnclaimed}
             />
             <Sidebar
               session={session}
@@ -579,6 +635,16 @@ export function GlassWorkspace({
             void handleDeclineNotification(notificationId)
           }
           onRefresh={() => void refreshNotifications()}
+        />
+      )}
+
+      {nodeSettingsOpen && (
+        <NodeSettingsDialog
+          networks={nodeNetworks}
+          node={node}
+          onClose={() => setNodeSettingsOpen(false)}
+          onNetworksUpdated={onNodeNetworksReload}
+          session={session}
         />
       )}
     </section>

@@ -96,4 +96,66 @@ describe(PigeonApiGateway.name, () => {
     });
     expect(signedPassword).toBe(session.password);
   });
+
+  it('uploads public profile files as signed raw bytes', async () => {
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    const upload = {
+      cid: 'bafy-avatar',
+      contentType: 'image/png',
+      filename: 'avatar.png',
+      size: 3,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(upload),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const file = {
+      arrayBuffer: jest.fn().mockResolvedValue(bytes),
+      name: 'avatar.png',
+      type: 'image/png',
+    } as unknown as File;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.uploadPublicFile(session, file)).resolves.toBe(upload);
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/ipfs/public',
+      bytes,
+    );
+    expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
+      body: bytes,
+      headers: {
+        'Content-Type': 'image/png',
+        'X-Filename': 'avatar.png',
+        'X-Signature': 'http-signature',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('loads public IPFS content by encoded cid', async () => {
+    const content = {
+      cid: 'bafy/avatar',
+      contentType: 'image/png',
+      data: 'abc',
+      filename: 'avatar.png',
+      size: 3,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(content),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toBe(content);
+
+    expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+  });
 });

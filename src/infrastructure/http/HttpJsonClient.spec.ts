@@ -38,6 +38,60 @@ describe(HttpJsonClient.name, () => {
     expect(json).not.toHaveBeenCalled();
   });
 
+  it('keeps JSON content type for string bodies with signed headers', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: jest.fn().mockResolvedValue({ ok: true }),
+      ok: true,
+      status: 200,
+    } as unknown as Response);
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+
+    await client.request('/keychains/', {
+      body: JSON.stringify({ ok: true }),
+      headers: { 'X-Signature': 'signature' },
+      method: 'POST',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost/keychains/',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-Signature': 'signature',
+        }),
+      }),
+    );
+  });
+
+  it('preserves explicit content type for raw uploads', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: jest.fn().mockResolvedValue({ cid: 'bafy-avatar' }),
+      ok: true,
+      status: 200,
+    } as unknown as Response);
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+    const body = new Uint8Array([1, 2, 3]).buffer;
+
+    await client.request('/ipfs/public', {
+      body,
+      headers: { 'Content-Type': 'image/png', 'X-Filename': 'avatar.png' },
+      method: 'POST',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost/ipfs/public',
+      expect.objectContaining({
+        body,
+        headers: expect.objectContaining({
+          Accept: 'application/json',
+          'Content-Type': 'image/png',
+          'X-Filename': 'avatar.png',
+        }),
+      }),
+    );
+  });
+
   it('exposes structured API error details', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,

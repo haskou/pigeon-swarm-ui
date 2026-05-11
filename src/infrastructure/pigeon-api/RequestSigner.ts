@@ -1,4 +1,5 @@
 import { SHA256Hash } from '@haskou/value-objects';
+import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/types';
 
@@ -51,6 +52,16 @@ export class RequestSigner {
   }
 
   private bodyHash(body?: unknown): string {
+    if (body instanceof ArrayBuffer) {
+      return SHA256Hash.from(Buffer.from(body)).toString();
+    }
+
+    if (ArrayBuffer.isView(body)) {
+      return SHA256Hash.from(
+        Buffer.from(body.buffer, body.byteOffset, body.byteLength),
+      ).toString();
+    }
+
     return SHA256Hash.from(this.bodyToString(body)).toString();
   }
 

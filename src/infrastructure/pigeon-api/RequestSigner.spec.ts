@@ -117,6 +117,40 @@ describe(RequestSigner.name, () => {
     expect(signedPassword(sign)).toBe('secret');
   });
 
+  it('hashes raw upload bytes instead of JSON stringifying them', async () => {
+    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
+    const signer = new RequestSigner(
+      () => 123,
+      () => 'nonce-1',
+    );
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const bytes = new Uint8Array([1, 2, 3]);
+
+    await signer.headers(session, 'POST', '/ipfs/public', bytes.buffer);
+    const arrayBufferPayload = signedPayload(sign);
+
+    sign.mockClear();
+    await signer.headers(session, 'POST', '/ipfs/public', bytes);
+    const typedArrayPayload = signedPayload(sign);
+
+    sign.mockClear();
+    await signer.headers(session, 'POST', '/ipfs/public', Array.from(bytes));
+    const jsonPayload = signedPayload(sign);
+
+    expect(arrayBufferPayload).toEqual({
+      bodyHash: typedArrayPayload.bodyHash,
+      method: 'POST',
+      nonce: 'nonce-1',
+      path: '/ipfs/public',
+      timestamp: '123',
+    });
+    expect(arrayBufferPayload.bodyHash).not.toBe(jsonPayload.bodyHash);
+  });
+
   it('uses a bound crypto random UUID nonce by default', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const session = {

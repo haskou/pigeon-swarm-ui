@@ -36,5 +36,27 @@ export function identityName(identity: IdentityResource): string | null {
 export function identityPicture(identity: IdentityResource): string | null {
   const picture = identity.profile.picture?.trim();
 
-  return picture ? picture : null;
+  return picture ? profilePictureUrl(picture) : null;
+}
+
+export function profilePictureUrl(value: string): string | null {
+  const picture = value.trim();
+
+  return isDirectProfilePictureUrl(picture) ? picture : null;
+}
+
+export function isDirectProfilePictureUrl(value: string): boolean {
+  return (
+    value.startsWith('data:') ||
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('/')
+  );
+}
+
+export function profilePictureDataUrl(input: {
+  contentType: string;
+  data: string;
+}): string {
+  return `data:${input.contentType};base64,${input.data}`;
 }

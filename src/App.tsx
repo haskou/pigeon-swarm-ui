@@ -102,7 +102,9 @@ function App() {
       ) : (
         <GlassWorkspace
           session={session}
+          node={nodeNetworks.node}
           nodeNetworks={nodeNetworks.networks}
+          onNodeNetworksReload={nodeNetworks.reload}
           setSession={(nextSession) => {
             if (!nextSession) clearSavedCredentials();
             setSession(nextSession);
