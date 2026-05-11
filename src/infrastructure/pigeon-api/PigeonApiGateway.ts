@@ -89,6 +89,17 @@ export class PigeonApiGateway {
     );
   }
 
+  public async claimNode(session: Session): Promise<void> {
+    const path = '/node/owner';
+    const body = { identityId: session.identity.id };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+  }
+
   public async getNodeNetworks(): Promise<
     { id: string; key?: null | string; name: string }[]
   > {

@@ -111,6 +111,8 @@ export const copy = {
   },
   nodeSettings: {
     body: 'Manage the networks this local node participates in.',
+    claim: 'Claim node',
+    claimAvailable: 'Ready to claim',
     copyCode: 'Copy network code',
     create: 'Create network',
     createLabel: 'New network name',
@@ -120,11 +122,16 @@ export const copy = {
     missingNetworkKey:
       'This network cannot be shared because the API did not return its private key.',
     networks: 'Node networks',
+    nodeId: 'Node ID',
     open: 'Open node settings',
+    owner: 'Owner',
+    ownerOnly: 'Only the node owner can manage networks and share network codes.',
     removeUnavailable: 'Remove network unavailable in API',
     saving: 'Saving...',
+    server: 'Server',
     shareLabel: 'Share selected network',
     title: 'Node settings',
+    unclaimed: 'Unclaimed node',
   },
   notifications: {
     accept: 'Accept',

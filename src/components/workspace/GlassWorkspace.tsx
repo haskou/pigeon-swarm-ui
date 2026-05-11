@@ -38,16 +38,16 @@ interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
-  nodeOwner: null | string;
   onNodeNetworksReload: () => Promise<void>;
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
 export function GlassWorkspace({
   conversations,
+  node,
   nodeNetworks,
-  nodeOwner,
   onNodeNetworksReload,
   session,
   setConversations,
@@ -107,7 +107,7 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
-  const ownsNode = nodeOwner === session.identity.id;
+  const nodeUnclaimed = node?.owner === null;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
         session.keychain,
@@ -444,7 +444,7 @@ export function GlassWorkspace({
             void refreshNotifications();
           }}
           onSettingsClick={() => setNodeSettingsOpen(true)}
-          showSettings={ownsNode}
+          settingsAttention={nodeUnclaimed}
         />
 
         <div
@@ -462,7 +462,7 @@ export function GlassWorkspace({
                 void refreshNotifications();
               }}
               onSettingsClick={() => setNodeSettingsOpen(true)}
-              showSettings={ownsNode}
+              settingsAttention={nodeUnclaimed}
             />
             <Sidebar
               session={session}
@@ -596,6 +596,7 @@ export function GlassWorkspace({
       {nodeSettingsOpen && (
         <NodeSettingsDialog
           networks={nodeNetworks}
+          node={node}
           onClose={() => setNodeSettingsOpen(false)}
           onNetworksUpdated={onNodeNetworksReload}
           session={session}

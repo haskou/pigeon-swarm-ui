@@ -1,15 +1,18 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { Session } from '../../domain/types';
+import type { IdentityResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
+import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
+import { identityName } from '../../utils/identityDisplay';
 
 interface NodeSettingsDialogProps {
+  node: { id: string; owner: null | string } | null;
   networks: NodeNetwork[];
   onClose: () => void;
   onNetworksUpdated: () => Promise<void>;
@@ -17,6 +20,7 @@ interface NodeSettingsDialogProps {
 }
 
 export function NodeSettingsDialog({
+  node,
   networks,
   onClose,
   onNetworksUpdated,
@@ -29,7 +33,26 @@ export function NodeSettingsDialog({
   );
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<'create' | 'join' | null>(null);
+  const [loading, setLoading] = useState<'claim' | 'create' | 'join' | null>(
+    null,
+  );
+  const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
+    node?.owner === session.identity.id ? session.identity : null,
+  );
+  const isOwner = node?.owner === session.identity.id;
+  const ownerLabel = !node?.owner
+    ? copy.nodeSettings.unclaimed
+    : node.owner === session.identity.id
+      ? identityName(session.identity) ?? shortId(node.owner)
+      : ownerIdentity
+        ? identityName(ownerIdentity) ?? shortId(node.owner)
+        : shortId(node.owner);
+  const ownerHandle =
+    ownerIdentity?.profile.handle?.trim() && node?.owner
+      ? `@${ownerIdentity.profile.handle.trim()}`
+      : node?.owner
+        ? shortId(node.owner)
+        : copy.nodeSettings.claimAvailable;
   const selectedNetwork = useMemo(
     () =>
       networks.find((network) => network.id === selectedNetworkId) ??
@@ -44,6 +67,47 @@ export function NodeSettingsDialog({
           name: selectedNetwork.name,
         })
       : '';
+
+  useEffect(() => {
+    if (!node?.owner) {
+      setOwnerIdentity(null);
+      return;
+    }
+
+    if (node.owner === session.identity.id) {
+      setOwnerIdentity(session.identity);
+      return;
+    }
+
+    let cancelled = false;
+
+    void pigeonApplication
+      .getIdentity(node.owner)
+      .then((identity) => {
+        if (!cancelled) setOwnerIdentity(identity);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnerIdentity(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [node?.owner, session.identity]);
+
+  const handleClaim = async () => {
+    setError(null);
+    setLoading('claim');
+    try {
+      await pigeonApplication.claimNode(session);
+      await onNetworksUpdated();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : copy.nodeSettings.error,
+      );
+    }
+    setLoading(null);
+  };
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
@@ -122,48 +186,93 @@ export function NodeSettingsDialog({
 
         <div className="grid min-h-0 gap-5 overflow-y-auto p-5 lg:grid-cols-[1fr_1.1fr]">
           <div>
-            <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-              {copy.nodeSettings.networks}
-            </div>
-            <div className="space-y-2">
-              {networks.map((network) => (
-                <button
-                  key={network.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedNetworkId(network.id);
-                    setCopied(false);
-                  }}
-                  className={`w-full rounded-2xl p-3 text-left transition ${
-                    selectedNetwork?.id === network.id
-                      ? 'bg-white text-slate-950'
-                      : 'bg-black/25 text-white hover:bg-white/10'
-                  }`}
-                >
-                  <div className="truncate font-black">{network.name}</div>
-                  <div
-                    className={`truncate text-xs ${
-                      selectedNetwork?.id === network.id
-                        ? 'text-slate-500'
-                        : 'text-white/45'
-                    }`}
-                  >
-                    {shortId(network.id)}
+            <div className="mb-5 rounded-3xl bg-black/20 p-4">
+              <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                {copy.nodeSettings.server}
+              </div>
+              <ServerField
+                label={copy.nodeSettings.nodeId}
+                value={node?.id ?? '--'}
+              />
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                  {copy.nodeSettings.owner}
+                </div>
+                <div className="rounded-2xl bg-black/25 px-3 py-2">
+                  <div className="truncate text-sm font-black text-white">
+                    {ownerLabel}
                   </div>
+                  <div className="truncate text-xs text-white/50">
+                    {ownerHandle}
+                  </div>
+                </div>
+              </div>
+              {node?.owner === null && (
+                <button
+                  type="button"
+                  onClick={() => void handleClaim()}
+                  disabled={loading !== null}
+                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {loading === 'claim'
+                    ? copy.nodeSettings.saving
+                    : copy.nodeSettings.claim}
                 </button>
-              ))}
+              )}
             </div>
-            <button
-              type="button"
-              disabled
-              className="mt-3 w-full rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 opacity-55 disabled:cursor-not-allowed"
-            >
-              {copy.nodeSettings.removeUnavailable}
-            </button>
+
+            {isOwner && (
+              <>
+                <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                  {copy.nodeSettings.networks}
+                </div>
+                <div className="space-y-2">
+                  {networks.map((network) => (
+                    <button
+                      key={network.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedNetworkId(network.id);
+                        setCopied(false);
+                      }}
+                      className={cx(
+                        'w-full rounded-2xl p-3 text-left transition',
+                        selectedNetwork?.id === network.id
+                          ? 'bg-white text-slate-950'
+                          : 'bg-black/25 text-white hover:bg-white/10',
+                      )}
+                    >
+                      <div className="truncate font-black">{network.name}</div>
+                      <div
+                        className={cx(
+                          'truncate text-xs',
+                          selectedNetwork?.id === network.id
+                            ? 'text-slate-500'
+                            : 'text-white/45',
+                        )}
+                      >
+                        {shortId(network.id)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="mt-3 w-full rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 opacity-55 disabled:cursor-not-allowed"
+                >
+                  {copy.nodeSettings.removeUnavailable}
+                </button>
+              </>
+            )}
           </div>
 
-          <div className="space-y-5">
-            <form onSubmit={handleCreate} className="rounded-3xl bg-black/20 p-4">
+          {isOwner ? (
+            <div className="space-y-5">
+              <form
+                onSubmit={handleCreate}
+                className="rounded-3xl bg-black/20 p-4"
+              >
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
                   {copy.nodeSettings.createLabel}
@@ -185,7 +294,7 @@ export function NodeSettingsDialog({
                   ? copy.nodeSettings.saving
                   : copy.nodeSettings.create}
               </button>
-            </form>
+              </form>
 
             <form onSubmit={handleJoin} className="rounded-3xl bg-black/20 p-4">
               <label className="block">
@@ -233,10 +342,33 @@ export function NodeSettingsDialog({
                 {error}
               </div>
             )}
-          </div>
+            </div>
+          ) : (
+            <div className="rounded-3xl bg-black/20 p-4 text-sm leading-6 text-white/60">
+              {copy.nodeSettings.ownerOnly}
+              {error && (
+                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </div>,
     document.body,
+  );
+}
+
+function ServerField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+        {label}
+      </div>
+      <div className="truncate rounded-2xl bg-black/25 px-3 py-2 text-sm text-white/70">
+        {value}
+      </div>
+    </div>
   );
 }

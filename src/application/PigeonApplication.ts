@@ -85,6 +85,10 @@ export class PigeonApplication {
     );
   }
 
+  public async claimNode(session: Session): Promise<void> {
+    await this.gateway.claimNode(session);
+  }
+
   public async createConversation(
     session: Session,
     peerIdentityId: string,
