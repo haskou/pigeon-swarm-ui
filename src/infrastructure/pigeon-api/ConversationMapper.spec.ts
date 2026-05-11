@@ -1,9 +1,9 @@
-import { ConversationProjector } from './ConversationProjector';
+import { ConversationMapper } from './ConversationMapper';
 
-describe(ConversationProjector.name, () => {
+describe(ConversationMapper.name, () => {
   it('normalizes envelope responses and preserves server IDs', () => {
-    const projector = new ConversationProjector();
-    const conversations = projector.list({
+    const mapper = new ConversationMapper();
+    const conversations = mapper.list({
       items: [
         {
           id: 'conversation-1',
@@ -24,13 +24,11 @@ describe(ConversationProjector.name, () => {
   });
 
   it('uses the fallback peer when the API omits peerIdentityId', () => {
-    const projector = new ConversationProjector();
+    const mapper = new ConversationMapper();
 
     expect(
-      projector.normalize(
-        { conversationId: 'conversation-2', id: '' },
-        'peer-1',
-      ).peerIdentityId,
+      mapper.normalize({ conversationId: 'conversation-2', id: '' }, 'peer-1')
+        .peerIdentityId,
     ).toBe('peer-1');
   });
 });
