@@ -182,10 +182,9 @@ export function Sidebar({
               <div className="flex items-center gap-3">
                 <div
                   className={cx(
-                    'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl text-sm font-black',
-                    activeConversationId === conversation.id
-                      ? 'bg-slate-950 text-white'
-                      : 'bg-white/10 text-white',
+                    'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+                    activeConversationId === conversation.id &&
+                      'ring-2 ring-slate-950/20',
                   )}
                 >
                   {conversationPicture(conversation) ? (
