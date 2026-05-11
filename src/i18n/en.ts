@@ -41,7 +41,7 @@ export const copy = {
   composer: {
     attach: 'Attach files',
     attachmentDownloadError: 'The attachment could not be decrypted.',
-    attachmentTooLarge: 'Attachments must be 10 MiB or smaller.',
+    attachmentTooLarge: 'Attachments must be 50 MiB or smaller.',
     placeholder: 'Write, encrypt, sign, and push to the swarm...',
     removeAttachment: 'Remove attachment',
     send: 'Send',

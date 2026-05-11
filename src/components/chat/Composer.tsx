@@ -4,7 +4,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 
 const MESSAGE_MAX_LENGTH = 4000;
-const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 
 interface ComposerProps {
   disabled: boolean;
