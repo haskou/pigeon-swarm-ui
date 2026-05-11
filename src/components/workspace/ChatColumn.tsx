@@ -6,6 +6,7 @@ import type {
   IdentityResource,
   Session,
 } from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { copy } from '../../i18n/en';
 import {
@@ -30,6 +31,7 @@ interface ChatColumnProps {
   hasConversationKey: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
+  nodeNetworks: NodeNetwork[];
   sendError: string | null;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
@@ -47,6 +49,7 @@ export function ChatColumn({
   identityPictures,
   messages,
   messageState,
+  nodeNetworks,
   onCreate,
   onOpenSidebar,
   onScroll,
@@ -195,6 +198,7 @@ export function ChatColumn({
           identity={peerIdentity}
           identityId={peerIdentityId}
           name={activeConversationName}
+          nodeNetworks={nodeNetworks}
           onClose={() => setProfileOpen(false)}
           picture={peerPicture}
         />

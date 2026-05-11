@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { IdentityResource } from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
@@ -10,6 +12,7 @@ interface UserProfileDialogProps {
   identity?: IdentityResource;
   identityId: string;
   name: string;
+  nodeNetworks: NodeNetwork[];
   onClose: () => void;
   picture?: string | null;
 }
@@ -18,13 +21,29 @@ export function UserProfileDialog({
   identity,
   identityId,
   name,
+  nodeNetworks,
   onClose,
   picture,
 }: UserProfileDialogProps) {
+  const [copied, setCopied] = useState(false);
   const displayName = identity ? (identityName(identity) ?? name) : name;
   const displayPicture = identity ? identityPicture(identity) : picture;
-  const biography = identity?.profile.biography?.trim();
+  const biography = identity?.profile.biography?.trim() || copy.profile.noBiography;
   const networks = identity?.networks ?? [];
+  const networkNames = networks.map(
+    (networkId) =>
+      nodeNetworks.find((network) => network.id === networkId)?.name ??
+      shortId(networkId),
+  );
+
+  const copyIdentityId = async () => {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(identityId);
+    }
+
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
@@ -34,7 +53,7 @@ export function UserProfileDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full max-w-md rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 w-full max-w-md overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950">
@@ -65,18 +84,34 @@ export function UserProfileDialog({
           </button>
         </div>
 
-        {biography && (
-          <p className="mt-5 rounded-3xl bg-black/25 p-4 text-sm leading-6 text-white/70">
-            {biography}
-          </p>
-        )}
+        <p className="mt-5 max-h-32 overflow-y-auto rounded-3xl bg-black/25 p-4 text-sm leading-6 text-white/70">
+          {biography}
+        </p>
 
         <div className="mt-5 grid gap-3 text-xs">
-          <ProfileField label={copy.profile.identityId} value={identityId} />
+          <div className="min-w-0">
+            <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+              {copy.profile.identityId}
+            </div>
+            <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-black/25 p-2">
+              <span className="min-w-0 flex-1 break-all text-white/70">
+                {identityId}
+              </span>
+              <button
+                type="button"
+                onClick={copyIdentityId}
+                className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+              >
+                {copied ? copy.profile.copied : copy.profile.copy}
+              </button>
+            </div>
+          </div>
           <ProfileField
             label={copy.profile.networks}
             value={
-              networks.length > 0 ? networks.map(shortId).join(', ') : copy.profile.noNetworks
+              networkNames.length > 0
+                ? networkNames.join(', ')
+                : copy.profile.noNetworks
             }
           />
         </div>
@@ -88,11 +123,11 @@ export function UserProfileDialog({
 
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
         {label}
       </div>
-      <div className="break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
+      <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
         {value}
       </div>
     </div>

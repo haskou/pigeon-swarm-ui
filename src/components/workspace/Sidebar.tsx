@@ -268,6 +268,13 @@ export function Sidebar({
                 label={copy.profile.keychainVersion}
                 value={`v${session.keychain.version}`}
               />
+              <ProfileDetail
+                label={copy.profile.biography}
+                value={
+                  session.identity.profile.biography?.trim() ||
+                  copy.profile.noBiography
+                }
+              />
             </div>
 
             <button
@@ -310,13 +317,17 @@ function ProfileAvatar({
 }: {
   label: string;
   picture?: string | null;
-  size?: 'lg' | 'md';
+  size?: 'lg' | 'md' | 'xl';
 }) {
   return (
     <div
       className={cx(
         'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
-        size === 'lg' ? 'h-12 w-12 text-lg' : 'h-11 w-11 text-base',
+        size === 'xl'
+          ? 'h-16 w-16 text-2xl'
+          : size === 'lg'
+            ? 'h-12 w-12 text-lg'
+            : 'h-11 w-11 text-base',
       )}
     >
       {picture ? (
@@ -390,9 +401,15 @@ function ProfileEditor({
 
   return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong w-full max-w-lg rounded-[2rem] p-5 shadow-2xl shadow-black/35"
+        className="glass-panel-strong relative z-10 w-full max-w-lg rounded-[2rem] p-5 shadow-2xl shadow-black/35"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -407,22 +424,22 @@ function ProfileEditor({
         </div>
 
         <div className="mt-4 grid gap-4">
-          <label className="grid gap-2 text-sm font-black text-white/70">
+          <div className="grid gap-2 text-sm font-black text-white/70">
             {copy.profile.picture}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePictureChange}
-              className="text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
-            />
-          </label>
-          {picture && (
-            <img
-              src={picture}
-              alt=""
-              className="h-20 w-20 rounded-2xl object-cover"
-            />
-          )}
+            <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
+              <ProfileAvatar
+                label={name || session.identity.id}
+                picture={picture}
+                size="xl"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePictureChange}
+                className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
+              />
+            </div>
+          </div>
           <ProfileInput
             label={copy.profile.name}
             value={name}
@@ -488,11 +505,11 @@ function ProfileInput({
 
 function ProfileDetail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
         {label}
       </div>
-      <div className="truncate rounded-2xl bg-black/25 px-3 py-2 text-white/70">
+      <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
         {value}
       </div>
     </div>

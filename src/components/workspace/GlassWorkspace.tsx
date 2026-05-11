@@ -508,6 +508,7 @@ export function GlassWorkspace({
           identityPictures={identityPictures}
           messages={messages}
           messageState={messageState}
+          nodeNetworks={nodeNetworks}
           sendError={sendError}
           scrollerRef={scrollerRef}
           bottomRef={bottomRef}
