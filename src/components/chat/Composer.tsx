@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 
 import { copy } from '../../i18n/en';
+import { cx } from '../../utils/classNameHelper';
 
 const MESSAGE_MAX_LENGTH = 4000;
 
@@ -8,9 +9,15 @@ interface ComposerProps {
   disabled: boolean;
   error: string | null;
   onSend: (content: string) => Promise<void>;
+  placeholder?: string;
 }
 
-export function Composer({ disabled, error, onSend }: ComposerProps) {
+export function Composer({
+  disabled,
+  error,
+  onSend,
+  placeholder = copy.composer.placeholder,
+}: ComposerProps) {
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -39,10 +46,16 @@ export function Composer({ disabled, error, onSend }: ComposerProps) {
           {error}
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2">
+      <div
+        className={cx(
+          'flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2 transition',
+          disabled && 'cursor-not-allowed opacity-45',
+        )}
+      >
         <button
           type="button"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70"
+          disabled={disabled || sending}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 disabled:cursor-not-allowed"
         >
           +
         </button>
@@ -51,8 +64,8 @@ export function Composer({ disabled, error, onSend }: ComposerProps) {
           onChange={(event) => setContent(event.target.value)}
           disabled={disabled || sending}
           maxLength={MESSAGE_MAX_LENGTH}
-          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/35 disabled:opacity-50"
-          placeholder={copy.composer.placeholder}
+          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
+          placeholder={placeholder}
         />
         <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
           {content.length}/{MESSAGE_MAX_LENGTH}

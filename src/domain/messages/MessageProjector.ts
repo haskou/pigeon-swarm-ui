@@ -3,6 +3,7 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 import type { ChatMessage, MessageResource, Session } from '../types';
 
 import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
+import { conversationKeyEntry } from '../conversations/conversationKey';
 
 type MessageListEnvelope = {
   cursor?: string | null;
@@ -97,14 +98,11 @@ export class MessageProjector {
   }
 
   private conversationKey(session: Session, conversationId: string) {
-    return (
-      session.keychain.conversations[conversationId] ??
-      Object.values(session.keychain.conversations).find(
-        (key) =>
-          key.conversationId === conversationId ||
-          this.ids.create(session.identity.id, key.peerIdentityId) ===
-            conversationId,
-      )
+    return conversationKeyEntry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+      this.ids,
     );
   }
 

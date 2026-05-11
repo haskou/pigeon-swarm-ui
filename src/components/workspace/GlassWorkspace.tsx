@@ -9,6 +9,7 @@ import type {
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
@@ -88,6 +89,13 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
+  const activeConversationKey = activeConversation
+    ? conversationKeyEntry(
+        session.keychain,
+        session.identity.id,
+        activeConversation.id,
+      )
+    : undefined;
   const identityIdsToResolve = useMemo(() => {
     const ids = new Set<string>();
 
@@ -404,6 +412,7 @@ export function GlassWorkspace({
         <ChatColumn
           session={session}
           activeConversation={activeConversation}
+          hasConversationKey={!!activeConversationKey}
           peerIdentityId={
             activeConversation
               ? conversationPeerIdentityId(

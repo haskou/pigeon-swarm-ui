@@ -5,7 +5,6 @@ import type {
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
-import { shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
@@ -20,6 +19,7 @@ interface ChatColumnProps {
   activeConversation?: ConversationResource;
   peerIdentityId?: string;
   identityNames: IdentityNames;
+  hasConversationKey: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
   sendError: string | null;
@@ -34,6 +34,7 @@ interface ChatColumnProps {
 export function ChatColumn({
   activeConversation,
   bottomRef,
+  hasConversationKey,
   identityNames,
   messages,
   messageState,
@@ -76,7 +77,7 @@ export function ChatColumn({
             </div>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${shortId(activeConversation.id)}`
+                ? `1to1 · ${activeConversation.id}`
                 : copy.chat.noConversationHint}
             </div>
           </div>
@@ -141,9 +142,14 @@ export function ChatColumn({
           </div>
 
           <Composer
-            disabled={messageState === 'loading'}
+            disabled={messageState === 'loading' || !hasConversationKey}
             error={sendError}
             onSend={onSend}
+            placeholder={
+              hasConversationKey
+                ? copy.composer.placeholder
+                : copy.messages.missingConversationKey
+            }
           />
         </>
       )}

@@ -24,6 +24,7 @@ import type {
 
 import { API_SERVER_URL } from '../../config';
 import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
+import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
@@ -332,7 +333,12 @@ export class PigeonApiGateway {
     content: string,
     previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
-    const key = session.keychain.conversations[conversationId];
+    const key = conversationKeyEntry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+      this.ids,
+    );
 
     if (!key) {
       throw new Error(copy.messages.missingConversationKey);
