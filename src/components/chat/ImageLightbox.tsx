@@ -63,6 +63,7 @@ export function ImageLightbox({
           <button
             type="button"
             onClick={(event) => {
+              event.preventDefault();
               event.stopPropagation();
               setActiveIndex((current) => current - 1);
             }}
@@ -93,6 +94,7 @@ export function ImageLightbox({
           <button
             type="button"
             onClick={(event) => {
+              event.preventDefault();
               event.stopPropagation();
               setActiveIndex((current) => current + 1);
             }}
@@ -116,6 +118,7 @@ export function ImageLightbox({
       <button
         type="button"
         onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           onClose();
         }}

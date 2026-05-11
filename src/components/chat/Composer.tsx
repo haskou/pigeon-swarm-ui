@@ -348,7 +348,15 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
     return <audio src={url} className="w-56 p-2" controls />;
   }
 
-  return null;
+  return (
+    <div className="grid h-28 w-56 place-items-center bg-black/20 p-4">
+      <div className="relative h-16 w-12 rounded-lg border border-white/20 bg-white/10">
+        <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
+        <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
+        <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
+      </div>
+    </div>
+  );
 }
 
 function formatFileSize(bytes: number): string {

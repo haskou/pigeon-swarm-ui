@@ -52,11 +52,19 @@ export function MessageBubble({
     () => message.attachments.map((attachment, index) => ({ attachment, index })),
     [message.attachments],
   );
-  const imageAttachments = indexedAttachments.filter(({ attachment }) =>
-    isImageAttachment(attachment),
+  const imageAttachments = useMemo(
+    () =>
+      indexedAttachments.filter(({ attachment }) =>
+        isImageAttachment(attachment),
+      ),
+    [indexedAttachments],
   );
-  const otherAttachments = indexedAttachments.filter(
-    ({ attachment }) => !isImageAttachment(attachment),
+  const otherAttachments = useMemo(
+    () =>
+      indexedAttachments.filter(
+        ({ attachment }) => !isImageAttachment(attachment),
+      ),
+    [indexedAttachments],
   );
 
   return (
@@ -352,6 +360,15 @@ function AttachmentCard({
               className="h-full rounded-full bg-fuchsia-400"
               style={{ width: `${progress.percent}%` }}
             />
+          </div>
+        </div>
+      )}
+      {!hasPreview && (
+        <div className="grid min-h-32 place-items-center bg-black/20 p-4">
+          <div className="relative h-16 w-12 rounded-lg border border-white/20 bg-white/10">
+            <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
+            <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
+            <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
           </div>
         </div>
       )}

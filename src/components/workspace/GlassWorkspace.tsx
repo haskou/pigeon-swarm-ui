@@ -138,6 +138,7 @@ export function GlassWorkspace({
         activeConversation.id,
       )
     : undefined;
+  const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
   const identityIdsToResolve = useMemo(() => {
     const ids = new Set<string>();
 
@@ -323,7 +324,7 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversation?.id) return;
 
-    if (!activeConversationKey) {
+    if (!activeConversationKeyId) {
       setMessages([]);
       setMessageCursor(null);
       lastScrollTopRef.current = 0;
@@ -332,7 +333,7 @@ export function GlassWorkspace({
     }
 
     void loadActiveMessages(activeConversation.id);
-  }, [activeConversation?.id, activeConversationKey, loadActiveMessages]);
+  }, [activeConversation?.id, activeConversationKeyId, loadActiveMessages]);
 
   const handleLoadOlder = async () => {
     if (
