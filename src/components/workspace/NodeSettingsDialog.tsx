@@ -25,16 +25,13 @@ export function NodeSettingsDialog({
   onNetworksUpdated,
   session,
 }: NodeSettingsDialogProps) {
-  const [createName, setCreateName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networks[0]?.id ?? '',
   );
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<'claim' | 'create' | 'join' | null>(
-    null,
-  );
+  const [loading, setLoading] = useState<'claim' | 'join' | null>(null);
   const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
     node?.owner === session.identity.id ? session.identity : null,
   );
@@ -106,22 +103,6 @@ export function NodeSettingsDialog({
     setLoading(null);
   };
 
-  const handleCreate = async (event: FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setLoading('create');
-    try {
-      await pigeonApplication.createNodeNetwork(session, createName.trim());
-      setCreateName('');
-      await onNetworksUpdated();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : copy.nodeSettings.error,
-      );
-    }
-    setLoading(null);
-  };
-
   const handleJoin = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -182,7 +163,7 @@ export function NodeSettingsDialog({
         </div>
 
         <div className="grid min-h-0 gap-5 overflow-y-auto p-5 lg:grid-cols-[1fr_1.1fr]">
-          <div>
+          <div className="min-w-0">
             <div className="mb-5 rounded-3xl bg-black/20 p-4">
               <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                 {copy.nodeSettings.server}
@@ -223,17 +204,10 @@ export function NodeSettingsDialog({
             </div>
             <div className="space-y-2">
               {networks.map((network) => (
-                <button
+                <div
                   key={network.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isOwner) return;
-                    setSelectedNetworkId(network.id);
-                    setCopied(false);
-                  }}
                   className={cx(
-                    'w-full rounded-2xl p-3 text-left transition',
-                    !isOwner && 'cursor-default',
+                    'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl p-3 text-left transition',
                     selectedNetwork?.id === network.id
                       ? 'bg-white text-slate-950'
                       : isOwner
@@ -241,60 +215,66 @@ export function NodeSettingsDialog({
                         : 'bg-black/25 text-white',
                   )}
                 >
-                  <div className="truncate font-black">{network.name}</div>
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isOwner) return;
+                      setSelectedNetworkId(network.id);
+                      setCopied(false);
+                    }}
                     className={cx(
-                      'truncate text-xs',
-                      selectedNetwork?.id === network.id
-                        ? 'text-slate-500'
-                        : 'text-white/45',
+                      'min-w-0 text-left',
+                      !isOwner && 'cursor-default',
                     )}
                   >
-                    {shortId(network.id)}
-                  </div>
-                </button>
+                    <div className="truncate font-black">{network.name}</div>
+                    <div
+                      className={cx(
+                        'truncate text-xs',
+                        selectedNetwork?.id === network.id
+                          ? 'text-slate-500'
+                          : 'text-white/45',
+                      )}
+                    >
+                      {network.id}
+                    </div>
+                  </button>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      disabled
+                      className={cx(
+                        'grid h-9 w-9 place-items-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-55',
+                        selectedNetwork?.id === network.id
+                          ? 'bg-slate-950/10 text-slate-700'
+                          : 'bg-rose-500/10 text-rose-100',
+                      )}
+                      aria-label={copy.nodeSettings.removeUnavailable}
+                      title={copy.nodeSettings.removeUnavailable}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="h-4 w-4"
+                      >
+                        <path
+                          d="M6 7h12M10 7V5h4v2m-6 3 .5 8h7l.5-8"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
-            {isOwner && (
-              <button
-                type="button"
-                disabled
-                className="mt-3 w-full rounded-2xl bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 opacity-55 disabled:cursor-not-allowed"
-              >
-                {copy.nodeSettings.removeUnavailable}
-              </button>
-            )}
           </div>
 
           {isOwner ? (
-            <div className="space-y-5">
-              <form
-                onSubmit={handleCreate}
-                className="rounded-3xl bg-black/20 p-4"
-              >
-                <label className="block">
-                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                    {copy.nodeSettings.createLabel}
-                  </span>
-                  <input
-                    value={createName}
-                    onChange={(event) => setCreateName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.namePlaceholder}
-                    required
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={loading !== null}
-                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {loading === 'create'
-                    ? copy.nodeSettings.saving
-                    : copy.nodeSettings.create}
-                </button>
-              </form>
-
+            <div className="min-w-0 space-y-5">
               <form onSubmit={handleJoin} className="rounded-3xl bg-black/20 p-4">
                 <label className="block">
                   <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -319,11 +299,11 @@ export function NodeSettingsDialog({
                 </button>
               </form>
 
-            <div className="rounded-3xl bg-black/20 p-4">
+            <div className="min-w-0 rounded-3xl bg-black/20 p-4">
               <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                 {copy.nodeSettings.shareLabel}
               </div>
-              <div className="truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
+              <div className="block max-w-full truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
                 {selectedNetworkCode || copy.nodeSettings.missingNetworkKey}
               </div>
               <button
