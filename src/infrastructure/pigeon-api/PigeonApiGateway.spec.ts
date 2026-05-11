@@ -343,8 +343,8 @@ describe(PigeonApiGateway.name, () => {
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
-          'conversation-1': {
-            conversationId: 'conversation-1',
+          'one-to-one:conversation': {
+            conversationId: 'one-to-one:conversation',
             createdAt: 1,
             peerIdentityId: 'identity-2',
             privateKey: 'private-key',
@@ -367,15 +367,16 @@ describe(PigeonApiGateway.name, () => {
     );
 
     await expect(
-      gateway.sendMessage(
-        session,
-        'conversation-1',
-        'hello',
-        ['previous-message'],
-        [file],
-        undefined,
-        'message-0',
-      ),
+      gateway.sendMessage(session, 'one-to-one:conversation', 'hello', {
+        attachments: [file],
+        previousMessageIds: ['previous-message'],
+        replyPreview: {
+          authorIdentityId: 'identity-2',
+          content: 'original',
+          messageId: 'message-0',
+        },
+        replyToMessageId: 'message-0',
+      }),
     ).resolves.toMatchObject({ content: 'sent' });
 
     const [, messageRequest] = (http.request as jest.Mock).mock.calls[1] as [
@@ -384,25 +385,64 @@ describe(PigeonApiGateway.name, () => {
     ];
     const body = JSON.parse(messageRequest.body as string) as {
       attachmentExternalIdentifiers: string[];
+      createdAt: number;
       encryptedPayload: string;
+      id: string;
       previousMessageIds: string[];
       replyToMessageId?: string;
       signature: string;
     };
-    const [signaturePayload] = sign.mock.calls[0] as [string, string];
+    const path = '/conversations/one-to-one%3Aconversation/messages';
+    const [signaturePayload, signaturePassword] = sign.mock.calls[0] as [
+      string,
+      string,
+    ];
+    const parsedSignaturePayload = JSON.parse(signaturePayload) as Record<
+      string,
+      unknown
+    >;
 
     expect(body.attachmentExternalIdentifiers).toEqual(['bafy-attachment']);
+    expect(body.createdAt).toEqual(expect.any(Number));
+    expect(body.encryptedPayload).toEqual(expect.any(String));
+    expect(body.id).toEqual(expect.stringContaining('one-to-one:conversation'));
     expect(body.previousMessageIds).toEqual(['previous-message']);
     expect(body.replyToMessageId).toBe('message-0');
     expect(body.signature).toBe('message-signature');
-    expect(JSON.parse(signaturePayload)).toMatchObject({
+    expect(Object.keys(parsedSignaturePayload)).toEqual([
+      'attachmentExternalIdentifiers',
+      'authorId',
+      'conversationId',
+      'createdAt',
+      'encryptedPayload',
+      'id',
+      'previousMessageIds',
+      'replyToMessageId',
+      'type',
+    ]);
+    expect(parsedSignaturePayload).toEqual({
       attachmentExternalIdentifiers: ['bafy-attachment'],
       authorId: 'identity-1',
-      conversationId: 'conversation-1',
-      encryptedPayload: expect.stringContaining('bafy-attachment'),
+      conversationId: 'one-to-one:conversation',
+      createdAt: body.createdAt,
+      encryptedPayload: body.encryptedPayload,
+      id: body.id,
       previousMessageIds: ['previous-message'],
       replyToMessageId: 'message-0',
       type: 'sent',
+    });
+    expect(parsedSignaturePayload).not.toHaveProperty('targetMessageId');
+    expect(signaturePassword).toBe('secret');
+    expect(signer.headers).toHaveBeenLastCalledWith(
+      session,
+      'POST',
+      path,
+      body,
+    );
+    expect(http.request).toHaveBeenLastCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
     });
     expect(JSON.parse(body.encryptedPayload)).toMatchObject({
       attachments: [
@@ -415,6 +455,11 @@ describe(PigeonApiGateway.name, () => {
         },
       ],
       content: 'hello',
+      reply: {
+        authorIdentityId: 'identity-2',
+        content: 'original',
+        messageId: 'message-0',
+      },
     });
   });
 

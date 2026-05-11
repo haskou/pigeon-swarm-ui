@@ -16,6 +16,7 @@ export class MessageSignaturePayloadFactory {
       encryptedPayload: undefined,
       id: input.id,
       previousMessageIds: [input.targetMessageId],
+      replyToMessageId: undefined,
       targetMessageId: input.targetMessageId,
       type: 'deleted',
     };

@@ -13,16 +13,15 @@ describe(SendMessage.name, () => {
     const useCase = new SendMessage(gateway);
 
     await expect(
-      useCase.execute(session, 'conversation-1', 'hello', ['previous']),
+      useCase.execute(session, 'conversation-1', 'hello', {
+        previousMessageIds: ['previous'],
+      }),
     ).resolves.toBe(expected);
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       session,
       'conversation-1',
       'hello',
-      ['previous'],
-      [],
-      undefined,
-      undefined,
+      { previousMessageIds: ['previous'] },
     );
   });
 
@@ -36,16 +35,15 @@ describe(SendMessage.name, () => {
     const useCase = new SendMessage(gateway);
 
     await expect(
-      useCase.execute(session, 'conversation-1', 'hello', [], [file]),
+      useCase.execute(session, 'conversation-1', 'hello', {
+        attachments: [file],
+      }),
     ).resolves.toBe(expected);
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       session,
       'conversation-1',
       'hello',
-      [],
-      [file],
-      undefined,
-      undefined,
+      { attachments: [file] },
     );
   });
 
@@ -55,27 +53,27 @@ describe(SendMessage.name, () => {
     const gateway = {
       sendMessage: jest.fn().mockResolvedValue(expected),
     } as unknown as PigeonApiGateway;
+    const replyPreview = {
+      authorIdentityId: 'identity-2',
+      content: 'original',
+      messageId: 'message-1',
+    };
     const useCase = new SendMessage(gateway);
 
     await expect(
-      useCase.execute(
-        session,
-        'conversation-1',
-        'hello',
-        [],
-        [],
-        undefined,
-        'message-1',
-      ),
+      useCase.execute(session, 'conversation-1', 'hello', {
+        replyPreview,
+        replyToMessageId: 'message-1',
+      }),
     ).resolves.toBe(expected);
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       session,
       'conversation-1',
       'hello',
-      [],
-      [],
-      undefined,
-      'message-1',
+      {
+        replyPreview,
+        replyToMessageId: 'message-1',
+      },
     );
   });
 });

@@ -1,6 +1,6 @@
-import type { MouseEvent } from 'react';
+import type { MouseEvent, PointerEvent } from 'react';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AttachmentProgress,
@@ -26,7 +26,7 @@ interface MessageBubbleProps {
   ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: () => void;
-  onContextMenu: (event: MouseEvent, message: ChatMessage) => void;
+  onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
@@ -47,7 +47,7 @@ export function MessageBubble({
   onAttachmentOpen,
   onAttachmentPreview,
   onAvatarClick,
-  onContextMenu,
+  onMessageMenuOpen,
   onReplyReferenceClick,
   replyAuthorName,
   replyImage,
@@ -55,6 +55,8 @@ export function MessageBubble({
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
+  const replyMessageId =
+    message.replyToMessageId ?? message.replyPreview?.messageId;
   const compactTimestamp =
     message.content.length <= 36 && !message.content.includes('\n');
   const [lightbox, setLightbox] = useState<{
@@ -62,6 +64,7 @@ export function MessageBubble({
     index: number;
   } | null>(null);
   const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indexedAttachments = useMemo(
     () =>
       message.attachments.map((attachment, index) => ({ attachment, index })),
@@ -113,6 +116,27 @@ export function MessageBubble({
     };
   }, [onAttachmentPreview, replyImage]);
 
+  useEffect(() => clearLongPressTimer, []);
+
+  const clearLongPressTimer = () => {
+    if (!longPressTimerRef.current) return;
+
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+  const handleContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    onMessageMenuOpen(message, event.clientX, event.clientY);
+  };
+  const handlePointerDown = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') return;
+
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      onMessageMenuOpen(message, event.clientX, event.clientY);
+    }, 550);
+  };
+
   return (
     <>
       <div
@@ -130,7 +154,12 @@ export function MessageBubble({
             <div className="w-11 shrink-0" />
           ))}
         <div
-          onContextMenu={(event) => onContextMenu(event, message)}
+          onContextMenu={handleContextMenu}
+          onPointerCancel={clearLongPressTimer}
+          onPointerDown={handlePointerDown}
+          onPointerLeave={clearLongPressTimer}
+          onPointerMove={clearLongPressTimer}
+          onPointerUp={clearLongPressTimer}
           className={cx(
             'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
@@ -141,10 +170,10 @@ export function MessageBubble({
               : 'border border-white/10 bg-black/25 text-white',
           )}
         >
-          {message.replyToMessageId && (
+          {replyMessageId && (
             <button
               type="button"
-              onClick={() => onReplyReferenceClick(message.replyToMessageId!)}
+              onClick={() => onReplyReferenceClick(replyMessageId)}
               className={cx(
                 'mb-6 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
                 mine
@@ -163,8 +192,7 @@ export function MessageBubble({
                 <span className="min-w-0">
                   <span className="block font-black text-white/75">
                     {copy.messages.replyTo}{' '}
-                    {replyAuthorName ??
-                      truncateMessageId(message.replyToMessageId)}
+                    {replyAuthorName ?? copy.messages.originalMessage}
                   </span>
                   {replyPreview && (
                     <span className="block truncate text-white/55">
@@ -233,12 +261,6 @@ export function MessageBubble({
       )}
     </>
   );
-}
-
-function truncateMessageId(messageId: string): string {
-  if (messageId.length <= 32) return messageId;
-
-  return `${messageId.slice(0, 16)}...${messageId.slice(-8)}`;
 }
 
 function ImageAttachmentAlbum({

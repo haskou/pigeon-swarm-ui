@@ -5,18 +5,19 @@ import type {
   AttachmentProgress,
   ConversationResource,
   IdentityResource,
+  MessageReplyPreview,
   NotificationResource,
   Session,
 } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
-import type { MouseEvent } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import {
   identityName,
@@ -40,6 +41,23 @@ type MessageContextMenuState = {
   x: number;
   y: number;
 };
+
+function replyPreviewFromMessage(
+  message?: ChatMessage | null,
+): MessageReplyPreview | undefined {
+  if (!message) return undefined;
+
+  const image = message.attachments.find((attachment) =>
+    isBrowserPreviewImage(attachment.contentType),
+  );
+
+  return {
+    authorIdentityId: message.authorIdentityId,
+    ...(message.content ? { content: message.content.slice(0, 180) } : {}),
+    ...(image ? { image } : {}),
+    messageId: message.id,
+  };
+}
 
 const archivedNotifications = new ArchivedNotifications();
 
@@ -416,10 +434,13 @@ export function GlassWorkspace({
         session,
         activeConversation.id,
         content,
-        lastMessageId ? [lastMessageId] : [],
-        attachments,
-        setAttachmentProgress,
-        replyTarget?.id,
+        {
+          attachments,
+          onAttachmentProgress: setAttachmentProgress,
+          previousMessageIds: lastMessageId ? [lastMessageId] : [],
+          replyPreview: replyPreviewFromMessage(replyTarget),
+          replyToMessageId: replyTarget?.id,
+        },
       );
       setMessages((current) => [...current, sent]);
       setReplyTarget(null);
@@ -436,15 +457,15 @@ export function GlassWorkspace({
     }
   };
 
-  const handleMessageContextMenu = (
-    event: MouseEvent,
+  const handleMessageMenuOpen = (
     message: ChatMessage,
+    x: number,
+    y: number,
   ) => {
-    event.preventDefault();
     setMessageContextMenu({
       message,
-      x: event.clientX,
-      y: event.clientY,
+      x,
+      y,
     });
   };
 
@@ -743,7 +764,7 @@ export function GlassWorkspace({
           bottomRef={bottomRef}
           onScroll={handleScroll}
           onSend={handleSend}
-          onMessageContextMenu={handleMessageContextMenu}
+          onMessageMenuOpen={handleMessageMenuOpen}
           onReplyReferenceClick={(messageId) =>
             void handleReplyReferenceClick(messageId)
           }

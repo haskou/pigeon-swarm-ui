@@ -28,6 +28,7 @@ import type {
   PrivateFileUpload,
   PublicFileContent,
   PublicFileUpload,
+  SendMessageOptions,
   Session,
 } from '../../domain/types';
 
@@ -508,11 +509,15 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
     content: string,
-    previousMessageIds: string[] = [],
-    attachments: File[] = [],
-    onAttachmentProgress?: (progress: AttachmentProgress) => void,
-    replyToMessageId?: string,
+    options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
+    const {
+      attachments = [],
+      onAttachmentProgress,
+      previousMessageIds = [],
+      replyPreview,
+      replyToMessageId,
+    } = options;
     const key = conversationKeyEntry(
       session.keychain,
       session.identity.id,
@@ -539,6 +544,7 @@ export class PigeonApiGateway {
         authorIdentityId: session.identity.id,
         content,
         conversationId,
+        ...(replyPreview ? { reply: replyPreview } : {}),
         timestamp,
         type: 'MessageSent',
       }),

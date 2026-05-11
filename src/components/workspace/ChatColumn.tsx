@@ -9,7 +9,6 @@ import type {
   MessageAttachment,
   Session,
 } from '../../domain/types';
-import type { MouseEvent } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -42,7 +41,7 @@ interface ChatColumnProps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
-  onMessageContextMenu: (event: MouseEvent, message: ChatMessage) => void;
+  onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
@@ -65,7 +64,7 @@ export function ChatColumn({
   onReplyReferenceClick,
   onScroll,
   onSend,
-  onMessageContextMenu,
+  onMessageMenuOpen,
   onCancelReply,
   peerIdentity,
   peerIdentityId,
@@ -276,20 +275,29 @@ export function ChatColumn({
                     }
                     onAttachmentPreview={loadAttachmentPreview}
                     onAvatarClick={() => openMessageAuthorProfile(message)}
-                    onContextMenu={onMessageContextMenu}
+                    onMessageMenuOpen={onMessageMenuOpen}
                     onReplyReferenceClick={onReplyReferenceClick}
-                    replyImage={replyMessage?.attachments.find((attachment) =>
-                      isBrowserPreviewImage(attachment.contentType),
-                    )}
+                    replyImage={
+                      replyMessage?.attachments.find((attachment) =>
+                        isBrowserPreviewImage(attachment.contentType),
+                      ) ?? message.replyPreview?.image
+                    }
                     replyAuthorName={
                       replyMessage
                         ? identityDisplayName(
                             replyMessage.authorIdentityId,
                             identityNames,
                           )
+                        : message.replyPreview
+                          ? identityDisplayName(
+                              message.replyPreview.authorIdentityId,
+                              identityNames,
+                            )
                         : undefined
                     }
-                    replyPreview={replyMessage?.content}
+                    replyPreview={
+                      replyMessage?.content ?? message.replyPreview?.content
+                    }
                     showAvatar={showAvatar}
                   />
                 );

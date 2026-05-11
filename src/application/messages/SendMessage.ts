@@ -1,6 +1,6 @@
 import type {
-  AttachmentProgress,
   ChatMessage,
+  SendMessageOptions,
   Session,
 } from '../../domain/types';
 
@@ -13,19 +13,13 @@ export class SendMessage {
     session: Session,
     conversationId: string,
     content: string,
-    previousMessageIds: string[] = [],
-    attachments: File[] = [],
-    onAttachmentProgress?: (progress: AttachmentProgress) => void,
-    replyToMessageId?: string,
+    options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
     return await this.gateway.sendMessage(
       session,
       conversationId,
       content,
-      previousMessageIds,
-      attachments,
-      onAttachmentProgress,
-      replyToMessageId,
+      options,
     );
   }
 }

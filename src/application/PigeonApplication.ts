@@ -10,6 +10,7 @@ import type {
   NotificationResource,
   PublicFileContent,
   PublicFileUpload,
+  SendMessageOptions,
   Session,
 } from '../domain/types';
 
@@ -241,19 +242,13 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     content: string,
-    previousMessageIds: string[] = [],
-    attachments: File[] = [],
-    onAttachmentProgress?: (progress: AttachmentProgress) => void,
-    replyToMessageId?: string,
+    options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
       conversationId,
       content,
-      previousMessageIds,
-      attachments,
-      onAttachmentProgress,
-      replyToMessageId,
+      options,
     );
   }
 

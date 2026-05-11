@@ -18,6 +18,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       'encryptedPayload',
       'id',
       'previousMessageIds',
+      'replyToMessageId',
       'targetMessageId',
       'type',
     ]);
@@ -29,6 +30,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       encryptedPayload: undefined,
       id: 'delete-message-1',
       previousMessageIds: ['message-1'],
+      replyToMessageId: undefined,
       targetMessageId: 'message-1',
       type: 'deleted',
     });

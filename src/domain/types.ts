@@ -98,6 +98,13 @@ export type MessageAttachment = {
   size: number;
 };
 
+export type MessageReplyPreview = {
+  authorIdentityId: string;
+  content?: string;
+  image?: MessageAttachment;
+  messageId: string;
+};
+
 export type PendingMessageAttachment = {
   encryptedBytes: ArrayBuffer;
   metadata: Omit<MessageAttachment, 'cid' | 'encryptedSize'>;
@@ -108,6 +115,14 @@ export type AttachmentProgress = {
   filename: string;
   percent: number;
   phase: 'decrypt' | 'encrypt';
+};
+
+export type SendMessageOptions = {
+  attachments?: File[];
+  onAttachmentProgress?: (progress: AttachmentProgress) => void;
+  previousMessageIds?: string[];
+  replyPreview?: MessageReplyPreview;
+  replyToMessageId?: string;
 };
 
 export type LocalKeychain = {
@@ -168,6 +183,7 @@ export type ChatMessage = {
   timestamp: number;
   mine: boolean;
   encrypted: boolean;
+  replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   raw: MessageResource;
 };

@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   MessageAttachment,
   MessageResource,
+  MessageReplyPreview,
   Session,
 } from '../types';
 
@@ -23,6 +24,7 @@ type PlainMessage = {
   attachments?: MessageAttachment[];
   authorIdentityId?: string;
   content?: string;
+  reply?: MessageReplyPreview;
   timestamp?: number;
 };
 
@@ -181,6 +183,8 @@ export class MessageProjector {
       encrypted: false,
       mine: authorIdentityId === currentIdentityId,
       raw: message,
+      replyPreview: parsed.reply,
+      replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
       timestamp: parsed.timestamp ?? base.timestamp,
     };
   }

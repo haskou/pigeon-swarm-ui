@@ -98,6 +98,7 @@ export const copy = {
       'This conversation key is missing from the keychain.',
     missingKey:
       '[encrypted] This conversation key is missing from the keychain.',
+    originalMessage: 'original message',
     rawTitle: 'Raw message',
     reply: 'Reply',
     replyTargetNotFound: 'The replied message could not be found.',
