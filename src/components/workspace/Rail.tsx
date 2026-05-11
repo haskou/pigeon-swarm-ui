@@ -5,12 +5,16 @@ interface RailProps {
   className?: string;
   notificationCount?: number;
   onNotificationsClick?: () => void;
+  onSettingsClick?: () => void;
+  showSettings?: boolean;
 }
 
 export function Rail({
   className,
   notificationCount = 0,
   onNotificationsClick,
+  onSettingsClick,
+  showSettings = false,
 }: RailProps) {
   return (
     <aside
@@ -55,6 +59,33 @@ export function Rail({
           </span>
         )}
       </button>
+      {showSettings && (
+        <button
+          type="button"
+          onClick={onSettingsClick}
+          className="mt-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15"
+          aria-label={copy.nodeSettings.open}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <path
+              d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M19 13.2v-2.4l-2.1-.5a5.8 5.8 0 0 0-.6-1.4l1.1-1.9-1.7-1.7-1.9 1.1a5.8 5.8 0 0 0-1.4-.6L12 3.7H9.6L9.1 5.8a5.8 5.8 0 0 0-1.4.6L5.8 5.3 4.1 7l1.1 1.9a5.8 5.8 0 0 0-.6 1.4l-2.1.5v2.4l2.1.5c.1.5.4 1 .6 1.4L4.1 17l1.7 1.7 1.9-1.1c.4.3.9.5 1.4.6l.5 2.1H12l.5-2.1c.5-.1 1-.4 1.4-.6l1.9 1.1 1.7-1.7-1.1-1.9c.3-.4.5-.9.6-1.4l2-.5Z"
+              stroke="currentColor"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          </svg>
+        </button>
+      )}
     </aside>
   );
 }

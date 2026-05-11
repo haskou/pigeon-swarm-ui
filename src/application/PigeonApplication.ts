@@ -103,12 +103,32 @@ export class PigeonApplication {
     await this.createNetworkUseCase.execute(name);
   }
 
+  public async createNodeNetwork(
+    session: Session,
+    name: string,
+  ): Promise<void> {
+    await this.gateway.createNetwork(name, session);
+  }
+
   public async joinNetwork(
     id: string,
     name: string,
     key: string,
   ): Promise<void> {
     await this.joinNetworkUseCase.execute(id, name, key);
+  }
+
+  public async joinNodeNetwork(
+    session: Session,
+    id: string,
+    name: string,
+    key: string,
+  ): Promise<void> {
+    await this.gateway.joinNetwork(id, name, key, session);
+  }
+
+  public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
+    return await this.gateway.getNodeInfo();
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {

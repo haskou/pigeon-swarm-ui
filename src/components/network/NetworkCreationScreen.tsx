@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
+import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
 import { Field } from '../auth/Field';
 import { HeroMetric } from '../auth/HeroMetric';
@@ -16,8 +17,7 @@ export function NetworkCreationScreen({
 }) {
   const [mode, setMode] = useState<NetworkSetupMode>('create');
   const [name, setName] = useState('');
-  const [id, setId] = useState('');
-  const [key, setKey] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [
@@ -34,7 +34,9 @@ export function NetworkCreationScreen({
       if (mode === 'create') {
         await pigeonApplication.createNetwork(name);
       } else {
-        await pigeonApplication.joinNetwork(id, name, key);
+        const invite = NetworkInviteCode.decode(inviteCode);
+
+        await pigeonApplication.joinNetwork(invite.id, invite.name, invite.key);
       }
 
       onNetworkCreated();
@@ -122,32 +124,12 @@ export function NetworkCreationScreen({
               </Field>
             ) : (
               <>
-                <Field label={copy.network.networkIdLabel}>
-                  <input
-                    value={id}
-                    onChange={(event) => setId(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.networkIdPlaceholder}
-                    autoComplete="off"
-                    required
-                  />
-                </Field>
-                <Field label={copy.network.nameLabel}>
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.namePlaceholder}
-                    autoComplete="off"
-                    required
-                  />
-                </Field>
-                <Field label={copy.network.keyLabel}>
-                  <input
-                    value={key}
-                    onChange={(event) => setKey(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.keyPlaceholder}
+                <Field label={copy.network.inviteCodeLabel}>
+                  <textarea
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value)}
+                    className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder={copy.network.inviteCodePlaceholder}
                     autoComplete="off"
                     required
                   />

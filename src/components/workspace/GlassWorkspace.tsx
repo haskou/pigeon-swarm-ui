@@ -24,6 +24,7 @@ import {
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
+import { NodeSettingsDialog } from './NodeSettingsDialog';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
 import { Sidebar } from './Sidebar';
@@ -38,12 +39,16 @@ interface GlassWorkspaceProps {
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
+  nodeOwner: null | string;
+  onNodeNetworksReload: () => Promise<void>;
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
 export function GlassWorkspace({
   conversations,
   nodeNetworks,
+  nodeOwner,
+  onNodeNetworksReload,
   session,
   setConversations,
   setSession,
@@ -57,6 +62,7 @@ export function GlassWorkspace({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResource[]>(
     [],
@@ -101,6 +107,7 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
+  const ownsNode = nodeOwner === session.identity.id;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
         session.keychain,
@@ -436,6 +443,8 @@ export function GlassWorkspace({
             setNotificationsOpen(true);
             void refreshNotifications();
           }}
+          onSettingsClick={() => setNodeSettingsOpen(true)}
+          showSettings={ownsNode}
         />
 
         <div
@@ -452,6 +461,8 @@ export function GlassWorkspace({
                 setNotificationsOpen(true);
                 void refreshNotifications();
               }}
+              onSettingsClick={() => setNodeSettingsOpen(true)}
+              showSettings={ownsNode}
             />
             <Sidebar
               session={session}
@@ -579,6 +590,15 @@ export function GlassWorkspace({
             void handleDeclineNotification(notificationId)
           }
           onRefresh={() => void refreshNotifications()}
+        />
+      )}
+
+      {nodeSettingsOpen && (
+        <NodeSettingsDialog
+          networks={nodeNetworks}
+          onClose={() => setNodeSettingsOpen(false)}
+          onNetworksUpdated={onNodeNetworksReload}
+          session={session}
         />
       )}
     </section>

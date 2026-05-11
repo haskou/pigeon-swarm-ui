@@ -89,9 +89,11 @@ export class PigeonApiGateway {
     );
   }
 
-  public async getNodeNetworks(): Promise<{ id: string; name: string }[]> {
+  public async getNodeNetworks(): Promise<
+    { id: string; key?: null | string; name: string }[]
+  > {
     const result = await this.http.request<{
-      networks: { id: string; name: string }[];
+      networks: { id: string; key?: null | string; name: string }[];
     }>('/node/networks/');
 
     return result.networks;
@@ -221,13 +223,19 @@ export class PigeonApiGateway {
     });
   }
 
-  public async createNetwork(name: string): Promise<void> {
-    await this.http.request('/node/networks/', {
-      body: JSON.stringify({
-        id: UUID.generate().toString(),
-        key: PrivateKey.generate().toString(),
-        name,
-      }),
+  public async createNetwork(name: string, session?: Session): Promise<void> {
+    const path = '/node/networks/';
+    const body = {
+      id: UUID.generate().toString(),
+      key: PrivateKey.generate().toString(),
+      name,
+    };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
       method: 'POST',
     });
   }
@@ -236,9 +244,16 @@ export class PigeonApiGateway {
     id: string,
     name: string,
     key: string,
+    session?: Session,
   ): Promise<void> {
-    await this.http.request('/node/networks/', {
-      body: JSON.stringify({ id, key, name }),
+    const path = '/node/networks/';
+    const body = { id, key, name };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
       method: 'POST',
     });
   }
