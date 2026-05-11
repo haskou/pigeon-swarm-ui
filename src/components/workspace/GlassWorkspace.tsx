@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChatMessage,
   ConversationResource,
+  IdentityResource,
   NotificationResource,
   Session,
 } from '../../domain/types';
@@ -16,7 +17,9 @@ import { ArchivedNotifications } from '../../presentation/notifications/Archived
 import { cx } from '../../utils/classNameHelper';
 import {
   identityName,
+  identityPicture,
   type IdentityNames,
+  type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -67,10 +70,19 @@ export function GlassWorkspace({
     null,
   );
   const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
-    [session.identity.id]: session.identity.profile.name,
+    [session.identity.id]: identityName(session.identity) ?? session.identity.id,
+  }));
+  const [identityProfiles, setIdentityProfiles] = useState<
+    Record<string, IdentityResource>
+  >(() => ({ [session.identity.id]: session.identity }));
+  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(() => ({
+    ...(identityPicture(session.identity)
+      ? { [session.identity.id]: identityPicture(session.identity) as string }
+      : {}),
   }));
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messageRequestRef = useRef(0);
 
   const activeConversation = useMemo(
     () =>
@@ -119,10 +131,10 @@ export function GlassWorkspace({
     messages.forEach((message) => ids.add(message.authorIdentityId));
     ids.delete(session.identity.id);
 
-    return [...ids].filter((identityId) => !identityNames[identityId]);
+    return [...ids].filter((identityId) => !identityProfiles[identityId]);
   }, [
     conversations,
-    identityNames,
+    identityProfiles,
     messages,
     notifications,
     session.identity.id,
@@ -143,9 +155,14 @@ export function GlassWorkspace({
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
 
-          return [identityId, identityName(identity) ?? identityId] as const;
+          return [
+            identityId,
+            identityName(identity) ?? identityId,
+            identityPicture(identity),
+            identity,
+          ] as const;
         } catch {
-          return [identityId, identityId] as const;
+          return [identityId, identityId, null, null] as const;
         }
       }),
     ).then((resolvedIdentities) => {
@@ -153,7 +170,28 @@ export function GlassWorkspace({
 
       setIdentityNames((current) => ({
         ...current,
-        ...Object.fromEntries(resolvedIdentities),
+        ...Object.fromEntries(
+          resolvedIdentities.map(([identityId, name]) => [identityId, name]),
+        ),
+      }));
+      setIdentityProfiles((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities
+            .filter(([, , , identity]) => !!identity)
+            .map(([identityId, , , identity]) => [
+              identityId,
+              identity as IdentityResource,
+            ]),
+        ),
+      }));
+      setIdentityPictures((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities
+            .filter(([, , picture]) => !!picture)
+            .map(([identityId, , picture]) => [identityId, picture as string]),
+        ),
       }));
     });
 
@@ -187,6 +225,9 @@ export function GlassWorkspace({
 
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
+      const requestId = messageRequestRef.current + 1;
+
+      messageRequestRef.current = requestId;
       setMessageState('loading');
       setSendError(null);
       try {
@@ -194,12 +235,17 @@ export function GlassWorkspace({
           session,
           conversationId,
         );
+
+        if (messageRequestRef.current !== requestId) return;
+
         setMessages(result.messages);
         setMessageCursor(result.nextCursor ?? result.messages[0]?.id ?? null);
         queueMicrotask(() =>
           bottomRef.current?.scrollIntoView({ block: 'end' }),
         );
       } catch (caught) {
+        if (messageRequestRef.current !== requestId) return;
+
         setMessages([]);
         setMessageState('error');
         setSendError(
@@ -210,18 +256,37 @@ export function GlassWorkspace({
 
         return;
       }
+      if (messageRequestRef.current !== requestId) return;
+
       setMessageState('idle');
     },
     [session],
   );
 
   useEffect(() => {
-    if (activeConversation?.id) void loadActiveMessages(activeConversation.id);
-  }, [activeConversation?.id, loadActiveMessages]);
+    if (!activeConversation?.id) return;
+
+    if (!activeConversationKey) {
+      setMessages([]);
+      setMessageCursor(null);
+      setMessageState('idle');
+      return;
+    }
+
+    void loadActiveMessages(activeConversation.id);
+  }, [activeConversation?.id, activeConversationKey, loadActiveMessages]);
 
   const handleLoadOlder = async () => {
-    if (!activeConversation?.id || messageState === 'loading') return;
+    if (
+      !activeConversation?.id ||
+      !activeConversationKey ||
+      messageState === 'loading'
+    )
+      return;
 
+    const requestId = messageRequestRef.current + 1;
+
+    messageRequestRef.current = requestId;
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
     setMessageState('loading');
     try {
@@ -230,6 +295,8 @@ export function GlassWorkspace({
         activeConversation.id,
         messageCursor,
       );
+      if (messageRequestRef.current !== requestId) return;
+
       setMessages((current) => [...result.messages, ...current]);
       setMessageCursor(
         result.nextCursor ?? result.messages[0]?.id ?? messageCursor,
@@ -246,6 +313,8 @@ export function GlassWorkspace({
           : copy.workspace.loadOlderError,
       );
     }
+    if (messageRequestRef.current !== requestId) return;
+
     setMessageState('idle');
   };
 
@@ -388,6 +457,8 @@ export function GlassWorkspace({
               session={session}
               conversations={conversations}
               identityNames={identityNames}
+              identityPictures={identityPictures}
+              identityProfiles={identityProfiles}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
               onSelect={(id) => {
@@ -397,6 +468,28 @@ export function GlassWorkspace({
               onCreate={() => setIsCreateOpen(true)}
               onClose={() => setSidebarOpen(false)}
               onLogout={() => setSession(null)}
+              onSessionUpdated={(nextSession) => {
+                setSession(nextSession);
+                setIdentityNames((current) => ({
+                  ...current,
+                  [nextSession.identity.id]:
+                    identityName(nextSession.identity) ?? nextSession.identity.id,
+                }));
+                setIdentityProfiles((current) => ({
+                  ...current,
+                  [nextSession.identity.id]: nextSession.identity,
+                }));
+                setIdentityPictures((current) => ({
+                  ...current,
+                  ...(identityPicture(nextSession.identity)
+                    ? {
+                        [nextSession.identity.id]: identityPicture(
+                          nextSession.identity,
+                        ) as string,
+                      }
+                    : {}),
+                }));
+              }}
             />
           </div>
         </div>
@@ -422,9 +515,33 @@ export function GlassWorkspace({
                 )
               : undefined
           }
+          peerIdentity={
+            activeConversation
+              ? identityProfiles[
+                  conversationPeerIdentityId(
+                    activeConversation,
+                    session.identity.id,
+                    session.keychain,
+                  ) ?? ''
+                ]
+              : undefined
+          }
+          peerPicture={
+            activeConversation
+              ? identityPictures[
+                  conversationPeerIdentityId(
+                    activeConversation,
+                    session.identity.id,
+                    session.keychain,
+                  ) ?? ''
+                ]
+              : undefined
+          }
           identityNames={identityNames}
+          identityPictures={identityPictures}
           messages={messages}
           messageState={messageState}
+          nodeNetworks={nodeNetworks}
           sendError={sendError}
           scrollerRef={scrollerRef}
           bottomRef={bottomRef}

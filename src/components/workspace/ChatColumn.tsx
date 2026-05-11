@@ -1,6 +1,10 @@
+import { useState } from 'react';
+
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   ChatMessage,
   ConversationResource,
+  IdentityResource,
   Session,
 } from '../../domain/types';
 
@@ -8,9 +12,11 @@ import { copy } from '../../i18n/en';
 import {
   identityDisplayName,
   type IdentityNames,
+  type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
+import { UserProfileDialog } from '../profile/UserProfileDialog';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -18,10 +24,14 @@ interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
   peerIdentityId?: string;
+  peerIdentity?: IdentityResource;
+  peerPicture?: string;
   identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
   hasConversationKey: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
+  nodeNetworks: NodeNetwork[];
   sendError: string | null;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
@@ -36,20 +46,61 @@ export function ChatColumn({
   bottomRef,
   hasConversationKey,
   identityNames,
+  identityPictures,
   messages,
   messageState,
+  nodeNetworks,
   onCreate,
   onOpenSidebar,
   onScroll,
   onSend,
+  peerIdentity,
   peerIdentityId,
+  peerPicture,
   scrollerRef,
   sendError,
   session,
 }: ChatColumnProps) {
+  const [profileViewer, setProfileViewer] = useState<{
+    identity?: IdentityResource;
+    identityId: string;
+    name: string;
+    picture?: string | null;
+  } | null>(null);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
+  const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
+  const openOwnProfile = () =>
+    setProfileViewer({
+      identity: session.identity,
+      identityId: session.identity.id,
+      name: session.identity.profile.name,
+      picture: session.identity.profile.picture,
+    });
+  const openPeerProfile = () => {
+    if (!peerIdentityId || !activeConversationName) return;
+
+    setProfileViewer({
+      identity: peerIdentity,
+      identityId: peerIdentityId,
+      name: activeConversationName,
+      picture: peerPicture,
+    });
+  };
+  const openMessageAuthorProfile = (message: ChatMessage) => {
+    if (message.mine || message.authorIdentityId === session.identity.id) {
+      openOwnProfile();
+      return;
+    }
+
+    setProfileViewer({
+      identity: peerIdentity,
+      identityId: message.authorIdentityId,
+      name: identityDisplayName(message.authorIdentityId, identityNames),
+      picture: identityPictures[message.authorIdentityId],
+    });
+  };
 
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
@@ -62,22 +113,41 @@ export function ChatColumn({
           >
             ☰
           </button>
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
-            {activeConversation
-              ? (activeConversationName ?? activeConversation.id)
-                  .slice(0, 1)
-                  .toUpperCase()
-              : '∅'}
-          </div>
+          <button
+            type="button"
+            onClick={openPeerProfile}
+            disabled={!canOpenPeerProfile}
+            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
+            aria-label={activeConversationName ?? copy.chat.noConversation}
+          >
+            {peerPicture ? (
+              <img
+                src={peerPicture}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : activeConversation ? (
+              (activeConversationName ?? activeConversation.id)
+                .slice(0, 1)
+                .toUpperCase()
+            ) : (
+              '∅'
+            )}
+          </button>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-2xl font-black tracking-tight">
+            <button
+              type="button"
+              onClick={openPeerProfile}
+              disabled={!canOpenPeerProfile}
+              className="block max-w-full truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
+            >
               {activeConversation
                 ? (activeConversationName ?? activeConversation.id)
                 : copy.chat.noConversation}
-            </div>
+            </button>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${activeConversation.id}`
+                ? `${copy.chat.directMessage} · ${activeConversation.id}`
                 : copy.chat.noConversationHint}
             </div>
           </div>
@@ -117,21 +187,35 @@ export function ChatColumn({
               </div>
             )}
             <div className="space-y-4">
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  currentIdentityId={session.identity.id}
-                  authorName={
-                    message.mine
-                      ? session.identity.profile.name
-                      : identityDisplayName(
-                          message.authorIdentityId,
-                          identityNames,
-                        )
-                  }
-                />
-              ))}
+              {messages.map((message, index) => {
+                const nextMessage = messages[index + 1];
+                const showAvatar =
+                  !nextMessage ||
+                  nextMessage.authorIdentityId !== message.authorIdentityId;
+
+                return (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    currentIdentityId={session.identity.id}
+                    authorName={
+                      message.mine
+                        ? session.identity.profile.name
+                        : identityDisplayName(
+                            message.authorIdentityId,
+                            identityNames,
+                          )
+                    }
+                    authorPicture={
+                      message.mine
+                        ? session.identity.profile.picture
+                        : identityPictures[message.authorIdentityId]
+                    }
+                    onAvatarClick={() => openMessageAuthorProfile(message)}
+                    showAvatar={showAvatar}
+                  />
+                );
+              })}
               {messages.length === 0 && messageState !== 'loading' && (
                 <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                   {copy.chat.emptyMessages}
@@ -152,6 +236,16 @@ export function ChatColumn({
             }
           />
         </>
+      )}
+      {profileViewer && (
+        <UserProfileDialog
+          identity={profileViewer.identity}
+          identityId={profileViewer.identityId}
+          name={profileViewer.name}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setProfileViewer(null)}
+          picture={profileViewer.picture}
+        />
       )}
     </section>
   );

@@ -9,6 +9,7 @@ import {
   UUID,
 } from '@haskou/value-objects';
 
+import type { IdentityUpdateProfileInput } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
   ConversationKeyEntry,
@@ -25,12 +26,14 @@ import type {
 import { API_SERVER_URL } from '../../config';
 import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
+import { IdentitySignaturePayloadFactory } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { copy } from '../../i18n/en';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
+import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
 import { RequestSigner } from './RequestSigner';
 
@@ -45,6 +48,8 @@ export class PigeonApiGateway {
   private readonly http: HttpJsonClient;
 
   private readonly ids: ConversationIdFactory;
+
+  private readonly identitySignatures: IdentitySignaturePayloadFactory;
 
   private readonly keychains: KeychainCipher;
 
@@ -67,6 +72,7 @@ export class PigeonApiGateway {
     this.conversations = conversations;
     this.http = http;
     this.ids = ids;
+    this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.keychains = keychains;
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
@@ -136,9 +142,11 @@ export class PigeonApiGateway {
     name: string,
     password: string,
     networks: string[],
+    handle?: string,
   ): Promise<IdentityResource> {
     return await this.http.request<IdentityResource>('/identities/', {
       body: JSON.stringify({
+        handle,
         name,
         networks: networks.filter(Boolean),
         password,
@@ -173,6 +181,44 @@ export class PigeonApiGateway {
     return await this.http.request<IdentityResource>(
       `/identities/${encodeURIComponent(identityId)}`,
     );
+  }
+
+  public async updateIdentityProfile(
+    session: Session,
+    profile: IdentityUpdateProfileInput,
+  ): Promise<IdentityResource> {
+    const currentIdentity = await this.getIdentity(session.identity.id);
+    const previousIdentityExternalIdentifier =
+      currentIdentity.identityExternalIdentifier ??
+      currentIdentity.previousIdentityExternalIdentifier ??
+      session.identity.identityExternalIdentifier ??
+      session.identity.previousIdentityExternalIdentifier;
+
+    if (!previousIdentityExternalIdentifier) {
+      throw new Error(copy.profile.missingIdentityExternalIdentifier);
+    }
+
+    const path = `/identities/${encodeURIComponent(session.identity.id)}`;
+    const unsigned = this.identitySignatures.createUpdate({
+      identity: currentIdentity,
+      previousIdentityExternalIdentifier,
+      profile,
+      timestamp: Date.now(),
+    });
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(unsigned),
+      session.password,
+    );
+    const body = {
+      ...unsigned,
+      signature: signature.toString(),
+    };
+
+    return await this.http.request<IdentityResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
   }
 
   public async createNetwork(name: string): Promise<void> {
@@ -274,7 +320,11 @@ export class PigeonApiGateway {
       password,
     };
     const keychainResource = await this.loadRemoteKeychain(session).catch(
-      () => undefined,
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
     );
     const keychain = keychainResource
       ? await this.decryptKeychain(session, keychainResource)
@@ -321,8 +371,14 @@ export class PigeonApiGateway {
     name: string,
     password: string,
     networks: string[],
+    handle?: string,
   ): Promise<LoginResult> {
-    const identity = await this.createIdentity(name, password, networks);
+    const identity = await this.createIdentity(
+      name,
+      password,
+      networks,
+      handle,
+    );
 
     return await this.login(identity.id, password);
   }
@@ -430,6 +486,14 @@ export class PigeonApiGateway {
     );
 
     return { ...published, notification: updated };
+  }
+
+  private isMissingRemoteKeychain(caught: unknown): boolean {
+    return (
+      caught instanceof HttpJsonError &&
+      (caught.code === 'KeychainNotFoundError' ||
+        caught.code === 'IdentityNotFoundError')
+    );
   }
 
   private async createConversationInvitation(

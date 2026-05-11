@@ -6,10 +6,11 @@ export const copy = {
     apiLabel: 'API',
     createIdentity: 'Create identity',
     fallbackNetworksLabel: 'Networks, comma-separated',
+    handleLabel: 'username',
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
-    identityIdLabel: 'Identity ID',
+    identityIdLabel: 'Identity ID or username',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
     loginSubmit: 'Decrypt identity & enter',
@@ -25,6 +26,7 @@ export const copy = {
   },
   chat: {
     createConversation: 'New conversation',
+    directMessage: 'Direct message',
     emptyBody:
       'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
     emptyMessages:
@@ -71,7 +73,7 @@ export const copy = {
     nets: 'nets',
     present: 'present',
     privateKey: 'Private key',
-    storedOneToOneKeys: 'Stored 1to1 keys',
+    storedOneKeys: 'Stored keys',
   },
   messages: {
     decryptFailed: '[encrypted] This event could not be decrypted.',
@@ -127,19 +129,30 @@ export const copy = {
     title: 'Notifications',
   },
   profile: {
+    biography: 'Bio',
     copied: 'Copied',
     copy: 'Copy',
+    edit: 'Edit profile',
+    handle: 'Username',
     identityId: 'Identity ID',
     keychainVersion: 'Keychain',
     logout: 'Log out',
+    missingIdentityExternalIdentifier:
+      'The API did not provide the current identity reference required to publish profile updates.',
+    name: 'Profile name',
     networks: 'Networks',
+    noBiography: 'No bio',
     noNetworks: 'No networks',
+    picture: 'Profile picture',
+    save: 'Save profile',
+    saving: 'Saving...',
+    updateError: 'The profile could not be updated.',
   },
   sidebar: {
     createConversation: 'New conversation',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
-    oneToOneTitle: '1to1 messages',
+    oneToOneTitle: 'Direct messages',
   },
   workspace: {
     closeSidebar: 'Close sidebar',

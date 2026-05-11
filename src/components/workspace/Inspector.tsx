@@ -57,9 +57,7 @@ export function Inspector({
           <b>{session.keychain.version}</b>
         </div>
         <div className="mt-3 flex justify-between gap-3 text-sm">
-          <span className="text-white/50">
-            {copy.inspector.storedOneToOneKeys}
-          </span>
+          <span className="text-white/50">{copy.inspector.storedOneKeys}</span>
           <b>{Object.keys(session.keychain.conversations).length}</b>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { ApiUrlBuilder } from './ApiUrlBuilder';
+import { HttpJsonError } from './HttpJsonError';
 
 export class HttpJsonClient {
   public constructor(private readonly urls: ApiUrlBuilder) {}
@@ -11,7 +12,7 @@ export class HttpJsonClient {
     });
 
     if (!response.ok) {
-      throw new Error(await this.errorMessage(response));
+      throw await this.error(response);
     }
 
     if (response.status === 204 || response.status === 304) {
@@ -21,11 +22,10 @@ export class HttpJsonClient {
     return (await response.json()) as T;
   }
 
-  private async errorMessage(response: Response): Promise<string> {
+  private async error(response: Response): Promise<HttpJsonError> {
     const text = await response.text().catch(() => '');
-    const details = text ? ` · ${text}` : '';
 
-    return `${response.status} ${response.statusText}${details}`;
+    return new HttpJsonError(response.status, response.statusText, text);
   }
 
   private headers(init: RequestInit): HeadersInit {

@@ -10,6 +10,29 @@ body {
 }
 button, input, textarea { font: inherit; }
 
+button:not(:disabled),
+a[href],
+summary,
+select,
+input[type="button"]:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: .35; transform: scale(.92); }
   50% { opacity: 1; transform: scale(1); }

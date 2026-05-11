@@ -9,7 +9,8 @@ export class RegisterIdentity {
     name: string,
     password: string,
     networks: string[],
+    handle?: string,
   ): Promise<LoginResult> {
-    return await this.gateway.register(name, password, networks);
+    return await this.gateway.register(name, password, networks, handle);
   }
 }

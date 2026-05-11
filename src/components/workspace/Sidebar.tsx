@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
-import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type {
+  ConversationResource,
+  IdentityResource,
+  Session,
+} from '../../domain/types';
 
+import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -10,6 +16,9 @@ import { conversationTitle, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
+  type IdentityPictures,
+  isValidHandle,
+  normalizeHandle,
 } from '../../utils/identityDisplay';
 import { SectionTitle } from '../common/SectionTitle';
 
@@ -18,25 +27,32 @@ interface SidebarProps {
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
   identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
   onCreate: () => void;
   onLogout: () => void;
+  onSessionUpdated: (session: Session) => void;
 }
 
 export function Sidebar({
   activeConversationId,
   conversations,
   identityNames,
+  identityPictures,
+  identityProfiles,
   nodeNetworks,
   onClose,
   onCreate,
   onLogout,
   onSelect,
+  onSessionUpdated,
   session,
 }: SidebarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const networkNames = session.identity.networks.map(
@@ -44,16 +60,59 @@ export function Sidebar({
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       shortId(networkId),
   );
-  const conversationName = (conversation: ConversationResource) => {
-    const peerIdentityId = conversationPeerIdentityId(
+  const ownDisplayName = identityDisplayName(
+    session.identity.id,
+    identityNames,
+  );
+  const ownProfileName =
+    session.identity.profile.name.trim() ||
+    (session.identity.profile.handle?.trim()
+      ? `@${session.identity.profile.handle.trim()}`
+      : ownDisplayName);
+  const ownProfileHandle = session.identity.profile.handle?.trim()
+    ? `@${session.identity.profile.handle.trim()}`
+    : shortId(session.identity.id);
+  const ownPicture =
+    session.identity.profile.picture ?? identityPictures[session.identity.id];
+  const conversationPeerId = (conversation: ConversationResource) =>
+    conversationPeerIdentityId(
       conversation,
       session.identity.id,
       session.keychain,
     );
 
-    return peerIdentityId
-      ? identityDisplayName(peerIdentityId, identityNames)
-      : conversationTitle(conversation);
+  const conversationName = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerId(conversation);
+    const peerProfile = peerIdentityId
+      ? identityProfiles[peerIdentityId]?.profile
+      : undefined;
+    const peerName = peerProfile?.name.trim();
+    const peerHandle = peerProfile?.handle?.trim();
+
+    return peerName
+      ? peerName
+      : peerHandle
+        ? `@${peerHandle}`
+        : peerIdentityId
+          ? identityDisplayName(peerIdentityId, identityNames)
+          : conversationTitle(conversation);
+  };
+  const conversationHandle = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerId(conversation);
+    const peerHandle = peerIdentityId
+      ? identityProfiles[peerIdentityId]?.profile.handle?.trim()
+      : undefined;
+
+    return peerHandle
+      ? `@${peerHandle}`
+      : peerIdentityId
+        ? shortId(peerIdentityId)
+        : conversationTitle(conversation);
+  };
+  const conversationPicture = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerId(conversation);
+
+    return peerIdentityId ? identityPictures[peerIdentityId] : undefined;
   };
 
   const copyIdentityId = async () => {
@@ -123,13 +182,20 @@ export function Sidebar({
               <div className="flex items-center gap-3">
                 <div
                   className={cx(
-                    'grid h-11 w-11 place-items-center rounded-2xl text-sm font-black',
-                    activeConversationId === conversation.id
-                      ? 'bg-slate-950 text-white'
-                      : 'bg-white/10 text-white',
+                    'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+                    activeConversationId === conversation.id &&
+                      'ring-2 ring-slate-950/20',
                   )}
                 >
-                  {conversationName(conversation).slice(0, 1).toUpperCase()}
+                  {conversationPicture(conversation) ? (
+                    <img
+                      src={conversationPicture(conversation)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    conversationName(conversation).slice(0, 1).toUpperCase()
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-black">
@@ -143,8 +209,7 @@ export function Sidebar({
                         : 'text-white/45',
                     )}
                   >
-                    {conversation.latestMessagePreview ??
-                      shortId(conversation.peerIdentityId ?? conversation.id)}
+                    {conversationHandle(conversation)}
                   </div>
                 </div>
                 {!!conversation.unreadCount && (
@@ -165,15 +230,15 @@ export function Sidebar({
           className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
           aria-expanded={profileOpen}
         >
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-lg font-black text-slate-950">
-            {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
-          </div>
+          <ProfileAvatar
+            label={ownDisplayName}
+            picture={ownPicture}
+            size="lg"
+          />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-black">
-              {session.identity.profile.name}
-            </div>
+            <div className="truncate font-black">{ownProfileName}</div>
             <div className="truncate text-xs text-white/50">
-              {shortId(session.identity.id)}
+              {ownProfileHandle}
             </div>
           </div>
           <svg
@@ -198,16 +263,18 @@ export function Sidebar({
         {profileOpen && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
             <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-base font-black text-slate-950">
-                {session.identity.profile.name.slice(0, 1).toUpperCase() || 'P'}
-              </div>
+              <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
               <div className="min-w-0">
-                <div className="truncate font-black">
-                  {session.identity.profile.name}
+                <div className="truncate font-black">{ownProfileName}</div>
+                <div className="truncate text-xs text-white/45">
+                  {ownProfileHandle}
                 </div>
-                <div className="text-xs text-white/45">
-                  v{session.identity.version}
-                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3 text-xs">
+              <div className="text-xs text-white/45">
+                {session.identity.profile.biography?.trim() || ''}
               </div>
             </div>
 
@@ -246,6 +313,14 @@ export function Sidebar({
 
             <button
               type="button"
+              onClick={() => setProfileEditorOpen(true)}
+              className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              {copy.profile.edit}
+            </button>
+
+            <button
+              type="button"
               onClick={onLogout}
               className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
             >
@@ -254,17 +329,223 @@ export function Sidebar({
           </div>
         )}
       </div>
+
+      {profileEditorOpen && (
+        <ProfileEditor
+          session={session}
+          onClose={() => setProfileEditorOpen(false)}
+          onUpdated={(nextSession) => {
+            onSessionUpdated(nextSession);
+            setProfileEditorOpen(false);
+          }}
+        />
+      )}
     </aside>
+  );
+}
+
+function ProfileAvatar({
+  label,
+  picture,
+  size = 'md',
+}: {
+  label: string;
+  picture?: string | null;
+  size?: 'lg' | 'md' | 'xl';
+}) {
+  return (
+    <div
+      className={cx(
+        'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        size === 'xl'
+          ? 'h-16 w-16 text-2xl'
+          : size === 'lg'
+            ? 'h-12 w-12 text-lg'
+            : 'h-11 w-11 text-base',
+      )}
+    >
+      {picture ? (
+        <img src={picture} alt="" className="h-full w-full object-cover" />
+      ) : (
+        label.slice(0, 1).toUpperCase() || 'P'
+      )}
+    </div>
+  );
+}
+
+function ProfileEditor({
+  onClose,
+  onUpdated,
+  session,
+}: {
+  session: Session;
+  onClose: () => void;
+  onUpdated: (session: Session) => void;
+}) {
+  const [name, setName] = useState(session.identity.profile.name);
+  const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
+  const [biography, setBiography] = useState(
+    session.identity.profile.biography ?? '',
+  );
+  const [picture, setPicture] = useState(
+    session.identity.profile.picture ?? '',
+  );
+  const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
+  const canSubmit =
+    name.trim().length > 0 &&
+    (!normalizedHandle || isValidHandle(normalizedHandle)) &&
+    state !== 'loading';
+
+  const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') setPicture(reader.result);
+    });
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!canSubmit) return;
+
+    setState('loading');
+    setError(null);
+    try {
+      const identity = await pigeonApplication.updateIdentityProfile(session, {
+        biography: biography.trim() || undefined,
+        handle: normalizedHandle,
+        name: name.trim(),
+        picture: picture || undefined,
+      });
+
+      onUpdated({ ...session, identity });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : copy.profile.updateError,
+      );
+    }
+    setState('idle');
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <form
+        onSubmit={handleSubmit}
+        className="glass-panel-strong relative z-10 w-full max-w-lg rounded-[2rem] p-5 shadow-2xl shadow-black/35"
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <h2 className="text-xl font-black">{copy.profile.edit}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-4">
+          <div className="grid gap-2 text-sm font-black text-white/70">
+            {copy.profile.picture}
+            <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
+              <ProfileAvatar
+                label={name || session.identity.id}
+                picture={picture}
+                size="xl"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePictureChange}
+                className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
+              />
+            </div>
+          </div>
+          <ProfileInput
+            label={copy.profile.name}
+            value={name}
+            onChange={setName}
+          />
+          <ProfileInput
+            label={copy.profile.handle}
+            value={handle}
+            onChange={setHandle}
+            placeholder="@ada"
+          />
+          <label className="grid gap-2 text-sm font-black text-white/70">
+            {copy.profile.biography}
+            <textarea
+              value={biography}
+              onChange={(event) => setBiography(event.target.value)}
+              className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+            {error}
+          </div>
+        )}
+
+        <button
+          disabled={!canSubmit}
+          className="mt-5 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {state === 'loading' ? copy.profile.saving : copy.profile.save}
+        </button>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
+function ProfileInput({
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-black text-white/70">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+      />
+    </label>
   );
 }
 
 function ProfileDetail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
         {label}
       </div>
-      <div className="truncate rounded-2xl bg-black/25 px-3 py-2 text-white/70">
+      <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
         {value}
       </div>
     </div>
