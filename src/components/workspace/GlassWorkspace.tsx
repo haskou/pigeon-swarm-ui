@@ -444,6 +444,7 @@ export function GlassWorkspace({
               conversations={conversations}
               identityNames={identityNames}
               identityPictures={identityPictures}
+              identityProfiles={identityProfiles}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
               onSelect={(id) => {

@@ -2,7 +2,11 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { ConversationResource, Session } from '../../domain/types';
+import type {
+  ConversationResource,
+  IdentityResource,
+  Session,
+} from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
@@ -24,6 +28,7 @@ interface SidebarProps {
   nodeNetworks: NodeNetwork[];
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -37,6 +42,7 @@ export function Sidebar({
   conversations,
   identityNames,
   identityPictures,
+  identityProfiles,
   nodeNetworks,
   onClose,
   onCreate,
@@ -60,23 +66,43 @@ export function Sidebar({
   );
   const ownPicture =
     session.identity.profile.picture ?? identityPictures[session.identity.id];
-  const conversationName = (conversation: ConversationResource) => {
-    const peerIdentityId = conversationPeerIdentityId(
+  const conversationPeerId = (conversation: ConversationResource) =>
+    conversationPeerIdentityId(
       conversation,
       session.identity.id,
       session.keychain,
     );
 
-    return peerIdentityId
-      ? identityDisplayName(peerIdentityId, identityNames)
-      : conversationTitle(conversation);
+  const conversationName = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerId(conversation);
+    const peerProfile = peerIdentityId
+      ? identityProfiles[peerIdentityId]?.profile
+      : undefined;
+    const peerName = peerProfile?.name.trim();
+    const peerHandle = peerProfile?.handle?.trim();
+
+    return peerName
+      ? peerName
+      : peerHandle
+        ? `@${peerHandle}`
+        : peerIdentityId
+          ? identityDisplayName(peerIdentityId, identityNames)
+          : conversationTitle(conversation);
+  };
+  const conversationHandle = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerId(conversation);
+    const peerHandle = peerIdentityId
+      ? identityProfiles[peerIdentityId]?.profile.handle?.trim()
+      : undefined;
+
+    return peerHandle
+      ? `@${peerHandle}`
+      : peerIdentityId
+        ? shortId(peerIdentityId)
+        : conversationTitle(conversation);
   };
   const conversationPicture = (conversation: ConversationResource) => {
-    const peerIdentityId = conversationPeerIdentityId(
-      conversation,
-      session.identity.id,
-      session.keychain,
-    );
+    const peerIdentityId = conversationPeerId(conversation);
 
     return peerIdentityId ? identityPictures[peerIdentityId] : undefined;
   };
@@ -176,8 +202,7 @@ export function Sidebar({
                         : 'text-white/45',
                     )}
                   >
-                    {conversation.latestMessagePreview ??
-                      shortId(conversation.peerIdentityId ?? conversation.id)}
+                    {conversationHandle(conversation)}
                   </div>
                 </div>
                 {!!conversation.unreadCount && (
