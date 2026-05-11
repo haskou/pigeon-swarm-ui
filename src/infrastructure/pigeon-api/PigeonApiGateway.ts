@@ -33,6 +33,7 @@ import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSig
 import { copy } from '../../i18n/en';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
+import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
 import { RequestSigner } from './RequestSigner';
 
@@ -316,7 +317,11 @@ export class PigeonApiGateway {
       password,
     };
     const keychainResource = await this.loadRemoteKeychain(session).catch(
-      () => undefined,
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
     );
     const keychain = keychainResource
       ? await this.decryptKeychain(session, keychainResource)
@@ -478,6 +483,14 @@ export class PigeonApiGateway {
     );
 
     return { ...published, notification: updated };
+  }
+
+  private isMissingRemoteKeychain(caught: unknown): boolean {
+    return (
+      caught instanceof HttpJsonError &&
+      (caught.code === 'KeychainNotFoundError' ||
+        caught.code === 'IdentityNotFoundError')
+    );
   }
 
   private async createConversationInvitation(
