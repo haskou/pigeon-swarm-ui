@@ -110,6 +110,7 @@ export function GlassWorkspace({
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
   const messageRequestRef = useRef(0);
 
   const activeConversation = useMemo(
@@ -294,10 +295,11 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         setMessages(result.messages);
-        setMessageCursor(result.nextCursor ?? result.messages[0]?.id ?? null);
-        queueMicrotask(() =>
-          bottomRef.current?.scrollIntoView({ block: 'end' }),
-        );
+        setMessageCursor(result.nextCursor ?? null);
+        queueMicrotask(() => {
+          bottomRef.current?.scrollIntoView({ block: 'end' });
+          lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
+        });
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
 
@@ -324,6 +326,7 @@ export function GlassWorkspace({
     if (!activeConversationKey) {
       setMessages([]);
       setMessageCursor(null);
+      lastScrollTopRef.current = 0;
       setMessageState('idle');
       return;
     }
@@ -335,6 +338,7 @@ export function GlassWorkspace({
     if (
       !activeConversation?.id ||
       !activeConversationKey ||
+      !messageCursor ||
       messageState === 'loading'
     )
       return;
@@ -343,6 +347,7 @@ export function GlassWorkspace({
 
     messageRequestRef.current = requestId;
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
+    const previousTop = scrollerRef.current?.scrollTop ?? 0;
     setMessageState('loading');
     try {
       const result = await pigeonApplication.loadMessages(
@@ -353,13 +358,15 @@ export function GlassWorkspace({
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
-      setMessageCursor(
-        result.nextCursor ?? result.messages[0]?.id ?? messageCursor,
-      );
+      setMessageCursor(result.nextCursor ?? null);
       requestAnimationFrame(() => {
-        if (scrollerRef.current)
-          scrollerRef.current.scrollTop =
-            scrollerRef.current.scrollHeight - previousHeight;
+        if (!scrollerRef.current) return;
+
+        const nextTop =
+          scrollerRef.current.scrollHeight - previousHeight + previousTop;
+
+        scrollerRef.current.scrollTop = nextTop;
+        lastScrollTopRef.current = nextTop;
       });
     } catch (caught) {
       setSendError(
@@ -374,7 +381,12 @@ export function GlassWorkspace({
   };
 
   const handleScroll = () => {
-    if ((scrollerRef.current?.scrollTop ?? 0) < 80) void handleLoadOlder();
+    const scrollTop = scrollerRef.current?.scrollTop ?? 0;
+    const isScrollingUp = scrollTop < lastScrollTopRef.current;
+
+    lastScrollTopRef.current = scrollTop;
+
+    if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };
 
   const handleSend = async (content: string, attachments: File[]) => {
