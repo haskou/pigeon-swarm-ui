@@ -100,6 +100,7 @@ export class MessageProjector {
         `${message.timestamp ?? Date.now()}-${Math.random()}`,
       mine: authorIdentityId === session.identity.id,
       raw: message,
+      replyToMessageId: message.replyToMessageId,
       timestamp: message.timestamp ?? message.createdAt ?? Date.now(),
     };
   }

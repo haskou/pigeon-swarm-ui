@@ -13,6 +13,7 @@ import type { MouseEvent } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import {
   identityDisplayName,
   type IdentityNames,
@@ -42,9 +43,12 @@ interface ChatColumnProps {
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
   onMessageContextMenu: (event: MouseEvent, message: ChatMessage) => void;
+  onReplyReferenceClick: (messageId: string) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
+  replyToMessage?: ChatMessage | null;
+  onCancelReply: () => void;
 }
 
 export function ChatColumn({
@@ -58,9 +62,11 @@ export function ChatColumn({
   nodeNetworks,
   onCreate,
   onOpenSidebar,
+  onReplyReferenceClick,
   onScroll,
   onSend,
   onMessageContextMenu,
+  onCancelReply,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -68,6 +74,7 @@ export function ChatColumn({
   sendError,
   session,
   progress,
+  replyToMessage,
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     identity?: IdentityResource;
@@ -237,6 +244,11 @@ export function ChatColumn({
             <div className="space-y-4">
               {messages.map((message, index) => {
                 const nextMessage = messages[index + 1];
+                const replyMessage = message.replyToMessageId
+                  ? messages.find(
+                      (item) => item.id === message.replyToMessageId,
+                    )
+                  : undefined;
                 const showAvatar =
                   !nextMessage ||
                   nextMessage.authorIdentityId !== message.authorIdentityId;
@@ -265,6 +277,19 @@ export function ChatColumn({
                     onAttachmentPreview={loadAttachmentPreview}
                     onAvatarClick={() => openMessageAuthorProfile(message)}
                     onContextMenu={onMessageContextMenu}
+                    onReplyReferenceClick={onReplyReferenceClick}
+                    replyImage={replyMessage?.attachments.find((attachment) =>
+                      isBrowserPreviewImage(attachment.contentType),
+                    )}
+                    replyAuthorName={
+                      replyMessage
+                        ? identityDisplayName(
+                            replyMessage.authorIdentityId,
+                            identityNames,
+                          )
+                        : undefined
+                    }
+                    replyPreview={replyMessage?.content}
                     showAvatar={showAvatar}
                   />
                 );
@@ -282,11 +307,21 @@ export function ChatColumn({
             disabled={messageState === 'loading' || !hasConversationKey}
             error={sendError ?? attachmentError}
             onSend={onSend}
+            onCancelReply={onCancelReply}
             progress={progress}
             placeholder={
               hasConversationKey
                 ? copy.composer.placeholder
                 : copy.messages.missingConversationKey
+            }
+            replyTo={replyToMessage}
+            replyToAuthorName={
+              replyToMessage
+                ? identityDisplayName(
+                    replyToMessage.authorIdentityId,
+                    identityNames,
+                  )
+                : undefined
             }
           />
         </>

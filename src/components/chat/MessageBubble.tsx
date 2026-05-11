@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react';
+
 import { useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -5,7 +7,6 @@ import type {
   ChatMessage,
   MessageAttachment,
 } from '../../domain/types';
-import type { MouseEvent } from 'react';
 
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -26,6 +27,10 @@ interface MessageBubbleProps {
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: () => void;
   onContextMenu: (event: MouseEvent, message: ChatMessage) => void;
+  onReplyReferenceClick: (messageId: string) => void;
+  replyImage?: MessageAttachment;
+  replyAuthorName?: string;
+  replyPreview?: string;
   showAvatar: boolean;
 }
 
@@ -39,10 +44,14 @@ export function MessageBubble({
   authorPicture,
   currentIdentityId,
   message,
-  onAttachmentPreview,
   onAttachmentOpen,
+  onAttachmentPreview,
   onAvatarClick,
   onContextMenu,
+  onReplyReferenceClick,
+  replyAuthorName,
+  replyImage,
+  replyPreview,
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
@@ -52,8 +61,10 @@ export function MessageBubble({
     images: LightboxImage[];
     index: number;
   } | null>(null);
+  const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
   const indexedAttachments = useMemo(
-    () => message.attachments.map((attachment, index) => ({ attachment, index })),
+    () =>
+      message.attachments.map((attachment, index) => ({ attachment, index })),
     [message.attachments],
   );
   const imageAttachments = useMemo(
@@ -71,9 +82,43 @@ export function MessageBubble({
     [indexedAttachments],
   );
 
+  useEffect(() => {
+    if (!replyImage) {
+      setReplyImageUrl(null);
+
+      return;
+    }
+
+    let cancelled = false;
+    let loadedUrl: string | null = null;
+
+    setReplyImageUrl(null);
+    void onAttachmentPreview(replyImage)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+
+          return;
+        }
+
+        loadedUrl = url;
+        setReplyImageUrl(url);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+
+      if (loadedUrl) URL.revokeObjectURL(loadedUrl);
+    };
+  }, [onAttachmentPreview, replyImage]);
+
   return (
     <>
-      <div className={cx('flex gap-3', mine && 'justify-end')}>
+      <div
+        data-message-id={message.id}
+        className={cx('flex gap-3', mine && 'justify-end')}
+      >
         {!mine &&
           (showAvatar ? (
             <Avatar
@@ -96,6 +141,40 @@ export function MessageBubble({
               : 'border border-white/10 bg-black/25 text-white',
           )}
         >
+          {message.replyToMessageId && (
+            <button
+              type="button"
+              onClick={() => onReplyReferenceClick(message.replyToMessageId!)}
+              className={cx(
+                'mb-6 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                mine
+                  ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                  : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
+              )}
+            >
+              <span className="flex items-center gap-2">
+                {replyImageUrl && (
+                  <img
+                    src={replyImageUrl}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                  />
+                )}
+                <span className="min-w-0">
+                  <span className="block font-black text-white/75">
+                    {copy.messages.replyTo}{' '}
+                    {replyAuthorName ??
+                      truncateMessageId(message.replyToMessageId)}
+                  </span>
+                  {replyPreview && (
+                    <span className="block truncate text-white/55">
+                      {replyPreview}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </button>
+          )}
           {message.content && (
             <p className={cx(message.encrypted && 'text-white/55')}>
               {message.content}
@@ -156,6 +235,12 @@ export function MessageBubble({
   );
 }
 
+function truncateMessageId(messageId: string): string {
+  if (messageId.length <= 32) return messageId;
+
+  return `${messageId.slice(0, 16)}...${messageId.slice(-8)}`;
+}
+
 function ImageAttachmentAlbum({
   items,
   mine,
@@ -200,6 +285,7 @@ function ImageAttachmentAlbum({
           .then((url) => {
             if (cancelled) {
               URL.revokeObjectURL(url);
+
               return;
             }
 
@@ -322,6 +408,7 @@ function AttachmentCard({
       .then((url) => {
         if (cancelled) {
           URL.revokeObjectURL(url);
+
           return;
         }
 

@@ -44,6 +44,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       encryptedPayload: 'encrypted',
       id: 'message-1',
       previousMessageIds: ['previous-message'],
+      replyToMessageId: 'original-message',
     });
 
     expect(Object.keys(payload)).toEqual([
@@ -54,6 +55,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       'encryptedPayload',
       'id',
       'previousMessageIds',
+      'replyToMessageId',
       'targetMessageId',
       'type',
     ]);
@@ -65,6 +67,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       encryptedPayload: 'encrypted',
       id: 'message-1',
       previousMessageIds: ['previous-message'],
+      replyToMessageId: 'original-message',
       targetMessageId: undefined,
       type: 'sent',
     });
