@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -387,7 +388,7 @@ function ProfileEditor({
     setState('idle');
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
@@ -456,7 +457,8 @@ function ProfileEditor({
           {state === 'loading' ? copy.profile.saving : copy.profile.save}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

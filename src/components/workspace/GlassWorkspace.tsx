@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChatMessage,
   ConversationResource,
+  IdentityResource,
   NotificationResource,
   Session,
 } from '../../domain/types';
@@ -71,6 +72,9 @@ export function GlassWorkspace({
   const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
     [session.identity.id]: identityName(session.identity) ?? session.identity.id,
   }));
+  const [identityProfiles, setIdentityProfiles] = useState<
+    Record<string, IdentityResource>
+  >(() => ({ [session.identity.id]: session.identity }));
   const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(() => ({
     ...(identityPicture(session.identity)
       ? { [session.identity.id]: identityPicture(session.identity) as string }
@@ -126,10 +130,10 @@ export function GlassWorkspace({
     messages.forEach((message) => ids.add(message.authorIdentityId));
     ids.delete(session.identity.id);
 
-    return [...ids].filter((identityId) => !identityNames[identityId]);
+    return [...ids].filter((identityId) => !identityProfiles[identityId]);
   }, [
     conversations,
-    identityNames,
+    identityProfiles,
     messages,
     notifications,
     session.identity.id,
@@ -154,9 +158,10 @@ export function GlassWorkspace({
             identityId,
             identityName(identity) ?? identityId,
             identityPicture(identity),
+            identity,
           ] as const;
         } catch {
-          return [identityId, identityId, null] as const;
+          return [identityId, identityId, null, null] as const;
         }
       }),
     ).then((resolvedIdentities) => {
@@ -166,6 +171,17 @@ export function GlassWorkspace({
         ...current,
         ...Object.fromEntries(
           resolvedIdentities.map(([identityId, name]) => [identityId, name]),
+        ),
+      }));
+      setIdentityProfiles((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities
+            .filter(([, , , identity]) => !!identity)
+            .map(([identityId, , , identity]) => [
+              identityId,
+              identity as IdentityResource,
+            ]),
         ),
       }));
       setIdentityPictures((current) => ({
@@ -426,6 +442,10 @@ export function GlassWorkspace({
                   [nextSession.identity.id]:
                     identityName(nextSession.identity) ?? nextSession.identity.id,
                 }));
+                setIdentityProfiles((current) => ({
+                  ...current,
+                  [nextSession.identity.id]: nextSession.identity,
+                }));
                 setIdentityPictures((current) => ({
                   ...current,
                   ...(identityPicture(nextSession.identity)
@@ -460,6 +480,17 @@ export function GlassWorkspace({
                   session.identity.id,
                   session.keychain,
                 )
+              : undefined
+          }
+          peerIdentity={
+            activeConversation
+              ? identityProfiles[
+                  conversationPeerIdentityId(
+                    activeConversation,
+                    session.identity.id,
+                    session.keychain,
+                  ) ?? ''
+                ]
               : undefined
           }
           peerPicture={

@@ -1,6 +1,9 @@
+import { useState } from 'react';
+
 import type {
   ChatMessage,
   ConversationResource,
+  IdentityResource,
   Session,
 } from '../../domain/types';
 
@@ -12,6 +15,7 @@ import {
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
+import { UserProfileDialog } from '../profile/UserProfileDialog';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -19,6 +23,7 @@ interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
   peerIdentityId?: string;
+  peerIdentity?: IdentityResource;
   peerPicture?: string;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
@@ -46,15 +51,18 @@ export function ChatColumn({
   onOpenSidebar,
   onScroll,
   onSend,
+  peerIdentity,
   peerIdentityId,
   peerPicture,
   scrollerRef,
   sendError,
   session,
 }: ChatColumnProps) {
+  const [profileOpen, setProfileOpen] = useState(false);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
+  const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
 
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
@@ -67,7 +75,15 @@ export function ChatColumn({
           >
             ☰
           </button>
-          <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
+          <button
+            type="button"
+            onClick={() => {
+              if (canOpenPeerProfile) setProfileOpen(true);
+            }}
+            disabled={!canOpenPeerProfile}
+            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950 disabled:cursor-default"
+            aria-label={activeConversationName ?? copy.chat.noConversation}
+          >
             {peerPicture ? (
               <img src={peerPicture} alt="" className="h-full w-full object-cover" />
             ) : activeConversation ? (
@@ -77,13 +93,20 @@ export function ChatColumn({
             ) : (
               '∅'
             )}
-          </div>
+          </button>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-2xl font-black tracking-tight">
+            <button
+              type="button"
+              onClick={() => {
+                if (canOpenPeerProfile) setProfileOpen(true);
+              }}
+              disabled={!canOpenPeerProfile}
+              className="block max-w-full truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
+            >
               {activeConversation
                 ? (activeConversationName ?? activeConversation.id)
                 : copy.chat.noConversation}
-            </div>
+            </button>
             <div className="truncate text-sm text-white/50">
               {activeConversation
                 ? `1to1 · ${activeConversation.id}`
@@ -166,6 +189,15 @@ export function ChatColumn({
             }
           />
         </>
+      )}
+      {profileOpen && peerIdentityId && activeConversationName && (
+        <UserProfileDialog
+          identity={peerIdentity}
+          identityId={peerIdentityId}
+          name={activeConversationName}
+          onClose={() => setProfileOpen(false)}
+          picture={peerPicture}
+        />
       )}
     </section>
   );
