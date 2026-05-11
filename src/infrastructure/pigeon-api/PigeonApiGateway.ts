@@ -9,6 +9,7 @@ import {
   UUID,
 } from '@haskou/value-objects';
 
+import type { Peer } from '../../application/peers/ListPeers';
 import type { IdentityUpdateProfileInput } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
@@ -120,6 +121,12 @@ export class PigeonApiGateway {
     }>('/node/networks/');
 
     return result.networks;
+  }
+
+  public async getPeers(): Promise<Peer[]> {
+    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
+
+    return result.peers;
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {

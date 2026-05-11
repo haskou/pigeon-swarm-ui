@@ -9,6 +9,7 @@ import type {
   Session,
 } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { Peer } from '../../application/peers/ListPeers';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
@@ -59,6 +60,7 @@ interface GlassWorkspaceProps {
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
   onNodeNetworksReload: () => Promise<void>;
+  peers: Peer[];
   setConversations: (conversations: ConversationResource[]) => void;
 }
 
@@ -67,6 +69,7 @@ export function GlassWorkspace({
   node,
   nodeNetworks,
   onNodeNetworksReload,
+  peers,
   session,
   setConversations,
   setSession,
@@ -82,6 +85,7 @@ export function GlassWorkspace({
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResource[]>(
@@ -528,6 +532,8 @@ export function GlassWorkspace({
                 void refreshNotifications();
               }}
               onSettingsClick={() => setNodeSettingsOpen(true)}
+              onInspectorClick={() => setInspectorOpen(true)}
+              peerCount={peers.length}
               settingsAttention={nodeUnclaimed}
             />
             <Sidebar
@@ -630,11 +636,33 @@ export function GlassWorkspace({
         />
 
         <Inspector
+          className="hidden xl:block"
           session={session}
           activeConversation={activeConversation}
           messages={messages}
+          peers={peers}
         />
       </div>
+
+      {inspectorOpen && (
+        <>
+          <button
+            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+            onClick={() => setInspectorOpen(false)}
+            aria-label={copy.dialog.close}
+          />
+          <div className="fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden">
+            <Inspector
+              className="h-full overflow-y-auto"
+              session={session}
+              activeConversation={activeConversation}
+              messages={messages}
+              onClose={() => setInspectorOpen(false)}
+              peers={peers}
+            />
+          </div>
+        </>
+      )}
 
       {isCreateOpen && (
         <CreateConversationDialog

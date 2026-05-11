@@ -14,6 +14,7 @@ import {
   loadSavedCredentials,
 } from './presentation/auth/savedCredentials';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
+import { usePeers } from './presentation/hooks/usePeers';
 
 type RestoreState = 'idle' | 'loading' | 'done';
 
@@ -27,6 +28,7 @@ function App() {
     hasSavedCredentials ? 'loading' : 'done',
   );
   const nodeNetworks = useNodeNetworks();
+  const peers = usePeers();
 
   const handleAuthenticated = (
     nextSession: Session,
@@ -98,13 +100,17 @@ function App() {
     <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
       <BackgroundGlow />
       {!session ? (
-        <AuthScreen onAuthenticated={handleAuthenticated} />
+        <AuthScreen
+          onAuthenticated={handleAuthenticated}
+          peerCount={peers.peers.length}
+        />
       ) : (
         <GlassWorkspace
           session={session}
           node={nodeNetworks.node}
           nodeNetworks={nodeNetworks.networks}
           onNodeNetworksReload={nodeNetworks.reload}
+          peers={peers.peers}
           setSession={(nextSession) => {
             if (!nextSession) clearSavedCredentials();
             setSession(nextSession);
