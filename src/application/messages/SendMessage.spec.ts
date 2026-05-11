@@ -13,12 +13,13 @@ describe(SendMessage.name, () => {
     const useCase = new SendMessage(gateway);
 
     await expect(
-      useCase.execute(session, 'conversation-1', 'hello'),
+      useCase.execute(session, 'conversation-1', 'hello', ['previous']),
     ).resolves.toBe(expected);
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       session,
       'conversation-1',
       'hello',
+      ['previous'],
     );
   });
 });

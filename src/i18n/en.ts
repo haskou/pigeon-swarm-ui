@@ -34,7 +34,6 @@ export const copy = {
     menu: 'Open sidebar',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
-    subtitleKeychain: 'keychain local',
     you: 'You',
   },
   composer: {
@@ -43,7 +42,7 @@ export const copy = {
     sending: 'Sending',
   },
   connection: {
-    body: 'The UI could not reach the local API. Check your connection and the status of your node server and retry.',
+    body: 'The UI could not reach the API. Check your connection and the status of your node server and retry.',
     endpointLabel: 'Endpoint',
     imageAlt: 'Connection lost illustration',
     kicker: 'Connection lost',
@@ -74,10 +73,17 @@ export const copy = {
     privateKey: 'Private key',
     storedOneToOneKeys: 'Stored 1to1 keys',
   },
+  messages: {
+    decryptFailed: '[encrypted] This event could not be decrypted.',
+    missingConversationKey:
+      'This conversation key is missing from the keychain.',
+    missingKey:
+      '[encrypted] This conversation key is missing from the keychain.',
+  },
   network: {
     create: 'Create network',
     createBody:
-      'This is the first time this node has started. Create a local network so your data have a place to sync.',
+      'This is the first time this node has started. Create a network so your data have a place to sync.',
     createSubmit: 'Create network',
     firstRunMetricLabel: 'State',
     firstRunMetricValue: 'First run',

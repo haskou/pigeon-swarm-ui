@@ -3,15 +3,21 @@ import { useEffect, useRef, useState } from 'react';
 import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
+import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { conversationTitle, shortId } from '../../utils/formatting';
+import {
+  identityDisplayName,
+  type IdentityNames,
+} from '../../utils/identityDisplay';
 import { SectionTitle } from '../common/SectionTitle';
 
 interface SidebarProps {
   session: Session;
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
+  identityNames: IdentityNames;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -22,6 +28,7 @@ interface SidebarProps {
 export function Sidebar({
   activeConversationId,
   conversations,
+  identityNames,
   nodeNetworks,
   onClose,
   onCreate,
@@ -37,6 +44,17 @@ export function Sidebar({
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       shortId(networkId),
   );
+  const conversationName = (conversation: ConversationResource) => {
+    const peerIdentityId = conversationPeerIdentityId(
+      conversation,
+      session.identity.id,
+      session.keychain,
+    );
+
+    return peerIdentityId
+      ? identityDisplayName(peerIdentityId, identityNames)
+      : conversationTitle(conversation);
+  };
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -78,7 +96,7 @@ export function Sidebar({
 
       <button
         onClick={onCreate}
-        className="glass-button rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
+        className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
         {copy.sidebar.createConversation}
       </button>
@@ -111,11 +129,11 @@ export function Sidebar({
                       : 'bg-white/10 text-white',
                   )}
                 >
-                  {conversationTitle(conversation).slice(0, 1).toUpperCase()}
+                  {conversationName(conversation).slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-black">
-                    {conversationTitle(conversation)}
+                    {conversationName(conversation)}
                   </div>
                   <div
                     className={cx(

@@ -1,16 +1,17 @@
 import type { ChatMessage } from '../../domain/types';
 
-import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { formatTime, shortId } from '../../utils/formatting';
+import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   currentIdentityId: string;
+  authorName: string;
 }
 
 export function MessageBubble({
+  authorName,
   currentIdentityId,
   message,
 }: MessageBubbleProps) {
@@ -18,26 +19,23 @@ export function MessageBubble({
 
   return (
     <div className={cx('flex gap-3', mine && 'justify-end')}>
-      {!mine && <Avatar label={message.authorIdentityId} />}
+      {!mine && <Avatar label={authorName} />}
       <div
         className={cx(
           'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
           mine
-            ? 'bg-fuchsia-500 text-white shadow-xl shadow-fuchsia-950/20'
+            ? 'bg-fuchsia-500 text-right text-white shadow-xl shadow-fuchsia-950/20'
             : 'border border-white/10 bg-black/25 text-white',
         )}
       >
-        <div className="mb-1 flex items-center justify-between gap-4 text-xs font-black opacity-75">
-          <span>
-            {mine ? copy.chat.you : shortId(message.authorIdentityId)}
-          </span>
-          <span>{formatTime(message.timestamp)}</span>
-        </div>
         <p className={cx(message.encrypted && 'text-white/55')}>
           {message.content}
         </p>
+        <div className="mt-1 text-right text-xs font-black opacity-65">
+          {formatTime(message.timestamp)}
+        </div>
       </div>
-      {mine && <Avatar label={copy.chat.you} mine />}
+      {mine && <Avatar label={authorName} mine />}
     </div>
   );
 }

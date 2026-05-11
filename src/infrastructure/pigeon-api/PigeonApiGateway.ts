@@ -24,9 +24,11 @@ import type {
 
 import { API_SERVER_URL } from '../../config';
 import { ConversationIdFactory } from '../../domain/conversations/ConversationIdFactory';
+import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
+import { copy } from '../../i18n/en';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { ConversationMapper } from './ConversationMapper';
@@ -58,7 +60,7 @@ export class PigeonApiGateway {
     ),
     signer: RequestSigner = new RequestSigner(),
     conversations: ConversationMapper = new ConversationMapper(),
-    messages: MessageProjector = new MessageProjector(),
+    messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),
     ids: ConversationIdFactory = new ConversationIdFactory(),
   ) {
@@ -329,13 +331,17 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
     content: string,
+    previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
-    const key = session.keychain.conversations[conversationId];
+    const key = conversationKeyEntry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+      this.ids,
+    );
 
     if (!key) {
-      throw new Error(
-        'No hay clave privada de conversación en el keychain. Drama criptográfico, el peor tipo de drama.',
-      );
+      throw new Error(copy.messages.missingConversationKey);
     }
 
     const timestamp = Date.now();
@@ -359,6 +365,7 @@ export class PigeonApiGateway {
           createdAt: timestamp,
           encryptedPayload: encryptedPayload.toString(),
           id,
+          previousMessageIds,
         }),
       ),
       session.password,

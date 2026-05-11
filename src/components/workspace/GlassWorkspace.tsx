@@ -9,9 +9,15 @@ import type {
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
+import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { cx } from '../../utils/classNameHelper';
+import {
+  identityName,
+  type IdentityNames,
+} from '../../utils/identityDisplay';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
@@ -60,6 +66,9 @@ export function GlassWorkspace({
   const [notificationError, setNotificationError] = useState<string | null>(
     null,
   );
+  const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
+    [session.identity.id]: session.identity.profile.name,
+  }));
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,11 +89,78 @@ export function GlassWorkspace({
   const pendingNotificationCount = visibleNotifications.filter(
     (notification) => notification.state === 'pending',
   ).length;
+  const activeConversationKey = activeConversation
+    ? conversationKeyEntry(
+        session.keychain,
+        session.identity.id,
+        activeConversation.id,
+      )
+    : undefined;
+  const identityIdsToResolve = useMemo(() => {
+    const ids = new Set<string>();
+
+    conversations.forEach((conversation) => {
+      const peerIdentityId = conversationPeerIdentityId(
+        conversation,
+        session.identity.id,
+        session.keychain,
+      );
+
+      if (peerIdentityId) ids.add(peerIdentityId);
+      conversation.participantIdentityIds?.forEach((identityId) =>
+        ids.add(identityId),
+      );
+      conversation.participantIds?.forEach((identityId) => ids.add(identityId));
+    });
+    notifications.forEach((notification) => {
+      ids.add(notification.payload.inviterIdentityId);
+      ids.add(notification.payload.recipientIdentityId);
+    });
+    messages.forEach((message) => ids.add(message.authorIdentityId));
+    ids.delete(session.identity.id);
+
+    return [...ids].filter((identityId) => !identityNames[identityId]);
+  }, [
+    conversations,
+    identityNames,
+    messages,
+    notifications,
+    session.identity.id,
+  ]);
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
       setActiveConversationId(conversations[0].id);
   }, [activeConversationId, conversations]);
+
+  useEffect(() => {
+    if (identityIdsToResolve.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      identityIdsToResolve.map(async (identityId) => {
+        try {
+          const identity = await pigeonApplication.getIdentity(identityId);
+
+          return [identityId, identityName(identity) ?? identityId] as const;
+        } catch {
+          return [identityId, identityId] as const;
+        }
+      }),
+    ).then((resolvedIdentities) => {
+      if (cancelled) return;
+
+      setIdentityNames((current) => ({
+        ...current,
+        ...Object.fromEntries(resolvedIdentities),
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identityIdsToResolve]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -182,10 +258,12 @@ export function GlassWorkspace({
     setSendError(null);
 
     try {
+      const lastMessageId = messages[messages.length - 1]?.id;
       const sent = await pigeonApplication.sendMessage(
         session,
         activeConversation.id,
         content,
+        lastMessageId ? [lastMessageId] : [],
       );
       setMessages((current) => [...current, sent]);
       queueMicrotask(() =>
@@ -309,6 +387,7 @@ export function GlassWorkspace({
             <Sidebar
               session={session}
               conversations={conversations}
+              identityNames={identityNames}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
               onSelect={(id) => {
@@ -333,6 +412,17 @@ export function GlassWorkspace({
         <ChatColumn
           session={session}
           activeConversation={activeConversation}
+          hasConversationKey={!!activeConversationKey}
+          peerIdentityId={
+            activeConversation
+              ? conversationPeerIdentityId(
+                  activeConversation,
+                  session.identity.id,
+                  session.keychain,
+                )
+              : undefined
+          }
+          identityNames={identityNames}
           messages={messages}
           messageState={messageState}
           sendError={sendError}
@@ -363,6 +453,7 @@ export function GlassWorkspace({
         <NotificationsPanel
           action={notificationAction}
           error={notificationError}
+          identityNames={identityNames}
           notifications={visibleNotifications}
           onAccept={(notification) => void handleAcceptNotification(notification)}
           onArchive={handleArchiveNotification}

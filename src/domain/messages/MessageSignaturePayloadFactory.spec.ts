@@ -9,6 +9,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       createdAt: 123,
       encryptedPayload: 'encrypted',
       id: 'message-1',
+      previousMessageIds: ['previous-message'],
     });
 
     expect(Object.keys(payload)).toEqual([
@@ -29,7 +30,7 @@ describe(MessageSignaturePayloadFactory.name, () => {
       createdAt: 123,
       encryptedPayload: 'encrypted',
       id: 'message-1',
-      previousMessageIds: [],
+      previousMessageIds: ['previous-message'],
       targetMessageId: undefined,
       type: 'sent',
     });

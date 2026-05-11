@@ -41,7 +41,7 @@ export function ServerConnectionScreen({
         <button
           type="button"
           onClick={onRetry}
-          className="glass-button mt-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01]"
+          className="glass-button mt-6 rounded-2xl bg-fuchsia-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01]"
         >
           {copy.connection.retry}
         </button>

@@ -3,6 +3,10 @@ import type { NotificationResource } from '../../domain/types';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { formatTime, shortId } from '../../utils/formatting';
+import {
+  identityDisplayName,
+  type IdentityNames,
+} from '../../utils/identityDisplay';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
@@ -10,6 +14,7 @@ interface NotificationsPanelProps {
   action: NotificationAction | null;
   error: string | null;
   notifications: NotificationResource[];
+  identityNames: IdentityNames;
   onAccept: (notification: NotificationResource) => void;
   onArchive: (notificationId: string) => void;
   onClose: () => void;
@@ -20,6 +25,7 @@ interface NotificationsPanelProps {
 export function NotificationsPanel({
   action,
   error,
+  identityNames,
   notifications,
   onAccept,
   onArchive,
@@ -99,7 +105,10 @@ export function NotificationsPanel({
                   <p className="mt-1 text-sm text-white/55">
                     {copy.notifications.invitedBy}{' '}
                     <span className="font-semibold text-white/75">
-                      {shortId(notification.payload.inviterIdentityId)}
+                      {identityDisplayName(
+                        notification.payload.inviterIdentityId,
+                        identityNames,
+                      )}
                     </span>
                   </p>
                 </div>

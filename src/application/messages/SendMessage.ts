@@ -9,7 +9,13 @@ export class SendMessage {
     session: Session,
     conversationId: string,
     content: string,
+    previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
-    return await this.gateway.sendMessage(session, conversationId, content);
+    return await this.gateway.sendMessage(
+      session,
+      conversationId,
+      content,
+      previousMessageIds,
+    );
   }
 }

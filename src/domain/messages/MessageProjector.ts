@@ -2,6 +2,9 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type { ChatMessage, MessageResource, Session } from '../types';
 
+import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
+import { conversationKeyEntry } from '../conversations/conversationKey';
+
 type MessageListEnvelope = {
   cursor?: string | null;
   data?: MessageResource[];
@@ -17,7 +20,17 @@ type PlainMessage = {
   timestamp?: number;
 };
 
+export type MessageProjectionCopy = {
+  decryptFailed: string;
+  missingKey: string;
+};
+
 export class MessageProjector {
+  public constructor(
+    private readonly copy: MessageProjectionCopy,
+    private readonly ids: ConversationIdFactory = new ConversationIdFactory(),
+  ) {}
+
   public list(value: unknown): {
     messages: MessageResource[];
     nextCursor?: null | string;
@@ -50,7 +63,7 @@ export class MessageProjector {
       return this.plainMessage(base, message);
     }
 
-    const key = session.keychain.conversations[conversationId];
+    const key = this.conversationKey(session, conversationId);
 
     if (!key) {
       return this.encryptedError(base, message, 'missing-key');
@@ -69,7 +82,8 @@ export class MessageProjector {
     session: Session,
     message: MessageResource,
   ): Omit<ChatMessage, 'content' | 'encrypted'> {
-    const authorIdentityId = message.authorIdentityId ?? 'unknown';
+    const authorIdentityId =
+      message.authorIdentityId ?? message.authorId ?? 'unknown';
 
     return {
       authorIdentityId,
@@ -81,6 +95,15 @@ export class MessageProjector {
       raw: message,
       timestamp: message.timestamp ?? message.createdAt ?? Date.now(),
     };
+  }
+
+  private conversationKey(session: Session, conversationId: string) {
+    return conversationKeyEntry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+      this.ids,
+    );
   }
 
   private async decryptMessage(
@@ -115,9 +138,7 @@ export class MessageProjector {
     reason: 'decrypt-failed' | 'missing-key',
   ): ChatMessage {
     const content =
-      reason === 'missing-key'
-        ? '[encrypted] Falta la clave privada de esta conversación en el keychain.'
-        : '[encrypted] No se ha podido desencriptar este evento. Qué sorpresa, la criptografía exige llaves correctas.';
+      reason === 'missing-key' ? this.copy.missingKey : this.copy.decryptFailed;
 
     return { ...base, content, encrypted: true, raw: message };
   }

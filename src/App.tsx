@@ -55,7 +55,6 @@ function App() {
         setRestoreState('done');
       })
       .catch(() => {
-        clearSavedCredentials();
         setRestoreState('done');
       });
   }, [nodeNetworks, restoreState, session]);

@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ConversationResource,
+  IdentityResource,
   LocalKeychain,
   LoginResult,
   NotificationResource,
@@ -27,6 +28,8 @@ import {
 } from './notifications';
 
 export class PigeonApplication {
+  private readonly gateway: PigeonApiGateway;
+
   private readonly acceptConversationInvitationUseCase: AcceptInvitation;
 
   private readonly createConversationUseCase: CreateConversation;
@@ -52,6 +55,7 @@ export class PigeonApplication {
   private readonly updateNotificationUseCase: UpdateNotification;
 
   public constructor(gateway: PigeonApiGateway = new PigeonApiGateway()) {
+    this.gateway = gateway;
     this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
@@ -106,6 +110,10 @@ export class PigeonApplication {
     await this.joinNetworkUseCase.execute(id, name, key);
   }
 
+  public async getIdentity(identityId: string): Promise<IdentityResource> {
+    return await this.gateway.getIdentity(identityId);
+  }
+
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
@@ -153,11 +161,13 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     content: string,
+    previousMessageIds: string[] = [],
   ): Promise<ChatMessage> {
     return await this.sendMessageUseCase.execute(
       session,
       conversationId,
       content,
+      previousMessageIds,
     );
   }
 

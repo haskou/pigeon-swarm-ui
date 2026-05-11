@@ -1,6 +1,12 @@
 import type { Session } from '../types';
 
+import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
 import { MessageProjector } from './MessageProjector';
+
+const projectorCopy = {
+  decryptFailed: '[encrypted] decrypt failed',
+  missingKey: '[encrypted] missing key',
+};
 
 const session = {
   encryptedKeyPair: {},
@@ -25,7 +31,7 @@ const session = {
 
 describe(MessageProjector.name, () => {
   it('normalizes message envelopes and cursors', () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     expect(
       projector.list({
@@ -39,7 +45,7 @@ describe(MessageProjector.name, () => {
   });
 
   it('projects plain messages without requiring a keychain entry', async () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     await expect(
       projector.toChatMessage(session, 'conversation-1', {
@@ -56,7 +62,7 @@ describe(MessageProjector.name, () => {
   });
 
   it('returns a readable encrypted placeholder when the key is missing', async () => {
-    const projector = new MessageProjector();
+    const projector = new MessageProjector(projectorCopy);
 
     await expect(
       projector.toChatMessage(session, 'conversation-1', {
@@ -66,8 +72,44 @@ describe(MessageProjector.name, () => {
         timestamp: 20,
       }),
     ).resolves.toMatchObject({
+      content: projectorCopy.missingKey,
       encrypted: true,
       mine: false,
+    });
+  });
+
+  it('finds deterministic conversation keys stored under a local key id', async () => {
+    const projector = new MessageProjector(projectorCopy);
+    const conversationId = new ConversationIdFactory().create(
+      'identity-1',
+      'identity-2',
+    );
+    const hydratedSession = {
+      ...session,
+      keychain: {
+        conversations: {
+          'local-key-id': {
+            conversationId: 'local-key-id',
+            createdAt: 1,
+            peerIdentityId: 'identity-2',
+            privateKey: 'invalid-private-key',
+            publicKey: 'invalid-public-key',
+          },
+        },
+        version: 1,
+      },
+    } as unknown as Session;
+
+    await expect(
+      projector.toChatMessage(hydratedSession, conversationId, {
+        authorIdentityId: 'identity-2',
+        encryptedPayload: 'payload',
+        id: 'message-2',
+        timestamp: 20,
+      }),
+    ).resolves.toMatchObject({
+      content: projectorCopy.decryptFailed,
+      encrypted: true,
     });
   });
 });

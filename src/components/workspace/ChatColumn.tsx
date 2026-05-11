@@ -5,7 +5,10 @@ import type {
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
-import { conversationTitle, shortId } from '../../utils/formatting';
+import {
+  identityDisplayName,
+  type IdentityNames,
+} from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
 
@@ -14,6 +17,9 @@ type LoadState = 'idle' | 'loading' | 'error';
 interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
+  peerIdentityId?: string;
+  identityNames: IdentityNames;
+  hasConversationKey: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
   sendError: string | null;
@@ -28,16 +34,23 @@ interface ChatColumnProps {
 export function ChatColumn({
   activeConversation,
   bottomRef,
+  hasConversationKey,
+  identityNames,
   messages,
   messageState,
   onCreate,
   onOpenSidebar,
   onScroll,
   onSend,
+  peerIdentityId,
   scrollerRef,
   sendError,
   session,
 }: ChatColumnProps) {
+  const activeConversationName = peerIdentityId
+    ? identityDisplayName(peerIdentityId, identityNames)
+    : activeConversation?.title;
+
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
       <header className="border-b border-white/10 p-4 sm:p-5">
@@ -51,18 +64,20 @@ export function ChatColumn({
           </button>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-indigo-400 font-black text-slate-950">
             {activeConversation
-              ? conversationTitle(activeConversation).slice(0, 1).toUpperCase()
+              ? (activeConversationName ?? activeConversation.id)
+                  .slice(0, 1)
+                  .toUpperCase()
               : '∅'}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-2xl font-black tracking-tight">
               {activeConversation
-                ? conversationTitle(activeConversation)
+                ? (activeConversationName ?? activeConversation.id)
                 : copy.chat.noConversation}
             </div>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${shortId(activeConversation.id)} · ${copy.chat.subtitleKeychain}`
+                ? `1to1 · ${activeConversation.id}`
                 : copy.chat.noConversationHint}
             </div>
           </div>
@@ -83,7 +98,7 @@ export function ChatColumn({
             <p className="mt-3 text-white/55">{copy.chat.emptyBody}</p>
             <button
               onClick={onCreate}
-              className="mt-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-3 font-black"
+              className="mt-6 rounded-2xl bg-fuchsia-500 px-5 py-3 font-black"
             >
               {copy.chat.createConversation}
             </button>
@@ -107,6 +122,14 @@ export function ChatColumn({
                   key={message.id}
                   message={message}
                   currentIdentityId={session.identity.id}
+                  authorName={
+                    message.mine
+                      ? session.identity.profile.name
+                      : identityDisplayName(
+                          message.authorIdentityId,
+                          identityNames,
+                        )
+                  }
                 />
               ))}
               {messages.length === 0 && messageState !== 'loading' && (
@@ -119,9 +142,14 @@ export function ChatColumn({
           </div>
 
           <Composer
-            disabled={messageState === 'loading'}
+            disabled={messageState === 'loading' || !hasConversationKey}
             error={sendError}
             onSend={onSend}
+            placeholder={
+              hasConversationKey
+                ? copy.composer.placeholder
+                : copy.messages.missingConversationKey
+            }
           />
         </>
       )}
