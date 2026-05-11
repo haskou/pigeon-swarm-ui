@@ -58,6 +58,13 @@ export type NotificationResource = {
   type: 'conversation_invitation';
 };
 
+export type PublicFileUpload = {
+  cid: string;
+  contentType: string;
+  filename: string;
+  size: number;
+};
+
 export type LocalKeychain = {
   version: number;
   conversations: Record<string, ConversationKeyEntry>;

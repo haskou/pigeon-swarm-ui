@@ -56,12 +56,12 @@ export const copy = {
     close: 'Close dialog',
     createConversation: 'Create conversation',
     createConversationBody:
-      'Enter the remote identity ID. The client resolves that identity, creates the conversation, generates a conversation keypair, and stores the private key in your encrypted keychain.',
+      'The user will be invited to join the conversation and will receive a notification. Direct conversations are end-to-end encrypted, so a keychain will be created and updated to the swarm as part of this process.',
     createConversationError:
       'The conversation could not be created. The backend chose violence.',
     createConversationLoading: 'Creating and publishing keychain...',
-    createConversationTitle: 'Create 1to1 conversation',
-    remoteIdentityId: 'Remote identity ID',
+    createConversationTitle: 'Create a new direct conversation',
+    remoteIdentityId: 'Identity ID or username',
   },
   inspector: {
     conversationKeychain: 'Conversation keychain',
@@ -92,9 +92,9 @@ export const copy = {
     heroBody:
       'A node needs one network before accounts can be created. You can start a fresh private swarm here, or join an existing one if another node already owns the network key.',
     heroTitle: 'First node startup',
-    join: 'Join network',
     inviteCodeLabel: 'Network code',
     inviteCodePlaceholder: 'Paste a psn1 network code',
+    join: 'Join network',
     joinBody: 'Join an existing network using its share code',
     joinSubmit: 'Join network',
     keyLabel: 'Network key',
@@ -125,7 +125,8 @@ export const copy = {
     nodeId: 'Node ID',
     open: 'Open node settings',
     owner: 'Owner',
-    ownerOnly: 'Only the node owner can manage networks and share network codes.',
+    ownerOnly:
+      'Only the node owner can manage networks and share network codes.',
     removeUnavailable: 'Remove network unavailable in API',
     saving: 'Saving...',
     server: 'Server',

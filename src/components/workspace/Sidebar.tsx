@@ -18,6 +18,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
   isValidHandle,
+  profilePictureUrl,
   normalizeHandle,
 } from '../../utils/identityDisplay';
 import { SectionTitle } from '../common/SectionTitle';
@@ -387,9 +388,12 @@ function ProfileEditor({
   const [biography, setBiography] = useState(
     session.identity.profile.biography ?? '',
   );
-  const [picture, setPicture] = useState(
-    session.identity.profile.picture ?? '',
+  const [picturePreview, setPicturePreview] = useState(
+    session.identity.profile.picture
+      ? profilePictureUrl(session.identity.profile.picture)
+      : '',
   );
+  const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
@@ -406,8 +410,9 @@ function ProfileEditor({
     const reader = new FileReader();
 
     reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setPicture(reader.result);
+      if (typeof reader.result === 'string') setPicturePreview(reader.result);
     });
+    setPictureFile(file);
     reader.readAsDataURL(file);
   };
 
@@ -419,11 +424,14 @@ function ProfileEditor({
     setState('loading');
     setError(null);
     try {
+      const pictureCid = pictureFile
+        ? (await pigeonApplication.uploadPublicFile(session, pictureFile)).cid
+        : session.identity.profile.picture?.trim() || undefined;
       const identity = await pigeonApplication.updateIdentityProfile(session, {
         biography: biography.trim() || undefined,
         handle: normalizedHandle,
         name: name.trim(),
-        picture: picture || undefined,
+        picture: pictureCid,
       });
 
       onUpdated({ ...session, identity });
@@ -465,7 +473,7 @@ function ProfileEditor({
             <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
               <ProfileAvatar
                 label={name || session.identity.id}
-                picture={picture}
+                picture={picturePreview}
                 size="xl"
               />
               <input

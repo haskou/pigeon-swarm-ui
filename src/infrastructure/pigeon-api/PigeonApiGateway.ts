@@ -20,6 +20,7 @@ import type {
   LoginResult,
   MessageResource,
   NotificationResource,
+  PublicFileUpload,
   Session,
 } from '../../domain/types';
 
@@ -231,6 +232,24 @@ export class PigeonApiGateway {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
+    });
+  }
+
+  public async uploadPublicFile(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    const path = '/ipfs/public';
+    const bytes = await file.arrayBuffer();
+
+    return await this.http.request<PublicFileUpload>(path, {
+      body: bytes,
+      headers: {
+        ...(await this.signer.headers(session, 'POST', path, bytes)),
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Filename': file.name || 'upload',
+      },
+      method: 'POST',
     });
   }
 

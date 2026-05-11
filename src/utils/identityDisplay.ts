@@ -1,5 +1,6 @@
 import type { IdentityResource } from '../domain/types';
 
+import { API_SERVER_URL } from '../config';
 import { shortId } from './formatting';
 
 export type IdentityNames = Record<string, string>;
@@ -36,5 +37,20 @@ export function identityName(identity: IdentityResource): string | null {
 export function identityPicture(identity: IdentityResource): string | null {
   const picture = identity.profile.picture?.trim();
 
-  return picture ? picture : null;
+  return picture ? profilePictureUrl(picture) : null;
+}
+
+export function profilePictureUrl(value: string): string {
+  const picture = value.trim();
+
+  if (
+    picture.startsWith('data:') ||
+    picture.startsWith('http://') ||
+    picture.startsWith('https://') ||
+    picture.startsWith('/')
+  ) {
+    return picture;
+  }
+
+  return `${API_SERVER_URL.replace(/\/$/, '')}/ipfs/${encodeURIComponent(picture)}`;
 }
