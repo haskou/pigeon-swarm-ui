@@ -10,6 +10,58 @@ import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
+  it('loads node networks anonymously when no session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-1', key: null, name: 'Public Swarm' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getNodeNetworks()).resolves.toBe(response.networks);
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/', {
+      headers: undefined,
+      method: 'GET',
+    });
+  });
+
+  it('loads node networks with signed identity headers when a session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-1', key: 'network-key', name: 'Private' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getNodeNetworks(session)).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/node/networks/',
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -299,6 +351,63 @@ describe(PigeonApiGateway.name, () => {
         },
       ],
       content: 'hello',
+    });
+  });
+
+  it('deletes messages with a signed tombstone body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'delete-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.deleteMessage(
+        session,
+        'one-to-one:conversation',
+        'message/to-delete',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-delete';
+    const [, request] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(request.body as string) as {
+      createdAt: number;
+      id: string;
+      signature: string;
+    };
+    const [signaturePayload] = sign.mock.calls[0] as [string, string];
+
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: expect.any(String),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
+    });
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(body.signature).toBe('delete-signature');
+    expect(JSON.parse(signaturePayload)).toEqual({
+      attachmentExternalIdentifiers: [],
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: body.createdAt,
+      id: body.id,
+      previousMessageIds: ['message/to-delete'],
+      targetMessageId: 'message/to-delete',
+      type: 'deleted',
     });
   });
 

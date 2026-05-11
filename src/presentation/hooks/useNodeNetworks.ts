@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 
@@ -12,7 +13,7 @@ type NodeNetworksState = {
   reload: () => Promise<void>;
 };
 
-export function useNodeNetworks(): NodeNetworksState {
+export function useNodeNetworks(session?: Session | null): NodeNetworksState {
   const [networks, setNetworks] = useState<NodeNetwork[]>([]);
   const [node, setNode] = useState<{ id: string; owner: string | null } | null>(
     null,
@@ -27,7 +28,7 @@ export function useNodeNetworks(): NodeNetworksState {
     try {
       const [nodeInfo, nodeNetworks] = await Promise.all([
         pigeonApplication.getNodeInfo(),
-        pigeonApplication.listNodeNetworks(),
+        pigeonApplication.listNodeNetworks(session ?? undefined),
       ]);
 
       setNode(nodeInfo);
@@ -41,7 +42,7 @@ export function useNodeNetworks(): NodeNetworksState {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     void reload();

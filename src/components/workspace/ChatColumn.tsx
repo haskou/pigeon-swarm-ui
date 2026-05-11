@@ -9,6 +9,7 @@ import type {
   MessageAttachment,
   Session,
 } from '../../domain/types';
+import type { MouseEvent } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -40,6 +41,7 @@ interface ChatColumnProps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
+  onMessageContextMenu: (event: MouseEvent, message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
@@ -58,6 +60,7 @@ export function ChatColumn({
   onOpenSidebar,
   onScroll,
   onSend,
+  onMessageContextMenu,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -261,6 +264,7 @@ export function ChatColumn({
                     }
                     onAttachmentPreview={loadAttachmentPreview}
                     onAvatarClick={() => openMessageAuthorProfile(message)}
+                    onContextMenu={onMessageContextMenu}
                     showAvatar={showAvatar}
                   />
                 );

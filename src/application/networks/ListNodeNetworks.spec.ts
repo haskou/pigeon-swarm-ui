@@ -1,3 +1,4 @@
+import type { Session } from '../../domain/types';
 import type { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
 
 import { ListNodeNetworks } from './ListNodeNetworks';
@@ -11,6 +12,18 @@ describe(ListNodeNetworks.name, () => {
     const useCase = new ListNodeNetworks(gateway);
 
     await expect(useCase.execute()).resolves.toBe(expected);
-    expect(gateway.getNodeNetworks).toHaveBeenCalledTimes(1);
+    expect(gateway.getNodeNetworks).toHaveBeenCalledWith(undefined);
+  });
+
+  it('loads node networks with the current identity session when available', async () => {
+    const expected = [{ id: 'network-1', name: 'Public Swarm' }];
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = {
+      getNodeNetworks: jest.fn().mockResolvedValue(expected),
+    } as unknown as PigeonApiGateway;
+    const useCase = new ListNodeNetworks(gateway);
+
+    await expect(useCase.execute(session)).resolves.toBe(expected);
+    expect(gateway.getNodeNetworks).toHaveBeenCalledWith(session);
   });
 });

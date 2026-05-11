@@ -151,11 +151,11 @@ export type MessageSignaturePayload = {
   authorId: string;
   conversationId: string;
   createdAt: number;
-  encryptedPayload: string;
+  encryptedPayload?: string;
   id: string;
   previousMessageIds: string[];
   targetMessageId?: string;
-  type: 'sent';
+  type: 'deleted' | 'sent';
 };
 
 export type ChatMessage = {

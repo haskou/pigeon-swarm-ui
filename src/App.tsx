@@ -27,7 +27,7 @@ function App() {
   const [restoreState, setRestoreState] = useState<RestoreState>(
     hasSavedCredentials ? 'loading' : 'done',
   );
-  const nodeNetworks = useNodeNetworks();
+  const nodeNetworks = useNodeNetworks(session);
   const peers = usePeers();
 
   const handleAuthenticated = (

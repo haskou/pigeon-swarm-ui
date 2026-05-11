@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   MessageAttachment,
 } from '../../domain/types';
+import type { MouseEvent } from 'react';
 
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -24,6 +25,7 @@ interface MessageBubbleProps {
   ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: () => void;
+  onContextMenu: (event: MouseEvent, message: ChatMessage) => void;
   showAvatar: boolean;
 }
 
@@ -40,6 +42,7 @@ export function MessageBubble({
   onAttachmentPreview,
   onAttachmentOpen,
   onAvatarClick,
+  onContextMenu,
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
@@ -82,6 +85,7 @@ export function MessageBubble({
             <div className="w-11 shrink-0" />
           ))}
         <div
+          onContextMenu={(event) => onContextMenu(event, message)}
           className={cx(
             'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
