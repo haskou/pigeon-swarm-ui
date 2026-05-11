@@ -1,8 +1,8 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { ConversationResource, Session } from '../../domain/types';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { ConversationResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
@@ -54,7 +54,10 @@ export function Sidebar({
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       shortId(networkId),
   );
-  const ownDisplayName = identityDisplayName(session.identity.id, identityNames);
+  const ownDisplayName = identityDisplayName(
+    session.identity.id,
+    identityNames,
+  );
   const ownPicture =
     session.identity.profile.picture ?? identityPictures[session.identity.id];
   const conversationName = (conversation: ConversationResource) => {
@@ -195,11 +198,13 @@ export function Sidebar({
           className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
           aria-expanded={profileOpen}
         >
-          <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
+          <ProfileAvatar
+            label={ownDisplayName}
+            picture={ownPicture}
+            size="lg"
+          />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-black">
-              {ownDisplayName}
-            </div>
+            <div className="truncate font-black">{ownDisplayName}</div>
             <div className="truncate text-xs text-white/50">
               {shortId(session.identity.id)}
             </div>
@@ -228,12 +233,17 @@ export function Sidebar({
             <div className="flex items-center gap-3 border-b border-white/10 pb-3">
               <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
               <div className="min-w-0">
-                <div className="truncate font-black">
-                  {ownDisplayName}
-                </div>
+                <div className="truncate font-black">{ownDisplayName}</div>
                 <div className="text-xs text-white/45">
-                  v{session.identity.version}
+                  {session.identity.profile.handle ||
+                    shortId(session.identity.id)}
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3 text-xs">
+              <div className="text-xs text-white/45">
+                {session.identity.profile.biography?.trim() || ''}
               </div>
             </div>
 
@@ -267,13 +277,6 @@ export function Sidebar({
               <ProfileDetail
                 label={copy.profile.keychainVersion}
                 value={`v${session.keychain.version}`}
-              />
-              <ProfileDetail
-                label={copy.profile.biography}
-                value={
-                  session.identity.profile.biography?.trim() ||
-                  copy.profile.noBiography
-                }
               />
             </div>
 
@@ -353,7 +356,9 @@ function ProfileEditor({
   const [biography, setBiography] = useState(
     session.identity.profile.biography ?? '',
   );
-  const [picture, setPicture] = useState(session.identity.profile.picture ?? '');
+  const [picture, setPicture] = useState(
+    session.identity.profile.picture ?? '',
+  );
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;

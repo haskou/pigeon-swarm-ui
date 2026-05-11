@@ -26,6 +26,7 @@ export const copy = {
   },
   chat: {
     createConversation: 'New conversation',
+    directMessage: 'Direct message',
     emptyBody:
       'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
     emptyMessages:
@@ -139,8 +140,8 @@ export const copy = {
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
     name: 'Name',
-    noBiography: 'No bio',
     networks: 'Networks',
+    noBiography: 'No bio',
     noNetworks: 'No networks',
     picture: 'Profile picture',
     save: 'Save profile',

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   ChatMessage,
   ConversationResource,
   IdentityResource,
   Session,
 } from '../../domain/types';
-import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 
 import { copy } from '../../i18n/en';
 import {
@@ -88,7 +88,11 @@ export function ChatColumn({
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
             {peerPicture ? (
-              <img src={peerPicture} alt="" className="h-full w-full object-cover" />
+              <img
+                src={peerPicture}
+                alt=""
+                className="h-full w-full object-cover"
+              />
             ) : activeConversation ? (
               (activeConversationName ?? activeConversation.id)
                 .slice(0, 1)
@@ -112,7 +116,7 @@ export function ChatColumn({
             </button>
             <div className="truncate text-sm text-white/50">
               {activeConversation
-                ? `1to1 · ${activeConversation.id}`
+                ? `${copy.chat.directMessage} · ${activeConversation.id}`
                 : copy.chat.noConversationHint}
             </div>
           </div>
@@ -152,26 +156,34 @@ export function ChatColumn({
               </div>
             )}
             <div className="space-y-4">
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  currentIdentityId={session.identity.id}
-                  authorName={
-                    message.mine
-                      ? session.identity.profile.name
-                      : identityDisplayName(
-                          message.authorIdentityId,
-                          identityNames,
-                        )
-                  }
-                  authorPicture={
-                    message.mine
-                      ? session.identity.profile.picture
-                      : identityPictures[message.authorIdentityId]
-                  }
-                />
-              ))}
+              {messages.map((message, index) => {
+                const nextMessage = messages[index + 1];
+                const showAvatar =
+                  !nextMessage ||
+                  nextMessage.authorIdentityId !== message.authorIdentityId;
+
+                return (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    currentIdentityId={session.identity.id}
+                    authorName={
+                      message.mine
+                        ? session.identity.profile.name
+                        : identityDisplayName(
+                            message.authorIdentityId,
+                            identityNames,
+                          )
+                    }
+                    authorPicture={
+                      message.mine
+                        ? session.identity.profile.picture
+                        : identityPictures[message.authorIdentityId]
+                    }
+                    showAvatar={showAvatar}
+                  />
+                );
+              })}
               {messages.length === 0 && messageState !== 'loading' && (
                 <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                   {copy.chat.emptyMessages}
