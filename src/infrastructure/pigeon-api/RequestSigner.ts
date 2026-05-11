@@ -1,3 +1,5 @@
+import { SHA256Hash } from '@haskou/value-objects';
+
 import type { Session } from '../../domain/types';
 
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
@@ -39,23 +41,23 @@ export class RequestSigner {
     nonce: string,
     body?: unknown,
   ): string {
-    return [
-      method.toUpperCase(),
-      `/${ApiUrlBuilder.trimSlashes(path)}`,
-      timestamp,
+    return JSON.stringify({
+      bodyHash: this.bodyHash(body),
+      method: method.toUpperCase(),
       nonce,
-      this.bodyToString(body),
-    ].join('\n');
+      path: ApiUrlBuilder.normalizePath(path),
+      timestamp,
+    });
+  }
+
+  private bodyHash(body?: unknown): string {
+    return SHA256Hash.from(this.bodyToString(body)).toString();
   }
 
   private bodyToString(body?: unknown): string {
-    if (body === undefined || body === null) {
-      return '';
-    }
+    if (body === undefined || body === null) return '';
 
-    if (typeof body === 'string') {
-      return body;
-    }
+    if (typeof body === 'string') return body;
 
     return JSON.stringify(body);
   }

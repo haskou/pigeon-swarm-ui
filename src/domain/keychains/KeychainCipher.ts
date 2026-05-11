@@ -41,8 +41,16 @@ export class KeychainCipher {
     const encryptedPayload = session.encryptedKeyPair
       .encrypt(JSON.stringify(keychain))
       .toString();
+    const previousKeychainExternalIdentifier =
+      session.keychainExternalIdentifier ?? undefined;
     const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify({ encryptedPayload, timestamp, version }),
+      JSON.stringify({
+        encryptedPayload,
+        ownerIdentityId: session.identity.id,
+        previousKeychainExternalIdentifier,
+        timestamp,
+        version,
+      }),
       session.password,
     );
 

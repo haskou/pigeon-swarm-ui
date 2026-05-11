@@ -5,6 +5,10 @@ export class ApiUrlBuilder {
     return value.replace(/^\/+|\/+$/g, '');
   }
 
+  public static normalizePath(value: string): string {
+    return `/${value.replace(/^\/+/, '')}`;
+  }
+
   public constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
@@ -13,7 +17,7 @@ export class ApiUrlBuilder {
     const cleanBase = this.baseUrl.endsWith('/')
       ? this.baseUrl
       : `${this.baseUrl}/`;
-    const cleanPath = ApiUrlBuilder.trimSlashes(path);
+    const cleanPath = path.replace(/^\/+/, '');
 
     return `${cleanBase}${cleanPath}`;
   }
