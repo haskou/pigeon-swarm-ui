@@ -28,6 +28,7 @@ import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
+import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { LockIcon } from '../workspace/LockIcon';
 
 interface CommunityWorkspaceProps {
@@ -82,6 +83,7 @@ export function CommunityWorkspace({
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
+  const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const owner = community.ownerIdentityId === session.identity.id;
@@ -681,6 +683,7 @@ export function CommunityWorkspace({
               key={member.identityId}
               identity={member.identity}
               identityId={member.identityId}
+              onClick={() => setProfileViewer(member)}
               owner={member.identityId === community.ownerIdentityId}
               pictureUrl={member.pictureUrl}
             />
@@ -716,6 +719,16 @@ export function CommunityWorkspace({
           onClose={() => setMemberOpen(false)}
           refreshCommunity={refreshCommunity}
           session={session}
+        />
+      )}
+      {profileViewer && (
+        <UserProfileDialog
+          identity={profileViewer.identity}
+          identityId={profileViewer.identityId}
+          name={memberDisplayName(profileViewer.identity, profileViewer.identityId)}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setProfileViewer(null)}
+          picture={profileViewer.pictureUrl}
         />
       )}
     </>
@@ -1203,11 +1216,13 @@ function DialogHeader({
 function MemberRow({
   identity,
   identityId,
+  onClick,
   owner,
   pictureUrl,
 }: {
   identity?: IdentityResource;
   identityId: string;
+  onClick: () => void;
   owner: boolean;
   pictureUrl: null | string;
 }) {
@@ -1215,7 +1230,11 @@ function MemberRow({
   const handle = identity?.profile.handle?.trim();
 
   return (
-    <div className="relative flex items-center gap-3 rounded-2xl bg-white/8 p-3">
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex w-full items-center gap-3 rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+    >
       <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
         {pictureUrl ? (
           <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
@@ -1237,7 +1256,7 @@ function MemberRow({
           ♛
         </span>
       )}
-    </div>
+    </button>
   );
 }
 
