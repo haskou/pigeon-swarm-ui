@@ -1,4 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -11,6 +18,12 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
+import {
+  getInitialLanguage,
+  languageOptions,
+  saveLanguage,
+  type AppLanguage,
+} from '../../i18n/language';
 import { cx } from '../../utils/classNameHelper';
 import {
   isValidPassword,
@@ -27,6 +40,7 @@ import {
   normalizeHandle,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { GlassSelect } from '../common/GlassSelect';
 import { SectionTitle } from '../common/SectionTitle';
 
 interface SidebarProps {
@@ -61,12 +75,8 @@ export function Sidebar({
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
+  const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
   const profileRef = useRef<HTMLDivElement>(null);
-  const networkNames = session.identity.networks.map(
-    (networkId) =>
-      nodeNetworks.find((network) => network.id === networkId)?.name ??
-      shortId(networkId),
-  );
   const ownDisplayName = identityDisplayName(
     session.identity.id,
     identityNames,
@@ -129,6 +139,10 @@ export function Sidebar({
 
     setIdentityCopied(true);
     window.setTimeout(() => setIdentityCopied(false), 1800);
+  };
+
+  const changeLanguage = (nextLanguage: string) => {
+    setLanguage(saveLanguage(nextLanguage));
   };
 
   useEffect(() => {
@@ -304,18 +318,17 @@ export function Sidebar({
                 </div>
               </div>
 
-              <ProfileDetail
-                label={copy.profile.networks}
-                value={
-                  networkNames.length > 0
-                    ? networkNames.join(', ')
-                    : copy.profile.noNetworks
-                }
-              />
-              <ProfileDetail
-                label={copy.profile.keychainVersion}
-                value={`v${session.keychain.version}`}
-              />
+              <div>
+                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.profile.language}
+                </div>
+                <GlassSelect
+                  ariaLabel={copy.profile.language}
+                  onChange={changeLanguage}
+                  options={languageOptions}
+                  value={language}
+                />
+              </div>
             </div>
 
             <button
@@ -340,6 +353,7 @@ export function Sidebar({
       {profileEditorOpen && (
         <ProfileEditor
           currentPicture={ownPicture}
+          nodeNetworks={nodeNetworks}
           session={session}
           onClose={() => setProfileEditorOpen(false)}
           onUpdated={(nextSession) => {
@@ -383,11 +397,13 @@ function ProfileAvatar({
 
 function ProfileEditor({
   currentPicture,
+  nodeNetworks,
   onClose,
   onUpdated,
   session,
 }: {
   currentPicture?: string | null;
+  nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
   onUpdated: (session: Session) => void;
@@ -400,6 +416,10 @@ function ProfileEditor({
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
+  const [identityNetworkIds, setIdentityNetworkIds] = useState(
+    session.identity.networks,
+  );
+  const [networkToAdd, setNetworkToAdd] = useState('');
   const [picturePreview, setPicturePreview] = useState(
     currentPicture ??
       (session.identity.profile.picture
@@ -419,9 +439,35 @@ function ProfileEditor({
     !wantsPasswordChange || (isValidPassword(newPassword) && passwordsMatch);
   const canSubmit =
     name.trim().length > 0 &&
+    identityNetworkIds.length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
     canChangePassword &&
     state !== 'loading';
+  const nodeNetworkOptions = useMemo(
+    () =>
+      nodeNetworks
+        .filter((network) => !identityNetworkIds.includes(network.id))
+        .map((network) => ({ label: network.name, value: network.id })),
+    [identityNetworkIds, nodeNetworks],
+  );
+  const networkNamesById = useMemo(
+    () => new Map(nodeNetworks.map((network) => [network.id, network.name])),
+    [nodeNetworks],
+  );
+
+  useEffect(() => {
+    if (nodeNetworkOptions.some((option) => option.value === networkToAdd)) {
+      return;
+    }
+
+    setNetworkToAdd(nodeNetworkOptions[0]?.value ?? '');
+  }, [networkToAdd, nodeNetworkOptions]);
+
+  const addNetwork = () => {
+    if (!networkToAdd || identityNetworkIds.includes(networkToAdd)) return;
+
+    setIdentityNetworkIds((networkIds) => [...networkIds, networkToAdd]);
+  };
 
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -452,6 +498,7 @@ function ProfileEditor({
         biography: biography.trim() || undefined,
         handle: normalizedHandle,
         name: name.trim(),
+        networks: identityNetworkIds,
         picture: pictureCid,
       }, wantsPasswordChange ? newPassword : undefined);
 
@@ -476,7 +523,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 w-full max-w-lg rounded-[2rem] p-5 shadow-2xl shadow-black/35"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2rem] p-5 shadow-2xl shadow-black/35"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -526,6 +573,56 @@ function ProfileEditor({
               className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
             />
           </label>
+          <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
+            <div className="text-sm font-black text-white/70">
+              {copy.profile.networks}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {identityNetworkIds.length > 0 ? (
+                identityNetworkIds.map((networkId) => (
+                  <span
+                    key={networkId}
+                    title={networkId}
+                    className="min-w-0 max-w-full truncate rounded-2xl bg-white/10 px-3 py-2 text-xs font-black text-white/70"
+                  >
+                    {networkNamesById.get(networkId) ?? shortId(networkId)}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs font-bold text-white/40">
+                  {copy.profile.noNetworks}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <GlassSelect
+                ariaLabel={copy.profile.availableNetwork}
+                className="min-w-0 flex-1"
+                disabled={nodeNetworkOptions.length === 0}
+                onChange={setNetworkToAdd}
+                options={
+                  nodeNetworkOptions.length > 0
+                    ? nodeNetworkOptions
+                    : [
+                        {
+                          disabled: true,
+                          label: copy.profile.noAvailableNetworks,
+                          value: '',
+                        },
+                      ]
+                }
+                value={networkToAdd}
+              />
+              <button
+                type="button"
+                onClick={addNetwork}
+                disabled={!networkToAdd || nodeNetworkOptions.length === 0}
+                className="shrink-0 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {copy.profile.addNetwork}
+              </button>
+            </div>
+          </section>
           <section className="mt-3 overflow-hidden rounded-3xl border border-white/10 bg-black/20">
             <button
               type="button"
@@ -660,19 +757,6 @@ function PasswordChecklist({
           <span>{label}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function ProfileDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-        {label}
-      </div>
-      <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
-        {value}
-      </div>
     </div>
   );
 }

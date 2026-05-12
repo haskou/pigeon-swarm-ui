@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -62,21 +63,21 @@ export function ChatColumn({
   messages,
   messageState,
   nodeNetworks,
+  onCancelReply,
   onCreate,
+  onMessageMenuOpen,
   onOpenSidebar,
   onReplyReferenceClick,
   onScroll,
   onSend,
-  onMessageMenuOpen,
-  onCancelReply,
   peerIdentity,
   peerIdentityId,
   peerPicture,
+  progress,
+  replyToMessage,
   scrollerRef,
   sendError,
   session,
-  progress,
-  replyToMessage,
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     identity?: IdentityResource;
@@ -85,6 +86,8 @@ export function ChatColumn({
     picture?: string | null;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
+  const [conversationDataOpen, setConversationDataOpen] = useState(false);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
@@ -112,6 +115,28 @@ export function ChatColumn({
   const e2eTooltip = hasConversationKey
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
+  const conversationData = useMemo(
+    () => ({
+      frontendDerived: {
+        conversationNetworkId: conversationNetworkId ?? null,
+        conversationNetworkName,
+        e2eReady: hasConversationKey,
+        loadedMessages: messages.length,
+        peerIdentity,
+        peerIdentityId: peerIdentityId ?? null,
+      },
+      serverConversation: activeConversation ?? null,
+    }),
+    [
+      activeConversation,
+      conversationNetworkId,
+      conversationNetworkName,
+      hasConversationKey,
+      messages.length,
+      peerIdentity,
+      peerIdentityId,
+    ],
+  );
   const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
   const openOwnProfile = () =>
     setProfileViewer({
@@ -133,6 +158,7 @@ export function ChatColumn({
   const openMessageAuthorProfile = (message: ChatMessage) => {
     if (message.mine || message.authorIdentityId === session.identity.id) {
       openOwnProfile();
+
       return;
     }
 
@@ -258,6 +284,41 @@ export function ChatColumn({
               </div>
             )}
           </div>
+          {activeConversation ? (
+            <div className="relative ml-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
+                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
+                aria-label={copy.chat.conversationMenu}
+                aria-expanded={conversationMenuOpen}
+              >
+                ⋮
+              </button>
+              {conversationMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-30 cursor-default"
+                    onClick={() => setConversationMenuOpen(false)}
+                    aria-label={copy.dialog.close}
+                  />
+                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConversationDataOpen(true);
+                        setConversationMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {copy.chat.viewData}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -353,7 +414,7 @@ export function ChatColumn({
                               message.replyPreview.authorIdentityId,
                               identityNames,
                             )
-                        : undefined
+                          : undefined
                     }
                     replyPreview={
                       replyMessage?.content ?? message.replyPreview?.content
@@ -394,6 +455,12 @@ export function ChatColumn({
           />
         </>
       )}
+      {conversationDataOpen && (
+        <ConversationDataDialog
+          data={conversationData}
+          onClose={() => setConversationDataOpen(false)}
+        />
+      )}
       {profileViewer && (
         <UserProfileDialog
           identity={profileViewer.identity}
@@ -410,18 +477,9 @@ export function ChatColumn({
 
 function LockIcon({ locked }: { locked: boolean }) {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
-        d={
-          locked
-            ? 'M7 10V8a5 5 0 0 1 10 0v2'
-            : 'M9 10V8a5 5 0 0 1 8.7-3.4'
-        }
+        d={locked ? 'M7 10V8a5 5 0 0 1 10 0v2' : 'M9 10V8a5 5 0 0 1 8.7-3.4'}
         stroke="currentColor"
         strokeLinecap="round"
         strokeWidth="1.8"
@@ -438,5 +496,43 @@ function LockIcon({ locked }: { locked: boolean }) {
         strokeWidth="1.8"
       />
     </svg>
+  );
+}
+
+function ConversationDataDialog({
+  data,
+  onClose,
+}: {
+  data: unknown;
+  onClose: () => void;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 flex h-full w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">
+            {copy.chat.conversationDataTitle}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+        <pre className="mt-4 min-h-0 overflow-auto rounded-3xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </section>
+    </div>,
+    document.body,
   );
 }
