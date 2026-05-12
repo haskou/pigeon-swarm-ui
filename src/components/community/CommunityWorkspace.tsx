@@ -586,7 +586,7 @@ export function CommunityWorkspace({
                           : 'bg-white/8 text-white hover:bg-white/14',
                       )}
                     >
-                      <span className="truncate">#{channel.name}</span>
+                      <span className="truncate"># {channel.name}</span>
                     </button>
                   ))
                 )}
