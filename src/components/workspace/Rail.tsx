@@ -183,30 +183,30 @@ export function Rail({
 }
 
 function CommunityRailAvatar({ community }: { community: Community }) {
-  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const banner = community.banner?.trim();
+    const avatar = community.avatar?.trim();
 
-    setBannerUrl(null);
-    if (!banner) return undefined;
+    setAvatarUrl(null);
+    if (!avatar) return undefined;
 
     let cancelled = false;
 
     void pigeonApplication
-      .getPublicFile(banner)
+      .getPublicFile(avatar)
       .then((content) => {
-        if (!cancelled) setBannerUrl(profilePictureDataUrl(content));
+        if (!cancelled) setAvatarUrl(profilePictureDataUrl(content));
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, [community.banner]);
+  }, [community.avatar]);
 
-  return bannerUrl ? (
-    <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+  return avatarUrl ? (
+    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
   ) : (
     community.name.slice(0, 1).toUpperCase()
   );

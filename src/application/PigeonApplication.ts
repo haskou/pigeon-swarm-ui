@@ -9,6 +9,7 @@ import type {
   LocalKeychain,
   LoginResult,
   MessageAttachment,
+  MessageResource,
   NotificationResource,
   PublicFileContent,
   PublicFileUpload,
@@ -181,17 +182,22 @@ export class PigeonApplication {
   public async createCommunity(
     session: Session,
     input: {
+      avatar?: File | null;
       banner?: File | null;
       description: string;
       name: string;
       networkId: string;
     },
   ): Promise<Community> {
+    const avatarCid = input.avatar
+      ? (await this.uploadPublicFile(session, input.avatar)).cid
+      : undefined;
     const bannerCid = input.banner
       ? (await this.uploadPublicFile(session, input.banner)).cid
       : undefined;
 
     return await this.gateway.createCommunity(session, {
+      ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
       name: input.name,
@@ -202,13 +208,22 @@ export class PigeonApplication {
   public async updateCommunity(
     session: Session,
     communityId: string,
-    input: { banner?: File | null; description?: string; name?: string },
+    input: {
+      avatar?: File | null;
+      banner?: File | null;
+      description?: string;
+      name?: string;
+    },
   ): Promise<Community> {
+    const avatarCid = input.avatar
+      ? (await this.uploadPublicFile(session, input.avatar)).cid
+      : undefined;
     const bannerCid = input.banner
       ? (await this.uploadPublicFile(session, input.banner)).cid
       : undefined;
 
     return await this.gateway.updateCommunity(session, communityId, {
+      ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
       name: input.name,
@@ -260,6 +275,39 @@ export class PigeonApplication {
       communityId,
       channelId,
       name,
+    );
+  }
+
+  public async createCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    input: {
+      attachmentExternalIdentifiers?: string[];
+      encryptedPayload: string;
+      id?: string;
+      timestamp?: number;
+    },
+  ): Promise<MessageResource> {
+    return await this.gateway.createCommunityChannelMessage(
+      session,
+      communityId,
+      channelId,
+      input,
+    );
+  }
+
+  public async listCommunityChannelMessages(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    options: { beforeMessageId?: string; limit?: number } = {},
+  ): Promise<MessageResource[]> {
+    return await this.gateway.listCommunityChannelMessages(
+      session,
+      communityId,
+      channelId,
+      options,
     );
   }
 

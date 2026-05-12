@@ -56,6 +56,7 @@ export function CommunityWorkspace({
   const [memberPictures, setMemberPictures] = useState<Record<string, string>>(
     {},
   );
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -122,6 +123,23 @@ export function CommunityWorkspace({
   }, [community.memberIds]);
 
   useEffect(() => {
+    const avatar = community.avatar?.trim();
+
+    setAvatarUrl(null);
+    if (!avatar) return undefined;
+
+    let cancelled = false;
+
+    void loadPublicImage(avatar).then((url) => {
+      if (!cancelled) setAvatarUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.avatar]);
+
+  useEffect(() => {
     const banner = community.banner?.trim();
 
     setBannerUrl(null);
@@ -130,12 +148,9 @@ export function CommunityWorkspace({
 
     let cancelled = false;
 
-    void pigeonApplication
-      .getPublicFile(banner)
-      .then((content) => {
-        if (!cancelled) setBannerUrl(profilePictureDataUrl(content));
-      })
-      .catch(() => undefined);
+    void loadPublicImage(banner).then((url) => {
+      if (!cancelled) setBannerUrl(url);
+    });
 
     return () => {
       cancelled = true;
@@ -259,8 +274,8 @@ export function CommunityWorkspace({
               ☰
             </button>
             <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-              {bannerUrl ? (
-                <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 community.name.slice(0, 1).toUpperCase()
               )}
@@ -359,8 +374,12 @@ function ManageCommunityDialog({
 }) {
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
+  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('');
   const [renamingChannelId, setRenamingChannelId] = useState<string | null>(null);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(() =>
@@ -370,6 +389,20 @@ function ManageCommunityDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
+
+  useEffect(() => {
+    if (!avatar) {
+      setAvatarPreview(null);
+
+      return undefined;
+    }
+
+    const nextPreview = URL.createObjectURL(avatar);
+
+    setAvatarPreview(nextPreview);
+
+    return () => URL.revokeObjectURL(nextPreview);
+  }, [avatar]);
 
   useEffect(() => {
     if (!banner) {
@@ -384,6 +417,36 @@ function ManageCommunityDialog({
 
     return () => URL.revokeObjectURL(nextPreview);
   }, [banner]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCurrentAvatarUrl(null);
+    if (!community.avatar) return undefined;
+
+    void loadPublicImage(community.avatar).then((url) => {
+      if (!cancelled) setCurrentAvatarUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.avatar]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCurrentBannerUrl(null);
+    if (!community.banner) return undefined;
+
+    void loadPublicImage(community.banner).then((url) => {
+      if (!cancelled) setCurrentBannerUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.banner]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -405,6 +468,7 @@ function ManageCommunityDialog({
         session,
         community.id,
         {
+          ...(avatar ? { avatar } : {}),
           ...(banner ? { banner } : {}),
           description: description.trim(),
           name: name.trim(),
@@ -503,11 +567,15 @@ function ManageCommunityDialog({
           <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
             <label className="block">
               <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.banner}
+                {copy.communities.avatar}
               </span>
-              <div className="grid h-32 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
-                {bannerPreview ? (
-                  <img src={bannerPreview} alt="" className="h-full w-full object-cover" />
+              <div className="mx-auto grid h-28 w-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                {avatarPreview || currentAvatarUrl ? (
+                  <img
+                    src={avatarPreview ?? currentAvatarUrl ?? ''}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   community.name.slice(0, 1).toUpperCase()
                 )}
@@ -515,11 +583,33 @@ function ManageCommunityDialog({
               <input
                 type="file"
                 accept="image/*"
-                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
                 className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
               />
             </label>
             <div className="space-y-3">
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.communities.banner}
+                </span>
+                <div className="grid h-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                  {bannerPreview || currentBannerUrl ? (
+                    <img
+                      src={bannerPreview ?? currentBannerUrl ?? ''}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    community.name.slice(0, 1).toUpperCase()
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                  className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
+                />
+              </label>
               <Field label={copy.communities.name}>
                 <input
                   value={name}
@@ -806,7 +896,15 @@ async function loadIdentityPicture(
   if (!pictureCid) return null;
 
   try {
-    const content = await pigeonApplication.getPublicFile(pictureCid);
+    return await loadPublicImage(pictureCid);
+  } catch {
+    return null;
+  }
+}
+
+async function loadPublicImage(cid: string): Promise<string | null> {
+  try {
+    const content = await pigeonApplication.getPublicFile(cid);
 
     return profilePictureDataUrl(content);
   } catch {

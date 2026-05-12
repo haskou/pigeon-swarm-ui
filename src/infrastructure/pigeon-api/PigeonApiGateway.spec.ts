@@ -65,6 +65,7 @@ describe(PigeonApiGateway.name, () => {
 
   it('creates communities with signed metadata payload', async () => {
     const community = {
+      avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       createdAt: 1,
       description: 'Description',
@@ -90,6 +91,7 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(
       gateway.createCommunity(session, {
+        avatar: 'bafy-avatar',
         banner: 'bafy-banner',
         description: 'Description',
         name: 'Mi comunidad',
@@ -98,6 +100,7 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(community);
 
     const body = {
+      avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       description: 'Description',
       name: 'Mi comunidad',

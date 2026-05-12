@@ -159,6 +159,7 @@ export type Community = {
   ownerIdentityId: string;
   name: string;
   description: string;
+  avatar?: string | null;
   banner?: string | null;
   memberIds: string[];
   textChannels: CommunityTextChannel[];
@@ -172,6 +173,8 @@ export type MessageResource = {
   messageId?: string;
   authorId?: string;
   conversationId?: string;
+  communityId?: string;
+  channelId?: string;
   authorIdentityId?: string;
   encryptedPayload?: string;
   payload?: string;
