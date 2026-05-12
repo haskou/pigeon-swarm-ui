@@ -1093,6 +1093,29 @@ export function GlassWorkspace({
             activeChannelId={communityChannelById[activeCommunity.id] ?? null}
             community={activeCommunity}
             mobileSidebarOpen={sidebarOpen}
+            mobileRail={
+              <Rail
+                activeCommunityId={activeCommunity.id}
+                communities={communities}
+                messageNotificationCount={unreadMessageCount}
+                notificationCount={pendingNotificationCount}
+                onCommunityClick={(communityId) => {
+                  setActiveCommunityId(communityId);
+                  setWorkspaceMode('community');
+                  setSidebarOpen(false);
+                }}
+                onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                onMessagesClick={() => {
+                  setWorkspaceMode('messages');
+                  setSidebarOpen(false);
+                }}
+                onNotificationsClick={() => setNotificationsOpen(true)}
+                onSettingsClick={() => setNodeSettingsOpen(true)}
+                onInspectorClick={() => setInspectorOpen(true)}
+                peerCount={peers.length}
+                settingsAttention={nodeUnclaimed}
+              />
+            }
             nodeNetworks={nodeNetworks}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>

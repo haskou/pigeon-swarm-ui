@@ -1,5 +1,12 @@
 import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -35,6 +42,7 @@ interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
   community: Community;
   mobileSidebarOpen: boolean;
+  mobileRail?: ReactNode;
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
@@ -53,6 +61,7 @@ export function CommunityWorkspace({
   activeChannelId,
   community,
   mobileSidebarOpen,
+  mobileRail,
   nodeNetworks,
   onChannelSelected,
   onCommunityUpdated,
@@ -456,88 +465,96 @@ export function CommunityWorkspace({
       )}
       <aside
         className={cx(
-          'glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]',
-          'fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[360px] transition lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none',
-          mobileSidebarOpen ? 'flex' : 'hidden lg:flex',
+          'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
+          mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
-        <div className="min-w-0">
-          <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            {copy.communities.privateCommunity}
-          </div>
-          <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
-            {bannerUrl ? (
-              <button
-                type="button"
-                onClick={() => setBannerViewerOpen(true)}
-                className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
-                aria-label={copy.communities.openBanner}
-              >
-                <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
-              </button>
-            ) : (
-              <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
-                {community.name.slice(0, 1).toUpperCase()}
+        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+          <div className="lg:hidden">{mobileRail}</div>
+          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.privateCommunity}
               </div>
-            )}
-            <div className="p-4">
-              <h2 className="truncate text-xl font-black">{community.name}</h2>
-              <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
-                {community.description}
-              </p>
-            </div>
-          </div>
-          {owner && (
-            <button
-              type="button"
-              onClick={() => setManageOpen(true)}
-              className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
-            >
-              {copy.communities.manage}
-            </button>
-          )}
-        </div>
-
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            {copy.communities.channels}
-          </div>
-          <input
-            value={channelSearch}
-            onChange={(event) => setChannelSearch(event.target.value)}
-            className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder={copy.communities.searchChannels}
-          />
-          <div className="space-y-2">
-            {community.textChannels.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                {copy.communities.noChannels}
+              <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
+                {bannerUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setBannerViewerOpen(true)}
+                    className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
+                    aria-label={copy.communities.openBanner}
+                  >
+                    <img
+                      src={bannerUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ) : (
+                  <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
+                    {community.name.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div className="p-4">
+                  <h2 className="truncate text-xl font-black">{community.name}</h2>
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
+                    {community.description}
+                  </p>
+                </div>
               </div>
-            ) : visibleChannels.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                {copy.communities.noMatchingChannels}
-              </div>
-            ) : (
-              visibleChannels.map((channel) => (
+              {owner && (
                 <button
-                  key={channel.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedChannelId(channel.id);
-                    onChannelSelected(channel.id);
-                    onMobileSidebarClose();
-                  }}
-                  className={cx(
-                    'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
-                    selectedChannelId === channel.id
-                      ? 'bg-white text-slate-950'
-                      : 'bg-white/8 text-white hover:bg-white/14',
-                  )}
+                  onClick={() => setManageOpen(true)}
+                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
                 >
-                  <span className="truncate">#{channel.name}</span>
+                  {copy.communities.manage}
                 </button>
-              ))
-            )}
+              )}
+            </div>
+
+            <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.channels}
+              </div>
+              <input
+                value={channelSearch}
+                onChange={(event) => setChannelSearch(event.target.value)}
+                className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.communities.searchChannels}
+              />
+              <div className="space-y-2">
+                {community.textChannels.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                    {copy.communities.noChannels}
+                  </div>
+                ) : visibleChannels.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                    {copy.communities.noMatchingChannels}
+                  </div>
+                ) : (
+                  visibleChannels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedChannelId(channel.id);
+                        onChannelSelected(channel.id);
+                        onMobileSidebarClose();
+                      }}
+                      className={cx(
+                        'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
+                        selectedChannelId === channel.id
+                          ? 'bg-white text-slate-950'
+                          : 'bg-white/8 text-white hover:bg-white/14',
+                      )}
+                    >
+                      <span className="truncate">#{channel.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </aside>
