@@ -203,10 +203,8 @@ function RailSelectionIndicator({
   return (
     <span
       aria-hidden="true"
-      className={cx(
-        'absolute top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]',
-        size === 'large' ? 'left-[calc(50%-2.25rem)]' : 'left-[calc(50%-2rem)]',
-      )}
+      className="absolute top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+      style={{ left: size === 'large' ? 'calc(50% - 2.25rem)' : 'calc(50% - 2rem)' }}
     />
   );
 }
