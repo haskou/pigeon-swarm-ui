@@ -888,7 +888,7 @@ export class PigeonApiGateway {
   ): Promise<ConversationResource> {
     const body = {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
-      networkIds: [networkId],
+      networkId,
       participantIds: [session.identity.id, peerIdentityId].sort(),
       type: 'one-to-one',
     };

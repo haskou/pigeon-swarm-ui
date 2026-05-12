@@ -101,6 +101,7 @@ export function ChatColumn({
       ? `@${peerIdentity.profile.handle.trim()}`
       : activeConversationFallbackName);
   const conversationNetworkId =
+    activeConversation?.networkId ??
     activeConversation?.networkIds?.[0] ??
     peerIdentity?.networks.find((networkId) =>
       session.identity.networks.includes(networkId),
