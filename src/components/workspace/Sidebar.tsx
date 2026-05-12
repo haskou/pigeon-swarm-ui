@@ -399,6 +399,7 @@ function ProfileEditor({
   );
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
+  const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const [picturePreview, setPicturePreview] = useState(
     currentPicture ??
       (session.identity.profile.picture
@@ -525,35 +526,53 @@ function ProfileEditor({
               className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
             />
           </label>
-          <section className="mt-3 rounded-3xl border border-white/10 bg-black/20 p-4">
-            <div className="text-sm font-black text-white/75">
-              {copy.profile.newPassword}
-            </div>
-            <p className="mt-1 text-xs font-bold text-white/45">
-              {copy.profile.newPasswordHelp}
-            </p>
-            <div className="mt-4 grid gap-3">
-              <ProfileInput
-                label={copy.profile.newPassword}
-                value={newPassword}
-                onChange={setNewPassword}
-                placeholder="••••••••••••"
-                type="password"
-              />
-              <ProfileInput
-                label={copy.profile.newPasswordConfirm}
-                value={newPasswordConfirmation}
-                onChange={setNewPasswordConfirmation}
-                placeholder="••••••••••••"
-                type="password"
-              />
-            </div>
-            <PasswordChecklist
-              checks={{
-                ...passwordChecks,
-                match: passwordsMatch,
-              }}
-            />
+          <section className="mt-3 overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+            <button
+              type="button"
+              onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
+              aria-expanded={passwordSectionOpen}
+            >
+              <span>{copy.profile.changePassword}</span>
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'text-white/45 transition-transform',
+                  passwordSectionOpen && 'rotate-180',
+                )}
+              >
+                ⌄
+              </span>
+            </button>
+            {passwordSectionOpen && (
+              <div className="border-t border-white/10 p-4">
+                <p className="text-xs font-bold text-white/45">
+                  {copy.profile.newPasswordHelp}
+                </p>
+                <div className="mt-4 grid gap-3">
+                  <ProfileInput
+                    label={copy.profile.newPassword}
+                    value={newPassword}
+                    onChange={setNewPassword}
+                    placeholder="••••••••••••"
+                    type="password"
+                  />
+                  <ProfileInput
+                    label={copy.profile.newPasswordConfirm}
+                    value={newPasswordConfirmation}
+                    onChange={setNewPasswordConfirmation}
+                    placeholder="••••••••••••"
+                    type="password"
+                  />
+                </div>
+                <PasswordChecklist
+                  checks={{
+                    ...passwordChecks,
+                    match: passwordsMatch,
+                  }}
+                />
+              </div>
+            )}
           </section>
         </div>
 

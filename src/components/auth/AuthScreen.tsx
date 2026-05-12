@@ -15,8 +15,9 @@ import {
   isValidHandle,
   isValidPassword,
   normalizeHandleInput,
-  passwordValidationError,
+  passwordValidationChecks,
 } from '../../utils/credentialsValidation';
+import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -44,6 +45,7 @@ export function AuthScreen({
   const [handle, setHandle] = useState('');
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +78,9 @@ export function AuthScreen({
       : name.trim().length > 0 &&
         (!handle.trim() || isValidHandle(handle)) &&
         isValidPassword(password) &&
+        password === passwordConfirmation &&
         (availableNetworks.length === 0 || selectedNetwork !== '');
-  const passwordError =
-    mode === 'create' && password
-      ? passwordValidationError(password)
-      : null;
+  const passwordChecks = passwordValidationChecks(password);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -255,10 +255,29 @@ export function AuthScreen({
                 }
               />
             </Field>
-            {mode === 'create' && (passwordError || password.length === 0) && (
-              <p className="text-xs font-bold text-white/45">
-                {copy.auth.passwordRequirements}
-              </p>
+            {mode === 'create' && (
+              <>
+                <Field label={copy.auth.passwordConfirmLabel}>
+                  <input
+                    value={passwordConfirmation}
+                    onChange={(event) =>
+                      setPasswordConfirmation(event.target.value)
+                    }
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder="••••••••••••"
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </Field>
+                <PasswordChecklist
+                  checks={{
+                    ...passwordChecks,
+                    match:
+                      password.length > 0 && password === passwordConfirmation,
+                  }}
+                  variant="auth"
+                />
+              </>
             )}
           </div>
 
@@ -269,7 +288,10 @@ export function AuthScreen({
           )}
 
           <div className="mt-6 flex items-center">
-            <div
+            <button
+              type="button"
+              id="remember-me"
+              aria-pressed={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full border border-white/10 transition-colors focus:outline-none ${
                 rememberMe ? 'bg-cyan-400/20' : 'bg-black/25'
@@ -280,10 +302,10 @@ export function AuthScreen({
                   rememberMe ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
-            </div>
+            </button>
             <label
               htmlFor="remember-me"
-              className="ml-2 block text-sm text-white/60"
+              className="ml-2 block cursor-pointer text-sm text-white/60"
             >
               {copy.auth.rememberMe}
             </label>
@@ -302,6 +324,55 @@ export function AuthScreen({
         </form>
       </div>
     </section>
+  );
+}
+
+function PasswordChecklist({
+  checks,
+  variant = 'profile',
+}: {
+  checks: {
+    lowercase: boolean;
+    match: boolean;
+    maxLength: boolean;
+    minLength: boolean;
+    number: boolean;
+    symbol: boolean;
+    uppercase: boolean;
+  };
+  variant?: 'auth' | 'profile';
+}) {
+  const requirements =
+    variant === 'auth'
+      ? copy.auth.passwordRequirementItems
+      : copy.profile.passwordRequirements;
+  const items = [
+    [requirements.minLength, checks.minLength],
+    [requirements.maxLength, checks.maxLength],
+    [requirements.uppercase, checks.uppercase],
+    [requirements.lowercase, checks.lowercase],
+    [requirements.number, checks.number],
+    [requirements.symbol, checks.symbol],
+    [requirements.match, checks.match],
+  ] as const;
+
+  return (
+    <div className="grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
+      {items.map(([label, complete]) => (
+        <div
+          key={label}
+          className={cx(
+            'flex items-center gap-2 rounded-2xl px-3 py-2',
+            complete
+              ? 'bg-emerald-400/10 text-emerald-200'
+              : 'bg-white/5 text-white/45',
+          )}
+        >
+          <span aria-hidden="true">{complete ? '✓' : '×'}</span>
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

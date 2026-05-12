@@ -25,8 +25,18 @@ export const copy = {
     networkLabel: 'Network',
     networksLabel: 'Networks',
     passwordLabel: 'Password',
+    passwordConfirmLabel: 'Repeat password',
     passwordRequirements:
       'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+    passwordRequirementItems: {
+      lowercase: 'Lowercase',
+      match: 'Passwords match',
+      maxLength: '256 characters or fewer',
+      minLength: 'At least 12 characters',
+      number: 'Number',
+      symbol: 'Symbol',
+      uppercase: 'Uppercase',
+    },
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
@@ -304,8 +314,9 @@ export const copy = {
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
     name: 'Profile name',
-    newPasswordConfirm: 'Repeat new password',
+    changePassword: 'Change password',
     newPassword: 'New password',
+    newPasswordConfirm: 'Repeat new password',
     newPasswordHelp:
       'Leave both fields empty to keep your current password.',
     passwordRequirements: {
