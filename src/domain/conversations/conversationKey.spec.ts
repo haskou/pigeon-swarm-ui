@@ -1,6 +1,5 @@
 import type { LocalKeychain } from '../types';
 
-import { ConversationIdFactory } from './ConversationIdFactory';
 import { conversationKeyEntry } from './conversationKey';
 
 const keychain = {
@@ -23,14 +22,9 @@ describe(conversationKeyEntry.name, () => {
     );
   });
 
-  it('returns keys by deterministic peer conversation id', () => {
-    const conversationId = new ConversationIdFactory().create(
-      'identity-1',
-      'identity-2',
-    );
-
-    expect(conversationKeyEntry(keychain, 'identity-1', conversationId)).toBe(
-      keychain.conversations['local-key-id'],
-    );
+  it('does not infer legacy conversation ids without an exact key', () => {
+    expect(
+      conversationKeyEntry(keychain, 'identity-1', 'missing-conversation-id'),
+    ).toBeUndefined();
   });
 });

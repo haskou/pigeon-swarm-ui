@@ -8,7 +8,6 @@ import type {
   Session,
 } from '../types';
 
-import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
 import { conversationKeyEntry } from '../conversations/conversationKey';
 
 type MessageListEnvelope = {
@@ -34,10 +33,7 @@ export type MessageProjectionCopy = {
 };
 
 export class MessageProjector {
-  public constructor(
-    private readonly copy: MessageProjectionCopy,
-    private readonly ids: ConversationIdFactory = new ConversationIdFactory(),
-  ) {}
+  public constructor(private readonly copy: MessageProjectionCopy) {}
 
   public list(value: unknown): {
     messages: MessageResource[];
@@ -112,7 +108,6 @@ export class MessageProjector {
       session.keychain,
       session.identity.id,
       conversationId,
-      this.ids,
     );
   }
 

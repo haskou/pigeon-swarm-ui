@@ -1,6 +1,5 @@
 import type { Session } from '../types';
 
-import { ConversationIdFactory } from '../conversations/ConversationIdFactory';
 import { MessageProjector } from './MessageProjector';
 
 const projectorCopy = {
@@ -78,12 +77,9 @@ describe(MessageProjector.name, () => {
     });
   });
 
-  it('finds deterministic conversation keys stored under a local key id', async () => {
+  it('uses exact conversation keys for encrypted messages', async () => {
     const projector = new MessageProjector(projectorCopy);
-    const conversationId = new ConversationIdFactory().create(
-      'identity-1',
-      'identity-2',
-    );
+    const conversationId = 'local-key-id';
     const hydratedSession = {
       ...session,
       keychain: {
