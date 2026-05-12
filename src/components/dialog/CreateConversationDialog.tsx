@@ -265,6 +265,11 @@ export function CreateConversationDialog({
     setError(null);
     try {
       const identity = await pigeonApplication.getIdentity(identityLookup);
+
+      if (!identity) {
+        throw new Error(copy.errors.notFound);
+      }
+
       const alreadyAdded =
         identity.id === session.identity.id ||
         groupParticipants.some(
@@ -272,12 +277,19 @@ export function CreateConversationDialog({
         );
 
       if (!alreadyAdded) {
-        const pictureUrl = await loadDialogIdentityPicture(identity);
-
         setGroupParticipants((participants) => [
           ...participants,
-          { identity, pictureUrl },
+          { identity, pictureUrl: null },
         ]);
+        void loadDialogIdentityPicture(identity).then((pictureUrl) => {
+          setGroupParticipants((participants) =>
+            participants.map((participant) =>
+              participant.identity.id === identity.id
+                ? { ...participant, pictureUrl }
+                : participant,
+            ),
+          );
+        });
       }
       setGroupIdentityInput('');
     } catch (caught) {
