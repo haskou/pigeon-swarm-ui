@@ -419,9 +419,21 @@ export function ChatColumn({
                 );
               })}
               {messages.length === 0 && messageState !== 'loading' && (
-                <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                  {copy.chat.emptyMessages}
-                </div>
+                hasConversationKey ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                    {copy.chat.emptyMessages}
+                  </div>
+                ) : (
+                  <div className="rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                    <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                      <LockIcon locked={false} />
+                    </div>
+                    <div className="font-black">{copy.chat.e2eMissing}</div>
+                    <div className="mt-2 text-rose-100/65">
+                      {copy.messages.missingConversationKey}
+                    </div>
+                  </div>
+                )
               )}
               <div ref={bottomRef} />
             </div>
