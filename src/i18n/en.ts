@@ -77,7 +77,11 @@ export const copy = {
       'The conversation could not be created. The backend chose violence.',
     createConversationLoading: 'Creating and publishing keychain...',
     createConversationTitle: 'Create a new direct conversation',
+    loadingIdentity: 'Looking for shared networks...',
+    noSharedNetwork:
+      'No shared network with this identity. You cannot create this conversation yet.',
     remoteIdentityId: 'Identity ID or username',
+    sharedNetwork: 'Conversation network',
   },
   errors: {
     backend: {

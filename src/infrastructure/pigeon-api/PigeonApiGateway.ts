@@ -151,6 +151,7 @@ export class PigeonApiGateway {
   public async createConversation(
     session: Session,
     peerIdentityId: string,
+    networkId: string,
   ): Promise<{
     conversation: ConversationResource;
     keychain: LocalKeychain;
@@ -169,6 +170,7 @@ export class PigeonApiGateway {
       session,
       peerIdentity.id,
       published,
+      networkId,
     );
     const serverKeyEntry = { ...keyEntry, conversationId: conversation.id };
 
@@ -853,9 +855,11 @@ export class PigeonApiGateway {
       keychain: LocalKeychain;
       keychainExternalIdentifier: string;
     },
+    networkId: string,
   ): Promise<ConversationResource> {
     const body = {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
+      networkIds: [networkId],
       participantIds: [session.identity.id, peerIdentityId].sort(),
       type: 'one-to-one',
     };

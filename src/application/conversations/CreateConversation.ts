@@ -12,11 +12,16 @@ export class CreateConversation {
   public async execute(
     session: Session,
     peerIdentityId: string,
+    networkId: string,
   ): Promise<{
     conversation: ConversationResource;
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.createConversation(session, peerIdentityId);
+    return await this.gateway.createConversation(
+      session,
+      peerIdentityId,
+      networkId,
+    );
   }
 }
