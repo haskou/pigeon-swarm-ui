@@ -491,10 +491,18 @@ export function GlassWorkspace({
 
   const sendPendingMessage = async (payload: PendingSend) => {
     if (!activeConversation?.id) return;
-    const optimisticId = `pending:${activeConversation.id}:${Date.now()}:${crypto.randomUUID()}`;
+    const optimisticTimestamp = Date.now();
+    const optimisticId = `pending:${activeConversation.id}:${optimisticTimestamp}:${crypto.randomUUID()}`;
 
     setSendError(null);
     setAttachmentProgress(null);
+    setConversations((current) =>
+      bumpConversationActivity(
+        current,
+        activeConversation.id,
+        optimisticTimestamp,
+      ),
+    );
     setFailedSends((current) => {
       const next = { ...current };
 
@@ -517,7 +525,7 @@ export function GlassWorkspace({
         raw: { id: optimisticId, type: 'sent' },
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
-        timestamp: Date.now(),
+        timestamp: optimisticTimestamp,
       },
     ]);
     scrollMessagesToBottom('smooth');
@@ -543,6 +551,9 @@ export function GlassWorkspace({
           current.filter((message) => message.id !== optimisticId),
           [sent],
         ),
+      );
+      setConversations((current) =>
+        bumpConversationActivity(current, activeConversation.id, sent.timestamp),
       );
       setAttachmentProgress(null);
       scrollMessagesToBottom('smooth');

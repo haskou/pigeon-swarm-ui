@@ -8,7 +8,35 @@ export class ListConversations {
 
   public async execute(session: Session): Promise<ConversationResource[]> {
     return sortConversationsByLatestMessage(
-      await this.gateway.listConversations(session),
+      await this.withLatestMessageActivity(
+        session,
+        await this.gateway.listConversations(session),
+      ),
+    );
+  }
+
+  private async withLatestMessageActivity(
+    session: Session,
+    conversations: ConversationResource[],
+  ): Promise<ConversationResource[]> {
+    return await Promise.all(
+      conversations.map(async (conversation) => {
+        if (conversation.latestMessageAt) return conversation;
+
+        try {
+          const { messages } = await this.gateway.loadMessages(
+            session,
+            conversation.id,
+          );
+          const latestMessage = messages[messages.length - 1];
+
+          return latestMessage
+            ? { ...conversation, latestMessageAt: latestMessage.timestamp }
+            : conversation;
+        } catch {
+          return conversation;
+        }
+      }),
     );
   }
 }
