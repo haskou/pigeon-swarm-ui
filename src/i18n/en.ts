@@ -84,6 +84,7 @@ export const copy = {
     you: 'You',
   },
   communities: {
+    addChannelPlaceholder: 'Add channel',
     addMember: 'Add member',
     avatar: 'Community avatar',
     banner: 'Community banner',

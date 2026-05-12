@@ -851,7 +851,6 @@ export function CommunityWorkspace({
           community={community}
           onClose={() => setManageOpen(false)}
           onCommunityUpdated={onCommunityUpdated}
-          refreshCommunity={refreshCommunity}
           session={session}
         />
       )}
@@ -904,13 +903,11 @@ function ManageCommunityDialog({
   community,
   onClose,
   onCommunityUpdated,
-  refreshCommunity,
   session,
 }: {
   community: Community;
   onClose: () => void;
   onCommunityUpdated: (community: Community) => void;
-  refreshCommunity: () => Promise<void>;
   session: Session;
 }) {
   const [name, setName] = useState(community.name);
@@ -922,7 +919,9 @@ function ManageCommunityDialog({
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('');
-  const [renamingChannelId, setRenamingChannelId] = useState<string | null>(null);
+  const [channelOrder, setChannelOrder] = useState<CommunityTextChannel[]>(
+    community.textChannels,
+  );
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       community.textChannels.map((channel) => [channel.id, channel.name]),
@@ -999,13 +998,23 @@ function ManageCommunityDialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const saveProfile = async (): Promise<boolean> => {
+  const saveChanges = async (): Promise<boolean> => {
     if (state === 'loading') return false;
+
+    if (
+      channelOrder.some(
+        (channel) => !(channelDrafts[channel.id] ?? channel.name).trim(),
+      )
+    ) {
+      setError(copy.communities.channelError);
+
+      return false;
+    }
 
     setState('loading');
     setError(null);
     try {
-      const updated = await pigeonApplication.updateCommunity(
+      const updatedCommunity = await pigeonApplication.updateCommunity(
         session,
         community.id,
         {
@@ -1015,8 +1024,29 @@ function ManageCommunityDialog({
           name: name.trim(),
         },
       );
+      const updatedChannels: CommunityTextChannel[] = [];
 
-      onCommunityUpdated(updated);
+      for (const channel of channelOrder) {
+        const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
+
+        if (nextName === channel.name) {
+          updatedChannels.push(channel);
+        } else {
+          updatedChannels.push(
+            await pigeonApplication.renameCommunityChannel(
+              session,
+              community.id,
+              channel.id,
+              nextName,
+            ),
+          );
+        }
+      }
+
+      onCommunityUpdated({
+        ...updatedCommunity,
+        textChannels: updatedChannels,
+      });
       return true;
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.updateError));
@@ -1027,10 +1057,9 @@ function ManageCommunityDialog({
   };
 
   const finishManage = async () => {
-    const saved = await saveProfile();
+    const saved = await saveChanges();
 
     if (!saved) return;
-    await refreshCommunity();
     onClose();
   };
 
@@ -1049,9 +1078,10 @@ function ManageCommunityDialog({
       );
 
       setChannelName('');
+      setChannelOrder((current) => [...current, channel]);
       onCommunityUpdated({
         ...community,
-        textChannels: [...community.textChannels, channel],
+        textChannels: [...channelOrder, channel],
       });
       setChannelDrafts((current) => ({ ...current, [channel.id]: channel.name }));
     } catch (caught) {
@@ -1060,49 +1090,20 @@ function ManageCommunityDialog({
     setState('idle');
   };
 
-  const renameChannel = async (channel: CommunityTextChannel) => {
-    const nextName = channelDrafts[channel.id]?.trim();
-
-    if (!nextName || nextName === channel.name || state === 'loading') return;
-
-    setRenamingChannelId(channel.id);
-    setState('loading');
-    setError(null);
-    try {
-      const updated = await pigeonApplication.renameCommunityChannel(
-        session,
-        community.id,
-        channel.id,
-        nextName,
-      );
-
-      onCommunityUpdated({
-        ...community,
-        textChannels: community.textChannels.map((item) =>
-          item.id === updated.id ? updated : item,
-        ),
-      });
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.channelError));
-    }
-    setRenamingChannelId(null);
-    setState('idle');
-  };
-
   const moveChannel = (channelId: string, direction: -1 | 1) => {
-    const index = community.textChannels.findIndex(
+    const index = channelOrder.findIndex(
       (channel) => channel.id === channelId,
     );
     const nextIndex = index + direction;
 
-    if (index < 0 || nextIndex < 0 || nextIndex >= community.textChannels.length)
+    if (index < 0 || nextIndex < 0 || nextIndex >= channelOrder.length)
       return;
 
-    const nextChannels = [...community.textChannels];
+    const nextChannels = [...channelOrder];
     const [channel] = nextChannels.splice(index, 1);
 
     nextChannels.splice(nextIndex, 0, channel);
-    onCommunityUpdated({ ...community, textChannels: nextChannels });
+    setChannelOrder(nextChannels);
   };
 
   return createPortal(
@@ -1183,29 +1184,8 @@ function ManageCommunityDialog({
             <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
               {copy.communities.channels}
             </div>
-            <div className="flex gap-2">
-              <input
-                value={channelName}
-                onChange={(event) => setChannelName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  event.preventDefault();
-                  void createChannel();
-                }}
-                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                placeholder="general"
-              />
-              <button
-                type="button"
-                onClick={() => void createChannel()}
-                disabled={!channelName.trim() || state === 'loading'}
-                className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                +
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              {community.textChannels.map((channel, index) => (
+            <div className="space-y-2">
+              {channelOrder.map((channel, index) => (
                 <div
                   key={channel.id}
                   className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
@@ -1233,26 +1213,35 @@ function ManageCommunityDialog({
                   <button
                     type="button"
                     onClick={() => moveChannel(channel.id, 1)}
-                    disabled={index === community.textChannels.length - 1}
+                    disabled={index === channelOrder.length - 1}
                     className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
                     aria-label={copy.communities.moveChannelDown}
                   >
                     ↓
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void renameChannel(channel)}
-                    disabled={
-                      state === 'loading' ||
-                      renamingChannelId === channel.id ||
-                      !channelDrafts[channel.id]?.trim()
-                    }
-                    className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {copy.profile.save}
-                  </button>
                 </div>
               ))}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={channelName}
+                onChange={(event) => setChannelName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  void createChannel();
+                }}
+                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.communities.addChannelPlaceholder}
+              />
+              <button
+                type="button"
+                onClick={() => void createChannel()}
+                disabled={!channelName.trim() || state === 'loading'}
+                className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                +
+              </button>
             </div>
           </div>
           {error && (
@@ -1267,7 +1256,7 @@ function ManageCommunityDialog({
           disabled={!name.trim() || state === 'loading'}
           className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {copy.communities.done}
+          {copy.profile.save}
         </button>
       </section>
     </div>,
