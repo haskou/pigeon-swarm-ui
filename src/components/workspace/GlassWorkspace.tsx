@@ -1142,9 +1142,14 @@ export function GlassWorkspace({
                 ),
               )
             }
+            onLogout={() => setSession(null)}
             onMobileSidebarClose={() => setSidebarOpen(false)}
             onMobileMembersClose={() => setCommunityMembersOpen(false)}
             onOpenMobileSidebar={() => setSidebarOpen(true)}
+            onSessionUpdated={(nextSession) => {
+              setSession(nextSession);
+              rememberIdentity(nextSession.identity);
+            }}
             session={session}
           />
         ) : (

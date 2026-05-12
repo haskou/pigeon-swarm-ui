@@ -43,6 +43,7 @@ import {
   type MessageContextMenuState,
 } from '../workspace/MessageContextMenu';
 import { RawMessageDialog } from '../workspace/RawMessageDialog';
+import { UserProfileDropdown } from '../workspace/Sidebar';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -53,9 +54,11 @@ interface CommunityWorkspaceProps {
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
+  onLogout: () => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
+  onSessionUpdated: (session: Session) => void;
   session: Session;
 }
 
@@ -74,9 +77,11 @@ export function CommunityWorkspace({
   nodeNetworks,
   onChannelSelected,
   onCommunityUpdated,
+  onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenMobileSidebar,
+  onSessionUpdated,
   session,
 }: CommunityWorkspaceProps) {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
@@ -144,6 +149,13 @@ export function CommunityWorkspace({
       channel.name.toLowerCase().includes(query),
     );
   }, [channelSearch, community.textChannels]);
+  const ownIdentityPictures = useMemo(
+    () =>
+      memberPictures[session.identity.id]
+        ? { [session.identity.id]: memberPictures[session.identity.id] }
+        : {},
+    [memberPictures, session.identity.id],
+  );
   const channelData = useMemo(
     () => ({
       frontendDerived: {
@@ -592,6 +604,13 @@ export function CommunityWorkspace({
                 )}
               </div>
             </div>
+            <UserProfileDropdown
+              identityPictures={ownIdentityPictures}
+              nodeNetworks={nodeNetworks}
+              onLogout={onLogout}
+              onSessionUpdated={onSessionUpdated}
+              session={session}
+            />
           </div>
         </div>
       </aside>

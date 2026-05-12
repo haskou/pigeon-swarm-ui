@@ -72,26 +72,7 @@ export function Sidebar({
   onSessionUpdated,
   session,
 }: SidebarProps) {
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [identityCopied, setIdentityCopied] = useState(false);
-  const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
   const [conversationSearch, setConversationSearch] = useState('');
-  const profileRef = useRef<HTMLDivElement>(null);
-  const ownDisplayName = identityDisplayName(
-    session.identity.id,
-    identityNames,
-  );
-  const ownProfileName =
-    session.identity.profile.name.trim() ||
-    (session.identity.profile.handle?.trim()
-      ? `@${session.identity.profile.handle.trim()}`
-      : ownDisplayName);
-  const ownProfileHandle = session.identity.profile.handle?.trim()
-    ? `@${session.identity.profile.handle.trim()}`
-    : shortId(session.identity.id);
-  const ownPicture =
-    identityPictures[session.identity.id] ?? identityPicture(session.identity);
   const conversationPeerId = (conversation: ConversationResource) =>
     conversationPeerIdentityId(
       conversation,
@@ -163,35 +144,6 @@ export function Sidebar({
       return searchable.includes(query);
     });
   }, [conversationSearch, conversations, identityNames, identityProfiles]);
-
-  const copyIdentityId = async () => {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(session.identity.id);
-    }
-
-    setIdentityCopied(true);
-    window.setTimeout(() => setIdentityCopied(false), 1800);
-  };
-
-  const changeLanguage = (nextLanguage: string) => {
-    setLanguage(saveLanguage(nextLanguage));
-  };
-
-  useEffect(() => {
-    if (!profileOpen) return;
-
-    const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      if (!profileRef.current?.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', closeOnOutsidePointerDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
-    };
-  }, [profileOpen]);
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
@@ -282,111 +234,183 @@ export function Sidebar({
         </div>
       </div>
 
-      <div ref={profileRef} className="relative mt-4">
-        <button
-          type="button"
-          onClick={() => setProfileOpen((isOpen) => !isOpen)}
-          className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
-          aria-expanded={profileOpen}
+      <UserProfileDropdown
+        identityNames={identityNames}
+        identityPictures={identityPictures}
+        nodeNetworks={nodeNetworks}
+        onLogout={onLogout}
+        onSessionUpdated={onSessionUpdated}
+        session={session}
+      />
+    </aside>
+  );
+}
+
+export function UserProfileDropdown({
+  identityNames = {},
+  identityPictures = {},
+  nodeNetworks,
+  onLogout,
+  onSessionUpdated,
+  session,
+}: {
+  identityNames?: IdentityNames;
+  identityPictures?: IdentityPictures;
+  nodeNetworks: NodeNetwork[];
+  onLogout: () => void;
+  onSessionUpdated: (session: Session) => void;
+  session: Session;
+}) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [identityCopied, setIdentityCopied] = useState(false);
+  const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const ownDisplayName = identityDisplayName(
+    session.identity.id,
+    identityNames,
+  );
+  const ownProfileName =
+    session.identity.profile.name.trim() ||
+    (session.identity.profile.handle?.trim()
+      ? `@${session.identity.profile.handle.trim()}`
+      : ownDisplayName);
+  const ownProfileHandle = session.identity.profile.handle?.trim()
+    ? `@${session.identity.profile.handle.trim()}`
+    : shortId(session.identity.id);
+  const ownPicture =
+    identityPictures[session.identity.id] ?? identityPicture(session.identity);
+
+  const copyIdentityId = async () => {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(session.identity.id);
+    }
+
+    setIdentityCopied(true);
+    window.setTimeout(() => setIdentityCopied(false), 1800);
+  };
+
+  const changeLanguage = (nextLanguage: string) => {
+    setLanguage(saveLanguage(nextLanguage));
+  };
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
+    };
+  }, [profileOpen]);
+
+  return (
+    <div ref={profileRef} className="relative mt-4">
+      <button
+        type="button"
+        onClick={() => setProfileOpen((isOpen) => !isOpen)}
+        className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        aria-expanded={profileOpen}
+      >
+        <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-black">{ownProfileName}</div>
+          <div className="truncate text-xs text-white/50">
+            {ownProfileHandle}
+          </div>
+        </div>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className={cx(
+            'h-5 w-5 shrink-0 text-white/45 transition-transform',
+            profileOpen && 'rotate-180',
+          )}
         >
-          <ProfileAvatar
-            label={ownDisplayName}
-            picture={ownPicture}
-            size="lg"
+          <path
+            d="M5 8l5 5 5-5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.8"
           />
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-black">{ownProfileName}</div>
-            <div className="truncate text-xs text-white/50">
-              {ownProfileHandle}
+        </svg>
+      </button>
+
+      {profileOpen && (
+        <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+            <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
+            <div className="min-w-0">
+              <div className="truncate font-black">{ownProfileName}</div>
+              <div className="truncate text-xs text-white/45">
+                {ownProfileHandle}
+              </div>
             </div>
           </div>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            className={cx(
-              'h-5 w-5 shrink-0 text-white/45 transition-transform',
-              profileOpen && 'rotate-180',
-            )}
+
+          <div className="mt-3 space-y-3 text-xs">
+            <div className="text-xs text-white/45">
+              {session.identity.profile.biography?.trim() || ''}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-3 text-xs">
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.profile.identityId}
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
+                <span className="min-w-0 flex-1 truncate text-white/70">
+                  {session.identity.id}
+                </span>
+                <button
+                  type="button"
+                  onClick={copyIdentityId}
+                  className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                >
+                  {identityCopied ? copy.profile.copied : copy.profile.copy}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.profile.language}
+              </div>
+              <GlassSelect
+                ariaLabel={copy.profile.language}
+                onChange={changeLanguage}
+                options={languageOptions}
+                value={language}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setProfileEditorOpen(true)}
+            className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
           >
-            <path
-              d="M5 8l5 5 5-5"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-        </button>
+            {copy.profile.edit}
+          </button>
 
-        {profileOpen && (
-          <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-              <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
-              <div className="min-w-0">
-                <div className="truncate font-black">{ownProfileName}</div>
-                <div className="truncate text-xs text-white/45">
-                  {ownProfileHandle}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-3 text-xs">
-              <div className="text-xs text-white/45">
-                {session.identity.profile.biography?.trim() || ''}
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-3 text-xs">
-              <div>
-                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.profile.identityId}
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
-                  <span className="min-w-0 flex-1 truncate text-white/70">
-                    {session.identity.id}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyIdentityId}
-                    className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
-                  >
-                    {identityCopied ? copy.profile.copied : copy.profile.copy}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.profile.language}
-                </div>
-                <GlassSelect
-                  ariaLabel={copy.profile.language}
-                  onChange={changeLanguage}
-                  options={languageOptions}
-                  value={language}
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setProfileEditorOpen(true)}
-              className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              {copy.profile.edit}
-            </button>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
-            >
-              {copy.profile.logout}
-            </button>
-          </div>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
+          >
+            {copy.profile.logout}
+          </button>
+        </div>
+      )}
 
       {profileEditorOpen && (
         <ProfileEditor
@@ -400,7 +424,7 @@ export function Sidebar({
           }}
         />
       )}
-    </aside>
+    </div>
   );
 }
 
