@@ -424,13 +424,15 @@ export function ChatColumn({
                     {copy.chat.emptyMessages}
                   </div>
                 ) : (
-                  <div className="rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                    <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                      <LockIcon locked={false} />
-                    </div>
-                    <div className="font-black">{copy.chat.e2eMissing}</div>
-                    <div className="mt-2 text-rose-100/65">
-                      {copy.messages.missingConversationKey}
+                  <div className="grid min-h-[42vh] place-items-center">
+                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                        <LockIcon locked={false} />
+                      </div>
+                      <div className="font-black">{copy.chat.e2eMissing}</div>
+                      <div className="mt-2 text-rose-100/65">
+                        {copy.messages.missingConversationKey}
+                      </div>
                     </div>
                   </div>
                 )
