@@ -89,6 +89,7 @@ export const copy = {
     decryptingAttachment: 'Decrypting',
     dropFiles: 'Drop files to attach',
     encryptingAttachment: 'Encrypting',
+    insertEmoji: 'Insert emoji',
     placeholder: 'Write, encrypt, sign, and push to the swarm...',
     removeAttachment: 'Remove attachment',
     send: 'Send',

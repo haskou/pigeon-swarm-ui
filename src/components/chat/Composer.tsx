@@ -1,8 +1,11 @@
 import {
+  ClipboardEvent,
   ChangeEvent,
   FormEvent,
+  KeyboardEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -13,6 +16,12 @@ import type { AttachmentProgress, ChatMessage } from '../../domain/types';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
+import {
+  EmojiSuggestion,
+  findEmojiTrigger,
+  replaceEmojiTrigger,
+  searchEmojiSuggestions,
+} from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -50,6 +59,7 @@ export function Composer({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [draggingFiles, setDraggingFiles] = useState(false);
+  const [caretIndex, setCaretIndex] = useState(0);
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +70,15 @@ export function Composer({
     content.trim().length <= MESSAGE_MAX_LENGTH &&
     !disabled &&
     !sending;
+  const emojiTrigger = useMemo(
+    () => findEmojiTrigger(content, caretIndex),
+    [caretIndex, content],
+  );
+  const emojiSuggestions = useMemo(
+    () =>
+      emojiTrigger ? searchEmojiSuggestions(emojiTrigger.query) : [],
+    [emojiTrigger],
+  );
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -98,6 +117,35 @@ export function Composer({
       })),
     ]);
   }, []);
+
+  const syncCaret = () => {
+    setCaretIndex(textInputRef.current?.selectionStart ?? content.length);
+  };
+
+  const insertEmoji = useCallback(
+    (suggestion: EmojiSuggestion) => {
+      if (!emojiTrigger) return;
+
+      const next = replaceEmojiTrigger(
+        content,
+        emojiTrigger,
+        suggestion.emoji,
+      );
+
+      if (next.value.length > MESSAGE_MAX_LENGTH) return;
+
+      setContent(next.value);
+      setCaretIndex(next.nextCaretIndex);
+      requestAnimationFrame(() => {
+        textInputRef.current?.focus();
+        textInputRef.current?.setSelectionRange(
+          next.nextCaretIndex,
+          next.nextCaretIndex,
+        );
+      });
+    },
+    [content, emojiTrigger],
+  );
 
   useEffect(() => {
     if (!canAttach) {
@@ -182,6 +230,32 @@ export function Composer({
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
     addFiles(Array.from(event.target.files ?? []));
     event.target.value = '';
+  };
+
+  const handleContentChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setContent(event.target.value);
+    setCaretIndex(event.target.selectionStart ?? event.target.value.length);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Tab' || emojiSuggestions.length === 0) return;
+
+    event.preventDefault();
+    insertEmoji(emojiSuggestions[0]);
+  };
+
+  const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    if (!canAttach) return;
+
+    const imageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item, index) => clipboardFile(item.getAsFile(), item.type, index))
+      .filter((file): file is File => !!file);
+
+    if (imageFiles.length === 0) return;
+
+    event.preventDefault();
+    addFiles(imageFiles);
   };
 
   const removeAttachment = (indexToRemove: number) => {
@@ -302,10 +376,16 @@ export function Composer({
         )}
         <div
           className={cx(
-            'flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2 transition',
+            'relative flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2 transition',
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
+          {emojiSuggestions.length > 0 && (
+            <EmojiSuggestionPanel
+              onSelect={insertEmoji}
+              suggestions={emojiSuggestions}
+            />
+          )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -325,7 +405,12 @@ export function Composer({
           <input
             ref={textInputRef}
             value={content}
-            onChange={(event) => setContent(event.target.value)}
+            onChange={handleContentChange}
+            onClick={syncCaret}
+            onKeyDown={handleKeyDown}
+            onKeyUp={syncCaret}
+            onPaste={handlePaste}
+            onSelect={syncCaret}
             disabled={disabled || sending}
             maxLength={MESSAGE_MAX_LENGTH}
             className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
@@ -481,6 +566,37 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
   );
 }
 
+function EmojiSuggestionPanel({
+  onSelect,
+  suggestions,
+}: {
+  onSelect: (suggestion: EmojiSuggestion) => void;
+  suggestions: EmojiSuggestion[];
+}) {
+  return (
+    <div className="absolute bottom-full left-12 z-30 mb-2 flex max-w-[min(22rem,calc(100vw-3rem))] gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 shadow-2xl shadow-black/40">
+      {suggestions.map((suggestion) => (
+        <button
+          key={suggestion.shortcode}
+          type="button"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            onSelect(suggestion);
+          }}
+          className="flex min-w-12 items-center gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"
+          aria-label={`${copy.composer.insertEmoji} :${suggestion.shortcode}:`}
+          title={`:${suggestion.shortcode}:`}
+        >
+          <span className="text-2xl leading-none">{suggestion.emoji}</span>
+          <span className="hidden max-w-24 truncate text-xs font-black text-white/65 sm:block">
+            :{suggestion.shortcode}:
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
 
@@ -489,4 +605,25 @@ function formatFileSize(bytes: number): string {
   if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
 
   return `${(kilobytes / 1024).toFixed(1)} MB`;
+}
+
+function clipboardFile(
+  file: File | null,
+  contentType: string,
+  index: number,
+): File | null {
+  if (!file) return null;
+  if (file.name) return file;
+
+  return new File([file], `clipboard-image-${index + 1}.${imageExtension(contentType)}`, {
+    type: contentType,
+  });
+}
+
+function imageExtension(contentType: string): string {
+  if (contentType === 'image/jpeg') return 'jpg';
+  if (contentType === 'image/gif') return 'gif';
+  if (contentType === 'image/webp') return 'webp';
+
+  return 'png';
 }
