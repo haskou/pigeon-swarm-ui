@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type {
   ChatMessage,
@@ -13,6 +21,10 @@ import type { Peer } from '../../application/peers/ListPeers';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
+import {
+  bumpConversationActivity,
+  sortConversationsByLatestMessage,
+} from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
@@ -63,7 +75,7 @@ interface GlassWorkspaceProps {
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
   peers: Peer[];
-  setConversations: (conversations: ConversationResource[]) => void;
+  setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
 
 export function GlassWorkspace({
@@ -469,10 +481,12 @@ export function GlassWorkspace({
     conversation: ConversationResource,
   ) => {
     setSession(nextSession);
-    setConversations([
-      conversation,
-      ...conversations.filter((item) => item.id !== conversation.id),
-    ]);
+    setConversations(
+      sortConversationsByLatestMessage([
+        conversation,
+        ...conversations.filter((item) => item.id !== conversation.id),
+      ]),
+    );
     setActiveConversationId(conversation.id);
     setIsCreateOpen(false);
     setSidebarOpen(false);
@@ -575,6 +589,10 @@ export function GlassWorkspace({
 
         if (!messageId || !conversationId) return;
 
+        setConversations((current) =>
+          bumpConversationActivity(current, conversationId, event.occurred_on),
+        );
+
         if (!isActiveConversation && authorId !== session.identity.id) {
           markUnreadMessage(conversationId, messageId);
         }
@@ -621,6 +639,7 @@ export function GlassWorkspace({
       refreshNotifications,
       refreshSession,
       session,
+      setConversations,
       setSession,
     ],
   );

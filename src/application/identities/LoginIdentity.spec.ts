@@ -4,9 +4,12 @@ import type { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApi
 import { LoginIdentity } from './LoginIdentity';
 
 describe(LoginIdentity.name, () => {
-  it('delegates login to the pigeon API gateway', async () => {
+  it('delegates login and orders conversations by latest message', async () => {
     const expected = {
-      conversations: [],
+      conversations: [
+        { id: 'old', latestMessageAt: 1, networkId: 'net' },
+        { id: 'new', latestMessageAt: 2, networkId: 'net' },
+      ],
       session: { password: 'secret' },
     } as unknown as LoginResult;
     const gateway = {
@@ -14,9 +17,13 @@ describe(LoginIdentity.name, () => {
     } as unknown as PigeonApiGateway;
     const useCase = new LoginIdentity(gateway);
 
-    await expect(useCase.execute('identity-1', 'secret')).resolves.toBe(
-      expected,
-    );
+    await expect(useCase.execute('identity-1', 'secret')).resolves.toEqual({
+      ...expected,
+      conversations: [
+        { id: 'new', latestMessageAt: 2, networkId: 'net' },
+        { id: 'old', latestMessageAt: 1, networkId: 'net' },
+      ],
+    });
     expect(gateway.login).toHaveBeenCalledWith('identity-1', 'secret');
   });
 });
