@@ -304,9 +304,19 @@ export const copy = {
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
     name: 'Profile name',
+    newPasswordConfirm: 'Repeat new password',
     newPassword: 'New password',
     newPasswordHelp:
-      'Leave it empty to keep your current password. Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+      'Leave both fields empty to keep your current password.',
+    passwordRequirements: {
+      lowercase: 'Lowercase',
+      maxLength: '256 characters or fewer',
+      minLength: 'At least 12 characters',
+      number: 'Number',
+      symbol: 'Symbol',
+      uppercase: 'Uppercase',
+      match: 'Passwords match',
+    },
     networks: 'Networks',
     noBiography: 'No bio',
     noNetworks: 'No networks',

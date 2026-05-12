@@ -9,16 +9,36 @@ export function isValidHandle(value: string): boolean {
 }
 
 export function passwordValidationError(value: string): string | null {
-  if (value.length < 12) return 'too-short';
-  if (value.length > 256) return 'too-long';
-  if (!/[A-Z]/.test(value)) return 'missing-uppercase';
-  if (!/[a-z]/.test(value)) return 'missing-lowercase';
-  if (!/[0-9]/.test(value)) return 'missing-number';
-  if (!/[^A-Za-z0-9]/.test(value)) return 'missing-symbol';
+  const checks = passwordValidationChecks(value);
+
+  if (!checks.minLength) return 'too-short';
+  if (!checks.maxLength) return 'too-long';
+  if (!checks.uppercase) return 'missing-uppercase';
+  if (!checks.lowercase) return 'missing-lowercase';
+  if (!checks.number) return 'missing-number';
+  if (!checks.symbol) return 'missing-symbol';
 
   return null;
 }
 
 export function isValidPassword(value: string): boolean {
   return passwordValidationError(value) === null;
+}
+
+export function passwordValidationChecks(value: string): {
+  lowercase: boolean;
+  maxLength: boolean;
+  minLength: boolean;
+  number: boolean;
+  symbol: boolean;
+  uppercase: boolean;
+} {
+  return {
+    lowercase: /[a-z]/.test(value),
+    maxLength: value.length <= 256,
+    minLength: value.length >= 12,
+    number: /[0-9]/.test(value),
+    symbol: /[^A-Za-z0-9]/.test(value),
+    uppercase: /[A-Z]/.test(value),
+  };
 }
