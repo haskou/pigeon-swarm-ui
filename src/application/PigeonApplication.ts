@@ -1,7 +1,7 @@
 import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
-  ChatMessage,
   AttachmentProgress,
+  ChatMessage,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
@@ -15,6 +15,10 @@ import type {
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
+import {
+  RealtimeGateway,
+  type RealtimeMessage,
+} from '../infrastructure/realtime/RealtimeGateway';
 import { CreateConversation } from './conversations/CreateConversation';
 import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
@@ -37,6 +41,8 @@ import { ListPeers, type Peer } from './peers/ListPeers';
 
 export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
+
+  private readonly realtime: RealtimeGateway;
 
   private readonly acceptConversationInvitationUseCase: AcceptInvitation;
 
@@ -66,8 +72,12 @@ export class PigeonApplication {
 
   private readonly updateNotificationUseCase: UpdateNotification;
 
-  public constructor(gateway: PigeonApiGateway = new PigeonApiGateway()) {
+  public constructor(
+    gateway: PigeonApiGateway = new PigeonApiGateway(),
+    realtime: RealtimeGateway = new RealtimeGateway(),
+  ) {
     this.gateway = gateway;
+    this.realtime = realtime;
     this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
@@ -100,6 +110,13 @@ export class PigeonApplication {
 
   public async claimNode(session: Session): Promise<void> {
     await this.gateway.claimNode(session);
+  }
+
+  public async connectRealtime(
+    session: Session,
+    onMessage: (message: RealtimeMessage) => void,
+  ): Promise<WebSocket> {
+    return await this.realtime.connect(session, onMessage);
   }
 
   public async createConversation(

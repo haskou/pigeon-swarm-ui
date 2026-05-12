@@ -16,6 +16,7 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
+import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
@@ -85,6 +86,7 @@ interface GlassWorkspaceProps {
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
   onNodeNetworksReload: () => Promise<void>;
+  onPeersReload: () => Promise<void>;
   peers: Peer[];
   setConversations: (conversations: ConversationResource[]) => void;
 }
@@ -94,6 +96,7 @@ export function GlassWorkspace({
   node,
   nodeNetworks,
   onNodeNetworksReload,
+  onPeersReload,
   peers,
   session,
   setConversations,
@@ -295,6 +298,16 @@ export function GlassWorkspace({
     setConversations(next);
   }, [session, setConversations]);
 
+  const refreshSession = useCallback(async () => {
+    const result = await pigeonApplication.login(
+      session.identity.id,
+      session.password,
+    );
+
+    setSession(result.session);
+    setConversations(result.conversations);
+  }, [session.identity.id, session.password, setConversations, setSession]);
+
   const refreshNotifications = useCallback(async () => {
     setNotificationAction('refresh');
     setNotificationError(null);
@@ -445,7 +458,6 @@ export function GlassWorkspace({
       queueMicrotask(() =>
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
       );
-      void refreshConversations().catch(() => undefined);
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
       setAttachmentProgress(null);
@@ -628,16 +640,91 @@ export function GlassWorkspace({
     );
   };
 
+  const refreshRealtimeViews = useCallback(() => {
+    void refreshNotifications();
+    void refreshConversations().catch(() => undefined);
+    void onPeersReload().catch(() => undefined);
+
+    if (activeConversation?.id && activeConversationKeyId) {
+      void loadActiveMessages(activeConversation.id);
+    }
+  }, [
+    activeConversation?.id,
+    activeConversationKeyId,
+    loadActiveMessages,
+    onPeersReload,
+    refreshConversations,
+    refreshNotifications,
+  ]);
+
+  const handleRealtimeEvent = useCallback(
+    (event: { aggregate_id: string; type: string }) => {
+      if (event.type.startsWith('nodes.')) {
+        void onPeersReload().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('notifications.')) {
+        void refreshNotifications();
+        return;
+      }
+
+      if (event.type.startsWith('keychains.')) {
+        void refreshSession().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('identities.')) {
+        if (event.aggregate_id === session.identity.id) {
+          void pigeonApplication
+            .getIdentity(session.identity.id)
+            .then((identity) => setSession({ ...session, identity }))
+            .catch(() => undefined);
+        }
+        return;
+      }
+
+      if (event.type.startsWith('conversations.v1.conversation.')) {
+        void refreshConversations().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('conversations.v1.message.')) {
+        void refreshConversations().catch(() => undefined);
+
+        if (
+          event.aggregate_id === activeConversation?.id &&
+          activeConversationKeyId
+        ) {
+          void loadActiveMessages(event.aggregate_id);
+        }
+      }
+    },
+    [
+      activeConversation?.id,
+      activeConversationKeyId,
+      loadActiveMessages,
+      onPeersReload,
+      refreshConversations,
+      refreshNotifications,
+      refreshSession,
+      session,
+      setSession,
+    ],
+  );
+
+  useRealtimeEvents(session, {
+    onConnected: refreshRealtimeViews,
+    onDomainEvent: handleRealtimeEvent,
+  });
+
   return (
     <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           notificationCount={pendingNotificationCount}
-          onNotificationsClick={() => {
-            setNotificationsOpen(true);
-            void refreshNotifications();
-          }}
+          onNotificationsClick={() => setNotificationsOpen(true)}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
         />
@@ -652,10 +739,7 @@ export function GlassWorkspace({
             <Rail
               className="lg:hidden"
               notificationCount={pendingNotificationCount}
-              onNotificationsClick={() => {
-                setNotificationsOpen(true);
-                void refreshNotifications();
-              }}
+              onNotificationsClick={() => setNotificationsOpen(true)}
               onSettingsClick={() => setNodeSettingsOpen(true)}
               onInspectorClick={() => setInspectorOpen(true)}
               peerCount={peers.length}
@@ -838,7 +922,6 @@ export function GlassWorkspace({
           onDecline={(notificationId) =>
             void handleDeclineNotification(notificationId)
           }
-          onRefresh={() => void refreshNotifications()}
         />
       )}
 

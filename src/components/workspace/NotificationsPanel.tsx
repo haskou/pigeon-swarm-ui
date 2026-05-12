@@ -19,7 +19,6 @@ interface NotificationsPanelProps {
   onArchive: (notificationId: string) => void;
   onClose: () => void;
   onDecline: (notificationId: string) => void;
-  onRefresh: () => void;
 }
 
 export function NotificationsPanel({
@@ -31,7 +30,6 @@ export function NotificationsPanel({
   onArchive,
   onClose,
   onDecline,
-  onRefresh,
 }: NotificationsPanelProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:pointer-events-none lg:bg-transparent lg:backdrop-blur-none">
@@ -45,38 +43,14 @@ export function NotificationsPanel({
               {copy.notifications.title}
             </h2>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={action === 'refresh'}
-              className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 disabled:opacity-50"
-              aria-label={copy.notifications.refresh}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                className={cx('h-5 w-5', action === 'refresh' && 'animate-spin')}
-              >
-                <path
-                  d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6M16.5 4.5v4h-4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-              aria-label={copy.notifications.close}
-            >
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.notifications.close}
+          >
+            ×
+          </button>
         </div>
 
         {error && (

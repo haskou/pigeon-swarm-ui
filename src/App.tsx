@@ -110,6 +110,7 @@ function App() {
           node={nodeNetworks.node}
           nodeNetworks={nodeNetworks.networks}
           onNodeNetworksReload={nodeNetworks.reload}
+          onPeersReload={peers.reload}
           peers={peers.peers}
           setSession={(nextSession) => {
             if (!nextSession) clearSavedCredentials();
