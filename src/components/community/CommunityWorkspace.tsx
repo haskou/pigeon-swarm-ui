@@ -916,8 +916,8 @@ function ManageCommunityDialog({
         session,
         community.id,
         {
-          ...(avatar ? { avatar } : {}),
-          ...(banner ? { banner } : {}),
+          avatar: avatar ?? community.avatar,
+          banner: banner ?? community.banner,
           description: description.trim(),
           name: name.trim(),
         },

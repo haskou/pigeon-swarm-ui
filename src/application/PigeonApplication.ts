@@ -209,18 +209,23 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     input: {
-      avatar?: File | null;
-      banner?: File | null;
+      avatar?: File | null | string;
+      banner?: File | null | string;
       description?: string;
       name?: string;
     },
   ): Promise<Community> {
-    const avatarCid = input.avatar
-      ? (await this.uploadPublicFile(session, input.avatar)).cid
-      : undefined;
-    const bannerCid = input.banner
-      ? (await this.uploadPublicFile(session, input.banner)).cid
-      : undefined;
+    const resolvePublicImageCid = async (
+      value: File | null | string | undefined,
+    ): Promise<string | undefined> => {
+      if (!value) return undefined;
+
+      if (typeof value === 'string') return value;
+
+      return (await this.uploadPublicFile(session, value)).cid;
+    };
+    const avatarCid = await resolvePublicImageCid(input.avatar);
+    const bannerCid = await resolvePublicImageCid(input.banner);
 
     return await this.gateway.updateCommunity(session, communityId, {
       ...(avatarCid ? { avatar: avatarCid } : {}),
