@@ -92,7 +92,9 @@ export class RealtimeGateway {
   }
 
   private debug(event: string, data: unknown): void {
-    if (localStorage.getItem(debugRealtimeStorageKey) !== '1') return;
+    if (globalThis.localStorage?.getItem(debugRealtimeStorageKey) !== '1') {
+      return;
+    }
 
     console.debug(`[pigeon:realtime:${event}]`, data);
   }

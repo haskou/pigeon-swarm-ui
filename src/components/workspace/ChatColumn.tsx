@@ -1,6 +1,6 @@
+import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -97,8 +97,7 @@ export function ChatColumn({
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
   >(null);
-  const [encryptedConversationKey, setEncryptedConversationKey] =
-    useState('');
+  const [encryptedConversationKey, setEncryptedConversationKey] = useState('');
   const [conversationKeyInput, setConversationKeyInput] = useState('');
   const [conversationKeyError, setConversationKeyError] = useState<
     string | null
@@ -160,6 +159,7 @@ export function ChatColumn({
     if (!activeConversation || !conversationKey || !peerIdentity) {
       setConversationKeyError(copy.chat.copyPrivateKeyUnavailable);
       setConversationKeyDialog('copy');
+
       return;
     }
 
@@ -169,7 +169,9 @@ export function ChatColumn({
         conversationId: activeConversation.id,
         peerIdentityId: session.identity.id,
       };
-      const encrypted = PublicKey.fromPEM(peerIdentity.encryptedKeyPair.publicKey)
+      const encrypted = PublicKey.fromPEM(
+        peerIdentity.encryptedKeyPair.publicKey,
+      )
         .encrypt(JSON.stringify(recipientKeyEntry))
         .toString();
 
@@ -187,6 +189,7 @@ export function ChatColumn({
 
     if (!encryptedPayload) {
       setConversationKeyError(copy.chat.addPrivateKeyRequired);
+
       return;
     }
 
@@ -204,6 +207,7 @@ export function ChatColumn({
       if (parsed.conversationId !== activeConversation.id) {
         throw new Error('Conversation key belongs to another conversation.');
       }
+
       if (!parsed.privateKey) {
         throw new Error('Conversation key payload is missing the private key.');
       }
@@ -461,7 +465,7 @@ export function ChatColumn({
                 {copy.chat.loadingEvents}
               </div>
             )}
-            <div className="space-y-4">
+            <div className="space-y-2">
               {hasReachedMessageStart &&
                 messages.length > 0 &&
                 messageState !== 'loading' && (
@@ -530,8 +534,9 @@ export function ChatColumn({
                   />
                 );
               })}
-              {messages.length === 0 && messageState !== 'loading' && (
-                hasConversationKey ? (
+              {messages.length === 0 &&
+                messageState !== 'loading' &&
+                (hasConversationKey ? (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                     {copy.chat.emptyMessages}
                   </div>
@@ -547,8 +552,7 @@ export function ChatColumn({
                       </div>
                     </div>
                   </div>
-                )
-              )}
+                ))}
               <div ref={bottomRef} />
             </div>
           </div>
