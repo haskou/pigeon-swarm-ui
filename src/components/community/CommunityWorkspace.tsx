@@ -37,6 +37,11 @@ import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { LockIcon } from '../workspace/LockIcon';
+import {
+  MessageContextMenu,
+  type MessageContextMenuState,
+} from '../workspace/MessageContextMenu';
+import { RawMessageDialog } from '../workspace/RawMessageDialog';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -97,7 +102,10 @@ export function CommunityWorkspace({
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
+  const [messageContextMenu, setMessageContextMenu] =
+    useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
+  const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const owner = community.ownerIdentityId === session.identity.id;
@@ -677,7 +685,9 @@ export function CommunityWorkspace({
                       }
                       onAttachmentPreview={loadAttachmentPreview}
                       onAvatarClick={() => undefined}
-                      onMessageMenuOpen={() => undefined}
+                      onMessageMenuOpen={(targetMessage, x, y) =>
+                        setMessageContextMenu({ message: targetMessage, x, y })
+                      }
                       onReplyReferenceClick={() => undefined}
                       showAvatar={showAvatar}
                     />
@@ -801,6 +811,22 @@ export function CommunityWorkspace({
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
           picture={profileViewer.pictureUrl}
+        />
+      )}
+      {messageContextMenu && (
+        <MessageContextMenu
+          menu={messageContextMenu}
+          onClose={() => setMessageContextMenu(null)}
+          onViewRaw={() => {
+            setRawMessage(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
+        />
+      )}
+      {rawMessage && (
+        <RawMessageDialog
+          message={rawMessage}
+          onClose={() => setRawMessage(null)}
         />
       )}
     </>

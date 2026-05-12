@@ -18,7 +18,7 @@ export function MessageContextMenu({
   menu: MessageContextMenuState;
   onClose: () => void;
   onDelete?: () => void;
-  onReply: () => void;
+  onReply?: () => void;
   onViewRaw: () => void;
 }) {
   return (
@@ -33,13 +33,15 @@ export function MessageContextMenu({
         className="fixed z-[90] min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
         style={{ left: menu.x, top: menu.y }}
       >
-        <button
-          type="button"
-          onClick={onReply}
-          className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-        >
-          {copy.messages.reply}
-        </button>
+        {onReply ? (
+          <button
+            type="button"
+            onClick={onReply}
+            className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {copy.messages.reply}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onViewRaw}
