@@ -17,7 +17,7 @@ export function MessageContextMenu({
 }: {
   menu: MessageContextMenuState;
   onClose: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onReply: () => void;
   onViewRaw: () => void;
 }) {
@@ -47,13 +47,15 @@ export function MessageContextMenu({
         >
           {copy.messages.viewRaw}
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15"
-        >
-          {copy.messages.delete}
-        </button>
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15"
+          >
+            {copy.messages.delete}
+          </button>
+        ) : null}
       </div>
     </>
   );

@@ -995,7 +995,11 @@ export function GlassWorkspace({
         <MessageContextMenu
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
-          onDelete={() => void handleDeleteMessage(messageContextMenu.message)}
+          onDelete={
+            messageContextMenu.message.authorIdentityId === session.identity.id
+              ? () => void handleDeleteMessage(messageContextMenu.message)
+              : undefined
+          }
           onReply={() => {
             setReplyTarget(messageContextMenu.message);
             setMessageContextMenu(null);
