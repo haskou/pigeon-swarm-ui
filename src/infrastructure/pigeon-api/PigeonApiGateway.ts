@@ -349,7 +349,10 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
     options: { beforeMessageId?: string; limit?: number } = {},
-  ): Promise<MessageResource[]> {
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
     const query = new URLSearchParams({
       limit: String(options.limit ?? 50),
     });
@@ -362,13 +365,19 @@ export class PigeonApiGateway {
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/messages?${query.toString()}`;
     const result = await this.http.request<
-      MessageResource[] | { messages?: MessageResource[] }
+      | MessageResource[]
+      | { messages?: MessageResource[]; nextBeforeMessageId?: null | string }
     >(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
 
-    return Array.isArray(result) ? result : (result.messages ?? []);
+    return Array.isArray(result)
+      ? { messages: result, nextBeforeMessageId: null }
+      : {
+          messages: result.messages ?? [],
+          nextBeforeMessageId: result.nextBeforeMessageId ?? null,
+        };
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
@@ -994,7 +1003,7 @@ export class PigeonApiGateway {
     return { ...published, notification: updated };
   }
 
-  private async publishMessageAttachments(
+  public async publishMessageAttachments(
     session: Session,
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,

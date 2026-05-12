@@ -302,12 +302,27 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
     options: { beforeMessageId?: string; limit?: number } = {},
-  ): Promise<MessageResource[]> {
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
     return await this.gateway.listCommunityChannelMessages(
       session,
       communityId,
       channelId,
       options,
+    );
+  }
+
+  public async publishMessageAttachments(
+    session: Session,
+    attachments: File[],
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<MessageAttachment[]> {
+    return await this.gateway.publishMessageAttachments(
+      session,
+      attachments,
+      onProgress,
     );
   }
 

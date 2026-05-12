@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   Community,
   CommunityTextChannel,
+  AttachmentProgress,
+  ChatMessage,
   IdentityResource,
+  MessageAttachment,
+  MessageResource,
   Session,
 } from '../../domain/types';
 
@@ -20,7 +25,9 @@ import {
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
+import { Composer } from '../chat/Composer';
 import { ImageLightbox } from '../chat/ImageLightbox';
+import { MessageBubble } from '../chat/MessageBubble';
 
 interface CommunityWorkspaceProps {
   community: Community;
@@ -50,6 +57,15 @@ export function CommunityWorkspace({
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
     community.textChannels[0]?.id ?? null,
   );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageCursor, setMessageCursor] = useState<null | string>(null);
+  const [messageState, setMessageState] = useState<
+    'error' | 'idle' | 'loading'
+  >('idle');
+  const [draft, setDraft] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
   const [memberIdentities, setMemberIdentities] = useState<
     Record<string, IdentityResource>
   >({});
@@ -61,6 +77,8 @@ export function CommunityWorkspace({
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -160,6 +178,239 @@ export function CommunityWorkspace({
   const refreshCommunity = async () => {
     onCommunityUpdated(await pigeonApplication.getCommunity(session, community.id));
   };
+
+  const resolveMemberIdentities = useCallback(async () => {
+    const entries = await Promise.all(
+      community.memberIds.map(async (identityId) => {
+        const cached =
+          identityId === session.identity.id
+            ? session.identity
+            : memberIdentities[identityId];
+
+        if (cached) return [identityId, cached] as const;
+
+        try {
+          return [identityId, await pigeonApplication.getIdentity(identityId)] as const;
+        } catch {
+          return [identityId, undefined] as const;
+        }
+      }),
+    );
+    const nextIdentities: Record<string, IdentityResource> = {};
+
+    for (const [identityId, identity] of entries) {
+      if (identity) nextIdentities[identityId] = identity;
+    }
+
+    return nextIdentities;
+  }, [community.memberIds, memberIdentities, session.identity]);
+
+  const projectChannelMessage = useCallback(
+    async (
+      rawMessage: MessageResource,
+      identities: Record<string, IdentityResource>,
+    ): Promise<ChatMessage> => {
+      const base = {
+        attachments: [],
+        authorIdentityId: rawMessage.authorIdentityId ?? 'unknown',
+        id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
+        mine: rawMessage.authorIdentityId === session.identity.id,
+        raw: rawMessage,
+        timestamp: rawMessage.createdAt ?? Date.now(),
+      };
+
+      try {
+        const payload = await decryptCommunityChannelPayload(
+          session,
+          rawMessage.encryptedPayload ?? '',
+        );
+
+        return {
+          ...base,
+          attachments: payload.attachments ?? [],
+          authorIdentityId: payload.authorIdentityId ?? base.authorIdentityId,
+          content: payload.content ?? '',
+          encrypted: false,
+          mine:
+            (payload.authorIdentityId ?? base.authorIdentityId) ===
+            session.identity.id,
+          timestamp: payload.timestamp ?? base.timestamp,
+        };
+      } catch {
+        return {
+          ...base,
+          authorIdentityId:
+            rawMessage.authorIdentityId ??
+            identities[rawMessage.authorIdentityId ?? '']?.id ??
+            'unknown',
+          content: copy.messages.decryptFailed,
+          encrypted: true,
+        };
+      }
+    },
+    [session],
+  );
+
+  const loadChannelMessages = useCallback(
+    async (channelId: string, beforeMessageId?: string) => {
+      const [identities, result] = await Promise.all([
+        resolveMemberIdentities(),
+        pigeonApplication.listCommunityChannelMessages(
+          session,
+          community.id,
+          channelId,
+          { beforeMessageId },
+        ),
+      ]);
+      const loadedMessages = await Promise.all(
+        result.messages.map((message) => projectChannelMessage(message, identities)),
+      );
+
+      return {
+        cursor: result.nextBeforeMessageId ?? null,
+        loadedMessages,
+      };
+    },
+    [community.id, projectChannelMessage, resolveMemberIdentities, session],
+  );
+
+  const handleMessagesScroll = () => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
+    if (messageState === 'loading' || !selectedChannelId) return;
+
+    const previousHeight = scroller.scrollHeight;
+
+    setMessageState('loading');
+    void loadChannelMessages(selectedChannelId, messageCursor)
+      .then(({ cursor, loadedMessages }) => {
+        setMessages((current) => [...loadedMessages, ...current]);
+        setMessageCursor(cursor);
+        requestAnimationFrame(() => {
+          if (!scrollerRef.current) return;
+          scrollerRef.current.scrollTop =
+            scrollerRef.current.scrollHeight - previousHeight;
+        });
+      })
+      .catch(() => setMessageState('error'))
+      .finally(() => setMessageState('idle'));
+  };
+
+  const handleSendChannelMessage = async (
+    content: string,
+    attachments: File[],
+  ) => {
+    if (!selectedChannelId) return;
+
+    setSendError(null);
+    const timestamp = Date.now();
+
+    try {
+      const identities = await resolveMemberIdentities();
+      const messageAttachments = await pigeonApplication.publishMessageAttachments(
+        session,
+        attachments,
+        setAttachmentProgress,
+      );
+      const encryptedPayload = await encryptCommunityChannelPayload({
+        attachments: messageAttachments,
+        authorIdentityId: session.identity.id,
+        channelId: selectedChannelId,
+        communityId: community.id,
+        content,
+        recipients: Object.values(identities),
+        timestamp,
+      });
+      const created = await pigeonApplication.createCommunityChannelMessage(
+        session,
+        community.id,
+        selectedChannelId,
+        {
+          attachmentExternalIdentifiers: messageAttachments.map(
+            (attachment) => attachment.cid,
+          ),
+          encryptedPayload,
+          timestamp,
+        },
+      );
+      const projected = await projectChannelMessage(created, identities);
+
+      setMessages((current) => [...current, projected]);
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+      });
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.communities.messageError));
+    } finally {
+      setAttachmentProgress(null);
+    }
+  };
+
+  const loadAttachmentPreview = useCallback(
+    async (
+      attachment: MessageAttachment,
+      onProgress?: (progress: AttachmentProgress) => void,
+    ): Promise<string> => {
+      const blob = await pigeonApplication.downloadAttachment(
+        attachment,
+        onProgress,
+      );
+
+      return URL.createObjectURL(blob);
+    },
+    [],
+  );
+
+  const openAttachment = async (attachment?: MessageAttachment) => {
+    if (!attachment) return;
+
+    try {
+      const url = await loadAttachmentPreview(attachment);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = attachment.filename;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setSendError(copy.composer.attachmentDownloadError);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedChannelId) {
+      setMessages([]);
+      setMessageCursor(null);
+      setMessageState('idle');
+
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    setMessageState('loading');
+    setSendError(null);
+    void loadChannelMessages(selectedChannelId)
+      .then(({ cursor, loadedMessages }) => {
+        if (cancelled) return;
+        setMessages(loadedMessages);
+        setMessageCursor(cursor);
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ block: 'end' });
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setMessageState('error');
+      })
+      .finally(() => {
+        if (!cancelled) setMessageState('idle');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadChannelMessages, selectedChannelId]);
 
   return (
     <>
@@ -293,19 +544,94 @@ export function CommunityWorkspace({
           </div>
         </header>
 
-        <div className="grid flex-1 place-items-center p-6 text-center">
-          <div className="max-w-md">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 text-3xl font-black">
-              #
+        {!selectedChannel ? (
+          <div className="grid flex-1 place-items-center p-6 text-center">
+            <div className="max-w-md">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 text-3xl font-black">
+                #
+              </div>
+              <h2 className="mt-5 text-2xl font-black">
+                {copy.communities.noChannelSelected}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/55">
+                {copy.communities.noChannelSelectedBody}
+              </p>
             </div>
-            <h2 className="mt-5 text-2xl font-black">
-              {copy.communities.channelsAreMetadata}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-white/55">
-              {copy.communities.channelsAreMetadataBody}
-            </p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div
+              ref={scrollerRef}
+              onScroll={handleMessagesScroll}
+              className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+            >
+              {messageState === 'loading' && (
+                <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+                  {copy.chat.loadingEvents}
+                </div>
+              )}
+              <div className="space-y-2">
+                {!messageCursor &&
+                  messages.length > 0 &&
+                  messageState !== 'loading' && (
+                    <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                      {copy.chat.noMoreMessages}
+                    </div>
+                  )}
+                {messages.map((message, index) => {
+                  const nextMessage = messages[index + 1];
+                  const showAvatar =
+                    !nextMessage ||
+                    nextMessage.authorIdentityId !== message.authorIdentityId;
+
+                  return (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      currentIdentityId={session.identity.id}
+                      authorName={
+                        message.mine
+                          ? session.identity.profile.name
+                          : memberDisplayName(
+                              memberIdentities[message.authorIdentityId],
+                              message.authorIdentityId,
+                            )
+                      }
+                      authorPicture={
+                        message.mine
+                          ? memberPictures[session.identity.id]
+                          : memberPictures[message.authorIdentityId]
+                      }
+                      onAttachmentOpen={(attachmentIndex) =>
+                        void openAttachment(message.attachments[attachmentIndex])
+                      }
+                      onAttachmentPreview={loadAttachmentPreview}
+                      onAvatarClick={() => undefined}
+                      onMessageMenuOpen={() => undefined}
+                      onReplyReferenceClick={() => undefined}
+                      showAvatar={showAvatar}
+                    />
+                  );
+                })}
+                {messages.length === 0 && messageState !== 'loading' && (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                    {copy.communities.emptyChannel}
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+            <Composer
+              disabled={messageState === 'loading'}
+              draft={draft}
+              error={sendError}
+              onDraftChange={setDraft}
+              onEscape={() => undefined}
+              onSend={handleSendChannelMessage}
+              progress={attachmentProgress}
+            />
+          </>
+        )}
       </section>
 
       <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-[2rem] p-4 xl:block">
@@ -910,4 +1236,135 @@ async function loadPublicImage(cid: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function memberDisplayName(
+  identity: IdentityResource | undefined,
+  identityId: string,
+): string {
+  return identity ? (identityName(identity) ?? shortId(identity.id)) : shortId(identityId);
+}
+
+type CommunityChannelPlainPayload = {
+  attachments?: MessageAttachment[];
+  authorIdentityId?: string;
+  channelId?: string;
+  communityId?: string;
+  content?: string;
+  timestamp?: number;
+  type?: string;
+};
+
+type CommunityChannelEnvelope = {
+  algorithm: 'community-channel.v1';
+  ciphertext: string;
+  iv: string;
+  recipients: Record<string, string>;
+};
+
+async function encryptCommunityChannelPayload(input: {
+  attachments: MessageAttachment[];
+  authorIdentityId: string;
+  channelId: string;
+  communityId: string;
+  content: string;
+  recipients: IdentityResource[];
+  timestamp: number;
+}): Promise<string> {
+  const key = await crypto.subtle.generateKey(
+    { length: 256, name: 'AES-GCM' },
+    true,
+    ['decrypt', 'encrypt'],
+  );
+  const rawKey = await crypto.subtle.exportKey('raw', key);
+  const rawKeyBase64 = bytesToBase64(new Uint8Array(rawKey));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(
+    JSON.stringify({
+      attachments: input.attachments,
+      authorIdentityId: input.authorIdentityId,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      content: input.content,
+      timestamp: input.timestamp,
+      type: 'CommunityChannelMessageSent',
+    }),
+  );
+  const encrypted = await crypto.subtle.encrypt({ iv, name: 'AES-GCM' }, key, plaintext);
+  const recipients: Record<string, string> = {};
+
+  for (const identity of input.recipients) {
+    recipients[identity.id] = PublicKey.fromPEM(
+      identity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(rawKeyBase64)
+      .toString();
+  }
+
+  return JSON.stringify({
+    algorithm: 'community-channel.v1',
+    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
+    iv: bytesToBase64(iv),
+    recipients,
+  } satisfies CommunityChannelEnvelope);
+}
+
+async function decryptCommunityChannelPayload(
+  session: Session,
+  encryptedPayload: string,
+): Promise<CommunityChannelPlainPayload> {
+  const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
+  const wrappedKey = envelope.recipients[session.identity.id];
+
+  if (!wrappedKey) {
+    throw new Error(copy.messages.missingKey);
+  }
+
+  const rawKey = await session.encryptedKeyPair.decrypt(
+    new EncryptedPayload(wrappedKey),
+    session.password,
+  );
+  const key = await crypto.subtle.importKey(
+    'raw',
+    bytesToArrayBuffer(base64ToBytes(rawKey.toString())),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt'],
+  );
+  const decrypted = await crypto.subtle.decrypt(
+    { iv: bytesToArrayBuffer(base64ToBytes(envelope.iv)), name: 'AES-GCM' },
+    key,
+    bytesToArrayBuffer(base64ToBytes(envelope.ciphertext)),
+  );
+
+  return JSON.parse(new TextDecoder().decode(decrypted)) as CommunityChannelPlainPayload;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copyBytes = new Uint8Array(bytes.byteLength);
+
+  copyBytes.set(bytes);
+
+  return copyBytes.buffer;
 }
