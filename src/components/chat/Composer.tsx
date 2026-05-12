@@ -175,6 +175,7 @@ export function Composer({
       if (fileInputRef.current) fileInputRef.current.value = '';
     } finally {
       setSending(false);
+      window.setTimeout(() => textInputRef.current?.focus(), 0);
     }
   };
 
