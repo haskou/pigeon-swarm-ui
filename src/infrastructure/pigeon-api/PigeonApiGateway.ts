@@ -414,6 +414,56 @@ export class PigeonApiGateway {
     };
   }
 
+  public async loadMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<ChatMessage | null> {
+    const path = this.messagePath(conversationId, messageId);
+    const message = await this.http.request<MessageResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    if (message.type === 'deleted') return null;
+
+    return await this.decryptMessage(session, conversationId, message);
+  }
+
+  public async loadMessagesAround(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<{
+    messages: ChatMessage[];
+    nextCursor?: null | string;
+    previousCursor?: null | string;
+  }> {
+    const path = this.messagesAroundPath(conversationId, messageId);
+    const raw = await this.http.request<unknown>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+    const envelope = raw as {
+      messages?: MessageResource[];
+      nextCursor?: null | string;
+      previousCursor?: null | string;
+    };
+    const messages = envelope.messages ?? [];
+
+    return {
+      messages: await Promise.all(
+        messages
+          .filter((message) => message.type !== 'deleted')
+          .map((message) =>
+            this.decryptMessage(session, conversationId, message),
+          ),
+      ),
+      nextCursor: envelope.nextCursor ?? null,
+      previousCursor: envelope.previousCursor ?? null,
+    };
+  }
+
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
     const path = `/keychains/${encodeURIComponent(session.identity.id)}`;
 
@@ -776,6 +826,24 @@ export class PigeonApiGateway {
     return `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages?${query.toString()}`;
+  }
+
+  private messagePath(conversationId: string, messageId: string): string {
+    return `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages/${encodeURIComponent(messageId)}`;
+  }
+
+  private messagesAroundPath(
+    conversationId: string,
+    messageId: string,
+  ): string {
+    const query = new URLSearchParams({ after: '20', before: '20' });
+
+    return `${this.messagePath(
+      conversationId,
+      messageId,
+    )}/around?${query.toString()}`;
   }
 
   private async postConversation(

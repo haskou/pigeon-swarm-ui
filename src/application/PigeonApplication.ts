@@ -24,7 +24,9 @@ import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
 import { RegisterIdentity } from './identities/RegisterIdentity';
 import { DeleteMessage } from './messages/DeleteMessage';
+import { LoadMessage } from './messages/LoadMessage';
 import { LoadMessages } from './messages/LoadMessages';
+import { LoadMessagesAround } from './messages/LoadMessagesAround';
 import { SendMessage } from './messages/SendMessage';
 import { CreateNetwork } from './networks/CreateNetwork';
 import { JoinNetwork } from './networks/JoinNetwork';
@@ -64,6 +66,10 @@ export class PigeonApplication {
 
   private readonly loadMessagesUseCase: LoadMessages;
 
+  private readonly loadMessageUseCase: LoadMessage;
+
+  private readonly loadMessagesAroundUseCase: LoadMessagesAround;
+
   private readonly loginIdentityUseCase: LoginIdentity;
 
   private readonly registerIdentityUseCase: RegisterIdentity;
@@ -87,6 +93,8 @@ export class PigeonApplication {
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
     this.listNotificationsUseCase = new ListNotifications(gateway);
     this.listPeersUseCase = new ListPeers(gateway);
+    this.loadMessageUseCase = new LoadMessage(gateway);
+    this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.registerIdentityUseCase = new RegisterIdentity(gateway);
@@ -231,6 +239,34 @@ export class PigeonApplication {
       session,
       conversationId,
       before,
+    );
+  }
+
+  public async loadMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<ChatMessage | null> {
+    return await this.loadMessageUseCase.execute(
+      session,
+      conversationId,
+      messageId,
+    );
+  }
+
+  public async loadMessagesAround(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<{
+    messages: ChatMessage[];
+    nextCursor?: null | string;
+    previousCursor?: null | string;
+  }> {
+    return await this.loadMessagesAroundUseCase.execute(
+      session,
+      conversationId,
+      messageId,
     );
   }
 

@@ -17,6 +17,7 @@ import { conversationKeyEntry } from '../../domain/conversations/conversationKey
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
@@ -504,31 +505,18 @@ export function GlassWorkspace({
     setSendError(null);
     setMessageState('loading');
     try {
-      let cursor = messageCursor;
+      const result = await pigeonApplication.loadMessagesAround(
+        session,
+        activeConversation.id,
+        messageId,
+      );
 
-      while (cursor) {
-        const result = await pigeonApplication.loadMessages(
-          session,
-          activeConversation.id,
-          cursor,
-        );
+      setMessages((current) => mergeMessages(current, result.messages));
+      setMessageCursor(result.previousCursor ?? null);
 
-        setMessages((current) => {
-          const knownIds = new Set(current.map((message) => message.id));
-          const nextMessages = result.messages.filter(
-            (message) => !knownIds.has(message.id),
-          );
-
-          return [...nextMessages, ...current];
-        });
-        setMessageCursor(result.nextCursor ?? null);
-
-        if (result.messages.some((message) => message.id === messageId)) {
-          scrollToMessage(messageId);
-          return;
-        }
-
-        cursor = result.nextCursor ?? null;
+      if (result.messages.some((message) => message.id === messageId)) {
+        scrollToMessage(messageId);
+        return;
       }
 
       setSendError(copy.messages.replyTargetNotFound);
@@ -657,8 +645,29 @@ export function GlassWorkspace({
     refreshNotifications,
   ]);
 
+  const fetchRealtimeMessage = useCallback(
+    async (conversationId: string, messageId: string) => {
+      try {
+        const message = await pigeonApplication.loadMessage(
+          session,
+          conversationId,
+          messageId,
+        );
+
+        if (!message) return;
+
+        setMessages((current) => mergeMessages(current, [message]));
+      } catch (caught) {
+        setSendError(
+          toUserErrorMessage(caught, copy.workspace.loadMessagesError),
+        );
+      }
+    },
+    [session],
+  );
+
   const handleRealtimeEvent = useCallback(
-    (event: { aggregate_id: string; type: string }) => {
+    (event: RealtimeDomainEvent) => {
       if (event.type.startsWith('nodes.')) {
         void onPeersReload().catch(() => undefined);
         return;
@@ -696,14 +705,37 @@ export function GlassWorkspace({
           event.aggregate_id === activeConversation?.id &&
           activeConversationKeyId
         ) {
-          void loadActiveMessages(event.aggregate_id);
+          if (event.type.endsWith('.was_deleted')) {
+            const targetMessageId = stringAttribute(
+              event,
+              'targetMessageId',
+              'target_message_id',
+            );
+
+            if (targetMessageId) {
+              setMessages((current) =>
+                current.filter((message) => message.id !== targetMessageId),
+              );
+            }
+
+            return;
+          }
+
+          const messageId = stringAttribute(event, 'messageId', 'message_id');
+
+          if (!messageId || messages.some((message) => message.id === messageId)) {
+            return;
+          }
+
+          void fetchRealtimeMessage(event.aggregate_id, messageId);
         }
       }
     },
     [
       activeConversation?.id,
       activeConversationKeyId,
-      loadActiveMessages,
+      fetchRealtimeMessage,
+      messages,
       onPeersReload,
       refreshConversations,
       refreshNotifications,
@@ -1023,4 +1055,29 @@ function RawMessageDialog({
       </section>
     </div>
   );
+}
+
+function mergeMessages(
+  currentMessages: ChatMessage[],
+  incomingMessages: ChatMessage[],
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+
+  for (const message of currentMessages) byId.set(message.id, message);
+  for (const message of incomingMessages) byId.set(message.id, message);
+
+  return [...byId.values()].sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function stringAttribute(
+  event: RealtimeDomainEvent,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = event.attributes[key];
+
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+
+  return undefined;
 }
