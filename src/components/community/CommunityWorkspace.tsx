@@ -28,6 +28,7 @@ import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
+import { LockIcon } from '../workspace/LockIcon';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -90,6 +91,14 @@ export function CommunityWorkspace({
   const selectedChannel = community.textChannels.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const channelEncryptionReady =
+    !!selectedChannel &&
+    community.memberIds.every(
+      (identityId) => identityId === session.identity.id || memberIdentities[identityId],
+    );
+  const channelEncryptionTooltip = channelEncryptionReady
+    ? copy.chat.e2eReady
+    : copy.chat.e2eMissing;
   const members = useMemo<MemberView[]>(
     () =>
       community.memberIds.map((identityId) => ({
@@ -537,10 +546,25 @@ export function CommunityWorkspace({
                 community.name.slice(0, 1).toUpperCase()
               )}
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-2xl font-black">
-                {selectedChannel ? `# ${selectedChannel.name}` : community.name}
-              </h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-2xl font-black">
+                  {selectedChannel
+                    ? `# ${selectedChannel.name}`
+                    : community.name}
+                </h1>
+                <span
+                  className={
+                    channelEncryptionReady
+                      ? 'shrink-0 text-emerald-300'
+                      : 'shrink-0 text-rose-300'
+                  }
+                  title={channelEncryptionTooltip}
+                  aria-label={channelEncryptionTooltip}
+                >
+                  <LockIcon locked={channelEncryptionReady} />
+                </span>
+              </div>
               <p className="truncate text-sm text-white/50">
                 {selectedChannel
                   ? copy.communities.channelMetadataOnly
