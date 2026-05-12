@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -85,6 +85,8 @@ export function ChatColumn({
     picture?: string | null;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
+  const [conversationDataOpen, setConversationDataOpen] = useState(false);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
@@ -112,6 +114,28 @@ export function ChatColumn({
   const e2eTooltip = hasConversationKey
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
+  const conversationData = useMemo(
+    () => ({
+      conversation: activeConversation ?? null,
+      derived: {
+        conversationNetworkId: conversationNetworkId ?? null,
+        conversationNetworkName,
+        e2eReady: hasConversationKey,
+        loadedMessages: messages.length,
+        peerIdentity,
+        peerIdentityId: peerIdentityId ?? null,
+      },
+    }),
+    [
+      activeConversation,
+      conversationNetworkId,
+      conversationNetworkName,
+      hasConversationKey,
+      messages.length,
+      peerIdentity,
+      peerIdentityId,
+    ],
+  );
   const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
   const openOwnProfile = () =>
     setProfileViewer({
@@ -239,6 +263,43 @@ export function ChatColumn({
                 >
                   <LockIcon locked={hasConversationKey} />
                 </span>
+              ) : null}
+              {activeConversation ? (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConversationMenuOpen((isOpen) => !isOpen)
+                    }
+                    className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 text-lg font-black text-white/70 transition hover:bg-white/15"
+                    aria-label={copy.chat.conversationMenu}
+                    aria-expanded={conversationMenuOpen}
+                  >
+                    ⋯
+                  </button>
+                  {conversationMenuOpen && (
+                    <>
+                      <button
+                        type="button"
+                        className="fixed inset-0 z-30 cursor-default"
+                        onClick={() => setConversationMenuOpen(false)}
+                        aria-label={copy.dialog.close}
+                      />
+                      <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConversationDataOpen(true);
+                            setConversationMenuOpen(false);
+                          }}
+                          className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        >
+                          {copy.chat.viewData}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : null}
             </div>
             {activeConversation ? (
@@ -394,6 +455,12 @@ export function ChatColumn({
           />
         </>
       )}
+      {conversationDataOpen && (
+        <ConversationDataDialog
+          data={conversationData}
+          onClose={() => setConversationDataOpen(false)}
+        />
+      )}
       {profileViewer && (
         <UserProfileDialog
           identity={profileViewer.identity}
@@ -438,5 +505,42 @@ function LockIcon({ locked }: { locked: boolean }) {
         strokeWidth="1.8"
       />
     </svg>
+  );
+}
+
+function ConversationDataDialog({
+  data,
+  onClose,
+}: {
+  data: unknown;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">
+            {copy.chat.conversationDataTitle}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+        <pre className="mt-4 min-h-0 overflow-auto rounded-3xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </section>
+    </div>
   );
 }

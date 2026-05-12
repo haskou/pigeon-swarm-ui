@@ -54,11 +54,14 @@ export const copy = {
     emptyMessages:
       'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
     emptyTitle: 'No conversations',
+    conversationDataTitle: 'Conversation data',
+    conversationMenu: 'Open conversation menu',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
     noMoreMessages: 'No more messages',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
+    viewData: 'View data',
     you: 'You',
   },
   composer: {
