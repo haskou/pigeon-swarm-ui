@@ -170,13 +170,6 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
-  const draftConversationIds = useMemo(
-    () =>
-      Object.entries(drafts)
-        .filter(([, draft]) => draft.trim().length > 0)
-        .map(([conversationId]) => conversationId),
-    [drafts],
-  );
   const updateActiveConversationDraft = useCallback(
     (value: string) => {
       if (!activeConversation?.id) return;
@@ -899,7 +892,6 @@ export function GlassWorkspace({
               identityProfiles={identityProfiles}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
-              draftConversationIds={draftConversationIds}
               onSelect={(id) => {
                 clearUnreadMessages(id);
                 setNewMessageCount(0);

@@ -51,7 +51,6 @@ interface SidebarProps {
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
   activeConversationId: string | null;
-  draftConversationIds: string[];
   onSelect: (id: string) => void;
   onClose: () => void;
   onCreate: () => void;
@@ -62,7 +61,6 @@ interface SidebarProps {
 export function Sidebar({
   activeConversationId,
   conversations,
-  draftConversationIds,
   identityNames,
   identityPictures,
   identityProfiles,
@@ -258,9 +256,7 @@ export function Sidebar({
                         : 'text-white/45',
                     )}
                   >
-                    {draftConversationIds.includes(conversation.id)
-                      ? copy.sidebar.draft
-                      : conversationHandle(conversation)}
+                    {conversationHandle(conversation)}
                   </div>
                 </div>
                 {!!conversation.unreadCount && (

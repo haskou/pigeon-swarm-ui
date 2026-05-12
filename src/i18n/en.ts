@@ -366,7 +366,6 @@ export const copy = {
   },
   sidebar: {
     createConversation: 'New conversation',
-    draft: 'Draft',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
     oneToOneTitle: 'Direct messages',
