@@ -2,6 +2,13 @@ export const copy = {
   app: {
     loading: 'Loading...',
   },
+  attachments: {
+    closeViewer: 'Close image viewer',
+    download: 'Download attachment',
+    nextImage: 'Next image',
+    openImage: 'Open image',
+    previousImage: 'Previous image',
+  },
   auth: {
     apiLabel: 'API',
     createIdentity: 'Create identity',
@@ -27,6 +34,8 @@ export const copy = {
   chat: {
     createConversation: 'New conversation',
     directMessage: 'Direct message',
+    e2eMissing: 'End-to-end encryption key is missing for this conversation.',
+    e2eReady: 'End-to-end encryption is active for this conversation.',
     emptyBody:
       'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
     emptyMessages:
@@ -34,16 +43,10 @@ export const copy = {
     emptyTitle: 'No conversations',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
+    noMoreMessages: 'No more messages',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
     you: 'You',
-  },
-  attachments: {
-    closeViewer: 'Close image viewer',
-    download: 'Download attachment',
-    nextImage: 'Next image',
-    openImage: 'Open image',
-    previousImage: 'Previous image',
   },
   composer: {
     attach: 'Attach files',
@@ -63,6 +66,18 @@ export const copy = {
     kicker: 'Connection lost',
     retry: 'Retry connection',
     title: 'No connection with the server',
+  },
+  dialog: {
+    cancel: 'Cancel',
+    close: 'Close dialog',
+    createConversation: 'Create conversation',
+    createConversationBody:
+      'The user will be invited to join the conversation and will receive a notification. Direct conversations are end-to-end encrypted, so a keychain will be created and updated to the swarm as part of this process.',
+    createConversationError:
+      'The conversation could not be created. The backend chose violence.',
+    createConversationLoading: 'Creating and publishing keychain...',
+    createConversationTitle: 'Create a new direct conversation',
+    remoteIdentityId: 'Identity ID or username',
   },
   errors: {
     backend: {
@@ -86,31 +101,18 @@ export const copy = {
       IdentityNotFoundError: 'That identity could not be found.',
       IdentityUpdateRequesterMismatchError:
         'Only the identity owner can publish profile updates.',
-      IPFSBlockNotFoundOfflineError:
-        'That IPFS block is not available while the node is offline.',
-      IPFSBlockNotFoundPublicError:
-        'That public IPFS block could not be found.',
-      IPFSContentNotFoundError:
-        'That IPFS content could not be found on any network.',
-      IPFSNetworkNotFoundError: 'That IPFS network could not be found.',
-      IPFSNetworksNotFoundByIdsError:
-        'One or more selected IPFS networks could not be found.',
-      IPFSPeerIdDuplicatedError:
-        'That IPFS peer is already registered in another network.',
       InvalidIdentityCandidateError:
         'The identity data is not valid. Please review the profile and try again.',
-      InvalidIdentitySignatureError:
-        'The identity signature is not valid.',
-      InvalidIdentityVersionError:
-        'The identity version is not valid.',
+      InvalidIdentitySignatureError: 'The identity signature is not valid.',
+      InvalidIdentityVersionError: 'The identity version is not valid.',
       InvalidKeychainCandidateError:
         'The keychain data is not valid. Please reload and try again.',
-      InvalidKeychainVersionError:
-        'The keychain version is not valid.',
+      InvalidKeychainVersionError: 'The keychain version is not valid.',
       InvalidMessageSignatureError:
         'The message signature is not valid. Please reload the chat and try again.',
       InvalidNodeIdError: 'The node identifier is not valid.',
-      InvalidPasswordError: 'The password does not meet the required format.',
+      InvalidPasswordError:
+        'The password does not meet the required format (At least 8 characters).',
       InvalidProfileHandleError:
         'The username must be 3 to 32 lowercase letters, numbers, or underscores.',
       InvalidProfileImageError:
@@ -119,8 +121,19 @@ export const copy = {
         'The signed request was rejected. Please reload and try again.',
       InvalidStringLengthError:
         'Some encrypted data is larger than the backend currently accepts.',
+      IPFSBlockNotFoundOfflineError:
+        'That IPFS block is not available while the node is offline.',
+      IPFSBlockNotFoundPublicError:
+        'That public IPFS block could not be found.',
+      IPFSContentNotFoundError:
+        'That IPFS content could not be found on any network.',
       IPFSContentTooLargeError:
         'That file is too large for the node to accept.',
+      IPFSNetworkNotFoundError: 'That IPFS network could not be found.',
+      IPFSNetworksNotFoundByIdsError:
+        'One or more selected IPFS networks could not be found.',
+      IPFSPeerIdDuplicatedError:
+        'That IPFS peer is already registered in another network.',
       KeychainNotFoundError:
         'No keychain has been published for this identity yet.',
       MessageTargetAlreadyDeletedError:
@@ -147,19 +160,8 @@ export const copy = {
     notFound: 'The requested resource could not be found.',
     unauthorized:
       'The signed request was rejected. Please reload and try again.',
-    validation: 'The request data is not valid. Please review it and try again.',
-  },
-  dialog: {
-    cancel: 'Cancel',
-    close: 'Close dialog',
-    createConversation: 'Create conversation',
-    createConversationBody:
-      'The user will be invited to join the conversation and will receive a notification. Direct conversations are end-to-end encrypted, so a keychain will be created and updated to the swarm as part of this process.',
-    createConversationError:
-      'The conversation could not be created. The backend chose violence.',
-    createConversationLoading: 'Creating and publishing keychain...',
-    createConversationTitle: 'Create a new direct conversation',
-    remoteIdentityId: 'Identity ID or username',
+    validation:
+      'The request data is not valid. Please review it and try again.',
   },
   inspector: {
     conversationKeychain: 'Conversation keychain',
@@ -176,9 +178,9 @@ export const copy = {
   },
   messages: {
     cancelReply: 'Cancel reply',
+    decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
     deleteError: 'The message could not be deleted.',
-    decryptFailed: '[encrypted] This event could not be decrypted.',
     missingConversationKey:
       'This conversation key is missing from the keychain.',
     missingKey:
@@ -186,9 +188,9 @@ export const copy = {
     originalMessage: 'original message',
     rawTitle: 'Raw message',
     reply: 'Reply',
+    replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
-    replyingTo: 'Replying to',
     viewRaw: 'View raw',
   },
   network: {
@@ -273,8 +275,8 @@ export const copy = {
     minuteAgo: '1 min ago',
     minutesAgo: '{count} min ago',
     networks: 'Networks',
-    noNetworks: 'No announced networks',
     node: 'Node',
+    noNetworks: 'No announced networks',
     open: 'Open peers',
     owner: 'Owner',
     refresh: 'Refresh',

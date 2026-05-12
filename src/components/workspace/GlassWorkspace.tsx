@@ -16,6 +16,8 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
+import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
@@ -85,6 +87,7 @@ interface GlassWorkspaceProps {
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
   onNodeNetworksReload: () => Promise<void>;
+  onPeersReload: () => Promise<void>;
   peers: Peer[];
   setConversations: (conversations: ConversationResource[]) => void;
 }
@@ -94,6 +97,7 @@ export function GlassWorkspace({
   node,
   nodeNetworks,
   onNodeNetworksReload,
+  onPeersReload,
   peers,
   session,
   setConversations,
@@ -144,7 +148,14 @@ export function GlassWorkspace({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
+  const keepMessageBottomUntilRef = useRef(0);
+  const messageCursorRef = useRef<string | null>(null);
   const messageRequestRef = useRef(0);
+
+  const updateMessageCursor = useCallback((cursor: null | string) => {
+    messageCursorRef.current = cursor;
+    setMessageCursor(cursor);
+  }, []);
 
   const activeConversation = useMemo(
     () =>
@@ -295,6 +306,16 @@ export function GlassWorkspace({
     setConversations(next);
   }, [session, setConversations]);
 
+  const refreshSession = useCallback(async () => {
+    const result = await pigeonApplication.login(
+      session.identity.id,
+      session.password,
+    );
+
+    setSession(result.session);
+    setConversations(result.conversations);
+  }, [session.identity.id, session.password, setConversations, setSession]);
+
   const refreshNotifications = useCallback(async () => {
     setNotificationAction('refresh');
     setNotificationError(null);
@@ -307,6 +328,56 @@ export function GlassWorkspace({
     }
     setNotificationAction(null);
   }, [session]);
+
+  const scrollMessagesToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
+      const scroll = () => {
+        bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+        lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
+      };
+
+      if (keepPinned) {
+        keepMessageBottomUntilRef.current = Date.now() + 5000;
+      }
+
+      requestAnimationFrame(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+        window.setTimeout(scroll, 120);
+        window.setTimeout(scroll, 450);
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const handleMediaLayoutChange = () => {
+      if (Date.now() > keepMessageBottomUntilRef.current) return;
+
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+        lastScrollTopRef.current = scroller.scrollTop;
+      });
+    };
+
+    scroller.addEventListener('load', handleMediaLayoutChange, true);
+    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
+    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
+
+    return () => {
+      scroller.removeEventListener('load', handleMediaLayoutChange, true);
+      scroller.removeEventListener(
+        'loadedmetadata',
+        handleMediaLayoutChange,
+        true,
+      );
+      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
+    };
+  }, []);
 
   useEffect(() => {
     setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
@@ -329,11 +400,8 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         setMessages(result.messages);
-        setMessageCursor(result.nextCursor ?? null);
-        queueMicrotask(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-          lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
-        });
+        updateMessageCursor(result.nextCursor ?? null);
+        scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
 
@@ -349,7 +417,7 @@ export function GlassWorkspace({
 
       setMessageState('idle');
     },
-    [session],
+    [scrollMessagesToBottom, session, updateMessageCursor],
   );
 
   useEffect(() => {
@@ -358,7 +426,7 @@ export function GlassWorkspace({
 
     if (!activeConversationKeyId) {
       setMessages([]);
-      setMessageCursor(null);
+      updateMessageCursor(null);
       lastScrollTopRef.current = 0;
       setMessageState('idle');
       return;
@@ -371,7 +439,7 @@ export function GlassWorkspace({
     if (
       !activeConversation?.id ||
       !activeConversationKey ||
-      !messageCursor ||
+      !messageCursorRef.current ||
       messageState === 'loading'
     )
       return;
@@ -386,12 +454,12 @@ export function GlassWorkspace({
       const result = await pigeonApplication.loadMessages(
         session,
         activeConversation.id,
-        messageCursor,
+        messageCursorRef.current,
       );
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
-      setMessageCursor(result.nextCursor ?? null);
+      updateMessageCursor(result.nextCursor ?? null);
       requestAnimationFrame(() => {
         if (!scrollerRef.current) return;
 
@@ -442,10 +510,7 @@ export function GlassWorkspace({
       setMessages((current) => [...current, sent]);
       setReplyTarget(null);
       setAttachmentProgress(null);
-      queueMicrotask(() =>
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
-      );
-      void refreshConversations().catch(() => undefined);
+      scrollMessagesToBottom('smooth');
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
       setAttachmentProgress(null);
@@ -492,31 +557,18 @@ export function GlassWorkspace({
     setSendError(null);
     setMessageState('loading');
     try {
-      let cursor = messageCursor;
+      const result = await pigeonApplication.loadMessagesAround(
+        session,
+        activeConversation.id,
+        messageId,
+      );
 
-      while (cursor) {
-        const result = await pigeonApplication.loadMessages(
-          session,
-          activeConversation.id,
-          cursor,
-        );
+      setMessages((current) => mergeMessages(current, result.messages));
+      updateMessageCursor(result.previousCursor ?? null);
 
-        setMessages((current) => {
-          const knownIds = new Set(current.map((message) => message.id));
-          const nextMessages = result.messages.filter(
-            (message) => !knownIds.has(message.id),
-          );
-
-          return [...nextMessages, ...current];
-        });
-        setMessageCursor(result.nextCursor ?? null);
-
-        if (result.messages.some((message) => message.id === messageId)) {
-          scrollToMessage(messageId);
-          return;
-        }
-
-        cursor = result.nextCursor ?? null;
+      if (result.messages.some((message) => message.id === messageId)) {
+        scrollToMessage(messageId);
+        return;
       }
 
       setSendError(copy.messages.replyTargetNotFound);
@@ -628,16 +680,135 @@ export function GlassWorkspace({
     );
   };
 
+  const refreshRealtimeViews = useCallback(() => {
+    void refreshNotifications();
+    void refreshConversations().catch(() => undefined);
+    void onPeersReload().catch(() => undefined);
+
+    if (activeConversation?.id && activeConversationKeyId) {
+      void loadActiveMessages(activeConversation.id);
+    }
+  }, [
+    activeConversation?.id,
+    activeConversationKeyId,
+    loadActiveMessages,
+    onPeersReload,
+    refreshConversations,
+    refreshNotifications,
+  ]);
+
+  const fetchRealtimeMessage = useCallback(
+    async (conversationId: string, messageId: string) => {
+      try {
+        const message = await pigeonApplication.loadMessage(
+          session,
+          conversationId,
+          messageId,
+        );
+
+        if (!message) return;
+
+        setMessages((current) => mergeMessages(current, [message]));
+      } catch (caught) {
+        setSendError(
+          toUserErrorMessage(caught, copy.workspace.loadMessagesError),
+        );
+      }
+    },
+    [session],
+  );
+
+  const handleRealtimeEvent = useCallback(
+    (event: RealtimeDomainEvent) => {
+      if (event.type.startsWith('nodes.')) {
+        void onPeersReload().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('notifications.')) {
+        void refreshNotifications();
+        return;
+      }
+
+      if (event.type.startsWith('keychains.')) {
+        void refreshSession().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('identities.')) {
+        if (event.aggregate_id === session.identity.id) {
+          void pigeonApplication
+            .getIdentity(session.identity.id)
+            .then((identity) => setSession({ ...session, identity }))
+            .catch(() => undefined);
+        }
+        return;
+      }
+
+      if (event.type.startsWith('conversations.v1.conversation.')) {
+        void refreshConversations().catch(() => undefined);
+        return;
+      }
+
+      if (event.type.startsWith('conversations.v1.message.')) {
+        void refreshConversations().catch(() => undefined);
+
+        if (
+          event.aggregate_id === activeConversation?.id &&
+          activeConversationKeyId
+        ) {
+          if (event.type.endsWith('.was_deleted')) {
+            const targetMessageId = stringAttribute(
+              event,
+              'targetMessageId',
+              'target_message_id',
+            );
+
+            if (targetMessageId) {
+              setMessages((current) =>
+                current.filter((message) => message.id !== targetMessageId),
+              );
+            }
+
+            return;
+          }
+
+          const messageId = stringAttribute(event, 'messageId', 'message_id');
+
+          if (!messageId || messages.some((message) => message.id === messageId)) {
+            return;
+          }
+
+          void fetchRealtimeMessage(event.aggregate_id, messageId);
+        }
+      }
+    },
+    [
+      activeConversation?.id,
+      activeConversationKeyId,
+      fetchRealtimeMessage,
+      messages,
+      onPeersReload,
+      refreshConversations,
+      refreshNotifications,
+      refreshSession,
+      session,
+      setSession,
+    ],
+  );
+
+  useRealtimeEvents(session, {
+    onConnected: refreshRealtimeViews,
+    onDomainEvent: handleRealtimeEvent,
+  });
+
   return (
     <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           notificationCount={pendingNotificationCount}
-          onNotificationsClick={() => {
-            setNotificationsOpen(true);
-            void refreshNotifications();
-          }}
+          onNotificationsClick={() => setNotificationsOpen(true)}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
         />
@@ -652,10 +823,7 @@ export function GlassWorkspace({
             <Rail
               className="lg:hidden"
               notificationCount={pendingNotificationCount}
-              onNotificationsClick={() => {
-                setNotificationsOpen(true);
-                void refreshNotifications();
-              }}
+              onNotificationsClick={() => setNotificationsOpen(true)}
               onSettingsClick={() => setNodeSettingsOpen(true)}
               onInspectorClick={() => setInspectorOpen(true)}
               peerCount={peers.length}
@@ -714,6 +882,7 @@ export function GlassWorkspace({
           session={session}
           activeConversation={activeConversation}
           hasConversationKey={!!activeConversationKey}
+          hasReachedMessageStart={!messageCursor}
           peerIdentityId={
             activeConversation
               ? conversationPeerIdentityId(
@@ -838,7 +1007,6 @@ export function GlassWorkspace({
           onDecline={(notificationId) =>
             void handleDeclineNotification(notificationId)
           }
-          onRefresh={() => void refreshNotifications()}
         />
       )}
 
@@ -939,4 +1107,29 @@ function RawMessageDialog({
       </section>
     </div>
   );
+}
+
+function mergeMessages(
+  currentMessages: ChatMessage[],
+  incomingMessages: ChatMessage[],
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+
+  for (const message of currentMessages) byId.set(message.id, message);
+  for (const message of incomingMessages) byId.set(message.id, message);
+
+  return [...byId.values()].sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function stringAttribute(
+  event: RealtimeDomainEvent,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = event.attributes[key];
+
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+
+  return undefined;
 }

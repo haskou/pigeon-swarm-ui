@@ -1,7 +1,7 @@
 import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
-  ChatMessage,
   AttachmentProgress,
+  ChatMessage,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
@@ -15,12 +15,18 @@ import type {
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
+import {
+  RealtimeGateway,
+  type RealtimeMessage,
+} from '../infrastructure/realtime/RealtimeGateway';
 import { CreateConversation } from './conversations/CreateConversation';
 import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
 import { RegisterIdentity } from './identities/RegisterIdentity';
 import { DeleteMessage } from './messages/DeleteMessage';
+import { LoadMessage } from './messages/LoadMessage';
 import { LoadMessages } from './messages/LoadMessages';
+import { LoadMessagesAround } from './messages/LoadMessagesAround';
 import { SendMessage } from './messages/SendMessage';
 import { CreateNetwork } from './networks/CreateNetwork';
 import { JoinNetwork } from './networks/JoinNetwork';
@@ -37,6 +43,8 @@ import { ListPeers, type Peer } from './peers/ListPeers';
 
 export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
+
+  private readonly realtime: RealtimeGateway;
 
   private readonly acceptConversationInvitationUseCase: AcceptInvitation;
 
@@ -58,6 +66,10 @@ export class PigeonApplication {
 
   private readonly loadMessagesUseCase: LoadMessages;
 
+  private readonly loadMessageUseCase: LoadMessage;
+
+  private readonly loadMessagesAroundUseCase: LoadMessagesAround;
+
   private readonly loginIdentityUseCase: LoginIdentity;
 
   private readonly registerIdentityUseCase: RegisterIdentity;
@@ -66,8 +78,12 @@ export class PigeonApplication {
 
   private readonly updateNotificationUseCase: UpdateNotification;
 
-  public constructor(gateway: PigeonApiGateway = new PigeonApiGateway()) {
+  public constructor(
+    gateway: PigeonApiGateway = new PigeonApiGateway(),
+    realtime: RealtimeGateway = new RealtimeGateway(),
+  ) {
     this.gateway = gateway;
+    this.realtime = realtime;
     this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
@@ -77,6 +93,8 @@ export class PigeonApplication {
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
     this.listNotificationsUseCase = new ListNotifications(gateway);
     this.listPeersUseCase = new ListPeers(gateway);
+    this.loadMessageUseCase = new LoadMessage(gateway);
+    this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.registerIdentityUseCase = new RegisterIdentity(gateway);
@@ -100,6 +118,13 @@ export class PigeonApplication {
 
   public async claimNode(session: Session): Promise<void> {
     await this.gateway.claimNode(session);
+  }
+
+  public async connectRealtime(
+    session: Session,
+    onMessage: (message: RealtimeMessage) => void,
+  ): Promise<WebSocket> {
+    return await this.realtime.connect(session, onMessage);
   }
 
   public async createConversation(
@@ -214,6 +239,34 @@ export class PigeonApplication {
       session,
       conversationId,
       before,
+    );
+  }
+
+  public async loadMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<ChatMessage | null> {
+    return await this.loadMessageUseCase.execute(
+      session,
+      conversationId,
+      messageId,
+    );
+  }
+
+  public async loadMessagesAround(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<{
+    messages: ChatMessage[];
+    nextCursor?: null | string;
+    previousCursor?: null | string;
+  }> {
+    return await this.loadMessagesAroundUseCase.execute(
+      session,
+      conversationId,
+      messageId,
     );
   }
 
