@@ -8,6 +8,7 @@ import { copy } from '../../i18n/en';
 import { profilePictureDataUrl } from '../../utils/identityDisplay';
 
 interface RailProps {
+  activeMessages?: boolean;
   className?: string;
   communities?: Community[];
   activeCommunityId?: null | string;
@@ -25,6 +26,7 @@ interface RailProps {
 
 export function Rail({
   activeCommunityId = null,
+  activeMessages = false,
   className,
   communities = [],
   messageNotificationCount = 0,
@@ -51,6 +53,7 @@ export function Rail({
         className="relative rounded-2xl transition hover:scale-[1.03]"
         aria-label={copy.rail.openMessages}
       >
+        <RailSelectionIndicator active={activeMessages} />
         <img
           src="/logo.png"
           alt="Pigeon Swarm"
@@ -71,12 +74,15 @@ export function Rail({
             onClick={() => onCommunityClick?.(community.id)}
             title={community.name}
             className={cx(
-              'grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/10 font-black text-white/75 ring-offset-2 ring-offset-[#0c102b] transition hover:bg-white/15',
+              'relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 ring-offset-2 ring-offset-[#0c102b] transition hover:bg-white/15',
               activeCommunityId === community.id && 'ring-2 ring-fuchsia-300',
             )}
             aria-label={community.name}
           >
-            <CommunityRailAvatar community={community} />
+            <RailSelectionIndicator active={activeCommunityId === community.id} />
+            <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
+              <CommunityRailAvatar community={community} />
+            </span>
           </button>
         ))}
         <button
@@ -179,6 +185,17 @@ export function Rail({
         )}
       </button>
     </aside>
+  );
+}
+
+function RailSelectionIndicator({ active }: { active: boolean }) {
+  if (!active) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -left-3 top-1/2 h-8 w-1 -translate-y-1/2 rounded-full bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+    />
   );
 }
 

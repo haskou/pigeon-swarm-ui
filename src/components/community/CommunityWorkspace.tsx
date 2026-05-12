@@ -41,11 +41,13 @@ import { LockIcon } from '../workspace/LockIcon';
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
   community: Community;
+  mobileMembersOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
+  onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
   session: Session;
@@ -60,11 +62,13 @@ type MemberView = {
 export function CommunityWorkspace({
   activeChannelId,
   community,
+  mobileMembersOpen,
   mobileSidebarOpen,
   mobileRail,
   nodeNetworks,
   onChannelSelected,
   onCommunityUpdated,
+  onMobileMembersClose,
   onMobileSidebarClose,
   onOpenMobileSidebar,
   session,
@@ -465,7 +469,7 @@ export function CommunityWorkspace({
       )}
       <aside
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
+          'fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
@@ -724,6 +728,40 @@ export function CommunityWorkspace({
           ))}
         </div>
       </aside>
+
+      {mobileMembersOpen && (
+        <>
+          <button
+            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+            onClick={onMobileMembersClose}
+            aria-label={copy.dialog.close}
+          />
+          <aside className="glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setMemberOpen(true)}
+              className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              {copy.communities.addMember}
+            </button>
+            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              {copy.communities.members}
+            </div>
+            <div className="space-y-2">
+              {members.map((member) => (
+                <MemberRow
+                  key={member.identityId}
+                  identity={member.identity}
+                  identityId={member.identityId}
+                  onClick={() => setProfileViewer(member)}
+                  owner={member.identityId === community.ownerIdentityId}
+                  pictureUrl={member.pictureUrl}
+                />
+              ))}
+            </div>
+          </aside>
+        </>
+      )}
 
       {bannerViewerOpen && bannerUrl && (
         <ImageLightbox

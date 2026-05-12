@@ -185,6 +185,7 @@ export function GlassWorkspace({
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -444,6 +445,7 @@ export function GlassWorkspace({
     setNotificationsOpen(false);
     setNodeSettingsOpen(false);
     setInspectorOpen(false);
+    setCommunityMembersOpen(false);
     setSidebarOpen(false);
   }, []);
 
@@ -951,6 +953,7 @@ export function GlassWorkspace({
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
+          activeMessages={workspaceMode === 'messages'}
           activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
           communities={communities}
           messageNotificationCount={unreadMessageCount}
@@ -981,6 +984,7 @@ export function GlassWorkspace({
               <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
                 <Rail
                   className="lg:hidden"
+                  activeMessages
                   activeCommunityId={null}
                   communities={communities}
                   messageNotificationCount={unreadMessageCount}
@@ -1092,6 +1096,7 @@ export function GlassWorkspace({
           <CommunityWorkspace
             activeChannelId={communityChannelById[activeCommunity.id] ?? null}
             community={activeCommunity}
+            mobileMembersOpen={communityMembersOpen}
             mobileSidebarOpen={sidebarOpen}
             mobileRail={
               <Rail
@@ -1111,7 +1116,10 @@ export function GlassWorkspace({
                 }}
                 onNotificationsClick={() => setNotificationsOpen(true)}
                 onSettingsClick={() => setNodeSettingsOpen(true)}
-                onInspectorClick={() => setInspectorOpen(true)}
+                onInspectorClick={() => {
+                  setSidebarOpen(false);
+                  setCommunityMembersOpen(true);
+                }}
                 peerCount={peers.length}
                 settingsAttention={nodeUnclaimed}
               />
@@ -1135,6 +1143,7 @@ export function GlassWorkspace({
               )
             }
             onMobileSidebarClose={() => setSidebarOpen(false)}
+            onMobileMembersClose={() => setCommunityMembersOpen(false)}
             onOpenMobileSidebar={() => setSidebarOpen(true)}
             session={session}
           />
