@@ -9,6 +9,8 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
+import { shortId } from '../../utils/formatting';
+import { identityName, identityPicture } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 import { GlassSelect } from '../common/GlassSelect';
@@ -44,15 +46,20 @@ export function CreateConversationDialog({
       peerIdentity.networks.includes(networkId),
     );
   }, [peerIdentity, session.identity.networks]);
-  const sharedNetworkOptions = sharedNetworkIds.map((networkId) => ({
+  const networkOptions = session.identity.networks.map((networkId) => ({
+    disabled: peerIdentity ? !sharedNetworkIds.includes(networkId) : true,
     label:
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       networkId,
     value: networkId,
   }));
+  const peerDisplayName = peerIdentity
+    ? (identityName(peerIdentity) ?? shortId(peerIdentity.id))
+    : null;
+  const peerPicture = peerIdentity ? identityPicture(peerIdentity) : null;
 
   useEffect(() => {
-    const trimmed = peerIdentityId.trim();
+    const trimmed = normalizeIdentityLookup(peerIdentityId);
 
     setError(null);
     setPeerIdentity(null);
@@ -93,10 +100,24 @@ export function CreateConversationDialog({
     };
   }, [peerIdentityId, session.identity.networks]);
 
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [onClose]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!peerIdentityId.trim()) return;
+    const identityLookup = normalizeIdentityLookup(peerIdentityId);
+
+    if (!identityLookup) return;
 
     if (!selectedNetworkId) {
       setError(copy.dialog.noSharedNetwork);
@@ -109,7 +130,7 @@ export function CreateConversationDialog({
     try {
       const result = await pigeonApplication.createConversation(
         session,
-        peerIdentityId,
+        identityLookup,
         selectedNetworkId,
       );
       onCreated(
@@ -158,11 +179,12 @@ export function CreateConversationDialog({
         </div>
 
         <Field label={copy.dialog.remoteIdentityId}>
-          <textarea
+          <input
             value={peerIdentityId}
             onChange={(event) => setPeerIdentityId(event.target.value)}
-            className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+            autoComplete="off"
           />
         </Field>
 
@@ -172,24 +194,45 @@ export function CreateConversationDialog({
           </div>
         )}
 
-        {peerIdentity && sharedNetworkOptions.length > 0 && (
-          <Field label={copy.dialog.sharedNetwork}>
-            <GlassSelect
-              ariaLabel={copy.dialog.sharedNetwork}
-              value={selectedNetworkId}
-              onChange={setSelectedNetworkId}
-              options={sharedNetworkOptions}
-            />
-          </Field>
+        {peerIdentity && peerDisplayName && (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+              {peerPicture ? (
+                <img
+                  src={peerPicture}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                peerDisplayName.slice(0, 1).toUpperCase()
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate font-black">{peerDisplayName}</p>
+              <p className="truncate text-xs text-white/45">
+                {peerIdentity.id}
+              </p>
+            </div>
+          </div>
         )}
 
         {peerIdentity &&
           lookupState === 'ready' &&
-          sharedNetworkOptions.length === 0 && (
+          sharedNetworkIds.length === 0 && (
             <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
               {copy.dialog.noSharedNetwork}
             </div>
           )}
+
+        <Field label={copy.dialog.sharedNetwork}>
+          <GlassSelect
+            ariaLabel={copy.dialog.sharedNetwork}
+            disabled={!peerIdentity || sharedNetworkIds.length === 0}
+            value={selectedNetworkId}
+            onChange={setSelectedNetworkId}
+            options={networkOptions}
+          />
+        </Field>
 
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -209,6 +252,7 @@ export function CreateConversationDialog({
             disabled={
               !peerIdentityId.trim() ||
               !selectedNetworkId ||
+              !peerIdentity ||
               state === 'loading'
             }
             className="glass-button rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
@@ -221,4 +265,10 @@ export function CreateConversationDialog({
       </form>
     </div>
   );
+}
+
+function normalizeIdentityLookup(value: string): string {
+  const trimmed = value.trim();
+
+  return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
 }
