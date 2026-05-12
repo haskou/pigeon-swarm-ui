@@ -155,6 +155,7 @@ export function GlassWorkspace({
   const keepMessageBottomUntilRef = useRef(0);
   const messageCursorRef = useRef<string | null>(null);
   const messageRequestRef = useRef(0);
+  const resolvingIdentityIdsRef = useRef(new Set<string>());
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -197,6 +198,13 @@ export function GlassWorkspace({
       )
     : undefined;
   const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
+  const activeConversationPeerIdentityId = activeConversation
+    ? conversationPeerIdentityId(
+        activeConversation,
+        session.identity.id,
+        session.keychain,
+      )
+    : undefined;
   const identityIdsToResolve = useMemo(() => {
     const ids = new Set<string>();
 
@@ -220,7 +228,11 @@ export function GlassWorkspace({
     messages.forEach((message) => ids.add(message.authorIdentityId));
     ids.delete(session.identity.id);
 
-    return [...ids].filter((identityId) => !identityProfiles[identityId]);
+    return [...ids].filter(
+      (identityId) =>
+        !identityProfiles[identityId] &&
+        !resolvingIdentityIdsRef.current.has(identityId),
+    );
   }, [
     conversations,
     identityProfiles,
@@ -261,9 +273,17 @@ export function GlassWorkspace({
     if (identityIdsToResolve.length === 0) return;
 
     let cancelled = false;
+    const identityIds = identityIdsToResolve.filter(
+      (identityId) => !resolvingIdentityIdsRef.current.has(identityId),
+    );
+
+    if (identityIds.length === 0) return;
+    identityIds.forEach((identityId) =>
+      resolvingIdentityIdsRef.current.add(identityId),
+    );
 
     void Promise.all(
-      identityIdsToResolve.map(async (identityId) => {
+      identityIds.map(async (identityId) => {
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
           const picture = await loadIdentityPicture(identity).catch(
@@ -280,35 +300,41 @@ export function GlassWorkspace({
           return [identityId, identityId, null, null] as const;
         }
       }),
-    ).then((resolvedIdentities) => {
-      if (cancelled) return;
+    )
+      .then((resolvedIdentities) => {
+        if (cancelled) return;
 
-      setIdentityNames((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          resolvedIdentities.map(([identityId, name]) => [identityId, name]),
-        ),
-      }));
-      setIdentityProfiles((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          resolvedIdentities
-            .filter(([, , , identity]) => !!identity)
-            .map(([identityId, , , identity]) => [
-              identityId,
-              identity as IdentityResource,
-            ]),
-        ),
-      }));
-      setIdentityPictures((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          resolvedIdentities
-            .filter(([, , picture]) => !!picture)
-            .map(([identityId, , picture]) => [identityId, picture as string]),
-        ),
-      }));
-    });
+        setIdentityNames((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            resolvedIdentities.map(([identityId, name]) => [identityId, name]),
+          ),
+        }));
+        setIdentityProfiles((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            resolvedIdentities
+              .filter(([, , , identity]) => !!identity)
+              .map(([identityId, , , identity]) => [
+                identityId,
+                identity as IdentityResource,
+              ]),
+          ),
+        }));
+        setIdentityPictures((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            resolvedIdentities
+              .filter(([, , picture]) => !!picture)
+              .map(([identityId, , picture]) => [identityId, picture as string]),
+          ),
+        }));
+      })
+      .finally(() => {
+        identityIds.forEach((identityId) =>
+          resolvingIdentityIdsRef.current.delete(identityId),
+        );
+      });
 
     return () => {
       cancelled = true;
@@ -956,35 +982,15 @@ export function GlassWorkspace({
           conversationKey={activeConversationKey}
           hasConversationKey={!!activeConversationKey}
           hasReachedMessageStart={!messageCursor}
-          peerIdentityId={
-            activeConversation
-              ? conversationPeerIdentityId(
-                  activeConversation,
-                  session.identity.id,
-                  session.keychain,
-                )
-              : undefined
-          }
+          peerIdentityId={activeConversationPeerIdentityId}
           peerIdentity={
-            activeConversation
-              ? identityProfiles[
-                  conversationPeerIdentityId(
-                    activeConversation,
-                    session.identity.id,
-                    session.keychain,
-                  ) ?? ''
-                ]
+            activeConversationPeerIdentityId
+              ? identityProfiles[activeConversationPeerIdentityId]
               : undefined
           }
           peerPicture={
-            activeConversation
-              ? identityPictures[
-                  conversationPeerIdentityId(
-                    activeConversation,
-                    session.identity.id,
-                    session.keychain,
-                  ) ?? ''
-                ]
+            activeConversationPeerIdentityId
+              ? identityPictures[activeConversationPeerIdentityId]
               : undefined
           }
           identityNames={identityNames}

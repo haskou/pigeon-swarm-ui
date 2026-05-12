@@ -68,5 +68,5 @@ export function useRealtimeEvents(
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [session]);
+  }, [session.encryptedKeyPair, session.identity.id, session.password]);
 }
