@@ -43,12 +43,12 @@ export function Rail({
   return (
     <aside
       className={cx(
-        'glass-panel flex h-full flex-col items-center gap-3 rounded-none p-3 sm:rounded-[2rem]',
+        'glass-panel flex h-full flex-col items-center gap-3 rounded-none px-1 py-3 sm:rounded-[2rem]',
         className,
       )}
     >
       <div className="relative flex w-full justify-center">
-        <RailSelectionIndicator active={activeMessages} size="large" />
+        <RailSelectionIndicator active={activeMessages} />
         <button
           type="button"
           onClick={onMessagesClick}
@@ -191,20 +191,14 @@ export function Rail({
   );
 }
 
-function RailSelectionIndicator({
-  active,
-  size = 'default',
-}: {
-  active: boolean;
-  size?: 'default' | 'large';
-}) {
+function RailSelectionIndicator({ active }: { active: boolean }) {
   if (!active) return null;
 
   return (
     <span
       aria-hidden="true"
       className="absolute top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
-      style={{ left: size === 'large' ? 'calc(50% - 2.25rem)' : 'calc(50% - 2rem)' }}
+      style={{ left: 'calc(50% - 2.25rem)' }}
     />
   );
 }
