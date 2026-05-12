@@ -45,8 +45,26 @@ export const copy = {
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   chat: {
+    addPrivateKey: 'Add private key',
+    addPrivateKeyAction: 'Add key to keychain',
+    addPrivateKeyBody:
+      'Paste the encrypted key package shared by the other participant.',
+    addPrivateKeyError:
+      'The key package could not be decrypted or does not belong to this conversation.',
+    addPrivateKeyPlaceholder: 'Paste encrypted conversation key...',
+    addPrivateKeyRequired: 'Paste an encrypted key package first.',
+    addPrivateKeySaving: 'Updating keychain...',
+    addPrivateKeyTitle: 'Add conversation key',
     conversationDataTitle: 'Conversation data',
     conversationMenu: 'Open conversation menu',
+    copyPrivateKey: 'Copy private key',
+    copyPrivateKeyAction: 'Copy encrypted key',
+    copyPrivateKeyBody:
+      'This package is encrypted for the other participant and can be pasted into their missing-key dialog.',
+    copyPrivateKeyError: 'The conversation key could not be encrypted.',
+    copyPrivateKeyTitle: 'Encrypted conversation key',
+    copyPrivateKeyUnavailable:
+      'The peer identity is not loaded, so the key cannot be encrypted yet.',
     createConversation: 'New conversation',
     directMessage: 'Direct message',
     e2eMissing: 'End-to-end encryption key is missing for this conversation.',

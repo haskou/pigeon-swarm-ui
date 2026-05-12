@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChatMessage,
   AttachmentProgress,
+  ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
   MessageReplyPreview,
@@ -614,6 +615,24 @@ export function GlassWorkspace({
     setSidebarOpen(false);
   };
 
+  const handleConversationKeyImported = async (
+    keyEntry: ConversationKeyEntry,
+  ) => {
+    const result = await pigeonApplication.publishKeychain(session, {
+      ...session.keychain,
+      conversations: {
+        ...session.keychain.conversations,
+        [keyEntry.conversationId]: keyEntry,
+      },
+    });
+
+    setSession({
+      ...session,
+      keychain: result.keychain,
+      keychainExternalIdentifier: result.keychainExternalIdentifier,
+    });
+  };
+
   const replaceNotification = (nextNotification: NotificationResource) => {
     setNotifications((current) =>
       current.map((notification) =>
@@ -881,6 +900,7 @@ export function GlassWorkspace({
         <ChatColumn
           session={session}
           activeConversation={activeConversation}
+          conversationKey={activeConversationKey}
           hasConversationKey={!!activeConversationKey}
           hasReachedMessageStart={!messageCursor}
           peerIdentityId={
@@ -924,6 +944,7 @@ export function GlassWorkspace({
           bottomRef={bottomRef}
           onScroll={handleScroll}
           onSend={handleSend}
+          onConversationKeyImported={handleConversationKeyImported}
           onMessageMenuOpen={handleMessageMenuOpen}
           onReplyReferenceClick={(messageId) =>
             void handleReplyReferenceClick(messageId)

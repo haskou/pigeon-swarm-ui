@@ -33,6 +33,10 @@ export class PrivateKey extends StringValueObject {
     return new PrivateKey(value.toString());
   }
 
+  public getPublicKey(): PublicKey {
+    return new PublicKey('public-key');
+  }
+
   public decrypt(): Uint8Array {
     throw new Error('decrypt not available in unit-test value object mock');
   }
