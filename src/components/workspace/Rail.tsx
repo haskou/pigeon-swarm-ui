@@ -11,6 +11,7 @@ interface RailProps {
   className?: string;
   communities?: Community[];
   activeCommunityId?: null | string;
+  messageNotificationCount?: number;
   notificationCount?: number;
   onCommunityClick?: (communityId: string) => void;
   onCreateCommunityClick?: () => void;
@@ -26,6 +27,7 @@ export function Rail({
   activeCommunityId = null,
   className,
   communities = [],
+  messageNotificationCount = 0,
   notificationCount = 0,
   onCommunityClick,
   onCreateCommunityClick,
@@ -46,7 +48,7 @@ export function Rail({
       <button
         type="button"
         onClick={onMessagesClick}
-        className="rounded-2xl transition hover:scale-[1.03]"
+        className="relative rounded-2xl transition hover:scale-[1.03]"
         aria-label={copy.rail.openMessages}
       >
         <img
@@ -54,6 +56,11 @@ export function Rail({
           alt="Pigeon Swarm"
           className="h-14 w-14 rounded-2xl shadow-xl"
         />
+        {messageNotificationCount > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
+            {messageNotificationCount > 9 ? '9+' : messageNotificationCount}
+          </span>
+        )}
       </button>
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto">

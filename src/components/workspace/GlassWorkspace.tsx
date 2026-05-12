@@ -208,6 +208,14 @@ export function GlassWorkspace({
     conversationsWithUnread,
     markUnreadMessage,
   } = useUnreadMessages(conversations);
+  const unreadMessageCount = useMemo(
+    () =>
+      conversationsWithUnread.reduce(
+        (total, conversation) => total + conversation.unreadCount,
+        0,
+      ),
+    [conversationsWithUnread],
+  );
   const handleNotificationAccepted = useCallback(
     (next: {
       conversationId: string;
@@ -895,13 +903,18 @@ export function GlassWorkspace({
           className="hidden lg:flex"
           activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
           communities={communities}
+          messageNotificationCount={unreadMessageCount}
           notificationCount={pendingNotificationCount}
           onCommunityClick={(communityId) => {
             setActiveCommunityId(communityId);
             setWorkspaceMode('community');
+            setSidebarOpen(false);
           }}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-          onMessagesClick={() => setWorkspaceMode('messages')}
+          onMessagesClick={() => {
+            setWorkspaceMode('messages');
+            setSidebarOpen(false);
+          }}
           onNotificationsClick={() => setNotificationsOpen(true)}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
@@ -920,6 +933,7 @@ export function GlassWorkspace({
                   className="lg:hidden"
                   activeCommunityId={null}
                   communities={communities}
+                  messageNotificationCount={unreadMessageCount}
                   notificationCount={pendingNotificationCount}
                   onCommunityClick={(communityId) => {
                     setActiveCommunityId(communityId);
@@ -927,7 +941,10 @@ export function GlassWorkspace({
                     setSidebarOpen(false);
                   }}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() => setWorkspaceMode('messages')}
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
                   onNotificationsClick={() => setNotificationsOpen(true)}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => setInspectorOpen(true)}
@@ -1024,6 +1041,7 @@ export function GlassWorkspace({
         ) : activeCommunity ? (
           <CommunityWorkspace
             community={activeCommunity}
+            mobileSidebarOpen={sidebarOpen}
             nodeNetworks={nodeNetworks}
             onCommunityUpdated={(community) =>
               setCommunities((current) =>
@@ -1032,6 +1050,8 @@ export function GlassWorkspace({
                 ),
               )
             }
+            onMobileSidebarClose={() => setSidebarOpen(false)}
+            onOpenMobileSidebar={() => setSidebarOpen(true)}
             session={session}
           />
         ) : (
