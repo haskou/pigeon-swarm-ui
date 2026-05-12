@@ -28,6 +28,7 @@ interface MessageBubbleProps {
   onAvatarClick: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
+  onRetryMessage?: (message: ChatMessage) => void;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -49,6 +50,7 @@ export function MessageBubble({
   onAvatarClick,
   onMessageMenuOpen,
   onReplyReferenceClick,
+  onRetryMessage,
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -231,13 +233,30 @@ export function MessageBubble({
           )}
           <div
             className={cx(
-              'text-right text-xs font-black opacity-65',
+              'flex items-center justify-end gap-2 text-xs font-black opacity-65',
               compactTimestamp && message.attachments.length === 0
                 ? 'shrink-0'
                 : 'mt-1',
             )}
           >
-            {formatTime(message.timestamp)}
+            {message.deliveryStatus === 'pending' && (
+              <span>{copy.messages.sending}</span>
+            )}
+            {message.deliveryStatus === 'failed' && (
+              <>
+                <span className="text-rose-100">{copy.messages.sendFailed}</span>
+                {onRetryMessage && (
+                  <button
+                    type="button"
+                    onClick={() => onRetryMessage(message)}
+                    className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
+                  >
+                    {copy.messages.retrySend}
+                  </button>
+                )}
+              </>
+            )}
+            <span>{formatTime(message.timestamp)}</span>
           </div>
         </div>
         {mine &&

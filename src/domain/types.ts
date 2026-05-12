@@ -181,6 +181,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
+  deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;
   encrypted: boolean;

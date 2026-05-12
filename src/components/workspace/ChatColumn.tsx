@@ -1,5 +1,5 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -39,6 +39,7 @@ interface ChatColumnProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   conversationKey?: ConversationKeyEntry;
+  draft: string;
   hasConversationKey: boolean;
   hasReachedMessageStart: boolean;
   messages: ChatMessage[];
@@ -47,11 +48,16 @@ interface ChatColumnProps {
   sendError: string | null;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
+  newMessageCount: number;
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
+  onDraftChange: (value: string) => void;
+  onEscape: () => void;
+  onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
+  onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
@@ -63,19 +69,25 @@ export function ChatColumn({
   activeConversation,
   bottomRef,
   conversationKey,
+  draft,
   hasConversationKey,
   hasReachedMessageStart,
   identityNames,
   identityPictures,
   messages,
   messageState,
+  newMessageCount,
   nodeNetworks,
   onCancelReply,
   onConversationKeyImported,
   onCreate,
+  onDraftChange,
+  onEscape,
+  onJumpToLatest,
   onMessageMenuOpen,
   onOpenSidebar,
   onReplyReferenceClick,
+  onRetryMessage,
   onScroll,
   onSend,
   peerIdentity,
@@ -157,6 +169,20 @@ export function ChatColumn({
     setConversationKeyError(null);
     setConversationKeySaving(false);
   };
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      setProfileViewer(null);
+      setConversationMenuOpen(false);
+      setConversationDataOpen(false);
+      closeConversationKeyDialog();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
   const openCopyConversationKeyDialog = () => {
     if (!activeConversation || !conversationKey || !peerIdentity) {
       setConversationKeyError(copy.chat.copyPrivateKeyUnavailable);
@@ -511,6 +537,7 @@ export function ChatColumn({
                     onAvatarClick={() => openMessageAuthorProfile(message)}
                     onMessageMenuOpen={onMessageMenuOpen}
                     onReplyReferenceClick={onReplyReferenceClick}
+                    onRetryMessage={onRetryMessage}
                     replyImage={
                       replyMessage?.attachments.find((attachment) =>
                         isBrowserPreviewImage(attachment.contentType),
@@ -557,11 +584,24 @@ export function ChatColumn({
                 ))}
               <div ref={bottomRef} />
             </div>
+            {newMessageCount > 0 && (
+              <button
+                type="button"
+                onClick={onJumpToLatest}
+                className="sticky bottom-3 left-1/2 z-20 mt-3 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
+              >
+                {copy.workspace.newMessages}
+                {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
+              </button>
+            )}
           </div>
 
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
+            draft={draft}
             error={sendError ?? attachmentError}
+            onDraftChange={onDraftChange}
+            onEscape={onEscape}
             onSend={onSend}
             onCancelReply={onCancelReply}
             progress={progress}

@@ -49,6 +49,42 @@ import { RawMessageDialog } from './RawMessageDialog';
 import { Sidebar } from './Sidebar';
 
 type LoadState = 'idle' | 'loading' | 'error';
+type ConversationDrafts = Record<string, string>;
+type PendingSend = {
+  attachments: File[];
+  content: string;
+  replyTarget: ChatMessage | null;
+};
+type FailedSends = Record<string, PendingSend>;
+
+const lastConversationStorageKey = (identityId: string) =>
+  `pigeon:lastConversation:${identityId}`;
+const draftsStorageKey = (identityId: string) =>
+  `pigeon:conversationDrafts:${identityId}`;
+
+function initialConversationId(
+  conversations: ConversationResource[],
+  identityId: string,
+): string | null {
+  const storedId = globalThis.localStorage?.getItem(
+    lastConversationStorageKey(identityId),
+  );
+
+  return conversations.some((conversation) => conversation.id === storedId)
+    ? storedId
+    : (conversations[0]?.id ?? null);
+}
+
+function loadDrafts(identityId: string): ConversationDrafts {
+  try {
+    return JSON.parse(
+      globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
+    ) as ConversationDrafts;
+  } catch {
+    return {};
+  }
+}
+
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
 ): MessageReplyPreview | undefined {
@@ -91,7 +127,7 @@ export function GlassWorkspace({
 }: GlassWorkspaceProps) {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
-  >(conversations[0]?.id ?? null);
+  >(() => initialConversationId(conversations, session.identity.id));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
@@ -103,6 +139,11 @@ export function GlassWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
+  const [drafts, setDrafts] = useState<ConversationDrafts>(() =>
+    loadDrafts(session.identity.id),
+  );
+  const [failedSends, setFailedSends] = useState<FailedSends>({});
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
@@ -125,6 +166,27 @@ export function GlassWorkspace({
         (conversation) => conversation.id === activeConversationId,
       ) ?? conversations[0],
     [activeConversationId, conversations],
+  );
+  const activeConversationDraft = activeConversation?.id
+    ? (drafts[activeConversation.id] ?? '')
+    : '';
+  const draftConversationIds = useMemo(
+    () =>
+      Object.entries(drafts)
+        .filter(([, draft]) => draft.trim().length > 0)
+        .map(([conversationId]) => conversationId),
+    [drafts],
+  );
+  const updateActiveConversationDraft = useCallback(
+    (value: string) => {
+      if (!activeConversation?.id) return;
+
+      setDrafts((current) => ({
+        ...current,
+        [activeConversation.id]: value,
+      }));
+    },
+    [activeConversation?.id],
   );
   const {
     clearUnreadMessages,
@@ -189,7 +251,34 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversationId && conversations[0])
       setActiveConversationId(conversations[0].id);
+    if (
+      activeConversationId &&
+      conversations.length > 0 &&
+      !conversations.some((conversation) => conversation.id === activeConversationId)
+    ) {
+      setActiveConversationId(conversations[0].id);
+    }
   }, [activeConversationId, conversations]);
+
+  useEffect(() => {
+    setDrafts(loadDrafts(session.identity.id));
+  }, [session.identity.id]);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(
+      draftsStorageKey(session.identity.id),
+      JSON.stringify(drafts),
+    );
+  }, [drafts, session.identity.id]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) return;
+
+    globalThis.localStorage?.setItem(
+      lastConversationStorageKey(session.identity.id),
+      activeConversation.id,
+    );
+  }, [activeConversation?.id, session.identity.id]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -226,6 +315,19 @@ export function GlassWorkspace({
     },
     [],
   );
+  const isScrolledNearBottom = useCallback(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return true;
+
+    return (
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96
+    );
+  }, []);
+  const jumpToLatestMessages = useCallback(() => {
+    setNewMessageCount(0);
+    scrollMessagesToBottom('smooth');
+  }, [scrollMessagesToBottom]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -259,6 +361,27 @@ export function GlassWorkspace({
   useEffect(() => {
     void refreshNotifications();
   }, [refreshNotifications]);
+
+  const closeTransientUi = useCallback(() => {
+    setMessageContextMenu(null);
+    setRawMessage(null);
+    setReplyTarget(null);
+    setIsCreateOpen(false);
+    setNotificationsOpen(false);
+    setNodeSettingsOpen(false);
+    setInspectorOpen(false);
+    setSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeTransientUi();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [closeTransientUi]);
 
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
@@ -299,6 +422,7 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversation?.id) return;
     setReplyTarget(null);
+    setNewMessageCount(0);
 
     if (!activeConversationKeyId) {
       setMessages([]);
@@ -360,37 +484,103 @@ export function GlassWorkspace({
     const isScrollingUp = scrollTop < lastScrollTopRef.current;
 
     lastScrollTopRef.current = scrollTop;
+    if (isScrolledNearBottom()) setNewMessageCount(0);
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };
 
-  const handleSend = async (content: string, attachments: File[]) => {
+  const sendPendingMessage = async (payload: PendingSend) => {
     if (!activeConversation?.id) return;
+    const optimisticId = `pending:${activeConversation.id}:${Date.now()}:${crypto.randomUUID()}`;
+
     setSendError(null);
     setAttachmentProgress(null);
+    setFailedSends((current) => {
+      const next = { ...current };
+
+      delete next[optimisticId];
+
+      return next;
+    });
+    setMessages((current) => [
+      ...current,
+      {
+        attachments: [],
+        authorIdentityId: session.identity.id,
+        content:
+          payload.content ||
+          payload.attachments.map((attachment) => attachment.name).join(', '),
+        deliveryStatus: 'pending',
+        encrypted: false,
+        id: optimisticId,
+        mine: true,
+        raw: { id: optimisticId, type: 'sent' },
+        replyPreview: replyPreviewFromMessage(payload.replyTarget),
+        replyToMessageId: payload.replyTarget?.id,
+        timestamp: Date.now(),
+      },
+    ]);
+    scrollMessagesToBottom('smooth');
 
     try {
-      const lastMessageId = messages[messages.length - 1]?.id;
+      const lastMessageId = [...messages]
+        .reverse()
+        .find((message) => !message.deliveryStatus)?.id;
       const sent = await pigeonApplication.sendMessage(
         session,
         activeConversation.id,
-        content,
+        payload.content,
         {
-          attachments,
+          attachments: payload.attachments,
           onAttachmentProgress: setAttachmentProgress,
           previousMessageIds: lastMessageId ? [lastMessageId] : [],
-          replyPreview: replyPreviewFromMessage(replyTarget),
-          replyToMessageId: replyTarget?.id,
+          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyToMessageId: payload.replyTarget?.id,
         },
       );
-      setMessages((current) => [...current, sent]);
-      setReplyTarget(null);
+      setMessages((current) =>
+        mergeMessages(
+          current.filter((message) => message.id !== optimisticId),
+          [sent],
+        ),
+      );
       setAttachmentProgress(null);
       scrollMessagesToBottom('smooth');
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+      setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === optimisticId
+            ? { ...message, deliveryStatus: 'failed' }
+            : message,
+        ),
+      );
       setAttachmentProgress(null);
     }
+  };
+
+  const handleSend = async (content: string, attachments: File[]) => {
+    const payload = { attachments, content, replyTarget };
+
+    setReplyTarget(null);
+    await sendPendingMessage(payload);
+  };
+
+  const retryMessage = (message: ChatMessage) => {
+    const payload = failedSends[message.id];
+
+    if (!payload) return;
+
+    setFailedSends((current) => {
+      const next = { ...current };
+
+      delete next[message.id];
+
+      return next;
+    });
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    void sendPendingMessage(payload);
   };
 
   const handleMessageMenuOpen = (
@@ -528,7 +718,11 @@ export function GlassWorkspace({
   ]);
 
   const fetchRealtimeMessage = useCallback(
-    async (conversationId: string, messageId: string) => {
+    async (
+      conversationId: string,
+      messageId: string,
+      shouldAutoScroll: boolean,
+    ) => {
       try {
         const message = await pigeonApplication.loadMessage(
           session,
@@ -539,13 +733,18 @@ export function GlassWorkspace({
         if (!message) return;
 
         setMessages((current) => mergeMessages(current, [message]));
+        if (shouldAutoScroll) {
+          scrollMessagesToBottom('smooth', true);
+        } else {
+          setNewMessageCount((current) => current + 1);
+        }
       } catch (caught) {
         setSendError(
           toUserErrorMessage(caught, copy.workspace.loadMessagesError),
         );
       }
     },
-    [session],
+    [scrollMessagesToBottom, session],
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
@@ -623,7 +822,11 @@ export function GlassWorkspace({
             return;
           }
 
-          void fetchRealtimeMessage(conversationId, messageId);
+          void fetchRealtimeMessage(
+            conversationId,
+            messageId,
+            isScrolledNearBottom() || authorId === session.identity.id,
+          );
         }
       }
     },
@@ -632,6 +835,7 @@ export function GlassWorkspace({
       activeConversationKeyId,
       clearUnreadMessages,
       fetchRealtimeMessage,
+      isScrolledNearBottom,
       markUnreadMessage,
       messages,
       onPeersReload,
@@ -684,8 +888,10 @@ export function GlassWorkspace({
               identityProfiles={identityProfiles}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
+              draftConversationIds={draftConversationIds}
               onSelect={(id) => {
                 clearUnreadMessages(id);
+                setNewMessageCount(0);
                 setActiveConversationId(id);
                 setSidebarOpen(false);
               }}
@@ -712,6 +918,7 @@ export function GlassWorkspace({
           session={session}
           activeConversation={activeConversation}
           conversationKey={activeConversationKey}
+          draft={activeConversationDraft}
           hasConversationKey={!!activeConversationKey}
           hasReachedMessageStart={!messageCursor}
           peerIdentityId={activeConversationPeerIdentityId}
@@ -729,6 +936,7 @@ export function GlassWorkspace({
           identityPictures={identityPictures}
           messages={messages}
           messageState={messageState}
+          newMessageCount={newMessageCount}
           nodeNetworks={nodeNetworks}
           sendError={sendError}
           scrollerRef={scrollerRef}
@@ -736,6 +944,9 @@ export function GlassWorkspace({
           onScroll={handleScroll}
           onSend={handleSend}
           onConversationKeyImported={handleConversationKeyImported}
+          onDraftChange={updateActiveConversationDraft}
+          onEscape={closeTransientUi}
+          onJumpToLatest={jumpToLatestMessages}
           onMessageMenuOpen={handleMessageMenuOpen}
           onReplyReferenceClick={(messageId) =>
             void handleReplyReferenceClick(messageId)
@@ -745,6 +956,7 @@ export function GlassWorkspace({
           progress={attachmentProgress}
           replyToMessage={replyTarget}
           onCancelReply={() => setReplyTarget(null)}
+          onRetryMessage={retryMessage}
         />
 
         <Inspector

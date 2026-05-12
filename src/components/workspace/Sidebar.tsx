@@ -51,6 +51,7 @@ interface SidebarProps {
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
   activeConversationId: string | null;
+  draftConversationIds: string[];
   onSelect: (id: string) => void;
   onClose: () => void;
   onCreate: () => void;
@@ -61,6 +62,7 @@ interface SidebarProps {
 export function Sidebar({
   activeConversationId,
   conversations,
+  draftConversationIds,
   identityNames,
   identityPictures,
   identityProfiles,
@@ -76,6 +78,7 @@ export function Sidebar({
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  const [conversationSearch, setConversationSearch] = useState('');
   const profileRef = useRef<HTMLDivElement>(null);
   const ownDisplayName = identityDisplayName(
     session.identity.id,
@@ -131,6 +134,25 @@ export function Sidebar({
 
     return peerIdentityId ? identityPictures[peerIdentityId] : undefined;
   };
+  const filteredConversations = useMemo(() => {
+    const query = conversationSearch.trim().toLowerCase();
+
+    if (!query) return conversations;
+
+    return conversations.filter((conversation) => {
+      const peerIdentityId = conversationPeerId(conversation);
+      const searchable = [
+        conversation.id,
+        conversationName(conversation),
+        conversationHandle(conversation),
+        peerIdentityId ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [conversationSearch, conversations, identityNames, identityProfiles]);
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -183,13 +205,19 @@ export function Sidebar({
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
         <SectionTitle title={copy.sidebar.oneToOneTitle} />
+        <input
+          value={conversationSearch}
+          onChange={(event) => setConversationSearch(event.target.value)}
+          className="mb-3 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-fuchsia-300/60"
+          placeholder={copy.sidebar.searchConversations}
+        />
         <div className="space-y-2">
-          {conversations.length === 0 && (
+          {filteredConversations.length === 0 && (
             <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
               {copy.sidebar.emptyConversations}
             </div>
           )}
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <button
               key={conversation.id}
               onClick={() => onSelect(conversation.id)}
@@ -230,7 +258,9 @@ export function Sidebar({
                         : 'text-white/45',
                     )}
                   >
-                    {conversationHandle(conversation)}
+                    {draftConversationIds.includes(conversation.id)
+                      ? copy.sidebar.draft
+                      : conversationHandle(conversation)}
                   </div>
                 </div>
                 {!!conversation.unreadCount && (

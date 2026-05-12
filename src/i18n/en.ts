@@ -232,6 +232,9 @@ export const copy = {
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
+    retrySend: 'Retry',
+    sendFailed: 'Failed',
+    sending: 'Sending',
     viewRaw: 'View raw',
   },
   network: {
@@ -363,15 +366,18 @@ export const copy = {
   },
   sidebar: {
     createConversation: 'New conversation',
+    draft: 'Draft',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
     oneToOneTitle: 'Direct messages',
+    searchConversations: 'Search conversations',
   },
   workspace: {
     closeSidebar: 'Close sidebar',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',
     loadOlderError: 'Older messages could not be loaded.',
+    newMessages: 'New messages',
     sendError: 'The message was not sent. TLS had other plans.',
   },
 } as const;
