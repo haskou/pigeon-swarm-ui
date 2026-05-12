@@ -34,6 +34,7 @@ interface ChatColumnProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   hasConversationKey: boolean;
+  hasReachedMessageStart: boolean;
   messages: ChatMessage[];
   messageState: LoadState;
   nodeNetworks: NodeNetwork[];
@@ -55,6 +56,7 @@ export function ChatColumn({
   activeConversation,
   bottomRef,
   hasConversationKey,
+  hasReachedMessageStart,
   identityNames,
   identityPictures,
   messages,
@@ -290,6 +292,13 @@ export function ChatColumn({
               </div>
             )}
             <div className="space-y-4">
+              {hasReachedMessageStart &&
+                messages.length > 0 &&
+                messageState !== 'loading' && (
+                  <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    {copy.chat.noMoreMessages}
+                  </div>
+                )}
               {messages.map((message, index) => {
                 const nextMessage = messages[index + 1];
                 const replyMessage = message.replyToMessageId

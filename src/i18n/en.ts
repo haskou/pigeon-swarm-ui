@@ -43,6 +43,7 @@ export const copy = {
     emptyTitle: 'No conversations',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
+    noMoreMessages: 'No more messages',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
     you: 'You',

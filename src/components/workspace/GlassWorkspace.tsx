@@ -798,6 +798,7 @@ export function GlassWorkspace({
           session={session}
           activeConversation={activeConversation}
           hasConversationKey={!!activeConversationKey}
+          hasReachedMessageStart={!messageCursor}
           peerIdentityId={
             activeConversation
               ? conversationPeerIdentityId(
