@@ -77,8 +77,8 @@ export function Rail({
               onClick={() => onCommunityClick?.(community.id)}
               title={community.name}
               className={cx(
-                'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 ring-offset-2 ring-offset-[#0c102b] transition hover:bg-white/15',
-                activeCommunityId === community.id && 'ring-2 ring-fuchsia-300',
+                'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition hover:bg-white/15',
+                activeCommunityId === community.id && 'bg-white/15',
               )}
               aria-label={community.name}
             >
@@ -197,7 +197,7 @@ function RailSelectionIndicator({ active }: { active: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+      className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
     />
   );
 }
