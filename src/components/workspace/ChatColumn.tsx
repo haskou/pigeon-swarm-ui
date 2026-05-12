@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -62,21 +63,21 @@ export function ChatColumn({
   messages,
   messageState,
   nodeNetworks,
+  onCancelReply,
   onCreate,
+  onMessageMenuOpen,
   onOpenSidebar,
   onReplyReferenceClick,
   onScroll,
   onSend,
-  onMessageMenuOpen,
-  onCancelReply,
   peerIdentity,
   peerIdentityId,
   peerPicture,
+  progress,
+  replyToMessage,
   scrollerRef,
   sendError,
   session,
-  progress,
-  replyToMessage,
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     identity?: IdentityResource;
@@ -116,7 +117,6 @@ export function ChatColumn({
     : copy.chat.e2eMissing;
   const conversationData = useMemo(
     () => ({
-      serverConversation: activeConversation ?? null,
       frontendDerived: {
         conversationNetworkId: conversationNetworkId ?? null,
         conversationNetworkName,
@@ -125,6 +125,7 @@ export function ChatColumn({
         peerIdentity,
         peerIdentityId: peerIdentityId ?? null,
       },
+      serverConversation: activeConversation ?? null,
     }),
     [
       activeConversation,
@@ -157,6 +158,7 @@ export function ChatColumn({
   const openMessageAuthorProfile = (message: ChatMessage) => {
     if (message.mine || message.authorIdentityId === session.identity.id) {
       openOwnProfile();
+
       return;
     }
 
@@ -287,7 +289,7 @@ export function ChatColumn({
               <button
                 type="button"
                 onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
                 aria-label={copy.chat.conversationMenu}
                 aria-expanded={conversationMenuOpen}
               >
@@ -412,7 +414,7 @@ export function ChatColumn({
                               message.replyPreview.authorIdentityId,
                               identityNames,
                             )
-                        : undefined
+                          : undefined
                     }
                     replyPreview={
                       replyMessage?.content ?? message.replyPreview?.content
@@ -475,18 +477,9 @@ export function ChatColumn({
 
 function LockIcon({ locked }: { locked: boolean }) {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
-        d={
-          locked
-            ? 'M7 10V8a5 5 0 0 1 10 0v2'
-            : 'M9 10V8a5 5 0 0 1 8.7-3.4'
-        }
+        d={locked ? 'M7 10V8a5 5 0 0 1 10 0v2' : 'M9 10V8a5 5 0 0 1 8.7-3.4'}
         stroke="currentColor"
         strokeLinecap="round"
         strokeWidth="1.8"
@@ -513,7 +506,7 @@ function ConversationDataDialog({
   data: unknown;
   onClose: () => void;
 }) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
       <button
         type="button"
@@ -539,6 +532,7 @@ function ConversationDataDialog({
           {JSON.stringify(data, null, 2)}
         </pre>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
