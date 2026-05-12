@@ -148,6 +148,7 @@ export function GlassWorkspace({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
+  const keepMessageBottomUntilRef = useRef(0);
   const messageRequestRef = useRef(0);
 
   const activeConversation = useMemo(
@@ -323,20 +324,54 @@ export function GlassWorkspace({
   }, [session]);
 
   const scrollMessagesToBottom = useCallback(
-    (behavior: ScrollBehavior = 'auto') => {
+    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
       const scroll = () => {
         bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
         lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
       };
 
+      if (keepPinned) {
+        keepMessageBottomUntilRef.current = Date.now() + 5000;
+      }
+
       requestAnimationFrame(() => {
         scroll();
         requestAnimationFrame(scroll);
         window.setTimeout(scroll, 120);
+        window.setTimeout(scroll, 450);
       });
     },
     [],
   );
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const handleMediaLayoutChange = () => {
+      if (Date.now() > keepMessageBottomUntilRef.current) return;
+
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+        lastScrollTopRef.current = scroller.scrollTop;
+      });
+    };
+
+    scroller.addEventListener('load', handleMediaLayoutChange, true);
+    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
+    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
+
+    return () => {
+      scroller.removeEventListener('load', handleMediaLayoutChange, true);
+      scroller.removeEventListener(
+        'loadedmetadata',
+        handleMediaLayoutChange,
+        true,
+      );
+      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
+    };
+  }, []);
 
   useEffect(() => {
     setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
@@ -360,7 +395,7 @@ export function GlassWorkspace({
 
         setMessages(result.messages);
         setMessageCursor(result.nextCursor ?? null);
-        scrollMessagesToBottom();
+        scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
 
