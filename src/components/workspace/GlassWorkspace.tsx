@@ -53,6 +53,11 @@ import { Sidebar } from './Sidebar';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type ConversationDrafts = Record<string, string>;
+type WorkspacePreference = {
+  channelByCommunityId?: Record<string, string>;
+  communityId?: null | string;
+  mode?: 'community' | 'messages';
+};
 type PendingSend = {
   attachments: File[];
   content: string;
@@ -64,6 +69,8 @@ const lastConversationStorageKey = (identityId: string) =>
   `pigeon:lastConversation:${identityId}`;
 const draftsStorageKey = (identityId: string) =>
   `pigeon:conversationDrafts:${identityId}`;
+const workspaceStorageKey = (identityId: string) =>
+  `pigeon:workspace:${identityId}`;
 
 function initialConversationId(
   conversations: ConversationResource[],
@@ -83,6 +90,16 @@ function loadDrafts(identityId: string): ConversationDrafts {
     return JSON.parse(
       globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
     ) as ConversationDrafts;
+  } catch {
+    return {};
+  }
+}
+
+function loadWorkspacePreference(identityId: string): WorkspacePreference {
+  try {
+    return JSON.parse(
+      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
+    ) as WorkspacePreference;
   } catch {
     return {};
   }
@@ -142,12 +159,18 @@ export function GlassWorkspace({
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
+  const [workspacePreference] = useState<WorkspacePreference>(() =>
+    loadWorkspacePreference(session.identity.id),
+  );
   const [workspaceMode, setWorkspaceMode] = useState<'community' | 'messages'>(
-    'messages',
+    workspacePreference.mode ?? 'messages',
   );
   const [activeCommunityId, setActiveCommunityId] = useState<string | null>(
-    null,
+    workspacePreference.communityId ?? null,
   );
+  const [communityChannelById, setCommunityChannelById] = useState<
+    Record<string, string>
+  >(() => workspacePreference.channelByCommunityId ?? {});
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -288,6 +311,14 @@ export function GlassWorkspace({
   }, [session.identity.id]);
 
   useEffect(() => {
+    const preference = loadWorkspacePreference(session.identity.id);
+
+    setWorkspaceMode(preference.mode ?? 'messages');
+    setActiveCommunityId(preference.communityId ?? null);
+    setCommunityChannelById(preference.channelByCommunityId ?? {});
+  }, [session.identity.id]);
+
+  useEffect(() => {
     globalThis.localStorage?.setItem(
       draftsStorageKey(session.identity.id),
       JSON.stringify(drafts),
@@ -302,6 +333,25 @@ export function GlassWorkspace({
       activeConversation.id,
     );
   }, [activeConversation?.id, session.identity.id]);
+
+  useEffect(() => {
+    const preference: WorkspacePreference = {
+      channelByCommunityId: communityChannelById,
+      communityId: activeCommunity?.id ?? activeCommunityId,
+      mode: workspaceMode,
+    };
+
+    globalThis.localStorage?.setItem(
+      workspaceStorageKey(session.identity.id),
+      JSON.stringify(preference),
+    );
+  }, [
+    activeCommunity?.id,
+    activeCommunityId,
+    communityChannelById,
+    session.identity.id,
+    workspaceMode,
+  ]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -1040,9 +1090,20 @@ export function GlassWorkspace({
           </>
         ) : activeCommunity ? (
           <CommunityWorkspace
+            activeChannelId={communityChannelById[activeCommunity.id] ?? null}
             community={activeCommunity}
             mobileSidebarOpen={sidebarOpen}
             nodeNetworks={nodeNetworks}
+            onChannelSelected={(channelId) =>
+              setCommunityChannelById((current) =>
+                current[activeCommunity.id] === channelId
+                  ? current
+                  : {
+                      ...current,
+                      [activeCommunity.id]: channelId,
+                    },
+              )
+            }
             onCommunityUpdated={(community) =>
               setCommunities((current) =>
                 current.map((item) =>

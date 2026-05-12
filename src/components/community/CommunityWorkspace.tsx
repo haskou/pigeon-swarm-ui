@@ -30,9 +30,11 @@ import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 
 interface CommunityWorkspaceProps {
+  activeChannelId?: null | string;
   community: Community;
   mobileSidebarOpen: boolean;
   nodeNetworks: NodeNetwork[];
+  onChannelSelected: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
@@ -46,16 +48,18 @@ type MemberView = {
 };
 
 export function CommunityWorkspace({
+  activeChannelId,
   community,
   mobileSidebarOpen,
   nodeNetworks,
+  onChannelSelected,
   onCommunityUpdated,
   onMobileSidebarClose,
   onOpenMobileSidebar,
   session,
 }: CommunityWorkspaceProps) {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
-    community.textChannels[0]?.id ?? null,
+    activeChannelId ?? community.textChannels[0]?.id ?? null,
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<null | string>(null);
@@ -98,13 +102,21 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     const nextSelectedChannel =
+      community.textChannels.find((channel) => channel.id === activeChannelId)
+        ?.id ??
       community.textChannels.find((channel) => channel.id === selectedChannelId)
         ?.id ??
       community.textChannels[0]?.id ??
       null;
 
     setSelectedChannelId(nextSelectedChannel);
-  }, [community.textChannels, selectedChannelId]);
+    if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
+  }, [
+    activeChannelId,
+    community.textChannels,
+    onChannelSelected,
+    selectedChannelId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -465,18 +477,11 @@ export function CommunityWorkspace({
             <button
               type="button"
               onClick={() => setManageOpen(true)}
-              className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90"
+              className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
             >
               {copy.communities.manage}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setMemberOpen(true)}
-            className="mt-2 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-          >
-            {copy.communities.addMember}
-          </button>
         </div>
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
@@ -495,6 +500,7 @@ export function CommunityWorkspace({
                   type="button"
                   onClick={() => {
                     setSelectedChannelId(channel.id);
+                    onChannelSelected(channel.id);
                     onMobileSidebarClose();
                   }}
                   className={cx(
@@ -635,6 +641,13 @@ export function CommunityWorkspace({
       </section>
 
       <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-[2rem] p-4 xl:block">
+        <button
+          type="button"
+          onClick={() => setMemberOpen(true)}
+          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+        >
+          {copy.communities.addMember}
+        </button>
         <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
           {copy.communities.members}
         </div>
