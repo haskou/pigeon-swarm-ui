@@ -504,17 +504,17 @@ export function CommunityWorkspace({
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
                     {community.description}
                   </p>
+                  {owner && (
+                    <button
+                      type="button"
+                      onClick={() => setManageOpen(true)}
+                      className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
+                    >
+                      {copy.communities.manage}
+                    </button>
+                  )}
                 </div>
               </div>
-              {owner && (
-                <button
-                  type="button"
-                  onClick={() => setManageOpen(true)}
-                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
-                >
-                  {copy.communities.manage}
-                </button>
-              )}
             </div>
 
             <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
