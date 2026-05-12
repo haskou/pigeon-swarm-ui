@@ -4,6 +4,7 @@ export type IdentityUpdateProfileInput = {
   biography?: string;
   handle?: string;
   name: string;
+  networks?: string[];
   picture?: string;
 };
 
@@ -19,7 +20,7 @@ export class IdentitySignaturePayloadFactory {
       encryptedKeyPair:
         input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
       id: input.identity.id,
-      networks: input.identity.networks,
+      networks: input.profile.networks ?? input.identity.networks,
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
       profile: {
