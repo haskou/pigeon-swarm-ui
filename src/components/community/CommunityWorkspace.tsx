@@ -1077,7 +1077,7 @@ function ManageCommunityDialog({
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   {copy.communities.banner}
                 </span>
-                <div className="grid h-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                <div className="grid aspect-[2/1] cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
                   {bannerPreview || currentBannerUrl ? (
                     <img
                       src={bannerPreview ?? currentBannerUrl ?? ''}
