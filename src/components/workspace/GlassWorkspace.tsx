@@ -149,7 +149,13 @@ export function GlassWorkspace({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
+  const messageCursorRef = useRef<string | null>(null);
   const messageRequestRef = useRef(0);
+
+  const updateMessageCursor = useCallback((cursor: null | string) => {
+    messageCursorRef.current = cursor;
+    setMessageCursor(cursor);
+  }, []);
 
   const activeConversation = useMemo(
     () =>
@@ -394,7 +400,7 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         setMessages(result.messages);
-        setMessageCursor(result.nextCursor ?? null);
+        updateMessageCursor(result.nextCursor ?? null);
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
@@ -411,7 +417,7 @@ export function GlassWorkspace({
 
       setMessageState('idle');
     },
-    [scrollMessagesToBottom, session],
+    [scrollMessagesToBottom, session, updateMessageCursor],
   );
 
   useEffect(() => {
@@ -420,7 +426,7 @@ export function GlassWorkspace({
 
     if (!activeConversationKeyId) {
       setMessages([]);
-      setMessageCursor(null);
+      updateMessageCursor(null);
       lastScrollTopRef.current = 0;
       setMessageState('idle');
       return;
@@ -433,7 +439,7 @@ export function GlassWorkspace({
     if (
       !activeConversation?.id ||
       !activeConversationKey ||
-      !messageCursor ||
+      !messageCursorRef.current ||
       messageState === 'loading'
     )
       return;
@@ -448,12 +454,12 @@ export function GlassWorkspace({
       const result = await pigeonApplication.loadMessages(
         session,
         activeConversation.id,
-        messageCursor,
+        messageCursorRef.current,
       );
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
-      setMessageCursor(result.nextCursor ?? null);
+      updateMessageCursor(result.nextCursor ?? null);
       requestAnimationFrame(() => {
         if (!scrollerRef.current) return;
 
@@ -558,7 +564,7 @@ export function GlassWorkspace({
       );
 
       setMessages((current) => mergeMessages(current, result.messages));
-      setMessageCursor(result.previousCursor ?? null);
+      updateMessageCursor(result.previousCursor ?? null);
 
       if (result.messages.some((message) => message.id === messageId)) {
         scrollToMessage(messageId);
