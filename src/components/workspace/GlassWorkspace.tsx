@@ -45,6 +45,7 @@ type MessageContextMenuState = {
   x: number;
   y: number;
 };
+type UnreadMessagesByConversation = Record<string, string[]>;
 
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
@@ -118,6 +119,8 @@ export function GlassWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
+  const [unreadMessages, setUnreadMessages] =
+    useState<UnreadMessagesByConversation>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
@@ -164,6 +167,16 @@ export function GlassWorkspace({
         (conversation) => conversation.id === activeConversationId,
       ) ?? conversations[0],
     [activeConversationId, conversations],
+  );
+  const conversationsWithUnread = useMemo(
+    () =>
+      conversations.map((conversation) => ({
+        ...conversation,
+        unreadCount:
+          (conversation.unreadCount ?? 0) +
+          (unreadMessages[conversation.id]?.length ?? 0),
+      })),
+    [conversations, unreadMessages],
   );
   const visibleNotifications = useMemo(
     () =>
@@ -736,6 +749,32 @@ export function GlassWorkspace({
     },
     [session],
   );
+  const clearUnreadMessages = useCallback((conversationId: string) => {
+    setUnreadMessages((current) => {
+      if (!current[conversationId]?.length) return current;
+
+      const next = { ...current };
+
+      delete next[conversationId];
+
+      return next;
+    });
+  }, []);
+  const markUnreadMessage = useCallback(
+    (conversationId: string, messageId: string) => {
+      setUnreadMessages((current) => {
+        const messages = current[conversationId] ?? [];
+
+        if (messages.includes(messageId)) return current;
+
+        return {
+          ...current,
+          [conversationId]: [...messages, messageId],
+        };
+      });
+    },
+    [],
+  );
 
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
@@ -771,11 +810,21 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('conversations.v1.message.')) {
         void refreshConversations().catch(() => undefined);
+        const conversationId = eventAggregateId(event);
+        const messageId = stringAttribute(event, 'messageId', 'message_id');
+        const authorId = stringAttribute(event, 'authorId', 'author_id');
+        const isActiveConversation =
+          !!conversationId && conversationId === activeConversation?.id;
 
-        if (
-          event.aggregate_id === activeConversation?.id &&
-          activeConversationKeyId
-        ) {
+        if (!messageId || !conversationId) return;
+
+        if (!isActiveConversation && authorId !== session.identity.id) {
+          markUnreadMessage(conversationId, messageId);
+        }
+
+        if (isActiveConversation) {
+          clearUnreadMessages(conversationId);
+
           if (event.type.endsWith('.was_deleted')) {
             const targetMessageId = stringAttribute(
               event,
@@ -792,20 +841,23 @@ export function GlassWorkspace({
             return;
           }
 
-          const messageId = stringAttribute(event, 'messageId', 'message_id');
-
-          if (!messageId || messages.some((message) => message.id === messageId)) {
+          if (
+            !activeConversationKeyId ||
+            messages.some((message) => message.id === messageId)
+          ) {
             return;
           }
 
-          void fetchRealtimeMessage(event.aggregate_id, messageId);
+          void fetchRealtimeMessage(conversationId, messageId);
         }
       }
     },
     [
       activeConversation?.id,
       activeConversationKeyId,
+      clearUnreadMessages,
       fetchRealtimeMessage,
+      markUnreadMessage,
       messages,
       onPeersReload,
       refreshConversations,
@@ -850,13 +902,14 @@ export function GlassWorkspace({
             />
             <Sidebar
               session={session}
-              conversations={conversations}
+              conversations={conversationsWithUnread}
               identityNames={identityNames}
               identityPictures={identityPictures}
               identityProfiles={identityProfiles}
               nodeNetworks={nodeNetworks}
               activeConversationId={activeConversation?.id ?? null}
               onSelect={(id) => {
+                clearUnreadMessages(id);
                 setActiveConversationId(id);
                 setSidebarOpen(false);
               }}
@@ -1154,4 +1207,14 @@ function stringAttribute(
   }
 
   return undefined;
+}
+
+function eventAggregateId(event: RealtimeDomainEvent): string | undefined {
+  const aggregateId =
+    event.aggregate_id ??
+    (event as RealtimeDomainEvent & { aggregateId?: string }).aggregateId;
+
+  return typeof aggregateId === 'string' && aggregateId.length > 0
+    ? aggregateId
+    : undefined;
 }
