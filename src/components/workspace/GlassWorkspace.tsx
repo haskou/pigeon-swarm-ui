@@ -5,7 +5,6 @@ import type {
   AttachmentProgress,
   ConversationKeyEntry,
   ConversationResource,
-  IdentityResource,
   MessageReplyPreview,
   NotificationResource,
   Session,
@@ -17,18 +16,12 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
+import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { ArchivedNotifications } from '../../presentation/notifications/ArchivedNotifications';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
-import {
-  identityName,
-  identityPicture,
-  profilePictureDataUrl,
-  type IdentityNames,
-  type IdentityPictures,
-} from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { ChatColumn } from './ChatColumn';
@@ -65,22 +58,6 @@ function replyPreviewFromMessage(
 }
 
 const archivedNotifications = new ArchivedNotifications();
-
-async function loadIdentityPicture(
-  identity: IdentityResource,
-): Promise<string | null> {
-  const directPicture = identityPicture(identity);
-
-  if (directPicture) return directPicture;
-
-  const pictureCid = identity.profile.picture?.trim();
-
-  if (!pictureCid) return null;
-
-  const content = await pigeonApplication.getPublicFile(pictureCid);
-
-  return profilePictureDataUrl(content);
-}
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -136,26 +113,12 @@ export function GlassWorkspace({
   const [notificationError, setNotificationError] = useState<string | null>(
     null,
   );
-  const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
-    [session.identity.id]: identityName(session.identity) ?? session.identity.id,
-  }));
-  const [identityProfiles, setIdentityProfiles] = useState<
-    Record<string, IdentityResource>
-  >(() => ({ [session.identity.id]: session.identity }));
-  const [identityPictures, setIdentityPictures] = useState<IdentityPictures>(
-    () => ({
-      ...(identityPicture(session.identity)
-        ? { [session.identity.id]: identityPicture(session.identity) as string }
-        : {}),
-    }),
-  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
   const messageCursorRef = useRef<string | null>(null);
   const messageRequestRef = useRef(0);
-  const resolvingIdentityIdsRef = useRef(new Set<string>());
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -205,141 +168,22 @@ export function GlassWorkspace({
         session.keychain,
       )
     : undefined;
-  const identityIdsToResolve = useMemo(() => {
-    const ids = new Set<string>();
-
-    conversations.forEach((conversation) => {
-      const peerIdentityId = conversationPeerIdentityId(
-        conversation,
-        session.identity.id,
-        session.keychain,
-      );
-
-      if (peerIdentityId) ids.add(peerIdentityId);
-      conversation.participantIdentityIds?.forEach((identityId) =>
-        ids.add(identityId),
-      );
-      conversation.participantIds?.forEach((identityId) => ids.add(identityId));
-    });
-    notifications.forEach((notification) => {
-      ids.add(notification.payload.inviterIdentityId);
-      ids.add(notification.payload.recipientIdentityId);
-    });
-    messages.forEach((message) => ids.add(message.authorIdentityId));
-    ids.delete(session.identity.id);
-
-    return [...ids].filter(
-      (identityId) =>
-        !identityProfiles[identityId] &&
-        !resolvingIdentityIdsRef.current.has(identityId),
-    );
-  }, [
-    conversations,
+  const {
+    identityNames,
+    identityPictures,
     identityProfiles,
+    rememberIdentity,
+  } = useIdentityDirectory({
+    conversations,
     messages,
     notifications,
-    session.identity.id,
-  ]);
+    session,
+  });
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
       setActiveConversationId(conversations[0].id);
   }, [activeConversationId, conversations]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void loadIdentityPicture(session.identity)
-      .then((picture) => {
-        if (cancelled) return;
-
-        setIdentityPictures((current) => {
-          const next = { ...current };
-
-          if (picture) next[session.identity.id] = picture;
-          else delete next[session.identity.id];
-
-          return next;
-        });
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session.identity]);
-
-  useEffect(() => {
-    if (identityIdsToResolve.length === 0) return;
-
-    let cancelled = false;
-    const identityIds = identityIdsToResolve.filter(
-      (identityId) => !resolvingIdentityIdsRef.current.has(identityId),
-    );
-
-    if (identityIds.length === 0) return;
-    identityIds.forEach((identityId) =>
-      resolvingIdentityIdsRef.current.add(identityId),
-    );
-
-    void Promise.all(
-      identityIds.map(async (identityId) => {
-        try {
-          const identity = await pigeonApplication.getIdentity(identityId);
-          const picture = await loadIdentityPicture(identity).catch(
-            () => null,
-          );
-
-          return [
-            identityId,
-            identityName(identity) ?? identityId,
-            picture,
-            identity,
-          ] as const;
-        } catch {
-          return [identityId, identityId, null, null] as const;
-        }
-      }),
-    )
-      .then((resolvedIdentities) => {
-        if (cancelled) return;
-
-        setIdentityNames((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities.map(([identityId, name]) => [identityId, name]),
-          ),
-        }));
-        setIdentityProfiles((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities
-              .filter(([, , , identity]) => !!identity)
-              .map(([identityId, , , identity]) => [
-                identityId,
-                identity as IdentityResource,
-              ]),
-          ),
-        }));
-        setIdentityPictures((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities
-              .filter(([, , picture]) => !!picture)
-              .map(([identityId, , picture]) => [identityId, picture as string]),
-          ),
-        }));
-      })
-      .finally(() => {
-        identityIds.forEach((identityId) =>
-          resolvingIdentityIdsRef.current.delete(identityId),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [identityIdsToResolve]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -944,25 +788,7 @@ export function GlassWorkspace({
               onLogout={() => setSession(null)}
               onSessionUpdated={(nextSession) => {
                 setSession(nextSession);
-                setIdentityNames((current) => ({
-                  ...current,
-                  [nextSession.identity.id]:
-                    identityName(nextSession.identity) ?? nextSession.identity.id,
-                }));
-                setIdentityProfiles((current) => ({
-                  ...current,
-                  [nextSession.identity.id]: nextSession.identity,
-                }));
-                setIdentityPictures((current) => ({
-                  ...current,
-                  ...(identityPicture(nextSession.identity)
-                    ? {
-                        [nextSession.identity.id]: identityPicture(
-                          nextSession.identity,
-                        ) as string,
-                      }
-                    : {}),
-                }));
+                rememberIdentity(nextSession.identity);
               }}
             />
           </div>
