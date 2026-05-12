@@ -1,5 +1,6 @@
 import type {
   IdentityResource,
+  LocalKeychain,
   PendingMessageAttachment,
   Session,
 } from '../../domain/types';
@@ -60,6 +61,94 @@ describe(PigeonApiGateway.name, () => {
       headers: { 'X-Identity-Id': 'identity-1' },
       method: 'GET',
     });
+  });
+
+  it('creates group conversations and stores the key under the server id', async () => {
+    const createdConversation = {
+      id: 'group:server-conversation',
+      name: 'Mi grupo',
+      networkId: 'network-1',
+      participantIds: ['identity-1', 'identity-2'],
+      type: 'group',
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce(createdConversation)
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 2,
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      keychainExternalIdentifier: 'keychain-current',
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.createGroupConversation(session, {
+      name: 'Mi grupo',
+      networkId: 'network-1',
+      participantIds: ['identity-2', 'identity-1', 'identity-2'],
+    });
+
+    const createBody = {
+      keychainExternalIdentifier: 'keychain-current',
+      name: 'Mi grupo',
+      networkId: 'network-1',
+      participantIds: ['identity-1', 'identity-2'],
+      type: 'group',
+    };
+
+    expect(http.request).toHaveBeenNthCalledWith(1, '/conversations', {
+      body: JSON.stringify(createBody),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      1,
+      session,
+      'POST',
+      '/conversations',
+      createBody,
+    );
+    expect(keychains.encryptForPublish).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        conversations: expect.objectContaining({
+          'group:server-conversation': expect.objectContaining({
+            conversationId: 'group:server-conversation',
+          }),
+        }),
+        version: 1,
+      }),
+    );
+    expect(result.conversation).toMatchObject(createdConversation);
+    expect(result.keychain.conversations['group:server-conversation']).toEqual(
+      expect.objectContaining({ conversationId: 'group:server-conversation' }),
+    );
+    expect(result.keychainExternalIdentifier).toBe('keychain-next');
   });
 
   it('does not project deleted messages when loading conversation messages', async () => {

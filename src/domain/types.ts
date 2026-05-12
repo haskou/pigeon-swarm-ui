@@ -134,11 +134,13 @@ export type ConversationResource = {
   id: string;
   conversationId?: string;
   networkId: string;
+  name?: string;
   participants?: string[];
   participantIdentityIds?: string[];
   participantIds?: string[];
   peerIdentityId?: string;
   title?: string;
+  type?: 'group' | 'one-to-one';
   latestMessagePreview?: string;
   latestMessageAt?: number;
   unreadCount?: number;
@@ -181,6 +183,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
+  deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;
   encrypted: boolean;

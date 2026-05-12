@@ -1,5 +1,6 @@
 import type { LoginResult } from '../../domain/types';
 
+import { sortConversationsByLatestMessage } from '../../domain/conversations/conversationOrdering';
 import { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
 
 export class LoginIdentity {
@@ -9,6 +10,11 @@ export class LoginIdentity {
     identityId: string,
     password: string,
   ): Promise<LoginResult> {
-    return await this.gateway.login(identityId, password);
+    const result = await this.gateway.login(identityId, password);
+
+    return {
+      ...result,
+      conversations: sortConversationsByLatestMessage(result.conversations),
+    };
   }
 }

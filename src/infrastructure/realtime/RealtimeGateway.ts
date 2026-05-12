@@ -96,6 +96,10 @@ export class RealtimeGateway {
       return;
     }
 
-    console.debug(`[pigeon:realtime:${event}]`, data);
+    globalThis.dispatchEvent(
+      new CustomEvent('pigeon:realtime-debug', {
+        detail: { data, event },
+      }),
+    );
   }
 }

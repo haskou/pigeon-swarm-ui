@@ -74,6 +74,7 @@ export const copy = {
     emptyMessages:
       'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
     emptyTitle: 'No conversations',
+    groupMessage: 'Group conversation',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
     noConversation: 'No conversation',
@@ -104,6 +105,7 @@ export const copy = {
     title: 'No connection with the server',
   },
   dialog: {
+    addParticipant: 'Add',
     cancel: 'Cancel',
     close: 'Close dialog',
     createConversation: 'Create conversation',
@@ -112,12 +114,20 @@ export const copy = {
     createConversationError:
       'The conversation could not be created. The backend chose violence.',
     createConversationLoading: 'Creating and publishing keychain...',
-    createConversationTitle: 'Create a new direct conversation',
+    createConversationTitle: 'Create a new conversation',
+    directConversation: 'Direct message',
+    groupConversation: 'Group',
+    groupName: 'Group name',
+    groupNamePlaceholder: 'Mi grupo',
+    groupNeedsParticipant: 'Add at least one participant.',
+    groupParticipant: 'Add identity',
+    groupParticipants: 'Participants',
     loadingIdentity: 'Looking for shared networks...',
     noSharedNetwork:
       'No shared network with this identity. You cannot create this conversation yet.',
     remoteIdentityId: 'Identity ID or username',
-    sharedNetwork: 'Conversation network',
+    removeParticipant: 'Remove participant',
+    sharedNetwork: 'Network',
   },
   errors: {
     backend: {
@@ -232,6 +242,9 @@ export const copy = {
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
+    retrySend: 'Retry',
+    sendFailed: 'Failed',
+    sending: 'Sending',
     viewRaw: 'View raw',
   },
   network: {
@@ -365,13 +378,16 @@ export const copy = {
     createConversation: 'New conversation',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
+    members: 'members',
     oneToOneTitle: 'Direct messages',
+    searchConversations: 'Search conversations',
   },
   workspace: {
     closeSidebar: 'Close sidebar',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',
     loadOlderError: 'Older messages could not be loaded.',
+    newMessages: 'New messages',
     sendError: 'The message was not sent. TLS had other plans.',
   },
 } as const;

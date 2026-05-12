@@ -30,7 +30,10 @@ const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 interface ComposerProps {
   disabled: boolean;
   error: string | null;
+  draft: string;
   onSend: (content: string, attachments: File[]) => Promise<void>;
+  onDraftChange: (value: string) => void;
+  onEscape?: () => void;
   placeholder?: string;
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
@@ -40,7 +43,10 @@ interface ComposerProps {
 
 export function Composer({
   disabled,
+  draft,
   error,
+  onDraftChange,
+  onEscape,
   onSend,
   placeholder = copy.composer.placeholder,
   progress,
@@ -48,7 +54,6 @@ export function Composer({
   replyToAuthorName,
   onCancelReply,
 }: ComposerProps) {
-  const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
   >([]);
@@ -66,13 +71,13 @@ export function Composer({
   const textInputRef = useRef<HTMLInputElement>(null);
   const canAttach = !disabled && !sending;
   const canSend =
-    (content.trim().length > 0 || attachments.length > 0) &&
-    content.trim().length <= MESSAGE_MAX_LENGTH &&
+    (draft.trim().length > 0 || attachments.length > 0) &&
+    draft.trim().length <= MESSAGE_MAX_LENGTH &&
     !disabled &&
     !sending;
   const emojiTrigger = useMemo(
-    () => findEmojiTrigger(content, caretIndex),
-    [caretIndex, content],
+    () => findEmojiTrigger(draft, caretIndex),
+    [caretIndex, draft],
   );
   const emojiSuggestions = useMemo(
     () =>
@@ -119,7 +124,7 @@ export function Composer({
   }, []);
 
   const syncCaret = () => {
-    setCaretIndex(textInputRef.current?.selectionStart ?? content.length);
+    setCaretIndex(textInputRef.current?.selectionStart ?? draft.length);
   };
 
   const insertEmoji = useCallback(
@@ -127,14 +132,14 @@ export function Composer({
       if (!emojiTrigger) return;
 
       const next = replaceEmojiTrigger(
-        content,
+        draft,
         emojiTrigger,
         suggestion.emoji,
       );
 
       if (next.value.length > MESSAGE_MAX_LENGTH) return;
 
-      setContent(next.value);
+      onDraftChange(next.value);
       setCaretIndex(next.nextCaretIndex);
       requestAnimationFrame(() => {
         textInputRef.current?.focus();
@@ -144,7 +149,7 @@ export function Composer({
         );
       });
     },
-    [content, emojiTrigger],
+    [draft, emojiTrigger, onDraftChange],
   );
 
   useEffect(() => {
@@ -204,7 +209,7 @@ export function Composer({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const trimmed = content.trim();
+    const trimmed = draft.trim();
 
     if (!canSend) return;
 
@@ -214,7 +219,7 @@ export function Composer({
         trimmed,
         attachments.map((attachment) => attachment.file),
       );
-      setContent('');
+      onDraftChange('');
       attachments.forEach((attachment) =>
         URL.revokeObjectURL(attachment.previewUrl),
       );
@@ -233,11 +238,16 @@ export function Composer({
   };
 
   const handleContentChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setContent(event.target.value);
+    onDraftChange(event.target.value);
     setCaretIndex(event.target.selectionStart ?? event.target.value.length);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      onEscape?.();
+      return;
+    }
+
     if (event.key !== 'Tab' || emojiSuggestions.length === 0) return;
 
     event.preventDefault();
@@ -404,7 +414,7 @@ export function Composer({
           />
           <input
             ref={textInputRef}
-            value={content}
+            value={draft}
             onChange={handleContentChange}
             onClick={syncCaret}
             onKeyDown={handleKeyDown}
@@ -416,8 +426,8 @@ export function Composer({
             className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
             placeholder={placeholder}
           />
-          <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
-            {content.length}/{MESSAGE_MAX_LENGTH}
+            <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
+            {draft.length}/{MESSAGE_MAX_LENGTH}
           </span>
           <button
             disabled={!canSend}

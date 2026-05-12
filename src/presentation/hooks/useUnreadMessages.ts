@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 
 import type { ConversationResource } from '../../domain/types';
 
+import { sortConversationsByLatestMessage } from '../../domain/conversations/conversationOrdering';
+
 type UnreadMessagesByConversation = Record<string, string[]>;
 
 type ConversationWithUnread = ConversationResource & {
@@ -20,12 +22,14 @@ export function useUnreadMessages(
 
   const conversationsWithUnread = useMemo(
     () =>
-      conversations.map((conversation) => ({
-        ...conversation,
-        unreadCount:
-          (conversation.unreadCount ?? 0) +
-          (unreadMessages[conversation.id]?.length ?? 0),
-      })),
+      sortConversationsByLatestMessage(
+        conversations.map((conversation) => ({
+          ...conversation,
+          unreadCount:
+            (conversation.unreadCount ?? 0) +
+            (unreadMessages[conversation.id]?.length ?? 0),
+        })),
+      ),
     [conversations, unreadMessages],
   );
 

@@ -20,6 +20,10 @@ import {
   type RealtimeMessage,
 } from '../infrastructure/realtime/RealtimeGateway';
 import { CreateConversation } from './conversations/CreateConversation';
+import {
+  CreateGroupConversation,
+  type CreateGroupConversationInput,
+} from './conversations/CreateGroupConversation';
 import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
 import { RegisterIdentity } from './identities/RegisterIdentity';
@@ -49,6 +53,8 @@ export class PigeonApplication {
   private readonly acceptConversationInvitationUseCase: AcceptInvitation;
 
   private readonly createConversationUseCase: CreateConversation;
+
+  private readonly createGroupConversationUseCase: CreateGroupConversation;
 
   private readonly createNetworkUseCase: CreateNetwork;
 
@@ -86,6 +92,7 @@ export class PigeonApplication {
     this.realtime = realtime;
     this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
+    this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.joinNetworkUseCase = new JoinNetwork(gateway);
@@ -141,6 +148,17 @@ export class PigeonApplication {
       peerIdentityId,
       networkId,
     );
+  }
+
+  public async createGroupConversation(
+    session: Session,
+    input: CreateGroupConversationInput,
+  ): Promise<{
+    conversation: ConversationResource;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    return await this.createGroupConversationUseCase.execute(session, input);
   }
 
   public async createNetwork(name: string): Promise<void> {

@@ -8,6 +8,28 @@ type ConversationListEnvelope = {
   items?: ConversationResource[];
 };
 
+function conversationId(
+  input: ConversationResource,
+  fallbackPeer: string | undefined,
+  idFactory: ConversationIdFactory,
+): string {
+  return (
+    input.id ??
+    input.conversationId ??
+    idFactory.create('', fallbackPeer ?? 'unknown')
+  );
+}
+
+function conversationPeerId(
+  input: ConversationResource,
+  id: string,
+  fallbackPeer: string | undefined,
+): string | undefined {
+  if (input.type === 'group' || id.startsWith('group:')) return undefined;
+
+  return input.peerIdentityId ?? fallbackPeer;
+}
+
 export class ConversationMapper {
   private readonly idFactory: ConversationIdFactory;
 
@@ -33,10 +55,7 @@ export class ConversationMapper {
     input: ConversationResource,
     fallbackPeer?: string,
   ): ConversationResource {
-    const id =
-      input.id ??
-      input.conversationId ??
-      this.idFactory.create('', fallbackPeer ?? 'unknown');
+    const id = conversationId(input, fallbackPeer, this.idFactory);
 
     return {
       ...input,
@@ -44,7 +63,8 @@ export class ConversationMapper {
       id,
       participantIdentityIds:
         input.participantIdentityIds ?? input.participantIds,
-      peerIdentityId: input.peerIdentityId ?? fallbackPeer,
+      peerIdentityId: conversationPeerId(input, id, fallbackPeer),
+      title: input.title ?? input.name,
     };
   }
 }

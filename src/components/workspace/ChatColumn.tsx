@@ -1,5 +1,5 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -26,6 +26,7 @@ import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from './ConversationDataDialog';
 import { ConversationKeyDialog } from './ConversationKeyDialog';
+import { GroupProfileDialog } from './GroupProfileDialog';
 import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -38,7 +39,9 @@ interface ChatColumnProps {
   peerPicture?: string;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
   conversationKey?: ConversationKeyEntry;
+  draft: string;
   hasConversationKey: boolean;
   hasReachedMessageStart: boolean;
   messages: ChatMessage[];
@@ -47,11 +50,16 @@ interface ChatColumnProps {
   sendError: string | null;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
+  newMessageCount: number;
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
+  onDraftChange: (value: string) => void;
+  onEscape: () => void;
+  onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
+  onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
@@ -63,19 +71,26 @@ export function ChatColumn({
   activeConversation,
   bottomRef,
   conversationKey,
+  draft,
   hasConversationKey,
   hasReachedMessageStart,
   identityNames,
   identityPictures,
+  identityProfiles,
   messages,
   messageState,
+  newMessageCount,
   nodeNetworks,
   onCancelReply,
   onConversationKeyImported,
   onCreate,
+  onDraftChange,
+  onEscape,
+  onJumpToLatest,
   onMessageMenuOpen,
   onOpenSidebar,
   onReplyReferenceClick,
+  onRetryMessage,
   onScroll,
   onSend,
   peerIdentity,
@@ -96,6 +111,7 @@ export function ChatColumn({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
+  const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
   >(null);
@@ -105,18 +121,26 @@ export function ChatColumn({
     string | null
   >(null);
   const [conversationKeySaving, setConversationKeySaving] = useState(false);
-  const activeConversationName = peerIdentityId
-    ? identityDisplayName(peerIdentityId, identityNames)
-    : activeConversation?.title;
+  const isGroupConversation = !!(
+    activeConversation &&
+    (activeConversation.type === 'group' ||
+      activeConversation.id.startsWith('group:'))
+  );
+  const activeConversationName = isGroupConversation
+    ? (activeConversation?.name ?? activeConversation?.title)
+    : peerIdentityId
+      ? identityDisplayName(peerIdentityId, identityNames)
+      : activeConversation?.title;
   const activeConversationFallbackName = activeConversationName?.replace(
     /\s+\(@[^)]+\)$/,
     '',
   );
-  const activeConversationTitle =
-    peerIdentity?.profile.name.trim() ||
-    (peerIdentity?.profile.handle?.trim()
-      ? `@${peerIdentity.profile.handle.trim()}`
-      : activeConversationFallbackName);
+  const activeConversationTitle = isGroupConversation
+    ? activeConversationName
+    : peerIdentity?.profile.name.trim() ||
+      (peerIdentity?.profile.handle?.trim()
+        ? `@${peerIdentity.profile.handle.trim()}`
+        : activeConversationFallbackName);
   const conversationNetworkId = activeConversation?.networkId;
   const conversationNetworkName = conversationNetworkId
     ? (nodeNetworks.find((network) => network.id === conversationNetworkId)
@@ -149,7 +173,23 @@ export function ChatColumn({
       peerIdentityId,
     ],
   );
-  const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
+  const canOpenPeerProfile =
+    !!activeConversation && !!peerIdentityId && !isGroupConversation;
+  const groupParticipants = useMemo(
+    () =>
+      conversationParticipantIds(activeConversation).map((identityId) => {
+        const identity = identityProfiles[identityId];
+
+        return {
+          identity,
+          identityId,
+          name: identityDisplayName(identityId, identityNames),
+          picture: identityPictures[identityId],
+        };
+      }),
+    [activeConversation, identityNames, identityPictures, identityProfiles],
+  );
+  const canShareConversationKey = !isGroupConversation;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
     setEncryptedConversationKey('');
@@ -157,6 +197,21 @@ export function ChatColumn({
     setConversationKeyError(null);
     setConversationKeySaving(false);
   };
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      setProfileViewer(null);
+      setGroupProfileOpen(false);
+      setConversationMenuOpen(false);
+      setConversationDataOpen(false);
+      closeConversationKeyDialog();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
   const openCopyConversationKeyDialog = () => {
     if (!activeConversation || !conversationKey || !peerIdentity) {
       setConversationKeyError(copy.chat.copyPrivateKeyUnavailable);
@@ -251,6 +306,16 @@ export function ChatColumn({
       picture: peerPicture,
     });
   };
+  const openConversationHeader = () => {
+    if (!activeConversation) return;
+
+    if (isGroupConversation) {
+      setGroupProfileOpen(true);
+      return;
+    }
+
+    openPeerProfile();
+  };
   const openMessageAuthorProfile = (message: ChatMessage) => {
     if (message.mine || message.authorIdentityId === session.identity.id) {
       openOwnProfile();
@@ -259,7 +324,7 @@ export function ChatColumn({
     }
 
     setProfileViewer({
-      identity: peerIdentity,
+      identity: identityProfiles[message.authorIdentityId],
       identityId: message.authorIdentityId,
       name: identityDisplayName(message.authorIdentityId, identityNames),
       picture: identityPictures[message.authorIdentityId],
@@ -318,8 +383,8 @@ export function ChatColumn({
           </button>
           <button
             type="button"
-            onClick={openPeerProfile}
-            disabled={!canOpenPeerProfile}
+            onClick={openConversationHeader}
+            disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
             className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
@@ -341,8 +406,8 @@ export function ChatColumn({
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
-                onClick={openPeerProfile}
-                disabled={!canOpenPeerProfile}
+                onClick={openConversationHeader}
+                disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
                 className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
               >
                 {activeConversation
@@ -365,7 +430,11 @@ export function ChatColumn({
             </div>
             {activeConversation ? (
               <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-white/50">
-                <span className="shrink-0">{copy.chat.directMessage}</span>
+                {isGroupConversation ? (
+                  <span className="shrink-0">{copy.chat.groupMessage}</span>
+                ) : (
+                  <span className="shrink-0">{copy.chat.directMessage}</span>
+                )}
                 <span className="text-white/25">·</span>
                 <span
                   className="min-w-0 truncate"
@@ -410,23 +479,25 @@ export function ChatColumn({
                     >
                       {copy.chat.viewData}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (hasConversationKey) {
-                          openCopyConversationKeyDialog();
-                        } else {
-                          setConversationKeyError(null);
-                          setConversationKeyDialog('add');
-                        }
-                        setConversationMenuOpen(false);
-                      }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {hasConversationKey
-                        ? copy.chat.copyPrivateKey
-                        : copy.chat.addPrivateKey}
-                    </button>
+                    {canShareConversationKey ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (hasConversationKey) {
+                            openCopyConversationKeyDialog();
+                          } else {
+                            setConversationKeyError(null);
+                            setConversationKeyDialog('add');
+                          }
+                          setConversationMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {hasConversationKey
+                          ? copy.chat.copyPrivateKey
+                          : copy.chat.addPrivateKey}
+                      </button>
+                    ) : null}
                   </div>
                 </>
               )}
@@ -511,6 +582,7 @@ export function ChatColumn({
                     onAvatarClick={() => openMessageAuthorProfile(message)}
                     onMessageMenuOpen={onMessageMenuOpen}
                     onReplyReferenceClick={onReplyReferenceClick}
+                    onRetryMessage={onRetryMessage}
                     replyImage={
                       replyMessage?.attachments.find((attachment) =>
                         isBrowserPreviewImage(attachment.contentType),
@@ -557,11 +629,24 @@ export function ChatColumn({
                 ))}
               <div ref={bottomRef} />
             </div>
+            {newMessageCount > 0 && (
+              <button
+                type="button"
+                onClick={onJumpToLatest}
+                className="sticky bottom-3 left-1/2 z-20 mt-3 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
+              >
+                {copy.workspace.newMessages}
+                {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
+              </button>
+            )}
           </div>
 
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
+            draft={draft}
             error={sendError ?? attachmentError}
+            onDraftChange={onDraftChange}
+            onEscape={onEscape}
             onSend={onSend}
             onCancelReply={onCancelReply}
             progress={progress}
@@ -613,6 +698,37 @@ export function ChatColumn({
           picture={profileViewer.picture}
         />
       )}
+      {groupProfileOpen && activeConversation && (
+        <GroupProfileDialog
+          conversation={activeConversation}
+          networkId={conversationNetworkId}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setGroupProfileOpen(false)}
+          onIdentityClick={(participant) => {
+            setGroupProfileOpen(false);
+            setProfileViewer({
+              identity: participant.identity,
+              identityId: participant.identityId,
+              name: participant.name,
+              picture: participant.picture,
+            });
+          }}
+          participants={groupParticipants}
+        />
+      )}
     </section>
+  );
+}
+
+function conversationParticipantIds(
+  conversation?: ConversationResource,
+): string[] {
+  if (!conversation) return [];
+
+  return (
+    conversation.participantIdentityIds ??
+    conversation.participantIds ??
+    conversation.participants ??
+    []
   );
 }

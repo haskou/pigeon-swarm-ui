@@ -52,6 +52,10 @@ const defaultKeychain: LocalKeychain = {
   version: 0,
 };
 
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))].sort();
+}
+
 export class PigeonApiGateway {
   private readonly attachmentCipher: AttachmentCipher;
 
@@ -188,6 +192,39 @@ export class PigeonApiGateway {
         keyEntry,
         conversation.id,
       ),
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
+  public async createGroupConversation(
+    session: Session,
+    input: { name: string; networkId: string; participantIds: string[] },
+  ): Promise<{
+    conversation: ConversationResource;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    const participantIds = uniqueSorted([
+      session.identity.id,
+      ...input.participantIds,
+    ]);
+    const conversation = await this.postGroupConversation(session, {
+      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
+      name: input.name.trim(),
+      networkId: input.networkId,
+      participantIds,
+    });
+    const keyEntry = await this.createGroupConversationKeyEntry(
+      conversation.id,
+    );
+    const published = await this.publishKeychain(
+      session,
+      this.withConversationKey(session.keychain, keyEntry),
+    );
+
+    return {
+      conversation,
+      keychain: published.keychain,
       keychainExternalIdentifier: published.keychainExternalIdentifier,
     };
   }
@@ -817,6 +854,21 @@ export class PigeonApiGateway {
     };
   }
 
+  private async createGroupConversationKeyEntry(
+    conversationId: string,
+  ): Promise<ConversationKeyEntry> {
+    const conversationKeyPair = await KeyPair.generate();
+    const keyPairPrimitives = conversationKeyPair.toPrimitives();
+
+    return {
+      conversationId,
+      createdAt: Date.now(),
+      peerIdentityId: '',
+      privateKey: keyPairPrimitives.privateKey,
+      publicKey: keyPairPrimitives.publicKey,
+    };
+  }
+
   private restoreEncryptedKeyPair(
     identity: IdentityResource,
   ): EncryptedKeyPair {
@@ -912,6 +964,32 @@ export class PigeonApiGateway {
     });
 
     return this.conversations.normalize(created, peerIdentityId);
+  }
+
+  private async postGroupConversation(
+    session: Session,
+    input: {
+      keychainExternalIdentifier: null | string;
+      name: string;
+      networkId: string;
+      participantIds: string[];
+    },
+  ): Promise<ConversationResource> {
+    const body = {
+      keychainExternalIdentifier: input.keychainExternalIdentifier,
+      name: input.name,
+      networkId: input.networkId,
+      participantIds: input.participantIds,
+      type: 'group',
+    };
+    const path = '/conversations';
+    const created = await this.http.request<ConversationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+
+    return this.conversations.normalize(created);
   }
 
   private withConversationKey(

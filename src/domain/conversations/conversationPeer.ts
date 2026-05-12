@@ -5,6 +5,10 @@ export function conversationPeerIdentityId(
   currentIdentityId: string,
   keychain?: LocalKeychain,
 ): string | undefined {
+  if (conversation.type === 'group' || conversation.id.startsWith('group:')) {
+    return undefined;
+  }
+
   if (conversation.peerIdentityId) return conversation.peerIdentityId;
 
   const participantIds =

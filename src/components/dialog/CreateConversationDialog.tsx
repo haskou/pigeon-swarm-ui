@@ -21,6 +21,11 @@ import { GlassSelect } from '../common/GlassSelect';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState = 'idle' | 'loading' | 'ready';
+type ConversationMode = 'direct' | 'group';
+type SelectedIdentity = {
+  identity: IdentityResource;
+  pictureUrl: null | string;
+};
 
 interface CreateConversationDialogProps {
   nodeNetworks: NodeNetwork[];
@@ -35,6 +40,7 @@ export function CreateConversationDialog({
   onCreated,
   session,
 }: CreateConversationDialogProps) {
+  const [mode, setMode] = useState<ConversationMode>('direct');
   const [peerIdentityId, setPeerIdentityId] = useState('');
   const [peerIdentity, setPeerIdentity] = useState<IdentityResource | null>(
     null,
@@ -42,6 +48,12 @@ export function CreateConversationDialog({
   const [lookupState, setLookupState] = useState<IdentityLookupState>('idle');
   const [peerPictureUrl, setPeerPictureUrl] = useState<string | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupIdentityInput, setGroupIdentityInput] = useState('');
+  const [groupParticipants, setGroupParticipants] = useState<
+    SelectedIdentity[]
+  >([]);
+  const [groupNetworkId, setGroupNetworkId] = useState('');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const sharedNetworkIds = useMemo(() => {
@@ -51,8 +63,26 @@ export function CreateConversationDialog({
       peerIdentity.networks.includes(networkId),
     );
   }, [peerIdentity, session.identity.networks]);
+  const groupSharedNetworkIds = useMemo(() => {
+    if (groupParticipants.length === 0) return [];
+
+    return session.identity.networks.filter((networkId) =>
+      groupParticipants.every(({ identity }) =>
+        identity.networks.includes(networkId),
+      ),
+    );
+  }, [groupParticipants, session.identity.networks]);
   const networkOptions = session.identity.networks.map((networkId) => ({
     disabled: peerIdentity ? !sharedNetworkIds.includes(networkId) : true,
+    label:
+      nodeNetworks.find((network) => network.id === networkId)?.name ??
+      networkId,
+    value: networkId,
+  }));
+  const groupNetworkOptions = session.identity.networks.map((networkId) => ({
+    disabled:
+      groupParticipants.length === 0 ||
+      !groupSharedNetworkIds.includes(networkId),
     label:
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       networkId,
@@ -61,6 +91,13 @@ export function CreateConversationDialog({
   const peerDisplayName = peerIdentity
     ? (identityName(peerIdentity) ?? shortId(peerIdentity.id))
     : null;
+  const canSubmitDirect =
+    !!peerIdentity && !!selectedNetworkId && state !== 'loading';
+  const canSubmitGroup =
+    groupName.trim().length > 0 &&
+    groupParticipants.length > 0 &&
+    !!groupNetworkId &&
+    state !== 'loading';
 
   useEffect(() => {
     const trimmed = normalizeIdentityLookup(peerIdentityId);
@@ -111,6 +148,14 @@ export function CreateConversationDialog({
   }, [peerIdentityId, session.identity.networks]);
 
   useEffect(() => {
+    if (groupNetworkId && groupSharedNetworkIds.includes(groupNetworkId)) {
+      return;
+    }
+
+    setGroupNetworkId(groupSharedNetworkIds[0] ?? '');
+  }, [groupNetworkId, groupSharedNetworkIds]);
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -124,6 +169,42 @@ export function CreateConversationDialog({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+
+    if (mode === 'group') {
+      if (!canSubmitGroup) return;
+
+      setState('loading');
+      setError(null);
+
+      try {
+        const result = await pigeonApplication.createGroupConversation(
+          session,
+          {
+            name: groupName.trim(),
+            networkId: groupNetworkId,
+            participantIds: groupParticipants.map(({ identity }) => identity.id),
+          },
+        );
+        onCreated(
+          {
+            ...session,
+            keychain: result.keychain,
+            keychainExternalIdentifier: result.keychainExternalIdentifier,
+          },
+          result.conversation,
+        );
+      } catch (caught) {
+        setState('error');
+        setError(
+          toUserErrorMessage(caught, copy.dialog.createConversationError),
+        );
+
+        return;
+      }
+
+      setState('idle');
+      return;
+    }
 
     const identityLookup = normalizeIdentityLookup(peerIdentityId);
 
@@ -162,6 +243,67 @@ export function CreateConversationDialog({
     setState('idle');
   };
 
+  const addGroupParticipant = async () => {
+    const identityLookup = normalizeIdentityLookup(groupIdentityInput);
+
+    if (!identityLookup) return;
+
+    if (
+      identityLookup === session.identity.id ||
+      groupParticipants.some(
+        ({ identity }) =>
+          identity.id === identityLookup ||
+          identity.profile.handle?.toLowerCase() === identityLookup,
+      )
+    ) {
+      setGroupIdentityInput('');
+
+      return;
+    }
+
+    setState('loading');
+    setError(null);
+    try {
+      const identity = await pigeonApplication.getIdentity(identityLookup);
+
+      if (!identity) {
+        throw new Error(copy.errors.notFound);
+      }
+
+      const alreadyAdded =
+        identity.id === session.identity.id ||
+        groupParticipants.some(
+          (participant) => participant.identity.id === identity.id,
+        );
+
+      if (!alreadyAdded) {
+        setGroupParticipants((participants) => [
+          ...participants,
+          { identity, pictureUrl: null },
+        ]);
+        void loadDialogIdentityPicture(identity).then((pictureUrl) => {
+          setGroupParticipants((participants) =>
+            participants.map((participant) =>
+              participant.identity.id === identity.id
+                ? { ...participant, pictureUrl }
+                : participant,
+            ),
+          );
+        });
+      }
+      setGroupIdentityInput('');
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.errors.notFound));
+    }
+    setState('idle');
+  };
+
+  const removeGroupParticipant = (identityId: string) => {
+    setGroupParticipants((participants) =>
+      participants.filter(({ identity }) => identity.id !== identityId),
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
       <form
@@ -187,62 +329,184 @@ export function CreateConversationDialog({
           </button>
         </div>
 
-        {lookupState === 'loading' && (
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
-            {copy.dialog.loadingIdentity}
-          </div>
-        )}
+        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-black/25 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('direct');
+              setError(null);
+            }}
+            className={
+              mode === 'direct'
+                ? 'rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950'
+                : 'rounded-xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
+            }
+          >
+            {copy.dialog.directConversation}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('group');
+              setError(null);
+            }}
+            className={
+              mode === 'group'
+                ? 'rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950'
+                : 'rounded-xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
+            }
+          >
+            {copy.dialog.groupConversation}
+          </button>
+        </div>
 
-        {peerIdentity && peerDisplayName && (
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-              {peerPictureUrl ? (
-                <img
-                  src={peerPictureUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
+        {mode === 'direct' ? (
+          <>
+            {lookupState === 'loading' && (
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
+                {copy.dialog.loadingIdentity}
+              </div>
+            )}
+
+            {peerIdentity && peerDisplayName && (
+              <IdentityPreview
+                identity={peerIdentity}
+                name={peerDisplayName}
+                pictureUrl={peerPictureUrl}
+              />
+            )}
+            <div className="mt-2">
+              <Field label={copy.dialog.remoteIdentityId}>
+                <input
+                  value={peerIdentityId}
+                  onChange={(event) => setPeerIdentityId(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+                  autoComplete="off"
                 />
+              </Field>
+            </div>
+            {peerIdentity &&
+              lookupState === 'ready' &&
+              sharedNetworkIds.length === 0 && (
+                <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
+                  {copy.dialog.noSharedNetwork}
+                </div>
+              )}
+            <div className="mt-2">
+              <Field label={copy.dialog.sharedNetwork}>
+                <GlassSelect
+                  ariaLabel={copy.dialog.sharedNetwork}
+                  disabled={!peerIdentity || sharedNetworkIds.length === 0}
+                  value={selectedNetworkId}
+                  onChange={setSelectedNetworkId}
+                  options={networkOptions}
+                />
+              </Field>{' '}
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            <Field label={copy.dialog.groupName}>
+              <input
+                value={groupName}
+                onChange={(event) => setGroupName(event.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.dialog.groupNamePlaceholder}
+                autoComplete="off"
+              />
+            </Field>
+
+            <Field label={copy.dialog.groupParticipant}>
+              <div className="flex gap-2">
+                <input
+                  value={groupIdentityInput}
+                  onChange={(event) =>
+                    setGroupIdentityInput(event.target.value)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    void addGroupParticipant();
+                  }}
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  placeholder="@ada or identity id"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addGroupParticipant()}
+                  disabled={!groupIdentityInput.trim() || state === 'loading'}
+                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {copy.dialog.addParticipant}
+                </button>
+              </div>
+            </Field>
+
+            <div className="grid gap-2">
+              <div className="text-sm font-black text-white/70">
+                {copy.dialog.groupParticipants}
+              </div>
+              {groupParticipants.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+                  {copy.dialog.groupNeedsParticipant}
+                </div>
               ) : (
-                peerDisplayName.slice(0, 1).toUpperCase()
+                <div className="grid gap-2">
+                  {groupParticipants.map(({ identity, pictureUrl }) => {
+                    const name = identityName(identity) ?? shortId(identity.id);
+
+                    return (
+                      <div
+                        key={identity.id}
+                        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <Avatar name={name} pictureUrl={pictureUrl} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-black">{name}</p>
+                          <p className="truncate text-xs text-white/45">
+                            {identity.profile.handle
+                              ? `@${identity.profile.handle}`
+                              : identity.id}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeGroupParticipant(identity.id)}
+                          className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-lg font-black text-white/70 transition hover:bg-white/15"
+                          aria-label={copy.dialog.removeParticipant}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-            <div className="min-w-0">
-              <p className="truncate font-black">{peerDisplayName}</p>
-              <p className="truncate text-xs text-white/45">
-                {peerIdentity.id}
-              </p>
-            </div>
+
+            {groupParticipants.length > 0 &&
+              groupSharedNetworkIds.length === 0 && (
+                <div className="rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
+                  {copy.dialog.noSharedNetwork}
+                </div>
+              )}
+
+            <Field label={copy.dialog.sharedNetwork}>
+              <GlassSelect
+                ariaLabel={copy.dialog.sharedNetwork}
+                disabled={
+                  groupParticipants.length === 0 ||
+                  groupSharedNetworkIds.length === 0
+                }
+                value={groupNetworkId}
+                onChange={setGroupNetworkId}
+                options={groupNetworkOptions}
+              />
+            </Field>
           </div>
         )}
-        <div className="mt-2">
-          <Field label={copy.dialog.remoteIdentityId}>
-            <input
-              value={peerIdentityId}
-              onChange={(event) => setPeerIdentityId(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-              placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
-              autoComplete="off"
-            />
-          </Field>
-        </div>
-        {peerIdentity &&
-          lookupState === 'ready' &&
-          sharedNetworkIds.length === 0 && (
-            <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
-              {copy.dialog.noSharedNetwork}
-            </div>
-          )}
-        <div className="mt-2">
-          <Field label={copy.dialog.sharedNetwork}>
-            <GlassSelect
-              ariaLabel={copy.dialog.sharedNetwork}
-              disabled={!peerIdentity || sharedNetworkIds.length === 0}
-              value={selectedNetworkId}
-              onChange={setSelectedNetworkId}
-              options={networkOptions}
-            />
-          </Field>{' '}
-        </div>
 
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -259,12 +523,7 @@ export function CreateConversationDialog({
             {copy.dialog.cancel}
           </button>
           <button
-            disabled={
-              !peerIdentityId.trim() ||
-              !selectedNetworkId ||
-              !peerIdentity ||
-              state === 'loading'
-            }
+            disabled={mode === 'direct' ? !canSubmitDirect : !canSubmitGroup}
             className="glass-button rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
           >
             {state === 'loading'
@@ -273,6 +532,44 @@ export function CreateConversationDialog({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function IdentityPreview({
+  identity,
+  name,
+  pictureUrl,
+}: {
+  identity: IdentityResource;
+  name: string;
+  pictureUrl: null | string;
+}) {
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <Avatar name={name} pictureUrl={pictureUrl} />
+      <div className="min-w-0">
+        <p className="truncate font-black">{name}</p>
+        <p className="truncate text-xs text-white/45">{identity.id}</p>
+      </div>
+    </div>
+  );
+}
+
+function Avatar({
+  name,
+  pictureUrl,
+}: {
+  name: string;
+  pictureUrl: null | string;
+}) {
+  return (
+    <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+      {pictureUrl ? (
+        <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        name.slice(0, 1).toUpperCase()
+      )}
     </div>
   );
 }
