@@ -322,6 +322,22 @@ export function GlassWorkspace({
     setNotificationAction(null);
   }, [session]);
 
+  const scrollMessagesToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      const scroll = () => {
+        bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+        lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
+      };
+
+      requestAnimationFrame(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+        window.setTimeout(scroll, 120);
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
     void refreshNotifications();
@@ -344,10 +360,7 @@ export function GlassWorkspace({
 
         setMessages(result.messages);
         setMessageCursor(result.nextCursor ?? null);
-        queueMicrotask(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-          lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
-        });
+        scrollMessagesToBottom();
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
 
@@ -363,7 +376,7 @@ export function GlassWorkspace({
 
       setMessageState('idle');
     },
-    [session],
+    [scrollMessagesToBottom, session],
   );
 
   useEffect(() => {
@@ -456,9 +469,7 @@ export function GlassWorkspace({
       setMessages((current) => [...current, sent]);
       setReplyTarget(null);
       setAttachmentProgress(null);
-      queueMicrotask(() =>
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }),
-      );
+      scrollMessagesToBottom('smooth');
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
       setAttachmentProgress(null);
