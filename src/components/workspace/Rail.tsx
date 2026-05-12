@@ -197,7 +197,7 @@ function RailSelectionIndicator({ active }: { active: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className="absolute -left-2 top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+      className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
     />
   );
 }
