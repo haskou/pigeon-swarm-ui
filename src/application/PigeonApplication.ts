@@ -2,6 +2,8 @@ import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySi
 import type {
   AttachmentProgress,
   ChatMessage,
+  Community,
+  CommunityTextChannel,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
@@ -163,6 +165,102 @@ export class PigeonApplication {
 
   public async createNetwork(name: string): Promise<void> {
     await this.createNetworkUseCase.execute(name);
+  }
+
+  public async listCommunities(session: Session): Promise<Community[]> {
+    return await this.gateway.listCommunities(session);
+  }
+
+  public async getCommunity(
+    session: Session,
+    communityId: string,
+  ): Promise<Community> {
+    return await this.gateway.getCommunity(session, communityId);
+  }
+
+  public async createCommunity(
+    session: Session,
+    input: {
+      banner?: File | null;
+      description: string;
+      name: string;
+      networkId: string;
+    },
+  ): Promise<Community> {
+    const bannerCid = input.banner
+      ? (await this.uploadPublicFile(session, input.banner)).cid
+      : undefined;
+
+    return await this.gateway.createCommunity(session, {
+      ...(bannerCid ? { banner: bannerCid } : {}),
+      description: input.description,
+      name: input.name,
+      networkId: input.networkId,
+    });
+  }
+
+  public async updateCommunity(
+    session: Session,
+    communityId: string,
+    input: { banner?: File | null; description?: string; name?: string },
+  ): Promise<Community> {
+    const bannerCid = input.banner
+      ? (await this.uploadPublicFile(session, input.banner)).cid
+      : undefined;
+
+    return await this.gateway.updateCommunity(session, communityId, {
+      ...(bannerCid ? { banner: bannerCid } : {}),
+      description: input.description,
+      name: input.name,
+    });
+  }
+
+  public async addCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<void> {
+    await this.gateway.addCommunityMember(session, communityId, identityId);
+  }
+
+  public async listCommunityMembers(
+    session: Session,
+    communityId: string,
+  ): Promise<string[]> {
+    return await this.gateway.listCommunityMembers(session, communityId);
+  }
+
+  public async createCommunityTextChannel(
+    session: Session,
+    communityId: string,
+    name: string,
+  ): Promise<CommunityTextChannel> {
+    return await this.gateway.createCommunityTextChannel(
+      session,
+      communityId,
+      name,
+    );
+  }
+
+  public async listCommunityChannels(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityTextChannel[]> {
+    return await this.gateway.listCommunityChannels(session, communityId);
+  }
+
+  public async renameCommunityChannel(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    name: string,
+  ): Promise<CommunityTextChannel> {
+    return await this.gateway.renameCommunityChannel(
+      session,
+      communityId,
+      channelId,
+      name,
+    );
   }
 
   public async createNodeNetwork(

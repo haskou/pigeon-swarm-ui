@@ -13,6 +13,8 @@ import type { Peer } from '../../application/peers/ListPeers';
 import type { IdentityUpdateProfileInput } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
+  Community,
+  CommunityTextChannel,
   ConversationKeyEntry,
   ConversationResource,
   AttachmentProgress,
@@ -138,6 +140,151 @@ export class PigeonApiGateway {
     const result = await this.http.request<{ peers: Peer[] }>('/peers/');
 
     return result.peers;
+  }
+
+  public async listCommunities(session: Session): Promise<Community[]> {
+    const path = '/communities/';
+    const result = await this.http.request<{ communities: Community[] }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.communities;
+  }
+
+  public async getCommunity(
+    session: Session,
+    communityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(communityId)}`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+  }
+
+  public async createCommunity(
+    session: Session,
+    input: {
+      banner?: string;
+      description: string;
+      name: string;
+      networkId: string;
+    },
+  ): Promise<Community> {
+    const path = '/communities/';
+    const body = {
+      ...(input.banner ? { banner: input.banner } : {}),
+      description: input.description,
+      name: input.name,
+      networkId: input.networkId,
+    };
+
+    return await this.http.request<Community>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async updateCommunity(
+    session: Session,
+    communityId: string,
+    input: { banner?: string; description?: string; name?: string },
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(communityId)}`;
+    const body = {
+      ...(input.banner ? { banner: input.banner } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.name !== undefined ? { name: input.name } : {}),
+    };
+
+    return await this.http.request<Community>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
+    });
+  }
+
+  public async addCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<void> {
+    const path = `/communities/${encodeURIComponent(communityId)}/members`;
+    const body = { identityId };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async listCommunityMembers(
+    session: Session,
+    communityId: string,
+  ): Promise<string[]> {
+    const path = `/communities/${encodeURIComponent(communityId)}/members`;
+    const result = await this.http.request<{ memberIds: string[] }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.memberIds;
+  }
+
+  public async createCommunityTextChannel(
+    session: Session,
+    communityId: string,
+    name: string,
+  ): Promise<CommunityTextChannel> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/text`;
+    const body = { name };
+
+    return await this.http.request<CommunityTextChannel>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async listCommunityChannels(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityTextChannel[]> {
+    const path = `/communities/${encodeURIComponent(communityId)}/channels`;
+    const result = await this.http.request<{
+      channels: CommunityTextChannel[];
+    }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.channels;
+  }
+
+  public async renameCommunityChannel(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    name: string,
+  ): Promise<CommunityTextChannel> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}`;
+    const body = { name };
+
+    return await this.http.request<CommunityTextChannel>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
+    });
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {

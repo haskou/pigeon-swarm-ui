@@ -63,6 +63,92 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('creates communities with signed metadata payload', async () => {
+    const community = {
+      banner: 'bafy-banner',
+      createdAt: 1,
+      description: 'Description',
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-1',
+      textChannels: [],
+      visibility: 'private',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.createCommunity(session, {
+        banner: 'bafy-banner',
+        description: 'Description',
+        name: 'Mi comunidad',
+        networkId: 'network-1',
+      }),
+    ).resolves.toBe(community);
+
+    const body = {
+      banner: 'bafy-banner',
+      description: 'Description',
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+    };
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/communities/',
+      body,
+    );
+    expect(http.request).toHaveBeenCalledWith('/communities/', {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('creates community text channels with signed owner requests', async () => {
+    const channel = {
+      createdAt: 1,
+      id: 'channel-1',
+      name: 'general',
+      type: 'text',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(channel),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const body = { name: 'general' };
+    const path = '/communities/community-1/channels/text';
+
+    await expect(
+      gateway.createCommunityTextChannel(session, 'community-1', 'general'),
+    ).resolves.toBe(channel);
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
   it('creates group conversations and stores the key under the server id', async () => {
     const createdConversation = {
       id: 'group:server-conversation',

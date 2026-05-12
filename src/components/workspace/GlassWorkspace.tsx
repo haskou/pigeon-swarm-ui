@@ -11,6 +11,7 @@ import {
 import type {
   ChatMessage,
   AttachmentProgress,
+  Community,
   ConversationKeyEntry,
   ConversationResource,
   MessageReplyPreview,
@@ -36,6 +37,8 @@ import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
+import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
@@ -106,22 +109,28 @@ interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  communities: Community[];
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
+  onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
   peers: Peer[];
+  setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
 
 export function GlassWorkspace({
   conversations,
+  communities,
   node,
   nodeNetworks,
+  onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
   peers,
   session,
+  setCommunities,
   setConversations,
   setSession,
 }: GlassWorkspaceProps) {
@@ -132,6 +141,13 @@ export function GlassWorkspace({
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<'community' | 'messages'>(
+    'messages',
+  );
+  const [activeCommunityId, setActiveCommunityId] = useState<string | null>(
+    null,
+  );
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -170,6 +186,12 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
+  const activeCommunity = useMemo(
+    () =>
+      communities.find((community) => community.id === activeCommunityId) ??
+      communities[0],
+    [activeCommunityId, communities],
+  );
   const updateActiveConversationDraft = useCallback(
     (value: string) => {
       if (!activeConversation?.id) return;
@@ -360,6 +382,7 @@ export function GlassWorkspace({
     setRawMessage(null);
     setReplyTarget(null);
     setIsCreateOpen(false);
+    setIsCreateCommunityOpen(false);
     setNotificationsOpen(false);
     setNodeSettingsOpen(false);
     setInspectorOpen(false);
@@ -707,6 +730,7 @@ export function GlassWorkspace({
   const refreshRealtimeViews = useCallback(() => {
     void refreshNotifications();
     void refreshConversations().catch(() => undefined);
+    void onCommunitiesReload().catch(() => undefined);
     void onPeersReload().catch(() => undefined);
 
     if (activeConversation?.id && activeConversationKeyId) {
@@ -716,6 +740,7 @@ export function GlassWorkspace({
     activeConversation?.id,
     activeConversationKeyId,
     loadActiveMessages,
+    onCommunitiesReload,
     onPeersReload,
     refreshConversations,
     refreshNotifications,
@@ -774,6 +799,11 @@ export function GlassWorkspace({
             .then((identity) => setSession({ ...session, identity }))
             .catch(() => undefined);
         }
+        return;
+      }
+
+      if (event.type.startsWith('communities.')) {
+        void onCommunitiesReload().catch(() => undefined);
         return;
       }
 
@@ -842,6 +872,7 @@ export function GlassWorkspace({
       isScrolledNearBottom,
       markUnreadMessage,
       messages,
+      onCommunitiesReload,
       onPeersReload,
       refreshConversations,
       refreshNotifications,
@@ -862,114 +893,152 @@ export function GlassWorkspace({
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
+          activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
+          communities={communities}
           notificationCount={pendingNotificationCount}
+          onCommunityClick={(communityId) => {
+            setActiveCommunityId(communityId);
+            setWorkspaceMode('community');
+          }}
+          onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+          onMessagesClick={() => setWorkspaceMode('messages')}
           onNotificationsClick={() => setNotificationsOpen(true)}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
         />
 
-        <div
-          className={cx(
-            'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
-            sidebarOpen ? 'block' : 'hidden lg:block',
-          )}
-        >
-          <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
-            <Rail
-              className="lg:hidden"
-              notificationCount={pendingNotificationCount}
-              onNotificationsClick={() => setNotificationsOpen(true)}
-              onSettingsClick={() => setNodeSettingsOpen(true)}
-              onInspectorClick={() => setInspectorOpen(true)}
-              peerCount={peers.length}
-              settingsAttention={nodeUnclaimed}
-            />
-            <Sidebar
+        {workspaceMode === 'messages' ? (
+          <>
+            <div
+              className={cx(
+                'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+                sidebarOpen ? 'block' : 'hidden lg:block',
+              )}
+            >
+              <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+                <Rail
+                  className="lg:hidden"
+                  activeCommunityId={null}
+                  communities={communities}
+                  notificationCount={pendingNotificationCount}
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
+                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                  onMessagesClick={() => setWorkspaceMode('messages')}
+                  onNotificationsClick={() => setNotificationsOpen(true)}
+                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onInspectorClick={() => setInspectorOpen(true)}
+                  peerCount={peers.length}
+                  settingsAttention={nodeUnclaimed}
+                />
+              <Sidebar
+                session={session}
+                conversations={conversationsWithUnread}
+                identityNames={identityNames}
+                identityPictures={identityPictures}
+                identityProfiles={identityProfiles}
+                nodeNetworks={nodeNetworks}
+                activeConversationId={activeConversation?.id ?? null}
+                onSelect={(id) => {
+                  clearUnreadMessages(id);
+                  setNewMessageCount(0);
+                  setActiveConversationId(id);
+                  setSidebarOpen(false);
+                }}
+                onCreate={() => setIsCreateOpen(true)}
+                onClose={() => setSidebarOpen(false)}
+                onLogout={() => setSession(null)}
+                onSessionUpdated={(nextSession) => {
+                  setSession(nextSession);
+                  rememberIdentity(nextSession.identity);
+                }}
+              />
+              </div>
+            </div>
+
+            {sidebarOpen && (
+              <button
+                className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-label={copy.workspace.closeSidebar}
+              />
+            )}
+
+            <ChatColumn
               session={session}
-              conversations={conversationsWithUnread}
+              activeConversation={activeConversation}
+              conversationKey={activeConversationKey}
+              draft={activeConversationDraft}
+              hasConversationKey={!!activeConversationKey}
+              hasReachedMessageStart={!messageCursor}
+              peerIdentityId={activeConversationPeerIdentityId}
+              peerIdentity={
+                activeConversationPeerIdentityId
+                  ? identityProfiles[activeConversationPeerIdentityId]
+                  : undefined
+              }
+              peerPicture={
+                activeConversationPeerIdentityId
+                  ? identityPictures[activeConversationPeerIdentityId]
+                  : undefined
+              }
               identityNames={identityNames}
               identityPictures={identityPictures}
               identityProfiles={identityProfiles}
+              messages={messages}
+              messageState={messageState}
+              newMessageCount={newMessageCount}
               nodeNetworks={nodeNetworks}
-              activeConversationId={activeConversation?.id ?? null}
-              onSelect={(id) => {
-                clearUnreadMessages(id);
-                setNewMessageCount(0);
-                setActiveConversationId(id);
-                setSidebarOpen(false);
-              }}
+              sendError={sendError}
+              scrollerRef={scrollerRef}
+              bottomRef={bottomRef}
+              onScroll={handleScroll}
+              onSend={handleSend}
+              onConversationKeyImported={handleConversationKeyImported}
+              onDraftChange={updateActiveConversationDraft}
+              onEscape={closeTransientUi}
+              onJumpToLatest={jumpToLatestMessages}
+              onMessageMenuOpen={handleMessageMenuOpen}
+              onReplyReferenceClick={(messageId) =>
+                void handleReplyReferenceClick(messageId)
+              }
+              onOpenSidebar={() => setSidebarOpen(true)}
               onCreate={() => setIsCreateOpen(true)}
-              onClose={() => setSidebarOpen(false)}
-              onLogout={() => setSession(null)}
-              onSessionUpdated={(nextSession) => {
-                setSession(nextSession);
-                rememberIdentity(nextSession.identity);
-              }}
+              progress={attachmentProgress}
+              replyToMessage={replyTarget}
+              onCancelReply={() => setReplyTarget(null)}
+              onRetryMessage={retryMessage}
             />
-          </div>
-        </div>
 
-        {sidebarOpen && (
-          <button
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-label={copy.workspace.closeSidebar}
+            <Inspector
+              className="hidden xl:block"
+              session={session}
+              activeConversation={activeConversation}
+              messages={messages}
+              peers={peers}
+            />
+          </>
+        ) : activeCommunity ? (
+          <CommunityWorkspace
+            community={activeCommunity}
+            nodeNetworks={nodeNetworks}
+            onCommunityUpdated={(community) =>
+              setCommunities((current) =>
+                current.map((item) =>
+                  item.id === community.id ? community : item,
+                ),
+              )
+            }
+            session={session}
           />
+        ) : (
+          <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55 sm:rounded-[2rem]">
+            {copy.communities.empty}
+          </div>
         )}
-
-        <ChatColumn
-          session={session}
-          activeConversation={activeConversation}
-          conversationKey={activeConversationKey}
-          draft={activeConversationDraft}
-          hasConversationKey={!!activeConversationKey}
-          hasReachedMessageStart={!messageCursor}
-          peerIdentityId={activeConversationPeerIdentityId}
-          peerIdentity={
-            activeConversationPeerIdentityId
-              ? identityProfiles[activeConversationPeerIdentityId]
-              : undefined
-          }
-          peerPicture={
-            activeConversationPeerIdentityId
-              ? identityPictures[activeConversationPeerIdentityId]
-              : undefined
-          }
-          identityNames={identityNames}
-          identityPictures={identityPictures}
-          identityProfiles={identityProfiles}
-          messages={messages}
-          messageState={messageState}
-          newMessageCount={newMessageCount}
-          nodeNetworks={nodeNetworks}
-          sendError={sendError}
-          scrollerRef={scrollerRef}
-          bottomRef={bottomRef}
-          onScroll={handleScroll}
-          onSend={handleSend}
-          onConversationKeyImported={handleConversationKeyImported}
-          onDraftChange={updateActiveConversationDraft}
-          onEscape={closeTransientUi}
-          onJumpToLatest={jumpToLatestMessages}
-          onMessageMenuOpen={handleMessageMenuOpen}
-          onReplyReferenceClick={(messageId) =>
-            void handleReplyReferenceClick(messageId)
-          }
-          onOpenSidebar={() => setSidebarOpen(true)}
-          onCreate={() => setIsCreateOpen(true)}
-          progress={attachmentProgress}
-          replyToMessage={replyTarget}
-          onCancelReply={() => setReplyTarget(null)}
-          onRetryMessage={retryMessage}
-        />
-
-        <Inspector
-          className="hidden xl:block"
-          session={session}
-          activeConversation={activeConversation}
-          messages={messages}
-          peers={peers}
-        />
       </div>
 
       {inspectorOpen && (
@@ -1025,6 +1094,20 @@ export function GlassWorkspace({
           session={session}
           onClose={() => setIsCreateOpen(false)}
           onCreated={handleConversationCreated}
+        />
+      )}
+
+      {isCreateCommunityOpen && (
+        <CreateCommunityDialog
+          nodeNetworks={nodeNetworks}
+          session={session}
+          onClose={() => setIsCreateCommunityOpen(false)}
+          onCreated={(community) => {
+            setCommunities((current) => [community, ...current]);
+            setActiveCommunityId(community.id);
+            setWorkspaceMode('community');
+            setIsCreateCommunityOpen(false);
+          }}
         />
       )}
 

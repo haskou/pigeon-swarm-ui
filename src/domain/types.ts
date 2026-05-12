@@ -146,6 +146,26 @@ export type ConversationResource = {
   unreadCount?: number;
 };
 
+export type CommunityTextChannel = {
+  id: string;
+  name: string;
+  type: 'text';
+  createdAt: number;
+};
+
+export type Community = {
+  id: string;
+  networkId: string;
+  ownerIdentityId: string;
+  name: string;
+  description: string;
+  banner?: string | null;
+  memberIds: string[];
+  textChannels: CommunityTextChannel[];
+  visibility: 'private';
+  createdAt: number;
+};
+
 export type MessageResource = {
   attachmentExternalIdentifiers?: string[];
   id?: string;
