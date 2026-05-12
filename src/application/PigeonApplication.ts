@@ -237,6 +237,13 @@ export class PigeonApplication {
     return await this.listPeersUseCase.execute();
   }
 
+  public async publishKeychain(
+    session: Session,
+    nextKeychain: LocalKeychain,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    return await this.gateway.publishKeychain(session, nextKeychain);
+  }
+
   public async loadMessages(
     session: Session,
     conversationId: string,

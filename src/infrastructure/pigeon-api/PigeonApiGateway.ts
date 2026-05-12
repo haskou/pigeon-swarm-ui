@@ -161,6 +161,7 @@ export class PigeonApiGateway {
     const keyEntry = await this.createConversationKeyEntry(
       session.identity.id,
       peerIdentity.id,
+      networkId,
     );
     const published = await this.publishKeychain(
       session,
@@ -226,8 +227,9 @@ export class PigeonApiGateway {
   public deterministicConversationId(
     leftIdentityId: string,
     rightIdentityId: string,
+    networkId: string,
   ): string {
-    return this.ids.create(leftIdentityId, rightIdentityId);
+    return this.ids.create(leftIdentityId, rightIdentityId, networkId);
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
@@ -583,7 +585,6 @@ export class PigeonApiGateway {
       session.keychain,
       session.identity.id,
       conversationId,
-      this.ids,
     );
 
     if (!key) {
@@ -797,12 +798,14 @@ export class PigeonApiGateway {
   private async createConversationKeyEntry(
     identityId: string,
     peerIdentityId: string,
+    networkId: string,
   ): Promise<ConversationKeyEntry> {
     const conversationKeyPair = await KeyPair.generate();
     const keyPairPrimitives = conversationKeyPair.toPrimitives();
     const conversationId = this.deterministicConversationId(
       identityId,
       peerIdentityId,
+      networkId,
     );
 
     return {
@@ -888,7 +891,7 @@ export class PigeonApiGateway {
   ): Promise<ConversationResource> {
     const body = {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
-      networkIds: [networkId],
+      networkId,
       participantIds: [session.identity.id, peerIdentityId].sort(),
       type: 'one-to-one',
     };

@@ -133,7 +133,7 @@ export type LocalKeychain = {
 export type ConversationResource = {
   id: string;
   conversationId?: string;
-  networkIds?: string[];
+  networkId: string;
   participants?: string[];
   participantIdentityIds?: string[];
   participantIds?: string[];

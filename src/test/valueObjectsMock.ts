@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 export class StringValueObject {
   public constructor(private readonly value: string) {}
 
@@ -19,14 +21,20 @@ export class EncryptedPayload extends StringValueObject {}
 export class Signature extends StringValueObject {}
 
 export class SHA256Hash extends StringValueObject {
-  public static from(value: string | StringValueObject): SHA256Hash {
-    return new SHA256Hash(`sha256:${value.toString()}`);
+  public static from(value: Buffer | string | StringValueObject): SHA256Hash {
+    return new SHA256Hash(
+      createHash('sha256').update(value.toString()).digest('hex'),
+    );
   }
 }
 
 export class PrivateKey extends StringValueObject {
   public static fromPEM(value: string | StringValueObject): PrivateKey {
     return new PrivateKey(value.toString());
+  }
+
+  public getPublicKey(): PublicKey {
+    return new PublicKey('public-key');
   }
 
   public decrypt(): Uint8Array {

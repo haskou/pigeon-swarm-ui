@@ -24,10 +24,8 @@ export const copy = {
     loginSubmit: 'Decrypt identity & enter',
     networkLabel: 'Network',
     networksLabel: 'Networks',
-    passwordLabel: 'Password',
     passwordConfirmLabel: 'Repeat password',
-    passwordRequirements:
-      'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+    passwordLabel: 'Password',
     passwordRequirementItems: {
       lowercase: 'Lowercase',
       match: 'Passwords match',
@@ -37,6 +35,8 @@ export const copy = {
       symbol: 'Symbol',
       uppercase: 'Uppercase',
     },
+    passwordRequirements:
+      'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
@@ -45,22 +45,40 @@ export const copy = {
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   chat: {
+    addPrivateKey: 'Add private key',
+    addPrivateKeyAction: 'Add key to keychain',
+    addPrivateKeyBody:
+      'Paste the encrypted key package shared by the other participant.',
+    addPrivateKeyError:
+      'The key package could not be decrypted or does not belong to this conversation.',
+    addPrivateKeyPlaceholder: 'Paste encrypted conversation key...',
+    addPrivateKeyRequired: 'Paste an encrypted key package first.',
+    addPrivateKeySaving: 'Updating keychain...',
+    addPrivateKeyTitle: 'Add conversation key',
+    conversationDataTitle: 'Conversation data',
+    conversationMenu: 'Open conversation menu',
+    copyPrivateKey: 'Copy private key',
+    copyPrivateKeyAction: 'Copy encrypted key',
+    copyPrivateKeyBody:
+      'This package is encrypted for the other participant and can be pasted into their missing-key dialog.',
+    copyPrivateKeyError: 'The conversation key could not be encrypted.',
+    copyPrivateKeyTitle: 'Encrypted conversation key',
+    copyPrivateKeyUnavailable:
+      'The peer identity is not loaded, so the key cannot be encrypted yet.',
     createConversation: 'New conversation',
     directMessage: 'Direct message',
     e2eMissing: 'End-to-end encryption key is missing for this conversation.',
     e2eReady: 'End-to-end encryption is active for this conversation.',
     emptyBody:
-      'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
+      "Create a conversation by entering the remote user's identity ID or username. Very romantic, if your idea of romance includes private keys.",
     emptyMessages:
       'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
     emptyTitle: 'No conversations',
-    conversationDataTitle: 'Conversation data',
-    conversationMenu: 'Open conversation menu',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
-    noMoreMessages: 'No more messages',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
+    noMoreMessages: 'No more messages',
     viewData: 'View data',
     you: 'You',
   },
@@ -69,6 +87,7 @@ export const copy = {
     attachmentDownloadError: 'The attachment could not be decrypted.',
     attachmentTooLarge: 'Attachments must be 50 MiB or smaller.',
     decryptingAttachment: 'Decrypting',
+    dropFiles: 'Drop files to attach',
     encryptingAttachment: 'Encrypting',
     placeholder: 'Write, encrypt, sign, and push to the swarm...',
     removeAttachment: 'Remove attachment',
@@ -133,8 +152,6 @@ export const copy = {
       InvalidNodeIdError: 'The node identifier is not valid.',
       InvalidPasswordError:
         'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
-      InvalidUsernameOrPasswordError:
-        'The username or password is incorrect.',
       InvalidProfileHandleError:
         'The username must be 3 to 32 letters, numbers, dots, dashes or underscores.',
       InvalidProfileImageError:
@@ -143,6 +160,7 @@ export const copy = {
         'The signed request was rejected. Please reload and try again.',
       InvalidStringLengthError:
         'Some encrypted data is larger than the backend currently accepts.',
+      InvalidUsernameOrPasswordError: 'The username or password is incorrect.',
       IPFSBlockNotFoundOfflineError:
         'That IPFS block is not available while the node is offline.',
       IPFSBlockNotFoundPublicError:
@@ -307,8 +325,9 @@ export const copy = {
   },
   profile: {
     addNetwork: 'Add network',
-    biography: 'Bio',
     availableNetwork: 'Available network',
+    biography: 'Bio',
+    changePassword: 'Change password',
     copied: 'Copied',
     copy: 'Copy',
     edit: 'Edit profile',
@@ -320,24 +339,22 @@ export const copy = {
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
     name: 'Profile name',
-    changePassword: 'Change password',
+    networks: 'Networks',
     newPassword: 'New password',
     newPasswordConfirm: 'Repeat new password',
-    newPasswordHelp:
-      'Leave both fields empty to keep your current password.',
+    newPasswordHelp: 'Leave both fields empty to keep your current password.',
+    noAvailableNetworks: 'No more node networks available',
+    noBiography: 'No bio',
+    noNetworks: 'No networks',
     passwordRequirements: {
       lowercase: 'Lowercase',
+      match: 'Passwords match',
       maxLength: '256 characters or fewer',
       minLength: 'At least 12 characters',
       number: 'Number',
       symbol: 'Symbol',
       uppercase: 'Uppercase',
-      match: 'Passwords match',
     },
-    networks: 'Networks',
-    noAvailableNetworks: 'No more node networks available',
-    noBiography: 'No bio',
-    noNetworks: 'No networks',
     picture: 'Profile picture',
     save: 'Save profile',
     saving: 'Saving...',

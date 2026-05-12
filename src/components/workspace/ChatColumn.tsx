@@ -1,3 +1,4 @@
+import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -5,6 +6,7 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   AttachmentProgress,
   ChatMessage,
+  ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
   MessageAttachment,
@@ -34,6 +36,7 @@ interface ChatColumnProps {
   peerPicture?: string;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
+  conversationKey?: ConversationKeyEntry;
   hasConversationKey: boolean;
   hasReachedMessageStart: boolean;
   messages: ChatMessage[];
@@ -44,6 +47,7 @@ interface ChatColumnProps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onSend: (content: string, attachments: File[]) => Promise<void>;
+  onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onOpenSidebar: () => void;
@@ -56,6 +60,7 @@ interface ChatColumnProps {
 export function ChatColumn({
   activeConversation,
   bottomRef,
+  conversationKey,
   hasConversationKey,
   hasReachedMessageStart,
   identityNames,
@@ -64,6 +69,7 @@ export function ChatColumn({
   messageState,
   nodeNetworks,
   onCancelReply,
+  onConversationKeyImported,
   onCreate,
   onMessageMenuOpen,
   onOpenSidebar,
@@ -88,6 +94,15 @@ export function ChatColumn({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
+  const [conversationKeyDialog, setConversationKeyDialog] = useState<
+    'add' | 'copy' | null
+  >(null);
+  const [encryptedConversationKey, setEncryptedConversationKey] = useState('');
+  const [conversationKeyInput, setConversationKeyInput] = useState('');
+  const [conversationKeyError, setConversationKeyError] = useState<
+    string | null
+  >(null);
+  const [conversationKeySaving, setConversationKeySaving] = useState(false);
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
@@ -100,12 +115,7 @@ export function ChatColumn({
     (peerIdentity?.profile.handle?.trim()
       ? `@${peerIdentity.profile.handle.trim()}`
       : activeConversationFallbackName);
-  const conversationNetworkId =
-    activeConversation?.networkIds?.[0] ??
-    peerIdentity?.networks.find((networkId) =>
-      session.identity.networks.includes(networkId),
-    ) ??
-    session.identity.networks[0];
+  const conversationNetworkId = activeConversation?.networkId;
   const conversationNetworkName = conversationNetworkId
     ? (nodeNetworks.find((network) => network.id === conversationNetworkId)
         ?.name ?? shortId(conversationNetworkId))
@@ -138,6 +148,90 @@ export function ChatColumn({
     ],
   );
   const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
+  const closeConversationKeyDialog = () => {
+    setConversationKeyDialog(null);
+    setEncryptedConversationKey('');
+    setConversationKeyInput('');
+    setConversationKeyError(null);
+    setConversationKeySaving(false);
+  };
+  const openCopyConversationKeyDialog = () => {
+    if (!activeConversation || !conversationKey || !peerIdentity) {
+      setConversationKeyError(copy.chat.copyPrivateKeyUnavailable);
+      setConversationKeyDialog('copy');
+
+      return;
+    }
+
+    try {
+      const recipientKeyEntry: ConversationKeyEntry = {
+        ...conversationKey,
+        conversationId: activeConversation.id,
+        peerIdentityId: session.identity.id,
+      };
+      const encrypted = PublicKey.fromPEM(
+        peerIdentity.encryptedKeyPair.publicKey,
+      )
+        .encrypt(JSON.stringify(recipientKeyEntry))
+        .toString();
+
+      setEncryptedConversationKey(encrypted);
+      setConversationKeyError(null);
+    } catch {
+      setConversationKeyError(copy.chat.copyPrivateKeyError);
+    }
+    setConversationKeyDialog('copy');
+  };
+  const importConversationKey = async () => {
+    if (!activeConversation) return;
+
+    const encryptedPayload = conversationKeyInput.trim();
+
+    if (!encryptedPayload) {
+      setConversationKeyError(copy.chat.addPrivateKeyRequired);
+
+      return;
+    }
+
+    setConversationKeySaving(true);
+    setConversationKeyError(null);
+    try {
+      const decrypted = await session.encryptedKeyPair.decrypt(
+        new EncryptedPayload(encryptedPayload),
+        session.password,
+      );
+      const parsed = JSON.parse(
+        decrypted.toString(),
+      ) as Partial<ConversationKeyEntry>;
+
+      if (parsed.conversationId !== activeConversation.id) {
+        throw new Error('Conversation key belongs to another conversation.');
+      }
+
+      if (!parsed.privateKey) {
+        throw new Error('Conversation key payload is missing the private key.');
+      }
+
+      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
+      const publicKey =
+        parsed.publicKey ?? privateKey.getPublicKey().toString();
+      const keyEntry: ConversationKeyEntry = {
+        conversationId: activeConversation.id,
+        createdAt: parsed.createdAt ?? Date.now(),
+        peerIdentityId:
+          parsed.peerIdentityId ?? peerIdentityId ?? session.identity.id,
+        privateKey: privateKey.toString(),
+        publicKey,
+      };
+
+      await onConversationKeyImported(keyEntry);
+      closeConversationKeyDialog();
+    } catch {
+      setConversationKeyError(copy.chat.addPrivateKeyError);
+    } finally {
+      setConversationKeySaving(false);
+    }
+  };
   const openOwnProfile = () =>
     setProfileViewer({
       identity: session.identity,
@@ -314,6 +408,23 @@ export function ChatColumn({
                     >
                       {copy.chat.viewData}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (hasConversationKey) {
+                          openCopyConversationKeyDialog();
+                        } else {
+                          setConversationKeyError(null);
+                          setConversationKeyDialog('add');
+                        }
+                        setConversationMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {hasConversationKey
+                        ? copy.chat.copyPrivateKey
+                        : copy.chat.addPrivateKey}
+                    </button>
                   </div>
                 </>
               )}
@@ -354,7 +465,7 @@ export function ChatColumn({
                 {copy.chat.loadingEvents}
               </div>
             )}
-            <div className="space-y-4">
+            <div className="space-y-2">
               {hasReachedMessageStart &&
                 messages.length > 0 &&
                 messageState !== 'loading' && (
@@ -423,11 +534,25 @@ export function ChatColumn({
                   />
                 );
               })}
-              {messages.length === 0 && messageState !== 'loading' && (
-                <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                  {copy.chat.emptyMessages}
-                </div>
-              )}
+              {messages.length === 0 &&
+                messageState !== 'loading' &&
+                (hasConversationKey ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                    {copy.chat.emptyMessages}
+                  </div>
+                ) : (
+                  <div className="grid min-h-[42vh] place-items-center">
+                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                        <LockIcon locked={false} />
+                      </div>
+                      <div className="font-black">{copy.chat.e2eMissing}</div>
+                      <div className="mt-2 text-rose-100/65">
+                        {copy.messages.missingConversationKey}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               <div ref={bottomRef} />
             </div>
           </div>
@@ -459,6 +584,21 @@ export function ChatColumn({
         <ConversationDataDialog
           data={conversationData}
           onClose={() => setConversationDataOpen(false)}
+        />
+      )}
+      {conversationKeyDialog && (
+        <ConversationKeyDialog
+          encryptedConversationKey={encryptedConversationKey}
+          error={conversationKeyError}
+          input={conversationKeyInput}
+          mode={conversationKeyDialog}
+          onClose={closeConversationKeyDialog}
+          onCopy={() =>
+            void navigator.clipboard.writeText(encryptedConversationKey)
+          }
+          onImport={() => void importConversationKey()}
+          onInputChange={setConversationKeyInput}
+          saving={conversationKeySaving}
         />
       )}
       {profileViewer && (
@@ -496,6 +636,107 @@ function LockIcon({ locked }: { locked: boolean }) {
         strokeWidth="1.8"
       />
     </svg>
+  );
+}
+
+function ConversationKeyDialog({
+  encryptedConversationKey,
+  error,
+  input,
+  mode,
+  onClose,
+  onCopy,
+  onImport,
+  onInputChange,
+  saving,
+}: {
+  encryptedConversationKey: string;
+  error: string | null;
+  input: string;
+  mode: 'add' | 'copy';
+  onClose: () => void;
+  onCopy: () => void;
+  onImport: () => void;
+  onInputChange: (value: string) => void;
+  saving: boolean;
+}) {
+  const isCopy = mode === 'copy';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-black">
+              {isCopy
+                ? copy.chat.copyPrivateKeyTitle
+                : copy.chat.addPrivateKeyTitle}
+            </h2>
+            <p className="mt-1 text-sm text-white/55">
+              {isCopy
+                ? copy.chat.copyPrivateKeyBody
+                : copy.chat.addPrivateKeyBody}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+        {isCopy ? (
+          <>
+            <textarea
+              readOnly
+              value={encryptedConversationKey}
+              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
+            />
+            <button
+              type="button"
+              onClick={onCopy}
+              disabled={!encryptedConversationKey}
+              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
+            >
+              {copy.chat.copyPrivateKeyAction}
+            </button>
+          </>
+        ) : (
+          <>
+            <textarea
+              value={input}
+              onChange={(event) => onInputChange(event.target.value)}
+              placeholder={copy.chat.addPrivateKeyPlaceholder}
+              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
+            />
+            <button
+              type="button"
+              onClick={onImport}
+              disabled={saving || !input.trim()}
+              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
+            >
+              {saving
+                ? copy.chat.addPrivateKeySaving
+                : copy.chat.addPrivateKeyAction}
+            </button>
+          </>
+        )}
+        {error ? (
+          <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm font-bold text-rose-100">
+            {error}
+          </div>
+        ) : null}
+      </section>
+    </div>,
+    document.body,
   );
 }
 
