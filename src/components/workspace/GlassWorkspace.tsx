@@ -937,6 +937,7 @@ export function GlassWorkspace({
           }
           identityNames={identityNames}
           identityPictures={identityPictures}
+          identityProfiles={identityProfiles}
           messages={messages}
           messageState={messageState}
           newMessageCount={newMessageCount}

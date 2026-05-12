@@ -26,6 +26,7 @@ import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from './ConversationDataDialog';
 import { ConversationKeyDialog } from './ConversationKeyDialog';
+import { GroupProfileDialog } from './GroupProfileDialog';
 import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -38,6 +39,7 @@ interface ChatColumnProps {
   peerPicture?: string;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
   conversationKey?: ConversationKeyEntry;
   draft: string;
   hasConversationKey: boolean;
@@ -74,6 +76,7 @@ export function ChatColumn({
   hasReachedMessageStart,
   identityNames,
   identityPictures,
+  identityProfiles,
   messages,
   messageState,
   newMessageCount,
@@ -108,6 +111,7 @@ export function ChatColumn({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
+  const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
   >(null);
@@ -171,6 +175,20 @@ export function ChatColumn({
   );
   const canOpenPeerProfile =
     !!activeConversation && !!peerIdentityId && !isGroupConversation;
+  const groupParticipants = useMemo(
+    () =>
+      conversationParticipantIds(activeConversation).map((identityId) => {
+        const identity = identityProfiles[identityId];
+
+        return {
+          identity,
+          identityId,
+          name: identityDisplayName(identityId, identityNames),
+          picture: identityPictures[identityId],
+        };
+      }),
+    [activeConversation, identityNames, identityPictures, identityProfiles],
+  );
   const canShareConversationKey = !isGroupConversation;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
@@ -184,6 +202,7 @@ export function ChatColumn({
       if (event.key !== 'Escape') return;
 
       setProfileViewer(null);
+      setGroupProfileOpen(false);
       setConversationMenuOpen(false);
       setConversationDataOpen(false);
       closeConversationKeyDialog();
@@ -287,6 +306,16 @@ export function ChatColumn({
       picture: peerPicture,
     });
   };
+  const openConversationHeader = () => {
+    if (!activeConversation) return;
+
+    if (isGroupConversation) {
+      setGroupProfileOpen(true);
+      return;
+    }
+
+    openPeerProfile();
+  };
   const openMessageAuthorProfile = (message: ChatMessage) => {
     if (message.mine || message.authorIdentityId === session.identity.id) {
       openOwnProfile();
@@ -295,7 +324,7 @@ export function ChatColumn({
     }
 
     setProfileViewer({
-      identity: peerIdentity,
+      identity: identityProfiles[message.authorIdentityId],
       identityId: message.authorIdentityId,
       name: identityDisplayName(message.authorIdentityId, identityNames),
       picture: identityPictures[message.authorIdentityId],
@@ -354,8 +383,8 @@ export function ChatColumn({
           </button>
           <button
             type="button"
-            onClick={openPeerProfile}
-            disabled={!canOpenPeerProfile}
+            onClick={openConversationHeader}
+            disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
             className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
@@ -377,8 +406,8 @@ export function ChatColumn({
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
-                onClick={openPeerProfile}
-                disabled={!canOpenPeerProfile}
+                onClick={openConversationHeader}
+                disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
                 className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
               >
                 {activeConversation
@@ -669,6 +698,37 @@ export function ChatColumn({
           picture={profileViewer.picture}
         />
       )}
+      {groupProfileOpen && activeConversation && (
+        <GroupProfileDialog
+          conversation={activeConversation}
+          networkId={conversationNetworkId}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setGroupProfileOpen(false)}
+          onIdentityClick={(participant) => {
+            setGroupProfileOpen(false);
+            setProfileViewer({
+              identity: participant.identity,
+              identityId: participant.identityId,
+              name: participant.name,
+              picture: participant.picture,
+            });
+          }}
+          participants={groupParticipants}
+        />
+      )}
     </section>
+  );
+}
+
+function conversationParticipantIds(
+  conversation?: ConversationResource,
+): string[] {
+  if (!conversation) return [];
+
+  return (
+    conversation.participantIdentityIds ??
+    conversation.participantIds ??
+    conversation.participants ??
+    []
   );
 }
