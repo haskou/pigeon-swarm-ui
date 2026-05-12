@@ -47,7 +47,7 @@ export function Rail({
         className,
       )}
     >
-      <div className="relative flex w-full justify-center">
+      <div className="relative flex w-full justify-center pl-2">
         <RailSelectionIndicator active={activeMessages} />
         <button
           type="button"
@@ -70,7 +70,10 @@ export function Rail({
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
         {communities.map((community) => (
-          <div key={community.id} className="relative flex w-full justify-center">
+          <div
+            key={community.id}
+            className="relative flex w-full justify-center pl-2"
+          >
             <RailSelectionIndicator active={activeCommunityId === community.id} />
             <button
               type="button"
