@@ -117,18 +117,26 @@ export function ChatColumn({
     string | null
   >(null);
   const [conversationKeySaving, setConversationKeySaving] = useState(false);
-  const activeConversationName = peerIdentityId
-    ? identityDisplayName(peerIdentityId, identityNames)
-    : activeConversation?.title;
+  const isGroupConversation = !!(
+    activeConversation &&
+    (activeConversation.type === 'group' ||
+      activeConversation.id.startsWith('group:'))
+  );
+  const activeConversationName = isGroupConversation
+    ? (activeConversation?.name ?? activeConversation?.title)
+    : peerIdentityId
+      ? identityDisplayName(peerIdentityId, identityNames)
+      : activeConversation?.title;
   const activeConversationFallbackName = activeConversationName?.replace(
     /\s+\(@[^)]+\)$/,
     '',
   );
-  const activeConversationTitle =
-    peerIdentity?.profile.name.trim() ||
-    (peerIdentity?.profile.handle?.trim()
-      ? `@${peerIdentity.profile.handle.trim()}`
-      : activeConversationFallbackName);
+  const activeConversationTitle = isGroupConversation
+    ? activeConversationName
+    : peerIdentity?.profile.name.trim() ||
+      (peerIdentity?.profile.handle?.trim()
+        ? `@${peerIdentity.profile.handle.trim()}`
+        : activeConversationFallbackName);
   const conversationNetworkId = activeConversation?.networkId;
   const conversationNetworkName = conversationNetworkId
     ? (nodeNetworks.find((network) => network.id === conversationNetworkId)
@@ -161,7 +169,9 @@ export function ChatColumn({
       peerIdentityId,
     ],
   );
-  const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
+  const canOpenPeerProfile =
+    !!activeConversation && !!peerIdentityId && !isGroupConversation;
+  const canShareConversationKey = !isGroupConversation;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
     setEncryptedConversationKey('');
@@ -391,7 +401,11 @@ export function ChatColumn({
             </div>
             {activeConversation ? (
               <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-white/50">
-                <span className="shrink-0">{copy.chat.directMessage}</span>
+                {isGroupConversation ? (
+                  <span className="shrink-0">{copy.chat.groupMessage}</span>
+                ) : (
+                  <span className="shrink-0">{copy.chat.directMessage}</span>
+                )}
                 <span className="text-white/25">·</span>
                 <span
                   className="min-w-0 truncate"
@@ -436,23 +450,25 @@ export function ChatColumn({
                     >
                       {copy.chat.viewData}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (hasConversationKey) {
-                          openCopyConversationKeyDialog();
-                        } else {
-                          setConversationKeyError(null);
-                          setConversationKeyDialog('add');
-                        }
-                        setConversationMenuOpen(false);
-                      }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {hasConversationKey
-                        ? copy.chat.copyPrivateKey
-                        : copy.chat.addPrivateKey}
-                    </button>
+                    {canShareConversationKey ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (hasConversationKey) {
+                            openCopyConversationKeyDialog();
+                          } else {
+                            setConversationKeyError(null);
+                            setConversationKeyDialog('add');
+                          }
+                          setConversationMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {hasConversationKey
+                          ? copy.chat.copyPrivateKey
+                          : copy.chat.addPrivateKey}
+                      </button>
+                    ) : null}
                   </div>
                 </>
               )}

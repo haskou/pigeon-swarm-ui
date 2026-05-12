@@ -12,12 +12,14 @@ export function formatTime(timestamp: number | string): string {
 }
 
 export function conversationTitle(conversation: {
+  name?: string;
   title?: string;
   peerIdentityId?: string;
   participantIdentityIds?: string[];
   id: string;
 }): string {
   return (
+    conversation.name ??
     conversation.title ??
     conversation.peerIdentityId ??
     conversation.participantIdentityIds?.join(' ↔ ') ??

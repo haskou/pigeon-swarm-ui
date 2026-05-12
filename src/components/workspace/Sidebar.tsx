@@ -100,6 +100,10 @@ export function Sidebar({
     );
 
   const conversationName = (conversation: ConversationResource) => {
+    if (isGroupConversation(conversation)) {
+      return conversation.name ?? conversation.title ?? conversation.id;
+    }
+
     const peerIdentityId = conversationPeerId(conversation);
     const peerProfile = peerIdentityId
       ? identityProfiles[peerIdentityId]?.profile
@@ -116,6 +120,12 @@ export function Sidebar({
           : conversationTitle(conversation);
   };
   const conversationHandle = (conversation: ConversationResource) => {
+    if (isGroupConversation(conversation)) {
+      const memberCount = conversationParticipants(conversation).length;
+
+      return `${memberCount} ${copy.sidebar.members}`;
+    }
+
     const peerIdentityId = conversationPeerId(conversation);
     const peerHandle = peerIdentityId
       ? identityProfiles[peerIdentityId]?.profile.handle?.trim()
@@ -128,6 +138,8 @@ export function Sidebar({
         : conversationTitle(conversation);
   };
   const conversationPicture = (conversation: ConversationResource) => {
+    if (isGroupConversation(conversation)) return undefined;
+
     const peerIdentityId = conversationPeerId(conversation);
 
     return peerIdentityId ? identityPictures[peerIdentityId] : undefined;
@@ -389,6 +401,21 @@ export function Sidebar({
         />
       )}
     </aside>
+  );
+}
+
+function isGroupConversation(conversation: ConversationResource): boolean {
+  return conversation.type === 'group' || conversation.id.startsWith('group:');
+}
+
+function conversationParticipants(
+  conversation: ConversationResource,
+): string[] {
+  return (
+    conversation.participantIdentityIds ??
+    conversation.participantIds ??
+    conversation.participants ??
+    []
   );
 }
 

@@ -37,4 +37,17 @@ describe(conversationPeerIdentityId.name, () => {
       ),
     ).toBe('identity-2');
   });
+
+  it('does not resolve a group participant as a one-to-one peer', () => {
+    expect(
+      conversationPeerIdentityId(
+        {
+          id: 'group:conversation-1',
+          participantIds: ['identity-1', 'identity-2', 'identity-3'],
+          type: 'group',
+        } as ConversationResource,
+        'identity-1',
+      ),
+    ).toBeUndefined();
+  });
 });

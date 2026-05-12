@@ -74,6 +74,7 @@ export const copy = {
     emptyMessages:
       'No visible messages. Sending the first one usually helps, groundbreaking product discovery.',
     emptyTitle: 'No conversations',
+    groupMessage: 'Group conversation',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
     noConversation: 'No conversation',
@@ -105,6 +106,7 @@ export const copy = {
   },
   dialog: {
     cancel: 'Cancel',
+    addParticipant: 'Add',
     close: 'Close dialog',
     createConversation: 'Create conversation',
     createConversationBody:
@@ -112,11 +114,19 @@ export const copy = {
     createConversationError:
       'The conversation could not be created. The backend chose violence.',
     createConversationLoading: 'Creating and publishing keychain...',
-    createConversationTitle: 'Create a new direct conversation',
+    createConversationTitle: 'Create a new conversation',
+    directConversation: 'Direct message',
+    groupConversation: 'Group',
+    groupName: 'Group name',
+    groupNamePlaceholder: 'Mi grupo',
+    groupNeedsParticipant: 'Add at least one participant.',
+    groupParticipant: 'Add identity',
+    groupParticipants: 'Participants',
     loadingIdentity: 'Looking for shared networks...',
     noSharedNetwork:
       'No shared network with this identity. You cannot create this conversation yet.',
     remoteIdentityId: 'Identity ID or username',
+    removeParticipant: 'Remove participant',
     sharedNetwork: 'Conversation network',
   },
   errors: {
@@ -368,6 +378,7 @@ export const copy = {
     createConversation: 'New conversation',
     emptyConversations:
       'No conversations yet. Create one and we will finally have something to look at besides the void.',
+    members: 'members',
     oneToOneTitle: 'Direct messages',
     searchConversations: 'Search conversations',
   },
