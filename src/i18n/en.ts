@@ -18,12 +18,25 @@ export const copy = {
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
     identityIdLabel: 'Identity ID or username',
+    invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
     loginSubmit: 'Decrypt identity & enter',
     networkLabel: 'Network',
     networksLabel: 'Networks',
     passwordLabel: 'Password',
+    passwordConfirmLabel: 'Repeat password',
+    passwordRequirements:
+      'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+    passwordRequirementItems: {
+      lowercase: 'Lowercase',
+      match: 'Passwords match',
+      maxLength: '256 characters or fewer',
+      minLength: 'At least 12 characters',
+      number: 'Number',
+      symbol: 'Symbol',
+      uppercase: 'Uppercase',
+    },
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
@@ -116,9 +129,11 @@ export const copy = {
         'The message signature is not valid. Please reload the chat and try again.',
       InvalidNodeIdError: 'The node identifier is not valid.',
       InvalidPasswordError:
-        'The password does not meet the required format (At least 8 characters).',
+        'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+      InvalidUsernameOrPasswordError:
+        'The username or password is incorrect.',
       InvalidProfileHandleError:
-        'The username must be 3 to 32 lowercase letters, numbers, or underscores.',
+        'The username must be 3 to 32 letters, numbers, dots, dashes or underscores.',
       InvalidProfileImageError:
         'The profile image must be uploaded before it can be used.',
       InvalidSignedRequestError:
@@ -299,6 +314,20 @@ export const copy = {
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
     name: 'Profile name',
+    changePassword: 'Change password',
+    newPassword: 'New password',
+    newPasswordConfirm: 'Repeat new password',
+    newPasswordHelp:
+      'Leave both fields empty to keep your current password.',
+    passwordRequirements: {
+      lowercase: 'Lowercase',
+      maxLength: '256 characters or fewer',
+      minLength: 'At least 12 characters',
+      number: 'Number',
+      symbol: 'Symbol',
+      uppercase: 'Uppercase',
+      match: 'Passwords match',
+    },
     networks: 'Networks',
     noBiography: 'No bio',
     noNetworks: 'No networks',

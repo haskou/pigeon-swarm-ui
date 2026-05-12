@@ -9,13 +9,15 @@ export type IdentityUpdateProfileInput = {
 
 export class IdentitySignaturePayloadFactory {
   public createUpdate(input: {
+    encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
     identity: IdentityResource;
     previousIdentityExternalIdentifier: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
     return {
-      encryptedKeyPair: input.identity.encryptedKeyPair,
+      encryptedKeyPair:
+        input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
       id: input.identity.id,
       networks: input.identity.networks,
       previousIdentityExternalIdentifier:

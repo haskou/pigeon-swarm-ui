@@ -12,6 +12,10 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import {
+  isValidPassword,
+  passwordValidationChecks,
+} from '../../utils/credentialsValidation';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
@@ -393,6 +397,9 @@ function ProfileEditor({
   const [biography, setBiography] = useState(
     session.identity.profile.biography ?? '',
   );
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
+  const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const [picturePreview, setPicturePreview] = useState(
     currentPicture ??
       (session.identity.profile.picture
@@ -403,9 +410,17 @@ function ProfileEditor({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
+  const wantsPasswordChange =
+    newPassword.length > 0 || newPasswordConfirmation.length > 0;
+  const passwordChecks = passwordValidationChecks(newPassword);
+  const passwordsMatch =
+    newPassword.length > 0 && newPassword === newPasswordConfirmation;
+  const canChangePassword =
+    !wantsPasswordChange || (isValidPassword(newPassword) && passwordsMatch);
   const canSubmit =
     name.trim().length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
+    canChangePassword &&
     state !== 'loading';
 
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -438,9 +453,13 @@ function ProfileEditor({
         handle: normalizedHandle,
         name: name.trim(),
         picture: pictureCid,
-      });
+      }, wantsPasswordChange ? newPassword : undefined);
 
-      onUpdated({ ...session, identity });
+      onUpdated({
+        ...session,
+        identity,
+        password: wantsPasswordChange ? newPassword : session.password,
+      });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
     }
@@ -496,7 +515,7 @@ function ProfileEditor({
           <ProfileInput
             label={copy.profile.handle}
             value={handle}
-            onChange={setHandle}
+            onChange={(value) => setHandle(normalizeHandle(value))}
             placeholder="@ada"
           />
           <label className="grid gap-2 text-sm font-black text-white/70">
@@ -507,6 +526,54 @@ function ProfileEditor({
               className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
             />
           </label>
+          <section className="mt-3 overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+            <button
+              type="button"
+              onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
+              aria-expanded={passwordSectionOpen}
+            >
+              <span>{copy.profile.changePassword}</span>
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'text-white/45 transition-transform',
+                  passwordSectionOpen && 'rotate-180',
+                )}
+              >
+                ⌄
+              </span>
+            </button>
+            {passwordSectionOpen && (
+              <div className="border-t border-white/10 p-4">
+                <p className="text-xs font-bold text-white/45">
+                  {copy.profile.newPasswordHelp}
+                </p>
+                <div className="mt-4 grid gap-3">
+                  <ProfileInput
+                    label={copy.profile.newPassword}
+                    value={newPassword}
+                    onChange={setNewPassword}
+                    placeholder="••••••••••••"
+                    type="password"
+                  />
+                  <ProfileInput
+                    label={copy.profile.newPasswordConfirm}
+                    value={newPasswordConfirmation}
+                    onChange={setNewPasswordConfirmation}
+                    placeholder="••••••••••••"
+                    type="password"
+                  />
+                </div>
+                <PasswordChecklist
+                  checks={{
+                    ...passwordChecks,
+                    match: passwordsMatch,
+                  }}
+                />
+              </div>
+            )}
+          </section>
         </div>
 
         {error && (
@@ -531,11 +598,13 @@ function ProfileInput({
   label,
   onChange,
   placeholder,
+  type = 'text',
   value,
 }: {
   label: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: string;
   value: string;
 }) {
   return (
@@ -545,9 +614,53 @@ function ProfileInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        type={type}
         className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
       />
     </label>
+  );
+}
+
+function PasswordChecklist({
+  checks,
+}: {
+  checks: {
+    lowercase: boolean;
+    match: boolean;
+    maxLength: boolean;
+    minLength: boolean;
+    number: boolean;
+    symbol: boolean;
+    uppercase: boolean;
+  };
+}) {
+  const items = [
+    [copy.profile.passwordRequirements.minLength, checks.minLength],
+    [copy.profile.passwordRequirements.maxLength, checks.maxLength],
+    [copy.profile.passwordRequirements.uppercase, checks.uppercase],
+    [copy.profile.passwordRequirements.lowercase, checks.lowercase],
+    [copy.profile.passwordRequirements.number, checks.number],
+    [copy.profile.passwordRequirements.symbol, checks.symbol],
+    [copy.profile.passwordRequirements.match, checks.match],
+  ] as const;
+
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
+      {items.map(([label, complete]) => (
+        <div
+          key={label}
+          className={cx(
+            'flex items-center gap-2 rounded-2xl px-3 py-2',
+            complete
+              ? 'bg-emerald-400/10 text-emerald-200'
+              : 'bg-white/5 text-white/45',
+          )}
+        >
+          <span aria-hidden="true">{complete ? '✓' : '×'}</span>
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
