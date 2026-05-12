@@ -72,6 +72,7 @@ export function CreateConversationDialog({
 
     if (!trimmed) {
       setLookupState('idle');
+
       return undefined;
     }
 
@@ -84,8 +85,8 @@ export function CreateConversationDialog({
         .then((identity) => {
           if (cancelled) return;
 
-          const sharedNetworks = session.identity.networks.filter(
-            (networkId) => identity.networks.includes(networkId),
+          const sharedNetworks = session.identity.networks.filter((networkId) =>
+            identity.networks.includes(networkId),
           );
 
           setPeerIdentity(identity);
@@ -130,6 +131,7 @@ export function CreateConversationDialog({
 
     if (!selectedNetworkId) {
       setError(copy.dialog.noSharedNetwork);
+
       return;
     }
 
@@ -152,9 +154,7 @@ export function CreateConversationDialog({
       );
     } catch (caught) {
       setState('error');
-      setError(
-        toUserErrorMessage(caught, copy.dialog.createConversationError),
-      );
+      setError(toUserErrorMessage(caught, copy.dialog.createConversationError));
 
       return;
     }
@@ -214,17 +214,17 @@ export function CreateConversationDialog({
             </div>
           </div>
         )}
-
-        <Field label={copy.dialog.remoteIdentityId}>
-          <input
-            value={peerIdentityId}
-            onChange={(event) => setPeerIdentityId(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
-            autoComplete="off"
-          />
-        </Field>
-
+        <div className="mt-2">
+          <Field label={copy.dialog.remoteIdentityId}>
+            <input
+              value={peerIdentityId}
+              onChange={(event) => setPeerIdentityId(event.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+              placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+              autoComplete="off"
+            />
+          </Field>
+        </div>
         {peerIdentity &&
           lookupState === 'ready' &&
           sharedNetworkIds.length === 0 && (
@@ -232,16 +232,17 @@ export function CreateConversationDialog({
               {copy.dialog.noSharedNetwork}
             </div>
           )}
-
-        <Field label={copy.dialog.sharedNetwork}>
-          <GlassSelect
-            ariaLabel={copy.dialog.sharedNetwork}
-            disabled={!peerIdentity || sharedNetworkIds.length === 0}
-            value={selectedNetworkId}
-            onChange={setSelectedNetworkId}
-            options={networkOptions}
-          />
-        </Field>
+        <div className="mt-2">
+          <Field label={copy.dialog.sharedNetwork}>
+            <GlassSelect
+              ariaLabel={copy.dialog.sharedNetwork}
+              disabled={!peerIdentity || sharedNetworkIds.length === 0}
+              value={selectedNetworkId}
+              onChange={setSelectedNetworkId}
+              options={networkOptions}
+            />
+          </Field>{' '}
+        </div>
 
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
