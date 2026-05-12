@@ -98,9 +98,11 @@ export function ChatColumn({
       ? `@${peerIdentity.profile.handle.trim()}`
       : activeConversationFallbackName);
   const conversationNetworkId =
+    activeConversation?.networkIds?.[0] ??
     peerIdentity?.networks.find((networkId) =>
       session.identity.networks.includes(networkId),
-    ) ?? session.identity.networks[0];
+    ) ??
+    session.identity.networks[0];
   const conversationNetworkName = conversationNetworkId
     ? (nodeNetworks.find((network) => network.id === conversationNetworkId)
         ?.name ?? shortId(conversationNetworkId))

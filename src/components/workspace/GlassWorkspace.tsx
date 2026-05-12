@@ -989,6 +989,7 @@ export function GlassWorkspace({
 
       {isCreateOpen && (
         <CreateConversationDialog
+          nodeNetworks={nodeNetworks}
           session={session}
           onClose={() => setIsCreateOpen(false)}
           onCreated={handleConversationCreated}

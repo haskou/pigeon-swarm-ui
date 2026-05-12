@@ -130,6 +130,7 @@ export class PigeonApplication {
   public async createConversation(
     session: Session,
     peerIdentityId: string,
+    networkId: string,
   ): Promise<{
     conversation: ConversationResource;
     keychain: LocalKeychain;
@@ -138,6 +139,7 @@ export class PigeonApplication {
     return await this.createConversationUseCase.execute(
       session,
       peerIdentityId,
+      networkId,
     );
   }
 
