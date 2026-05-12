@@ -24,6 +24,8 @@ export type RealtimeMessage =
       type: 'domain_event';
     };
 
+const debugRealtimeStorageKey = 'pigeon:debugRealtime';
+
 export class RealtimeGateway {
   public constructor(
     private readonly urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
@@ -51,10 +53,16 @@ export class RealtimeGateway {
     const socket = new WebSocket(url.toString());
 
     socket.addEventListener('message', (event) => {
+      this.debug('message', event.data);
       const message = this.parseMessage(event.data);
 
       if (message) onMessage(message);
     });
+    socket.addEventListener('open', () => this.debug('open', url.pathname));
+    socket.addEventListener('close', (event) =>
+      this.debug('close', `${event.code} ${event.reason}`.trim()),
+    );
+    socket.addEventListener('error', () => this.debug('error', url.pathname));
 
     return socket;
   }
@@ -81,5 +89,11 @@ export class RealtimeGateway {
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
     return url;
+  }
+
+  private debug(event: string, data: unknown): void {
+    if (localStorage.getItem(debugRealtimeStorageKey) !== '1') return;
+
+    console.debug(`[pigeon:realtime:${event}]`, data);
   }
 }
