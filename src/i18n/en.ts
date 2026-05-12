@@ -87,6 +87,7 @@ export const copy = {
     addMember: 'Add member',
     avatar: 'Community avatar',
     banner: 'Community banner',
+    channelDataTitle: 'Channel data',
     channelError: 'The channel could not be created.',
     channelMetadataOnly: 'Community channel.',
     channels: 'Text channels',

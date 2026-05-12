@@ -5,9 +5,11 @@ import { copy } from '../../i18n/en';
 export function ConversationDataDialog({
   data,
   onClose,
+  title = copy.chat.conversationDataTitle,
 }: {
   data: unknown;
   onClose: () => void;
+  title?: string;
 }) {
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
@@ -19,9 +21,7 @@ export function ConversationDataDialog({
       />
       <section className="glass-panel-strong relative z-10 flex h-full w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-black">
-            {copy.chat.conversationDataTitle}
-          </h2>
+          <h2 className="text-2xl font-black">{title}</h2>
           <button
             type="button"
             onClick={onClose}

@@ -36,6 +36,7 @@ import { Composer } from '../chat/Composer';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
+import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
 import { LockIcon } from '../workspace/LockIcon';
 import {
   MessageContextMenu,
@@ -99,6 +100,8 @@ export function CommunityWorkspace({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
+  const [channelDataOpen, setChannelDataOpen] = useState(false);
+  const [channelMenuOpen, setChannelMenuOpen] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
@@ -141,6 +144,28 @@ export function CommunityWorkspace({
       channel.name.toLowerCase().includes(query),
     );
   }, [channelSearch, community.textChannels]);
+  const channelData = useMemo(
+    () => ({
+      frontendDerived: {
+        channelEncryptionReady,
+        communityId: community.id,
+        communityName: community.name,
+        loadedMessages: messages.length,
+        memberCount: community.memberIds.length,
+        networkId: community.networkId,
+        networkName,
+      },
+      serverChannel: selectedChannel ?? null,
+      serverCommunity: community,
+    }),
+    [
+      channelEncryptionReady,
+      community,
+      messages.length,
+      networkName,
+      selectedChannel,
+    ],
+  );
 
   useEffect(() => {
     const nextSelectedChannel =
@@ -619,6 +644,41 @@ export function CommunityWorkspace({
                 </p>
               )}
             </div>
+            {selectedChannel ? (
+              <div className="relative ml-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setChannelMenuOpen((isOpen) => !isOpen)}
+                  className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
+                  aria-label={copy.chat.conversationMenu}
+                  aria-expanded={channelMenuOpen}
+                >
+                  ⋮
+                </button>
+                {channelMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-30 cursor-default"
+                      onClick={() => setChannelMenuOpen(false)}
+                      aria-label={copy.dialog.close}
+                    />
+                    <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChannelDataOpen(true);
+                          setChannelMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {copy.chat.viewData}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : null}
           </div>
         </header>
 
@@ -827,6 +887,13 @@ export function CommunityWorkspace({
         <RawMessageDialog
           message={rawMessage}
           onClose={() => setRawMessage(null)}
+        />
+      )}
+      {channelDataOpen && (
+        <ConversationDataDialog
+          data={channelData}
+          onClose={() => setChannelDataOpen(false)}
+          title={copy.communities.channelDataTitle}
         />
       )}
     </>
