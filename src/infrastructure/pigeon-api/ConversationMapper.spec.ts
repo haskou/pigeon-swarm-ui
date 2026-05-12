@@ -7,6 +7,7 @@ describe(ConversationMapper.name, () => {
       items: [
         {
           id: 'conversation-1',
+          networkId: 'network-1',
           participantIds: ['left', 'right'],
         },
       ],
@@ -16,6 +17,7 @@ describe(ConversationMapper.name, () => {
       {
         conversationId: 'conversation-1',
         id: 'conversation-1',
+        networkId: 'network-1',
         participantIdentityIds: ['left', 'right'],
         participantIds: ['left', 'right'],
         peerIdentityId: undefined,
@@ -27,8 +29,10 @@ describe(ConversationMapper.name, () => {
     const mapper = new ConversationMapper();
 
     expect(
-      mapper.normalize({ conversationId: 'conversation-2', id: '' }, 'peer-1')
-        .peerIdentityId,
+      mapper.normalize(
+        { conversationId: 'conversation-2', id: '', networkId: 'network-1' },
+        'peer-1',
+      ).peerIdentityId,
     ).toBe('peer-1');
   });
 });
