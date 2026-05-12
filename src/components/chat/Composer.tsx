@@ -53,6 +53,7 @@ export function Composer({
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const canAttach = !disabled && !sending;
   const canSend =
     (content.trim().length > 0 || attachments.length > 0) &&
@@ -72,6 +73,12 @@ export function Composer({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!replyTo || disabled || sending) return;
+
+    textInputRef.current?.focus();
+  }, [disabled, replyTo, sending]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     const acceptedFiles = selectedFiles.filter(
@@ -315,6 +322,7 @@ export function Composer({
             className="hidden"
           />
           <input
+            ref={textInputRef}
             value={content}
             onChange={(event) => setContent(event.target.value)}
             disabled={disabled || sending}
