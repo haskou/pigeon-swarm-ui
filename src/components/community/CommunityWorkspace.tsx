@@ -81,6 +81,7 @@ export function CommunityWorkspace({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
+  const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
@@ -110,6 +111,15 @@ export function CommunityWorkspace({
       })),
     [community.memberIds, memberIdentities, memberPictures],
   );
+  const visibleChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return community.textChannels;
+
+    return community.textChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, community.textChannels]);
 
   useEffect(() => {
     const nextSelectedChannel =
@@ -455,35 +465,28 @@ export function CommunityWorkspace({
           <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
             {copy.communities.privateCommunity}
           </div>
-          <button
-            type="button"
-            disabled={!bannerUrl}
-            onClick={() => setBannerViewerOpen(true)}
-            className={cx(
-              'mt-3 block w-full overflow-hidden rounded-3xl bg-white/8 text-left',
-              bannerUrl && 'transition hover:bg-white/12',
-            )}
-          >
-            <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
-              {bannerUrl ? (
+          <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
+            {bannerUrl ? (
+              <button
+                type="button"
+                onClick={() => setBannerViewerOpen(true)}
+                className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
+                aria-label={copy.communities.openBanner}
+              >
                 <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                community.name.slice(0, 1).toUpperCase()
-              )}
-            </div>
+              </button>
+            ) : (
+              <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
+                {community.name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
             <div className="p-4">
               <h2 className="truncate text-xl font-black">{community.name}</h2>
               <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
                 {community.description}
               </p>
-              <div
-                className="mt-3 truncate rounded-2xl bg-black/25 px-3 py-2 text-xs font-black text-white/60"
-                title={community.networkId}
-              >
-                {networkName}
-              </div>
             </div>
-          </button>
+          </div>
           {owner && (
             <button
               type="button"
@@ -499,13 +502,23 @@ export function CommunityWorkspace({
           <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
             {copy.communities.channels}
           </div>
+          <input
+            value={channelSearch}
+            onChange={(event) => setChannelSearch(event.target.value)}
+            className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            placeholder={copy.communities.searchChannels}
+          />
           <div className="space-y-2">
             {community.textChannels.length === 0 ? (
               <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                 {copy.communities.noChannels}
               </div>
+            ) : visibleChannels.length === 0 ? (
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                {copy.communities.noMatchingChannels}
+              </div>
             ) : (
-              community.textChannels.map((channel) => (
+              visibleChannels.map((channel) => (
                 <button
                   key={channel.id}
                   type="button"
@@ -521,8 +534,7 @@ export function CommunityWorkspace({
                       : 'bg-white/8 text-white hover:bg-white/14',
                   )}
                 >
-                  <span className="text-white/45">#</span>
-                  <span className="truncate">{channel.name}</span>
+                  <span className="truncate">#{channel.name}</span>
                 </button>
               ))
             )}
@@ -567,11 +579,16 @@ export function CommunityWorkspace({
                   <LockIcon locked={channelEncryptionReady} />
                 </span>
               </div>
-              <p className="truncate text-sm text-white/50">
-                {selectedChannel
-                  ? copy.communities.channelMetadataOnly
-                  : community.description}
-              </p>
+              {selectedChannel ? (
+                <p className="truncate text-sm text-white/50">
+                  {copy.communities.channelMetadataOnly}{' '}
+                  <span title={community.networkId}>{networkName}</span>
+                </p>
+              ) : (
+                <p className="truncate text-sm text-white/50">
+                  {community.description}
+                </p>
+              )}
             </div>
           </div>
         </header>
@@ -834,8 +851,8 @@ function ManageCommunityDialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const saveProfile = async () => {
-    if (state === 'loading') return;
+  const saveProfile = async (): Promise<boolean> => {
+    if (state === 'loading') return false;
 
     setState('loading');
     setError(null);
@@ -852,10 +869,21 @@ function ManageCommunityDialog({
       );
 
       onCommunityUpdated(updated);
+      return true;
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.updateError));
+      return false;
+    } finally {
+      setState('idle');
     }
-    setState('idle');
+  };
+
+  const finishManage = async () => {
+    const saved = await saveProfile();
+
+    if (!saved) return;
+    await refreshCommunity();
+    onClose();
   };
 
   const createChannel = async () => {
@@ -1000,14 +1028,6 @@ function ManageCommunityDialog({
                   className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
               </Field>
-              <button
-                type="button"
-                onClick={() => void saveProfile()}
-                disabled={!name.trim() || state === 'loading'}
-                className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {copy.profile.save}
-              </button>
             </div>
           </div>
 
@@ -1095,8 +1115,9 @@ function ManageCommunityDialog({
         </div>
         <button
           type="button"
-          onClick={() => void refreshCommunity().then(onClose)}
-          className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+          onClick={() => void finishManage()}
+          disabled={!name.trim() || state === 'loading'}
+          className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {copy.communities.done}
         </button>
@@ -1226,7 +1247,7 @@ function MemberRow({
   owner: boolean;
   pictureUrl: null | string;
 }) {
-  const name = identity ? (identityName(identity) ?? shortId(identity.id)) : shortId(identityId);
+  const name = memberPrimaryName(identity, identityId);
   const handle = identity?.profile.handle?.trim();
 
   return (
@@ -1299,6 +1320,19 @@ function memberDisplayName(
   identityId: string,
 ): string {
   return identity ? (identityName(identity) ?? shortId(identity.id)) : shortId(identityId);
+}
+
+function memberPrimaryName(
+  identity: IdentityResource | undefined,
+  identityId: string,
+): string {
+  const name = identity?.profile.name.trim();
+
+  if (name) return name;
+
+  const handle = identity?.profile.handle?.trim();
+
+  return handle ? `@${handle}` : shortId(identityId);
 }
 
 type CommunityChannelPlainPayload = {

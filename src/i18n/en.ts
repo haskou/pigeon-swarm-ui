@@ -88,7 +88,7 @@ export const copy = {
     avatar: 'Community avatar',
     banner: 'Community banner',
     channelError: 'The channel could not be created.',
-    channelMetadataOnly: 'Community channel metadata. Messages arrive later.',
+    channelMetadataOnly: 'Community channel.',
     channels: 'Text channels',
     channelsAreMetadata: 'Channels are ready for metadata',
     channelsAreMetadataBody:
@@ -120,8 +120,11 @@ export const copy = {
     noChannelSelected: 'Choose a channel',
     noChannelSelectedBody:
       'Community channels are private spaces inside this community.',
+    noMatchingChannels: 'No channels match that search.',
+    openBanner: 'Open community banner',
     owner: 'Owner',
     privateCommunity: 'Private community',
+    searchChannels: 'Search channels',
     updateError: 'The community could not be updated.',
   },
   composer: {
