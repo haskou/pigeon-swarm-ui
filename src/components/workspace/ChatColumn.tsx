@@ -1,6 +1,5 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { useCallback, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -25,6 +24,9 @@ import {
 import { Composer } from '../chat/Composer';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
+import { ConversationDataDialog } from './ConversationDataDialog';
+import { ConversationKeyDialog } from './ConversationKeyDialog';
+import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -612,168 +614,5 @@ export function ChatColumn({
         />
       )}
     </section>
-  );
-}
-
-function LockIcon({ locked }: { locked: boolean }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-      <path
-        d={locked ? 'M7 10V8a5 5 0 0 1 10 0v2' : 'M9 10V8a5 5 0 0 1 8.7-3.4'}
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M12 14v2"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function ConversationKeyDialog({
-  encryptedConversationKey,
-  error,
-  input,
-  mode,
-  onClose,
-  onCopy,
-  onImport,
-  onInputChange,
-  saving,
-}: {
-  encryptedConversationKey: string;
-  error: string | null;
-  input: string;
-  mode: 'add' | 'copy';
-  onClose: () => void;
-  onCopy: () => void;
-  onImport: () => void;
-  onInputChange: (value: string) => void;
-  saving: boolean;
-}) {
-  const isCopy = mode === 'copy';
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-[2rem] p-5 shadow-2xl shadow-black/40">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-black">
-              {isCopy
-                ? copy.chat.copyPrivateKeyTitle
-                : copy.chat.addPrivateKeyTitle}
-            </h2>
-            <p className="mt-1 text-sm text-white/55">
-              {isCopy
-                ? copy.chat.copyPrivateKeyBody
-                : copy.chat.addPrivateKeyBody}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
-        {isCopy ? (
-          <>
-            <textarea
-              readOnly
-              value={encryptedConversationKey}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
-            />
-            <button
-              type="button"
-              onClick={onCopy}
-              disabled={!encryptedConversationKey}
-              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
-            >
-              {copy.chat.copyPrivateKeyAction}
-            </button>
-          </>
-        ) : (
-          <>
-            <textarea
-              value={input}
-              onChange={(event) => onInputChange(event.target.value)}
-              placeholder={copy.chat.addPrivateKeyPlaceholder}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
-            />
-            <button
-              type="button"
-              onClick={onImport}
-              disabled={saving || !input.trim()}
-              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
-            >
-              {saving
-                ? copy.chat.addPrivateKeySaving
-                : copy.chat.addPrivateKeyAction}
-            </button>
-          </>
-        )}
-        {error ? (
-          <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm font-bold text-rose-100">
-            {error}
-          </div>
-        ) : null}
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function ConversationDataDialog({
-  data,
-  onClose,
-}: {
-  data: unknown;
-  onClose: () => void;
-}) {
-  return createPortal(
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 flex h-full w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-black">
-            {copy.chat.conversationDataTitle}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
-        <pre className="mt-4 min-h-0 overflow-auto rounded-3xl bg-black/35 p-4 text-xs leading-5 text-white/70">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </section>
-    </div>,
-    document.body,
   );
 }

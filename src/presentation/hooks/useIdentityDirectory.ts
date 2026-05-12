@@ -152,14 +152,18 @@ export function useIdentityDirectory({
               ]),
           ),
         }));
-        setIdentityPictures((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities
-              .filter(([, , picture]) => !!picture)
-              .map(([identityId, , picture]) => [identityId, picture as string]),
-          ),
-        }));
+        setIdentityPictures((current) => {
+          const next = { ...current };
+
+          resolvedIdentities.forEach(([identityId, , picture, identity]) => {
+            if (!identity) return;
+
+            if (picture) next[identityId] = picture;
+            else delete next[identityId];
+          });
+
+          return next;
+        });
         setResolvingIdentityIds((current) =>
           current.filter(
             (identityId) => !identityIdsToResolve.includes(identityId),
