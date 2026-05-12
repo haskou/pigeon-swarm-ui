@@ -10,7 +10,11 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
-import { identityName, identityPicture } from '../../utils/identityDisplay';
+import {
+  identityName,
+  identityPicture,
+  profilePictureDataUrl,
+} from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 import { GlassSelect } from '../common/GlassSelect';
@@ -36,6 +40,7 @@ export function CreateConversationDialog({
     null,
   );
   const [lookupState, setLookupState] = useState<IdentityLookupState>('idle');
+  const [peerPictureUrl, setPeerPictureUrl] = useState<string | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState('');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +61,13 @@ export function CreateConversationDialog({
   const peerDisplayName = peerIdentity
     ? (identityName(peerIdentity) ?? shortId(peerIdentity.id))
     : null;
-  const peerPicture = peerIdentity ? identityPicture(peerIdentity) : null;
 
   useEffect(() => {
     const trimmed = normalizeIdentityLookup(peerIdentityId);
 
     setError(null);
     setPeerIdentity(null);
+    setPeerPictureUrl(null);
     setSelectedNetworkId('');
 
     if (!trimmed) {
@@ -86,6 +91,10 @@ export function CreateConversationDialog({
           setPeerIdentity(identity);
           setSelectedNetworkId(sharedNetworks[0] ?? '');
           setLookupState('ready');
+
+          void loadDialogIdentityPicture(identity).then((picture) => {
+            if (!cancelled) setPeerPictureUrl(picture);
+          });
         })
         .catch(() => {
           if (cancelled) return;
@@ -178,16 +187,6 @@ export function CreateConversationDialog({
           </button>
         </div>
 
-        <Field label={copy.dialog.remoteIdentityId}>
-          <input
-            value={peerIdentityId}
-            onChange={(event) => setPeerIdentityId(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
-            autoComplete="off"
-          />
-        </Field>
-
         {lookupState === 'loading' && (
           <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
             {copy.dialog.loadingIdentity}
@@ -197,9 +196,9 @@ export function CreateConversationDialog({
         {peerIdentity && peerDisplayName && (
           <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-              {peerPicture ? (
+              {peerPictureUrl ? (
                 <img
-                  src={peerPicture}
+                  src={peerPictureUrl}
                   alt=""
                   className="h-full w-full object-cover"
                 />
@@ -215,6 +214,16 @@ export function CreateConversationDialog({
             </div>
           </div>
         )}
+
+        <Field label={copy.dialog.remoteIdentityId}>
+          <input
+            value={peerIdentityId}
+            onChange={(event) => setPeerIdentityId(event.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+            autoComplete="off"
+          />
+        </Field>
 
         {peerIdentity &&
           lookupState === 'ready' &&
@@ -271,4 +280,24 @@ function normalizeIdentityLookup(value: string): string {
   const trimmed = value.trim();
 
   return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
+}
+
+async function loadDialogIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  try {
+    const content = await pigeonApplication.getPublicFile(pictureCid);
+
+    return profilePictureDataUrl(content);
+  } catch {
+    return null;
+  }
 }
