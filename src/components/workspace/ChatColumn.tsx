@@ -13,6 +13,7 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
+import { shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
@@ -85,6 +86,28 @@ export function ChatColumn({
   const activeConversationName = peerIdentityId
     ? identityDisplayName(peerIdentityId, identityNames)
     : activeConversation?.title;
+  const activeConversationFallbackName = activeConversationName?.replace(
+    /\s+\(@[^)]+\)$/,
+    '',
+  );
+  const activeConversationTitle =
+    peerIdentity?.profile.name.trim() ||
+    (peerIdentity?.profile.handle?.trim()
+      ? `@${peerIdentity.profile.handle.trim()}`
+      : activeConversationFallbackName);
+  const conversationNetworkId =
+    peerIdentity?.networks.find((networkId) =>
+      session.identity.networks.includes(networkId),
+    ) ?? session.identity.networks[0];
+  const conversationNetworkName = conversationNetworkId
+    ? (nodeNetworks.find((network) => network.id === conversationNetworkId)
+        ?.name ?? shortId(conversationNetworkId))
+    : copy.profile.noNetworks;
+  const conversationNetworkTooltip =
+    conversationNetworkId ?? copy.profile.noNetworks;
+  const e2eTooltip = hasConversationKey
+    ? copy.chat.e2eReady
+    : copy.chat.e2eMissing;
   const canOpenPeerProfile = !!activeConversation && !!peerIdentityId;
   const openOwnProfile = () =>
     setProfileViewer({
@@ -189,21 +212,47 @@ export function ChatColumn({
             )}
           </button>
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={openPeerProfile}
-              disabled={!canOpenPeerProfile}
-              className="block max-w-full truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
-            >
-              {activeConversation
-                ? (activeConversationName ?? activeConversation.id)
-                : copy.chat.noConversation}
-            </button>
-            <div className="truncate text-sm text-white/50">
-              {activeConversation
-                ? `${copy.chat.directMessage} · ${activeConversation.id}`
-                : copy.chat.noConversationHint}
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={openPeerProfile}
+                disabled={!canOpenPeerProfile}
+                className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
+              >
+                {activeConversation
+                  ? (activeConversationTitle ?? activeConversation.id)
+                  : copy.chat.noConversation}
+              </button>
+              {activeConversation ? (
+                <span
+                  className={
+                    hasConversationKey
+                      ? 'shrink-0 text-emerald-300'
+                      : 'shrink-0 text-rose-300'
+                  }
+                  title={e2eTooltip}
+                  aria-label={e2eTooltip}
+                >
+                  <LockIcon locked={hasConversationKey} />
+                </span>
+              ) : null}
             </div>
+            {activeConversation ? (
+              <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-white/50">
+                <span className="shrink-0">{copy.chat.directMessage}</span>
+                <span className="text-white/25">·</span>
+                <span
+                  className="min-w-0 truncate"
+                  title={conversationNetworkTooltip}
+                >
+                  {conversationNetworkName}
+                </span>
+              </div>
+            ) : (
+              <div className="truncate text-sm text-white/50">
+                {copy.chat.noConversationHint}
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -345,5 +394,38 @@ export function ChatColumn({
         />
       )}
     </section>
+  );
+}
+
+function LockIcon({ locked }: { locked: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d={
+          locked
+            ? 'M7 10V8a5 5 0 0 1 10 0v2'
+            : 'M9 10V8a5 5 0 0 1 8.7-3.4'
+        }
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 14v2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }

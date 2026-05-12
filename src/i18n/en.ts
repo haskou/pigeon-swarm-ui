@@ -34,6 +34,8 @@ export const copy = {
   chat: {
     createConversation: 'New conversation',
     directMessage: 'Direct message',
+    e2eMissing: 'End-to-end encryption key is missing for this conversation.',
+    e2eReady: 'End-to-end encryption is active for this conversation.',
     emptyBody:
       'Create a 1to1 by entering the remote identity ID. Very romantic, if your idea of romance includes private keys.',
     emptyMessages:
