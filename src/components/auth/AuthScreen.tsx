@@ -11,7 +11,12 @@ import {
   saveCredentials,
 } from '../../presentation/auth/savedCredentials';
 import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
-import { isValidHandle, normalizeHandle } from '../../utils/identityDisplay';
+import {
+  isValidHandle,
+  isValidPassword,
+  normalizeHandleInput,
+  passwordValidationError,
+} from '../../utils/credentialsValidation';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -70,8 +75,12 @@ export function AuthScreen({
       ? identityId.trim().length > 0 && password.length > 0
       : name.trim().length > 0 &&
         (!handle.trim() || isValidHandle(handle)) &&
-        password.length > 0 &&
+        isValidPassword(password) &&
         (availableNetworks.length === 0 || selectedNetwork !== '');
+  const passwordError =
+    mode === 'create' && password
+      ? passwordValidationError(password)
+      : null;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -102,12 +111,15 @@ export function AuthScreen({
 
       const result =
         mode === 'login'
-          ? await pigeonApplication.login(identityId, password)
+          ? await pigeonApplication.login(
+              normalizeIdentityLogin(identityId),
+              password,
+            )
           : await pigeonApplication.register(
               name,
               password,
               networksToRegister,
-              handle.trim() ? normalizeHandle(handle) : undefined,
+              handle.trim() ? normalizeHandleInput(handle) : undefined,
             );
 
       if (rememberMe) {
@@ -198,7 +210,9 @@ export function AuthScreen({
                 <Field label={copy.auth.handleLabel}>
                   <input
                     value={handle}
-                    onChange={(event) => setHandle(event.target.value)}
+                    onChange={(event) =>
+                      setHandle(normalizeHandleInput(event.target.value))
+                    }
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="@ada"
                     autoComplete="username"
@@ -241,6 +255,11 @@ export function AuthScreen({
                 }
               />
             </Field>
+            {mode === 'create' && (passwordError || password.length === 0) && (
+              <p className="text-xs font-bold text-white/45">
+                {copy.auth.passwordRequirements}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -284,4 +303,12 @@ export function AuthScreen({
       </div>
     </section>
   );
+}
+
+function normalizeIdentityLogin(value: string): string {
+  const trimmed = value.trim();
+
+  return trimmed.startsWith('@')
+    ? normalizeHandleInput(trimmed)
+    : trimmed;
 }

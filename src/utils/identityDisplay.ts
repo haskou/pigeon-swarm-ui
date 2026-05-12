@@ -1,18 +1,20 @@
 import type { IdentityResource } from '../domain/types';
 
+import {
+  isValidHandle as isValidCredentialHandle,
+  normalizeHandleInput,
+} from './credentialsValidation';
 import { shortId } from './formatting';
 
 export type IdentityNames = Record<string, string>;
 export type IdentityPictures = Record<string, string>;
 
 export function normalizeHandle(value: string): string {
-  return value.trim().replace(/^@/, '').toLowerCase();
+  return normalizeHandleInput(value);
 }
 
 export function isValidHandle(value: string): boolean {
-  const handle = normalizeHandle(value);
-
-  return /^[a-z0-9_]{3,32}$/.test(handle);
+  return isValidCredentialHandle(value);
 }
 
 export function identityDisplayName(

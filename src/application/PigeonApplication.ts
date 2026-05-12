@@ -201,8 +201,13 @@ export class PigeonApplication {
   public async updateIdentityProfile(
     session: Session,
     profile: IdentityUpdateProfileInput,
+    newPassword?: string,
   ): Promise<IdentityResource> {
-    return await this.gateway.updateIdentityProfile(session, profile);
+    return await this.gateway.updateIdentityProfile(
+      session,
+      profile,
+      newPassword,
+    );
   }
 
   public async uploadPublicFile(

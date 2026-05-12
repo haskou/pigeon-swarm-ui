@@ -239,6 +239,7 @@ export class PigeonApiGateway {
   public async updateIdentityProfile(
     session: Session,
     profile: IdentityUpdateProfileInput,
+    newPassword?: string,
   ): Promise<IdentityResource> {
     const currentIdentity = await this.getIdentity(session.identity.id);
     const previousIdentityExternalIdentifier =
@@ -251,8 +252,12 @@ export class PigeonApiGateway {
       throw new Error(copy.profile.missingIdentityExternalIdentifier);
     }
 
+    const encryptedKeyPair = newPassword
+      ? await this.reEncryptKeyPair(session, newPassword)
+      : undefined;
     const path = `/identities/${encodeURIComponent(session.identity.id)}`;
     const unsigned = this.identitySignatures.createUpdate({
+      encryptedKeyPair,
       identity: currentIdentity,
       previousIdentityExternalIdentifier,
       profile,
@@ -482,10 +487,14 @@ export class PigeonApiGateway {
     const identity = await this.getIdentity(identityId.trim());
     const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
 
-    await encryptedKeyPair.sign(
-      new StringValueObject(`pigeon-swarm:login:${identity.id}`),
-      new StringValueObject(password),
-    );
+    try {
+      await encryptedKeyPair.sign(
+        new StringValueObject(`pigeon-swarm:login:${identity.id}`),
+        new StringValueObject(password),
+      );
+    } catch {
+      throw new Error(copy.auth.invalidLogin);
+    }
 
     const session: Session = {
       encryptedKeyPair,
@@ -816,6 +825,26 @@ export class PigeonApiGateway {
         new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
       ),
     );
+  }
+
+  private async reEncryptKeyPair(
+    session: Session,
+    newPassword: string,
+  ): Promise<IdentityResource['encryptedKeyPair']> {
+    const privateKey = await new EncryptedPrivateKey(
+      new StringValueObject(
+        session.identity.encryptedKeyPair.encryptedPrivateKey,
+      ),
+    ).decrypt(new StringValueObject(session.password));
+    const encryptedKeyPair = await EncryptedKeyPair.encryptKeyPair(
+      PublicKey.fromPEM(
+        new StringValueObject(session.identity.encryptedKeyPair.publicKey),
+      ),
+      privateKey,
+      new StringValueObject(newPassword),
+    );
+
+    return encryptedKeyPair.toPrimitives();
   }
 
   private messagesPath(conversationId: string, before?: null | string): string {

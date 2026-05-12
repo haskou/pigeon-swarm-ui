@@ -12,6 +12,10 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import {
+  isValidPassword,
+  passwordValidationError,
+} from '../../utils/credentialsValidation';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
@@ -393,6 +397,7 @@ function ProfileEditor({
   const [biography, setBiography] = useState(
     session.identity.profile.biography ?? '',
   );
+  const [newPassword, setNewPassword] = useState('');
   const [picturePreview, setPicturePreview] = useState(
     currentPicture ??
       (session.identity.profile.picture
@@ -403,9 +408,13 @@ function ProfileEditor({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
+  const newPasswordError = newPassword
+    ? passwordValidationError(newPassword)
+    : null;
   const canSubmit =
     name.trim().length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
+    (!newPassword || isValidPassword(newPassword)) &&
     state !== 'loading';
 
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -438,9 +447,13 @@ function ProfileEditor({
         handle: normalizedHandle,
         name: name.trim(),
         picture: pictureCid,
-      });
+      }, newPassword || undefined);
 
-      onUpdated({ ...session, identity });
+      onUpdated({
+        ...session,
+        identity,
+        password: newPassword || session.password,
+      });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
     }
@@ -496,9 +509,21 @@ function ProfileEditor({
           <ProfileInput
             label={copy.profile.handle}
             value={handle}
-            onChange={setHandle}
+            onChange={(value) => setHandle(normalizeHandle(value))}
             placeholder="@ada"
           />
+          <ProfileInput
+            label={copy.profile.newPassword}
+            value={newPassword}
+            onChange={setNewPassword}
+            placeholder="••••••••••••"
+            type="password"
+          />
+          {(newPasswordError || !newPassword) && (
+            <p className="-mt-2 text-xs font-bold text-white/45">
+              {copy.profile.newPasswordHelp}
+            </p>
+          )}
           <label className="grid gap-2 text-sm font-black text-white/70">
             {copy.profile.biography}
             <textarea
@@ -531,11 +556,13 @@ function ProfileInput({
   label,
   onChange,
   placeholder,
+  type = 'text',
   value,
 }: {
   label: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: string;
   value: string;
 }) {
   return (
@@ -545,6 +572,7 @@ function ProfileInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        type={type}
         className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
       />
     </label>
