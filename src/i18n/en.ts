@@ -105,8 +105,8 @@ export const copy = {
     title: 'No connection with the server',
   },
   dialog: {
-    cancel: 'Cancel',
     addParticipant: 'Add',
+    cancel: 'Cancel',
     close: 'Close dialog',
     createConversation: 'Create conversation',
     createConversationBody:
@@ -127,7 +127,7 @@ export const copy = {
       'No shared network with this identity. You cannot create this conversation yet.',
     remoteIdentityId: 'Identity ID or username',
     removeParticipant: 'Remove participant',
-    sharedNetwork: 'Conversation network',
+    sharedNetwork: 'Network',
   },
   errors: {
     backend: {
