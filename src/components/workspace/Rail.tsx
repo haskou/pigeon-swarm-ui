@@ -48,7 +48,7 @@ export function Rail({
       )}
     >
       <div className="relative flex w-full justify-center">
-        <RailSelectionIndicator active={activeMessages} />
+        <RailSelectionIndicator active={activeMessages} size="large" />
         <button
           type="button"
           onClick={onMessagesClick}
@@ -68,7 +68,7 @@ export function Rail({
         </button>
       </div>
       <div className="h-px w-10 bg-white/10" />
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-x-visible overflow-y-auto">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
         {communities.map((community) => (
           <div key={community.id} className="relative flex w-full justify-center">
             <RailSelectionIndicator active={activeCommunityId === community.id} />
@@ -191,13 +191,22 @@ export function Rail({
   );
 }
 
-function RailSelectionIndicator({ active }: { active: boolean }) {
+function RailSelectionIndicator({
+  active,
+  size = 'default',
+}: {
+  active: boolean;
+  size?: 'default' | 'large';
+}) {
   if (!active) return null;
 
   return (
     <span
       aria-hidden="true"
-      className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+      className={cx(
+        'absolute top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]',
+        size === 'large' ? 'left-[calc(50%-2.25rem)]' : 'left-[calc(50%-2rem)]',
+      )}
     />
   );
 }
