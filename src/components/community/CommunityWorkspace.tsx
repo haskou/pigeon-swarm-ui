@@ -1,5 +1,6 @@
 import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
 import {
+  Fragment,
   type ReactNode,
   useCallback,
   useEffect,
@@ -25,7 +26,11 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { shortId } from '../../utils/formatting';
+import {
+  formatDateSeparator,
+  isSameDay,
+  shortId,
+} from '../../utils/formatting';
 import {
   identityName,
   identityPicture,
@@ -35,6 +40,7 @@ import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
+import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
@@ -993,7 +999,7 @@ export function CommunityWorkspace({
                     {copy.chat.loadingEvents}
                   </div>
                 ) : null}
-                <div className="space-y-2">
+                <div>
                 {!messageCursor &&
                   visibleMessages.length > 0 &&
                   messageState !== 'loading' && (
@@ -1014,44 +1020,73 @@ export function CommunityWorkspace({
                     </div>
                   </div>
                 )}
-                {!missingCommunityKey && visibleMessages.map((message, index) => {
-                  const nextMessage = visibleMessages[index + 1];
-                  const showAvatar =
-                    !nextMessage ||
-                    nextMessage.authorIdentityId !== message.authorIdentityId;
+                {!missingCommunityKey &&
+                  visibleMessages.map((message, index) => {
+                    const previousMessage = visibleMessages[index - 1];
+                    const nextMessage = visibleMessages[index + 1];
+                    const startsNewDay =
+                      !previousMessage ||
+                      !isSameDay(previousMessage.timestamp, message.timestamp);
+                    const startsNewAuthorRun =
+                      !previousMessage ||
+                      previousMessage.authorIdentityId !==
+                        message.authorIdentityId;
+                    const showAvatar =
+                      !nextMessage ||
+                      nextMessage.authorIdentityId !== message.authorIdentityId;
 
-                  return (
-                    <MessageBubble
-                      key={message.id}
-                      message={message}
-                      currentIdentityId={session.identity.id}
-                      authorName={
-                        message.mine
-                          ? session.identity.profile.name
-                          : memberDisplayName(
-                              memberIdentities[message.authorIdentityId],
-                              message.authorIdentityId,
-                            )
-                      }
-                      authorPicture={
-                        message.mine
-                          ? memberPictures[session.identity.id]
-                          : memberPictures[message.authorIdentityId]
-                      }
-                      onAttachmentOpen={(attachmentIndex) =>
-                        void openAttachment(message.attachments[attachmentIndex])
-                      }
-                      onAttachmentPreview={loadAttachmentPreview}
-                      onAvatarClick={() => undefined}
-                      onMessageMenuOpen={(targetMessage, x, y) =>
-                        setMessageContextMenu({ message: targetMessage, x, y })
-                      }
-                      onReplyReferenceClick={() => undefined}
-                      onRetryMessage={retryChannelMessage}
-                      showAvatar={showAvatar}
-                    />
-                  );
-                })}
+                    return (
+                      <Fragment key={message.id}>
+                        {startsNewDay && (
+                          <DateSeparator
+                            label={formatDateSeparator(message.timestamp)}
+                          />
+                        )}
+                        <div
+                          className={
+                            startsNewDay || startsNewAuthorRun
+                              ? 'mt-4'
+                              : 'mt-1'
+                          }
+                        >
+                          <MessageBubble
+                            message={message}
+                            currentIdentityId={session.identity.id}
+                            authorName={
+                              message.mine
+                                ? session.identity.profile.name
+                                : memberDisplayName(
+                                    memberIdentities[message.authorIdentityId],
+                                    message.authorIdentityId,
+                                  )
+                            }
+                            authorPicture={
+                              message.mine
+                                ? memberPictures[session.identity.id]
+                                : memberPictures[message.authorIdentityId]
+                            }
+                            onAttachmentOpen={(attachmentIndex) =>
+                              void openAttachment(
+                                message.attachments[attachmentIndex],
+                              )
+                            }
+                            onAttachmentPreview={loadAttachmentPreview}
+                            onAvatarClick={() => undefined}
+                            onMessageMenuOpen={(targetMessage, x, y) =>
+                              setMessageContextMenu({
+                                message: targetMessage,
+                                x,
+                                y,
+                              })
+                            }
+                            onReplyReferenceClick={() => undefined}
+                            onRetryMessage={retryChannelMessage}
+                            showAvatar={showAvatar}
+                          />
+                        </div>
+                      </Fragment>
+                    );
+                  })}
                 {visibleMessages.length === 0 && messageState !== 'loading' && (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                     {copy.communities.emptyChannel}
