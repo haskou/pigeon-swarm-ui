@@ -12,6 +12,7 @@ import {
   identityPicture,
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
+import { ImageLightbox, type LightboxImage } from '../chat/ImageLightbox';
 
 type ProfilePopoverAnchor = {
   bottom: number;
@@ -43,6 +44,9 @@ export function UserProfileDialog({
 }: UserProfileDialogProps) {
   const [copied, setCopied] = useState(false);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<LightboxImage[] | null>(
+    null,
+  );
   const profileName = identity?.profile.name.trim();
   const profileHandle = identity?.profile.handle?.trim();
   const displayName =
@@ -128,11 +132,26 @@ export function UserProfileDialog({
       >
         <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
           {bannerUrl && (
-            <img
-              src={bannerUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <button
+              type="button"
+              onClick={() =>
+                setLightboxImages([
+                  {
+                    alt: displayName,
+                    filename: `${displayName} banner`,
+                    url: bannerUrl,
+                  },
+                ])
+              }
+              className="h-full w-full cursor-zoom-in"
+              aria-label={copy.profile.openBanner}
+            >
+              <img
+                src={bannerUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </button>
           )}
           <button
             type="button"
@@ -145,7 +164,23 @@ export function UserProfileDialog({
         </div>
 
         <div className="relative px-5 pb-5">
-          <div className="-mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35">
+          <button
+            type="button"
+            onClick={() => {
+              if (!displayPicture) return;
+
+              setLightboxImages([
+                {
+                  alt: displayName,
+                  filename: `${displayName} avatar`,
+                  url: displayPicture,
+                },
+              ]);
+            }}
+            disabled={!displayPicture}
+            className="-mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
+            aria-label={copy.profile.openPicture}
+          >
             {displayPicture ? (
               <img
                 src={displayPicture}
@@ -155,7 +190,7 @@ export function UserProfileDialog({
             ) : (
               displayName.slice(0, 1).toUpperCase()
             )}
-          </div>
+          </button>
 
           <div className="mt-3 min-w-0">
             <h2 className="truncate text-2xl font-black">{displayName}</h2>
@@ -195,6 +230,13 @@ export function UserProfileDialog({
           </div>
         </div>
       </section>
+      {lightboxImages && (
+        <ImageLightbox
+          images={lightboxImages}
+          initialIndex={0}
+          onClose={() => setLightboxImages(null)}
+        />
+      )}
     </div>,
     document.body,
   );

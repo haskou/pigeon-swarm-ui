@@ -1353,6 +1353,8 @@ function ManageCommunityDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!avatar) {
@@ -1542,11 +1544,16 @@ function ManageCommunityDialog({
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-            <label className="block">
+            <div className="block">
               <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.avatar}
               </span>
-              <div className="mx-auto grid h-28 w-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="group relative mx-auto grid h-28 w-28 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950"
+                aria-label={copy.communities.avatar}
+              >
                 {avatarPreview || currentAvatarUrl ? (
                   <img
                     src={avatarPreview ?? currentAvatarUrl ?? ''}
@@ -1556,20 +1563,32 @@ function ManageCommunityDialog({
                 ) : (
                   community.name.slice(0, 1).toUpperCase()
                 )}
-              </div>
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
+                </span>
+              </button>
               <input
+                ref={avatarInputRef}
                 type="file"
                 accept="image/*"
                 onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-                className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
+                className="sr-only"
               />
-            </label>
+              <p className="mt-3 text-center text-xs font-bold text-white/45">
+                {copy.profile.hoverToEdit}
+              </p>
+            </div>
             <div className="space-y-3">
-              <label className="block">
+              <div className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   {copy.communities.banner}
                 </span>
-                <div className="grid aspect-[2/1] cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                <button
+                  type="button"
+                  onClick={() => bannerInputRef.current?.click()}
+                  className="group relative grid aspect-[2/1] w-full place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950"
+                  aria-label={copy.communities.banner}
+                >
                   {bannerPreview || currentBannerUrl ? (
                     <img
                       src={bannerPreview ?? currentBannerUrl ?? ''}
@@ -1579,14 +1598,21 @@ function ManageCommunityDialog({
                   ) : (
                     community.name.slice(0, 1).toUpperCase()
                   )}
-                </div>
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                    ✎
+                  </span>
+                </button>
                 <input
+                  ref={bannerInputRef}
                   type="file"
                   accept="image/*"
                   onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
-                  className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
+                  className="sr-only"
                 />
-              </label>
+                <p className="mt-3 text-xs font-bold text-white/45">
+                  {copy.profile.hoverToEdit}
+                </p>
+              </div>
               <Field label={copy.communities.name}>
                 <input
                   value={name}

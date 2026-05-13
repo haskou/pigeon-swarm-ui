@@ -507,6 +507,8 @@ function ProfileEditor({
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const pictureInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
@@ -672,23 +674,42 @@ function ProfileEditor({
           <div className="grid gap-2 text-sm font-black text-white/70">
             {copy.profile.picture}
             <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
-              <ProfileAvatar
-                label={name || session.identity.id}
-                picture={picturePreview}
-                size="xl"
-              />
+              <button
+                type="button"
+                onClick={() => pictureInputRef.current?.click()}
+                className="group relative overflow-hidden rounded-2xl"
+                aria-label={copy.profile.changePicture}
+              >
+                <ProfileAvatar
+                  label={name || session.identity.id}
+                  picture={picturePreview}
+                  size="xl"
+                />
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
+                </span>
+              </button>
               <input
+                ref={pictureInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handlePictureChange}
-                className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
+                className="sr-only"
               />
+              <p className="min-w-0 flex-1 text-xs font-bold text-white/45">
+                {copy.profile.hoverToEdit}
+              </p>
             </div>
           </div>
           <div className="grid gap-2 text-sm font-black text-white/70">
             {copy.profile.banner}
             <div className="overflow-hidden rounded-3xl bg-black/20 p-3">
-              <div className="mb-3 aspect-[3/1] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                className="group relative mb-3 block aspect-[3/1] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                aria-label={copy.profile.changeBanner}
+              >
                 {bannerPreview && (
                   <img
                     src={bannerPreview}
@@ -696,13 +717,20 @@ function ProfileEditor({
                     className="h-full w-full object-cover"
                   />
                 )}
-              </div>
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
+                </span>
+              </button>
               <input
+                ref={bannerInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleBannerChange}
-                className="w-full min-w-0 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
+                className="sr-only"
               />
+              <p className="text-xs font-bold text-white/45">
+                {copy.profile.hoverToEdit}
+              </p>
             </div>
           </div>
           <ProfileInput
