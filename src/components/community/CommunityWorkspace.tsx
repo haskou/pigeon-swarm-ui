@@ -3,6 +3,7 @@ import {
   Fragment,
   type MouseEvent,
   type ReactNode,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -25,6 +26,7 @@ import type {
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import {
@@ -175,6 +177,9 @@ export function CommunityWorkspace({
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
+  const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
+  const sendQueueRef = useRef(Promise.resolve());
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -187,6 +192,18 @@ export function CommunityWorkspace({
     community.memberIds.every(
       (identityId) => identityId === session.identity.id || memberIdentities[identityId],
     );
+
+  const setMessageLoadState = useCallback(
+    (state: 'error' | 'idle' | 'loading') => {
+      messageStateRef.current = state;
+      setMessageState(state);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    memberIdentitiesRef.current = memberIdentities;
+  }, [memberIdentities]);
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
@@ -379,12 +396,13 @@ export function CommunityWorkspace({
   };
 
   const resolveMemberIdentities = useCallback(async () => {
+    const cachedIdentities = memberIdentitiesRef.current;
     const entries = await Promise.all(
       community.memberIds.map(async (identityId) => {
         const cached =
           identityId === session.identity.id
             ? session.identity
-            : memberIdentities[identityId];
+            : cachedIdentities[identityId];
 
         if (cached) return [identityId, cached] as const;
 
@@ -402,7 +420,7 @@ export function CommunityWorkspace({
     }
 
     return nextIdentities;
-  }, [community.memberIds, memberIdentities, session.identity]);
+  }, [community.memberIds, session.identity]);
 
   const projectChannelMessage = useCallback(
     async (
@@ -485,11 +503,11 @@ export function CommunityWorkspace({
     }
 
     if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
-    if (messageState === 'loading' || !selectedChannelId) return;
+    if (messageStateRef.current === 'loading' || !selectedChannelId) return;
 
     const previousHeight = scroller.scrollHeight;
 
-    setMessageState('loading');
+    setMessageLoadState('loading');
     void loadChannelMessages(selectedChannelId, messageCursor)
       .then(({ cursor, loadedMessages }) => {
         setMessages((current) => [...loadedMessages, ...current]);
@@ -500,24 +518,26 @@ export function CommunityWorkspace({
             scrollerRef.current.scrollHeight - previousHeight;
         });
       })
-      .catch(() => setMessageState('error'))
-      .finally(() => setMessageState('idle'));
+      .catch(() => setMessageLoadState('error'))
+      .finally(() => setMessageLoadState('idle'));
   };
 
-  const handleSendChannelMessage = async (
+  const handleSendChannelMessage = (
     content: string,
     attachments: File[],
-  ) => {
-    if (!selectedChannelId) return;
+  ): Promise<void> => {
+    if (!selectedChannelId) return Promise.resolve();
 
-    await sendPendingChannelMessage({
+    sendPendingChannelMessage({
       attachments,
       channelId: selectedChannelId,
       content,
     });
+
+    return Promise.resolve();
   };
 
-  const sendPendingChannelMessage = async (payload: CommunityPendingSend) => {
+  const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
     setSendError(null);
     const timestamp = Date.now();
     const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${crypto.randomUUID()}`;
@@ -532,7 +552,7 @@ export function CommunityWorkspace({
     setMessages((current) => [
       ...current,
       {
-        attachments: [],
+        attachments: pendingFileAttachments(payload.attachments, optimisticId),
         authorIdentityId: session.identity.id,
         content:
           payload.content ||
@@ -554,57 +574,73 @@ export function CommunityWorkspace({
       bottomRef.current?.scrollIntoView({ block: 'end' });
     });
 
-    try {
-      const identities = await resolveMemberIdentities();
-      const messageAttachments = await pigeonApplication.publishMessageAttachments(
-        session,
-        payload.attachments,
-        setAttachmentProgress,
-      );
-      const encryptedPayload = await encryptCommunityChannelPayload({
-        attachments: messageAttachments,
-        authorIdentityId: session.identity.id,
-        channelId: payload.channelId,
-        communityId: community.id,
-        content: payload.content,
-        recipients: Object.values(identities),
-        timestamp,
-      });
-      const created = await pigeonApplication.createCommunityChannelMessage(
-        session,
-        community.id,
-        payload.channelId,
-        {
-          attachmentExternalIdentifiers: messageAttachments.map(
-            (attachment) => attachment.cid,
-          ),
-          encryptedPayload,
+    sendQueueRef.current = sendQueueRef.current.then(async () => {
+      try {
+        const identities = await resolveMemberIdentities();
+        const messageAttachments =
+          await pigeonApplication.publishMessageAttachments(
+            session,
+            payload.attachments,
+            (progress) => {
+              startTransition(() => {
+                setMessages((current) =>
+                  current.map((message) =>
+                    message.id === optimisticId
+                      ? { ...message, attachmentProgress: progress }
+                      : message,
+                  ),
+                );
+              });
+            },
+          );
+        const encryptedPayload = await encryptCommunityChannelPayload({
+          attachments: messageAttachments,
+          authorIdentityId: session.identity.id,
+          channelId: payload.channelId,
+          communityId: community.id,
+          content: payload.content,
+          recipients: Object.values(identities),
           timestamp,
-        },
-      );
-      const projected = await projectChannelMessage(created, identities);
+        });
+        const created = await pigeonApplication.createCommunityChannelMessage(
+          session,
+          community.id,
+          payload.channelId,
+          {
+            attachmentExternalIdentifiers: messageAttachments.map(
+              (attachment) => attachment.cid,
+            ),
+            encryptedPayload,
+            timestamp,
+          },
+        );
+        const projected = await projectChannelMessage(created, identities);
 
-      setMessages((current) =>
-        [...current.filter((message) => message.id !== optimisticId), projected].sort(
-          (left, right) => left.timestamp - right.timestamp,
-        ),
-      );
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ block: 'end' });
-      });
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.communities.messageError));
-      setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === optimisticId
-            ? { ...message, deliveryStatus: 'failed' }
-            : message,
-        ),
-      );
-    } finally {
-      setAttachmentProgress(null);
-    }
+        setMessages((current) =>
+          mergeChatMessages(
+            current.filter((message) => message.id !== optimisticId),
+            [projected],
+          ),
+        );
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ block: 'end' });
+        });
+      } catch (caught) {
+        setSendError(toUserErrorMessage(caught, copy.communities.messageError));
+        setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === optimisticId
+              ? {
+                  ...message,
+                  attachmentProgress: undefined,
+                  deliveryStatus: 'failed',
+                }
+              : message,
+          ),
+        );
+      }
+    });
   };
 
   const retryChannelMessage = (message: ChatMessage) => {
@@ -687,14 +723,14 @@ export function CommunityWorkspace({
     if (!selectedChannelId) {
       setMessages([]);
       setMessageCursor(null);
-      setMessageState('idle');
+      setMessageLoadState('idle');
 
       return undefined;
     }
 
     let cancelled = false;
 
-    setMessageState('loading');
+    setMessageLoadState('loading');
     setSendError(null);
     void loadChannelMessages(selectedChannelId)
       .then(({ cursor, loadedMessages }) => {
@@ -708,16 +744,21 @@ export function CommunityWorkspace({
         });
       })
       .catch(() => {
-        if (!cancelled) setMessageState('error');
+        if (!cancelled) setMessageLoadState('error');
       })
       .finally(() => {
-        if (!cancelled) setMessageState('idle');
+        if (!cancelled) setMessageLoadState('idle');
       });
 
     return () => {
       cancelled = true;
     };
-  }, [loadChannelMessages, onChannelViewed, selectedChannelId]);
+  }, [
+    loadChannelMessages,
+    onChannelViewed,
+    selectedChannelId,
+    setMessageLoadState,
+  ]);
 
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
@@ -1276,7 +1317,7 @@ export function CommunityWorkspace({
         <AddCommunityMemberDialog
           communityId={community.id}
           onClose={() => setMemberOpen(false)}
-          refreshCommunity={refreshCommunity}
+          onSessionUpdated={onSessionUpdated}
           session={session}
         />
       )}
@@ -1705,12 +1746,12 @@ function ManageCommunityDialog({
 function AddCommunityMemberDialog({
   communityId,
   onClose,
-  refreshCommunity,
+  onSessionUpdated,
   session,
 }: {
   communityId: string;
   onClose: () => void;
-  refreshCommunity: () => Promise<void>;
+  onSessionUpdated: (session: Session) => void;
   session: Session;
 }) {
   const [identityInput, setIdentityInput] = useState('');
@@ -1735,8 +1776,16 @@ function AddCommunityMemberDialog({
     setState('loading');
     setError(null);
     try {
-      await pigeonApplication.addCommunityMember(session, communityId, identityId);
-      await refreshCommunity();
+      const result = await pigeonApplication.createCommunityInvitation(
+        session,
+        communityId,
+        identityId,
+      );
+      onSessionUpdated({
+        ...session,
+        keychain: result.keychain,
+        keychainExternalIdentifier: result.keychainExternalIdentifier,
+      });
       onClose();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.memberError));
@@ -2051,6 +2100,20 @@ async function decryptCommunityChannelPayload(
   );
 
   return JSON.parse(new TextDecoder().decode(decrypted)) as CommunityChannelPlainPayload;
+}
+
+function mergeChatMessages(
+  currentMessages: ChatMessage[],
+  incomingMessages: ChatMessage[],
+): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+
+  for (const message of currentMessages) byId.set(message.id, message);
+  for (const message of incomingMessages) byId.set(message.id, message);
+
+  return [...byId.values()].sort(
+    (left, right) => left.timestamp - right.timestamp,
+  );
 }
 
 function realtimeStringAttribute(

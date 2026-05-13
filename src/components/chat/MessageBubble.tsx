@@ -226,9 +226,33 @@ export function MessageBubble({
                   key={`${message.id}-${attachment.cid}`}
                   mine={mine}
                   onPreview={onAttachmentPreview}
+                  pending={message.deliveryStatus === 'pending'}
                   onClick={() => onAttachmentOpen(index)}
                 />
               ))}
+            </div>
+          )}
+          {message.attachmentProgress && (
+            <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate">
+                  {message.attachmentProgress.phase === 'encrypt'
+                    ? copy.composer.encryptingAttachment
+                    : message.attachmentProgress.phase === 'upload'
+                      ? copy.composer.uploadingAttachment
+                      : copy.composer.decryptingAttachment}{' '}
+                  {message.attachmentProgress.filename}
+                </span>
+                <span className="shrink-0">
+                  {message.attachmentProgress.percent}%
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-fuchsia-400"
+                  style={{ width: `${message.attachmentProgress.percent}%` }}
+                />
+              </div>
             </div>
           )}
           <div
@@ -425,6 +449,7 @@ function AttachmentCard({
   mine,
   onClick,
   onPreview,
+  pending,
 }: {
   attachment: MessageAttachment;
   mine: boolean;
@@ -433,12 +458,14 @@ function AttachmentCard({
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ) => Promise<string>;
+  pending?: boolean;
 }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
   const hasPreview =
-    attachment.contentType.startsWith('video/') ||
-    attachment.contentType.startsWith('audio/');
+    !isLargeOrChunkedAttachment(attachment) &&
+    (attachment.contentType.startsWith('video/') ||
+      attachment.contentType.startsWith('audio/'));
 
   useEffect(() => {
     if (!hasPreview) return undefined;
@@ -507,8 +534,12 @@ function AttachmentCard({
       )}
       <button
         type="button"
-        onClick={onClick}
-        className="flex w-full max-w-full items-center gap-3 px-3 py-2 text-left"
+        disabled={pending}
+        onClick={pending ? undefined : onClick}
+        className={cx(
+          'flex w-full max-w-full items-center gap-3 px-3 py-2 text-left',
+          pending ? 'cursor-wait opacity-70' : 'cursor-pointer',
+        )}
         aria-label={copy.attachments.download}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/20 font-black">
@@ -528,7 +559,17 @@ function AttachmentCard({
 }
 
 function isImageAttachment(attachment: MessageAttachment): boolean {
+  if (isLargeOrChunkedAttachment(attachment)) return false;
+
   return isBrowserPreviewImage(attachment.contentType);
+}
+
+function isLargeOrChunkedAttachment(attachment: MessageAttachment): boolean {
+  return (
+    attachment.type === 'chunked_file' ||
+    !!attachment.chunks?.length ||
+    attachment.size > 50 * 1024 * 1024
+  );
 }
 
 function formatFileSize(bytes: number): string {

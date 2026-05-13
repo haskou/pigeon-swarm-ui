@@ -243,6 +243,33 @@ export class PigeonApplication {
     await this.gateway.addCommunityMember(session, communityId, identityId);
   }
 
+  public async createGroupConversationInvitation(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+  ): Promise<void> {
+    await this.gateway.createGroupConversationInvitation(
+      session,
+      conversationId,
+      recipientIdentityId,
+    );
+  }
+
+  public async createCommunityInvitation(
+    session: Session,
+    communityId: string,
+    recipientIdentityId: string,
+  ): Promise<{
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    return await this.gateway.createCommunityInvitation(
+      session,
+      communityId,
+      recipientIdentityId,
+    );
+  }
+
   public async listCommunityMembers(
     session: Session,
     communityId: string,

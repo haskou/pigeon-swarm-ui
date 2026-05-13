@@ -49,15 +49,37 @@ export type ConversationInvitationPayload = {
   recipientIdentityId: string;
 };
 
-export type NotificationResource = {
+export type CommunityInvitationPayload = {
+  communityId: string;
+  encryptedCommunityKey: string;
+  inviterIdentityId: string;
+  inviterSignature: string;
+  recipientIdentityId: string;
+};
+
+type BaseNotificationResource = {
   createdAt: string;
   id: string;
-  payload: ConversationInvitationPayload;
   recipientIdentityId: string;
   state: 'accepted' | 'declined' | 'pending';
   status: 'read' | 'unread';
-  type: 'conversation_invitation';
 };
+
+export type ConversationInvitationNotificationResource =
+  BaseNotificationResource & {
+    payload: ConversationInvitationPayload;
+    type: 'conversation_invitation' | 'group_conversation_invitation';
+  };
+
+export type CommunityInvitationNotificationResource =
+  BaseNotificationResource & {
+    payload: CommunityInvitationPayload;
+    type: 'community_invitation';
+  };
+
+export type NotificationResource =
+  | CommunityInvitationNotificationResource
+  | ConversationInvitationNotificationResource;
 
 export type PublicFileUpload = {
   cid: string;
@@ -92,11 +114,18 @@ export type MessageAttachmentEncryption = {
 
 export type MessageAttachment = {
   cid: string;
+  chunks?: Array<{
+    cid: string;
+    index: number;
+    sha256: string;
+    size: number;
+  }>;
   contentType: string;
   encryptedSize?: number;
   encryption: MessageAttachmentEncryption;
   filename: string;
   size: number;
+  type?: 'chunked_file';
 };
 
 export type MessageReplyPreview = {
@@ -115,7 +144,7 @@ export type PendingMessageAttachment = {
 export type AttachmentProgress = {
   filename: string;
   percent: number;
-  phase: 'decrypt' | 'encrypt';
+  phase: 'decrypt' | 'encrypt' | 'upload';
 };
 
 export type SendMessageOptions = {
@@ -203,6 +232,7 @@ export type MessageSignaturePayload = {
 };
 
 export type ChatMessage = {
+  attachmentProgress?: AttachmentProgress;
   attachments: MessageAttachment[];
   id: string;
   authorIdentityId: string;

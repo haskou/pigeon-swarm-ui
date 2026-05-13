@@ -23,7 +23,7 @@ export class RequestSigner {
     const timestamp = `${this.clock()}`;
     const nonce = this.nonceFactory();
     const signature = await session.encryptedKeyPair.sign(
-      this.payload(method, path, timestamp, nonce, body),
+      await this.asyncPayload(method, path, timestamp, nonce, body),
       session.password,
     );
 
@@ -49,6 +49,51 @@ export class RequestSigner {
       path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
       timestamp,
     });
+  }
+
+  private async asyncPayload(
+    method: string,
+    path: string,
+    timestamp: string,
+    nonce: string,
+    body?: unknown,
+  ): Promise<string> {
+    return JSON.stringify({
+      bodyHash: await this.asyncBodyHash(body),
+      method: method.toUpperCase(),
+      nonce,
+      path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
+      timestamp,
+    });
+  }
+
+  private async asyncBodyHash(body?: unknown): Promise<string> {
+    if (body instanceof ArrayBuffer) {
+      return await this.sha256Hex(body);
+    }
+
+    if (ArrayBuffer.isView(body)) {
+      const bytes = new Uint8Array(
+        body.buffer,
+        body.byteOffset,
+        body.byteLength,
+      );
+      const copy = new Uint8Array(bytes.byteLength);
+
+      copy.set(bytes);
+
+      return await this.sha256Hex(copy.buffer);
+    }
+
+    return this.bodyHash(body);
+  }
+
+  private async sha256Hex(body: ArrayBuffer): Promise<string> {
+    const hash = await crypto.subtle.digest('SHA-256', body);
+
+    return [...new Uint8Array(hash)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   private bodyHash(body?: unknown): string {

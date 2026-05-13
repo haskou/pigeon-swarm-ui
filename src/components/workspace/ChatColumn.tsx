@@ -1,6 +1,6 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -101,6 +101,12 @@ function profileAnchorFromTarget(
   };
 }
 
+function normalizeIdentityLookup(value: string): string {
+  const trimmed = value.trim();
+
+  return trimmed.startsWith('@') ? trimmed.slice(1).trim() : trimmed;
+}
+
 export function ChatColumn({
   activeConversation,
   bottomRef,
@@ -147,6 +153,10 @@ export function ChatColumn({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
+  const [groupInviteOpen, setGroupInviteOpen] = useState(false);
+  const [groupInviteInput, setGroupInviteInput] = useState('');
+  const [groupInviteError, setGroupInviteError] = useState<string | null>(null);
+  const [groupInviteLoading, setGroupInviteLoading] = useState(false);
   const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
@@ -241,6 +251,7 @@ export function ChatColumn({
       setGroupProfileOpen(false);
       setConversationMenuOpen(false);
       setConversationDataOpen(false);
+      setGroupInviteOpen(false);
       closeConversationKeyDialog();
     };
 
@@ -323,6 +334,33 @@ export function ChatColumn({
       setConversationKeyError(copy.chat.addPrivateKeyError);
     } finally {
       setConversationKeySaving(false);
+    }
+  };
+  const sendGroupInvitation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!activeConversation || groupInviteLoading) return;
+
+    const recipientIdentityId = normalizeIdentityLookup(groupInviteInput);
+
+    if (!recipientIdentityId) return;
+
+    setGroupInviteLoading(true);
+    setGroupInviteError(null);
+    try {
+      await pigeonApplication.createGroupConversationInvitation(
+        session,
+        activeConversation.id,
+        recipientIdentityId,
+      );
+      setGroupInviteInput('');
+      setGroupInviteOpen(false);
+    } catch (caught) {
+      setGroupInviteError(
+        caught instanceof Error ? caught.message : copy.chat.inviteError,
+      );
+    } finally {
+      setGroupInviteLoading(false);
     }
   };
   const openOwnProfile = (anchor?: ProfilePopoverAnchor) =>
@@ -565,6 +603,19 @@ export function ChatColumn({
                           : copy.chat.addPrivateKey}
                       </button>
                     ) : null}
+                    {isGroupConversation && hasConversationKey ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroupInviteError(null);
+                          setGroupInviteOpen(true);
+                          setConversationMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {copy.chat.invite}
+                      </button>
+                    ) : null}
                   </div>
                 </>
               )}
@@ -763,6 +814,58 @@ export function ChatColumn({
           data={conversationData}
           onClose={() => setConversationDataOpen(false)}
         />
+      )}
+      {groupInviteOpen && activeConversation && (
+        <div className="fixed inset-0 z-[80] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => setGroupInviteOpen(false)}
+            aria-label={copy.dialog.close}
+          />
+          <form
+            onSubmit={(event) => void sendGroupInvitation(event)}
+            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">
+                  {copy.chat.invite}
+                </h2>
+                <p className="mt-1 text-sm text-white/50">
+                  {copy.chat.inviteGroupBody}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGroupInviteOpen(false)}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+                aria-label={copy.dialog.close}
+              >
+                ×
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={groupInviteInput}
+              onChange={(event) => setGroupInviteInput(event.target.value)}
+              className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+              placeholder={copy.communities.memberIdentity}
+            />
+            {groupInviteError && (
+              <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
+                {groupInviteError}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={!groupInviteInput.trim() || groupInviteLoading}
+              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {copy.chat.sendInvite}
+            </button>
+          </form>
+        </div>
       )}
       {conversationKeyDialog && (
         <ConversationKeyDialog

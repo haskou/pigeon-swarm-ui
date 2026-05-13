@@ -1,6 +1,7 @@
 import {
   type Dispatch,
   type SetStateAction,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -27,6 +28,7 @@ import {
   sortConversationsByLatestMessage,
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
+import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { copy } from '../../i18n/en';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
@@ -217,6 +219,22 @@ export function GlassWorkspace({
   const keepMessageBottomUntilRef = useRef(0);
   const messageCursorRef = useRef<string | null>(null);
   const messageRequestRef = useRef(0);
+  const messageStateRef = useRef<LoadState>('idle');
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const sendQueueRef = useRef(Promise.resolve());
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    messageStateRef.current = messageState;
+  }, [messageState]);
+
+  const setMessageLoadState = useCallback((state: LoadState) => {
+    messageStateRef.current = state;
+    setMessageState(state);
+  }, []);
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -314,15 +332,23 @@ export function GlassWorkspace({
   );
   const handleNotificationAccepted = useCallback(
     (next: {
-      conversationId: string;
-      conversations: ConversationResource[];
+      communities?: Community[];
+      conversationId?: string;
+      conversations?: ConversationResource[];
       session: Session;
     }) => {
       setSession(next.session);
-      setConversations(next.conversations);
-      setActiveConversationId(next.conversationId);
+      if (next.conversations) {
+        setConversations(next.conversations);
+      }
+      if (next.communities) {
+        setCommunities(next.communities);
+      }
+      if (next.conversationId) {
+        setActiveConversationId(next.conversationId);
+      }
     },
-    [setConversations, setSession],
+    [setCommunities, setConversations, setSession],
   );
   const {
     accept: acceptNotification,
@@ -544,7 +570,7 @@ export function GlassWorkspace({
       const requestId = messageRequestRef.current + 1;
 
       messageRequestRef.current = requestId;
-      setMessageState('loading');
+      setMessageLoadState('loading');
       setSendError(null);
       try {
         const result = await pigeonApplication.loadMessages(
@@ -561,7 +587,7 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         setMessages([]);
-        setMessageState('error');
+        setMessageLoadState('error');
         setSendError(
           toUserErrorMessage(caught, copy.workspace.loadMessagesError),
         );
@@ -570,33 +596,42 @@ export function GlassWorkspace({
       }
       if (messageRequestRef.current !== requestId) return;
 
-      setMessageState('idle');
+      setMessageLoadState('idle');
     },
-    [scrollMessagesToBottom, session, updateMessageCursor],
+    [scrollMessagesToBottom, session, setMessageLoadState, updateMessageCursor],
   );
 
   useEffect(() => {
+    if (workspaceMode !== 'messages') return;
     if (!activeConversation?.id) return;
     setReplyTarget(null);
     setNewMessageCount(0);
+    lastScrollTopRef.current = 0;
 
     if (!activeConversationKeyId) {
       setMessages([]);
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;
-      setMessageState('idle');
+      setMessageLoadState('idle');
       return;
     }
 
     void loadActiveMessages(activeConversation.id);
-  }, [activeConversation?.id, activeConversationKeyId, loadActiveMessages]);
+  }, [
+    activeConversation?.id,
+    activeConversationKeyId,
+    loadActiveMessages,
+    workspaceMode,
+  ]);
 
   const handleLoadOlder = async () => {
     if (
+      workspaceMode !== 'messages' ||
       !activeConversation?.id ||
       !activeConversationKey ||
       !messageCursorRef.current ||
-      messageState === 'loading'
+      messageStateRef.current === 'loading' ||
+      Date.now() < keepMessageBottomUntilRef.current
     )
       return;
 
@@ -605,7 +640,7 @@ export function GlassWorkspace({
     messageRequestRef.current = requestId;
     const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
     const previousTop = scrollerRef.current?.scrollTop ?? 0;
-    setMessageState('loading');
+    setMessageLoadState('loading');
     try {
       const result = await pigeonApplication.loadMessages(
         session,
@@ -632,10 +667,12 @@ export function GlassWorkspace({
     }
     if (messageRequestRef.current !== requestId) return;
 
-    setMessageState('idle');
+    setMessageLoadState('idle');
   };
 
   const handleScroll = () => {
+    if (workspaceMode !== 'messages') return;
+
     const scrollTop = scrollerRef.current?.scrollTop ?? 0;
     const isScrollingUp = scrollTop < lastScrollTopRef.current;
 
@@ -645,17 +682,18 @@ export function GlassWorkspace({
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };
 
-  const sendPendingMessage = async (payload: PendingSend) => {
+  const sendPendingMessage = (payload: PendingSend) => {
     if (!activeConversation?.id) return;
+    const conversationId = activeConversation.id;
     const optimisticTimestamp = Date.now();
-    const optimisticId = `pending:${activeConversation.id}:${optimisticTimestamp}:${crypto.randomUUID()}`;
+    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${crypto.randomUUID()}`;
 
     setSendError(null);
     setAttachmentProgress(null);
     setConversations((current) =>
       bumpConversationActivity(
         current,
-        activeConversation.id,
+        conversationId,
         optimisticTimestamp,
       ),
     );
@@ -669,7 +707,7 @@ export function GlassWorkspace({
     setMessages((current) => [
       ...current,
       {
-        attachments: [],
+        attachments: pendingFileAttachments(payload.attachments, optimisticId),
         authorIdentityId: session.identity.id,
         content:
           payload.content ||
@@ -686,52 +724,69 @@ export function GlassWorkspace({
     ]);
     scrollMessagesToBottom('smooth');
 
-    try {
-      const lastMessageId = [...messages]
-        .reverse()
-        .find((message) => !message.deliveryStatus)?.id;
-      const sent = await pigeonApplication.sendMessage(
-        session,
-        activeConversation.id,
-        payload.content,
-        {
-          attachments: payload.attachments,
-          onAttachmentProgress: setAttachmentProgress,
-          previousMessageIds: lastMessageId ? [lastMessageId] : [],
-          replyPreview: replyPreviewFromMessage(payload.replyTarget),
-          replyToMessageId: payload.replyTarget?.id,
-        },
-      );
-      setMessages((current) =>
-        mergeMessages(
-          current.filter((message) => message.id !== optimisticId),
-          [sent],
-        ),
-      );
-      setConversations((current) =>
-        bumpConversationActivity(current, activeConversation.id, sent.timestamp),
-      );
-      setAttachmentProgress(null);
-      scrollMessagesToBottom('smooth');
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
-      setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === optimisticId
-            ? { ...message, deliveryStatus: 'failed' }
-            : message,
-        ),
-      );
-      setAttachmentProgress(null);
-    }
+    sendQueueRef.current = sendQueueRef.current.then(async () => {
+      try {
+        const lastMessageId = [...messagesRef.current]
+          .reverse()
+          .find((message) => !message.deliveryStatus)?.id;
+        const sent = await pigeonApplication.sendMessage(
+          session,
+          conversationId,
+          payload.content,
+          {
+            attachments: payload.attachments,
+            onAttachmentProgress: (progress) => {
+              startTransition(() => {
+                setMessages((current) =>
+                  current.map((message) =>
+                    message.id === optimisticId
+                      ? { ...message, attachmentProgress: progress }
+                      : message,
+                  ),
+                );
+              });
+            },
+            previousMessageIds: lastMessageId ? [lastMessageId] : [],
+            replyPreview: replyPreviewFromMessage(payload.replyTarget),
+            replyToMessageId: payload.replyTarget?.id,
+          },
+        );
+
+        setMessages((current) =>
+          mergeMessages(
+            current.filter((message) => message.id !== optimisticId),
+            [sent],
+          ),
+        );
+        setConversations((current) =>
+          bumpConversationActivity(current, conversationId, sent.timestamp),
+        );
+        scrollMessagesToBottom('smooth');
+      } catch (caught) {
+        setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === optimisticId
+              ? {
+                  ...message,
+                  attachmentProgress: undefined,
+                  deliveryStatus: 'failed',
+                }
+              : message,
+          ),
+        );
+      }
+    });
   };
 
-  const handleSend = async (content: string, attachments: File[]) => {
+  const handleSend = (content: string, attachments: File[]): Promise<void> => {
     const payload = { attachments, content, replyTarget };
 
     setReplyTarget(null);
-    await sendPendingMessage(payload);
+    sendPendingMessage(payload);
+
+    return Promise.resolve();
   };
 
   const retryMessage = (message: ChatMessage) => {
@@ -788,7 +843,7 @@ export function GlassWorkspace({
     if (!activeConversation?.id || !activeConversationKey) return;
 
     setSendError(null);
-    setMessageState('loading');
+    setMessageLoadState('loading');
     try {
       const result = await pigeonApplication.loadMessagesAround(
         session,
@@ -810,7 +865,7 @@ export function GlassWorkspace({
         toUserErrorMessage(caught, copy.workspace.loadOlderError),
       );
     } finally {
-      setMessageState('idle');
+      setMessageLoadState('idle');
     }
   };
 
@@ -866,25 +921,6 @@ export function GlassWorkspace({
       keychainExternalIdentifier: result.keychainExternalIdentifier,
     });
   };
-
-  const refreshRealtimeViews = useCallback(() => {
-    void refreshNotifications();
-    void refreshConversations().catch(() => undefined);
-    void onCommunitiesReload().catch(() => undefined);
-    void onPeersReload().catch(() => undefined);
-
-    if (activeConversation?.id && activeConversationKeyId) {
-      void loadActiveMessages(activeConversation.id);
-    }
-  }, [
-    activeConversation?.id,
-    activeConversationKeyId,
-    loadActiveMessages,
-    onCommunitiesReload,
-    onPeersReload,
-    refreshConversations,
-    refreshNotifications,
-  ]);
 
   const fetchRealtimeMessage = useCallback(
     async (
@@ -986,7 +1022,9 @@ export function GlassWorkspace({
         const messageId = stringAttribute(event, 'messageId', 'message_id');
         const authorId = stringAttribute(event, 'authorId', 'author_id');
         const isActiveConversation =
-          !!conversationId && conversationId === activeConversation?.id;
+          workspaceMode === 'messages' &&
+          !!conversationId &&
+          conversationId === activeConversation?.id;
 
         if (!messageId || !conversationId) return;
 
@@ -1058,7 +1096,6 @@ export function GlassWorkspace({
   useRealtimeEvents(session, {
     onConnected: () => {
       setRealtimeStatus('connected');
-      refreshRealtimeViews();
     },
     onDisconnected: () => setRealtimeStatus('reconnecting'),
     onDomainEvent: handleRealtimeEvent,

@@ -27,6 +27,8 @@ export class ListConversations {
           const { messages } = await this.gateway.loadMessages(
             session,
             conversation.id,
+            null,
+            1,
           );
           const latestMessage = messages[messages.length - 1];
 
