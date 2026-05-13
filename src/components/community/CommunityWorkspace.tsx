@@ -602,6 +602,11 @@ export function CommunityWorkspace({
     },
     [community.id, projectChannelMessage, resolveMemberIdentities, session],
   );
+  const loadChannelMessagesRef = useRef(loadChannelMessages);
+
+  useEffect(() => {
+    loadChannelMessagesRef.current = loadChannelMessages;
+  }, [loadChannelMessages]);
 
   const handleMessagesScroll = () => {
     const scroller = scrollerRef.current;
@@ -846,7 +851,8 @@ export function CommunityWorkspace({
 
     setMessageLoadState('loading');
     setSendError(null);
-    void loadChannelMessages(selectedChannelId)
+    void loadChannelMessagesRef
+      .current(selectedChannelId)
       .then(({ cursor, loadedMessages }) => {
         if (cancelled) return;
         setMessages(loadedMessages);
@@ -867,12 +873,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [
-    loadChannelMessages,
-    onChannelViewed,
-    selectedChannelId,
-    setMessageLoadState,
-  ]);
+  }, [onChannelViewed, selectedChannelId, setMessageLoadState]);
 
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
@@ -1472,6 +1473,7 @@ export function CommunityWorkspace({
         <AddCommunityMemberDialog
           communityId={community.id}
           onClose={() => setMemberOpen(false)}
+          onCommunityUpdated={onCommunityUpdated}
           onSessionUpdated={onSessionUpdated}
           session={session}
         />
@@ -1951,11 +1953,13 @@ function ManageCommunityDialog({
 function AddCommunityMemberDialog({
   communityId,
   onClose,
+  onCommunityUpdated,
   onSessionUpdated,
   session,
 }: {
   communityId: string;
   onClose: () => void;
+  onCommunityUpdated: (community: Community) => void;
   onSessionUpdated: (session: Session) => void;
   session: Session;
 }) {
@@ -2044,6 +2048,9 @@ function AddCommunityMemberDialog({
           keychainExternalIdentifier: result.keychainExternalIdentifier,
         });
       }
+      onCommunityUpdated(
+        await pigeonApplication.getCommunity(session, communityId),
+      );
       onClose();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.memberError));

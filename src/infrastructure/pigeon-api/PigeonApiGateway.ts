@@ -790,6 +790,7 @@ export class PigeonApiGateway {
       recipientIdentity,
       keyEntry,
     );
+    await this.addCommunityMember(session, communityId, recipientIdentity.id);
 
     return published;
   }
