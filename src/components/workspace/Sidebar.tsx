@@ -709,6 +709,27 @@ function ProfileEditor({
                   ✎
                 </span>
               </button>
+              <div className="mt-4 grid gap-3">
+                <input
+                  aria-label={copy.profile.name}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+                <input
+                  aria-label={copy.profile.handle}
+                  value={handle}
+                  onChange={(event) => setHandle(normalizeHandle(event.target.value))}
+                  placeholder="@ada"
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+                <textarea
+                  aria-label={copy.profile.biography}
+                  value={biography}
+                  onChange={(event) => setBiography(event.target.value)}
+                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+              </div>
             </div>
             <input
               ref={pictureInputRef}
@@ -725,25 +746,6 @@ function ProfileEditor({
               className="sr-only"
             />
           </div>
-          <ProfileInput
-            label={copy.profile.name}
-            value={name}
-            onChange={setName}
-          />
-          <ProfileInput
-            label={copy.profile.handle}
-            value={handle}
-            onChange={(value) => setHandle(normalizeHandle(value))}
-            placeholder="@ada"
-          />
-          <label className="grid gap-2 text-sm font-black text-white/70">
-            {copy.profile.biography}
-            <textarea
-              value={biography}
-              onChange={(event) => setBiography(event.target.value)}
-              className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            />
-          </label>
           <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
             <div className="text-sm font-black text-white/70">
               {copy.profile.networks}

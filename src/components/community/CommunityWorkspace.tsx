@@ -1543,7 +1543,7 @@ function ManageCommunityDialog({
       <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-2xl sm:rounded-[2rem]">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-4 sm:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="grid gap-4">
             <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
               <button
                 type="button"
@@ -1586,6 +1586,20 @@ function ManageCommunityDialog({
                     ✎
                   </span>
                 </button>
+                <div className="mt-4 grid gap-3">
+                  <input
+                    aria-label={copy.communities.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                  <textarea
+                    aria-label={copy.communities.description}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </div>
               </div>
               <input
                 ref={avatarInputRef}
@@ -1601,22 +1615,6 @@ function ManageCommunityDialog({
                 onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
                 className="sr-only"
               />
-            </div>
-            <div className="space-y-3">
-              <Field label={copy.communities.name}>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-              </Field>
-              <Field label={copy.communities.description}>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-              </Field>
             </div>
           </div>
 
