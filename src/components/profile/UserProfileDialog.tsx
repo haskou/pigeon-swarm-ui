@@ -45,9 +45,13 @@ export function UserProfileDialog({
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const profileName = identity?.profile.name.trim();
   const profileHandle = identity?.profile.handle?.trim();
-  const displayName = profileName || (profileHandle ? `@${profileHandle}` : name);
-  const displayHandle = profileHandle ? `@${profileHandle}` : shortId(identityId);
-  const displayPicture = (identity ? identityPicture(identity) : null) ?? picture;
+  const displayName =
+    profileName || (profileHandle ? `@${profileHandle}` : name);
+  const displayHandle = profileHandle
+    ? `@${profileHandle}`
+    : shortId(identityId);
+  const displayPicture =
+    (identity ? identityPicture(identity) : null) ?? picture;
   const directBanner = identity ? identityBanner(identity) : null;
   const biography =
     identity?.profile.biography?.trim() || copy.profile.noBiography;
@@ -158,7 +162,7 @@ export function UserProfileDialog({
             <p className="truncate text-sm text-white/45">{displayHandle}</p>
           </div>
 
-          <p className="mt-4 max-h-28 overflow-y-auto rounded-2xl bg-black/20 p-3 text-sm leading-6 text-white/70">
+          <p className="mt-4 max-h-28 overflow-y-auto text-sm leading-6 text-white/70">
             {biography}
           </p>
 
