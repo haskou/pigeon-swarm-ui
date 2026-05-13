@@ -93,6 +93,22 @@ export const copy = {
     viewData: 'View data',
     you: 'You',
   },
+  calls: {
+    deafen: 'Silence call audio',
+    incoming: 'Incoming call',
+    joinVoice: 'Join voice',
+    leave: 'Leave call',
+    microphoneUnavailable:
+      'Microphone permission is unavailable. Check browser permissions.',
+    mute: 'Mute microphone',
+    muted: 'Muted',
+    startCall: 'Start call',
+    undeafen: 'Enable call audio',
+    unmute: 'Unmute microphone',
+    voiceChannel: 'Voice channel',
+    voiceChannels: 'Voice channels',
+    waitingForParticipants: 'Waiting for participants',
+  },
   communities: {
     addChannelPlaceholder: 'Add channel',
     addMember: 'Add member',

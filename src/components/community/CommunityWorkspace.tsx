@@ -24,6 +24,7 @@ import type {
   MessageResource,
   Session,
 } from '../../domain/types';
+import type { CallSession } from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
@@ -58,6 +59,7 @@ import { UserProfileDropdown } from '../workspace/Sidebar';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
+  activeCall?: CallSession | null;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
   mobileMembersOpen: boolean;
@@ -71,6 +73,7 @@ interface CommunityWorkspaceProps {
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
+  onJoinVoiceChannel?: (channel: { id: string; name: string }) => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -117,6 +120,7 @@ function profileAnchorFromTarget(
 }
 
 export function CommunityWorkspace({
+  activeCall,
   activeChannelId,
   channelUnreadCounts = {},
   community,
@@ -131,6 +135,7 @@ export function CommunityWorkspace({
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenMobileSidebar,
+  onJoinVoiceChannel,
   onSessionUpdated,
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -187,6 +192,15 @@ export function CommunityWorkspace({
   const selectedChannel = community.textChannels.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const voiceChannels = useMemo(
+    () => [{ id: `voice:${community.id}:2`, name: '2' }],
+    [community.id],
+  );
+  const activeVoiceChannelId =
+    activeCall?.kind === 'community-voice' &&
+    activeCall.communityId === community.id
+      ? activeCall.channelId
+      : null;
   const channelEncryptionReady =
     !!selectedChannel &&
     community.memberIds.every(
@@ -937,6 +951,26 @@ export function CommunityWorkspace({
                     </button>
                   ))
                 )}
+              </div>
+            </div>
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.calls.voiceChannels}
+              </div>
+              <div className="space-y-2">
+                {voiceChannels.map((channel) => (
+                  <VoiceChannelButton
+                    key={channel.id}
+                    active={activeVoiceChannelId === channel.id}
+                    channel={channel}
+                    onJoin={() => onJoinVoiceChannel?.(channel)}
+                    participants={
+                      activeVoiceChannelId === channel.id
+                        ? (activeCall?.participants ?? [])
+                        : []
+                    }
+                  />
+                ))}
               </div>
             </div>
             <UserProfileDropdown
@@ -1833,6 +1867,96 @@ function AddCommunityMemberDialog({
       </section>
     </div>,
     document.body,
+  );
+}
+
+function VoiceChannelButton({
+  active,
+  channel,
+  onJoin,
+  participants,
+}: {
+  active: boolean;
+  channel: { id: string; name: string };
+  onJoin: () => void;
+  participants: Array<{
+    identityId: string;
+    muted: boolean;
+    name: string;
+    picture?: null | string;
+  }>;
+}) {
+  return (
+    <div
+      className={cx(
+        'overflow-hidden rounded-2xl',
+        active ? 'bg-white/10' : 'bg-white/5',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onJoin}
+        className={cx(
+          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-black transition',
+          active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/8',
+        )}
+        title={copy.calls.joinVoice}
+      >
+        <span className="text-emerald-300">
+          <VoiceIcon />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+      </button>
+      {participants.length > 0 && (
+        <div className="space-y-1 px-3 pb-3">
+          {participants.map((participant) => (
+            <div
+              key={participant.identityId}
+              className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-white/55"
+            >
+              <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+                {participant.picture ? (
+                  <img
+                    src={participant.picture}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  participant.name.slice(0, 1).toUpperCase()
+                )}
+              </div>
+              <span className="min-w-0 flex-1 truncate">
+                {participant.name}
+              </span>
+              {participant.muted && (
+                <span className="text-xs text-fuchsia-200">
+                  {copy.calls.muted}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VoiceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M4 9.5v5h3.2L12 18.2V5.8L7.2 9.5H4Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 

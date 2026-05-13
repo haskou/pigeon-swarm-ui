@@ -12,6 +12,7 @@ import type {
   MessageAttachment,
   Session,
 } from '../../domain/types';
+import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -82,6 +83,12 @@ interface ChatColumnProps {
   realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
+  onStartCall?: (input: {
+    conversationId: string;
+    kind: 'group' | 'one-to-one';
+    participants: CallParticipant[];
+    title: string;
+  }) => void;
 }
 
 function profileAnchorFromTarget(
@@ -133,6 +140,7 @@ export function ChatColumn({
   onRetryMessage,
   onScroll,
   onSend,
+  onStartCall,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -555,7 +563,34 @@ export function ChatColumn({
               : copy.chat.realtimeReconnecting}
           </div>
           {activeConversation ? (
-            <div className="relative ml-auto shrink-0">
+            <div className="relative ml-auto flex shrink-0 items-center gap-1">
+              {onStartCall ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onStartCall({
+                      conversationId: activeConversation.id,
+                      kind: isGroupConversation ? 'group' : 'one-to-one',
+                      participants: groupParticipants.map((participant) => ({
+                        identity: participant.identity,
+                        identityId: participant.identityId,
+                        muted: false,
+                        name: participant.name,
+                        picture: participant.picture,
+                      })),
+                      title:
+                        activeConversationTitle ??
+                        activeConversationName ??
+                        activeConversation.id,
+                    })
+                  }
+                  className="grid h-11 w-11 place-items-center rounded-2xl text-white/70 transition hover:bg-white/15"
+                  aria-label={copy.calls.startCall}
+                  title={copy.calls.startCall}
+                >
+                  <CallIcon />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
@@ -913,6 +948,19 @@ export function ChatColumn({
         />
       )}
     </section>
+  );
+}
+
+function CallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M7.2 4.8 9 7.9a1.6 1.6 0 0 1-.3 1.9l-1 1a12.2 12.2 0 0 0 5.5 5.5l1-1a1.6 1.6 0 0 1 1.9-.3l3.1 1.8a1.6 1.6 0 0 1 .8 1.7l-.4 2a1.8 1.8 0 0 1-1.8 1.4A15.8 15.8 0 0 1 2.1 6.2a1.8 1.8 0 0 1 1.4-1.8l2-.4a1.6 1.6 0 0 1 1.7.8Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 

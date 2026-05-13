@@ -18,6 +18,10 @@ import type {
   MessageReplyPreview,
   Session,
 } from '../../domain/types';
+import type {
+  CallParticipant,
+  CallSession,
+} from '../../domain/calls/CallSession';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
 
@@ -34,13 +38,16 @@ import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirect
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
+import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
+import { playNotificationSound } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
+import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
@@ -224,6 +231,13 @@ export function GlassWorkspace({
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
+  const {
+    activeCall,
+    endCall,
+    startCall,
+    toggleDeafen,
+    toggleMute,
+  } = useCallSession();
 
   useEffect(() => {
     sessionRef.current = session;
@@ -412,6 +426,63 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
+  const callParticipantForIdentity = useCallback(
+    (identityId: string): CallParticipant => {
+      const identity =
+        identityId === session.identity.id
+          ? session.identity
+          : identityProfiles[identityId];
+
+      return {
+        identity,
+        identityId,
+        muted: false,
+        name:
+          identityNames[identityId] ??
+          identity?.profile.name?.trim() ??
+          identityId,
+        picture: identityPictures[identityId] ?? null,
+      };
+    },
+    [identityNames, identityPictures, identityProfiles, session.identity],
+  );
+  const startConversationCall = useCallback(
+    (input: {
+      conversationId: string;
+      kind: 'group' | 'one-to-one';
+      participants: CallParticipant[];
+      title: string;
+    }) => {
+      const participants =
+        input.participants.length > 0
+          ? input.participants
+          : [callParticipantForIdentity(session.identity.id)];
+
+      void startCall({
+        conversationId: input.conversationId,
+        id: `conversation:${input.conversationId}`,
+        kind: input.kind,
+        participants,
+        title: input.title,
+      });
+    },
+    [callParticipantForIdentity, session.identity.id, startCall],
+  );
+  const startCommunityVoiceCall = useCallback(
+    (channel: { id: string; name: string }) => {
+      if (!activeCommunity) return;
+
+      void startCall({
+        channelId: channel.id,
+        communityId: activeCommunity.id,
+        id: `community:${activeCommunity.id}:${channel.id}`,
+        kind: 'community-voice',
+        participants: [callParticipantForIdentity(session.identity.id)],
+        title: `${activeCommunity.name} · ${channel.name}`,
+      });
+    },
+    [activeCommunity, callParticipantForIdentity, session.identity.id, startCall],
+  );
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -977,6 +1048,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('notifications.')) {
+        playNotificationSound();
         void refreshNotifications();
         return;
       }
@@ -1012,6 +1084,7 @@ export function GlassWorkspace({
           !isActiveChannel &&
           authorIdentityId !== session.identity.id
         ) {
+          playNotificationSound();
           markCommunityChannelUnread(communityId, channelId);
         }
 
@@ -1051,6 +1124,7 @@ export function GlassWorkspace({
         );
 
         if (!isActiveConversation && authorId !== session.identity.id) {
+          playNotificationSound();
           markUnreadMessage(conversationId, messageId);
         }
 
@@ -1257,6 +1331,7 @@ export function GlassWorkspace({
               replyToMessage={replyTarget}
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}
+              onStartCall={startConversationCall}
             />
 
             <Inspector
@@ -1304,6 +1379,7 @@ export function GlassWorkspace({
               />
             }
             nodeNetworks={nodeNetworks}
+            activeCall={activeCall}
             realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>
@@ -1335,6 +1411,7 @@ export function GlassWorkspace({
             }}
             realtimeStatus={realtimeStatus}
             session={session}
+            onJoinVoiceChannel={startCommunityVoiceCall}
           />
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55 sm:rounded-[2rem]">
@@ -1435,6 +1512,14 @@ export function GlassWorkspace({
           onClose={() => setNodeSettingsOpen(false)}
           onNetworksUpdated={onNodeNetworksReload}
           session={session}
+        />
+      )}
+      {activeCall && (
+        <GlobalCallBar
+          call={activeCall}
+          onEnd={endCall}
+          onToggleDeafen={toggleDeafen}
+          onToggleMute={toggleMute}
         />
       )}
     </section>
