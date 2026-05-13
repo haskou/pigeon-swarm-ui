@@ -10,8 +10,8 @@ export function pendingFileAttachments(
     encryptedSize: file.size,
     encryption: {
       algorithm: 'AES-GCM',
-      chunkSize: 0,
       chunks: [],
+      chunkSize: 0,
       iv: '',
       key: '',
     },

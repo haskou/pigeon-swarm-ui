@@ -101,7 +101,11 @@ export function useIdentityDirectory({
       conversation.participantIds?.forEach((identityId) => ids.add(identityId));
     });
     notifications.forEach((notification) => {
-      ids.add(notification.payload.inviterIdentityId);
+      if (notification.type === 'missed_call') {
+        ids.add(notification.payload.callerIdentityId);
+      } else {
+        ids.add(notification.payload.inviterIdentityId);
+      }
       ids.add(notification.payload.recipientIdentityId);
     });
     messages.forEach((message) => ids.add(message.authorIdentityId));

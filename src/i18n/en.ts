@@ -94,7 +94,9 @@ export const copy = {
     you: 'You',
   },
   calls: {
+    answer: 'Answer',
     deafen: 'Silence call audio',
+    decline: 'Decline',
     incoming: 'Incoming call',
     joinVoice: 'Join voice',
     leave: 'Leave call',
@@ -379,6 +381,8 @@ export const copy = {
   notifications: {
     accept: 'Accept',
     archive: 'Archive',
+    call: 'Call',
+    calledBy: 'Called by',
     close: 'Close notifications',
     conversation: 'Conversation',
     createdAt: 'Created',
@@ -391,6 +395,7 @@ export const copy = {
     invitationTitle: 'Conversation invitation',
     invitedBy: 'Invited by',
     kicker: 'Inbox',
+    missedCallTitle: 'Missed call',
     open: 'Open notifications',
     refresh: 'Refresh notifications',
     states: {

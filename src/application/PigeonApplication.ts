@@ -1,3 +1,7 @@
+import type {
+  CallResource,
+  CallSignalPayload,
+} from '../domain/calls/CallSession';
 import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   AttachmentProgress,
@@ -128,6 +132,59 @@ export class PigeonApplication {
 
   public async claimNode(session: Session): Promise<void> {
     await this.gateway.claimNode(session);
+  }
+
+  public async listCalls(session: Session): Promise<CallResource[]> {
+    return await this.gateway.listCalls(session);
+  }
+
+  public async getCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    return await this.gateway.getCall(session, callId);
+  }
+
+  public async startConversationCall(
+    session: Session,
+    conversationId: string,
+  ): Promise<CallResource> {
+    return await this.gateway.startConversationCall(session, conversationId);
+  }
+
+  public async startCommunityChannelCall(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CallResource> {
+    return await this.gateway.startCommunityChannelCall(
+      session,
+      communityId,
+      channelId,
+    );
+  }
+
+  public async joinCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    return await this.gateway.joinCall(session, callId);
+  }
+
+  public async leaveCall(session: Session, callId: string): Promise<void> {
+    await this.gateway.leaveCall(session, callId);
+  }
+
+  public async endCall(session: Session, callId: string): Promise<void> {
+    await this.gateway.endCall(session, callId);
+  }
+
+  public async sendCallSignal(
+    session: Session,
+    callId: string,
+    signal: CallSignalPayload,
+  ): Promise<void> {
+    await this.gateway.sendCallSignal(session, callId, signal);
   }
 
   public async connectRealtime(
@@ -446,6 +503,18 @@ export class PigeonApplication {
     session: Session,
   ): Promise<ConversationResource[]> {
     return await this.listConversationsUseCase.execute(session);
+  }
+
+  public async markConversationReadUntil(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.markConversationReadUntil(
+      session,
+      conversationId,
+      messageId,
+    );
   }
 
   public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {

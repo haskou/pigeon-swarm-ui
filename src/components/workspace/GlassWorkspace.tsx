@@ -20,6 +20,8 @@ import type {
 } from '../../domain/types';
 import type {
   CallParticipant,
+  CallResource,
+  CallSignalType,
   CallSession,
 } from '../../domain/calls/CallSession';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -48,6 +50,7 @@ import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
+import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
@@ -218,6 +221,12 @@ export function GlassWorkspace({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<{
+    call: CallResource;
+    caller?: CallParticipant;
+    participants: CallParticipant[];
+    title: string;
+  } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -228,12 +237,17 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
+    () => undefined,
+  );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
     endCall,
+    receiveSignal,
+    reconcileCall,
     startCall,
     toggleDeafen,
     toggleMute,
@@ -446,6 +460,136 @@ export function GlassWorkspace({
     },
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
+  const callDetailsForResource = useCallback(
+    (call: CallResource): {
+      channelId?: string;
+      communityId?: string;
+      conversationId?: string;
+      kind: CallSession['kind'];
+      participants: CallParticipant[];
+      title: string;
+    } => {
+      const participants = call.participantIds.map((identityId) => {
+        const participant = callParticipantForIdentity(identityId);
+        const status = call.participants.find(
+          (item) => item.identityId === identityId,
+        )?.status;
+
+        return { ...participant, status };
+      });
+
+      const scope = call.scope;
+
+      if (scope.type === 'community_channel') {
+        const community = communities.find(
+          (item) => item.id === scope.communityId,
+        );
+        const channel = community?.textChannels.find(
+          (item) => item.id === scope.channelId,
+        );
+
+        return {
+          channelId: scope.channelId,
+          communityId: scope.communityId,
+          kind: 'community-voice',
+          participants,
+          title: `${community?.name ?? copy.communities.privateCommunity} · ${
+            channel?.name ?? copy.calls.voiceChannel
+          }`,
+        };
+      }
+
+      const conversation = conversations.find(
+        (item) => item.id === scope.conversationId,
+      );
+      const peerIdentityId = conversation
+        ? conversationPeerIdentityId(
+            conversation,
+            session.identity.id,
+            session.keychain,
+          )
+        : undefined;
+      const title =
+        conversation?.name ??
+        conversation?.title ??
+        (peerIdentityId ? identityNames[peerIdentityId] : undefined) ??
+        copy.chat.noConversation;
+
+      return {
+        conversationId: scope.conversationId,
+        kind: conversation?.type === 'group' ? 'group' : 'one-to-one',
+        participants,
+        title,
+      };
+    },
+    [
+      callParticipantForIdentity,
+      communities,
+      conversations,
+      identityNames,
+      session.identity.id,
+      session.keychain,
+    ],
+  );
+  const reconcileCallResource = useCallback(
+    (call: CallResource) => {
+      const details = callDetailsForResource(call);
+      const currentParticipant = call.participants.find(
+        (participant) => participant.identityId === session.identity.id,
+      );
+
+      if (call.status !== 'active') {
+        if (incomingCall?.call.id === call.id) setIncomingCall(null);
+        if (activeCall?.id === call.id) endCall();
+        return;
+      }
+
+      if (currentParticipant?.status === 'ringing') {
+        const caller = details.participants.find(
+          (participant) => participant.identityId === call.creatorIdentityId,
+        );
+
+        setIncomingCall({
+          call,
+          caller,
+          participants: details.participants,
+          title: details.title,
+        });
+        return;
+      }
+
+      if (activeCall?.id === call.id) reconcileCall(call, details);
+    },
+    [
+      activeCall?.id,
+      callDetailsForResource,
+      endCall,
+      incomingCall?.call.id,
+      reconcileCall,
+      session.identity.id,
+    ],
+  );
+
+  useEffect(() => {
+    reconcileCallResourceRef.current = reconcileCallResource;
+  }, [reconcileCallResource]);
+
+  const callSignalSender = useCallback(
+    (callId: string) =>
+      async (
+        recipientIdentityId: string,
+        signalType: CallSignalType,
+        payload: Record<string, unknown>,
+      ) => {
+        await pigeonApplication.sendCallSignal(sessionRef.current, callId, {
+          payload,
+          recipientIdentityId,
+          signalType,
+        });
+      },
+    [],
+  );
+
   const startConversationCall = useCallback(
     (input: {
       conversationId: string;
@@ -453,36 +597,119 @@ export function GlassWorkspace({
       participants: CallParticipant[];
       title: string;
     }) => {
-      const participants =
-        input.participants.length > 0
-          ? input.participants
-          : [callParticipantForIdentity(session.identity.id)];
+      void pigeonApplication
+        .startConversationCall(sessionRef.current, input.conversationId)
+        .then(async (call) => {
+          const details = callDetailsForResource(call);
 
-      void startCall({
-        conversationId: input.conversationId,
-        id: `conversation:${input.conversationId}`,
-        kind: input.kind,
-        participants,
-        title: input.title,
-      });
+          await startCall({
+            ...details,
+            call,
+            currentIdentityId: sessionRef.current.identity.id,
+            id: call.id,
+            onSignal: callSignalSender(call.id),
+            participants:
+              details.participants.length > 0
+                ? details.participants
+                : input.participants,
+            title: details.title || input.title,
+          });
+        })
+        .catch((caught) =>
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
+        );
     },
-    [callParticipantForIdentity, session.identity.id, startCall],
+    [callDetailsForResource, callSignalSender, startCall],
   );
   const startCommunityVoiceCall = useCallback(
     (channel: { id: string; name: string }) => {
       if (!activeCommunity) return;
 
-      void startCall({
-        channelId: channel.id,
-        communityId: activeCommunity.id,
-        id: `community:${activeCommunity.id}:${channel.id}`,
-        kind: 'community-voice',
-        participants: [callParticipantForIdentity(session.identity.id)],
-        title: `${activeCommunity.name} · ${channel.name}`,
-      });
+      void pigeonApplication
+        .startCommunityChannelCall(
+          sessionRef.current,
+          activeCommunity.id,
+          channel.id,
+        )
+        .then(async (call) => {
+          const details = callDetailsForResource(call);
+
+          await startCall({
+            ...details,
+            call,
+            currentIdentityId: sessionRef.current.identity.id,
+            id: call.id,
+            onSignal: callSignalSender(call.id),
+          });
+        })
+        .catch((caught) =>
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
+        );
     },
-    [activeCommunity, callParticipantForIdentity, session.identity.id, startCall],
+    [activeCommunity, callDetailsForResource, callSignalSender, startCall],
   );
+
+  const acceptIncomingCall = useCallback(() => {
+    if (!incomingCall) return;
+
+    const pendingCall = incomingCall.call;
+
+    setIncomingCall(null);
+    void pigeonApplication
+      .joinCall(sessionRef.current, pendingCall.id)
+      .then(async (call) => {
+        const details = callDetailsForResource(call);
+
+        await startCall({
+          ...details,
+          call,
+          currentIdentityId: sessionRef.current.identity.id,
+          id: call.id,
+          onSignal: callSignalSender(call.id),
+        });
+      })
+      .catch((caught) =>
+        setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
+      );
+  }, [callDetailsForResource, callSignalSender, incomingCall, startCall]);
+
+  const declineIncomingCall = useCallback(() => {
+    if (!incomingCall) return;
+
+    const callId = incomingCall.call.id;
+
+    setIncomingCall(null);
+    void pigeonApplication
+      .leaveCall(sessionRef.current, callId)
+      .catch(() => undefined);
+  }, [incomingCall]);
+
+  const leaveActiveCall = useCallback(() => {
+    const callId = activeCall?.id;
+
+    endCall();
+    if (!callId) return;
+
+    void pigeonApplication
+      .leaveCall(sessionRef.current, callId)
+      .catch(() => undefined);
+  }, [activeCall?.id, endCall]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void pigeonApplication
+      .listCalls(session)
+      .then((calls) => {
+        if (cancelled) return;
+        calls.forEach((call) => reconcileCallResourceRef.current(call));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.identity.id]);
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -642,6 +869,33 @@ export function GlassWorkspace({
     setSidebarOpen(false);
   }, [closeNotificationsPanel]);
 
+  const markConversationReadUntil = useCallback(
+    (conversationId: string, loadedMessages: ChatMessage[]) => {
+      const lastMessage = [...loadedMessages]
+        .reverse()
+        .find((message) => !message.deliveryStatus);
+
+      if (!lastMessage) return;
+
+      clearUnreadMessages(conversationId);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, unreadCount: 0 }
+            : conversation,
+        ),
+      );
+      void pigeonApplication
+        .markConversationReadUntil(
+          sessionRef.current,
+          conversationId,
+          lastMessage.id,
+        )
+        .catch(() => undefined);
+    },
+    [clearUnreadMessages, setConversations],
+  );
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeTransientUi();
@@ -669,6 +923,7 @@ export function GlassWorkspace({
 
         setMessages(result.messages);
         updateMessageCursor(result.nextCursor ?? null);
+        markConversationReadUntil(conversationId, result.messages);
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
@@ -685,7 +940,12 @@ export function GlassWorkspace({
 
       setMessageLoadState('idle');
     },
-    [scrollMessagesToBottom, setMessageLoadState, updateMessageCursor],
+    [
+      markConversationReadUntil,
+      scrollMessagesToBottom,
+      setMessageLoadState,
+      updateMessageCursor,
+    ],
   );
 
   useEffect(() => {
@@ -1028,6 +1288,7 @@ export function GlassWorkspace({
 
         setMessages((current) => mergeMessages(current, [message]));
         if (shouldAutoScroll) {
+          markConversationReadUntil(conversationId, [message]);
           scrollMessagesToBottom('smooth', true);
         } else {
           setNewMessageCount((current) => current + 1);
@@ -1038,10 +1299,49 @@ export function GlassWorkspace({
         );
       }
     },
-    [scrollMessagesToBottom, session],
+    [markConversationReadUntil, scrollMessagesToBottom, session],
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
+      if (event.type.startsWith('calls.')) {
+        if (event.type === 'calls.v1.signal.sent') {
+          const callId = eventAggregateId(event) ?? stringAttribute(event, 'callId');
+          const senderIdentityId = stringAttribute(event, 'senderIdentityId');
+          const recipientIdentityId = stringAttribute(
+            event,
+            'recipientIdentityId',
+          );
+          const signalType = callSignalTypeAttribute(event);
+          const payload = recordAttribute(event, 'payload');
+
+          if (
+            callId &&
+            senderIdentityId &&
+            recipientIdentityId === session.identity.id &&
+            signalType &&
+            payload
+          ) {
+            void receiveSignal({
+              callId,
+              payload,
+              senderIdentityId,
+              signalType,
+            }).catch(() => undefined);
+          }
+          return;
+        }
+
+        const callId = eventAggregateId(event);
+
+        if (!callId) return;
+
+        void pigeonApplication
+          .getCall(sessionRef.current, callId)
+          .then(reconcileCallResource)
+          .catch(() => undefined);
+        return;
+      }
+
       if (event.type.startsWith('nodes.')) {
         void onPeersReload().catch(() => undefined);
         return;
@@ -1161,6 +1461,26 @@ export function GlassWorkspace({
           );
         }
       }
+
+      if (event.type === 'conversations.v1.messages.were_read') {
+        const conversationId = eventAggregateId(event);
+        const readerIdentityId = stringAttribute(
+          event,
+          'readerIdentityId',
+          'reader_identity_id',
+        );
+
+        if (conversationId && readerIdentityId === session.identity.id) {
+          clearUnreadMessages(conversationId);
+          setConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === conversationId
+                ? { ...conversation, unreadCount: 0 }
+                : conversation,
+            ),
+          );
+        }
+      }
     },
     [
       activeCommunity?.id,
@@ -1178,6 +1498,8 @@ export function GlassWorkspace({
       refreshConversations,
       refreshNotifications,
       refreshSession,
+      receiveSignal,
+      reconcileCallResource,
       session,
       setConversations,
       setSession,
@@ -1514,10 +1836,18 @@ export function GlassWorkspace({
           session={session}
         />
       )}
+      {incomingCall && (
+        <IncomingCallDialog
+          caller={incomingCall.caller}
+          onAccept={acceptIncomingCall}
+          onDecline={declineIncomingCall}
+          title={incomingCall.title}
+        />
+      )}
       {activeCall && (
         <GlobalCallBar
           call={activeCall}
-          onEnd={endCall}
+          onEnd={leaveActiveCall}
           onToggleDeafen={toggleDeafen}
           onToggleMute={toggleMute}
         />
@@ -1549,6 +1879,27 @@ function stringAttribute(
   }
 
   return undefined;
+}
+
+function recordAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): Record<string, unknown> | undefined {
+  const value = event.attributes[key];
+
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function callSignalTypeAttribute(
+  event: RealtimeDomainEvent,
+): CallSignalType | undefined {
+  const value = stringAttribute(event, 'signalType');
+
+  return value === 'answer' || value === 'ice_candidate' || value === 'offer'
+    ? value
+    : undefined;
 }
 
 function eventAggregateId(event: RealtimeDomainEvent): string | undefined {

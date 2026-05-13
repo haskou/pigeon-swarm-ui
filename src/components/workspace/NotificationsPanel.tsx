@@ -22,6 +22,10 @@ interface NotificationsPanelProps {
 }
 
 function notificationTitle(notification: NotificationResource): string {
+  if (notification.type === 'missed_call') {
+    return copy.notifications.missedCallTitle;
+  }
+
   if (notification.type === 'community_invitation') {
     return copy.notifications.communityInvitationTitle;
   }
@@ -41,6 +45,13 @@ function notificationTarget(notification: NotificationResource): {
     return {
       label: copy.notifications.community,
       value: notification.payload.communityId,
+    };
+  }
+
+  if (notification.type === 'missed_call') {
+    return {
+      label: copy.notifications.call,
+      value: notification.payload.callId,
     };
   }
 
@@ -97,6 +108,13 @@ export function NotificationsPanel({
 
           {notifications.map((notification) => {
             const target = notificationTarget(notification);
+            const inviterIdentityId =
+              notification.type === 'missed_call'
+                ? notification.payload.callerIdentityId
+                : notification.payload.inviterIdentityId;
+            const canRespond =
+              notification.state === 'pending' &&
+              notification.type !== 'missed_call';
 
             return (
               <article
@@ -109,10 +127,12 @@ export function NotificationsPanel({
                     {notificationTitle(notification)}
                   </h3>
                   <p className="mt-1 text-sm text-white/55">
-                    {copy.notifications.invitedBy}{' '}
+                    {notification.type === 'missed_call'
+                      ? copy.notifications.calledBy
+                      : copy.notifications.invitedBy}{' '}
                     <span className="font-semibold text-white/75">
                       {identityDisplayName(
-                        notification.payload.inviterIdentityId,
+                        inviterIdentityId,
                         identityNames,
                       )}
                     </span>
@@ -146,7 +166,7 @@ export function NotificationsPanel({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {notification.state === 'pending' && (
+                {canRespond && (
                   <>
                     <button
                       type="button"

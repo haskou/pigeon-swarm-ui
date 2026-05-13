@@ -133,9 +133,10 @@ export function useNotifications({
         onAccepted({
           communities,
           conversationId:
-            notification.type === 'community_invitation'
-              ? undefined
-              : notification.payload.conversationId,
+            notification.type === 'conversation_invitation' ||
+            notification.type === 'group_conversation_invitation'
+              ? notification.payload.conversationId
+              : undefined,
           conversations,
           session: nextSession,
         });

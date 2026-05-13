@@ -193,8 +193,12 @@ export function CommunityWorkspace({
     (channel) => channel.id === selectedChannelId,
   );
   const voiceChannels = useMemo(
-    () => [{ id: `voice:${community.id}:2`, name: '2' }],
-    [community.id],
+    () =>
+      community.textChannels.map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+      })),
+    [community.textChannels],
   );
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&

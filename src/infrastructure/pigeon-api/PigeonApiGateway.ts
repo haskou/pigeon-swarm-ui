@@ -10,6 +10,10 @@ import {
 } from '@haskou/value-objects';
 
 import type { Peer } from '../../application/peers/ListPeers';
+import type {
+  CallResource,
+  CallSignalPayload,
+} from '../../domain/calls/CallSession';
 import type { IdentityUpdateProfileInput } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
@@ -166,6 +170,117 @@ export class PigeonApiGateway {
     );
 
     return result.peers;
+  }
+
+  public async listCalls(session: Session): Promise<CallResource[]> {
+    const path = '/calls/';
+    const result = await this.http.request<
+      { calls?: CallResource[] } | CallResource[]
+    >(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return Array.isArray(result) ? result : (result.calls ?? []);
+  }
+
+  public async getCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    const path = `/calls/${encodeURIComponent(callId)}`;
+
+    return await this.http.request<CallResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+  }
+
+  public async startConversationCall(
+    session: Session,
+    conversationId: string,
+  ): Promise<CallResource> {
+    const path = '/calls/';
+    const body = {
+      conversationId,
+      scopeType: 'conversation',
+    };
+
+    return await this.http.request<CallResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async startCommunityChannelCall(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CallResource> {
+    const path = '/calls/';
+    const body = {
+      channelId,
+      communityId,
+      scopeType: 'community_channel',
+    };
+
+    return await this.http.request<CallResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async joinCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    const path = `/calls/${encodeURIComponent(callId)}/participants`;
+    const body = {};
+
+    return await this.http.request<CallResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async leaveCall(session: Session, callId: string): Promise<void> {
+    const path = `/calls/${encodeURIComponent(callId)}/participants/me`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async endCall(session: Session, callId: string): Promise<void> {
+    const path = `/calls/${encodeURIComponent(callId)}`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async sendCallSignal(
+    session: Session,
+    callId: string,
+    signal: CallSignalPayload,
+  ): Promise<void> {
+    const path = `/calls/${encodeURIComponent(callId)}/signals`;
+    const body = {
+      payload: signal.payload,
+      recipientIdentityId: signal.recipientIdentityId,
+      signalType: signal.signalType,
+    };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -835,6 +950,23 @@ export class PigeonApiGateway {
     return this.conversations.list(raw);
   }
 
+  public async markConversationReadUntil(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages/read-until`;
+    const body = { messageId };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+  }
+
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
@@ -1163,6 +1295,10 @@ export class PigeonApiGateway {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
+    if (notification.type === 'missed_call') {
+      throw new Error('Missed call notifications cannot be accepted.');
+    }
+
     const encryptedKey =
       notification.type === 'community_invitation'
         ? notification.payload.encryptedCommunityKey

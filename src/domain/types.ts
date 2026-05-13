@@ -57,6 +57,13 @@ export type CommunityInvitationPayload = {
   recipientIdentityId: string;
 };
 
+export type MissedCallPayload = {
+  callId: string;
+  callerIdentityId: string;
+  networkId: string;
+  recipientIdentityId: string;
+};
+
 type BaseNotificationResource = {
   createdAt: string;
   id: string;
@@ -77,9 +84,15 @@ export type CommunityInvitationNotificationResource =
     type: 'community_invitation';
   };
 
+export type MissedCallNotificationResource = BaseNotificationResource & {
+  payload: MissedCallPayload;
+  type: 'missed_call';
+};
+
 export type NotificationResource =
   | CommunityInvitationNotificationResource
-  | ConversationInvitationNotificationResource;
+  | ConversationInvitationNotificationResource
+  | MissedCallNotificationResource;
 
 export type PublicFileUpload = {
   cid: string;
