@@ -11,6 +11,7 @@ import {
 
 import type { Peer } from '../../application/peers/ListPeers';
 import type {
+  CallIceServerConfig,
   CallResource,
   CallSignalPayload,
 } from '../../domain/calls/CallSession';
@@ -192,6 +193,17 @@ export class PigeonApiGateway {
     const path = `/calls/${encodeURIComponent(callId)}`;
 
     return await this.http.request<CallResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+  }
+
+  public async getCallIceServers(
+    session: Session,
+  ): Promise<CallIceServerConfig> {
+    const path = '/calls/ice-servers';
+
+    return await this.http.request<CallIceServerConfig>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });

@@ -6,8 +6,6 @@ type SignalSender = (
   payload: Record<string, unknown>,
 ) => Promise<void>;
 
-const iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
-
 function descriptionPayload(
   description: RTCSessionDescriptionInit,
 ): Record<string, unknown> {
@@ -23,6 +21,12 @@ export class CallPeerConnectionManager {
   private readonly remoteAudio = new Map<string, HTMLAudioElement>();
 
   private localStream: MediaStream | null = null;
+
+  private rtcConfiguration: RTCConfiguration | null = null;
+
+  public configure(rtcConfiguration: RTCConfiguration): void {
+    this.rtcConfiguration = rtcConfiguration;
+  }
 
   public setLocalStream(stream: MediaStream): void {
     this.localStream = stream;
@@ -82,6 +86,7 @@ export class CallPeerConnectionManager {
     }
     this.remoteAudio.clear();
     this.localStream = null;
+    this.rtcConfiguration = null;
   }
 
   private getOrCreatePeer(
@@ -92,7 +97,11 @@ export class CallPeerConnectionManager {
 
     if (existing) return existing;
 
-    const peer = new RTCPeerConnection({ iceServers });
+    if (!this.rtcConfiguration) {
+      throw new Error('RTCPeerConnection configuration is not loaded.');
+    }
+
+    const peer = new RTCPeerConnection(this.rtcConfiguration);
 
     this.localStream?.getTracks().forEach((track) => {
       if (this.localStream) peer.addTrack(track, this.localStream);

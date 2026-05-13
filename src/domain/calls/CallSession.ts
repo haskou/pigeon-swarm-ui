@@ -49,6 +49,11 @@ export type CallSignalPayload = {
   signalType: CallSignalType;
 };
 
+export type CallIceServerConfig = {
+  iceServers: RTCIceServer[];
+  iceTransportPolicy?: RTCIceTransportPolicy;
+};
+
 export type CallParticipant = {
   identity?: IdentityResource;
   identityId: string;

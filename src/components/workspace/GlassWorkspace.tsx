@@ -328,10 +328,12 @@ export function GlassWorkspace({
   const communityUnreadCounts = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(communityUnreadCountsById).map(([communityId, channels]) => [
-          communityId,
-          Object.values(channels).reduce((total, count) => total + count, 0),
-        ]),
+        Object.entries(communityUnreadCountsById).map(
+          ([communityId, channels]) => [
+            communityId,
+            Object.values(channels).reduce((total, count) => total + count, 0),
+          ],
+        ),
       ) as Record<string, number>,
     [communityUnreadCountsById],
   );
@@ -375,11 +377,8 @@ export function GlassWorkspace({
     },
     [activeConversation?.id],
   );
-  const {
-    clearUnreadMessages,
-    conversationsWithUnread,
-    markUnreadMessage,
-  } = useUnreadMessages(conversations);
+  const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
+    useUnreadMessages(conversations);
   const unreadMessageCount = useMemo(
     () =>
       conversationsWithUnread.reduce(
@@ -471,7 +470,9 @@ export function GlassWorkspace({
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
   const callDetailsForResource = useCallback(
-    (call: CallResource): {
+    (
+      call: CallResource,
+    ): {
       channelId?: string;
       communityId?: string;
       conversationId?: string;
@@ -618,6 +619,17 @@ export function GlassWorkspace({
       },
     [],
   );
+  const loadCallIceConfig = useCallback(async () => {
+    const iceConfig = await pigeonApplication.getCallIceServers(
+      sessionRef.current,
+    );
+
+    if (iceConfig.iceServers.length === 0) {
+      throw new Error(copy.calls.iceServersUnavailable);
+    }
+
+    return iceConfig;
+  }, []);
 
   const startConversationCall = useCallback(
     (input: {
@@ -632,11 +644,13 @@ export function GlassWorkspace({
         .startConversationCall(sessionRef.current, input.conversationId)
         .then(async (call) => {
           const details = callDetailsForResource(call);
+          const iceConfig = await loadCallIceConfig();
 
           await startCall({
             ...details,
             call,
             currentIdentityId: sessionRef.current.identity.id,
+            iceConfig,
             id: call.id,
             onSignal: callSignalSender(call.id),
             participants:
@@ -650,7 +664,7 @@ export function GlassWorkspace({
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
         );
     },
-    [callDetailsForResource, callSignalSender, startCall],
+    [callDetailsForResource, callSignalSender, loadCallIceConfig, startCall],
   );
   const startCommunityVoiceCall = useCallback(
     (channel: { id: string; name: string }) => {
@@ -664,11 +678,13 @@ export function GlassWorkspace({
         )
         .then(async (call) => {
           const details = callDetailsForResource(call);
+          const iceConfig = await loadCallIceConfig();
 
           await startCall({
             ...details,
             call,
             currentIdentityId: sessionRef.current.identity.id,
+            iceConfig,
             id: call.id,
             onSignal: callSignalSender(call.id),
           });
@@ -677,7 +693,13 @@ export function GlassWorkspace({
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
         );
     },
-    [activeCommunity, callDetailsForResource, callSignalSender, startCall],
+    [
+      activeCommunity,
+      callDetailsForResource,
+      callSignalSender,
+      loadCallIceConfig,
+      startCall,
+    ],
   );
 
   const acceptIncomingCall = useCallback(() => {
@@ -690,11 +712,13 @@ export function GlassWorkspace({
       .joinCall(sessionRef.current, pendingCall.id)
       .then(async (call) => {
         const details = callDetailsForResource(call);
+        const iceConfig = await loadCallIceConfig();
 
         await startCall({
           ...details,
           call,
           currentIdentityId: sessionRef.current.identity.id,
+          iceConfig,
           id: call.id,
           onSignal: callSignalSender(call.id),
         });
@@ -702,7 +726,13 @@ export function GlassWorkspace({
       .catch((caught) =>
         setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
       );
-  }, [callDetailsForResource, callSignalSender, incomingCall, startCall]);
+  }, [
+    callDetailsForResource,
+    callSignalSender,
+    incomingCall,
+    loadCallIceConfig,
+    startCall,
+  ]);
 
   const declineIncomingCall = useCallback(() => {
     if (!incomingCall) return;
@@ -751,7 +781,9 @@ export function GlassWorkspace({
     if (
       activeConversationId &&
       conversations.length > 0 &&
-      !conversations.some((conversation) => conversation.id === activeConversationId)
+      !conversations.some(
+        (conversation) => conversation.id === activeConversationId,
+      )
     ) {
       setActiveConversationId(conversations[0].id);
     }
@@ -759,7 +791,9 @@ export function GlassWorkspace({
 
   useEffect(() => {
     setDrafts(loadDrafts(session.identity.id));
-    setCommunityUnreadCountsById(loadCommunityUnreadCounts(session.identity.id));
+    setCommunityUnreadCountsById(
+      loadCommunityUnreadCounts(session.identity.id),
+    );
   }, [session.identity.id]);
 
   useEffect(() => {
@@ -1044,9 +1078,7 @@ export function GlassWorkspace({
         lastScrollTopRef.current = nextTop;
       });
     } catch (caught) {
-      setSendError(
-        toUserErrorMessage(caught, copy.workspace.loadOlderError),
-      );
+      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     }
     if (messageRequestRef.current !== requestId) return;
 
@@ -1075,11 +1107,7 @@ export function GlassWorkspace({
     setSendError(null);
     setAttachmentProgress(null);
     setConversations((current) =>
-      bumpConversationActivity(
-        current,
-        conversationId,
-        optimisticTimestamp,
-      ),
+      bumpConversationActivity(current, conversationId, optimisticTimestamp),
     );
     setFailedSends((current) => {
       const next = { ...current };
@@ -1245,9 +1273,7 @@ export function GlassWorkspace({
 
       setSendError(copy.messages.replyTargetNotFound);
     } catch (caught) {
-      setSendError(
-        toUserErrorMessage(caught, copy.workspace.loadOlderError),
-      );
+      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     } finally {
       setMessageLoadState('idle');
     }
@@ -1344,7 +1370,8 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('calls.')) {
         if (event.type === 'calls.v1.signal.sent') {
-          const callId = eventAggregateId(event) ?? stringAttribute(event, 'callId');
+          const callId =
+            eventAggregateId(event) ?? stringAttribute(event, 'callId');
           const senderIdentityId = stringAttribute(event, 'senderIdentityId');
           const recipientIdentityId = stringAttribute(
             event,
@@ -1562,7 +1589,9 @@ export function GlassWorkspace({
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}
-          activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
+          activeCommunityId={
+            workspaceMode === 'community' ? activeCommunity?.id : null
+          }
           communities={communities}
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
@@ -1615,28 +1644,28 @@ export function GlassWorkspace({
                   peerCount={peers.length}
                   settingsAttention={nodeUnclaimed}
                 />
-              <Sidebar
-                session={session}
-                conversations={conversationsWithUnread}
-                identityNames={identityNames}
-                identityPictures={identityPictures}
-                identityProfiles={identityProfiles}
-                nodeNetworks={nodeNetworks}
-                activeConversationId={activeConversation?.id ?? null}
-                onSelect={(id) => {
-                  clearUnreadMessages(id);
-                  setNewMessageCount(0);
-                  setActiveConversationId(id);
-                  setSidebarOpen(false);
-                }}
-                onCreate={() => setIsCreateOpen(true)}
-                onClose={() => setSidebarOpen(false)}
-                onLogout={() => setSession(null)}
-                onSessionUpdated={(nextSession) => {
-                  setSession(nextSession);
-                  rememberIdentity(nextSession.identity);
-                }}
-              />
+                <Sidebar
+                  session={session}
+                  conversations={conversationsWithUnread}
+                  identityNames={identityNames}
+                  identityPictures={identityPictures}
+                  identityProfiles={identityProfiles}
+                  nodeNetworks={nodeNetworks}
+                  activeConversationId={activeConversation?.id ?? null}
+                  onSelect={(id) => {
+                    clearUnreadMessages(id);
+                    setNewMessageCount(0);
+                    setActiveConversationId(id);
+                    setSidebarOpen(false);
+                  }}
+                  onCreate={() => setIsCreateOpen(true)}
+                  onClose={() => setSidebarOpen(false)}
+                  onLogout={() => setSession(null)}
+                  onSessionUpdated={(nextSession) => {
+                    setSession(nextSession);
+                    rememberIdentity(nextSession.identity);
+                  }}
+                />
               </div>
             </div>
 
@@ -1913,7 +1942,9 @@ function mergeMessages(
   for (const message of currentMessages) byId.set(message.id, message);
   for (const message of incomingMessages) byId.set(message.id, message);
 
-  return [...byId.values()].sort((left, right) => left.timestamp - right.timestamp);
+  return [...byId.values()].sort(
+    (left, right) => left.timestamp - right.timestamp,
+  );
 }
 
 function stringAttribute(

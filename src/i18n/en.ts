@@ -101,6 +101,7 @@ export const copy = {
     deafen: 'Silence call audio',
     decline: 'Decline',
     incoming: 'Incoming call',
+    iceServersUnavailable: 'Calls are not configured on this node.',
     joinVoice: 'Join voice',
     leave: 'Leave call',
     microphoneUnavailable:

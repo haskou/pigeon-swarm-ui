@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   CallParticipant,
+  CallIceServerConfig,
   CallResource,
   CallSignalType,
   CallSession,
@@ -24,6 +25,7 @@ type StartCallInput = {
   channelId?: string;
   conversationId?: string;
   kind: CallSession['kind'];
+  iceConfig: CallIceServerConfig;
   onSignal: SignalSender;
   participants: CallParticipant[];
   title: string;
@@ -40,7 +42,10 @@ export function useCallSession(): {
   }) => Promise<void>;
   reconcileCall: (
     call: CallResource,
-    input: Omit<StartCallInput, 'call' | 'currentIdentityId' | 'id' | 'onSignal'>,
+    input: Omit<
+      StartCallInput,
+      'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
+    >,
   ) => void;
   startCall: (input: StartCallInput) => Promise<void>;
   toggleDeafen: () => void;
@@ -88,8 +93,13 @@ export function useCallSession(): {
     try {
       const stream = await mediaManager.startAudio();
 
+      peerManager.configure(input.iceConfig);
       peerManager.setLocalStream(stream);
-      await connectJoinedPeers(nextCall, input.currentIdentityId, input.onSignal);
+      await connectJoinedPeers(
+        nextCall,
+        input.currentIdentityId,
+        input.onSignal,
+      );
       setActiveCall((current) =>
         current?.id === nextCall.id ? { ...current, status: 'live' } : current,
       );
@@ -112,7 +122,10 @@ export function useCallSession(): {
 
   const reconcileCall = (
     call: CallResource,
-    input: Omit<StartCallInput, 'call' | 'currentIdentityId' | 'id' | 'onSignal'>,
+    input: Omit<
+      StartCallInput,
+      'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
+    >,
   ) => {
     setActiveCall((current) => {
       if (!current || current.id !== call.id) return current;
@@ -218,9 +231,7 @@ export function useCallSession(): {
     await Promise.all(
       call.participants
         .filter((participant) => participant.identityId !== currentIdentityId)
-        .filter((participant) =>
-          joinedParticipants.has(participant.identityId),
-        )
+        .filter((participant) => joinedParticipants.has(participant.identityId))
         .map((participant) =>
           peerManager.ensurePeer(
             participant.identityId,

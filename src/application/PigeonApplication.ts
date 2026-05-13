@@ -1,4 +1,5 @@
 import type {
+  CallIceServerConfig,
   CallResource,
   CallSignalPayload,
 } from '../domain/calls/CallSession';
@@ -144,6 +145,12 @@ export class PigeonApplication {
     callId: string,
   ): Promise<CallResource> {
     return await this.gateway.getCall(session, callId);
+  }
+
+  public async getCallIceServers(
+    session: Session,
+  ): Promise<CallIceServerConfig> {
+    return await this.gateway.getCallIceServers(session);
   }
 
   public async startConversationCall(
