@@ -1543,30 +1543,58 @@ function ManageCommunityDialog({
       <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-2xl sm:rounded-[2rem]">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-            <div className="block">
-              <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.avatar}
-              </span>
+          <div className="grid gap-4 sm:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
               <button
                 type="button"
-                onClick={() => avatarInputRef.current?.click()}
-                className="group relative mx-auto grid h-28 w-28 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950"
-                aria-label={copy.communities.avatar}
+                onClick={() => bannerInputRef.current?.click()}
+                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                aria-label={copy.communities.banner}
               >
-                {avatarPreview || currentAvatarUrl ? (
+                {bannerPreview || currentBannerUrl ? (
                   <img
-                    src={avatarPreview ?? currentAvatarUrl ?? ''}
+                    src={bannerPreview ?? currentBannerUrl ?? ''}
                     alt=""
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  community.name.slice(0, 1).toUpperCase()
+                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
+                    {community.name.slice(0, 1).toUpperCase()}
+                  </span>
                 )}
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
                   ✎
                 </span>
               </button>
+              <div className="relative px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  aria-label={copy.communities.avatar}
+                >
+                  {avatarPreview || currentAvatarUrl ? (
+                    <img
+                      src={avatarPreview ?? currentAvatarUrl ?? ''}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    community.name.slice(0, 1).toUpperCase()
+                  )}
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                    ✎
+                  </span>
+                </button>
+                <div className="mt-3 min-w-0">
+                  <div className="truncate text-lg font-black text-white">
+                    {name.trim() || community.name}
+                  </div>
+                  <div className="truncate text-xs font-bold text-white/45">
+                    {description.trim() || community.description}
+                  </div>
+                </div>
+              </div>
               <input
                 ref={avatarInputRef}
                 type="file"
@@ -1574,45 +1602,15 @@ function ManageCommunityDialog({
                 onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
                 className="sr-only"
               />
-              <p className="mt-3 text-center text-xs font-bold text-white/45">
-                {copy.profile.hoverToEdit}
-              </p>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
             </div>
             <div className="space-y-3">
-              <div className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.communities.banner}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => bannerInputRef.current?.click()}
-                  className="group relative grid aspect-[2/1] w-full place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950"
-                  aria-label={copy.communities.banner}
-                >
-                  {bannerPreview || currentBannerUrl ? (
-                    <img
-                      src={bannerPreview ?? currentBannerUrl ?? ''}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    community.name.slice(0, 1).toUpperCase()
-                  )}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                    ✎
-                  </span>
-                </button>
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
-                  className="sr-only"
-                />
-                <p className="mt-3 text-xs font-bold text-white/45">
-                  {copy.profile.hoverToEdit}
-                </p>
-              </div>
               <Field label={copy.communities.name}>
                 <input
                   value={name}
