@@ -25,7 +25,10 @@ import type {
   MessageResource,
   Session,
 } from '../../domain/types';
-import type { CallSession } from '../../domain/calls/CallSession';
+import type {
+  CallParticipant,
+  CallSession,
+} from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
@@ -313,6 +316,58 @@ export function CommunityWorkspace({
         ? { [session.identity.id]: memberPictures[session.identity.id] }
         : {},
     [memberPictures, session.identity.id],
+  );
+  const callParticipantForIdentity = useCallback(
+    (identityId: string): CallParticipant => {
+      const identity =
+        identityId === session.identity.id
+          ? session.identity
+          : memberIdentities[identityId];
+
+      return {
+        identity,
+        identityId,
+        muted: false,
+        name: identity
+          ? (identityName(identity) ?? shortId(identityId))
+          : shortId(identityId),
+        picture: memberPictures[identityId] ?? null,
+      };
+    },
+    [memberIdentities, memberPictures, session.identity],
+  );
+  const voiceParticipantsForChannel = useCallback(
+    (channel: CommunityChannel): CallParticipant[] => {
+      if (channel.type !== 'voice') return [];
+
+      const activeParticipants =
+        activeVoiceChannelId === channel.id
+          ? (activeCall?.participants ?? [])
+          : [];
+      const activeByIdentityId = new Map(
+        activeParticipants.map((participant) => [
+          participant.identityId,
+          participant,
+        ]),
+      );
+      const identityIds = Array.from(
+        new Set([
+          ...(channel.connectedIdentityIds ?? []),
+          ...activeParticipants.map((participant) => participant.identityId),
+        ]),
+      );
+
+      return identityIds.map(
+        (identityId) =>
+          activeByIdentityId.get(identityId) ??
+          callParticipantForIdentity(identityId),
+      );
+    },
+    [
+      activeCall?.participants,
+      activeVoiceChannelId,
+      callParticipantForIdentity,
+    ],
   );
   const channelData = useMemo(
     () => ({
@@ -999,11 +1054,9 @@ export function CommunityWorkspace({
                               active={activeVoiceChannelId === channel.id}
                               channel={channel}
                               onJoin={() => onJoinVoiceChannel?.(channel)}
-                              participants={
-                                activeVoiceChannelId === channel.id
-                                  ? (activeCall?.participants ?? [])
-                                  : []
-                              }
+                              participants={voiceParticipantsForChannel(
+                                channel,
+                              )}
                             />
                           ))}
                         </div>

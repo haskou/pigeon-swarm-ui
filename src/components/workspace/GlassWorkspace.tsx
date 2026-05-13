@@ -1410,7 +1410,13 @@ export function GlassWorkspace({
 
         void pigeonApplication
           .getCall(sessionRef.current, callId)
-          .then(reconcileCallResource)
+          .then((call) => {
+            reconcileCallResource(call);
+
+            if (call.scope.type === 'community_channel') {
+              void onCommunitiesReload().catch(() => undefined);
+            }
+          })
           .catch(() => undefined);
         return;
       }

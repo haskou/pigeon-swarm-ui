@@ -192,11 +192,19 @@ export type ConversationResource = {
 export type CommunityTextChannel = {
   id: string;
   name: string;
-  type: 'text' | 'voice';
+  type: 'text';
   createdAt: number;
 };
 
-export type CommunityChannel = CommunityTextChannel;
+export type CommunityVoiceChannel = {
+  connectedIdentityIds?: string[];
+  id: string;
+  name: string;
+  type: 'voice';
+  createdAt: number;
+};
+
+export type CommunityChannel = CommunityTextChannel | CommunityVoiceChannel;
 
 export type Community = {
   id: string;
@@ -207,7 +215,7 @@ export type Community = {
   avatar?: string | null;
   banner?: string | null;
   memberIds: string[];
-  textChannels: CommunityTextChannel[];
+  textChannels: CommunityChannel[];
   visibility: 'private';
   createdAt: number;
 };
