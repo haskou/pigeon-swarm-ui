@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import type {
   Community,
   CommunityTextChannel,
@@ -30,6 +31,7 @@ import {
   identityPicture,
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
@@ -59,6 +61,7 @@ interface CommunityWorkspaceProps {
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
   onSessionUpdated: (session: Session) => void;
+  realtimeEvent?: null | RealtimeDomainEvent;
   session: Session;
 }
 
@@ -82,6 +85,7 @@ export function CommunityWorkspace({
   onMobileSidebarClose,
   onOpenMobileSidebar,
   onSessionUpdated,
+  realtimeEvent,
   session,
 }: CommunityWorkspaceProps) {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
@@ -438,6 +442,24 @@ export function CommunityWorkspace({
     }
   };
 
+  const handleDeleteChannelMessage = async (message: ChatMessage) => {
+    if (!selectedChannelId || !message.mine) return;
+
+    setMessageContextMenu(null);
+    setSendError(null);
+    try {
+      await pigeonApplication.deleteCommunityChannelMessage(
+        session,
+        community.id,
+        selectedChannelId,
+        message.id,
+      );
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
+    }
+  };
+
   const loadAttachmentPreview = useCallback(
     async (
       attachment: MessageAttachment,
@@ -502,6 +524,75 @@ export function CommunityWorkspace({
       cancelled = true;
     };
   }, [loadChannelMessages, selectedChannelId]);
+
+  useEffect(() => {
+    if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
+
+    const channelId = realtimeStringAttribute(realtimeEvent, 'channelId');
+
+    if (!channelId || channelId !== selectedChannelId) return;
+
+    if (realtimeEvent.type === 'communities.v1.channel.message.was_deleted') {
+      const targetMessageId = realtimeStringAttribute(
+        realtimeEvent,
+        'targetMessageId',
+      );
+
+      if (!targetMessageId) return;
+
+      setMessages((current) =>
+        current.filter((message) => message.id !== targetMessageId),
+      );
+      return;
+    }
+
+    if (realtimeEvent.type !== 'communities.v1.channel.message.was_sent') {
+      return;
+    }
+
+    const message = realtimeMessageAttribute(realtimeEvent);
+
+    if (!message) return;
+
+    const scroller = scrollerRef.current;
+    const shouldStickToBottom =
+      !scroller ||
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140 ||
+      message.authorIdentityId === session.identity.id;
+    let cancelled = false;
+
+    void resolveMemberIdentities()
+      .then((identities) => projectChannelMessage(message, identities))
+      .then((projected) => {
+        if (cancelled) return;
+
+        setMessages((current) => {
+          if (current.some((item) => item.id === projected.id)) return current;
+
+          return [...current, projected].sort(
+            (left, right) => left.timestamp - right.timestamp,
+          );
+        });
+
+        if (shouldStickToBottom) {
+          requestAnimationFrame(() => {
+            bottomRef.current?.scrollIntoView({ block: 'end' });
+          });
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    community.id,
+    projectChannelMessage,
+    realtimeEvent,
+    resolveMemberIdentities,
+    selectedChannelId,
+    session.identity.id,
+  ]);
 
   return (
     <>
@@ -895,6 +986,11 @@ export function CommunityWorkspace({
         <MessageContextMenu
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
+          onDelete={
+            messageContextMenu.message.mine
+              ? () => void handleDeleteChannelMessage(messageContextMenu.message)
+              : undefined
+          }
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
@@ -1560,7 +1656,9 @@ async function decryptCommunityChannelPayload(
   encryptedPayload: string,
 ): Promise<CommunityChannelPlainPayload> {
   const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
-  const wrappedKey = envelope.recipients[session.identity.id];
+  const wrappedKey =
+    envelope.recipients[session.identity.id] ??
+    envelope.recipients[normalizeIdentityId(session.identity.id)];
 
   if (!wrappedKey) {
     throw new Error(copy.messages.missingKey);
@@ -1584,6 +1682,23 @@ async function decryptCommunityChannelPayload(
   );
 
   return JSON.parse(new TextDecoder().decode(decrypted)) as CommunityChannelPlainPayload;
+}
+
+function realtimeStringAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): string | undefined {
+  const value = event.attributes[key];
+
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function realtimeMessageAttribute(
+  event: RealtimeDomainEvent,
+): MessageResource | null {
+  const value = event.attributes.message;
+
+  return value && typeof value === 'object' ? (value as MessageResource) : null;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

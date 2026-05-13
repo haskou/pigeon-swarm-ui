@@ -171,6 +171,8 @@ export function GlassWorkspace({
   const [communityChannelById, setCommunityChannelById] = useState<
     Record<string, string>
   >(() => workspacePreference.channelByCommunityId ?? {});
+  const [communityRealtimeEvent, setCommunityRealtimeEvent] =
+    useState<RealtimeDomainEvent | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -862,6 +864,16 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type === 'communities.v1.channel.message.was_sent') {
+        setCommunityRealtimeEvent(event);
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.message.was_deleted') {
+        setCommunityRealtimeEvent(event);
+        return;
+      }
+
       if (event.type.startsWith('communities.')) {
         void onCommunitiesReload().catch(() => undefined);
         return;
@@ -1125,6 +1137,7 @@ export function GlassWorkspace({
               />
             }
             nodeNetworks={nodeNetworks}
+            realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>
                 current[activeCommunity.id] === channelId

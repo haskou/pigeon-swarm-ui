@@ -319,6 +319,20 @@ export class PigeonApplication {
     );
   }
 
+  public async deleteCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.deleteCommunityChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
   public async publishMessageAttachments(
     session: Session,
     attachments: File[],

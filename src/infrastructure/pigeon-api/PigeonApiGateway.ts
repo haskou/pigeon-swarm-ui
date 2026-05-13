@@ -380,6 +380,45 @@ export class PigeonApiGateway {
         };
   }
 
+  public async deleteCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    const createdAt = Date.now();
+    const id = `${communityId}:${channelId}:${createdAt}:${crypto.randomUUID()}:deleted`;
+    const signaturePayload = {
+      actorIdentityId: session.identity.id,
+      channelId,
+      communityId,
+      createdAt,
+      id,
+      targetMessageId: messageId,
+      type: 'deleted',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+    const body = {
+      createdAt,
+      id,
+      signature: signature.toString(),
+    };
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}`;
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
+  }
+
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
     return await this.http.request<PublicFileContent>(
       `/ipfs/${encodeURIComponent(cid)}`,
