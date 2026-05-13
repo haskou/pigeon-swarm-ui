@@ -205,13 +205,8 @@ export function MessageBubble({
               </span>
             </button>
           )}
-          {message.content && (
-            <p className={cx(message.encrypted && 'text-white/55')}>
-              {message.content}
-            </p>
-          )}
           {message.attachments.length > 0 && (
-            <div className={cx(message.content && 'mt-3', 'grid gap-2')}>
+            <div className="grid gap-2">
               {imageAttachments.length > 0 && (
                 <ImageAttachmentAlbum
                   items={imageAttachments}
@@ -254,6 +249,16 @@ export function MessageBubble({
                 />
               </div>
             </div>
+          )}
+          {message.content && (
+            <p
+              className={cx(
+                message.attachments.length > 0 && 'mt-3',
+                message.encrypted && 'text-white/55',
+              )}
+            >
+              {message.content}
+            </p>
           )}
           <div
             className={cx(

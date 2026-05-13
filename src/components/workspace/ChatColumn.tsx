@@ -564,7 +564,7 @@ export function ChatColumn({
           </div>
           {activeConversation ? (
             <div className="relative ml-auto flex shrink-0 items-center gap-1">
-              {onStartCall ? (
+              {onStartCall && !isGroupConversation ? (
                 <button
                   type="button"
                   onClick={() =>

@@ -544,6 +544,25 @@ export function GlassWorkspace({
         return;
       }
 
+      if (details.kind === 'group') {
+        if (incomingCall?.call.id === call.id) setIncomingCall(null);
+        if (activeCall?.id === call.id) endCall();
+        return;
+      }
+
+      if (
+        details.kind === 'one-to-one' &&
+        activeCall?.id === call.id &&
+        call.participants.some(
+          (participant) =>
+            participant.identityId !== session.identity.id &&
+            ['declined', 'left', 'missed'].includes(participant.status),
+        )
+      ) {
+        endCall();
+        return;
+      }
+
       if (currentParticipant?.status === 'ringing') {
         const caller = details.participants.find(
           (participant) => participant.identityId === call.creatorIdentityId,
@@ -597,6 +616,8 @@ export function GlassWorkspace({
       participants: CallParticipant[];
       title: string;
     }) => {
+      if (input.kind === 'group') return;
+
       void pigeonApplication
         .startConversationCall(sessionRef.current, input.conversationId)
         .then(async (call) => {
@@ -686,14 +707,17 @@ export function GlassWorkspace({
 
   const leaveActiveCall = useCallback(() => {
     const callId = activeCall?.id;
+    const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
 
     endCall();
     if (!callId) return;
 
-    void pigeonApplication
-      .leaveCall(sessionRef.current, callId)
-      .catch(() => undefined);
-  }, [activeCall?.id, endCall]);
+    const request = shouldEndForEveryone
+      ? pigeonApplication.endCall(sessionRef.current, callId)
+      : pigeonApplication.leaveCall(sessionRef.current, callId);
+
+    void request.catch(() => undefined);
+  }, [activeCall?.id, activeCall?.kind, endCall]);
 
   useEffect(() => {
     let cancelled = false;
