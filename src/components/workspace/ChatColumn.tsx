@@ -1,5 +1,5 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -15,13 +15,19 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
-import { shortId } from '../../utils/formatting';
+import { cx } from '../../utils/classNameHelper';
+import {
+  formatDateSeparator,
+  isSameDay,
+  shortId,
+} from '../../utils/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from './ConversationDataDialog';
@@ -63,6 +69,7 @@ interface ChatColumnProps {
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
+  realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
 }
@@ -97,6 +104,7 @@ export function ChatColumn({
   peerIdentityId,
   peerPicture,
   progress,
+  realtimeStatus = 'connected',
   replyToMessage,
   scrollerRef,
   sendError,
@@ -449,6 +457,31 @@ export function ChatColumn({
               </div>
             )}
           </div>
+          <div
+            className={cx(
+              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+              realtimeStatus === 'connected'
+                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+            )}
+            title={
+              realtimeStatus === 'connected'
+                ? copy.chat.realtimeConnected
+                : copy.chat.realtimeReconnecting
+            }
+          >
+            <span
+              className={cx(
+                'h-2 w-2 rounded-full',
+                realtimeStatus === 'connected'
+                  ? 'bg-emerald-300'
+                  : 'bg-amber-300',
+              )}
+            />
+            {realtimeStatus === 'connected'
+              ? copy.chat.realtimeConnected
+              : copy.chat.realtimeReconnecting}
+          </div>
           {activeConversation ? (
             <div className="relative ml-auto shrink-0">
               <button
@@ -538,7 +571,7 @@ export function ChatColumn({
                 {copy.chat.loadingEvents}
               </div>
             )}
-            <div className="space-y-2">
+            <div>
               {hasReachedMessageStart &&
                 messages.length > 0 &&
                 messageState !== 'loading' && (
@@ -547,65 +580,84 @@ export function ChatColumn({
                   </div>
                 )}
               {messages.map((message, index) => {
+                const previousMessage = messages[index - 1];
                 const nextMessage = messages[index + 1];
                 const replyMessage = message.replyToMessageId
                   ? messages.find(
                       (item) => item.id === message.replyToMessageId,
                     )
                   : undefined;
+                const startsNewDay =
+                  !previousMessage ||
+                  !isSameDay(previousMessage.timestamp, message.timestamp);
+                const startsNewAuthorRun =
+                  !previousMessage ||
+                  previousMessage.authorIdentityId !== message.authorIdentityId;
                 const showAvatar =
                   !nextMessage ||
                   nextMessage.authorIdentityId !== message.authorIdentityId;
 
                 return (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    currentIdentityId={session.identity.id}
-                    authorName={
-                      message.mine
-                        ? session.identity.profile.name
-                        : identityDisplayName(
-                            message.authorIdentityId,
-                            identityNames,
+                  <Fragment key={message.id}>
+                    {startsNewDay && (
+                      <DateSeparator label={formatDateSeparator(message.timestamp)} />
+                    )}
+                    <div
+                      className={
+                        startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'
+                      }
+                    >
+                      <MessageBubble
+                        message={message}
+                        currentIdentityId={session.identity.id}
+                        authorName={
+                          message.mine
+                            ? session.identity.profile.name
+                            : identityDisplayName(
+                                message.authorIdentityId,
+                                identityNames,
+                              )
+                        }
+                        authorPicture={
+                          message.mine
+                            ? identityPictures[session.identity.id]
+                            : identityPictures[message.authorIdentityId]
+                        }
+                        onAttachmentOpen={(attachmentIndex) =>
+                          void openAttachment(
+                            message.attachments[attachmentIndex],
                           )
-                    }
-                    authorPicture={
-                      message.mine
-                        ? identityPictures[session.identity.id]
-                        : identityPictures[message.authorIdentityId]
-                    }
-                    onAttachmentOpen={(attachmentIndex) =>
-                      void openAttachment(message.attachments[attachmentIndex])
-                    }
-                    onAttachmentPreview={loadAttachmentPreview}
-                    onAvatarClick={() => openMessageAuthorProfile(message)}
-                    onMessageMenuOpen={onMessageMenuOpen}
-                    onReplyReferenceClick={onReplyReferenceClick}
-                    onRetryMessage={onRetryMessage}
-                    replyImage={
-                      replyMessage?.attachments.find((attachment) =>
-                        isBrowserPreviewImage(attachment.contentType),
-                      ) ?? message.replyPreview?.image
-                    }
-                    replyAuthorName={
-                      replyMessage
-                        ? identityDisplayName(
-                            replyMessage.authorIdentityId,
-                            identityNames,
-                          )
-                        : message.replyPreview
-                          ? identityDisplayName(
-                              message.replyPreview.authorIdentityId,
-                              identityNames,
-                            )
-                          : undefined
-                    }
-                    replyPreview={
-                      replyMessage?.content ?? message.replyPreview?.content
-                    }
-                    showAvatar={showAvatar}
-                  />
+                        }
+                        onAttachmentPreview={loadAttachmentPreview}
+                        onAvatarClick={() => openMessageAuthorProfile(message)}
+                        onMessageMenuOpen={onMessageMenuOpen}
+                        onReplyReferenceClick={onReplyReferenceClick}
+                        onRetryMessage={onRetryMessage}
+                        replyImage={
+                          replyMessage?.attachments.find((attachment) =>
+                            isBrowserPreviewImage(attachment.contentType),
+                          ) ?? message.replyPreview?.image
+                        }
+                        replyAuthorName={
+                          replyMessage
+                            ? identityDisplayName(
+                                replyMessage.authorIdentityId,
+                                identityNames,
+                              )
+                            : message.replyPreview
+                              ? identityDisplayName(
+                                  message.replyPreview.authorIdentityId,
+                                  identityNames,
+                                )
+                              : undefined
+                        }
+                        replyPreview={
+                          replyMessage?.content ?? message.replyPreview?.content
+                        }
+                        showAvatar={showAvatar}
+                      />
+                    </div>
+                  </Fragment>
                 );
               })}
               {messages.length === 0 &&

@@ -1,0 +1,2020 @@
+import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
+
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type {
+  Community,
+  CommunityTextChannel,
+  AttachmentProgress,
+  ChatMessage,
+  IdentityResource,
+  MessageAttachment,
+  MessageResource,
+  Session,
+} from '../../domain/types';
+
+import { pigeonApplication } from '../../application/applicationContainer';
+import { copy } from '../../i18n/en';
+import { cx } from '../../utils/classNameHelper';
+import {
+  formatDateSeparator,
+  isSameDay,
+  shortId,
+} from '../../utils/formatting';
+import {
+  identityName,
+  identityPicture,
+  profilePictureDataUrl,
+} from '../../utils/identityDisplay';
+import { normalizeIdentityId } from '../../utils/identityId';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { Field } from '../auth/Field';
+import { Composer } from '../chat/Composer';
+import { DateSeparator } from '../chat/DateSeparator';
+import { ImageLightbox } from '../chat/ImageLightbox';
+import { MessageBubble } from '../chat/MessageBubble';
+import { UserProfileDialog } from '../profile/UserProfileDialog';
+import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
+import { LockIcon } from '../workspace/LockIcon';
+import {
+  MessageContextMenu,
+  type MessageContextMenuState,
+} from '../workspace/MessageContextMenu';
+import { RawMessageDialog } from '../workspace/RawMessageDialog';
+import { UserProfileDropdown } from '../workspace/Sidebar';
+
+interface CommunityWorkspaceProps {
+  activeChannelId?: null | string;
+  channelUnreadCounts?: Record<string, number>;
+  community: Community;
+  mobileMembersOpen: boolean;
+  mobileSidebarOpen: boolean;
+  mobileRail?: ReactNode;
+  nodeNetworks: NodeNetwork[];
+  onChannelSelected: (channelId: string) => void;
+  onChannelViewed?: (channelId: string) => void;
+  onCommunityUpdated: (community: Community) => void;
+  onLogout: () => void;
+  onMobileMembersClose: () => void;
+  onMobileSidebarClose: () => void;
+  onOpenMobileSidebar: () => void;
+  onSessionUpdated: (session: Session) => void;
+  realtimeEvent?: null | RealtimeDomainEvent;
+  realtimeStatus?: 'connected' | 'reconnecting';
+  session: Session;
+}
+
+type MemberView = {
+  identity?: IdentityResource;
+  identityId: string;
+  pictureUrl: null | string;
+};
+
+type CommunityPendingSend = {
+  attachments: File[];
+  channelId: string;
+  content: string;
+};
+
+export function CommunityWorkspace({
+  activeChannelId,
+  channelUnreadCounts = {},
+  community,
+  mobileMembersOpen,
+  mobileSidebarOpen,
+  mobileRail,
+  nodeNetworks,
+  onChannelSelected,
+  onChannelViewed,
+  onCommunityUpdated,
+  onLogout,
+  onMobileMembersClose,
+  onMobileSidebarClose,
+  onOpenMobileSidebar,
+  onSessionUpdated,
+  realtimeEvent,
+  realtimeStatus = 'connected',
+  session,
+}: CommunityWorkspaceProps) {
+  const resolvedChannelId = useMemo(
+    () => resolveCommunityChannelId(activeChannelId, community.textChannels),
+    [activeChannelId, community.textChannels],
+  );
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    resolvedChannelId,
+  );
+  const [newChannelMessageCount, setNewChannelMessageCount] = useState(0);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageCursor, setMessageCursor] = useState<null | string>(null);
+  const [messageState, setMessageState] = useState<
+    'error' | 'idle' | 'loading'
+  >('idle');
+  const [draft, setDraft] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
+  const [memberIdentities, setMemberIdentities] = useState<
+    Record<string, IdentityResource>
+  >({});
+  const [memberPictures, setMemberPictures] = useState<Record<string, string>>(
+    {},
+  );
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
+  const [channelDataOpen, setChannelDataOpen] = useState(false);
+  const [channelMenuOpen, setChannelMenuOpen] = useState(false);
+  const [channelSearch, setChannelSearch] = useState('');
+  const [manageOpen, setManageOpen] = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [messageContextMenu, setMessageContextMenu] =
+    useState<MessageContextMenuState | null>(null);
+  const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
+  const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [failedSends, setFailedSends] = useState<Record<string, CommunityPendingSend>>(
+    {},
+  );
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const owner = community.ownerIdentityId === session.identity.id;
+  const network =
+    nodeNetworks.find((item) => item.id === community.networkId) ?? null;
+  const networkName = network?.name ?? shortId(community.networkId);
+  const selectedChannel = community.textChannels.find(
+    (channel) => channel.id === selectedChannelId,
+  );
+  const channelEncryptionReady =
+    !!selectedChannel &&
+    community.memberIds.every(
+      (identityId) => identityId === session.identity.id || memberIdentities[identityId],
+    );
+  const channelEncryptionTooltip = channelEncryptionReady
+    ? copy.chat.e2eReady
+    : copy.chat.e2eMissing;
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (message) => message.deliveryStatus || message.raw.type !== 'deleted',
+      ),
+    [messages],
+  );
+  const missingCommunityKey =
+    visibleMessages.length > 0 &&
+    visibleMessages.every((message) => message.encrypted);
+  const members = useMemo<MemberView[]>(
+    () =>
+      community.memberIds.map((identityId) => ({
+        identity: memberIdentities[identityId],
+        identityId,
+        pictureUrl: memberPictures[identityId] ?? null,
+      })),
+    [community.memberIds, memberIdentities, memberPictures],
+  );
+  const visibleChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return community.textChannels;
+
+    return community.textChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, community.textChannels]);
+  const isScrolledNearBottom = useCallback(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return true;
+
+    return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
+  }, []);
+  const handleChannelSelected = useCallback(
+    (channelId: string) => {
+      setSelectedChannelId(channelId);
+      setNewChannelMessageCount(0);
+      onChannelViewed?.(channelId);
+      onChannelSelected(channelId);
+      onMobileSidebarClose();
+    },
+    [onChannelSelected, onChannelViewed, onMobileSidebarClose],
+  );
+  const ownIdentityPictures = useMemo(
+    () =>
+      memberPictures[session.identity.id]
+        ? { [session.identity.id]: memberPictures[session.identity.id] }
+        : {},
+    [memberPictures, session.identity.id],
+  );
+  const channelData = useMemo(
+    () => ({
+      frontendDerived: {
+        channelEncryptionReady,
+        communityId: community.id,
+        communityName: community.name,
+        loadedMessages: messages.length,
+        memberCount: community.memberIds.length,
+        networkId: community.networkId,
+        networkName,
+      },
+      serverChannel: selectedChannel ?? null,
+      serverCommunity: community,
+    }),
+    [
+      channelEncryptionReady,
+      community,
+      messages.length,
+      networkName,
+      selectedChannel,
+    ],
+  );
+
+  useEffect(() => {
+    const nextSelectedChannel =
+      community.textChannels.find((channel) => channel.id === activeChannelId)
+        ?.id ??
+      community.textChannels.find((channel) => channel.id === selectedChannelId)
+        ?.id ??
+      community.textChannels[0]?.id ??
+      null;
+
+    setSelectedChannelId(nextSelectedChannel);
+    if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
+  }, [
+    activeChannelId,
+    community.textChannels,
+    onChannelSelected,
+    selectedChannelId,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all(
+      community.memberIds.map(async (identityId) => {
+        try {
+          const identity = await pigeonApplication.getIdentity(identityId);
+          const pictureUrl = await loadIdentityPicture(identity);
+
+          return [identityId, identity, pictureUrl] as const;
+        } catch {
+          return [identityId, undefined, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+
+      const nextIdentities: Record<string, IdentityResource> = {};
+      const nextPictures: Record<string, string> = {};
+
+      for (const [identityId, identity, pictureUrl] of entries) {
+        if (identity) nextIdentities[identityId] = identity;
+        if (pictureUrl) nextPictures[identityId] = pictureUrl;
+      }
+
+      setMemberIdentities(nextIdentities);
+      setMemberPictures(nextPictures);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.memberIds]);
+
+  useEffect(() => {
+    const avatar = community.avatar?.trim();
+
+    setAvatarUrl(null);
+    if (!avatar) return undefined;
+
+    let cancelled = false;
+
+    void loadPublicImage(avatar).then((url) => {
+      if (!cancelled) setAvatarUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.avatar]);
+
+  useEffect(() => {
+    const banner = community.banner?.trim();
+
+    setBannerUrl(null);
+    setBannerViewerOpen(false);
+    if (!banner) return undefined;
+
+    let cancelled = false;
+
+    void loadPublicImage(banner).then((url) => {
+      if (!cancelled) setBannerUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.banner]);
+
+  const refreshCommunity = async () => {
+    onCommunityUpdated(await pigeonApplication.getCommunity(session, community.id));
+  };
+
+  const resolveMemberIdentities = useCallback(async () => {
+    const entries = await Promise.all(
+      community.memberIds.map(async (identityId) => {
+        const cached =
+          identityId === session.identity.id
+            ? session.identity
+            : memberIdentities[identityId];
+
+        if (cached) return [identityId, cached] as const;
+
+        try {
+          return [identityId, await pigeonApplication.getIdentity(identityId)] as const;
+        } catch {
+          return [identityId, undefined] as const;
+        }
+      }),
+    );
+    const nextIdentities: Record<string, IdentityResource> = {};
+
+    for (const [identityId, identity] of entries) {
+      if (identity) nextIdentities[identityId] = identity;
+    }
+
+    return nextIdentities;
+  }, [community.memberIds, memberIdentities, session.identity]);
+
+  const projectChannelMessage = useCallback(
+    async (
+      rawMessage: MessageResource,
+      identities: Record<string, IdentityResource>,
+    ): Promise<ChatMessage> => {
+      const base = {
+        attachments: [],
+        authorIdentityId: rawMessage.authorIdentityId ?? 'unknown',
+        id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
+        mine: rawMessage.authorIdentityId === session.identity.id,
+        raw: rawMessage,
+        timestamp: rawMessage.createdAt ?? Date.now(),
+      };
+
+      try {
+        const payload = await decryptCommunityChannelPayload(
+          session,
+          rawMessage.encryptedPayload ?? '',
+        );
+
+        return {
+          ...base,
+          attachments: payload.attachments ?? [],
+          authorIdentityId: payload.authorIdentityId ?? base.authorIdentityId,
+          content: payload.content ?? '',
+          encrypted: false,
+          mine:
+            (payload.authorIdentityId ?? base.authorIdentityId) ===
+            session.identity.id,
+          timestamp: payload.timestamp ?? base.timestamp,
+        };
+      } catch {
+        return {
+          ...base,
+          authorIdentityId:
+            rawMessage.authorIdentityId ??
+            identities[rawMessage.authorIdentityId ?? '']?.id ??
+            'unknown',
+          content: copy.messages.decryptFailed,
+          encrypted: true,
+        };
+      }
+    },
+    [session],
+  );
+
+  const loadChannelMessages = useCallback(
+    async (channelId: string, beforeMessageId?: string) => {
+      const [identities, result] = await Promise.all([
+        resolveMemberIdentities(),
+        pigeonApplication.listCommunityChannelMessages(
+          session,
+          community.id,
+          channelId,
+          { beforeMessageId },
+        ),
+      ]);
+      const loadedMessages = await Promise.all(
+        result.messages.map((message) => projectChannelMessage(message, identities)),
+      );
+
+      return {
+        cursor: result.nextBeforeMessageId ?? null,
+        loadedMessages,
+      };
+    },
+    [community.id, projectChannelMessage, resolveMemberIdentities, session],
+  );
+
+  const handleMessagesScroll = () => {
+    const scroller = scrollerRef.current;
+    const nearBottom = isScrolledNearBottom();
+
+    setIsAwayFromBottom(!nearBottom);
+
+    if (nearBottom) {
+      setNewChannelMessageCount(0);
+      if (selectedChannelId) onChannelViewed?.(selectedChannelId);
+    }
+
+    if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
+    if (messageState === 'loading' || !selectedChannelId) return;
+
+    const previousHeight = scroller.scrollHeight;
+
+    setMessageState('loading');
+    void loadChannelMessages(selectedChannelId, messageCursor)
+      .then(({ cursor, loadedMessages }) => {
+        setMessages((current) => [...loadedMessages, ...current]);
+        setMessageCursor(cursor);
+        requestAnimationFrame(() => {
+          if (!scrollerRef.current) return;
+          scrollerRef.current.scrollTop =
+            scrollerRef.current.scrollHeight - previousHeight;
+        });
+      })
+      .catch(() => setMessageState('error'))
+      .finally(() => setMessageState('idle'));
+  };
+
+  const handleSendChannelMessage = async (
+    content: string,
+    attachments: File[],
+  ) => {
+    if (!selectedChannelId) return;
+
+    await sendPendingChannelMessage({
+      attachments,
+      channelId: selectedChannelId,
+      content,
+    });
+  };
+
+  const sendPendingChannelMessage = async (payload: CommunityPendingSend) => {
+    setSendError(null);
+    const timestamp = Date.now();
+    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${crypto.randomUUID()}`;
+
+    setFailedSends((current) => {
+      const next = { ...current };
+
+      delete next[optimisticId];
+
+      return next;
+    });
+    setMessages((current) => [
+      ...current,
+      {
+        attachments: [],
+        authorIdentityId: session.identity.id,
+        content:
+          payload.content ||
+          payload.attachments.map((attachment) => attachment.name).join(', '),
+        deliveryStatus: 'pending',
+        encrypted: false,
+        id: optimisticId,
+        mine: true,
+        raw: {
+          channelId: payload.channelId,
+          communityId: community.id,
+          id: optimisticId,
+          type: 'sent',
+        },
+        timestamp,
+      },
+    ]);
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ block: 'end' });
+    });
+
+    try {
+      const identities = await resolveMemberIdentities();
+      const messageAttachments = await pigeonApplication.publishMessageAttachments(
+        session,
+        payload.attachments,
+        setAttachmentProgress,
+      );
+      const encryptedPayload = await encryptCommunityChannelPayload({
+        attachments: messageAttachments,
+        authorIdentityId: session.identity.id,
+        channelId: payload.channelId,
+        communityId: community.id,
+        content: payload.content,
+        recipients: Object.values(identities),
+        timestamp,
+      });
+      const created = await pigeonApplication.createCommunityChannelMessage(
+        session,
+        community.id,
+        payload.channelId,
+        {
+          attachmentExternalIdentifiers: messageAttachments.map(
+            (attachment) => attachment.cid,
+          ),
+          encryptedPayload,
+          timestamp,
+        },
+      );
+      const projected = await projectChannelMessage(created, identities);
+
+      setMessages((current) =>
+        [...current.filter((message) => message.id !== optimisticId), projected].sort(
+          (left, right) => left.timestamp - right.timestamp,
+        ),
+      );
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+      });
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.communities.messageError));
+      setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === optimisticId
+            ? { ...message, deliveryStatus: 'failed' }
+            : message,
+        ),
+      );
+    } finally {
+      setAttachmentProgress(null);
+    }
+  };
+
+  const retryChannelMessage = (message: ChatMessage) => {
+    const pending = failedSends[message.id];
+
+    if (!pending) return;
+
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    void sendPendingChannelMessage(pending);
+  };
+
+  const handleDeleteChannelMessage = async (message: ChatMessage) => {
+    if (!selectedChannelId || !message.mine) return;
+    if (!window.confirm(copy.messages.deleteConfirm)) return;
+
+    setMessageContextMenu(null);
+    setSendError(null);
+    try {
+      await pigeonApplication.deleteCommunityChannelMessage(
+        session,
+        community.id,
+        selectedChannelId,
+        message.id,
+      );
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
+    }
+  };
+
+  const loadAttachmentPreview = useCallback(
+    async (
+      attachment: MessageAttachment,
+      onProgress?: (progress: AttachmentProgress) => void,
+    ): Promise<string> => {
+      const blob = await pigeonApplication.downloadAttachment(
+        attachment,
+        onProgress,
+      );
+
+      return URL.createObjectURL(blob);
+    },
+    [],
+  );
+
+  const openAttachment = async (attachment?: MessageAttachment) => {
+    if (!attachment) return;
+
+    try {
+      const url = await loadAttachmentPreview(attachment);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = attachment.filename;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setSendError(copy.composer.attachmentDownloadError);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedChannelId === resolvedChannelId) return;
+
+    setSelectedChannelId(resolvedChannelId);
+    setNewChannelMessageCount(0);
+
+    if (resolvedChannelId) {
+      onChannelViewed?.(resolvedChannelId);
+      onChannelSelected(resolvedChannelId);
+    }
+  }, [
+    onChannelSelected,
+    onChannelViewed,
+    resolvedChannelId,
+    selectedChannelId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedChannelId) {
+      setMessages([]);
+      setMessageCursor(null);
+      setMessageState('idle');
+
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    setMessageState('loading');
+    setSendError(null);
+    void loadChannelMessages(selectedChannelId)
+      .then(({ cursor, loadedMessages }) => {
+        if (cancelled) return;
+        setMessages(loadedMessages);
+        setMessageCursor(cursor);
+        setNewChannelMessageCount(0);
+        onChannelViewed?.(selectedChannelId);
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ block: 'end' });
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setMessageState('error');
+      })
+      .finally(() => {
+        if (!cancelled) setMessageState('idle');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadChannelMessages, onChannelViewed, selectedChannelId]);
+
+  useEffect(() => {
+    if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
+
+    const channelId = realtimeStringAttribute(realtimeEvent, 'channelId');
+
+    if (!channelId || channelId !== selectedChannelId) return;
+
+    if (realtimeEvent.type === 'communities.v1.channel.message.was_deleted') {
+      const targetMessageId = realtimeStringAttribute(
+        realtimeEvent,
+        'targetMessageId',
+      );
+
+      if (!targetMessageId) return;
+
+      setMessages((current) =>
+        current.filter((message) => message.id !== targetMessageId),
+      );
+      return;
+    }
+
+    if (realtimeEvent.type !== 'communities.v1.channel.message.was_sent') {
+      return;
+    }
+
+    const message = realtimeMessageAttribute(realtimeEvent);
+
+    if (!message) return;
+
+    const shouldStickToBottom =
+      isScrolledNearBottom() ||
+      message.authorIdentityId === session.identity.id;
+    let cancelled = false;
+
+    void resolveMemberIdentities()
+      .then((identities) => projectChannelMessage(message, identities))
+      .then((projected) => {
+        if (cancelled) return;
+
+        setMessages((current) => {
+          if (current.some((item) => item.id === projected.id)) return current;
+
+          return [...current, projected].sort(
+            (left, right) => left.timestamp - right.timestamp,
+          );
+        });
+
+        if (shouldStickToBottom) {
+          setNewChannelMessageCount(0);
+          onChannelViewed?.(channelId);
+          requestAnimationFrame(() => {
+            bottomRef.current?.scrollIntoView({ block: 'end' });
+          });
+        } else {
+          setNewChannelMessageCount((current) => current + 1);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    community.id,
+    isScrolledNearBottom,
+    onChannelViewed,
+    projectChannelMessage,
+    realtimeEvent,
+    resolveMemberIdentities,
+    selectedChannelId,
+    session.identity.id,
+  ]);
+
+  return (
+    <>
+      {mobileSidebarOpen && (
+        <button
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={onMobileSidebarClose}
+          aria-label={copy.workspace.closeSidebar}
+        />
+      )}
+      <aside
+        className={cx(
+          'fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
+          mobileSidebarOpen ? 'block' : 'hidden lg:block',
+        )}
+      >
+        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+          <div className="lg:hidden">{mobileRail}</div>
+          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.privateCommunity}
+              </div>
+              <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
+                {bannerUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setBannerViewerOpen(true)}
+                    className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
+                    aria-label={copy.communities.openBanner}
+                  >
+                    <img
+                      src={bannerUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ) : (
+                  <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
+                    {community.name.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div className="p-4">
+                  <h2 className="truncate text-xl font-black">{community.name}</h2>
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
+                    {community.description}
+                  </p>
+                  {owner && (
+                    <button
+                      type="button"
+                      onClick={() => setManageOpen(true)}
+                      className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
+                    >
+                      {copy.communities.manage}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.channels}
+              </div>
+              <input
+                value={channelSearch}
+                onChange={(event) => setChannelSearch(event.target.value)}
+                className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.communities.searchChannels}
+              />
+              <div className="space-y-2">
+                {community.textChannels.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                    {copy.communities.noChannels}
+                  </div>
+                ) : visibleChannels.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                    {copy.communities.noMatchingChannels}
+                  </div>
+                ) : (
+                  visibleChannels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      onClick={() => handleChannelSelected(channel.id)}
+                      className={cx(
+                        'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
+                        selectedChannelId === channel.id
+                          ? 'bg-white text-slate-950'
+                          : 'bg-white/8 text-white hover:bg-white/14',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        # {channel.name}
+                      </span>
+                      {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
+                        <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
+                          {(channelUnreadCounts[channel.id] ?? 0) > 9
+                            ? '9+'
+                            : channelUnreadCounts[channel.id]}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            <UserProfileDropdown
+              identityPictures={ownIdentityPictures}
+              nodeNetworks={nodeNetworks}
+              onLogout={onLogout}
+              onSessionUpdated={onSessionUpdated}
+              session={session}
+            />
+          </div>
+        </div>
+      </aside>
+
+      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
+        <header className="border-b border-white/10 p-4 sm:p-5">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onOpenMobileSidebar}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white lg:hidden"
+              aria-label={copy.chat.menu}
+            >
+              ☰
+            </button>
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                community.name.slice(0, 1).toUpperCase()
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-2xl font-black">
+                  {selectedChannel
+                    ? `# ${selectedChannel.name}`
+                    : community.name}
+                </h1>
+                <span
+                  className={
+                    channelEncryptionReady
+                      ? 'shrink-0 text-emerald-300'
+                      : 'shrink-0 text-rose-300'
+                  }
+                  title={channelEncryptionTooltip}
+                  aria-label={channelEncryptionTooltip}
+                >
+                  <LockIcon locked={channelEncryptionReady} />
+                </span>
+              </div>
+              {selectedChannel ? (
+                <p className="truncate text-sm text-white/50">
+                  {copy.communities.channelMetadataOnly}{' '}
+                  <span title={community.networkId}>{networkName}</span>
+                </p>
+              ) : (
+                <p className="truncate text-sm text-white/50">
+                  {community.description}
+                </p>
+              )}
+            </div>
+            <div
+              className={cx(
+                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+                realtimeStatus === 'connected'
+                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+              )}
+              title={
+                realtimeStatus === 'connected'
+                  ? copy.chat.realtimeConnected
+                  : copy.chat.realtimeReconnecting
+              }
+            >
+              <span
+                className={cx(
+                  'h-2 w-2 rounded-full',
+                  realtimeStatus === 'connected'
+                    ? 'bg-emerald-300'
+                    : 'bg-amber-300',
+                )}
+              />
+              {realtimeStatus === 'connected'
+                ? copy.chat.realtimeConnected
+                : copy.chat.realtimeReconnecting}
+            </div>
+            {selectedChannel ? (
+              <div className="relative ml-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setChannelMenuOpen((isOpen) => !isOpen)}
+                  className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
+                  aria-label={copy.chat.conversationMenu}
+                  aria-expanded={channelMenuOpen}
+                >
+                  ⋮
+                </button>
+                {channelMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-30 cursor-default"
+                      onClick={() => setChannelMenuOpen(false)}
+                      aria-label={copy.dialog.close}
+                    />
+                    <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChannelDataOpen(true);
+                          setChannelMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {copy.chat.viewData}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </header>
+
+        {!selectedChannel ? (
+          <div className="grid flex-1 place-items-center p-6 text-center">
+            <div className="max-w-md">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 text-3xl font-black">
+                #
+              </div>
+              <h2 className="mt-5 text-2xl font-black">
+                {copy.communities.noChannelSelected}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/55">
+                {copy.communities.noChannelSelectedBody}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="relative min-h-0 flex-1">
+              <div
+                ref={scrollerRef}
+                onScroll={handleMessagesScroll}
+                className="h-full overflow-y-auto p-4 sm:p-6"
+              >
+                {messageState === 'loading' && visibleMessages.length === 0 ? (
+                  <ChannelMessageSkeleton />
+                ) : messageState === 'loading' ? (
+                  <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+                    {copy.chat.loadingEvents}
+                  </div>
+                ) : null}
+                <div>
+                {!messageCursor &&
+                  visibleMessages.length > 0 &&
+                  messageState !== 'loading' && (
+                    <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                      {copy.chat.noMoreMessages}
+                    </div>
+                  )}
+                {missingCommunityKey && (
+                  <div className="grid min-h-[28vh] place-items-center">
+                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                        <LockIcon locked={false} />
+                      </div>
+                      <div className="font-black">{copy.chat.e2eMissing}</div>
+                      <div className="mt-2 text-rose-100/65">
+                        {copy.messages.missingCommunityKey}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!missingCommunityKey &&
+                  visibleMessages.map((message, index) => {
+                    const previousMessage = visibleMessages[index - 1];
+                    const nextMessage = visibleMessages[index + 1];
+                    const startsNewDay =
+                      !previousMessage ||
+                      !isSameDay(previousMessage.timestamp, message.timestamp);
+                    const startsNewAuthorRun =
+                      !previousMessage ||
+                      previousMessage.authorIdentityId !==
+                        message.authorIdentityId;
+                    const showAvatar =
+                      !nextMessage ||
+                      nextMessage.authorIdentityId !== message.authorIdentityId;
+
+                    return (
+                      <Fragment key={message.id}>
+                        {startsNewDay && (
+                          <DateSeparator
+                            label={formatDateSeparator(message.timestamp)}
+                          />
+                        )}
+                        <div
+                          className={
+                            startsNewDay || startsNewAuthorRun
+                              ? 'mt-4'
+                              : 'mt-1'
+                          }
+                        >
+                          <MessageBubble
+                            message={message}
+                            currentIdentityId={session.identity.id}
+                            authorName={
+                              message.mine
+                                ? session.identity.profile.name
+                                : memberDisplayName(
+                                    memberIdentities[message.authorIdentityId],
+                                    message.authorIdentityId,
+                                  )
+                            }
+                            authorPicture={
+                              message.mine
+                                ? memberPictures[session.identity.id]
+                                : memberPictures[message.authorIdentityId]
+                            }
+                            onAttachmentOpen={(attachmentIndex) =>
+                              void openAttachment(
+                                message.attachments[attachmentIndex],
+                              )
+                            }
+                            onAttachmentPreview={loadAttachmentPreview}
+                            onAvatarClick={() => undefined}
+                            onMessageMenuOpen={(targetMessage, x, y) =>
+                              setMessageContextMenu({
+                                message: targetMessage,
+                                x,
+                                y,
+                              })
+                            }
+                            onReplyReferenceClick={() => undefined}
+                            onRetryMessage={retryChannelMessage}
+                            showAvatar={showAvatar}
+                          />
+                        </div>
+                      </Fragment>
+                    );
+                  })}
+                {visibleMessages.length === 0 && messageState !== 'loading' && (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                    {copy.communities.emptyChannel}
+                  </div>
+                )}
+                <div ref={bottomRef} />
+                </div>
+              </div>
+              {(newChannelMessageCount > 0 || isAwayFromBottom) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewChannelMessageCount(0);
+                    setIsAwayFromBottom(false);
+                    if (selectedChannelId) onChannelViewed?.(selectedChannelId);
+                    bottomRef.current?.scrollIntoView({ block: 'end' });
+                  }}
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
+                >
+                  {newChannelMessageCount > 0
+                    ? newChannelMessageCount > 1
+                      ? copy.chat.newMessages
+                      : copy.chat.newMessage
+                    : copy.chat.jumpToLatest}
+                </button>
+              )}
+            </div>
+            <Composer
+              disabled={messageState === 'loading'}
+              draft={draft}
+              error={sendError}
+              onDraftChange={setDraft}
+              onEscape={() => undefined}
+              onSend={handleSendChannelMessage}
+              progress={attachmentProgress}
+            />
+          </>
+        )}
+      </section>
+
+      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-[2rem] p-4 xl:block">
+        <button
+          type="button"
+          onClick={() => setMemberOpen(true)}
+          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+        >
+          {copy.communities.addMember}
+        </button>
+        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+          {copy.communities.members}
+        </div>
+        <div className="space-y-2">
+          {members.map((member) => (
+            <MemberRow
+              key={member.identityId}
+              identity={member.identity}
+              identityId={member.identityId}
+              onClick={() => setProfileViewer(member)}
+              owner={member.identityId === community.ownerIdentityId}
+              pictureUrl={member.pictureUrl}
+            />
+          ))}
+        </div>
+      </aside>
+
+      {mobileMembersOpen && (
+        <>
+          <button
+            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+            onClick={onMobileMembersClose}
+            aria-label={copy.dialog.close}
+          />
+          <aside className="glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setMemberOpen(true)}
+              className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              {copy.communities.addMember}
+            </button>
+            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              {copy.communities.members}
+            </div>
+            <div className="space-y-2">
+              {members.map((member) => (
+                <MemberRow
+                  key={member.identityId}
+                  identity={member.identity}
+                  identityId={member.identityId}
+                  onClick={() => setProfileViewer(member)}
+                  owner={member.identityId === community.ownerIdentityId}
+                  pictureUrl={member.pictureUrl}
+                />
+              ))}
+            </div>
+          </aside>
+        </>
+      )}
+
+      {bannerViewerOpen && bannerUrl && (
+        <ImageLightbox
+          images={[
+            {
+              alt: community.name,
+              filename: community.banner ?? community.name,
+              url: bannerUrl,
+            },
+          ]}
+          initialIndex={0}
+          onClose={() => setBannerViewerOpen(false)}
+        />
+      )}
+      {manageOpen && (
+        <ManageCommunityDialog
+          community={community}
+          onClose={() => setManageOpen(false)}
+          onCommunityUpdated={onCommunityUpdated}
+          session={session}
+        />
+      )}
+      {memberOpen && (
+        <AddCommunityMemberDialog
+          communityId={community.id}
+          onClose={() => setMemberOpen(false)}
+          refreshCommunity={refreshCommunity}
+          session={session}
+        />
+      )}
+      {profileViewer && (
+        <UserProfileDialog
+          identity={profileViewer.identity}
+          identityId={profileViewer.identityId}
+          name={memberDisplayName(profileViewer.identity, profileViewer.identityId)}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setProfileViewer(null)}
+          picture={profileViewer.pictureUrl}
+        />
+      )}
+      {messageContextMenu && (
+        <MessageContextMenu
+          menu={messageContextMenu}
+          onClose={() => setMessageContextMenu(null)}
+          onDelete={
+            messageContextMenu.message.mine
+              ? () => void handleDeleteChannelMessage(messageContextMenu.message)
+              : undefined
+          }
+          onViewRaw={() => {
+            setRawMessage(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
+        />
+      )}
+      {rawMessage && (
+        <RawMessageDialog
+          message={rawMessage}
+          onClose={() => setRawMessage(null)}
+        />
+      )}
+      {channelDataOpen && (
+        <ConversationDataDialog
+          data={channelData}
+          onClose={() => setChannelDataOpen(false)}
+          title={copy.communities.channelDataTitle}
+        />
+      )}
+    </>
+  );
+}
+
+function ManageCommunityDialog({
+  community,
+  onClose,
+  onCommunityUpdated,
+  session,
+}: {
+  community: Community;
+  onClose: () => void;
+  onCommunityUpdated: (community: Community) => void;
+  session: Session;
+}) {
+  const [name, setName] = useState(community.name);
+  const [description, setDescription] = useState(community.description);
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [banner, setBanner] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
+  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState('');
+  const [channelOrder, setChannelOrder] = useState<CommunityTextChannel[]>(
+    community.textChannels,
+  );
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      community.textChannels.map((channel) => [channel.id, channel.name]),
+    ),
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<'idle' | 'loading'>('idle');
+
+  useEffect(() => {
+    if (!avatar) {
+      setAvatarPreview(null);
+
+      return undefined;
+    }
+
+    const nextPreview = URL.createObjectURL(avatar);
+
+    setAvatarPreview(nextPreview);
+
+    return () => URL.revokeObjectURL(nextPreview);
+  }, [avatar]);
+
+  useEffect(() => {
+    if (!banner) {
+      setBannerPreview(null);
+
+      return undefined;
+    }
+
+    const nextPreview = URL.createObjectURL(banner);
+
+    setBannerPreview(nextPreview);
+
+    return () => URL.revokeObjectURL(nextPreview);
+  }, [banner]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCurrentAvatarUrl(null);
+    if (!community.avatar) return undefined;
+
+    void loadPublicImage(community.avatar).then((url) => {
+      if (!cancelled) setCurrentAvatarUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.avatar]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCurrentBannerUrl(null);
+    if (!community.banner) return undefined;
+
+    void loadPublicImage(community.banner).then((url) => {
+      if (!cancelled) setCurrentBannerUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.banner]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const saveChanges = async (): Promise<boolean> => {
+    if (state === 'loading') return false;
+
+    if (
+      channelOrder.some(
+        (channel) => !(channelDrafts[channel.id] ?? channel.name).trim(),
+      )
+    ) {
+      setError(copy.communities.channelError);
+
+      return false;
+    }
+
+    setState('loading');
+    setError(null);
+    try {
+      const updatedCommunity = await pigeonApplication.updateCommunity(
+        session,
+        community.id,
+        {
+          avatar: avatar ?? community.avatar,
+          banner: banner ?? community.banner,
+          description: description.trim(),
+          name: name.trim(),
+        },
+      );
+      const updatedChannels: CommunityTextChannel[] = [];
+
+      for (const channel of channelOrder) {
+        const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
+
+        if (nextName === channel.name) {
+          updatedChannels.push(channel);
+        } else {
+          updatedChannels.push(
+            await pigeonApplication.renameCommunityChannel(
+              session,
+              community.id,
+              channel.id,
+              nextName,
+            ),
+          );
+        }
+      }
+
+      onCommunityUpdated({
+        ...updatedCommunity,
+        textChannels: updatedChannels,
+      });
+      return true;
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.updateError));
+      return false;
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const finishManage = async () => {
+    const saved = await saveChanges();
+
+    if (!saved) return;
+    onClose();
+  };
+
+  const createChannel = async () => {
+    const nextName = channelName.trim();
+
+    if (!nextName || state === 'loading') return;
+
+    setState('loading');
+    setError(null);
+    try {
+      const channel = await pigeonApplication.createCommunityTextChannel(
+        session,
+        community.id,
+        nextName,
+      );
+
+      setChannelName('');
+      setChannelOrder((current) => [...current, channel]);
+      onCommunityUpdated({
+        ...community,
+        textChannels: [...channelOrder, channel],
+      });
+      setChannelDrafts((current) => ({ ...current, [channel.id]: channel.name }));
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.channelError));
+    }
+    setState('idle');
+  };
+
+  const moveChannel = (channelId: string, direction: -1 | 1) => {
+    const index = channelOrder.findIndex(
+      (channel) => channel.id === channelId,
+    );
+    const nextIndex = index + direction;
+
+    if (index < 0 || nextIndex < 0 || nextIndex >= channelOrder.length)
+      return;
+
+    const nextChannels = [...channelOrder];
+    const [channel] = nextChannels.splice(index, 1);
+
+    nextChannels.splice(nextIndex, 0, channel);
+    setChannelOrder(nextChannels);
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-2xl sm:rounded-[2rem]">
+        <DialogHeader title={copy.communities.manage} onClose={onClose} />
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <label className="block">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.avatar}
+              </span>
+              <div className="mx-auto grid h-28 w-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                {avatarPreview || currentAvatarUrl ? (
+                  <img
+                    src={avatarPreview ?? currentAvatarUrl ?? ''}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  community.name.slice(0, 1).toUpperCase()
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
+                className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
+              />
+            </label>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.communities.banner}
+                </span>
+                <div className="grid aspect-[2/1] cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
+                  {bannerPreview || currentBannerUrl ? (
+                    <img
+                      src={bannerPreview ?? currentBannerUrl ?? ''}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    community.name.slice(0, 1).toUpperCase()
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                  className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
+                />
+              </label>
+              <Field label={copy.communities.name}>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+              </Field>
+              <Field label={copy.communities.description}>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              {copy.communities.channels}
+            </div>
+            <div className="space-y-2">
+              {channelOrder.map((channel, index) => (
+                <div
+                  key={channel.id}
+                  className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
+                >
+                  <span className="px-2 text-white/45">#</span>
+                  <input
+                    value={channelDrafts[channel.id] ?? channel.name}
+                    onChange={(event) =>
+                      setChannelDrafts((current) => ({
+                        ...current,
+                        [channel.id]: event.target.value,
+                      }))
+                    }
+                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => moveChannel(channel.id, -1)}
+                    disabled={index === 0}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                    aria-label={copy.communities.moveChannelUp}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveChannel(channel.id, 1)}
+                    disabled={index === channelOrder.length - 1}
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                    aria-label={copy.communities.moveChannelDown}
+                  >
+                    ↓
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={channelName}
+                onChange={(event) => setChannelName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  void createChannel();
+                }}
+                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.communities.addChannelPlaceholder}
+              />
+              <button
+                type="button"
+                onClick={() => void createChannel()}
+                disabled={!channelName.trim() || state === 'loading'}
+                className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {error && (
+            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
+              {error}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void finishManage()}
+          disabled={!name.trim() || state === 'loading'}
+          className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {copy.profile.save}
+        </button>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function AddCommunityMemberDialog({
+  communityId,
+  onClose,
+  refreshCommunity,
+  session,
+}: {
+  communityId: string;
+  onClose: () => void;
+  refreshCommunity: () => Promise<void>;
+  session: Session;
+}) {
+  const [identityInput, setIdentityInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<'idle' | 'loading'>('idle');
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const addMember = async () => {
+    const identityId = normalizeIdentityLookup(identityInput);
+
+    if (!identityId || state === 'loading') return;
+
+    setState('loading');
+    setError(null);
+    try {
+      await pigeonApplication.addCommunityMember(session, communityId, identityId);
+      await refreshCommunity();
+      onClose();
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.memberError));
+    }
+    setState('idle');
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]">
+        <DialogHeader title={copy.communities.addMember} onClose={onClose} />
+        <Field label={copy.communities.memberIdentity}>
+          <input
+            autoFocus
+            value={identityInput}
+            onChange={(event) => setIdentityInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              void addMember();
+            }}
+            className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            placeholder="@ada or identity id"
+          />
+        </Field>
+        {error && (
+          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
+            {error}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => void addMember()}
+          disabled={!identityInput.trim() || state === 'loading'}
+          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {copy.communities.addMember}
+        </button>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function DialogHeader({
+  onClose,
+  title,
+}: {
+  onClose: () => void;
+  title: string;
+}) {
+  return (
+    <div className="mb-5 flex items-start justify-between gap-4">
+      <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+      <button
+        type="button"
+        onClick={onClose}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+        aria-label={copy.dialog.close}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function MemberRow({
+  identity,
+  identityId,
+  onClick,
+  owner,
+  pictureUrl,
+}: {
+  identity?: IdentityResource;
+  identityId: string;
+  onClick: () => void;
+  owner: boolean;
+  pictureUrl: null | string;
+}) {
+  const name = memberPrimaryName(identity, identityId);
+  const handle = identity?.profile.handle?.trim();
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex w-full items-center gap-3 rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+    >
+      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+        {pictureUrl ? (
+          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          name.slice(0, 1).toUpperCase()
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-black">{name}</div>
+        <div className="truncate text-xs text-white/45">
+          {handle ? `@${handle}` : shortId(identityId)}
+        </div>
+      </div>
+      {owner && (
+        <span
+          className="absolute right-2 top-2 text-sm text-yellow-300"
+          title={copy.communities.owner}
+        >
+          ♛
+        </span>
+      )}
+    </button>
+  );
+}
+
+function ChannelMessageSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[0, 1, 2, 3].map((item) => (
+        <div
+          key={item}
+          className={cx(
+            'flex animate-pulse items-end gap-2',
+            item % 2 === 0 ? 'justify-start' : 'justify-end',
+          )}
+        >
+          {item % 2 === 0 && (
+            <div className="h-9 w-9 rounded-2xl bg-white/10" />
+          )}
+          <div
+            className={cx(
+              'rounded-3xl bg-white/10',
+              item % 2 === 0 ? 'h-16 w-56' : 'h-12 w-44',
+            )}
+          />
+          {item % 2 !== 0 && (
+            <div className="h-9 w-9 rounded-2xl bg-white/10" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function normalizeIdentityLookup(value: string): string {
+  const trimmed = value.trim();
+
+  return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
+}
+
+async function loadIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  try {
+    return await loadPublicImage(pictureCid);
+  } catch {
+    return null;
+  }
+}
+
+async function loadPublicImage(cid: string): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const content = await pigeonApplication.getPublicFile(cid);
+
+      return profilePictureDataUrl(content);
+    } catch {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 250 * (attempt + 1)),
+      );
+    }
+  }
+
+  return null;
+}
+
+function resolveCommunityChannelId(
+  channelId: null | string | undefined,
+  channels: CommunityTextChannel[],
+): null | string {
+  if (channelId && channels.some((channel) => channel.id === channelId)) {
+    return channelId;
+  }
+
+  return channels[0]?.id ?? null;
+}
+
+function memberDisplayName(
+  identity: IdentityResource | undefined,
+  identityId: string,
+): string {
+  return identity ? (identityName(identity) ?? shortId(identity.id)) : shortId(identityId);
+}
+
+function memberPrimaryName(
+  identity: IdentityResource | undefined,
+  identityId: string,
+): string {
+  const name = identity?.profile.name.trim();
+
+  if (name) return name;
+
+  const handle = identity?.profile.handle?.trim();
+
+  return handle ? `@${handle}` : shortId(identityId);
+}
+
+type CommunityChannelPlainPayload = {
+  attachments?: MessageAttachment[];
+  authorIdentityId?: string;
+  channelId?: string;
+  communityId?: string;
+  content?: string;
+  timestamp?: number;
+  type?: string;
+};
+
+type CommunityChannelEnvelope = {
+  algorithm: 'community-channel.v1';
+  ciphertext: string;
+  iv: string;
+  recipients: Record<string, string>;
+};
+
+async function encryptCommunityChannelPayload(input: {
+  attachments: MessageAttachment[];
+  authorIdentityId: string;
+  channelId: string;
+  communityId: string;
+  content: string;
+  recipients: IdentityResource[];
+  timestamp: number;
+}): Promise<string> {
+  const key = await crypto.subtle.generateKey(
+    { length: 256, name: 'AES-GCM' },
+    true,
+    ['decrypt', 'encrypt'],
+  );
+  const rawKey = await crypto.subtle.exportKey('raw', key);
+  const rawKeyBase64 = bytesToBase64(new Uint8Array(rawKey));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(
+    JSON.stringify({
+      attachments: input.attachments,
+      authorIdentityId: input.authorIdentityId,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      content: input.content,
+      timestamp: input.timestamp,
+      type: 'CommunityChannelMessageSent',
+    }),
+  );
+  const encrypted = await crypto.subtle.encrypt({ iv, name: 'AES-GCM' }, key, plaintext);
+  const recipients: Record<string, string> = {};
+
+  for (const identity of input.recipients) {
+    recipients[identity.id] = PublicKey.fromPEM(
+      identity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(rawKeyBase64)
+      .toString();
+  }
+
+  return JSON.stringify({
+    algorithm: 'community-channel.v1',
+    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
+    iv: bytesToBase64(iv),
+    recipients,
+  } satisfies CommunityChannelEnvelope);
+}
+
+async function decryptCommunityChannelPayload(
+  session: Session,
+  encryptedPayload: string,
+): Promise<CommunityChannelPlainPayload> {
+  const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
+  const wrappedKey =
+    envelope.recipients[session.identity.id] ??
+    envelope.recipients[normalizeIdentityId(session.identity.id)];
+
+  if (!wrappedKey) {
+    throw new Error(copy.messages.missingKey);
+  }
+
+  const rawKey = await session.encryptedKeyPair.decrypt(
+    new EncryptedPayload(wrappedKey),
+    session.password,
+  );
+  const key = await crypto.subtle.importKey(
+    'raw',
+    bytesToArrayBuffer(base64ToBytes(rawKey.toString())),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt'],
+  );
+  const decrypted = await crypto.subtle.decrypt(
+    { iv: bytesToArrayBuffer(base64ToBytes(envelope.iv)), name: 'AES-GCM' },
+    key,
+    bytesToArrayBuffer(base64ToBytes(envelope.ciphertext)),
+  );
+
+  return JSON.parse(new TextDecoder().decode(decrypted)) as CommunityChannelPlainPayload;
+}
+
+function realtimeStringAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): string | undefined {
+  const value = event.attributes[key];
+
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function realtimeMessageAttribute(
+  event: RealtimeDomainEvent,
+): MessageResource | null {
+  const value = event.attributes.message;
+
+  return value && typeof value === 'object' ? (value as MessageResource) : null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copyBytes = new Uint8Array(bytes.byteLength);
+
+  copyBytes.set(bytes);
+
+  return copyBytes.buffer;
+}
