@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   Community,
@@ -50,6 +50,12 @@ export function useNotifications({
   >(() => archivedNotifications.get(session.identity.id));
   const [action, setAction] = useState<NotificationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sessionRef = useRef(session);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
   const visible = useMemo(
     () =>
       notifications.filter(
@@ -75,31 +81,42 @@ export function useNotifications({
   );
 
   const refresh = useCallback(async () => {
+    const currentSession = sessionRef.current;
+
     setAction('refresh');
     setError(null);
     try {
-      setNotifications(await pigeonApplication.listNotifications(session));
+      setNotifications(
+        await pigeonApplication.listNotifications(currentSession),
+      );
       setArchivedNotificationIds(
-        archivedNotifications.get(session.identity.id),
+        archivedNotifications.get(currentSession.identity.id),
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.notifications.error));
     }
     setAction(null);
-  }, [session]);
+  }, []);
+
+  useEffect(() => {
+    setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
+    void refresh();
+  }, [refresh, session.identity.id]);
 
   const accept = useCallback(
     async (notification: NotificationResource) => {
+      const currentSession = sessionRef.current;
+
       setAction('accept');
       setError(null);
 
       try {
         const result = await pigeonApplication.acceptConversationInvitation(
-          session,
+          currentSession,
           notification,
         );
         const nextSession = {
-          ...session,
+          ...currentSession,
           keychain: result.keychain,
           keychainExternalIdentifier: result.keychainExternalIdentifier,
         };
@@ -128,18 +145,20 @@ export function useNotifications({
       }
       setAction(null);
     },
-    [onAccepted, onAcceptedPanelClose, replaceNotification, session],
+    [onAccepted, onAcceptedPanelClose, replaceNotification],
   );
 
   const decline = useCallback(
     async (notificationId: string) => {
+      const currentSession = sessionRef.current;
+
       setAction('decline');
       setError(null);
 
       try {
         replaceNotification(
           await pigeonApplication.updateNotification(
-            session,
+            currentSession,
             notificationId,
             'declined',
           ),
@@ -149,16 +168,21 @@ export function useNotifications({
       }
       setAction(null);
     },
-    [replaceNotification, session],
+    [replaceNotification],
   );
 
   const archive = useCallback(
     (notificationId: string) => {
+      const currentSession = sessionRef.current;
+
       setArchivedNotificationIds(
-        archivedNotifications.archive(session.identity.id, notificationId),
+        archivedNotifications.archive(
+          currentSession.identity.id,
+          notificationId,
+        ),
       );
     },
-    [session.identity.id],
+    [],
   );
 
   return {
