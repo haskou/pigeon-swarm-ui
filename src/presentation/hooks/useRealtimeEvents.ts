@@ -43,14 +43,26 @@ export function useRealtimeEvents(
 
     const connect = async () => {
       try {
-        socket = await pigeonApplication.connectRealtime(session, (message) => {
-          if (message.type === 'connection_ack') {
-            handlersRef.current.onConnected?.();
-            return;
-          }
+        const nextSocket = await pigeonApplication.connectRealtime(
+          session,
+          (message) => {
+            if (cancelled) return;
 
-          handlersRef.current.onDomainEvent(message.event);
-        });
+            if (message.type === 'connection_ack') {
+              handlersRef.current.onConnected?.();
+              return;
+            }
+
+            handlersRef.current.onDomainEvent(message.event);
+          },
+        );
+
+        if (cancelled) {
+          nextSocket.close();
+          return;
+        }
+
+        socket = nextSocket;
 
         socket.addEventListener('open', () => {
           attempt = 0;

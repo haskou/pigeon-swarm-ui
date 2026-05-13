@@ -1365,7 +1365,13 @@ export function GlassWorkspace({
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
       if (realtimeEventsOpen) {
-        setRealtimeEventLog((current) => [...current.slice(-99), event]);
+        setRealtimeEventLog((current) => {
+          if (current.some((item) => item.event_id === event.event_id)) {
+            return current;
+          }
+
+          return [...current.slice(-99), event];
+        });
       }
 
       if (event.type.startsWith('calls.')) {
