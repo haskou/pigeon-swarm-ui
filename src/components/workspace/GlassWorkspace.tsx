@@ -11,6 +11,7 @@ import {
 import type {
   ChatMessage,
   AttachmentProgress,
+  Community,
   ConversationKeyEntry,
   ConversationResource,
   MessageReplyPreview,
@@ -36,6 +37,8 @@ import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
+import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
@@ -50,6 +53,12 @@ import { Sidebar } from './Sidebar';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type ConversationDrafts = Record<string, string>;
+type WorkspacePreference = {
+  channelByCommunityId?: Record<string, string>;
+  communityId?: null | string;
+  mode?: 'community' | 'messages';
+};
+type CommunityUnreadCounts = Record<string, Record<string, number>>;
 type PendingSend = {
   attachments: File[];
   content: string;
@@ -61,6 +70,10 @@ const lastConversationStorageKey = (identityId: string) =>
   `pigeon:lastConversation:${identityId}`;
 const draftsStorageKey = (identityId: string) =>
   `pigeon:conversationDrafts:${identityId}`;
+const workspaceStorageKey = (identityId: string) =>
+  `pigeon:workspace:${identityId}`;
+const communityUnreadStorageKey = (identityId: string) =>
+  `pigeon:communityUnread:${identityId}`;
 
 function initialConversationId(
   conversations: ConversationResource[],
@@ -80,6 +93,27 @@ function loadDrafts(identityId: string): ConversationDrafts {
     return JSON.parse(
       globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
     ) as ConversationDrafts;
+  } catch {
+    return {};
+  }
+}
+
+function loadWorkspacePreference(identityId: string): WorkspacePreference {
+  try {
+    return JSON.parse(
+      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
+    ) as WorkspacePreference;
+  } catch {
+    return {};
+  }
+}
+
+function loadCommunityUnreadCounts(identityId: string): CommunityUnreadCounts {
+  try {
+    return JSON.parse(
+      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
+        '{}',
+    ) as CommunityUnreadCounts;
   } catch {
     return {};
   }
@@ -106,22 +140,28 @@ interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
+  communities: Community[];
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
+  onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
   peers: Peer[];
+  setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
 
 export function GlassWorkspace({
   conversations,
+  communities,
   node,
   nodeNetworks,
+  onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
   peers,
   session,
+  setCommunities,
   setConversations,
   setSession,
 }: GlassWorkspaceProps) {
@@ -132,6 +172,28 @@ export function GlassWorkspace({
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
+  const [workspacePreference] = useState<WorkspacePreference>(() =>
+    loadWorkspacePreference(session.identity.id),
+  );
+  const [workspaceMode, setWorkspaceMode] = useState<'community' | 'messages'>(
+    workspacePreference.mode ?? 'messages',
+  );
+  const [activeCommunityId, setActiveCommunityId] = useState<string | null>(
+    workspacePreference.communityId ?? null,
+  );
+  const [communityChannelById, setCommunityChannelById] = useState<
+    Record<string, string>
+  >(() => workspacePreference.channelByCommunityId ?? {});
+  const [communityRealtimeEvent, setCommunityRealtimeEvent] =
+    useState<RealtimeDomainEvent | null>(null);
+  const [communityUnreadCountsById, setCommunityUnreadCountsById] =
+    useState<CommunityUnreadCounts>(() =>
+      loadCommunityUnreadCounts(session.identity.id),
+    );
+  const [realtimeStatus, setRealtimeStatus] = useState<
+    'connected' | 'reconnecting'
+  >('reconnecting');
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -146,6 +208,7 @@ export function GlassWorkspace({
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -170,6 +233,61 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
+  const activeCommunity = useMemo(
+    () =>
+      communities.find((community) => community.id === activeCommunityId) ??
+      communities[0],
+    [activeCommunityId, communities],
+  );
+  const activeCommunityChannelId = useMemo(() => {
+    if (!activeCommunity) return null;
+
+    const storedId = communityChannelById[activeCommunity.id];
+
+    return storedId &&
+      activeCommunity.textChannels.some((channel) => channel.id === storedId)
+      ? storedId
+      : (activeCommunity.textChannels[0]?.id ?? null);
+  }, [activeCommunity, communityChannelById]);
+  const communityUnreadCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(communityUnreadCountsById).map(([communityId, channels]) => [
+          communityId,
+          Object.values(channels).reduce((total, count) => total + count, 0),
+        ]),
+      ) as Record<string, number>,
+    [communityUnreadCountsById],
+  );
+  const clearCommunityChannelUnread = useCallback(
+    (communityId: string, channelId: string) => {
+      setCommunityUnreadCountsById((current) => {
+        if (!current[communityId]?.[channelId]) return current;
+
+        const nextCommunity = { ...current[communityId] };
+
+        delete nextCommunity[channelId];
+
+        return {
+          ...current,
+          [communityId]: nextCommunity,
+        };
+      });
+    },
+    [],
+  );
+  const markCommunityChannelUnread = useCallback(
+    (communityId: string, channelId: string) => {
+      setCommunityUnreadCountsById((current) => ({
+        ...current,
+        [communityId]: {
+          ...(current[communityId] ?? {}),
+          [channelId]: (current[communityId]?.[channelId] ?? 0) + 1,
+        },
+      }));
+    },
+    [],
+  );
   const updateActiveConversationDraft = useCallback(
     (value: string) => {
       if (!activeConversation?.id) return;
@@ -186,6 +304,14 @@ export function GlassWorkspace({
     conversationsWithUnread,
     markUnreadMessage,
   } = useUnreadMessages(conversations);
+  const unreadMessageCount = useMemo(
+    () =>
+      conversationsWithUnread.reduce(
+        (total, conversation) => total + conversation.unreadCount,
+        0,
+      ),
+    [conversationsWithUnread],
+  );
   const handleNotificationAccepted = useCallback(
     (next: {
       conversationId: string;
@@ -255,6 +381,15 @@ export function GlassWorkspace({
 
   useEffect(() => {
     setDrafts(loadDrafts(session.identity.id));
+    setCommunityUnreadCountsById(loadCommunityUnreadCounts(session.identity.id));
+  }, [session.identity.id]);
+
+  useEffect(() => {
+    const preference = loadWorkspacePreference(session.identity.id);
+
+    setWorkspaceMode(preference.mode ?? 'messages');
+    setActiveCommunityId(preference.communityId ?? null);
+    setCommunityChannelById(preference.channelByCommunityId ?? {});
   }, [session.identity.id]);
 
   useEffect(() => {
@@ -272,6 +407,32 @@ export function GlassWorkspace({
       activeConversation.id,
     );
   }, [activeConversation?.id, session.identity.id]);
+
+  useEffect(() => {
+    const preference: WorkspacePreference = {
+      channelByCommunityId: communityChannelById,
+      communityId: activeCommunity?.id ?? activeCommunityId,
+      mode: workspaceMode,
+    };
+
+    globalThis.localStorage?.setItem(
+      workspaceStorageKey(session.identity.id),
+      JSON.stringify(preference),
+    );
+  }, [
+    activeCommunity?.id,
+    activeCommunityId,
+    communityChannelById,
+    session.identity.id,
+    workspaceMode,
+  ]);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(
+      communityUnreadStorageKey(session.identity.id),
+      JSON.stringify(communityUnreadCountsById),
+    );
+  }, [communityUnreadCountsById, session.identity.id]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -360,9 +521,11 @@ export function GlassWorkspace({
     setRawMessage(null);
     setReplyTarget(null);
     setIsCreateOpen(false);
+    setIsCreateCommunityOpen(false);
     setNotificationsOpen(false);
     setNodeSettingsOpen(false);
     setInspectorOpen(false);
+    setCommunityMembersOpen(false);
     setSidebarOpen(false);
   }, []);
 
@@ -707,6 +870,7 @@ export function GlassWorkspace({
   const refreshRealtimeViews = useCallback(() => {
     void refreshNotifications();
     void refreshConversations().catch(() => undefined);
+    void onCommunitiesReload().catch(() => undefined);
     void onPeersReload().catch(() => undefined);
 
     if (activeConversation?.id && activeConversationKeyId) {
@@ -716,6 +880,7 @@ export function GlassWorkspace({
     activeConversation?.id,
     activeConversationKeyId,
     loadActiveMessages,
+    onCommunitiesReload,
     onPeersReload,
     refreshConversations,
     refreshNotifications,
@@ -777,6 +942,39 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type === 'communities.v1.channel.message.was_sent') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+        const authorIdentityId = stringAttribute(event, 'authorIdentityId');
+        const isActiveChannel =
+          workspaceMode === 'community' &&
+          communityId === activeCommunity?.id &&
+          channelId === activeCommunityChannelId;
+
+        if (
+          communityId &&
+          channelId &&
+          !isActiveChannel &&
+          authorIdentityId !== session.identity.id
+        ) {
+          markCommunityChannelUnread(communityId, channelId);
+        }
+
+        setCommunityRealtimeEvent(event);
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.message.was_deleted') {
+        setCommunityRealtimeEvent(event);
+        return;
+      }
+
+      if (event.type.startsWith('communities.')) {
+        void onCommunitiesReload().catch(() => undefined);
+        return;
+      }
+
       if (event.type.startsWith('conversations.v1.conversation.')) {
         void refreshConversations().catch(() => undefined);
         return;
@@ -835,13 +1033,17 @@ export function GlassWorkspace({
       }
     },
     [
+      activeCommunity?.id,
+      activeCommunityChannelId,
       activeConversation?.id,
       activeConversationKeyId,
       clearUnreadMessages,
       fetchRealtimeMessage,
       isScrolledNearBottom,
+      markCommunityChannelUnread,
       markUnreadMessage,
       messages,
+      onCommunitiesReload,
       onPeersReload,
       refreshConversations,
       refreshNotifications,
@@ -849,12 +1051,18 @@ export function GlassWorkspace({
       session,
       setConversations,
       setSession,
+      workspaceMode,
     ],
   );
 
   useRealtimeEvents(session, {
-    onConnected: refreshRealtimeViews,
+    onConnected: () => {
+      setRealtimeStatus('connected');
+      refreshRealtimeViews();
+    },
+    onDisconnected: () => setRealtimeStatus('reconnecting'),
     onDomainEvent: handleRealtimeEvent,
+    onReconnecting: () => setRealtimeStatus('reconnecting'),
   });
 
   return (
@@ -862,114 +1070,222 @@ export function GlassWorkspace({
       <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
+          activeMessages={workspaceMode === 'messages'}
+          activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
+          communities={communities}
+          communityUnreadCounts={communityUnreadCounts}
+          messageNotificationCount={unreadMessageCount}
           notificationCount={pendingNotificationCount}
+          onCommunityClick={(communityId) => {
+            setActiveCommunityId(communityId);
+            setWorkspaceMode('community');
+            setSidebarOpen(false);
+          }}
+          onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+          onMessagesClick={() => {
+            setWorkspaceMode('messages');
+            setSidebarOpen(false);
+          }}
           onNotificationsClick={() => setNotificationsOpen(true)}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
         />
 
-        <div
-          className={cx(
-            'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
-            sidebarOpen ? 'block' : 'hidden lg:block',
-          )}
-        >
-          <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
-            <Rail
-              className="lg:hidden"
-              notificationCount={pendingNotificationCount}
-              onNotificationsClick={() => setNotificationsOpen(true)}
-              onSettingsClick={() => setNodeSettingsOpen(true)}
-              onInspectorClick={() => setInspectorOpen(true)}
-              peerCount={peers.length}
-              settingsAttention={nodeUnclaimed}
-            />
-            <Sidebar
+        {workspaceMode === 'messages' ? (
+          <>
+            <div
+              className={cx(
+                'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+                sidebarOpen ? 'block' : 'hidden lg:block',
+              )}
+            >
+              <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+                <Rail
+                  className="lg:hidden"
+                  activeMessages
+                  activeCommunityId={null}
+                  communities={communities}
+                  communityUnreadCounts={communityUnreadCounts}
+                  messageNotificationCount={unreadMessageCount}
+                  notificationCount={pendingNotificationCount}
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
+                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
+                  onNotificationsClick={() => setNotificationsOpen(true)}
+                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onInspectorClick={() => setInspectorOpen(true)}
+                  peerCount={peers.length}
+                  settingsAttention={nodeUnclaimed}
+                />
+              <Sidebar
+                session={session}
+                conversations={conversationsWithUnread}
+                identityNames={identityNames}
+                identityPictures={identityPictures}
+                identityProfiles={identityProfiles}
+                nodeNetworks={nodeNetworks}
+                activeConversationId={activeConversation?.id ?? null}
+                onSelect={(id) => {
+                  clearUnreadMessages(id);
+                  setNewMessageCount(0);
+                  setActiveConversationId(id);
+                  setSidebarOpen(false);
+                }}
+                onCreate={() => setIsCreateOpen(true)}
+                onClose={() => setSidebarOpen(false)}
+                onLogout={() => setSession(null)}
+                onSessionUpdated={(nextSession) => {
+                  setSession(nextSession);
+                  rememberIdentity(nextSession.identity);
+                }}
+              />
+              </div>
+            </div>
+
+            {sidebarOpen && (
+              <button
+                className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-label={copy.workspace.closeSidebar}
+              />
+            )}
+
+            <ChatColumn
               session={session}
-              conversations={conversationsWithUnread}
+              activeConversation={activeConversation}
+              conversationKey={activeConversationKey}
+              draft={activeConversationDraft}
+              hasConversationKey={!!activeConversationKey}
+              hasReachedMessageStart={!messageCursor}
+              peerIdentityId={activeConversationPeerIdentityId}
+              peerIdentity={
+                activeConversationPeerIdentityId
+                  ? identityProfiles[activeConversationPeerIdentityId]
+                  : undefined
+              }
+              peerPicture={
+                activeConversationPeerIdentityId
+                  ? identityPictures[activeConversationPeerIdentityId]
+                  : undefined
+              }
               identityNames={identityNames}
               identityPictures={identityPictures}
               identityProfiles={identityProfiles}
+              messages={messages}
+              messageState={messageState}
+              newMessageCount={newMessageCount}
               nodeNetworks={nodeNetworks}
-              activeConversationId={activeConversation?.id ?? null}
-              onSelect={(id) => {
-                clearUnreadMessages(id);
-                setNewMessageCount(0);
-                setActiveConversationId(id);
-                setSidebarOpen(false);
-              }}
+              sendError={sendError}
+              scrollerRef={scrollerRef}
+              bottomRef={bottomRef}
+              onScroll={handleScroll}
+              onSend={handleSend}
+              onConversationKeyImported={handleConversationKeyImported}
+              onDraftChange={updateActiveConversationDraft}
+              onEscape={closeTransientUi}
+              onJumpToLatest={jumpToLatestMessages}
+              onMessageMenuOpen={handleMessageMenuOpen}
+              onReplyReferenceClick={(messageId) =>
+                void handleReplyReferenceClick(messageId)
+              }
+              onOpenSidebar={() => setSidebarOpen(true)}
               onCreate={() => setIsCreateOpen(true)}
-              onClose={() => setSidebarOpen(false)}
-              onLogout={() => setSession(null)}
-              onSessionUpdated={(nextSession) => {
-                setSession(nextSession);
-                rememberIdentity(nextSession.identity);
-              }}
+              progress={attachmentProgress}
+              realtimeStatus={realtimeStatus}
+              replyToMessage={replyTarget}
+              onCancelReply={() => setReplyTarget(null)}
+              onRetryMessage={retryMessage}
             />
-          </div>
-        </div>
 
-        {sidebarOpen && (
-          <button
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-label={copy.workspace.closeSidebar}
+            <Inspector
+              className="hidden xl:block"
+              session={session}
+              activeConversation={activeConversation}
+              messages={messages}
+              peers={peers}
+            />
+          </>
+        ) : activeCommunity ? (
+          <CommunityWorkspace
+            activeChannelId={activeCommunityChannelId}
+            channelUnreadCounts={
+              communityUnreadCountsById[activeCommunity.id] ?? {}
+            }
+            community={activeCommunity}
+            mobileMembersOpen={communityMembersOpen}
+            mobileSidebarOpen={sidebarOpen}
+            mobileRail={
+              <Rail
+                activeCommunityId={activeCommunity.id}
+                communities={communities}
+                communityUnreadCounts={communityUnreadCounts}
+                messageNotificationCount={unreadMessageCount}
+                notificationCount={pendingNotificationCount}
+                onCommunityClick={(communityId) => {
+                  setActiveCommunityId(communityId);
+                  setWorkspaceMode('community');
+                  setSidebarOpen(false);
+                }}
+                onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                onMessagesClick={() => {
+                  setWorkspaceMode('messages');
+                  setSidebarOpen(false);
+                }}
+                onNotificationsClick={() => setNotificationsOpen(true)}
+                onSettingsClick={() => setNodeSettingsOpen(true)}
+                onInspectorClick={() => {
+                  setSidebarOpen(false);
+                  setCommunityMembersOpen(true);
+                }}
+                peerCount={peers.length}
+                settingsAttention={nodeUnclaimed}
+              />
+            }
+            nodeNetworks={nodeNetworks}
+            realtimeEvent={communityRealtimeEvent}
+            onChannelSelected={(channelId) =>
+              setCommunityChannelById((current) =>
+                current[activeCommunity.id] === channelId
+                  ? current
+                  : {
+                      ...current,
+                      [activeCommunity.id]: channelId,
+                    },
+              )
+            }
+            onCommunityUpdated={(community) =>
+              setCommunities((current) =>
+                current.map((item) =>
+                  item.id === community.id ? community : item,
+                ),
+              )
+            }
+            onChannelViewed={(channelId) =>
+              clearCommunityChannelUnread(activeCommunity.id, channelId)
+            }
+            onLogout={() => setSession(null)}
+            onMobileSidebarClose={() => setSidebarOpen(false)}
+            onMobileMembersClose={() => setCommunityMembersOpen(false)}
+            onOpenMobileSidebar={() => setSidebarOpen(true)}
+            onSessionUpdated={(nextSession) => {
+              setSession(nextSession);
+              rememberIdentity(nextSession.identity);
+            }}
+            realtimeStatus={realtimeStatus}
+            session={session}
           />
+        ) : (
+          <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55 sm:rounded-[2rem]">
+            {copy.communities.empty}
+          </div>
         )}
-
-        <ChatColumn
-          session={session}
-          activeConversation={activeConversation}
-          conversationKey={activeConversationKey}
-          draft={activeConversationDraft}
-          hasConversationKey={!!activeConversationKey}
-          hasReachedMessageStart={!messageCursor}
-          peerIdentityId={activeConversationPeerIdentityId}
-          peerIdentity={
-            activeConversationPeerIdentityId
-              ? identityProfiles[activeConversationPeerIdentityId]
-              : undefined
-          }
-          peerPicture={
-            activeConversationPeerIdentityId
-              ? identityPictures[activeConversationPeerIdentityId]
-              : undefined
-          }
-          identityNames={identityNames}
-          identityPictures={identityPictures}
-          identityProfiles={identityProfiles}
-          messages={messages}
-          messageState={messageState}
-          newMessageCount={newMessageCount}
-          nodeNetworks={nodeNetworks}
-          sendError={sendError}
-          scrollerRef={scrollerRef}
-          bottomRef={bottomRef}
-          onScroll={handleScroll}
-          onSend={handleSend}
-          onConversationKeyImported={handleConversationKeyImported}
-          onDraftChange={updateActiveConversationDraft}
-          onEscape={closeTransientUi}
-          onJumpToLatest={jumpToLatestMessages}
-          onMessageMenuOpen={handleMessageMenuOpen}
-          onReplyReferenceClick={(messageId) =>
-            void handleReplyReferenceClick(messageId)
-          }
-          onOpenSidebar={() => setSidebarOpen(true)}
-          onCreate={() => setIsCreateOpen(true)}
-          progress={attachmentProgress}
-          replyToMessage={replyTarget}
-          onCancelReply={() => setReplyTarget(null)}
-          onRetryMessage={retryMessage}
-        />
-
-        <Inspector
-          className="hidden xl:block"
-          session={session}
-          activeConversation={activeConversation}
-          messages={messages}
-          peers={peers}
-        />
       </div>
 
       {inspectorOpen && (
@@ -1025,6 +1341,20 @@ export function GlassWorkspace({
           session={session}
           onClose={() => setIsCreateOpen(false)}
           onCreated={handleConversationCreated}
+        />
+      )}
+
+      {isCreateCommunityOpen && (
+        <CreateCommunityDialog
+          nodeNetworks={nodeNetworks}
+          session={session}
+          onClose={() => setIsCreateCommunityOpen(false)}
+          onCreated={(community) => {
+            setCommunities((current) => [community, ...current]);
+            setActiveCommunityId(community.id);
+            setWorkspaceMode('community');
+            setIsCreateCommunityOpen(false);
+          }}
         />
       )}
 

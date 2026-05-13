@@ -1,10 +1,24 @@
+import { useEffect, useState } from 'react';
+
+import type { Community } from '../../domain/types';
+
+import { pigeonApplication } from '../../application/applicationContainer';
 import { cx } from '../../utils/classNameHelper';
 import { copy } from '../../i18n/en';
+import { profilePictureDataUrl } from '../../utils/identityDisplay';
 
 interface RailProps {
+  activeMessages?: boolean;
   className?: string;
+  communities?: Community[];
+  communityUnreadCounts?: Record<string, number>;
+  activeCommunityId?: null | string;
+  messageNotificationCount?: number;
   notificationCount?: number;
+  onCommunityClick?: (communityId: string) => void;
+  onCreateCommunityClick?: () => void;
   onInspectorClick?: () => void;
+  onMessagesClick?: () => void;
   onNotificationsClick?: () => void;
   onSettingsClick?: () => void;
   peerCount?: number;
@@ -12,9 +26,17 @@ interface RailProps {
 }
 
 export function Rail({
+  activeCommunityId = null,
+  activeMessages = false,
   className,
+  communities = [],
+  communityUnreadCounts = {},
+  messageNotificationCount = 0,
   notificationCount = 0,
+  onCommunityClick,
+  onCreateCommunityClick,
   onInspectorClick,
+  onMessagesClick,
   onNotificationsClick,
   onSettingsClick,
   peerCount = 0,
@@ -23,15 +45,67 @@ export function Rail({
   return (
     <aside
       className={cx(
-        'glass-panel flex h-full flex-col items-center gap-3 rounded-none p-3 sm:rounded-[2rem]',
+        'glass-panel flex h-full flex-col items-center gap-3 rounded-none px-1 py-3 sm:rounded-[2rem]',
         className,
       )}
     >
-      <img
-        src="/logo.png"
-        alt="Pigeon Swarm"
-        className="h-14 w-14 rounded-2xl shadow-xl"
-      />
+      <div className="relative flex w-full justify-center">
+        <RailSelectionIndicator active={activeMessages} />
+        <button
+          type="button"
+          onClick={onMessagesClick}
+          className="relative rounded-2xl transition hover:scale-[1.03]"
+          aria-label={copy.rail.openMessages}
+        >
+          <img
+            src="/logo.png"
+            alt="Pigeon Swarm"
+            className="h-14 w-14 rounded-2xl shadow-xl"
+          />
+          {messageNotificationCount > 0 && (
+            <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
+              {messageNotificationCount > 9 ? '9+' : messageNotificationCount}
+            </span>
+          )}
+        </button>
+      </div>
+      <div className="h-px w-10 bg-white/10" />
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
+        {communities.map((community) => (
+          <div key={community.id} className="relative flex w-full justify-center">
+            <RailSelectionIndicator active={activeCommunityId === community.id} />
+            <button
+              type="button"
+              onClick={() => onCommunityClick?.(community.id)}
+              title={community.name}
+              className={cx(
+                'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition hover:bg-white/15',
+                activeCommunityId === community.id && 'bg-white/15',
+              )}
+              aria-label={community.name}
+            >
+              <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
+                <CommunityRailAvatar community={community} />
+              </span>
+              {(communityUnreadCounts[community.id] ?? 0) > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
+                  {(communityUnreadCounts[community.id] ?? 0) > 9
+                    ? '9+'
+                    : communityUnreadCounts[community.id]}
+                </span>
+              )}
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={onCreateCommunityClick}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-dashed border-white/25 bg-white/5 text-2xl font-black text-white/60 transition hover:bg-white/12 hover:text-white"
+          aria-label={copy.communities.create}
+        >
+          +
+        </button>
+      </div>
       <button
         type="button"
         onClick={onNotificationsClick}
@@ -124,4 +198,59 @@ export function Rail({
       </button>
     </aside>
   );
+}
+
+function RailSelectionIndicator({ active }: { active: boolean }) {
+  if (!active) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute top-1/2 h-8 w-1 -translate-y-1/2 bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.7)]"
+      style={{ left: 'calc(50% - 2.25rem)' }}
+    />
+  );
+}
+
+function CommunityRailAvatar({ community }: { community: Community }) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const avatar = community.avatar?.trim();
+
+    setAvatarUrl(null);
+    if (!avatar) return undefined;
+
+    let cancelled = false;
+
+    void loadRailAvatar(avatar).then((url) => {
+      if (!cancelled) setAvatarUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.avatar]);
+
+  return avatarUrl ? (
+    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+  ) : (
+    community.name.slice(0, 1).toUpperCase()
+  );
+}
+
+async function loadRailAvatar(cid: string): Promise<null | string> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const content = await pigeonApplication.getPublicFile(cid);
+
+      return profilePictureDataUrl(content);
+    } catch {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 250 * (attempt + 1)),
+      );
+    }
+  }
+
+  return null;
 }

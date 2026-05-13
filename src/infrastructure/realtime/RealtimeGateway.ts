@@ -1,6 +1,7 @@
 import type { Session } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../pigeon-api/RequestSigner';
 
@@ -45,7 +46,10 @@ export class RealtimeGateway {
     );
     const url = this.url('/ws');
 
-    url.searchParams.set('identityId', session.identity.id);
+    url.searchParams.set(
+      'identityId',
+      normalizeIdentityId(session.identity.id),
+    );
     url.searchParams.set('timestamp', timestamp);
     url.searchParams.set('nonce', nonce);
     url.searchParams.set('signature', signature.toString());

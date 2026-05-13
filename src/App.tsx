@@ -13,6 +13,7 @@ import {
   clearSavedCredentials,
   loadSavedCredentials,
 } from './presentation/auth/savedCredentials';
+import { useCommunities } from './presentation/hooks/useCommunities';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 import { usePeers } from './presentation/hooks/usePeers';
 
@@ -29,6 +30,7 @@ function App() {
   );
   const nodeNetworks = useNodeNetworks(session);
   const peers = usePeers();
+  const communities = useCommunities(session);
 
   const handleAuthenticated = (
     nextSession: Session,
@@ -117,6 +119,9 @@ function App() {
             setSession(nextSession);
           }}
           conversations={conversations}
+          communities={communities.communities}
+          onCommunitiesReload={communities.reload}
+          setCommunities={communities.setCommunities}
           setConversations={setConversations}
         />
       )}

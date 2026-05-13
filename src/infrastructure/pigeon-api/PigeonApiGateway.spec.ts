@@ -63,6 +63,166 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('creates communities with signed metadata payload', async () => {
+    const community = {
+      avatar: 'bafy-avatar',
+      banner: 'bafy-banner',
+      createdAt: 1,
+      description: 'Description',
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-1',
+      textChannels: [],
+      visibility: 'private',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.createCommunity(session, {
+        avatar: 'bafy-avatar',
+        banner: 'bafy-banner',
+        description: 'Description',
+        name: 'Mi comunidad',
+        networkId: 'network-1',
+      }),
+    ).resolves.toBe(community);
+
+    const body = {
+      avatar: 'bafy-avatar',
+      banner: 'bafy-banner',
+      description: 'Description',
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+    };
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/communities/',
+      body,
+    );
+    expect(http.request).toHaveBeenCalledWith('/communities/', {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('creates community text channels with signed owner requests', async () => {
+    const channel = {
+      createdAt: 1,
+      id: 'channel-1',
+      name: 'general',
+      type: 'text',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(channel),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const body = { name: 'general' };
+    const path = '/communities/community-1/channels/text';
+
+    await expect(
+      gateway.createCommunityTextChannel(session, 'community-1', 'general'),
+    ).resolves.toBe(channel);
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('creates community channel messages with the canonical domain signature', async () => {
+    const createdMessage = {
+      attachmentExternalIdentifiers: ['bafy-private'],
+      authorIdentityId: 'identity-1',
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      createdAt: 1234,
+      encryptedPayload: 'encrypted-payload',
+      id: 'message-1',
+      signature: 'domain-signature',
+      type: 'sent',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(createdMessage),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({
+          toString: () => 'domain-signature',
+        }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/communities/community-1/channels/channel-1/messages';
+    const body = {
+      attachmentExternalIdentifiers: ['bafy-private'],
+      createdAt: 1234,
+      encryptedPayload: 'encrypted-payload',
+      id: 'message-1',
+      signature: 'domain-signature',
+    };
+
+    await expect(
+      gateway.createCommunityChannelMessage(
+        session,
+        'community-1',
+        'channel-1',
+        {
+          attachmentExternalIdentifiers: ['bafy-private'],
+          encryptedPayload: 'encrypted-payload',
+          id: 'message-1',
+          timestamp: 1234,
+        },
+      ),
+    ).resolves.toBe(createdMessage);
+    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+      JSON.stringify({
+        attachmentExternalIdentifiers: ['bafy-private'],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 1234,
+        encryptedPayload: 'encrypted-payload',
+        id: 'message-1',
+        type: 'sent',
+      }),
+      'secret',
+    );
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
   it('creates group conversations and stores the key under the server id', async () => {
     const createdConversation = {
       id: 'group:server-conversation',
