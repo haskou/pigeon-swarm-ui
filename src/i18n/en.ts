@@ -394,6 +394,7 @@ export const copy = {
   profile: {
     addNetwork: 'Add network',
     availableNetwork: 'Available network',
+    banner: 'Profile banner',
     biography: 'Bio',
     changePassword: 'Change password',
     copied: 'Copied',

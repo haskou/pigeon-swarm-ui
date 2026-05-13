@@ -25,7 +25,7 @@ interface MessageBubbleProps {
     onProgress?: (progress: AttachmentProgress) => void,
   ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
-  onAvatarClick: () => void;
+  onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;

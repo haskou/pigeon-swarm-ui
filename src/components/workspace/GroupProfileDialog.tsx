@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react';
+
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
@@ -18,7 +20,10 @@ interface GroupProfileDialogProps {
   networkId?: string;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
-  onIdentityClick: (participant: GroupParticipant) => void;
+  onIdentityClick: (
+    participant: GroupParticipant,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => void;
   participants: GroupParticipant[];
 }
 
@@ -87,7 +92,7 @@ export function GroupProfileDialog({
               <button
                 key={participant.identityId}
                 type="button"
-                onClick={() => onIdentityClick(participant)}
+                onClick={(event) => onIdentityClick(participant, event)}
                 className="flex w-full items-center gap-3 rounded-2xl bg-white/5 p-3 text-left transition hover:bg-white/10"
               >
                 <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">

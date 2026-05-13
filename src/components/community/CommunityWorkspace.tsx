@@ -1,6 +1,7 @@
 import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
 import {
   Fragment,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -75,9 +76,19 @@ interface CommunityWorkspaceProps {
 }
 
 type MemberView = {
+  anchor?: ProfilePopoverAnchor;
   identity?: IdentityResource;
   identityId: string;
   pictureUrl: null | string;
+};
+
+type ProfilePopoverAnchor = {
+  bottom: number;
+  height: number;
+  left: number;
+  right: number;
+  top: number;
+  width: number;
 };
 
 type CommunityPendingSend = {
@@ -85,6 +96,23 @@ type CommunityPendingSend = {
   channelId: string;
   content: string;
 };
+
+function profileAnchorFromTarget(
+  target: HTMLElement | null | undefined,
+): ProfilePopoverAnchor | undefined {
+  if (!target) return undefined;
+
+  const rect = target.getBoundingClientRect();
+
+  return {
+    bottom: rect.bottom,
+    height: rect.height,
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    width: rect.width,
+  };
+}
 
 export function CommunityWorkspace({
   activeChannelId,
@@ -181,6 +209,28 @@ export function CommunityWorkspace({
       })),
     [community.memberIds, memberIdentities, memberPictures],
   );
+  const openMemberProfile = (
+    member: MemberView,
+    anchor?: ProfilePopoverAnchor,
+  ) => setProfileViewer({ ...member, anchor });
+  const openMessageAuthorProfile = (
+    message: ChatMessage,
+    anchor?: ProfilePopoverAnchor,
+  ) => {
+    const identityId = message.authorIdentityId;
+
+    openMemberProfile(
+      {
+        identity:
+          identityId === session.identity.id
+            ? session.identity
+            : memberIdentities[identityId],
+        identityId,
+        pictureUrl: memberPictures[identityId] ?? null,
+      },
+      anchor,
+    );
+  };
   const visibleChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
@@ -1071,7 +1121,12 @@ export function CommunityWorkspace({
                               )
                             }
                             onAttachmentPreview={loadAttachmentPreview}
-                            onAvatarClick={() => undefined}
+                            onAvatarClick={(event) =>
+                              openMessageAuthorProfile(
+                                message,
+                                profileAnchorFromTarget(event.currentTarget),
+                              )
+                            }
                             onMessageMenuOpen={(targetMessage, x, y) =>
                               setMessageContextMenu({
                                 message: targetMessage,
@@ -1144,7 +1199,12 @@ export function CommunityWorkspace({
               key={member.identityId}
               identity={member.identity}
               identityId={member.identityId}
-              onClick={() => setProfileViewer(member)}
+              onClick={(event) =>
+                openMemberProfile(
+                  member,
+                  profileAnchorFromTarget(event.currentTarget),
+                )
+              }
               owner={member.identityId === community.ownerIdentityId}
               pictureUrl={member.pictureUrl}
             />
@@ -1176,7 +1236,12 @@ export function CommunityWorkspace({
                   key={member.identityId}
                   identity={member.identity}
                   identityId={member.identityId}
-                  onClick={() => setProfileViewer(member)}
+                  onClick={(event) =>
+                    openMemberProfile(
+                      member,
+                      profileAnchorFromTarget(event.currentTarget),
+                    )
+                  }
                   owner={member.identityId === community.ownerIdentityId}
                   pictureUrl={member.pictureUrl}
                 />
@@ -1217,6 +1282,7 @@ export function CommunityWorkspace({
       )}
       {profileViewer && (
         <UserProfileDialog
+          anchor={profileViewer.anchor}
           identity={profileViewer.identity}
           identityId={profileViewer.identityId}
           name={memberDisplayName(profileViewer.identity, profileViewer.identityId)}
@@ -1738,7 +1804,7 @@ function MemberRow({
 }: {
   identity?: IdentityResource;
   identityId: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   owner: boolean;
   pictureUrl: null | string;
 }) {

@@ -36,6 +36,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
   isValidHandle,
+  profilePictureDataUrl,
   profilePictureUrl,
   normalizeHandle,
 } from '../../utils/identityDisplay';
@@ -504,6 +505,8 @@ function ProfileEditor({
         : null),
   );
   const [pictureFile, setPictureFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
@@ -540,6 +543,39 @@ function ProfileEditor({
     setNetworkToAdd(nodeNetworkOptions[0]?.value ?? '');
   }, [networkToAdd, nodeNetworkOptions]);
 
+  useEffect(() => {
+    const banner = session.identity.profile.banner?.trim();
+
+    if (!banner) {
+      setBannerPreview(null);
+
+      return;
+    }
+
+    const directBanner = profilePictureUrl(banner);
+
+    if (directBanner) {
+      setBannerPreview(directBanner);
+
+      return;
+    }
+
+    let active = true;
+
+    void pigeonApplication
+      .getPublicFile(banner)
+      .then((content) => {
+        if (active) setBannerPreview(profilePictureDataUrl(content));
+      })
+      .catch(() => {
+        if (active) setBannerPreview(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session.identity.profile.banner]);
+
   const addNetwork = () => {
     if (!networkToAdd || identityNetworkIds.includes(networkToAdd)) return;
 
@@ -560,6 +596,20 @@ function ProfileEditor({
     reader.readAsDataURL(file);
   };
 
+  const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') setBannerPreview(reader.result);
+    });
+    setBannerFile(file);
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -571,7 +621,11 @@ function ProfileEditor({
       const pictureCid = pictureFile
         ? (await pigeonApplication.uploadPublicFile(session, pictureFile)).cid
         : session.identity.profile.picture?.trim() || undefined;
+      const bannerCid = bannerFile
+        ? (await pigeonApplication.uploadPublicFile(session, bannerFile)).cid
+        : session.identity.profile.banner?.trim() || undefined;
       const identity = await pigeonApplication.updateIdentityProfile(session, {
+        banner: bannerCid,
         biography: biography.trim() || undefined,
         handle: normalizedHandle,
         name: name.trim(),
@@ -628,6 +682,26 @@ function ProfileEditor({
                 accept="image/*"
                 onChange={handlePictureChange}
                 className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
+              />
+            </div>
+          </div>
+          <div className="grid gap-2 text-sm font-black text-white/70">
+            {copy.profile.banner}
+            <div className="overflow-hidden rounded-3xl bg-black/20 p-3">
+              <div className="mb-3 aspect-[3/1] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
+                {bannerPreview && (
+                  <img
+                    src={bannerPreview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleBannerChange}
+                className="w-full min-w-0 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
               />
             </div>
           </div>
