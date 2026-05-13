@@ -143,7 +143,12 @@ export function MessageBubble({
   };
 
   if (callEvent) {
-    return <CallEventMessage message={message} />;
+    return (
+      <CallEventMessage
+        currentIdentityId={currentIdentityId}
+        message={message}
+      />
+    );
   }
 
   return (
@@ -320,13 +325,26 @@ export function MessageBubble({
   );
 }
 
-function CallEventMessage({ message }: { message: ChatMessage }) {
+function CallEventMessage({
+  currentIdentityId,
+  message,
+}: {
+  currentIdentityId: string;
+  message: ChatMessage;
+}) {
+  const direction = callEventDirection(message, currentIdentityId);
   const label = callEventLabel(message.raw.callEventType);
   const duration = formatDuration(message.raw.durationMs);
 
   return (
     <div data-message-id={message.id} className="flex justify-center py-2">
       <div className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/55">
+        {direction && (
+          <>
+            <span>{direction}</span>
+            <span className="text-white/30"> · </span>
+          </>
+        )}
         <span>{label}</span>
         {duration && <span className="text-white/35"> · {duration}</span>}
         <span className="text-white/30">
@@ -336,6 +354,24 @@ function CallEventMessage({ message }: { message: ChatMessage }) {
       </div>
     </div>
   );
+}
+
+function callEventDirection(
+  message: ChatMessage,
+  currentIdentityId: string,
+): string | null {
+  const actorIdentityId =
+    message.raw.actorIdentityId ??
+    (message.authorIdentityId !== 'unknown' &&
+    message.authorIdentityId !== 'system'
+      ? message.authorIdentityId
+      : undefined);
+
+  if (!actorIdentityId) return null;
+
+  return actorIdentityId === currentIdentityId
+    ? copy.calls.outgoingCallDirection
+    : copy.calls.incomingCallDirection;
 }
 
 function callEventLabel(eventType: MessageResource['callEventType']): string {
