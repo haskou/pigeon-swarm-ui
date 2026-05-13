@@ -4,6 +4,7 @@ import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
+import { incomingCallSoundUrl } from '../../utils/sounds';
 
 interface IncomingCallDialogProps {
   caller?: CallParticipant;
@@ -19,9 +20,7 @@ export function IncomingCallDialog({
   title,
 }: IncomingCallDialogProps) {
   const handle = caller?.identity?.profile.handle?.trim();
-  const fallbackName = caller?.name
-    ?.replace(/\s+\(@[^)]+\)$/, '')
-    .trim();
+  const fallbackName = caller?.name?.replace(/\s+\(@[^)]+\)$/, '').trim();
   const displayName =
     caller?.identity?.profile.name?.trim() || fallbackName || title;
   const rawSubtitle = handle
@@ -32,7 +31,7 @@ export function IncomingCallDialog({
   const subtitle = rawSubtitle === displayName ? undefined : rawSubtitle;
 
   useEffect(() => {
-    const audio = new Audio('/inputCallSong.mp3');
+    const audio = new Audio(incomingCallSoundUrl);
 
     audio.loop = true;
     audio.volume = 0.45;

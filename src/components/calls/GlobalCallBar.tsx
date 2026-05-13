@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import type { CallSession } from '../../domain/calls/CallSession';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import { dialingCallSoundUrl, playAnsweredCallSound } from '../../utils/sounds';
 
 interface GlobalCallBarProps {
   call: CallSession;
@@ -21,6 +23,49 @@ export function GlobalCallBar({
   const participantNames = call.participants
     .map((participant) => participant.name)
     .join(', ');
+  const ringingParticipantCount = useMemo(
+    () =>
+      call.call?.participants.filter(
+        (participant) => participant.status === 'ringing',
+      ).length ?? 0,
+    [call.call?.participants],
+  );
+  const joinedParticipantCount = useMemo(
+    () =>
+      call.call?.participants.filter(
+        (participant) => participant.status === 'joined',
+      ).length ?? 0,
+    [call.call?.participants],
+  );
+  const previousJoinedParticipantCountRef = useRef(joinedParticipantCount);
+
+  useEffect(() => {
+    if (ringingParticipantCount === 0 || call.status === 'permission-denied') {
+      return undefined;
+    }
+
+    const audio = new Audio(dialingCallSoundUrl);
+
+    audio.loop = true;
+    audio.volume = 0.35;
+    void audio.play().catch(() => undefined);
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [call.status, ringingParticipantCount]);
+
+  useEffect(() => {
+    const previousJoinedParticipantCount =
+      previousJoinedParticipantCountRef.current;
+
+    if (joinedParticipantCount > previousJoinedParticipantCount) {
+      playAnsweredCallSound();
+    }
+
+    previousJoinedParticipantCountRef.current = joinedParticipantCount;
+  }, [joinedParticipantCount]);
 
   return (
     <aside className="fixed bottom-3 left-1/2 z-[90] w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2 rounded-[1.5rem] border border-white/10 bg-[#151722]/95 p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
