@@ -1,5 +1,6 @@
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -37,6 +38,15 @@ import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
+type ProfilePopoverAnchor = {
+  bottom: number;
+  height: number;
+  left: number;
+  right: number;
+  top: number;
+  width: number;
+};
+
 interface ChatColumnProps {
   session: Session;
   activeConversation?: ConversationResource;
@@ -72,6 +82,23 @@ interface ChatColumnProps {
   realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
+}
+
+function profileAnchorFromTarget(
+  target: HTMLElement | null | undefined,
+): ProfilePopoverAnchor | undefined {
+  if (!target) return undefined;
+
+  const rect = target.getBoundingClientRect();
+
+  return {
+    bottom: rect.bottom,
+    height: rect.height,
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    width: rect.width,
+  };
 }
 
 export function ChatColumn({
@@ -111,6 +138,7 @@ export function ChatColumn({
   session,
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
+    anchor?: ProfilePopoverAnchor;
     identity?: IdentityResource;
     identityId: string;
     name: string;
@@ -297,24 +325,26 @@ export function ChatColumn({
       setConversationKeySaving(false);
     }
   };
-  const openOwnProfile = () =>
+  const openOwnProfile = (anchor?: ProfilePopoverAnchor) =>
     setProfileViewer({
+      anchor,
       identity: session.identity,
       identityId: session.identity.id,
       name: session.identity.profile.name,
       picture: identityPictures[session.identity.id],
     });
-  const openPeerProfile = () => {
+  const openPeerProfile = (anchor?: ProfilePopoverAnchor) => {
     if (!peerIdentityId || !activeConversationName) return;
 
     setProfileViewer({
+      anchor,
       identity: peerIdentity,
       identityId: peerIdentityId,
       name: activeConversationName,
       picture: peerPicture,
     });
   };
-  const openConversationHeader = () => {
+  const openConversationHeader = (event?: MouseEvent<HTMLElement>) => {
     if (!activeConversation) return;
 
     if (isGroupConversation) {
@@ -322,16 +352,20 @@ export function ChatColumn({
       return;
     }
 
-    openPeerProfile();
+    openPeerProfile(profileAnchorFromTarget(event?.currentTarget));
   };
-  const openMessageAuthorProfile = (message: ChatMessage) => {
+  const openMessageAuthorProfile = (
+    message: ChatMessage,
+    anchor?: ProfilePopoverAnchor,
+  ) => {
     if (message.mine || message.authorIdentityId === session.identity.id) {
-      openOwnProfile();
+      openOwnProfile(anchor);
 
       return;
     }
 
     setProfileViewer({
+      anchor,
       identity: identityProfiles[message.authorIdentityId],
       identityId: message.authorIdentityId,
       name: identityDisplayName(message.authorIdentityId, identityNames),
@@ -629,7 +663,12 @@ export function ChatColumn({
                           )
                         }
                         onAttachmentPreview={loadAttachmentPreview}
-                        onAvatarClick={() => openMessageAuthorProfile(message)}
+                        onAvatarClick={(event) =>
+                          openMessageAuthorProfile(
+                            message,
+                            profileAnchorFromTarget(event.currentTarget),
+                          )
+                        }
                         onMessageMenuOpen={onMessageMenuOpen}
                         onReplyReferenceClick={onReplyReferenceClick}
                         onRetryMessage={onRetryMessage}
@@ -742,6 +781,7 @@ export function ChatColumn({
       )}
       {profileViewer && (
         <UserProfileDialog
+          anchor={profileViewer.anchor}
           identity={profileViewer.identity}
           identityId={profileViewer.identityId}
           name={profileViewer.name}
@@ -756,9 +796,10 @@ export function ChatColumn({
           networkId={conversationNetworkId}
           nodeNetworks={nodeNetworks}
           onClose={() => setGroupProfileOpen(false)}
-          onIdentityClick={(participant) => {
+          onIdentityClick={(participant, event) => {
             setGroupProfileOpen(false);
             setProfileViewer({
+              anchor: profileAnchorFromTarget(event.currentTarget),
               identity: participant.identity,
               identityId: participant.identityId,
               name: participant.name,

@@ -1,9 +1,11 @@
+import type { MouseEvent } from 'react';
+
 import { cx } from '../../utils/classNameHelper';
 
 interface AvatarProps {
   label: string;
   mine?: boolean;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   picture?: string | null;
 }
 

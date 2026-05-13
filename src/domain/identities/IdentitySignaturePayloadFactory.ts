@@ -1,6 +1,7 @@
 import type { IdentityResource } from '../types';
 
 export type IdentityUpdateProfileInput = {
+  banner?: string;
   biography?: string;
   handle?: string;
   name: string;
@@ -24,6 +25,7 @@ export class IdentitySignaturePayloadFactory {
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
       profile: {
+        banner: input.profile.banner,
         biography: input.profile.biography,
         handle: input.profile.handle,
         name: input.profile.name,

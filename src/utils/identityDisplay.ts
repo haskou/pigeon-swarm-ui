@@ -41,6 +41,12 @@ export function identityPicture(identity: IdentityResource): string | null {
   return picture ? profilePictureUrl(picture) : null;
 }
 
+export function identityBanner(identity: IdentityResource): string | null {
+  const banner = identity.profile.banner?.trim();
+
+  return banner ? profilePictureUrl(banner) : null;
+}
+
 export function profilePictureUrl(value: string): string | null {
   const picture = value.trim();
 

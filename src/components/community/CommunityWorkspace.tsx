@@ -1,6 +1,7 @@
 import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
 import {
   Fragment,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -75,9 +76,19 @@ interface CommunityWorkspaceProps {
 }
 
 type MemberView = {
+  anchor?: ProfilePopoverAnchor;
   identity?: IdentityResource;
   identityId: string;
   pictureUrl: null | string;
+};
+
+type ProfilePopoverAnchor = {
+  bottom: number;
+  height: number;
+  left: number;
+  right: number;
+  top: number;
+  width: number;
 };
 
 type CommunityPendingSend = {
@@ -85,6 +96,23 @@ type CommunityPendingSend = {
   channelId: string;
   content: string;
 };
+
+function profileAnchorFromTarget(
+  target: HTMLElement | null | undefined,
+): ProfilePopoverAnchor | undefined {
+  if (!target) return undefined;
+
+  const rect = target.getBoundingClientRect();
+
+  return {
+    bottom: rect.bottom,
+    height: rect.height,
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    width: rect.width,
+  };
+}
 
 export function CommunityWorkspace({
   activeChannelId,
@@ -181,6 +209,28 @@ export function CommunityWorkspace({
       })),
     [community.memberIds, memberIdentities, memberPictures],
   );
+  const openMemberProfile = (
+    member: MemberView,
+    anchor?: ProfilePopoverAnchor,
+  ) => setProfileViewer({ ...member, anchor });
+  const openMessageAuthorProfile = (
+    message: ChatMessage,
+    anchor?: ProfilePopoverAnchor,
+  ) => {
+    const identityId = message.authorIdentityId;
+
+    openMemberProfile(
+      {
+        identity:
+          identityId === session.identity.id
+            ? session.identity
+            : memberIdentities[identityId],
+        identityId,
+        pictureUrl: memberPictures[identityId] ?? null,
+      },
+      anchor,
+    );
+  };
   const visibleChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
@@ -1071,7 +1121,12 @@ export function CommunityWorkspace({
                               )
                             }
                             onAttachmentPreview={loadAttachmentPreview}
-                            onAvatarClick={() => undefined}
+                            onAvatarClick={(event) =>
+                              openMessageAuthorProfile(
+                                message,
+                                profileAnchorFromTarget(event.currentTarget),
+                              )
+                            }
                             onMessageMenuOpen={(targetMessage, x, y) =>
                               setMessageContextMenu({
                                 message: targetMessage,
@@ -1144,7 +1199,12 @@ export function CommunityWorkspace({
               key={member.identityId}
               identity={member.identity}
               identityId={member.identityId}
-              onClick={() => setProfileViewer(member)}
+              onClick={(event) =>
+                openMemberProfile(
+                  member,
+                  profileAnchorFromTarget(event.currentTarget),
+                )
+              }
               owner={member.identityId === community.ownerIdentityId}
               pictureUrl={member.pictureUrl}
             />
@@ -1176,7 +1236,12 @@ export function CommunityWorkspace({
                   key={member.identityId}
                   identity={member.identity}
                   identityId={member.identityId}
-                  onClick={() => setProfileViewer(member)}
+                  onClick={(event) =>
+                    openMemberProfile(
+                      member,
+                      profileAnchorFromTarget(event.currentTarget),
+                    )
+                  }
                   owner={member.identityId === community.ownerIdentityId}
                   pictureUrl={member.pictureUrl}
                 />
@@ -1217,6 +1282,7 @@ export function CommunityWorkspace({
       )}
       {profileViewer && (
         <UserProfileDialog
+          anchor={profileViewer.anchor}
           identity={profileViewer.identity}
           identityId={profileViewer.identityId}
           name={memberDisplayName(profileViewer.identity, profileViewer.identityId)}
@@ -1287,6 +1353,8 @@ function ManageCommunityDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!avatar) {
@@ -1475,66 +1543,78 @@ function ManageCommunityDialog({
       <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-2xl sm:rounded-[2rem]">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-            <label className="block">
-              <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.avatar}
-              </span>
-              <div className="mx-auto grid h-28 w-28 cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
-                {avatarPreview || currentAvatarUrl ? (
+          <div className="grid gap-4">
+            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                aria-label={copy.communities.banner}
+              >
+                {bannerPreview || currentBannerUrl ? (
                   <img
-                    src={avatarPreview ?? currentAvatarUrl ?? ''}
+                    src={bannerPreview ?? currentBannerUrl ?? ''}
                     alt=""
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  community.name.slice(0, 1).toUpperCase()
+                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
+                    {community.name.slice(0, 1).toUpperCase()}
+                  </span>
                 )}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-                className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
-              />
-            </label>
-            <div className="space-y-3">
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.communities.banner}
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
                 </span>
-                <div className="grid aspect-[2/1] cursor-pointer place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-4xl font-black text-slate-950">
-                  {bannerPreview || currentBannerUrl ? (
+              </button>
+              <div className="relative px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  aria-label={copy.communities.avatar}
+                >
+                  {avatarPreview || currentAvatarUrl ? (
                     <img
-                      src={bannerPreview ?? currentBannerUrl ?? ''}
+                      src={avatarPreview ?? currentAvatarUrl ?? ''}
                       alt=""
                       className="h-full w-full object-cover"
                     />
                   ) : (
                     community.name.slice(0, 1).toUpperCase()
                   )}
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                    ✎
+                  </span>
+                </button>
+                <div className="mt-4 grid gap-3">
+                  <input
+                    aria-label={copy.communities.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                  <textarea
+                    aria-label={copy.communities.description}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
-                  className="mt-3 w-full text-xs text-white/55 file:mr-3 file:rounded-2xl file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-950"
-                />
-              </label>
-              <Field label={copy.communities.name}>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-              </Field>
-              <Field label={copy.communities.description}>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-              </Field>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
             </div>
           </div>
 
@@ -1738,7 +1818,7 @@ function MemberRow({
 }: {
   identity?: IdentityResource;
   identityId: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   owner: boolean;
   pictureUrl: null | string;
 }) {

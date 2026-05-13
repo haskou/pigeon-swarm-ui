@@ -10,6 +10,7 @@ export type IdentityResource = {
     name: string;
     handle?: string | null;
     biography?: string | null;
+    banner?: string | null;
     picture?: string | null;
   };
   networks: string[];

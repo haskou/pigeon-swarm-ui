@@ -36,6 +36,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
   isValidHandle,
+  profilePictureDataUrl,
   profilePictureUrl,
   normalizeHandle,
 } from '../../utils/identityDisplay';
@@ -504,6 +505,10 @@ function ProfileEditor({
         : null),
   );
   const [pictureFile, setPictureFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const pictureInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
@@ -540,6 +545,39 @@ function ProfileEditor({
     setNetworkToAdd(nodeNetworkOptions[0]?.value ?? '');
   }, [networkToAdd, nodeNetworkOptions]);
 
+  useEffect(() => {
+    const banner = session.identity.profile.banner?.trim();
+
+    if (!banner) {
+      setBannerPreview(null);
+
+      return;
+    }
+
+    const directBanner = profilePictureUrl(banner);
+
+    if (directBanner) {
+      setBannerPreview(directBanner);
+
+      return;
+    }
+
+    let active = true;
+
+    void pigeonApplication
+      .getPublicFile(banner)
+      .then((content) => {
+        if (active) setBannerPreview(profilePictureDataUrl(content));
+      })
+      .catch(() => {
+        if (active) setBannerPreview(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session.identity.profile.banner]);
+
   const addNetwork = () => {
     if (!networkToAdd || identityNetworkIds.includes(networkToAdd)) return;
 
@@ -560,6 +598,20 @@ function ProfileEditor({
     reader.readAsDataURL(file);
   };
 
+  const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') setBannerPreview(reader.result);
+    });
+    setBannerFile(file);
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -571,7 +623,11 @@ function ProfileEditor({
       const pictureCid = pictureFile
         ? (await pigeonApplication.uploadPublicFile(session, pictureFile)).cid
         : session.identity.profile.picture?.trim() || undefined;
+      const bannerCid = bannerFile
+        ? (await pigeonApplication.uploadPublicFile(session, bannerFile)).cid
+        : session.identity.profile.banner?.trim() || undefined;
       const identity = await pigeonApplication.updateIdentityProfile(session, {
+        banner: bannerCid,
         biography: biography.trim() || undefined,
         handle: normalizedHandle,
         name: name.trim(),
@@ -615,41 +671,81 @@ function ProfileEditor({
         </div>
 
         <div className="mt-4 grid gap-4">
-          <div className="grid gap-2 text-sm font-black text-white/70">
-            {copy.profile.picture}
-            <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
-              <ProfileAvatar
-                label={name || session.identity.id}
-                picture={picturePreview}
-                size="xl"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePictureChange}
-                className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
-              />
+          <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+            <button
+              type="button"
+              onClick={() => bannerInputRef.current?.click()}
+              className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+              aria-label={copy.profile.changeBanner}
+            >
+              {bannerPreview && (
+                <img
+                  src={bannerPreview}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              )}
+              <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                ✎
+              </span>
+            </button>
+            <div className="relative px-4 pb-4">
+              <button
+                type="button"
+                onClick={() => pictureInputRef.current?.click()}
+                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                aria-label={copy.profile.changePicture}
+              >
+                {picturePreview ? (
+                  <img
+                    src={picturePreview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  (name || session.identity.id).slice(0, 1).toUpperCase()
+                )}
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
+                </span>
+              </button>
+              <div className="mt-4 grid gap-3">
+                <input
+                  aria-label={copy.profile.name}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+                <input
+                  aria-label={copy.profile.handle}
+                  value={handle}
+                  onChange={(event) => setHandle(normalizeHandle(event.target.value))}
+                  placeholder="@ada"
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+                <textarea
+                  aria-label={copy.profile.biography}
+                  value={biography}
+                  onChange={(event) => setBiography(event.target.value)}
+                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                />
+              </div>
             </div>
-          </div>
-          <ProfileInput
-            label={copy.profile.name}
-            value={name}
-            onChange={setName}
-          />
-          <ProfileInput
-            label={copy.profile.handle}
-            value={handle}
-            onChange={(value) => setHandle(normalizeHandle(value))}
-            placeholder="@ada"
-          />
-          <label className="grid gap-2 text-sm font-black text-white/70">
-            {copy.profile.biography}
-            <textarea
-              value={biography}
-              onChange={(event) => setBiography(event.target.value)}
-              className="min-h-24 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            <input
+              ref={pictureInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePictureChange}
+              className="sr-only"
             />
-          </label>
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleBannerChange}
+              className="sr-only"
+            />
+          </div>
           <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
             <div className="text-sm font-black text-white/70">
               {copy.profile.networks}

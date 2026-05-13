@@ -21,6 +21,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       identity,
       previousIdentityExternalIdentifier: 'cid-1',
       profile: {
+        banner: 'banner-cid',
         biography: undefined,
         handle: 'ada',
         name: 'Ada Updated',
@@ -44,6 +45,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       networks: ['network-1'],
       previousIdentityExternalIdentifier: 'cid-1',
       profile: {
+        banner: 'banner-cid',
         biography: undefined,
         handle: 'ada',
         name: 'Ada Updated',
