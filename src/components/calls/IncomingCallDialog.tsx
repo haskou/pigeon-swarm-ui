@@ -1,10 +1,7 @@
-import { useEffect } from 'react';
-
 import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
-import { incomingCallSoundUrl } from '../../utils/sounds';
 
 interface IncomingCallDialogProps {
   caller?: CallParticipant;
@@ -29,19 +26,6 @@ export function IncomingCallDialog({
       ? shortId(caller.identityId)
       : undefined;
   const subtitle = rawSubtitle === displayName ? undefined : rawSubtitle;
-
-  useEffect(() => {
-    const audio = new Audio(incomingCallSoundUrl);
-
-    audio.loop = true;
-    audio.volume = 0.45;
-    void audio.play().catch(() => undefined);
-
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
-    };
-  }, []);
 
   return (
     <div className="fixed inset-0 z-[95] grid place-items-center bg-black/55 p-4 backdrop-blur-sm">

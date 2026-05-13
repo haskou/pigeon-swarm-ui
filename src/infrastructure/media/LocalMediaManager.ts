@@ -1,6 +1,13 @@
 export class LocalMediaManager {
   private stream: MediaStream | null = null;
 
+  public useStream(stream: MediaStream): MediaStream {
+    this.stop();
+    this.stream = stream;
+
+    return this.stream;
+  }
+
   public async startAudio(): Promise<MediaStream> {
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: true,

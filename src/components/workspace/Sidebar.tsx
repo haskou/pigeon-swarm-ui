@@ -9,6 +9,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { CallSession } from '../../domain/calls/CallSession';
 import type {
   ConversationResource,
   IdentityResource,
@@ -43,6 +44,7 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 import { SectionTitle } from '../common/SectionTitle';
+import { GlobalCallBar } from '../calls/GlobalCallBar';
 
 interface SidebarProps {
   session: Session;
@@ -57,6 +59,10 @@ interface SidebarProps {
   onCreate: () => void;
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
+  activeCall?: CallSession | null;
+  onCallEnd?: () => void;
+  onCallToggleDeafen?: () => void;
+  onCallToggleMute?: () => void;
 }
 
 export function Sidebar({
@@ -68,6 +74,10 @@ export function Sidebar({
   nodeNetworks,
   onClose,
   onCreate,
+  activeCall,
+  onCallEnd,
+  onCallToggleDeafen,
+  onCallToggleMute,
   onLogout,
   onSelect,
   onSessionUpdated,
@@ -242,6 +252,10 @@ export function Sidebar({
         onLogout={onLogout}
         onSessionUpdated={onSessionUpdated}
         session={session}
+        activeCall={activeCall}
+        onCallEnd={onCallEnd}
+        onCallToggleDeafen={onCallToggleDeafen}
+        onCallToggleMute={onCallToggleMute}
       />
     </aside>
   );
@@ -254,6 +268,10 @@ export function UserProfileDropdown({
   onLogout,
   onSessionUpdated,
   session,
+  activeCall,
+  onCallEnd,
+  onCallToggleDeafen,
+  onCallToggleMute,
 }: {
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;
@@ -261,6 +279,10 @@ export function UserProfileDropdown({
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
   session: Session;
+  activeCall?: CallSession | null;
+  onCallEnd?: () => void;
+  onCallToggleDeafen?: () => void;
+  onCallToggleMute?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
@@ -313,6 +335,14 @@ export function UserProfileDropdown({
 
   return (
     <div ref={profileRef} className="relative mt-4">
+      {activeCall && onCallEnd && onCallToggleDeafen && onCallToggleMute && (
+        <GlobalCallBar
+          call={activeCall}
+          onEnd={onCallEnd}
+          onToggleDeafen={onCallToggleDeafen}
+          onToggleMute={onCallToggleMute}
+        />
+      )}
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}

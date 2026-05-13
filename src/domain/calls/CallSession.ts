@@ -72,6 +72,7 @@ export type CallSession = {
   conversationId?: string;
   kind: CallKind;
   muted: boolean;
+  hasMicrophone: boolean;
   deafened: boolean;
   participants: CallParticipant[];
   startedAt: number;

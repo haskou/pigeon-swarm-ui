@@ -26,6 +26,7 @@ type StartCallInput = {
   conversationId?: string;
   kind: CallSession['kind'];
   iceConfig: CallIceServerConfig;
+  localStream?: MediaStream | null;
   onSignal: SignalSender;
   participants: CallParticipant[];
   title: string;
@@ -83,7 +84,8 @@ export function useCallSession(): {
       participants: input.participants,
       title: input.title,
       deafened: false,
-      muted: false,
+      hasMicrophone: input.localStream !== null,
+      muted: input.localStream === null,
       startedAt: Date.now(),
       status: 'connecting',
     };
@@ -91,7 +93,12 @@ export function useCallSession(): {
     setActiveCall(nextCall);
 
     try {
-      const stream = await mediaManager.startAudio();
+      const stream =
+        input.localStream === null
+          ? null
+          : input.localStream
+            ? mediaManager.useStream(input.localStream)
+            : await mediaManager.startAudio();
 
       peerManager.configure(input.iceConfig);
       peerManager.setLocalStream(stream);
@@ -106,7 +113,12 @@ export function useCallSession(): {
     } catch {
       setActiveCall((current) =>
         current?.id === nextCall.id
-          ? { ...current, status: 'permission-denied', muted: true }
+          ? {
+              ...current,
+              hasMicrophone: false,
+              status: 'permission-denied',
+              muted: true,
+            }
           : current,
       );
     }
@@ -154,6 +166,7 @@ export function useCallSession(): {
         ...input,
         call,
         deafened: activeCallRef.current?.deafened ?? false,
+        hasMicrophone: activeCallRef.current?.hasMicrophone ?? false,
         id: call.id,
         muted: activeCallRef.current?.muted ?? false,
         participants: mergeParticipantStatuses(input.participants, call),
@@ -186,6 +199,7 @@ export function useCallSession(): {
   const toggleMute = () => {
     setActiveCall((current) => {
       if (!current) return current;
+      if (!current.hasMicrophone) return current;
 
       const muted = !current.muted;
 

@@ -36,6 +36,10 @@ import {
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import {
+  communityChannels,
+  communityTextChannels,
+} from '../../domain/communities/communityChannels';
 import { copy } from '../../i18n/en';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
@@ -45,12 +49,17 @@ import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
-import { playNotificationSound } from '../../utils/sounds';
+import {
+  playAnsweredCallSound,
+  playEndedCallSound,
+  playIncomingCallSound,
+  playNotificationSound,
+  stopIncomingCallSound,
+} from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
-import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
@@ -271,6 +280,14 @@ export function GlassWorkspace({
     messageStateRef.current = messageState;
   }, [messageState]);
 
+  useEffect(() => {
+    if (!incomingCall) return undefined;
+
+    playIncomingCallSound();
+
+    return stopIncomingCallSound;
+  }, [incomingCall?.call.id]);
+
   const setMessageLoadState = useCallback((state: LoadState) => {
     messageStateRef.current = state;
     setMessageState(state);
@@ -316,16 +333,20 @@ export function GlassWorkspace({
       communities[0],
     [activeCommunityId, communities],
   );
+  const activeCommunityTextChannels = useMemo(
+    () => (activeCommunity ? communityTextChannels(activeCommunity) : []),
+    [activeCommunity],
+  );
   const activeCommunityChannelId = useMemo(() => {
     if (!activeCommunity) return null;
 
     const storedId = communityChannelById[activeCommunity.id];
 
     return storedId &&
-      activeCommunity.textChannels.some((channel) => channel.id === storedId)
+      activeCommunityTextChannels.some((channel) => channel.id === storedId)
       ? storedId
-      : (activeCommunity.textChannels[0]?.id ?? null);
-  }, [activeCommunity, communityChannelById]);
+      : (activeCommunityTextChannels[0]?.id ?? null);
+  }, [activeCommunity, activeCommunityTextChannels, communityChannelById]);
   const communityUnreadCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -502,9 +523,11 @@ export function GlassWorkspace({
         const community = communities.find(
           (item) => item.id === scope.communityId,
         );
-        const channel = community?.textChannels.find(
-          (item) => item.id === scope.channelId,
-        );
+        const channel = community
+          ? communityChannels(community).find(
+              (item) => item.id === scope.channelId,
+            )
+          : undefined;
 
         return {
           channelId: scope.channelId,
@@ -558,13 +581,19 @@ export function GlassWorkspace({
 
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
-        if (activeCall?.id === call.id) endCall();
+        if (activeCall?.id === call.id) {
+          playEndedCallSound();
+          endCall();
+        }
         return;
       }
 
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
-        if (activeCall?.id === call.id) endCall();
+        if (activeCall?.id === call.id) {
+          playEndedCallSound();
+          endCall();
+        }
         return;
       }
 
@@ -577,6 +606,7 @@ export function GlassWorkspace({
             ['declined', 'left', 'missed'].includes(participant.status),
         )
       ) {
+        playEndedCallSound();
         endCall();
         return;
       }
@@ -627,16 +657,38 @@ export function GlassWorkspace({
     [],
   );
   const loadCallIceConfig = useCallback(async () => {
-    const iceConfig = await pigeonApplication.getCallIceServers(
-      sessionRef.current,
-    );
+    const fallbackIceConfig = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    };
 
-    if (iceConfig.iceServers.length === 0) {
-      throw new Error(copy.calls.iceServersUnavailable);
+    let iceConfig;
+
+    try {
+      iceConfig = await pigeonApplication.getCallIceServers(sessionRef.current);
+    } catch {
+      return fallbackIceConfig;
     }
 
-    return iceConfig;
+    return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
   }, []);
+  const requestLocalAudio =
+    useCallback(async (): Promise<MediaStream | null> => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return null;
+      }
+
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false,
+        });
+      } catch {
+        return null;
+      }
+    }, []);
+  const stopLocalAudio = (stream: MediaStream | null) => {
+    stream?.getTracks().forEach((track) => track.stop());
+  };
 
   const startConversationCall = useCallback(
     (input: {
@@ -647,8 +699,19 @@ export function GlassWorkspace({
     }) => {
       if (input.kind === 'group') return;
 
-      void pigeonApplication
-        .startConversationCall(sessionRef.current, input.conversationId)
+      let localStream: MediaStream | null = null;
+
+      const localAudioRequest = requestLocalAudio();
+
+      void localAudioRequest
+        .then(async (stream) => {
+          localStream = stream;
+
+          return await pigeonApplication.startConversationCall(
+            sessionRef.current,
+            input.conversationId,
+          );
+        })
         .then(async (call) => {
           const details = callDetailsForResource(call);
           const iceConfig = await loadCallIceConfig();
@@ -659,6 +722,7 @@ export function GlassWorkspace({
             currentIdentityId: sessionRef.current.identity.id,
             iceConfig,
             id: call.id,
+            localStream,
             onSignal: callSignalSender(call.id),
             participants:
               details.participants.length > 0
@@ -667,22 +731,37 @@ export function GlassWorkspace({
             title: details.title || input.title,
           });
         })
-        .catch((caught) =>
-          setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
-        );
+        .catch((caught) => {
+          stopLocalAudio(localStream);
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        });
     },
-    [callDetailsForResource, callSignalSender, loadCallIceConfig, startCall],
+    [
+      callDetailsForResource,
+      callSignalSender,
+      loadCallIceConfig,
+      requestLocalAudio,
+      startCall,
+    ],
   );
   const startCommunityVoiceCall = useCallback(
     (channel: { id: string; name: string }) => {
       if (!activeCommunity) return;
 
-      void pigeonApplication
-        .startCommunityChannelCall(
-          sessionRef.current,
-          activeCommunity.id,
-          channel.id,
-        )
+      let localStream: MediaStream | null = null;
+
+      const localAudioRequest = requestLocalAudio();
+
+      void localAudioRequest
+        .then(async (stream) => {
+          localStream = stream;
+
+          return await pigeonApplication.startCommunityChannelCall(
+            sessionRef.current,
+            activeCommunity.id,
+            channel.id,
+          );
+        })
         .then(async (call) => {
           const details = callDetailsForResource(call);
           const iceConfig = await loadCallIceConfig();
@@ -693,18 +772,22 @@ export function GlassWorkspace({
             currentIdentityId: sessionRef.current.identity.id,
             iceConfig,
             id: call.id,
+            localStream,
             onSignal: callSignalSender(call.id),
           });
+          playAnsweredCallSound();
         })
-        .catch((caught) =>
-          setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
-        );
+        .catch((caught) => {
+          stopLocalAudio(localStream);
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        });
     },
     [
       activeCommunity,
       callDetailsForResource,
       callSignalSender,
       loadCallIceConfig,
+      requestLocalAudio,
       startCall,
     ],
   );
@@ -715,8 +798,19 @@ export function GlassWorkspace({
     const pendingCall = incomingCall.call;
 
     setIncomingCall(null);
-    void pigeonApplication
-      .joinCall(sessionRef.current, pendingCall.id)
+    stopIncomingCallSound();
+    let localStream: MediaStream | null = null;
+    const localAudioRequest = requestLocalAudio();
+
+    void localAudioRequest
+      .then(async (stream) => {
+        localStream = stream;
+
+        return await pigeonApplication.joinCall(
+          sessionRef.current,
+          pendingCall.id,
+        );
+      })
       .then(async (call) => {
         const details = callDetailsForResource(call);
         const iceConfig = await loadCallIceConfig();
@@ -727,17 +821,20 @@ export function GlassWorkspace({
           currentIdentityId: sessionRef.current.identity.id,
           iceConfig,
           id: call.id,
+          localStream,
           onSignal: callSignalSender(call.id),
         });
       })
-      .catch((caught) =>
-        setSendError(toUserErrorMessage(caught, copy.workspace.sendError)),
-      );
+      .catch((caught) => {
+        stopLocalAudio(localStream);
+        setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+      });
   }, [
     callDetailsForResource,
     callSignalSender,
     incomingCall,
     loadCallIceConfig,
+    requestLocalAudio,
     startCall,
   ]);
 
@@ -747,6 +844,7 @@ export function GlassWorkspace({
     const callId = incomingCall.call.id;
 
     setIncomingCall(null);
+    stopIncomingCallSound();
     void pigeonApplication
       .leaveCall(sessionRef.current, callId)
       .catch(() => undefined);
@@ -757,6 +855,7 @@ export function GlassWorkspace({
     const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
 
     endCall();
+    playEndedCallSound();
     if (!callId) return;
 
     const request = shouldEndForEveryone
@@ -1418,10 +1517,6 @@ export function GlassWorkspace({
           .getCall(sessionRef.current, callId)
           .then((call) => {
             reconcileCallResource(call);
-
-            if (call.scope.type === 'community_channel') {
-              void onCommunitiesReload().catch(() => undefined);
-            }
           })
           .catch(() => undefined);
         return;
@@ -1703,6 +1798,7 @@ export function GlassWorkspace({
                   settingsAttention={nodeUnclaimed}
                 />
                 <Sidebar
+                  activeCall={activeCall}
                   session={session}
                   conversations={conversationsWithUnread}
                   identityNames={identityNames}
@@ -1718,6 +1814,9 @@ export function GlassWorkspace({
                   }}
                   onCreate={() => setIsCreateOpen(true)}
                   onClose={() => setSidebarOpen(false)}
+                  onCallEnd={leaveActiveCall}
+                  onCallToggleDeafen={toggleDeafen}
+                  onCallToggleMute={toggleMute}
                   onLogout={() => setSession(null)}
                   onSessionUpdated={(nextSession) => {
                     setSession(nextSession);
@@ -1830,6 +1929,9 @@ export function GlassWorkspace({
             }
             nodeNetworks={nodeNetworks}
             activeCall={activeCall}
+            onCallEnd={leaveActiveCall}
+            onCallToggleDeafen={toggleDeafen}
+            onCallToggleMute={toggleMute}
             realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>
@@ -1977,14 +2079,6 @@ export function GlassWorkspace({
           onAccept={acceptIncomingCall}
           onDecline={declineIncomingCall}
           title={incomingCall.title}
-        />
-      )}
-      {activeCall && (
-        <GlobalCallBar
-          call={activeCall}
-          onEnd={leaveActiveCall}
-          onToggleDeafen={toggleDeafen}
-          onToggleMute={toggleMute}
         />
       )}
     </section>

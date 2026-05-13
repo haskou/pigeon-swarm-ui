@@ -68,9 +68,9 @@ export function GlobalCallBar({
   }, [joinedParticipantCount]);
 
   return (
-    <aside className="fixed bottom-3 left-1/2 z-[90] w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2 rounded-[1.5rem] border border-white/10 bg-[#151722]/95 p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+    <aside className="mb-2 rounded-3xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl">
+      <div className="flex items-center gap-2.5">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
           <SpeakerIcon />
         </div>
         <div className="min-w-0 flex-1">
@@ -85,17 +85,18 @@ export function GlobalCallBar({
               {call.title}
             </h2>
           </div>
-          <p className="mt-0.5 truncate text-xs text-white/45">
+          <p className="mt-0.5 truncate text-[0.7rem] text-white/45">
             {call.status === 'permission-denied'
               ? copy.calls.microphoneUnavailable
               : participantNames || copy.calls.waitingForParticipants}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
           <CallButton
             active={call.muted}
             label={call.muted ? copy.calls.unmute : copy.calls.mute}
             onClick={onToggleMute}
+            disabled={!call.hasMicrophone}
           >
             <MicrophoneIcon muted={call.muted} />
           </CallButton>
@@ -109,7 +110,7 @@ export function GlobalCallBar({
           <button
             type="button"
             onClick={onEnd}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/30 transition hover:bg-rose-400"
+            className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/30 transition hover:bg-rose-400"
             aria-label={copy.calls.leave}
             title={copy.calls.leave}
           >
@@ -124,23 +125,28 @@ export function GlobalCallBar({
 function CallButton({
   active,
   children,
+  disabled = false,
   label,
   onClick,
 }: {
   active: boolean;
   children: ReactNode;
+  disabled?: boolean;
   label: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
       className={cx(
-        'grid h-11 w-11 place-items-center rounded-2xl transition',
-        active
-          ? 'bg-fuchsia-500 text-white hover:bg-fuchsia-400'
-          : 'bg-white/10 text-white/75 hover:bg-white/15',
+        'grid h-9 w-9 place-items-center rounded-2xl transition',
+        disabled
+          ? 'cursor-not-allowed bg-white/5 text-white/30'
+          : active
+            ? 'bg-fuchsia-500 text-white hover:bg-fuchsia-400'
+            : 'bg-white/10 text-white/75 hover:bg-white/15',
       )}
       aria-label={label}
       title={label}

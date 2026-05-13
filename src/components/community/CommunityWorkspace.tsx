@@ -32,6 +32,12 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import {
+  communityChannels,
+  communityTextChannels,
+  communityVoiceChannels,
+  splitCommunityChannels,
+} from '../../domain/communities/communityChannels';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import {
@@ -73,6 +79,9 @@ interface CommunityWorkspaceProps {
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
+  onCallEnd?: () => void;
+  onCallToggleDeafen?: () => void;
+  onCallToggleMute?: () => void;
   onLogout: () => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
@@ -136,6 +145,9 @@ export function CommunityWorkspace({
   onChannelSelected,
   onChannelViewed,
   onCommunityUpdated,
+  onCallEnd,
+  onCallToggleDeafen,
+  onCallToggleMute,
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
@@ -148,12 +160,12 @@ export function CommunityWorkspace({
   session,
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
-    () => community.textChannels.filter((channel) => channel.type === 'text'),
-    [community.textChannels],
+    () => communityTextChannels(community),
+    [community],
   );
   const voiceChannels = useMemo(
-    () => community.textChannels.filter((channel) => channel.type === 'voice'),
-    [community.textChannels],
+    () => communityVoiceChannels(community),
+    [community],
   );
   const resolvedChannelId = useMemo(
     () => resolveCommunityChannelId(activeChannelId, textChannels),
@@ -196,9 +208,12 @@ export function CommunityWorkspace({
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const keepChannelBottomUntilRef = useRef(0);
   const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
   const sendQueueRef = useRef(Promise.resolve());
+  const onChannelSelectedRef = useRef(onChannelSelected);
+  const onChannelViewedRef = useRef(onChannelViewed);
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -229,6 +244,11 @@ export function CommunityWorkspace({
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
   }, [memberIdentities]);
+
+  useEffect(() => {
+    onChannelSelectedRef.current = onChannelSelected;
+    onChannelViewedRef.current = onChannelViewed;
+  }, [onChannelSelected, onChannelViewed]);
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
@@ -311,6 +331,23 @@ export function CommunityWorkspace({
       scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140
     );
   }, []);
+  const scrollChannelToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
+      const scroll = () => bottomRef.current?.scrollIntoView({ behavior });
+
+      if (keepPinned) {
+        keepChannelBottomUntilRef.current = Date.now() + 5000;
+      }
+
+      requestAnimationFrame(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+        window.setTimeout(scroll, 120);
+        window.setTimeout(scroll, 450);
+      });
+    },
+    [],
+  );
   const handleChannelSelected = useCallback(
     (channelId: string) => {
       setSelectedChannelId(channelId);
@@ -608,6 +645,34 @@ export function CommunityWorkspace({
     loadChannelMessagesRef.current = loadChannelMessages;
   }, [loadChannelMessages]);
 
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const handleMediaLayoutChange = () => {
+      if (Date.now() > keepChannelBottomUntilRef.current) return;
+
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+      });
+    };
+
+    scroller.addEventListener('load', handleMediaLayoutChange, true);
+    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
+    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
+
+    return () => {
+      scroller.removeEventListener('load', handleMediaLayoutChange, true);
+      scroller.removeEventListener(
+        'loadedmetadata',
+        handleMediaLayoutChange,
+        true,
+      );
+      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
+    };
+  }, []);
+
   const handleMessagesScroll = () => {
     const scroller = scrollerRef.current;
     const nearBottom = isScrolledNearBottom();
@@ -687,9 +752,7 @@ export function CommunityWorkspace({
         timestamp,
       },
     ]);
-    requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ block: 'end' });
-    });
+    scrollChannelToBottom('smooth');
 
     sendQueueRef.current = sendQueueRef.current.then(async () => {
       try {
@@ -739,9 +802,7 @@ export function CommunityWorkspace({
             [projected],
           ),
         );
-        requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-        });
+        scrollChannelToBottom('smooth', true);
       } catch (caught) {
         setSendError(toUserErrorMessage(caught, copy.communities.messageError));
         setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
@@ -828,15 +889,10 @@ export function CommunityWorkspace({
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
-      onChannelViewed?.(resolvedChannelId);
-      onChannelSelected(resolvedChannelId);
+      onChannelViewedRef.current?.(resolvedChannelId);
+      onChannelSelectedRef.current(resolvedChannelId);
     }
-  }, [
-    onChannelSelected,
-    onChannelViewed,
-    resolvedChannelId,
-    selectedChannelId,
-  ]);
+  }, [resolvedChannelId, selectedChannelId]);
 
   useEffect(() => {
     if (!selectedChannelId) {
@@ -858,10 +914,8 @@ export function CommunityWorkspace({
         setMessages(loadedMessages);
         setMessageCursor(cursor);
         setNewChannelMessageCount(0);
-        onChannelViewed?.(selectedChannelId);
-        requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-        });
+        onChannelViewedRef.current?.(selectedChannelId);
+        scrollChannelToBottom('auto', true);
       })
       .catch(() => {
         if (!cancelled) setMessageLoadState('error');
@@ -873,7 +927,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [onChannelViewed, selectedChannelId, setMessageLoadState]);
+  }, [scrollChannelToBottom, selectedChannelId, setMessageLoadState]);
 
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
@@ -928,9 +982,7 @@ export function CommunityWorkspace({
         if (shouldStickToBottom) {
           setNewChannelMessageCount(0);
           onChannelViewed?.(channelId);
-          requestAnimationFrame(() => {
-            bottomRef.current?.scrollIntoView({ block: 'end' });
-          });
+          scrollChannelToBottom('smooth', true);
         } else {
           setNewChannelMessageCount((current) => current + 1);
         }
@@ -949,6 +1001,7 @@ export function CommunityWorkspace({
     resolveMemberIdentities,
     selectedChannelId,
     session.identity.id,
+    scrollChannelToBottom,
   ]);
 
   return (
@@ -1070,6 +1123,22 @@ export function CommunityWorkspace({
                               active={activeVoiceChannelId === channel.id}
                               channel={channel}
                               onJoin={() => onJoinVoiceChannel?.(channel)}
+                              onParticipantClick={(participant, event) =>
+                                openMemberProfile(
+                                  {
+                                    identity:
+                                      participant.identityId ===
+                                      session.identity.id
+                                        ? session.identity
+                                        : memberIdentities[
+                                            participant.identityId
+                                          ],
+                                    identityId: participant.identityId,
+                                    pictureUrl: participant.picture ?? null,
+                                  },
+                                  profileAnchorFromTarget(event.currentTarget),
+                                )
+                              }
                               participants={voiceParticipantsForChannel(
                                 channel,
                               )}
@@ -1083,8 +1152,12 @@ export function CommunityWorkspace({
               </div>
             </div>
             <UserProfileDropdown
+              activeCall={activeCall}
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
+              onCallEnd={onCallEnd}
+              onCallToggleDeafen={onCallToggleDeafen}
+              onCallToggleMute={onCallToggleMute}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}
               session={session}
@@ -1549,12 +1622,15 @@ function ManageCommunityDialog({
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
-    community.textChannels,
+    communityChannels(community),
   );
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
-        community.textChannels.map((channel) => [channel.id, channel.name]),
+        communityChannels(community).map((channel) => [
+          channel.id,
+          channel.name,
+        ]),
       ),
   );
   const [error, setError] = useState<string | null>(null);
@@ -1691,7 +1767,7 @@ function ManageCommunityDialog({
 
       onCommunityUpdated({
         ...updatedCommunity,
-        textChannels: updatedChannels,
+        ...splitCommunityChannels(updatedChannels),
       });
       return true;
     } catch (caught) {
@@ -2145,11 +2221,21 @@ function VoiceChannelButton({
   active,
   channel,
   onJoin,
+  onParticipantClick,
   participants,
 }: {
   active: boolean;
   channel: { id: string; name: string };
   onJoin: () => void;
+  onParticipantClick: (
+    participant: {
+      identityId: string;
+      muted: boolean;
+      name: string;
+      picture?: null | string;
+    },
+    event: MouseEvent<HTMLButtonElement>,
+  ) => void;
   participants: Array<{
     identityId: string;
     muted: boolean;
@@ -2181,9 +2267,11 @@ function VoiceChannelButton({
       {participants.length > 0 && (
         <div className="space-y-1 px-3 pb-3">
           {participants.map((participant) => (
-            <div
+            <button
               key={participant.identityId}
-              className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-white/55"
+              type="button"
+              onClick={(event) => onParticipantClick(participant, event)}
+              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm text-white/55 transition hover:bg-white/8 hover:text-white"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
                 {participant.picture ? (
@@ -2204,7 +2292,7 @@ function VoiceChannelButton({
                   {copy.calls.muted}
                 </span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -215,8 +215,9 @@ export type Community = {
   avatar?: string | null;
   banner?: string | null;
   memberIds: string[];
-  textChannels: CommunityChannel[];
+  textChannels: CommunityTextChannel[];
   visibility: 'private';
+  voiceChannels?: CommunityVoiceChannel[];
   createdAt: number;
 };
 

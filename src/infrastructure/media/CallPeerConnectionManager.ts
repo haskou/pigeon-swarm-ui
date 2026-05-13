@@ -28,7 +28,7 @@ export class CallPeerConnectionManager {
     this.rtcConfiguration = rtcConfiguration;
   }
 
-  public setLocalStream(stream: MediaStream): void {
+  public setLocalStream(stream: MediaStream | null): void {
     this.localStream = stream;
   }
 
@@ -103,9 +103,13 @@ export class CallPeerConnectionManager {
 
     const peer = new RTCPeerConnection(this.rtcConfiguration);
 
-    this.localStream?.getTracks().forEach((track) => {
-      if (this.localStream) peer.addTrack(track, this.localStream);
-    });
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => {
+        if (this.localStream) peer.addTrack(track, this.localStream);
+      });
+    } else {
+      peer.addTransceiver('audio', { direction: 'recvonly' });
+    }
     peer.addEventListener('icecandidate', (event) => {
       if (!event.candidate) return;
 
