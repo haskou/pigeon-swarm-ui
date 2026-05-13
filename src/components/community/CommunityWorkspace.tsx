@@ -251,6 +251,17 @@ export function CommunityWorkspace({
       })),
     [community.memberIds, memberIdentities, memberPictures],
   );
+  const communityMemberIdsKey = useMemo(
+    () => community.memberIds.join('\u0000'),
+    [community.memberIds],
+  );
+  const communityMemberIds = useMemo(
+    () =>
+      communityMemberIdsKey.length > 0
+        ? communityMemberIdsKey.split('\u0000')
+        : [],
+    [communityMemberIdsKey],
+  );
   const openMemberProfile = (
     member: MemberView,
     anchor?: ProfilePopoverAnchor,
@@ -407,7 +418,7 @@ export function CommunityWorkspace({
     let cancelled = false;
 
     void Promise.all(
-      community.memberIds.map(async (identityId) => {
+      communityMemberIds.map(async (identityId) => {
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
           const pictureUrl = await loadIdentityPicture(identity);
@@ -435,7 +446,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [community.memberIds]);
+  }, [communityMemberIds]);
 
   useEffect(() => {
     const avatar = community.avatar?.trim();
@@ -506,7 +517,7 @@ export function CommunityWorkspace({
     }
 
     return nextIdentities;
-  }, [community.memberIds, session.identity]);
+  }, [communityMemberIds, session.identity]);
 
   const projectChannelMessage = useCallback(
     async (
@@ -1523,6 +1534,8 @@ function ManageCommunityDialog({
   onCommunityUpdated: (community: Community) => void;
   session: Session;
 }) {
+  type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
+
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
   const [avatar, setAvatar] = useState<File | null>(null);
@@ -1533,7 +1546,7 @@ function ManageCommunityDialog({
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
-  const [channelOrder, setChannelOrder] = useState<CommunityChannel[]>(
+  const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
     community.textChannels,
   );
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
@@ -1646,7 +1659,21 @@ function ManageCommunityDialog({
       for (const channel of channelOrder) {
         const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
 
-        if (nextName === channel.name) {
+        if (channel.pending) {
+          updatedChannels.push(
+            channel.type === 'text'
+              ? await pigeonApplication.createCommunityTextChannel(
+                  session,
+                  community.id,
+                  nextName,
+                )
+              : await pigeonApplication.createCommunityVoiceChannel(
+                  session,
+                  community.id,
+                  nextName,
+                ),
+          );
+        } else if (nextName === channel.name) {
           updatedChannels.push(channel);
         } else {
           updatedChannels.push(
@@ -1680,41 +1707,36 @@ function ManageCommunityDialog({
     onClose();
   };
 
-  const createChannel = async () => {
+  const createChannel = () => {
     const nextName = channelName.trim();
 
     if (!nextName || state === 'loading') return;
 
-    setState('loading');
     setError(null);
-    try {
-      const channel =
-        channelType === 'text'
-          ? await pigeonApplication.createCommunityTextChannel(
-              session,
-              community.id,
-              nextName,
-            )
-          : await pigeonApplication.createCommunityVoiceChannel(
-              session,
-              community.id,
-              nextName,
-            );
+    const channel: ManagedCommunityChannel =
+      channelType === 'text'
+        ? {
+            createdAt: Date.now(),
+            id: draftChannelId(),
+            name: nextName,
+            pending: true,
+            type: 'text',
+          }
+        : {
+            connectedIdentityIds: [],
+            createdAt: Date.now(),
+            id: draftChannelId(),
+            name: nextName,
+            pending: true,
+            type: 'voice',
+          };
 
-      setChannelName('');
-      setChannelOrder((current) => [...current, channel]);
-      onCommunityUpdated({
-        ...community,
-        textChannels: [...channelOrder, channel],
-      });
-      setChannelDrafts((current) => ({
-        ...current,
-        [channel.id]: channel.name,
-      }));
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.channelError));
-    }
-    setState('idle');
+    setChannelName('');
+    setChannelOrder((current) => [...current, channel]);
+    setChannelDrafts((current) => ({
+      ...current,
+      [channel.id]: channel.name,
+    }));
   };
 
   const moveChannel = (channelId: string, direction: -1 | 1) => {
@@ -2304,6 +2326,10 @@ function normalizeIdentityLookup(value: string): string {
   const trimmed = value.trim();
 
   return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
+}
+
+function draftChannelId(): string {
+  return `draft:${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
 }
 
 async function loadIdentityPicture(
