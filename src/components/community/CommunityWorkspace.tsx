@@ -2008,11 +2008,16 @@ function AddCommunityMemberDialog({
         communityId,
         identityId,
       );
-      onSessionUpdated({
-        ...session,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      });
+      if (
+        result.keychain !== session.keychain ||
+        result.keychainExternalIdentifier !== session.keychainExternalIdentifier
+      ) {
+        onSessionUpdated({
+          ...session,
+          keychain: result.keychain,
+          keychainExternalIdentifier: result.keychainExternalIdentifier,
+        });
+      }
       onClose();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.memberError));
