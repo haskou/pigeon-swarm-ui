@@ -1175,6 +1175,7 @@ export function GlassWorkspace({
               onOpenSidebar={() => setSidebarOpen(true)}
               onCreate={() => setIsCreateOpen(true)}
               progress={attachmentProgress}
+              realtimeStatus={realtimeStatus}
               replyToMessage={replyTarget}
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}

@@ -15,6 +15,7 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
+import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
@@ -63,6 +64,7 @@ interface ChatColumnProps {
   onOpenSidebar: () => void;
   onCreate: () => void;
   progress?: AttachmentProgress | null;
+  realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
 }
@@ -97,6 +99,7 @@ export function ChatColumn({
   peerIdentityId,
   peerPicture,
   progress,
+  realtimeStatus = 'connected',
   replyToMessage,
   scrollerRef,
   sendError,
@@ -448,6 +451,31 @@ export function ChatColumn({
                 {copy.chat.noConversationHint}
               </div>
             )}
+          </div>
+          <div
+            className={cx(
+              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+              realtimeStatus === 'connected'
+                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+            )}
+            title={
+              realtimeStatus === 'connected'
+                ? copy.chat.realtimeConnected
+                : copy.chat.realtimeReconnecting
+            }
+          >
+            <span
+              className={cx(
+                'h-2 w-2 rounded-full',
+                realtimeStatus === 'connected'
+                  ? 'bg-emerald-300'
+                  : 'bg-amber-300',
+              )}
+            />
+            {realtimeStatus === 'connected'
+              ? copy.chat.realtimeConnected
+              : copy.chat.realtimeReconnecting}
           </div>
           {activeConversation ? (
             <div className="relative ml-auto shrink-0">
