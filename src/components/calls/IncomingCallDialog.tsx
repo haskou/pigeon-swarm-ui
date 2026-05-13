@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { copy } from '../../i18n/en';
+import { shortId } from '../../utils/formatting';
 
 interface IncomingCallDialogProps {
   caller?: CallParticipant;
@@ -17,6 +18,19 @@ export function IncomingCallDialog({
   onDecline,
   title,
 }: IncomingCallDialogProps) {
+  const handle = caller?.identity?.profile.handle?.trim();
+  const fallbackName = caller?.name
+    ?.replace(/\s+\(@[^)]+\)$/, '')
+    .trim();
+  const displayName =
+    caller?.identity?.profile.name?.trim() || fallbackName || title;
+  const rawSubtitle = handle
+    ? `@${handle}`
+    : caller
+      ? shortId(caller.identityId)
+      : undefined;
+  const subtitle = rawSubtitle === displayName ? undefined : rawSubtitle;
+
   useEffect(() => {
     const audio = new Audio('/inputCallSong.mp3');
 
@@ -48,10 +62,10 @@ export function IncomingCallDialog({
           {copy.calls.incoming}
         </div>
         <h2 className="mt-2 truncate text-2xl font-black text-white">
-          {title}
+          {displayName}
         </h2>
-        {caller && (
-          <p className="mt-1 truncate text-sm text-white/55">{caller.name}</p>
+        {subtitle && (
+          <p className="mt-1 truncate text-sm text-white/55">{subtitle}</p>
         )}
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
