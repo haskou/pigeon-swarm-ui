@@ -17,6 +17,7 @@ type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 type UseNotificationsInput = {
   onAccepted: (next: {
     communities?: Community[];
+    communityId?: string;
     conversationId?: string;
     conversations?: ConversationResource[];
     session: Session;
@@ -124,14 +125,22 @@ export function useNotifications({
           notification.type === 'community_invitation'
             ? undefined
             : await pigeonApplication.listConversations(nextSession);
+        const communityId =
+          notification.type === 'community_invitation'
+            ? notification.payload.communityId
+            : undefined;
         const communities =
           notification.type === 'community_invitation'
-            ? await pigeonApplication.listCommunities(nextSession)
+            ? await listCommunitiesAfterCommunityAccept(
+                nextSession,
+                communityId,
+              )
             : undefined;
 
         replaceNotification(result.notification);
         onAccepted({
           communities,
+          communityId,
           conversationId:
             notification.type === 'conversation_invitation' ||
             notification.type === 'group_conversation_invitation'
@@ -172,19 +181,13 @@ export function useNotifications({
     [replaceNotification],
   );
 
-  const archive = useCallback(
-    (notificationId: string) => {
-      const currentSession = sessionRef.current;
+  const archive = useCallback((notificationId: string) => {
+    const currentSession = sessionRef.current;
 
-      setArchivedNotificationIds(
-        archivedNotifications.archive(
-          currentSession.identity.id,
-          notificationId,
-        ),
-      );
-    },
-    [],
-  );
+    setArchivedNotificationIds(
+      archivedNotifications.archive(currentSession.identity.id, notificationId),
+    );
+  }, []);
 
   return {
     accept,
@@ -197,4 +200,26 @@ export function useNotifications({
     refresh,
     visible,
   };
+}
+
+async function listCommunitiesAfterCommunityAccept(
+  session: Session,
+  communityId?: string,
+): Promise<Community[]> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const communities = await pigeonApplication.listCommunities(session);
+
+    if (
+      !communityId ||
+      communities.some((community) => community.id === communityId)
+    ) {
+      return communities;
+    }
+
+    await new Promise((resolve) =>
+      window.setTimeout(resolve, 200 * (attempt + 1)),
+    );
+  }
+
+  return await pigeonApplication.listCommunities(session);
 }

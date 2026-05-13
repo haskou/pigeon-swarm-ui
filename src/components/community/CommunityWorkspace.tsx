@@ -1935,6 +1935,13 @@ function AddCommunityMemberDialog({
 }) {
   const [identityInput, setIdentityInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'ready'>(
+    'idle',
+  );
+  const [memberIdentity, setMemberIdentity] = useState<IdentityResource | null>(
+    null,
+  );
+  const [memberPictureUrl, setMemberPictureUrl] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
 
   useEffect(() => {
@@ -1947,8 +1954,49 @@ function AddCommunityMemberDialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const addMember = async () => {
+  useEffect(() => {
     const identityId = normalizeIdentityLookup(identityInput);
+
+    setError(null);
+    setMemberIdentity(null);
+    setMemberPictureUrl(null);
+
+    if (!identityId) {
+      setLookupState('idle');
+
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    setLookupState('loading');
+    const timeout = window.setTimeout(() => {
+      void pigeonApplication
+        .getIdentity(identityId)
+        .then((identity) => {
+          if (cancelled) return;
+
+          setMemberIdentity(identity);
+          setLookupState('ready');
+
+          void loadIdentityPicture(identity).then((picture) => {
+            if (!cancelled) setMemberPictureUrl(picture);
+          });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setLookupState('idle');
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [identityInput]);
+
+  const addMember = async () => {
+    const identityId = memberIdentity?.id;
 
     if (!identityId || state === 'loading') return;
 
@@ -1996,6 +2044,17 @@ function AddCommunityMemberDialog({
             placeholder="@ada or identity id"
           />
         </Field>
+        {lookupState === 'loading' && (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
+            {copy.dialog.loadingIdentity}
+          </div>
+        )}
+        {memberIdentity && lookupState === 'ready' && (
+          <IdentityPreviewCard
+            identity={memberIdentity}
+            pictureUrl={memberPictureUrl}
+          />
+        )}
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
             {error}
@@ -2004,7 +2063,7 @@ function AddCommunityMemberDialog({
         <button
           type="button"
           onClick={() => void addMember()}
-          disabled={!identityInput.trim() || state === 'loading'}
+          disabled={!memberIdentity || state === 'loading'}
           className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {copy.communities.addMember}
@@ -2012,6 +2071,35 @@ function AddCommunityMemberDialog({
       </section>
     </div>,
     document.body,
+  );
+}
+
+function IdentityPreviewCard({
+  identity,
+  pictureUrl,
+}: {
+  identity: IdentityResource;
+  pictureUrl: null | string;
+}) {
+  const name = identityName(identity) ?? shortId(identity.id);
+  const handle = identity.profile.handle
+    ? `@${identity.profile.handle}`
+    : identity.id;
+
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+        {pictureUrl ? (
+          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          name.slice(0, 1).toUpperCase()
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate font-black">{name}</p>
+        <p className="truncate text-xs text-white/45">{handle}</p>
+      </div>
+    </div>
   );
 }
 

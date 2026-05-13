@@ -391,6 +391,7 @@ export function GlassWorkspace({
   const handleNotificationAccepted = useCallback(
     (next: {
       communities?: Community[];
+      communityId?: string;
       conversationId?: string;
       conversations?: ConversationResource[];
       session: Session;
@@ -404,6 +405,11 @@ export function GlassWorkspace({
       }
       if (next.conversationId) {
         setActiveConversationId(next.conversationId);
+        setWorkspaceMode('messages');
+      }
+      if (next.communityId) {
+        setActiveCommunityId(next.communityId);
+        setWorkspaceMode('community');
       }
     },
     [setCommunities, setConversations, setSession],
