@@ -513,11 +513,15 @@ export function CommunityWorkspace({
       rawMessage: MessageResource,
       identities: Record<string, IdentityResource>,
     ): Promise<ChatMessage> => {
+      const authorIdentityId =
+        rawMessage.authorIdentityId ??
+        rawMessage.actorIdentityId ??
+        session.identity.id;
       const base = {
         attachments: [],
-        authorIdentityId: rawMessage.authorIdentityId ?? 'unknown',
+        authorIdentityId,
         id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
-        mine: rawMessage.authorIdentityId === session.identity.id,
+        mine: authorIdentityId === session.identity.id,
         raw: rawMessage,
         timestamp: rawMessage.createdAt ?? Date.now(),
       };
