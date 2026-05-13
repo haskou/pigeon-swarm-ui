@@ -1,3 +1,5 @@
+import { KeyPair } from '@haskou/value-objects';
+
 import type {
   IdentityResource,
   LocalKeychain,
@@ -224,6 +226,8 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('creates group conversations and stores the key under the server id', async () => {
+    const recipientKeyPair = await KeyPair.generate();
+    const recipientPublicKey = recipientKeyPair.toPrimitives().publicKey;
     const createdConversation = {
       id: 'group:server-conversation',
       name: 'Mi grupo',
@@ -239,6 +243,18 @@ describe(PigeonApiGateway.name, () => {
           keychainExternalIdentifier: 'keychain-next',
           ownerIdentityId: 'identity-1',
           version: 2,
+        })
+        .mockResolvedValueOnce({
+          encryptedKeyPair: {
+            encryptedPrivateKey: 'encrypted-private-key',
+            publicKey: recipientPublicKey,
+          },
+          id: 'identity-2',
+          networks: ['network-1'],
+          profile: { name: 'Bob' },
+          signature: 'signature',
+          timestamp: 1,
+          version: 1,
         }),
     } as unknown as HttpJsonClient;
     const signer = {
@@ -254,6 +270,11 @@ describe(PigeonApiGateway.name, () => {
       ),
     };
     const session = {
+      encryptedKeyPair: {
+        sign: jest
+          .fn()
+          .mockResolvedValue({ toString: () => 'inviter-signature' }),
+      },
       identity: { id: 'identity-1' },
       keychain: { conversations: {}, version: 0 },
       keychainExternalIdentifier: 'keychain-current',

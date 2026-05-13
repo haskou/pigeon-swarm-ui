@@ -25,7 +25,6 @@ import {
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 
 const MESSAGE_MAX_LENGTH = 4000;
-const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 
 interface ComposerProps {
   disabled: boolean;
@@ -65,6 +64,10 @@ export function Composer({
   const [sending, setSending] = useState(false);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [caretIndex, setCaretIndex] = useState(0);
+  const [dismissedEmojiTrigger, setDismissedEmojiTrigger] = useState<
+    null | string
+  >(null);
+  const [selectedEmojiIndex, setSelectedEmojiIndex] = useState(0);
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +87,15 @@ export function Composer({
       emojiTrigger ? searchEmojiSuggestions(emojiTrigger.query) : [],
     [emojiTrigger],
   );
+  const emojiTriggerKey = emojiTrigger
+    ? `${emojiTrigger.start}:${emojiTrigger.end}:${emojiTrigger.query}`
+    : null;
+  const emojiPanelOpen =
+    emojiSuggestions.length > 0 && emojiTriggerKey !== dismissedEmojiTrigger;
+
+  useEffect(() => {
+    setSelectedEmojiIndex(0);
+  }, [emojiTriggerKey]);
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -105,18 +117,10 @@ export function Composer({
   }, [disabled, replyTo, sending]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
-    const acceptedFiles = selectedFiles.filter(
-      (file) => file.size <= ATTACHMENT_MAX_BYTES,
-    );
-
-    setAttachmentError(
-      acceptedFiles.length === selectedFiles.length
-        ? null
-        : copy.composer.attachmentTooLarge,
-    );
+    setAttachmentError(null);
     setAttachments((current) => [
       ...current,
-      ...acceptedFiles.map((file) => ({
+      ...selectedFiles.map((file) => ({
         file,
         previewUrl: URL.createObjectURL(file),
       })),
@@ -140,6 +144,7 @@ export function Composer({
       if (next.value.length > MESSAGE_MAX_LENGTH) return;
 
       onDraftChange(next.value);
+      setDismissedEmojiTrigger(null);
       setCaretIndex(next.nextCaretIndex);
       requestAnimationFrame(() => {
         textInputRef.current?.focus();
@@ -213,23 +218,18 @@ export function Composer({
 
     if (!canSend) return;
 
-    setSending(true);
-    try {
-      await onSend(
-        trimmed,
-        attachments.map((attachment) => attachment.file),
-      );
-      onDraftChange('');
-      attachments.forEach((attachment) =>
-        URL.revokeObjectURL(attachment.previewUrl),
-      );
-      setAttachments([]);
-      setAttachmentError(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } finally {
-      setSending(false);
-      window.setTimeout(() => textInputRef.current?.focus(), 0);
-    }
+    void onSend(
+      trimmed,
+      attachments.map((attachment) => attachment.file),
+    );
+    onDraftChange('');
+    attachments.forEach((attachment) =>
+      URL.revokeObjectURL(attachment.previewUrl),
+    );
+    setAttachments([]);
+    setAttachmentError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    window.setTimeout(() => textInputRef.current?.focus(), 0);
   };
 
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
@@ -240,18 +240,42 @@ export function Composer({
   const handleContentChange = (event: ChangeEvent<HTMLInputElement>) => {
     onDraftChange(event.target.value);
     setCaretIndex(event.target.selectionStart ?? event.target.value.length);
+    setDismissedEmojiTrigger(null);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (emojiPanelOpen) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDismissedEmojiTrigger(emojiTriggerKey);
+        return;
+      }
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setSelectedEmojiIndex((current) =>
+          Math.min(current + 1, emojiSuggestions.length - 1),
+        );
+        return;
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setSelectedEmojiIndex((current) => Math.max(current - 1, 0));
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        insertEmoji(emojiSuggestions[selectedEmojiIndex] ?? emojiSuggestions[0]);
+        return;
+      }
+    }
+
     if (event.key === 'Escape') {
       onEscape?.();
       return;
     }
-
-    if (event.key !== 'Tab' || emojiSuggestions.length === 0) return;
-
-    event.preventDefault();
-    insertEmoji(emojiSuggestions[0]);
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
@@ -371,7 +395,9 @@ export function Composer({
               <span className="truncate">
                 {progress.phase === 'encrypt'
                   ? copy.composer.encryptingAttachment
-                  : copy.composer.decryptingAttachment}{' '}
+                  : progress.phase === 'upload'
+                    ? copy.composer.uploadingAttachment
+                    : copy.composer.decryptingAttachment}{' '}
                 {progress.filename}
               </span>
               <span className="shrink-0 font-black">{progress.percent}%</span>
@@ -390,9 +416,12 @@ export function Composer({
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
-          {emojiSuggestions.length > 0 && (
+          {emojiPanelOpen && emojiTrigger && (
             <EmojiSuggestionPanel
               onSelect={insertEmoji}
+              query={emojiTrigger.query}
+              selectedIndex={selectedEmojiIndex}
+              setSelectedIndex={setSelectedEmojiIndex}
               suggestions={emojiSuggestions}
             />
           )}
@@ -578,31 +607,48 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
 
 function EmojiSuggestionPanel({
   onSelect,
+  query,
+  selectedIndex,
+  setSelectedIndex,
   suggestions,
 }: {
   onSelect: (suggestion: EmojiSuggestion) => void;
+  query: string;
+  selectedIndex: number;
+  setSelectedIndex: (index: number) => void;
   suggestions: EmojiSuggestion[];
 }) {
   return (
-    <div className="absolute bottom-full left-12 z-30 mb-2 flex max-w-[min(22rem,calc(100vw-3rem))] gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 shadow-2xl shadow-black/40">
-      {suggestions.map((suggestion) => (
-        <button
-          key={suggestion.shortcode}
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            onSelect(suggestion);
-          }}
-          className="flex min-w-12 items-center gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"
-          aria-label={`${copy.composer.insertEmoji} :${suggestion.shortcode}:`}
-          title={`:${suggestion.shortcode}:`}
-        >
-          <span className="text-2xl leading-none">{suggestion.emoji}</span>
-          <span className="hidden max-w-24 truncate text-xs font-black text-white/65 sm:block">
-            :{suggestion.shortcode}:
-          </span>
-        </button>
-      ))}
+    <div className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-[min(28rem,calc(100vh-12rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#24242b] shadow-2xl shadow-black/40">
+      <div className="border-b border-white/5 px-4 py-3 text-xs font-black uppercase tracking-wide text-white/45">
+        {copy.composer.emojiMatches} :{query.toUpperCase()}
+      </div>
+      <div className="max-h-[min(24rem,calc(100vh-16rem))] overflow-y-auto p-2">
+        {suggestions.map((suggestion, index) => (
+          <button
+            key={suggestion.shortcode}
+            type="button"
+            onMouseEnter={() => setSelectedIndex(index)}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onSelect(suggestion);
+            }}
+            className={cx(
+              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition',
+              index === selectedIndex ? 'bg-white/12' : 'hover:bg-white/8',
+            )}
+            aria-label={`${copy.composer.insertEmoji} :${suggestion.shortcode}:`}
+            title={`:${suggestion.shortcode}:`}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center text-xl leading-none">
+              {suggestion.emoji}
+            </span>
+            <span className="min-w-0 truncate text-sm font-semibold text-white/80">
+              :{suggestion.shortcode}:
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type {
+  Community,
   ConversationResource,
   NotificationResource,
   Session,
@@ -15,8 +16,9 @@ type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
 type UseNotificationsInput = {
   onAccepted: (next: {
-    conversationId: string;
-    conversations: ConversationResource[];
+    communities?: Community[];
+    conversationId?: string;
+    conversations?: ConversationResource[];
     session: Session;
   }) => void;
   onAcceptedPanelClose: () => void;
@@ -102,11 +104,21 @@ export function useNotifications({
           keychainExternalIdentifier: result.keychainExternalIdentifier,
         };
         const conversations =
-          await pigeonApplication.listConversations(nextSession);
+          notification.type === 'community_invitation'
+            ? undefined
+            : await pigeonApplication.listConversations(nextSession);
+        const communities =
+          notification.type === 'community_invitation'
+            ? await pigeonApplication.listCommunities(nextSession)
+            : undefined;
 
         replaceNotification(result.notification);
         onAccepted({
-          conversationId: notification.payload.conversationId,
+          communities,
+          conversationId:
+            notification.type === 'community_invitation'
+              ? undefined
+              : notification.payload.conversationId,
           conversations,
           session: nextSession,
         });

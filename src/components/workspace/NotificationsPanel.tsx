@@ -21,6 +21,35 @@ interface NotificationsPanelProps {
   onDecline: (notificationId: string) => void;
 }
 
+function notificationTitle(notification: NotificationResource): string {
+  if (notification.type === 'community_invitation') {
+    return copy.notifications.communityInvitationTitle;
+  }
+
+  if (notification.type === 'group_conversation_invitation') {
+    return copy.notifications.groupInvitationTitle;
+  }
+
+  return copy.notifications.invitationTitle;
+}
+
+function notificationTarget(notification: NotificationResource): {
+  label: string;
+  value: string;
+} {
+  if (notification.type === 'community_invitation') {
+    return {
+      label: copy.notifications.community,
+      value: notification.payload.communityId,
+    };
+  }
+
+  return {
+    label: copy.notifications.conversation,
+    value: notification.payload.conversationId,
+  };
+}
+
 export function NotificationsPanel({
   action,
   error,
@@ -66,15 +95,18 @@ export function NotificationsPanel({
             </div>
           )}
 
-          {notifications.map((notification) => (
-            <article
-              key={notification.id}
-              className="rounded-3xl border border-white/10 bg-black/25 p-4"
-            >
+          {notifications.map((notification) => {
+            const target = notificationTarget(notification);
+
+            return (
+              <article
+                key={notification.id}
+                className="rounded-3xl border border-white/10 bg-black/25 p-4"
+              >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="font-black text-white">
-                    {copy.notifications.invitationTitle}
+                    {notificationTitle(notification)}
                   </h3>
                   <p className="mt-1 text-sm text-white/55">
                     {copy.notifications.invitedBy}{' '}
@@ -100,9 +132,9 @@ export function NotificationsPanel({
 
               <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
                 <div className="flex items-center justify-between gap-3">
-                  <span>{copy.notifications.conversation}</span>
+                  <span>{target.label}</span>
                   <span className="truncate font-semibold text-white/70">
-                    {shortId(notification.payload.conversationId)}
+                    {shortId(target.value)}
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
@@ -142,8 +174,9 @@ export function NotificationsPanel({
                   {copy.notifications.archive}
                 </button>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>

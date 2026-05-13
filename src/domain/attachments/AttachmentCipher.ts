@@ -5,7 +5,7 @@ import type {
   PendingMessageAttachment,
 } from '../types';
 
-const chunkSize = 1024 * 1024;
+const chunkSize = 8 * 1024 * 1024;
 const largeAttachmentBytes = 5 * 1024 * 1024;
 
 type AttachmentProgressHandler = (progress: AttachmentProgress) => void;
