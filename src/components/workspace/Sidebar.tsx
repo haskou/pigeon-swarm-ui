@@ -709,16 +709,6 @@ function ProfileEditor({
                   ✎
                 </span>
               </button>
-              <div className="mt-3 min-w-0">
-                <div className="truncate text-lg font-black text-white">
-                  {name.trim() || session.identity.profile.name}
-                </div>
-                <div className="truncate text-xs font-bold text-white/45">
-                  {normalizedHandle
-                    ? `@${normalizedHandle}`
-                    : copy.profile.hoverToEdit}
-                </div>
-              </div>
             </div>
             <input
               ref={pictureInputRef}

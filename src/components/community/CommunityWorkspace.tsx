@@ -1586,14 +1586,6 @@ function ManageCommunityDialog({
                     ✎
                   </span>
                 </button>
-                <div className="mt-3 min-w-0">
-                  <div className="truncate text-lg font-black text-white">
-                    {name.trim() || community.name}
-                  </div>
-                  <div className="truncate text-xs font-bold text-white/45">
-                    {description.trim() || community.description}
-                  </div>
-                </div>
               </div>
               <input
                 ref={avatarInputRef}
