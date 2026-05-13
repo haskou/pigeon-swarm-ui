@@ -626,14 +626,18 @@ function ProfileEditor({
       const bannerCid = bannerFile
         ? (await pigeonApplication.uploadPublicFile(session, bannerFile)).cid
         : session.identity.profile.banner?.trim() || undefined;
-      const identity = await pigeonApplication.updateIdentityProfile(session, {
-        banner: bannerCid,
-        biography: biography.trim() || undefined,
-        handle: normalizedHandle,
-        name: name.trim(),
-        networks: identityNetworkIds,
-        picture: pictureCid,
-      }, wantsPasswordChange ? newPassword : undefined);
+      const identity = await pigeonApplication.updateIdentityProfile(
+        session,
+        {
+          banner: bannerCid,
+          biography: biography.trim() || undefined,
+          handle: normalizedHandle,
+          name: name.trim(),
+          networks: identityNetworkIds,
+          picture: pictureCid,
+        },
+        wantsPasswordChange ? newPassword : undefined,
+      );
 
       onUpdated({
         ...session,
@@ -656,7 +660,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2rem] p-5 shadow-2xl shadow-black/35"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2rem] p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -670,7 +674,7 @@ function ProfileEditor({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-4">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
           <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
             <button
               type="button"
@@ -719,7 +723,9 @@ function ProfileEditor({
                 <input
                   aria-label={copy.profile.handle}
                   value={handle}
-                  onChange={(event) => setHandle(normalizeHandle(event.target.value))}
+                  onChange={(event) =>
+                    setHandle(normalizeHandle(event.target.value))
+                  }
                   placeholder="@ada"
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
@@ -746,104 +752,106 @@ function ProfileEditor({
               className="sr-only"
             />
           </div>
-          <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
-            <div className="text-sm font-black text-white/70">
-              {copy.profile.networks}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {identityNetworkIds.length > 0 ? (
-                identityNetworkIds.map((networkId) => (
-                  <span
-                    key={networkId}
-                    title={networkId}
-                    className="min-w-0 max-w-full truncate rounded-2xl bg-white/10 px-3 py-2 text-xs font-black text-white/70"
-                  >
-                    {networkNamesById.get(networkId) ?? shortId(networkId)}
+          <div className="grid gap-4">
+            <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-black text-white/70">
+                {copy.profile.networks}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {identityNetworkIds.length > 0 ? (
+                  identityNetworkIds.map((networkId) => (
+                    <span
+                      key={networkId}
+                      title={networkId}
+                      className="min-w-0 max-w-full truncate rounded-2xl bg-white/10 px-3 py-2 text-xs font-black text-white/70"
+                    >
+                      {networkNamesById.get(networkId) ?? shortId(networkId)}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs font-bold text-white/40">
+                    {copy.profile.noNetworks}
                   </span>
-                ))
-              ) : (
-                <span className="text-xs font-bold text-white/40">
-                  {copy.profile.noNetworks}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <GlassSelect
-                ariaLabel={copy.profile.availableNetwork}
-                className="min-w-0 flex-1"
-                disabled={nodeNetworkOptions.length === 0}
-                onChange={setNetworkToAdd}
-                options={
-                  nodeNetworkOptions.length > 0
-                    ? nodeNetworkOptions
-                    : [
-                        {
-                          disabled: true,
-                          label: copy.profile.noAvailableNetworks,
-                          value: '',
-                        },
-                      ]
-                }
-                value={networkToAdd}
-              />
+                )}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <GlassSelect
+                  ariaLabel={copy.profile.availableNetwork}
+                  className="min-w-0 flex-1"
+                  disabled={nodeNetworkOptions.length === 0}
+                  onChange={setNetworkToAdd}
+                  options={
+                    nodeNetworkOptions.length > 0
+                      ? nodeNetworkOptions
+                      : [
+                          {
+                            disabled: true,
+                            label: copy.profile.noAvailableNetworks,
+                            value: '',
+                          },
+                        ]
+                  }
+                  value={networkToAdd}
+                />
+                <button
+                  type="button"
+                  onClick={addNetwork}
+                  disabled={!networkToAdd || nodeNetworkOptions.length === 0}
+                  className="shrink-0 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {copy.profile.addNetwork}
+                </button>
+              </div>
+            </section>
+            <section className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
               <button
                 type="button"
-                onClick={addNetwork}
-                disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                className="shrink-0 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
+                aria-expanded={passwordSectionOpen}
               >
-                {copy.profile.addNetwork}
+                <span>{copy.profile.changePassword}</span>
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'text-white/45 transition-transform',
+                    passwordSectionOpen && 'rotate-180',
+                  )}
+                >
+                  ⌄
+                </span>
               </button>
-            </div>
-          </section>
-          <section className="mt-3 overflow-hidden rounded-3xl border border-white/10 bg-black/20">
-            <button
-              type="button"
-              onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
-              aria-expanded={passwordSectionOpen}
-            >
-              <span>{copy.profile.changePassword}</span>
-              <span
-                aria-hidden="true"
-                className={cx(
-                  'text-white/45 transition-transform',
-                  passwordSectionOpen && 'rotate-180',
-                )}
-              >
-                ⌄
-              </span>
-            </button>
-            {passwordSectionOpen && (
-              <div className="border-t border-white/10 p-4">
-                <p className="text-xs font-bold text-white/45">
-                  {copy.profile.newPasswordHelp}
-                </p>
-                <div className="mt-4 grid gap-3">
-                  <ProfileInput
-                    label={copy.profile.newPassword}
-                    value={newPassword}
-                    onChange={setNewPassword}
-                    placeholder="••••••••••••"
-                    type="password"
-                  />
-                  <ProfileInput
-                    label={copy.profile.newPasswordConfirm}
-                    value={newPasswordConfirmation}
-                    onChange={setNewPasswordConfirmation}
-                    placeholder="••••••••••••"
-                    type="password"
+              {passwordSectionOpen && (
+                <div className="border-t border-white/10 p-4">
+                  <p className="text-xs font-bold text-white/45">
+                    {copy.profile.newPasswordHelp}
+                  </p>
+                  <div className="mt-4 grid gap-3">
+                    <ProfileInput
+                      label={copy.profile.newPassword}
+                      value={newPassword}
+                      onChange={setNewPassword}
+                      placeholder="••••••••••••"
+                      type="password"
+                    />
+                    <ProfileInput
+                      label={copy.profile.newPasswordConfirm}
+                      value={newPasswordConfirmation}
+                      onChange={setNewPasswordConfirmation}
+                      placeholder="••••••••••••"
+                      type="password"
+                    />
+                  </div>
+                  <PasswordChecklist
+                    checks={{
+                      ...passwordChecks,
+                      match: passwordsMatch,
+                    }}
                   />
                 </div>
-                <PasswordChecklist
-                  checks={{
-                    ...passwordChecks,
-                    match: passwordsMatch,
-                  }}
-                />
-              </div>
-            )}
-          </section>
+              )}
+            </section>
+          </div>
         </div>
 
         {error && (
