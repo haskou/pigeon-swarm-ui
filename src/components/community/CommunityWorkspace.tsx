@@ -74,6 +74,12 @@ type MemberView = {
   pictureUrl: null | string;
 };
 
+type CommunityPendingSend = {
+  attachments: File[];
+  channelId: string;
+  content: string;
+};
+
 export function CommunityWorkspace({
   activeChannelId,
   channelUnreadCounts = {},
@@ -129,6 +135,10 @@ export function CommunityWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [failedSends, setFailedSends] = useState<Record<string, CommunityPendingSend>>(
+    {},
+  );
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const owner = community.ownerIdentityId === session.identity.id;
@@ -146,6 +156,16 @@ export function CommunityWorkspace({
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (message) => message.deliveryStatus || message.raw.type !== 'deleted',
+      ),
+    [messages],
+  );
+  const missingCommunityKey =
+    visibleMessages.length > 0 &&
+    visibleMessages.every((message) => message.encrypted);
   const members = useMemo<MemberView[]>(
     () =>
       community.memberIds.map((identityId) => ({
@@ -399,8 +419,11 @@ export function CommunityWorkspace({
 
   const handleMessagesScroll = () => {
     const scroller = scrollerRef.current;
+    const nearBottom = isScrolledNearBottom();
 
-    if (isScrolledNearBottom()) {
+    setIsAwayFromBottom(!nearBottom);
+
+    if (nearBottom) {
       setNewChannelMessageCount(0);
       if (selectedChannelId) onChannelViewed?.(selectedChannelId);
     }
@@ -431,29 +454,70 @@ export function CommunityWorkspace({
   ) => {
     if (!selectedChannelId) return;
 
+    await sendPendingChannelMessage({
+      attachments,
+      channelId: selectedChannelId,
+      content,
+    });
+  };
+
+  const sendPendingChannelMessage = async (payload: CommunityPendingSend) => {
     setSendError(null);
     const timestamp = Date.now();
+    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${crypto.randomUUID()}`;
+
+    setFailedSends((current) => {
+      const next = { ...current };
+
+      delete next[optimisticId];
+
+      return next;
+    });
+    setMessages((current) => [
+      ...current,
+      {
+        attachments: [],
+        authorIdentityId: session.identity.id,
+        content:
+          payload.content ||
+          payload.attachments.map((attachment) => attachment.name).join(', '),
+        deliveryStatus: 'pending',
+        encrypted: false,
+        id: optimisticId,
+        mine: true,
+        raw: {
+          channelId: payload.channelId,
+          communityId: community.id,
+          id: optimisticId,
+          type: 'sent',
+        },
+        timestamp,
+      },
+    ]);
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ block: 'end' });
+    });
 
     try {
       const identities = await resolveMemberIdentities();
       const messageAttachments = await pigeonApplication.publishMessageAttachments(
         session,
-        attachments,
+        payload.attachments,
         setAttachmentProgress,
       );
       const encryptedPayload = await encryptCommunityChannelPayload({
         attachments: messageAttachments,
         authorIdentityId: session.identity.id,
-        channelId: selectedChannelId,
+        channelId: payload.channelId,
         communityId: community.id,
-        content,
+        content: payload.content,
         recipients: Object.values(identities),
         timestamp,
       });
       const created = await pigeonApplication.createCommunityChannelMessage(
         session,
         community.id,
-        selectedChannelId,
+        payload.channelId,
         {
           attachmentExternalIdentifiers: messageAttachments.map(
             (attachment) => attachment.cid,
@@ -464,19 +528,41 @@ export function CommunityWorkspace({
       );
       const projected = await projectChannelMessage(created, identities);
 
-      setMessages((current) => [...current, projected]);
+      setMessages((current) =>
+        [...current.filter((message) => message.id !== optimisticId), projected].sort(
+          (left, right) => left.timestamp - right.timestamp,
+        ),
+      );
       requestAnimationFrame(() => {
         bottomRef.current?.scrollIntoView({ block: 'end' });
       });
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.communities.messageError));
+      setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === optimisticId
+            ? { ...message, deliveryStatus: 'failed' }
+            : message,
+        ),
+      );
     } finally {
       setAttachmentProgress(null);
     }
   };
 
+  const retryChannelMessage = (message: ChatMessage) => {
+    const pending = failedSends[message.id];
+
+    if (!pending) return;
+
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    void sendPendingChannelMessage(pending);
+  };
+
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
     if (!selectedChannelId || !message.mine) return;
+    if (!window.confirm(copy.messages.deleteConfirm)) return;
 
     setMessageContextMenu(null);
     setSendError(null);
@@ -900,21 +986,36 @@ export function CommunityWorkspace({
                 onScroll={handleMessagesScroll}
                 className="h-full overflow-y-auto p-4 sm:p-6"
               >
-                {messageState === 'loading' && (
+                {messageState === 'loading' && visibleMessages.length === 0 ? (
+                  <ChannelMessageSkeleton />
+                ) : messageState === 'loading' ? (
                   <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
                     {copy.chat.loadingEvents}
                   </div>
-                )}
+                ) : null}
                 <div className="space-y-2">
                 {!messageCursor &&
-                  messages.length > 0 &&
+                  visibleMessages.length > 0 &&
                   messageState !== 'loading' && (
                     <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                       {copy.chat.noMoreMessages}
                     </div>
                   )}
-                {messages.map((message, index) => {
-                  const nextMessage = messages[index + 1];
+                {missingCommunityKey && (
+                  <div className="grid min-h-[28vh] place-items-center">
+                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                        <LockIcon locked={false} />
+                      </div>
+                      <div className="font-black">{copy.chat.e2eMissing}</div>
+                      <div className="mt-2 text-rose-100/65">
+                        {copy.messages.missingCommunityKey}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!missingCommunityKey && visibleMessages.map((message, index) => {
+                  const nextMessage = visibleMessages[index + 1];
                   const showAvatar =
                     !nextMessage ||
                     nextMessage.authorIdentityId !== message.authorIdentityId;
@@ -946,11 +1047,12 @@ export function CommunityWorkspace({
                         setMessageContextMenu({ message: targetMessage, x, y })
                       }
                       onReplyReferenceClick={() => undefined}
+                      onRetryMessage={retryChannelMessage}
                       showAvatar={showAvatar}
                     />
                   );
                 })}
-                {messages.length === 0 && messageState !== 'loading' && (
+                {visibleMessages.length === 0 && messageState !== 'loading' && (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                     {copy.communities.emptyChannel}
                   </div>
@@ -958,19 +1060,22 @@ export function CommunityWorkspace({
                 <div ref={bottomRef} />
                 </div>
               </div>
-              {newChannelMessageCount > 0 && (
+              {(newChannelMessageCount > 0 || isAwayFromBottom) && (
                 <button
                   type="button"
                   onClick={() => {
                     setNewChannelMessageCount(0);
+                    setIsAwayFromBottom(false);
                     if (selectedChannelId) onChannelViewed?.(selectedChannelId);
                     bottomRef.current?.scrollIntoView({ block: 'end' });
                   }}
                   className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
                 >
-                  {newChannelMessageCount > 1
-                    ? copy.chat.newMessages
-                    : copy.chat.newMessage}
+                  {newChannelMessageCount > 0
+                    ? newChannelMessageCount > 1
+                      ? copy.chat.newMessages
+                      : copy.chat.newMessage
+                    : copy.chat.jumpToLatest}
                 </button>
               )}
             </div>
@@ -1633,6 +1738,35 @@ function MemberRow({
         </span>
       )}
     </button>
+  );
+}
+
+function ChannelMessageSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[0, 1, 2, 3].map((item) => (
+        <div
+          key={item}
+          className={cx(
+            'flex animate-pulse items-end gap-2',
+            item % 2 === 0 ? 'justify-start' : 'justify-end',
+          )}
+        >
+          {item % 2 === 0 && (
+            <div className="h-9 w-9 rounded-2xl bg-white/10" />
+          )}
+          <div
+            className={cx(
+              'rounded-3xl bg-white/10',
+              item % 2 === 0 ? 'h-16 w-56' : 'h-12 w-44',
+            )}
+          />
+          {item % 2 !== 0 && (
+            <div className="h-9 w-9 rounded-2xl bg-white/10" />
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

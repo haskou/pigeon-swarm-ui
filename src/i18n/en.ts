@@ -79,6 +79,7 @@ export const copy = {
     menu: 'Open sidebar',
     newMessage: 'New message',
     newMessages: 'New messages',
+    jumpToLatest: 'Jump to latest',
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
     noMoreMessages: 'No more messages',
@@ -281,7 +282,10 @@ export const copy = {
     cancelReply: 'Cancel reply',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
+    deleteConfirm: 'Delete this message?',
     deleteError: 'The message could not be deleted.',
+    missingCommunityKey:
+      'This community key is missing from the keychain, so channel messages cannot be decrypted.',
     missingConversationKey:
       'This conversation key is missing from the keychain.',
     missingKey:

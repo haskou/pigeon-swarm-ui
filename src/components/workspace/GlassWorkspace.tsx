@@ -72,6 +72,8 @@ const draftsStorageKey = (identityId: string) =>
   `pigeon:conversationDrafts:${identityId}`;
 const workspaceStorageKey = (identityId: string) =>
   `pigeon:workspace:${identityId}`;
+const communityUnreadStorageKey = (identityId: string) =>
+  `pigeon:communityUnread:${identityId}`;
 
 function initialConversationId(
   conversations: ConversationResource[],
@@ -101,6 +103,17 @@ function loadWorkspacePreference(identityId: string): WorkspacePreference {
     return JSON.parse(
       globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
     ) as WorkspacePreference;
+  } catch {
+    return {};
+  }
+}
+
+function loadCommunityUnreadCounts(identityId: string): CommunityUnreadCounts {
+  try {
+    return JSON.parse(
+      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
+        '{}',
+    ) as CommunityUnreadCounts;
   } catch {
     return {};
   }
@@ -175,7 +188,9 @@ export function GlassWorkspace({
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [communityUnreadCountsById, setCommunityUnreadCountsById] =
-    useState<CommunityUnreadCounts>({});
+    useState<CommunityUnreadCounts>(() =>
+      loadCommunityUnreadCounts(session.identity.id),
+    );
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
   >('reconnecting');
@@ -366,6 +381,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     setDrafts(loadDrafts(session.identity.id));
+    setCommunityUnreadCountsById(loadCommunityUnreadCounts(session.identity.id));
   }, [session.identity.id]);
 
   useEffect(() => {
@@ -410,6 +426,13 @@ export function GlassWorkspace({
     session.identity.id,
     workspaceMode,
   ]);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(
+      communityUnreadStorageKey(session.identity.id),
+      JSON.stringify(communityUnreadCountsById),
+    );
+  }, [communityUnreadCountsById, session.identity.id]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
