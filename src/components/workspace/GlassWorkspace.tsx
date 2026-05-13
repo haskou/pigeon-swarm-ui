@@ -222,6 +222,12 @@ export function GlassWorkspace({
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
   const sendQueueRef = useRef(Promise.resolve());
+  const sessionRef = useRef(session);
+  const suppressMessageLoadsUntilRef = useRef(0);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -235,6 +241,20 @@ export function GlassWorkspace({
     messageStateRef.current = state;
     setMessageState(state);
   }, []);
+
+  const suppressMessageLoadsBriefly = useCallback(() => {
+    suppressMessageLoadsUntilRef.current = Date.now() + 800;
+  }, []);
+
+  const openNotificationsPanel = useCallback(() => {
+    suppressMessageLoadsBriefly();
+    setNotificationsOpen(true);
+  }, [suppressMessageLoadsBriefly]);
+
+  const closeNotificationsPanel = useCallback(() => {
+    suppressMessageLoadsBriefly();
+    setNotificationsOpen(false);
+  }, [suppressMessageLoadsBriefly]);
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -362,7 +382,7 @@ export function GlassWorkspace({
     visible: visibleNotifications,
   } = useNotifications({
     onAccepted: handleNotificationAccepted,
-    onAcceptedPanelClose: () => setNotificationsOpen(false),
+    onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
   const nodeUnclaimed = !node?.owner;
@@ -538,22 +558,18 @@ export function GlassWorkspace({
     };
   }, []);
 
-  useEffect(() => {
-    void refreshNotifications();
-  }, [refreshNotifications]);
-
   const closeTransientUi = useCallback(() => {
     setMessageContextMenu(null);
     setRawMessage(null);
     setReplyTarget(null);
     setIsCreateOpen(false);
     setIsCreateCommunityOpen(false);
-    setNotificationsOpen(false);
+    closeNotificationsPanel();
     setNodeSettingsOpen(false);
     setInspectorOpen(false);
     setCommunityMembersOpen(false);
     setSidebarOpen(false);
-  }, []);
+  }, [closeNotificationsPanel]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -574,7 +590,7 @@ export function GlassWorkspace({
       setSendError(null);
       try {
         const result = await pigeonApplication.loadMessages(
-          session,
+          sessionRef.current,
           conversationId,
         );
 
@@ -598,7 +614,7 @@ export function GlassWorkspace({
 
       setMessageLoadState('idle');
     },
-    [scrollMessagesToBottom, session, setMessageLoadState, updateMessageCursor],
+    [scrollMessagesToBottom, setMessageLoadState, updateMessageCursor],
   );
 
   useEffect(() => {
@@ -631,6 +647,7 @@ export function GlassWorkspace({
       !activeConversationKey ||
       !messageCursorRef.current ||
       messageStateRef.current === 'loading' ||
+      Date.now() < suppressMessageLoadsUntilRef.current ||
       Date.now() < keepMessageBottomUntilRef.current
     )
       return;
@@ -643,7 +660,7 @@ export function GlassWorkspace({
     setMessageLoadState('loading');
     try {
       const result = await pigeonApplication.loadMessages(
-        session,
+        sessionRef.current,
         activeConversation.id,
         messageCursorRef.current,
       );
@@ -677,6 +694,7 @@ export function GlassWorkspace({
     const isScrollingUp = scrollTop < lastScrollTopRef.current;
 
     lastScrollTopRef.current = scrollTop;
+    if (Date.now() < suppressMessageLoadsUntilRef.current) return;
     if (isScrolledNearBottom()) setNewMessageCount(0);
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
@@ -1123,7 +1141,7 @@ export function GlassWorkspace({
             setWorkspaceMode('messages');
             setSidebarOpen(false);
           }}
-          onNotificationsClick={() => setNotificationsOpen(true)}
+          onNotificationsClick={openNotificationsPanel}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
         />
@@ -1155,7 +1173,7 @@ export function GlassWorkspace({
                     setWorkspaceMode('messages');
                     setSidebarOpen(false);
                   }}
-                  onNotificationsClick={() => setNotificationsOpen(true)}
+                  onNotificationsClick={openNotificationsPanel}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => setInspectorOpen(true)}
                   peerCount={peers.length}
@@ -1275,7 +1293,7 @@ export function GlassWorkspace({
                   setWorkspaceMode('messages');
                   setSidebarOpen(false);
                 }}
-                onNotificationsClick={() => setNotificationsOpen(true)}
+                onNotificationsClick={openNotificationsPanel}
                 onSettingsClick={() => setNodeSettingsOpen(true)}
                 onInspectorClick={() => {
                   setSidebarOpen(false);
@@ -1403,7 +1421,7 @@ export function GlassWorkspace({
           notifications={visibleNotifications}
           onAccept={(notification) => void acceptNotification(notification)}
           onArchive={archiveNotification}
-          onClose={() => setNotificationsOpen(false)}
+          onClose={closeNotificationsPanel}
           onDecline={(notificationId) =>
             void declineNotification(notificationId)
           }
