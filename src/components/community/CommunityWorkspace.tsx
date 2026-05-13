@@ -458,6 +458,15 @@ export function CommunityWorkspace({
         timestamp: rawMessage.createdAt ?? Date.now(),
       };
 
+      if (rawMessage.type === 'call_event') {
+        return {
+          ...base,
+          content: '',
+          encrypted: false,
+          kind: 'call-event',
+        };
+      }
+
       try {
         const payload = await decryptCommunityChannelPayload(
           session,
@@ -807,7 +816,10 @@ export function CommunityWorkspace({
       return;
     }
 
-    if (realtimeEvent.type !== 'communities.v1.channel.message.was_sent') {
+    if (
+      realtimeEvent.type !== 'communities.v1.channel.message.was_sent' &&
+      realtimeEvent.type !== 'communities.v1.call.event.was_recorded'
+    ) {
       return;
     }
 

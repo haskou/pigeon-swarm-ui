@@ -6,6 +6,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   MessageAttachment,
+  MessageResource,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -57,6 +58,8 @@ export function MessageBubble({
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
+  const callEvent =
+    message.raw.type === 'call_event' || message.kind === 'call-event';
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
   const compactTimestamp =
@@ -138,6 +141,10 @@ export function MessageBubble({
       onMessageMenuOpen(message, event.clientX, event.clientY);
     }, 550);
   };
+
+  if (callEvent) {
+    return <CallEventMessage message={message} />;
+  }
 
   return (
     <>
@@ -273,7 +280,9 @@ export function MessageBubble({
             )}
             {message.deliveryStatus === 'failed' && (
               <>
-                <span className="text-rose-100">{copy.messages.sendFailed}</span>
+                <span className="text-rose-100">
+                  {copy.messages.sendFailed}
+                </span>
                 {onRetryMessage && (
                   <button
                     type="button"
@@ -309,6 +318,43 @@ export function MessageBubble({
       )}
     </>
   );
+}
+
+function CallEventMessage({ message }: { message: ChatMessage }) {
+  const label = callEventLabel(message.raw.callEventType);
+  const duration = formatDuration(message.raw.durationMs);
+
+  return (
+    <div data-message-id={message.id} className="flex justify-center py-2">
+      <div className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/55">
+        <span>{label}</span>
+        {duration && <span className="text-white/35"> · {duration}</span>}
+        <span className="text-white/30">
+          {' '}
+          · {formatTime(message.timestamp)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function callEventLabel(eventType: MessageResource['callEventType']): string {
+  if (eventType === 'missed') return copy.calls.missed;
+  if (eventType === 'declined') return copy.calls.declined;
+
+  return copy.calls.ended;
+}
+
+function formatDuration(durationMs?: number): string | null {
+  if (!durationMs || durationMs <= 0) return null;
+
+  const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) return `${seconds}s`;
+
+  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
 }
 
 function ImageAttachmentAlbum({

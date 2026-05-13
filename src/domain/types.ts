@@ -227,6 +227,10 @@ export type MessageResource = {
   signature?: string;
   timestamp?: number;
   createdAt?: number;
+  callEventType?: 'declined' | 'ended' | 'missed';
+  callId?: string;
+  actorIdentityId?: string;
+  durationMs?: number;
   previousMessageIds?: string[];
   replyToMessageId?: string;
   targetMessageId?: string;
@@ -252,6 +256,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
+  kind?: 'call-event' | 'message';
   deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;

@@ -15,6 +15,7 @@ import type {
   Community,
   ConversationKeyEntry,
   ConversationResource,
+  MessageResource,
   MessageReplyPreview,
   Session,
 } from '../../domain/types';
@@ -1464,7 +1465,10 @@ export function GlassWorkspace({
         return;
       }
 
-      if (event.type === 'communities.v1.channel.message.was_deleted') {
+      if (
+        event.type === 'communities.v1.channel.message.was_deleted' ||
+        event.type === 'communities.v1.call.event.was_recorded'
+      ) {
         setCommunityRealtimeEvent(event);
         return;
       }
@@ -1479,25 +1483,38 @@ export function GlassWorkspace({
         return;
       }
 
-      if (event.type.startsWith('conversations.v1.message.')) {
+      if (
+        event.type.startsWith('conversations.v1.message.') ||
+        event.type === 'conversations.v1.call.event.was_recorded'
+      ) {
         void refreshConversations().catch(() => undefined);
         const conversationId = eventAggregateId(event);
         const messageId = stringAttribute(event, 'messageId', 'message_id');
+        const timelineMessage = recordAttribute(event, 'message') as
+          | MessageResource
+          | undefined;
         const authorId = stringAttribute(event, 'authorId', 'author_id');
         const isActiveConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
           conversationId === activeConversation?.id;
 
-        if (!messageId || !conversationId) return;
+        if ((!messageId && !timelineMessage) || !conversationId) return;
 
         setConversations((current) =>
           bumpConversationActivity(current, conversationId, event.occurred_on),
         );
 
-        if (!isActiveConversation && authorId !== session.identity.id) {
+        if (
+          !isActiveConversation &&
+          authorId !== session.identity.id &&
+          timelineMessage?.actorIdentityId !== session.identity.id
+        ) {
+          const unreadMessageId = messageId ?? timelineMessage?.id;
+
           playNotificationSound();
-          markUnreadMessage(conversationId, messageId);
+          if (unreadMessageId)
+            markUnreadMessage(conversationId, unreadMessageId);
         }
 
         if (isActiveConversation) {
@@ -1519,8 +1536,31 @@ export function GlassWorkspace({
             return;
           }
 
+          if (timelineMessage) {
+            const shouldAutoScroll = isScrolledNearBottom();
+            const message: ChatMessage = {
+              attachments: [],
+              authorIdentityId:
+                timelineMessage.actorIdentityId ??
+                timelineMessage.authorIdentityId ??
+                'system',
+              content: '',
+              encrypted: false,
+              id: timelineMessage.id ?? `${event.event_id}:call-event`,
+              kind: 'call-event',
+              mine: timelineMessage.actorIdentityId === session.identity.id,
+              raw: timelineMessage,
+              timestamp: timelineMessage.createdAt ?? event.occurred_on,
+            };
+
+            setMessages((current) => mergeMessages(current, [message]));
+            if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+            return;
+          }
+
           if (
             !activeConversationKeyId ||
+            !messageId ||
             messages.some((message) => message.id === messageId)
           ) {
             return;

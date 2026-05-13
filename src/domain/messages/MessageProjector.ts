@@ -61,6 +61,11 @@ export class MessageProjector {
     message: MessageResource,
   ): Promise<ChatMessage> {
     const base = this.baseMessage(session, message);
+
+    if (message.type === 'call_event') {
+      return this.callEventMessage(base, message);
+    }
+
     const encryptedPayload = message.encryptedPayload ?? message.payload;
 
     if (!encryptedPayload) {
@@ -157,6 +162,20 @@ export class MessageProjector {
       attachments: [],
       content: message.content ?? '',
       encrypted: false,
+      raw: message,
+    };
+  }
+
+  private callEventMessage(
+    base: Omit<ChatMessage, 'content' | 'encrypted'>,
+    message: MessageResource,
+  ): ChatMessage {
+    return {
+      ...base,
+      attachments: [],
+      content: '',
+      encrypted: false,
+      kind: 'call-event',
       raw: message,
     };
   }
