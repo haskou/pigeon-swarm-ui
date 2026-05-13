@@ -88,6 +88,9 @@ export const copy = {
     noConversationHint: 'Create a conversation to start',
     noMoreMessages: 'No more messages',
     realtimeConnected: 'Live',
+    realtimeEventsEmpty:
+      'No WebSocket events captured while this viewer has been open.',
+    realtimeEventsTitle: 'WebSocket events',
     realtimeReconnecting: 'Reconnecting',
     sendInvite: 'Send invite',
     viewData: 'View data',

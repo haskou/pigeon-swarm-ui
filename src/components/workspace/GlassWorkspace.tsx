@@ -56,6 +56,7 @@ import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
+import { RealtimeEventsDialog } from './RealtimeEventsDialog';
 import {
   MessageContextMenu,
   type MessageContextMenuState,
@@ -206,6 +207,10 @@ export function GlassWorkspace({
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
   >('reconnecting');
+  const [realtimeEventsOpen, setRealtimeEventsOpen] = useState(false);
+  const [realtimeEventLog, setRealtimeEventLog] = useState<
+    RealtimeDomainEvent[]
+  >([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -283,6 +288,11 @@ export function GlassWorkspace({
     suppressMessageLoadsBriefly();
     setNotificationsOpen(false);
   }, [suppressMessageLoadsBriefly]);
+
+  const openRealtimeEvents = useCallback(() => {
+    setRealtimeEventLog([]);
+    setRealtimeEventsOpen(true);
+  }, []);
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -888,6 +898,7 @@ export function GlassWorkspace({
     setIsCreateCommunityOpen(false);
     closeNotificationsPanel();
     setNodeSettingsOpen(false);
+    setRealtimeEventsOpen(false);
     setInspectorOpen(false);
     setCommunityMembersOpen(false);
     setSidebarOpen(false);
@@ -1327,6 +1338,10 @@ export function GlassWorkspace({
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
+      if (realtimeEventsOpen) {
+        setRealtimeEventLog((current) => [...current.slice(-99), event]);
+      }
+
       if (event.type.startsWith('calls.')) {
         if (event.type === 'calls.v1.signal.sent') {
           const callId = eventAggregateId(event) ?? stringAttribute(event, 'callId');
@@ -1522,6 +1537,7 @@ export function GlassWorkspace({
       refreshConversations,
       refreshNotifications,
       refreshSession,
+      realtimeEventsOpen,
       receiveSignal,
       reconcileCallResource,
       session,
@@ -1674,6 +1690,7 @@ export function GlassWorkspace({
               onCreate={() => setIsCreateOpen(true)}
               progress={attachmentProgress}
               realtimeStatus={realtimeStatus}
+              onRealtimeEventsOpen={openRealtimeEvents}
               replyToMessage={replyTarget}
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}
@@ -1756,6 +1773,7 @@ export function GlassWorkspace({
               rememberIdentity(nextSession.identity);
             }}
             realtimeStatus={realtimeStatus}
+            onRealtimeEventsOpen={openRealtimeEvents}
             session={session}
             onJoinVoiceChannel={startCommunityVoiceCall}
           />
@@ -1858,6 +1876,12 @@ export function GlassWorkspace({
           onClose={() => setNodeSettingsOpen(false)}
           onNetworksUpdated={onNodeNetworksReload}
           session={session}
+        />
+      )}
+      {realtimeEventsOpen && (
+        <RealtimeEventsDialog
+          events={realtimeEventLog}
+          onClose={() => setRealtimeEventsOpen(false)}
         />
       )}
       {incomingCall && (

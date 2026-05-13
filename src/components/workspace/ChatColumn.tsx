@@ -79,6 +79,7 @@ interface ChatColumnProps {
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
+  onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
@@ -136,6 +137,7 @@ export function ChatColumn({
   onJumpToLatest,
   onMessageMenuOpen,
   onOpenSidebar,
+  onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
   onScroll,
@@ -537,12 +539,14 @@ export function ChatColumn({
               </div>
             )}
           </div>
-          <div
+          <button
+            type="button"
+            onClick={onRealtimeEventsOpen}
             className={cx(
-              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
               realtimeStatus === 'connected'
-                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
+                : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
             )}
             title={
               realtimeStatus === 'connected'
@@ -561,36 +565,9 @@ export function ChatColumn({
             {realtimeStatus === 'connected'
               ? copy.chat.realtimeConnected
               : copy.chat.realtimeReconnecting}
-          </div>
+          </button>
           {activeConversation ? (
             <div className="relative ml-auto flex shrink-0 items-center gap-1">
-              {onStartCall && !isGroupConversation ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onStartCall({
-                      conversationId: activeConversation.id,
-                      kind: isGroupConversation ? 'group' : 'one-to-one',
-                      participants: groupParticipants.map((participant) => ({
-                        identity: participant.identity,
-                        identityId: participant.identityId,
-                        muted: false,
-                        name: participant.name,
-                        picture: participant.picture,
-                      })),
-                      title:
-                        activeConversationTitle ??
-                        activeConversationName ??
-                        activeConversation.id,
-                    })
-                  }
-                  className="grid h-11 w-11 place-items-center rounded-2xl text-white/70 transition hover:bg-white/15"
-                  aria-label={copy.calls.startCall}
-                  title={copy.calls.startCall}
-                >
-                  <CallIcon />
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
@@ -609,6 +586,32 @@ export function ChatColumn({
                     aria-label={copy.dialog.close}
                   />
                   <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                    {onStartCall && !isGroupConversation ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onStartCall({
+                            conversationId: activeConversation.id,
+                            kind: 'one-to-one',
+                            participants: groupParticipants.map((participant) => ({
+                              identity: participant.identity,
+                              identityId: participant.identityId,
+                              muted: false,
+                              name: participant.name,
+                              picture: participant.picture,
+                            })),
+                            title:
+                              activeConversationTitle ??
+                              activeConversationName ??
+                              activeConversation.id,
+                          });
+                          setConversationMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {copy.calls.startCall}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {

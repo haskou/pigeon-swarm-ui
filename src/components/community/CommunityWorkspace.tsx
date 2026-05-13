@@ -74,6 +74,7 @@ interface CommunityWorkspaceProps {
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
   onJoinVoiceChannel?: (channel: { id: string; name: string }) => void;
+  onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -136,6 +137,7 @@ export function CommunityWorkspace({
   onMobileSidebarClose,
   onOpenMobileSidebar,
   onJoinVoiceChannel,
+  onRealtimeEventsOpen,
   onSessionUpdated,
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -1036,12 +1038,14 @@ export function CommunityWorkspace({
                 </p>
               )}
             </div>
-            <div
+            <button
+              type="button"
+              onClick={onRealtimeEventsOpen}
               className={cx(
-                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
                 realtimeStatus === 'connected'
-                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
+                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
               )}
               title={
                 realtimeStatus === 'connected'
@@ -1060,7 +1064,7 @@ export function CommunityWorkspace({
               {realtimeStatus === 'connected'
                 ? copy.chat.realtimeConnected
                 : copy.chat.realtimeReconnecting}
-            </div>
+            </button>
             {selectedChannel ? (
               <div className="relative ml-auto shrink-0">
                 <button
