@@ -11,6 +11,7 @@ interface RailProps {
   activeMessages?: boolean;
   className?: string;
   communities?: Community[];
+  communityUnreadCounts?: Record<string, number>;
   activeCommunityId?: null | string;
   messageNotificationCount?: number;
   notificationCount?: number;
@@ -29,6 +30,7 @@ export function Rail({
   activeMessages = false,
   className,
   communities = [],
+  communityUnreadCounts = {},
   messageNotificationCount = 0,
   notificationCount = 0,
   onCommunityClick,
@@ -85,6 +87,13 @@ export function Rail({
               <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
                 <CommunityRailAvatar community={community} />
               </span>
+              {(communityUnreadCounts[community.id] ?? 0) > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
+                  {(communityUnreadCounts[community.id] ?? 0) > 9
+                    ? '9+'
+                    : communityUnreadCounts[community.id]}
+                </span>
+              )}
             </button>
           </div>
         ))}
@@ -214,12 +223,9 @@ function CommunityRailAvatar({ community }: { community: Community }) {
 
     let cancelled = false;
 
-    void pigeonApplication
-      .getPublicFile(avatar)
-      .then((content) => {
-        if (!cancelled) setAvatarUrl(profilePictureDataUrl(content));
-      })
-      .catch(() => undefined);
+    void loadRailAvatar(avatar).then((url) => {
+      if (!cancelled) setAvatarUrl(url);
+    });
 
     return () => {
       cancelled = true;
@@ -231,4 +237,20 @@ function CommunityRailAvatar({ community }: { community: Community }) {
   ) : (
     community.name.slice(0, 1).toUpperCase()
   );
+}
+
+async function loadRailAvatar(cid: string): Promise<null | string> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const content = await pigeonApplication.getPublicFile(cid);
+
+      return profilePictureDataUrl(content);
+    } catch {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 250 * (attempt + 1)),
+      );
+    }
+  }
+
+  return null;
 }

@@ -49,12 +49,14 @@ import { UserProfileDropdown } from '../workspace/Sidebar';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
+  channelUnreadCounts?: Record<string, number>;
   community: Community;
   mobileMembersOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
+  onChannelViewed?: (channelId: string) => void;
   onCommunityUpdated: (community: Community) => void;
   onLogout: () => void;
   onMobileMembersClose: () => void;
@@ -62,6 +64,7 @@ interface CommunityWorkspaceProps {
   onOpenMobileSidebar: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
+  realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
 }
 
@@ -73,12 +76,14 @@ type MemberView = {
 
 export function CommunityWorkspace({
   activeChannelId,
+  channelUnreadCounts = {},
   community,
   mobileMembersOpen,
   mobileSidebarOpen,
   mobileRail,
   nodeNetworks,
   onChannelSelected,
+  onChannelViewed,
   onCommunityUpdated,
   onLogout,
   onMobileMembersClose,
@@ -86,11 +91,17 @@ export function CommunityWorkspace({
   onOpenMobileSidebar,
   onSessionUpdated,
   realtimeEvent,
+  realtimeStatus = 'connected',
   session,
 }: CommunityWorkspaceProps) {
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
-    activeChannelId ?? community.textChannels[0]?.id ?? null,
+  const resolvedChannelId = useMemo(
+    () => resolveCommunityChannelId(activeChannelId, community.textChannels),
+    [activeChannelId, community.textChannels],
   );
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    resolvedChannelId,
+  );
+  const [newChannelMessageCount, setNewChannelMessageCount] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<null | string>(null);
   const [messageState, setMessageState] = useState<
@@ -153,6 +164,23 @@ export function CommunityWorkspace({
       channel.name.toLowerCase().includes(query),
     );
   }, [channelSearch, community.textChannels]);
+  const isScrolledNearBottom = useCallback(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return true;
+
+    return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
+  }, []);
+  const handleChannelSelected = useCallback(
+    (channelId: string) => {
+      setSelectedChannelId(channelId);
+      setNewChannelMessageCount(0);
+      onChannelViewed?.(channelId);
+      onChannelSelected(channelId);
+      onMobileSidebarClose();
+    },
+    [onChannelSelected, onChannelViewed, onMobileSidebarClose],
+  );
   const ownIdentityPictures = useMemo(
     () =>
       memberPictures[session.identity.id]
@@ -372,6 +400,11 @@ export function CommunityWorkspace({
   const handleMessagesScroll = () => {
     const scroller = scrollerRef.current;
 
+    if (isScrolledNearBottom()) {
+      setNewChannelMessageCount(0);
+      if (selectedChannelId) onChannelViewed?.(selectedChannelId);
+    }
+
     if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
     if (messageState === 'loading' || !selectedChannelId) return;
 
@@ -492,6 +525,23 @@ export function CommunityWorkspace({
   };
 
   useEffect(() => {
+    if (selectedChannelId === resolvedChannelId) return;
+
+    setSelectedChannelId(resolvedChannelId);
+    setNewChannelMessageCount(0);
+
+    if (resolvedChannelId) {
+      onChannelViewed?.(resolvedChannelId);
+      onChannelSelected(resolvedChannelId);
+    }
+  }, [
+    onChannelSelected,
+    onChannelViewed,
+    resolvedChannelId,
+    selectedChannelId,
+  ]);
+
+  useEffect(() => {
     if (!selectedChannelId) {
       setMessages([]);
       setMessageCursor(null);
@@ -509,6 +559,8 @@ export function CommunityWorkspace({
         if (cancelled) return;
         setMessages(loadedMessages);
         setMessageCursor(cursor);
+        setNewChannelMessageCount(0);
+        onChannelViewed?.(selectedChannelId);
         requestAnimationFrame(() => {
           bottomRef.current?.scrollIntoView({ block: 'end' });
         });
@@ -523,7 +575,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [loadChannelMessages, selectedChannelId]);
+  }, [loadChannelMessages, onChannelViewed, selectedChannelId]);
 
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
@@ -554,10 +606,8 @@ export function CommunityWorkspace({
 
     if (!message) return;
 
-    const scroller = scrollerRef.current;
     const shouldStickToBottom =
-      !scroller ||
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140 ||
+      isScrolledNearBottom() ||
       message.authorIdentityId === session.identity.id;
     let cancelled = false;
 
@@ -575,9 +625,13 @@ export function CommunityWorkspace({
         });
 
         if (shouldStickToBottom) {
+          setNewChannelMessageCount(0);
+          onChannelViewed?.(channelId);
           requestAnimationFrame(() => {
             bottomRef.current?.scrollIntoView({ block: 'end' });
           });
+        } else {
+          setNewChannelMessageCount((current) => current + 1);
         }
       })
       .catch(() => undefined);
@@ -587,6 +641,8 @@ export function CommunityWorkspace({
     };
   }, [
     community.id,
+    isScrolledNearBottom,
+    onChannelViewed,
     projectChannelMessage,
     realtimeEvent,
     resolveMemberIdentities,
@@ -677,11 +733,7 @@ export function CommunityWorkspace({
                     <button
                       key={channel.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedChannelId(channel.id);
-                        onChannelSelected(channel.id);
-                        onMobileSidebarClose();
-                      }}
+                      onClick={() => handleChannelSelected(channel.id)}
                       className={cx(
                         'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
                         selectedChannelId === channel.id
@@ -689,7 +741,16 @@ export function CommunityWorkspace({
                           : 'bg-white/8 text-white hover:bg-white/14',
                       )}
                     >
-                      <span className="truncate"># {channel.name}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        # {channel.name}
+                      </span>
+                      {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
+                        <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
+                          {(channelUnreadCounts[channel.id] ?? 0) > 9
+                            ? '9+'
+                            : channelUnreadCounts[channel.id]}
+                        </span>
+                      )}
                     </button>
                   ))
                 )}
@@ -754,6 +815,31 @@ export function CommunityWorkspace({
                 </p>
               )}
             </div>
+            <div
+              className={cx(
+                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+                realtimeStatus === 'connected'
+                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+              )}
+              title={
+                realtimeStatus === 'connected'
+                  ? copy.chat.realtimeConnected
+                  : copy.chat.realtimeReconnecting
+              }
+            >
+              <span
+                className={cx(
+                  'h-2 w-2 rounded-full',
+                  realtimeStatus === 'connected'
+                    ? 'bg-emerald-300'
+                    : 'bg-amber-300',
+                )}
+              />
+              {realtimeStatus === 'connected'
+                ? copy.chat.realtimeConnected
+                : copy.chat.realtimeReconnecting}
+            </div>
             {selectedChannel ? (
               <div className="relative ml-auto shrink-0">
                 <button
@@ -808,17 +894,18 @@ export function CommunityWorkspace({
           </div>
         ) : (
           <>
-            <div
-              ref={scrollerRef}
-              onScroll={handleMessagesScroll}
-              className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
-            >
-              {messageState === 'loading' && (
-                <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
-                  {copy.chat.loadingEvents}
-                </div>
-              )}
-              <div className="space-y-2">
+            <div className="relative min-h-0 flex-1">
+              <div
+                ref={scrollerRef}
+                onScroll={handleMessagesScroll}
+                className="h-full overflow-y-auto p-4 sm:p-6"
+              >
+                {messageState === 'loading' && (
+                  <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+                    {copy.chat.loadingEvents}
+                  </div>
+                )}
+                <div className="space-y-2">
                 {!messageCursor &&
                   messages.length > 0 &&
                   messageState !== 'loading' && (
@@ -869,7 +956,23 @@ export function CommunityWorkspace({
                   </div>
                 )}
                 <div ref={bottomRef} />
+                </div>
               </div>
+              {newChannelMessageCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewChannelMessageCount(0);
+                    if (selectedChannelId) onChannelViewed?.(selectedChannelId);
+                    bottomRef.current?.scrollIntoView({ block: 'end' });
+                  }}
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
+                >
+                  {newChannelMessageCount > 1
+                    ? copy.chat.newMessages
+                    : copy.chat.newMessage}
+                </button>
+              )}
             </div>
             <Composer
               disabled={messageState === 'loading'}
@@ -1558,13 +1661,30 @@ async function loadIdentityPicture(
 }
 
 async function loadPublicImage(cid: string): Promise<string | null> {
-  try {
-    const content = await pigeonApplication.getPublicFile(cid);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const content = await pigeonApplication.getPublicFile(cid);
 
-    return profilePictureDataUrl(content);
-  } catch {
-    return null;
+      return profilePictureDataUrl(content);
+    } catch {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 250 * (attempt + 1)),
+      );
+    }
   }
+
+  return null;
+}
+
+function resolveCommunityChannelId(
+  channelId: null | string | undefined,
+  channels: CommunityTextChannel[],
+): null | string {
+  if (channelId && channels.some((channel) => channel.id === channelId)) {
+    return channelId;
+  }
+
+  return channels[0]?.id ?? null;
 }
 
 function memberDisplayName(

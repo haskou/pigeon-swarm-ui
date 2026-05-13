@@ -58,6 +58,7 @@ type WorkspacePreference = {
   communityId?: null | string;
   mode?: 'community' | 'messages';
 };
+type CommunityUnreadCounts = Record<string, Record<string, number>>;
 type PendingSend = {
   attachments: File[];
   content: string;
@@ -173,6 +174,11 @@ export function GlassWorkspace({
   >(() => workspacePreference.channelByCommunityId ?? {});
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
+  const [communityUnreadCountsById, setCommunityUnreadCountsById] =
+    useState<CommunityUnreadCounts>({});
+  const [realtimeStatus, setRealtimeStatus] = useState<
+    'connected' | 'reconnecting'
+  >('reconnecting');
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -217,6 +223,55 @@ export function GlassWorkspace({
       communities.find((community) => community.id === activeCommunityId) ??
       communities[0],
     [activeCommunityId, communities],
+  );
+  const activeCommunityChannelId = useMemo(() => {
+    if (!activeCommunity) return null;
+
+    const storedId = communityChannelById[activeCommunity.id];
+
+    return storedId &&
+      activeCommunity.textChannels.some((channel) => channel.id === storedId)
+      ? storedId
+      : (activeCommunity.textChannels[0]?.id ?? null);
+  }, [activeCommunity, communityChannelById]);
+  const communityUnreadCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(communityUnreadCountsById).map(([communityId, channels]) => [
+          communityId,
+          Object.values(channels).reduce((total, count) => total + count, 0),
+        ]),
+      ) as Record<string, number>,
+    [communityUnreadCountsById],
+  );
+  const clearCommunityChannelUnread = useCallback(
+    (communityId: string, channelId: string) => {
+      setCommunityUnreadCountsById((current) => {
+        if (!current[communityId]?.[channelId]) return current;
+
+        const nextCommunity = { ...current[communityId] };
+
+        delete nextCommunity[channelId];
+
+        return {
+          ...current,
+          [communityId]: nextCommunity,
+        };
+      });
+    },
+    [],
+  );
+  const markCommunityChannelUnread = useCallback(
+    (communityId: string, channelId: string) => {
+      setCommunityUnreadCountsById((current) => ({
+        ...current,
+        [communityId]: {
+          ...(current[communityId] ?? {}),
+          [channelId]: (current[communityId]?.[channelId] ?? 0) + 1,
+        },
+      }));
+    },
+    [],
   );
   const updateActiveConversationDraft = useCallback(
     (value: string) => {
@@ -865,6 +920,24 @@ export function GlassWorkspace({
       }
 
       if (event.type === 'communities.v1.channel.message.was_sent') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+        const authorIdentityId = stringAttribute(event, 'authorIdentityId');
+        const isActiveChannel =
+          workspaceMode === 'community' &&
+          communityId === activeCommunity?.id &&
+          channelId === activeCommunityChannelId;
+
+        if (
+          communityId &&
+          channelId &&
+          !isActiveChannel &&
+          authorIdentityId !== session.identity.id
+        ) {
+          markCommunityChannelUnread(communityId, channelId);
+        }
+
         setCommunityRealtimeEvent(event);
         return;
       }
@@ -937,11 +1010,14 @@ export function GlassWorkspace({
       }
     },
     [
+      activeCommunity?.id,
+      activeCommunityChannelId,
       activeConversation?.id,
       activeConversationKeyId,
       clearUnreadMessages,
       fetchRealtimeMessage,
       isScrolledNearBottom,
+      markCommunityChannelUnread,
       markUnreadMessage,
       messages,
       onCommunitiesReload,
@@ -952,12 +1028,18 @@ export function GlassWorkspace({
       session,
       setConversations,
       setSession,
+      workspaceMode,
     ],
   );
 
   useRealtimeEvents(session, {
-    onConnected: refreshRealtimeViews,
+    onConnected: () => {
+      setRealtimeStatus('connected');
+      refreshRealtimeViews();
+    },
+    onDisconnected: () => setRealtimeStatus('reconnecting'),
     onDomainEvent: handleRealtimeEvent,
+    onReconnecting: () => setRealtimeStatus('reconnecting'),
   });
 
   return (
@@ -968,6 +1050,7 @@ export function GlassWorkspace({
           activeMessages={workspaceMode === 'messages'}
           activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
           communities={communities}
+          communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
           notificationCount={pendingNotificationCount}
           onCommunityClick={(communityId) => {
@@ -999,6 +1082,7 @@ export function GlassWorkspace({
                   activeMessages
                   activeCommunityId={null}
                   communities={communities}
+                  communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={pendingNotificationCount}
                   onCommunityClick={(communityId) => {
@@ -1106,7 +1190,10 @@ export function GlassWorkspace({
           </>
         ) : activeCommunity ? (
           <CommunityWorkspace
-            activeChannelId={communityChannelById[activeCommunity.id] ?? null}
+            activeChannelId={activeCommunityChannelId}
+            channelUnreadCounts={
+              communityUnreadCountsById[activeCommunity.id] ?? {}
+            }
             community={activeCommunity}
             mobileMembersOpen={communityMembersOpen}
             mobileSidebarOpen={sidebarOpen}
@@ -1114,6 +1201,7 @@ export function GlassWorkspace({
               <Rail
                 activeCommunityId={activeCommunity.id}
                 communities={communities}
+                communityUnreadCounts={communityUnreadCounts}
                 messageNotificationCount={unreadMessageCount}
                 notificationCount={pendingNotificationCount}
                 onCommunityClick={(communityId) => {
@@ -1155,6 +1243,9 @@ export function GlassWorkspace({
                 ),
               )
             }
+            onChannelViewed={(channelId) =>
+              clearCommunityChannelUnread(activeCommunity.id, channelId)
+            }
             onLogout={() => setSession(null)}
             onMobileSidebarClose={() => setSidebarOpen(false)}
             onMobileMembersClose={() => setCommunityMembersOpen(false)}
@@ -1163,6 +1254,7 @@ export function GlassWorkspace({
               setSession(nextSession);
               rememberIdentity(nextSession.identity);
             }}
+            realtimeStatus={realtimeStatus}
             session={session}
           />
         ) : (

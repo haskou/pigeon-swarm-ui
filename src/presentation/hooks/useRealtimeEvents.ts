@@ -7,7 +7,9 @@ import { pigeonApplication } from '../../application/applicationContainer';
 
 type RealtimeHandlers = {
   onConnected?: () => void;
+  onDisconnected?: () => void;
   onDomainEvent: (event: RealtimeDomainEvent) => void;
+  onReconnecting?: () => void;
 };
 
 export function useRealtimeEvents(
@@ -29,6 +31,7 @@ export function useRealtimeEvents(
     const scheduleReconnect = () => {
       if (cancelled) return;
 
+      handlersRef.current.onReconnecting?.();
       const delay = Math.min(30000, 1000 * 2 ** attempt);
       const jitter = Math.floor(Math.random() * 500);
 
@@ -54,6 +57,7 @@ export function useRealtimeEvents(
         });
         socket.addEventListener('close', scheduleReconnect);
         socket.addEventListener('error', () => {
+          handlersRef.current.onDisconnected?.();
           socket?.close();
         });
       } catch {
@@ -66,6 +70,7 @@ export function useRealtimeEvents(
     return () => {
       cancelled = true;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      handlersRef.current.onDisconnected?.();
       socket?.close();
     };
   }, [session.encryptedKeyPair, session.identity.id, session.password]);
