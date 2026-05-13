@@ -7,6 +7,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   Community,
+  CommunityChannel,
   CommunityTextChannel,
   ConversationResource,
   IdentityResource,
@@ -346,10 +347,22 @@ export class PigeonApplication {
     );
   }
 
+  public async createCommunityVoiceChannel(
+    session: Session,
+    communityId: string,
+    name: string,
+  ): Promise<CommunityChannel> {
+    return await this.gateway.createCommunityVoiceChannel(
+      session,
+      communityId,
+      name,
+    );
+  }
+
   public async listCommunityChannels(
     session: Session,
     communityId: string,
-  ): Promise<CommunityTextChannel[]> {
+  ): Promise<CommunityChannel[]> {
     return await this.gateway.listCommunityChannels(session, communityId);
   }
 

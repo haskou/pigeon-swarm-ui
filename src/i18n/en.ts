@@ -122,7 +122,7 @@ export const copy = {
     channelDataTitle: 'Channel data',
     channelError: 'The channel could not be created.',
     channelMetadataOnly: 'Community channel.',
-    channels: 'Text channels',
+    channels: 'Channels',
     channelsAreMetadata: 'Channels are ready for metadata',
     channelsAreMetadataBody:
       'This MVP creates private communities and text channels. Messages inside community channels will be wired in a later backend contract.',
@@ -158,7 +158,9 @@ export const copy = {
     owner: 'Owner',
     privateCommunity: 'Private community',
     searchChannels: 'Search channels',
+    textChannel: 'Text',
     updateError: 'The community could not be updated.',
+    voiceChannel: 'Voice',
   },
   composer: {
     attach: 'Attach files',

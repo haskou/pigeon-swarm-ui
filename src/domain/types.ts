@@ -192,9 +192,11 @@ export type ConversationResource = {
 export type CommunityTextChannel = {
   id: string;
   name: string;
-  type: 'text';
+  type: 'text' | 'voice';
   createdAt: number;
 };
+
+export type CommunityChannel = CommunityTextChannel;
 
 export type Community = {
   id: string;

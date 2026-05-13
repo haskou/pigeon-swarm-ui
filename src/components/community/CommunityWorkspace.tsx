@@ -16,6 +16,7 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import type {
   Community,
+  CommunityChannel,
   CommunityTextChannel,
   AttachmentProgress,
   ChatMessage,
@@ -143,9 +144,17 @@ export function CommunityWorkspace({
   realtimeStatus = 'connected',
   session,
 }: CommunityWorkspaceProps) {
+  const textChannels = useMemo(
+    () => community.textChannels.filter((channel) => channel.type === 'text'),
+    [community.textChannels],
+  );
+  const voiceChannels = useMemo(
+    () => community.textChannels.filter((channel) => channel.type === 'voice'),
+    [community.textChannels],
+  );
   const resolvedChannelId = useMemo(
-    () => resolveCommunityChannelId(activeChannelId, community.textChannels),
-    [activeChannelId, community.textChannels],
+    () => resolveCommunityChannelId(activeChannelId, textChannels),
+    [activeChannelId, textChannels],
   );
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
     resolvedChannelId,
@@ -191,16 +200,8 @@ export function CommunityWorkspace({
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
   const networkName = network?.name ?? shortId(community.networkId);
-  const selectedChannel = community.textChannels.find(
+  const selectedChannel = textChannels.find(
     (channel) => channel.id === selectedChannelId,
-  );
-  const voiceChannels = useMemo(
-    () =>
-      community.textChannels.map((channel) => ({
-        id: channel.id,
-        name: channel.name,
-      })),
-    [community.textChannels],
   );
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
@@ -272,12 +273,12 @@ export function CommunityWorkspace({
   const visibleChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
-    if (!query) return community.textChannels;
+    if (!query) return textChannels;
 
-    return community.textChannels.filter((channel) =>
+    return textChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [channelSearch, community.textChannels]);
+  }, [channelSearch, textChannels]);
   const isScrolledNearBottom = useCallback(() => {
     const scroller = scrollerRef.current;
 
@@ -329,21 +330,14 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     const nextSelectedChannel =
-      community.textChannels.find((channel) => channel.id === activeChannelId)
-        ?.id ??
-      community.textChannels.find((channel) => channel.id === selectedChannelId)
-        ?.id ??
-      community.textChannels[0]?.id ??
+      textChannels.find((channel) => channel.id === activeChannelId)?.id ??
+      textChannels.find((channel) => channel.id === selectedChannelId)?.id ??
+      textChannels[0]?.id ??
       null;
 
     setSelectedChannelId(nextSelectedChannel);
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
-  }, [
-    activeChannelId,
-    community.textChannels,
-    onChannelSelected,
-    selectedChannelId,
-  ]);
+  }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -937,7 +931,7 @@ export function CommunityWorkspace({
                 placeholder={copy.communities.searchChannels}
               />
               <div className="space-y-2">
-                {community.textChannels.length === 0 ? (
+                {textChannels.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noChannels}
                   </div>
@@ -1455,7 +1449,8 @@ function ManageCommunityDialog({
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('');
-  const [channelOrder, setChannelOrder] = useState<CommunityTextChannel[]>(
+  const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
+  const [channelOrder, setChannelOrder] = useState<CommunityChannel[]>(
     community.textChannels,
   );
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
@@ -1563,7 +1558,7 @@ function ManageCommunityDialog({
           name: name.trim(),
         },
       );
-      const updatedChannels: CommunityTextChannel[] = [];
+      const updatedChannels: CommunityChannel[] = [];
 
       for (const channel of channelOrder) {
         const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
@@ -1610,11 +1605,18 @@ function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const channel = await pigeonApplication.createCommunityTextChannel(
-        session,
-        community.id,
-        nextName,
-      );
+      const channel =
+        channelType === 'text'
+          ? await pigeonApplication.createCommunityTextChannel(
+              session,
+              community.id,
+              nextName,
+            )
+          : await pigeonApplication.createCommunityVoiceChannel(
+              session,
+              community.id,
+              nextName,
+            );
 
       setChannelName('');
       setChannelOrder((current) => [...current, channel]);
@@ -1740,7 +1742,9 @@ function ManageCommunityDialog({
                     key={channel.id}
                     className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
                   >
-                    <span className="px-2 text-white/45">#</span>
+                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/8 text-white/55">
+                      {channel.type === 'voice' ? <VoiceIcon /> : '#'}
+                    </span>
                     <input
                       value={channelDrafts[channel.id] ?? channel.name}
                       onChange={(event) =>
@@ -1751,6 +1755,11 @@ function ManageCommunityDialog({
                       }
                       className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
                     />
+                    <span className="hidden rounded-xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
+                      {channel.type === 'voice'
+                        ? copy.communities.voiceChannel
+                        : copy.communities.textChannel}
+                    </span>
                     <button
                       type="button"
                       onClick={() => moveChannel(channel.id, -1)}
@@ -1772,7 +1781,26 @@ function ManageCommunityDialog({
                   </div>
                 ))}
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
+                {(['text', 'voice'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setChannelType(type)}
+                    className={cx(
+                      'rounded-xl px-3 py-2 text-xs font-black transition',
+                      channelType === type
+                        ? 'bg-white text-slate-950'
+                        : 'text-white/55 hover:bg-white/10',
+                    )}
+                  >
+                    {type === 'voice'
+                      ? copy.communities.voiceChannel
+                      : copy.communities.textChannel}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
                 <input
                   value={channelName}
                   onChange={(event) => setChannelName(event.target.value)}

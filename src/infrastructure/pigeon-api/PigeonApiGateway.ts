@@ -18,6 +18,7 @@ import type { IdentityUpdateProfileInput } from '../../domain/identities/Identit
 import type {
   ChatMessage,
   Community,
+  CommunityChannel,
   CommunityTextChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -407,13 +408,30 @@ export class PigeonApiGateway {
     });
   }
 
+  public async createCommunityVoiceChannel(
+    session: Session,
+    communityId: string,
+    name: string,
+  ): Promise<CommunityChannel> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/voice`;
+    const body = { name };
+
+    return await this.http.request<CommunityChannel>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
   public async listCommunityChannels(
     session: Session,
     communityId: string,
-  ): Promise<CommunityTextChannel[]> {
+  ): Promise<CommunityChannel[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/channels`;
     const result = await this.http.request<{
-      channels: CommunityTextChannel[];
+      channels: CommunityChannel[];
     }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
