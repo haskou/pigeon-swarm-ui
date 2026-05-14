@@ -13,6 +13,7 @@ import type {
   ChatMessage,
   AttachmentProgress,
   Community,
+  CommunityChannel,
   ConversationKeyEntry,
   ConversationResource,
   MessageResource,
@@ -1692,6 +1693,16 @@ export function GlassWorkspace({
     },
     [markConversationReadUntil, scrollMessagesToBottom, session],
   );
+  const updateCommunityState = useCallback(
+    (communityId: string, updater: (community: Community) => Community) => {
+      setCommunities((current) =>
+        current.map((community) =>
+          community.id === communityId ? updater(community) : community,
+        ),
+      );
+    },
+    [setCommunities],
+  );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
       if (realtimeEventsOpen) {
@@ -1801,6 +1812,110 @@ export function GlassWorkspace({
         event.type === 'communities.v1.call.event.was_recorded'
       ) {
         setCommunityRealtimeEvent(event);
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_created') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channel = communityChannelAttribute(event, 'channel');
+
+        if (communityId && channel) {
+          updateCommunityState(communityId, (community) => {
+            const channels = communityChannels(community);
+
+            if (channels.some((item) => item.id === channel.id)) {
+              return community;
+            }
+
+            return channel.type === 'voice'
+              ? {
+                  ...community,
+                  voiceChannels: [...(community.voiceChannels ?? []), channel],
+                }
+              : {
+                  ...community,
+                  textChannels: [...community.textChannels, channel],
+                };
+          });
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_renamed') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+        const name = stringAttribute(event, 'name');
+
+        if (communityId && channelId && name) {
+          updateCommunityState(communityId, (community) => ({
+            ...community,
+            textChannels: community.textChannels.map((channel) =>
+              channel.id === channelId ? { ...channel, name } : channel,
+            ),
+            voiceChannels: (community.voiceChannels ?? []).map((channel) =>
+              channel.id === channelId ? { ...channel, name } : channel,
+            ),
+          }));
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_deleted') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+
+        if (communityId && channelId) {
+          updateCommunityState(communityId, (community) => ({
+            ...community,
+            textChannels: community.textChannels.filter(
+              (channel) => channel.id !== channelId,
+            ),
+            voiceChannels: (community.voiceChannels ?? []).filter(
+              (channel) => channel.id !== channelId,
+            ),
+          }));
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.community.was_updated') {
+        const community = communityAttribute(event, 'community');
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.member.was_added') {
+        const community = communityAttribute(event, 'community');
+        const communityId =
+          community?.id ??
+          eventAggregateId(event) ??
+          stringAttribute(event, 'communityId');
+        const identityId = stringAttribute(event, 'identityId');
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        } else if (communityId && identityId) {
+          updateCommunityState(communityId, (current) =>
+            current.memberIds.includes(identityId)
+              ? current
+              : { ...current, memberIds: [...current.memberIds, identityId] },
+          );
+        }
+
         return;
       }
 
@@ -1946,7 +2061,9 @@ export function GlassWorkspace({
       reconcileCallResource,
       session,
       setConversations,
+      setCommunities,
       setSession,
+      updateCommunityState,
       workspaceMode,
     ],
   );
@@ -2345,6 +2462,55 @@ function recordAttribute(
 
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function communityChannelAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): CommunityChannel | undefined {
+  const value = recordAttribute(event, key);
+
+  if (!value) return undefined;
+
+  const { id, name, type } = value;
+  const createdAt =
+    typeof value.createdAt === 'number' ? value.createdAt : Date.now();
+
+  if (typeof id !== 'string' || typeof name !== 'string') return undefined;
+
+  if (type === 'text') {
+    return { createdAt, id, name, type };
+  }
+
+  if (type === 'voice') {
+    const connectedIdentityIds = Array.isArray(value.connectedIdentityIds)
+      ? value.connectedIdentityIds.filter(
+          (identityId): identityId is string => typeof identityId === 'string',
+        )
+      : [];
+
+    return { connectedIdentityIds, createdAt, id, name, type };
+  }
+
+  return undefined;
+}
+
+function communityAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): Community | undefined {
+  const value = recordAttribute(event, key);
+
+  return value &&
+    typeof value.id === 'string' &&
+    typeof value.networkId === 'string' &&
+    typeof value.ownerIdentityId === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.description === 'string' &&
+    Array.isArray(value.memberIds) &&
+    Array.isArray(value.textChannels)
+    ? (value as Community)
     : undefined;
 }
 
