@@ -160,6 +160,8 @@ export function useCallSession(): {
         current?.id === nextCall.id ? { ...current, status: 'live' } : current,
       );
     } catch {
+      mediaManager.stop();
+      peerManager.reset();
       setActiveCall((current) =>
         current?.id === nextCall.id
           ? {
@@ -265,9 +267,15 @@ export function useCallSession(): {
   };
 
   const toggleDeafen = () => {
-    setActiveCall((current) =>
-      current ? { ...current, deafened: !current.deafened } : current,
-    );
+    setActiveCall((current) => {
+      if (!current) return current;
+
+      const deafened = !current.deafened;
+
+      peerManager.setDeafened(deafened);
+
+      return { ...current, deafened };
+    });
   };
 
   return {

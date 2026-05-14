@@ -49,12 +49,28 @@ export class CallPeerConnectionManager {
 
   private rtcConfiguration: RTCConfiguration | null = null;
 
+  private deafened = false;
+
   public configure(rtcConfiguration: RTCConfiguration): void {
     this.rtcConfiguration = rtcConfiguration;
   }
 
   public setLocalStream(stream: MediaStream | null): void {
     this.localStream = stream;
+  }
+
+  public setDeafened(deafened: boolean): void {
+    this.deafened = deafened;
+
+    for (const audio of this.remoteAudio.values()) {
+      audio.muted = deafened;
+
+      if (deafened) {
+        audio.pause();
+      } else {
+        void audio.play().catch(() => undefined);
+      }
+    }
   }
 
   public async ensurePeer(
@@ -112,6 +128,7 @@ export class CallPeerConnectionManager {
     this.remoteAudio.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
+    this.deafened = false;
   }
 
   public async collectStats(): Promise<Record<string, PeerMediaStats>> {
@@ -175,6 +192,7 @@ export class CallPeerConnectionManager {
       this.remoteAudio.get(peerIdentityId) ?? document.createElement('audio');
 
     audio.autoplay = true;
+    audio.muted = this.deafened;
     audio.srcObject = stream;
 
     if (!this.remoteAudio.has(peerIdentityId)) {
@@ -183,6 +201,13 @@ export class CallPeerConnectionManager {
       document.body.append(audio);
       this.remoteAudio.set(peerIdentityId, audio);
     }
+
+    if (this.deafened) {
+      audio.pause();
+
+      return;
+    }
+
     void audio.play().catch(() => undefined);
   }
 
