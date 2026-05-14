@@ -43,6 +43,11 @@ function descriptionPayload(
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
 
+  private readonly pendingIceCandidates = new Map<
+    string,
+    RTCIceCandidateInit[]
+  >();
+
   private readonly remoteAudio = new Map<string, HTMLAudioElement>();
 
   private localStream: MediaStream | null = null;
@@ -97,7 +102,18 @@ export class CallPeerConnectionManager {
     const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
 
     if (signalType === 'ice_candidate') {
-      await peer.addIceCandidate(new RTCIceCandidate(payload));
+      if (!peer.remoteDescription) {
+        this.queueIceCandidate(
+          senderIdentityId,
+          payload as RTCIceCandidateInit,
+        );
+
+        return;
+      }
+
+      await peer.addIceCandidate(
+        new RTCIceCandidate(payload as RTCIceCandidateInit),
+      );
 
       return;
     }
@@ -107,6 +123,7 @@ export class CallPeerConnectionManager {
     );
 
     await peer.setRemoteDescription(description);
+    await this.flushIceCandidates(senderIdentityId, peer);
 
     if (signalType !== 'offer') return;
 
@@ -119,6 +136,7 @@ export class CallPeerConnectionManager {
   public reset(): void {
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
+    this.pendingIceCandidates.clear();
 
     for (const audio of this.remoteAudio.values()) {
       audio.pause();
@@ -209,6 +227,31 @@ export class CallPeerConnectionManager {
     }
 
     void audio.play().catch(() => undefined);
+  }
+
+  private async flushIceCandidates(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+  ): Promise<void> {
+    const candidates = this.pendingIceCandidates.get(peerIdentityId);
+
+    if (!candidates?.length) return;
+
+    this.pendingIceCandidates.delete(peerIdentityId);
+
+    for (const candidate of candidates) {
+      await peer.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  }
+
+  private queueIceCandidate(
+    peerIdentityId: string,
+    candidate: RTCIceCandidateInit,
+  ): void {
+    const candidates = this.pendingIceCandidates.get(peerIdentityId) ?? [];
+
+    candidates.push(candidate);
+    this.pendingIceCandidates.set(peerIdentityId, candidates);
   }
 
   private async collectPeerStats(

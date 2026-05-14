@@ -18,6 +18,13 @@ type SignalSender = (
   payload: Record<string, unknown>,
 ) => Promise<void>;
 
+type ReceivedSignal = {
+  callId: string;
+  payload: Record<string, unknown>;
+  senderIdentityId: string;
+  signalType: CallSignalType;
+};
+
 type StartCallInput = {
   call?: CallResource;
   currentIdentityId: string;
@@ -37,12 +44,7 @@ type StartCallInput = {
 export function useCallSession(): {
   activeCall: CallSession | null;
   endCall: () => void;
-  receiveSignal: (input: {
-    callId: string;
-    payload: Record<string, unknown>;
-    senderIdentityId: string;
-    signalType: CallSignalType;
-  }) => Promise<void>;
+  receiveSignal: (input: ReceivedSignal) => Promise<void>;
   reconcileCall: (
     call: CallResource,
     input: Omit<
@@ -59,7 +61,9 @@ export function useCallSession(): {
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
   const currentIdentityIdRef = useRef<string | null>(null);
+  const pendingSignalsRef = useRef(new Map<string, ReceivedSignal[]>());
   const sendSignalRef = useRef<SignalSender | null>(null);
+  const startingCallIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -140,6 +144,8 @@ export function useCallSession(): {
     };
 
     setActiveCall(nextCall);
+    activeCallRef.current = nextCall;
+    startingCallIdRef.current = nextCall.id;
 
     try {
       const stream =
@@ -151,17 +157,24 @@ export function useCallSession(): {
 
       peerManager.configure(input.iceConfig);
       peerManager.setLocalStream(stream);
+      startingCallIdRef.current = null;
+      await flushPendingSignals(nextCall.id, input.onSignal);
       await connectJoinedPeers(
         nextCall,
         input.currentIdentityId,
         input.onSignal,
       );
+      await flushPendingSignals(nextCall.id, input.onSignal);
       setActiveCall((current) =>
         current?.id === nextCall.id ? { ...current, status: 'live' } : current,
       );
     } catch {
       mediaManager.stop();
       peerManager.reset();
+      pendingSignalsRef.current.delete(nextCall.id);
+      if (startingCallIdRef.current === nextCall.id) {
+        startingCallIdRef.current = null;
+      }
       setActiveCall((current) =>
         current?.id === nextCall.id
           ? {
@@ -179,7 +192,9 @@ export function useCallSession(): {
     mediaManager.stop();
     peerManager.reset();
     currentIdentityIdRef.current = null;
+    pendingSignalsRef.current.clear();
     sendSignalRef.current = null;
+    startingCallIdRef.current = null;
     setActiveCall(null);
   };
 
@@ -229,15 +244,17 @@ export function useCallSession(): {
     );
   };
 
-  const receiveSignal = async (input: {
-    callId: string;
-    payload: Record<string, unknown>;
-    senderIdentityId: string;
-    signalType: CallSignalType;
-  }) => {
+  const receiveSignal = async (input: ReceivedSignal) => {
     const sendSignal = sendSignalRef.current;
+    const activeCallId = activeCallRef.current?.id;
 
-    if (!sendSignal || activeCallRef.current?.id !== input.callId) return;
+    if (activeCallId && activeCallId !== input.callId) return;
+
+    if (!sendSignal || startingCallIdRef.current === input.callId) {
+      queuePendingSignal(input);
+
+      return;
+    }
 
     await peerManager.handleSignal(
       input.senderIdentityId,
@@ -311,6 +328,33 @@ export function useCallSession(): {
           ),
         ),
     );
+  }
+
+  async function flushPendingSignals(
+    callId: string,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const signals = pendingSignalsRef.current.get(callId);
+
+    if (!signals?.length) return;
+
+    pendingSignalsRef.current.delete(callId);
+
+    for (const signal of signals) {
+      await peerManager.handleSignal(
+        signal.senderIdentityId,
+        signal.signalType,
+        signal.payload,
+        sendSignal,
+      );
+    }
+  }
+
+  function queuePendingSignal(signal: ReceivedSignal): void {
+    const signals = pendingSignalsRef.current.get(signal.callId) ?? [];
+
+    signals.push(signal);
+    pendingSignalsRef.current.set(signal.callId, signals.slice(-100));
   }
 }
 
