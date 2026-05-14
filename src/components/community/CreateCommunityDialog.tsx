@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Community, Session } from '../../domain/types';
@@ -6,7 +6,6 @@ import type { Community, Session } from '../../domain/types';
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { GlassSelect } from '../common/GlassSelect';
 
 interface CreateCommunityDialogProps {
@@ -33,6 +32,8 @@ export function CreateCommunityDialog({
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const networkOptions = useMemo(
     () =>
       session.identity.networks.map((id) => ({
@@ -57,34 +58,40 @@ export function CreateCommunityDialog({
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!avatar) {
+      setAvatarPreview(null);
+
+      return undefined;
+    }
+
+    const nextPreview = URL.createObjectURL(avatar);
+
+    setAvatarPreview(nextPreview);
+
+    return () => URL.revokeObjectURL(nextPreview);
+  }, [avatar]);
+
+  useEffect(() => {
+    if (!banner) {
+      setBannerPreview(null);
+
+      return undefined;
+    }
+
+    const nextPreview = URL.createObjectURL(banner);
+
+    setBannerPreview(nextPreview);
+
+    return () => URL.revokeObjectURL(nextPreview);
+  }, [banner]);
+
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-
-    setAvatar(file);
-    setAvatarPreview(null);
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setAvatarPreview(reader.result);
-    });
-    reader.readAsDataURL(file);
+    setAvatar(event.target.files?.[0] ?? null);
   };
 
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-
-    setBanner(file);
-    setBannerPreview(null);
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setBannerPreview(reader.result);
-    });
-    reader.readAsDataURL(file);
+    setBanner(event.target.files?.[0] ?? null);
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -117,10 +124,16 @@ export function CreateCommunityDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
+    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-[2rem] sm:p-6"
+        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-[2rem]"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -141,40 +154,37 @@ export function CreateCommunityDialog({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4">
-          <Field label={copy.communities.name}>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-              placeholder={copy.communities.namePlaceholder}
-              autoComplete="off"
-            />
-          </Field>
-
-          <Field label={copy.communities.description}>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              className="min-h-24 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-              placeholder={copy.communities.descriptionPlaceholder}
-            />
-          </Field>
-
-          <Field label={copy.communities.network}>
-            <GlassSelect
-              ariaLabel={copy.communities.network}
-              value={networkId}
-              onChange={setNetworkId}
-              options={networkOptions}
-            />
-          </Field>
-
-          <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
-            <label className="grid gap-2 text-sm font-black text-white/70">
-              {copy.communities.avatar}
-              <div className="rounded-3xl bg-black/20 p-3">
-                <div className="mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950">
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
+            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                aria-label={copy.communities.banner}
+              >
+                {bannerPreview ? (
+                  <img
+                    src={bannerPreview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
+                    {name.slice(0, 1).toUpperCase() || 'C'}
+                  </span>
+                )}
+                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  ✎
+                </span>
+              </button>
+              <div className="relative px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  aria-label={copy.communities.avatar}
+                >
                   {avatarPreview ? (
                     <img
                       src={avatarPreview}
@@ -184,46 +194,66 @@ export function CreateCommunityDialog({
                   ) : (
                     name.slice(0, 1).toUpperCase() || 'C'
                   )}
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                    ✎
+                  </span>
+                </button>
+                <div className="mt-4 grid gap-3">
+                  <input
+                    aria-label={copy.communities.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder={copy.communities.namePlaceholder}
+                    autoComplete="off"
+                  />
+                  <textarea
+                    aria-label={copy.communities.description}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    placeholder={copy.communities.descriptionPlaceholder}
+                  />
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="mt-3 w-full text-xs text-white/60 file:mb-2 file:mr-0 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
-                />
               </div>
-            </label>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="sr-only"
+              />
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBannerChange}
+                className="sr-only"
+              />
+            </div>
 
-            <label className="grid gap-2 text-sm font-black text-white/70">
-              {copy.communities.banner}
-              <div className="flex items-center gap-4 rounded-3xl bg-black/20 p-3">
-                <div className="grid h-20 w-32 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-                  {bannerPreview ? (
-                    <img
-                      src={bannerPreview}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    name.slice(0, 1).toUpperCase() || 'C'
-                  )}
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBannerChange}
-                  className="min-w-0 flex-1 text-sm text-white/60 file:mr-4 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-2 file:font-black file:text-slate-950"
-                />
+            <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+              <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.network}
               </div>
-            </label>
+              <GlassSelect
+                ariaLabel={copy.communities.network}
+                value={networkId}
+                onChange={setNetworkId}
+                options={networkOptions}
+              />
+              <p className="mt-3 text-xs leading-relaxed text-white/45">
+                {copy.communities.createBody}
+              </p>
+            </div>
           </div>
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+              {error}
+            </div>
+          )}
         </div>
-
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-            {error}
-          </div>
-        )}
 
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
