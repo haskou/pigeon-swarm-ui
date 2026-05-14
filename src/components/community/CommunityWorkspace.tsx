@@ -1988,7 +1988,11 @@ function ManageCommunityDialog({
   };
 
   const deleteChannel = (channel: ManagedCommunityChannel) => {
-    if (!window.confirm(copy.communities.deleteChannelConfirm)) return;
+    if (
+      channel.type === 'text' &&
+      !window.confirm(copy.communities.deleteChannelConfirm)
+    )
+      return;
 
     setChannelOrder((current) =>
       current.filter((candidate) => candidate.id !== channel.id),
