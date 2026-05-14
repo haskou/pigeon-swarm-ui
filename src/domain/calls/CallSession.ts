@@ -55,10 +55,14 @@ export type CallIceServerConfig = {
 };
 
 export type CallParticipant = {
+  audioLevel?: number;
+  connectionState?: RTCPeerConnectionState;
   identity?: IdentityResource;
   identityId: string;
+  latencyMs?: number;
   muted: boolean;
   name: string;
+  packetsLost?: number;
   picture?: null | string;
   speaking?: boolean;
   status?: CallParticipantStatus;
@@ -84,5 +88,6 @@ export type CallSession = {
     | 'live'
     | 'missed'
     | 'permission-denied';
+  subtitle?: string;
   title: string;
 };

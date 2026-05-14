@@ -138,6 +138,9 @@ export const copy = {
     createError: 'The community could not be created.',
     createTitle: 'Create community',
     creating: 'Creating community...',
+    deleteChannel: 'Delete channel',
+    deleteChannelConfirm:
+      'Delete this channel? Text channel messages will also be deleted.',
     description: 'Description',
     descriptionPlaceholder: 'A private space for a team, project or crew.',
     done: 'Done',

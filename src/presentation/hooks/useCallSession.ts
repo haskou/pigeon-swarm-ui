@@ -9,6 +9,7 @@ import type {
 } from '../../domain/calls/CallSession';
 
 import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
+import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 
 type SignalSender = (
@@ -29,6 +30,7 @@ type StartCallInput = {
   localStream?: MediaStream | null;
   onSignal: SignalSender;
   participants: CallParticipant[];
+  subtitle?: string;
   title: string;
 };
 
@@ -63,6 +65,52 @@ export function useCallSession(): {
     activeCallRef.current = activeCall;
   }, [activeCall]);
 
+  useEffect(() => {
+    if (!activeCall) return undefined;
+
+    let cancelled = false;
+
+    const refreshStats = async () => {
+      const stats = await peerManager
+        .collectStats()
+        .catch((): Record<string, PeerMediaStats> => ({}));
+
+      if (cancelled) return;
+
+      setActiveCall((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          participants: current.participants.map((participant) => {
+            const stat = stats[participant.identityId];
+
+            return stat
+              ? {
+                  ...participant,
+                  audioLevel: stat.audioLevel,
+                  connectionState: stat.connectionState,
+                  latencyMs: stat.latencyMs,
+                  packetsLost: stat.packetsLost,
+                  speaking: stat.speaking,
+                }
+              : participant;
+          }),
+        };
+      });
+    };
+
+    void refreshStats();
+    const interval = window.setInterval(() => {
+      void refreshStats();
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeCall?.id, peerManager]);
+
   useEffect(
     () => () => {
       mediaManager.stop();
@@ -82,6 +130,7 @@ export function useCallSession(): {
       id: input.id,
       kind: input.kind,
       participants: input.participants,
+      subtitle: input.subtitle,
       title: input.title,
       deafened: false,
       hasMicrophone: input.localStream !== null,

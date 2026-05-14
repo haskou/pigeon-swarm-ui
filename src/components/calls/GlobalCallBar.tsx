@@ -1,10 +1,13 @@
-import type { ReactNode } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { CallSession } from '../../domain/calls/CallSession';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import { shortId } from '../../utils/formatting';
 import { dialingCallSoundUrl, playAnsweredCallSound } from '../../utils/sounds';
 
 interface GlobalCallBarProps {
@@ -20,9 +23,11 @@ export function GlobalCallBar({
   onToggleDeafen,
   onToggleMute,
 }: GlobalCallBarProps) {
-  const participantNames = call.participants
-    .map((participant) => participant.name)
-    .join(', ');
+  const [stageOpen, setStageOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
+  const subtitle =
+    call.subtitle ||
+    call.participants.map((participant) => participant.name).join(', ');
   const ringingParticipantCount = useMemo(
     () =>
       call.call?.participants.filter(
@@ -40,7 +45,11 @@ export function GlobalCallBar({
   const previousJoinedParticipantCountRef = useRef(joinedParticipantCount);
 
   useEffect(() => {
-    if (ringingParticipantCount === 0 || call.status === 'permission-denied') {
+    if (
+      call.kind === 'community-voice' ||
+      ringingParticipantCount === 0 ||
+      call.status === 'permission-denied'
+    ) {
       return undefined;
     }
 
@@ -68,57 +77,84 @@ export function GlobalCallBar({
   }, [joinedParticipantCount]);
 
   return (
-    <aside className="mb-2 rounded-3xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl">
-      <div className="flex items-center gap-2.5">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
-          <SpeakerIcon />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              className={cx(
-                'h-2.5 w-2.5 shrink-0 rounded-full',
-                call.status === 'live' ? 'bg-emerald-300' : 'bg-amber-300',
-              )}
-            />
-            <h2 className="truncate text-sm font-black text-white">
-              {call.title}
-            </h2>
+    <>
+      <aside
+        role="button"
+        tabIndex={0}
+        onClick={() => setStageOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') setStageOpen(true);
+        }}
+        className="mb-2 cursor-pointer rounded-3xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl transition hover:bg-[#191b29]/95"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+            <SpeakerIcon />
           </div>
-          <p className="mt-0.5 truncate text-[0.7rem] text-white/45">
-            {call.status === 'permission-denied'
-              ? copy.calls.microphoneUnavailable
-              : participantNames || copy.calls.waitingForParticipants}
-          </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-sm font-black text-white">
+                {call.title}
+              </h2>
+            </div>
+            <p className="mt-0.5 truncate text-[0.7rem] text-white/45">
+              {call.status === 'permission-denied'
+                ? copy.calls.microphoneUnavailable
+                : subtitle || copy.calls.waitingForParticipants}
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <CallButton
+              active={call.muted}
+              label={call.muted ? copy.calls.unmute : copy.calls.mute}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleMute();
+              }}
+              disabled={!call.hasMicrophone}
+            >
+              <MicrophoneIcon muted={call.muted} />
+            </CallButton>
+            <CallButton
+              active={call.deafened}
+              label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleDeafen();
+              }}
+            >
+              <HeadphonesIcon deafened={call.deafened} />
+            </CallButton>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEnd();
+              }}
+              className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35"
+              aria-label={copy.calls.leave}
+              title={copy.calls.leave}
+            >
+              <HangUpIcon />
+            </button>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <CallButton
-            active={call.muted}
-            label={call.muted ? copy.calls.unmute : copy.calls.mute}
-            onClick={onToggleMute}
-            disabled={!call.hasMicrophone}
-          >
-            <MicrophoneIcon muted={call.muted} />
-          </CallButton>
-          <CallButton
-            active={call.deafened}
-            label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
-            onClick={onToggleDeafen}
-          >
-            <HeadphonesIcon deafened={call.deafened} />
-          </CallButton>
-          <button
-            type="button"
-            onClick={onEnd}
-            className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/30 transition hover:bg-rose-400"
-            aria-label={copy.calls.leave}
-            title={copy.calls.leave}
-          >
-            <HangUpIcon />
-          </button>
-        </div>
-      </div>
-    </aside>
+      </aside>
+      {stageOpen &&
+        createPortal(
+          <CallStageDialog
+            call={call}
+            dataOpen={dataOpen}
+            onClose={() => setStageOpen(false)}
+            onDataToggle={() => setDataOpen((isOpen) => !isOpen)}
+            onEnd={onEnd}
+            onToggleDeafen={onToggleDeafen}
+            onToggleMute={onToggleMute}
+            subtitle={subtitle}
+          />,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -133,7 +169,7 @@ function CallButton({
   children: ReactNode;
   disabled?: boolean;
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
@@ -153,6 +189,259 @@ function CallButton({
     >
       {children}
     </button>
+  );
+}
+
+function CallStageDialog({
+  call,
+  dataOpen,
+  onClose,
+  onDataToggle,
+  onEnd,
+  onToggleDeafen,
+  onToggleMute,
+  subtitle,
+}: {
+  call: CallSession;
+  dataOpen: boolean;
+  onClose: () => void;
+  onDataToggle: () => void;
+  onEnd: () => void;
+  onToggleDeafen: () => void;
+  onToggleMute: () => void;
+  subtitle: string;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] bg-[#060712]/95 p-4 text-white backdrop-blur-xl sm:p-6"
+      onClick={onClose}
+    >
+      <section
+        className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/60"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex flex-wrap items-center gap-3 border-b border-white/10 p-4 sm:p-5">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+            <SpeakerIcon />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-xl font-black text-white">
+              {call.title}
+            </h2>
+            <p className="truncate text-sm text-white/50">
+              {call.status === 'permission-denied'
+                ? copy.calls.microphoneUnavailable
+                : subtitle || copy.calls.waitingForParticipants}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onDataToggle}
+            className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+          >
+            {dataOpen ? 'Hide call data' : 'View call data'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </header>
+
+        <div
+          className={cx(
+            'min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-5',
+            dataOpen ? 'flex flex-col lg:flex-row' : 'flex',
+          )}
+        >
+          <div className="flex min-h-full flex-1 flex-wrap content-center items-center justify-center gap-4">
+            {call.participants.map((participant) => (
+              <ParticipantTile
+                key={participant.identityId}
+                participant={participant}
+              />
+            ))}
+          </div>
+
+          {dataOpen && (
+            <div className="min-h-0 w-full shrink-0 lg:w-[360px]">
+              <CallDataPanel call={call} />
+            </div>
+          )}
+        </div>
+
+        <footer className="flex items-center justify-center gap-3 border-t border-white/10 p-4">
+          <CallButton
+            active={call.muted}
+            disabled={!call.hasMicrophone}
+            label={call.muted ? copy.calls.unmute : copy.calls.mute}
+            onClick={onToggleMute}
+          >
+            <MicrophoneIcon muted={call.muted} />
+          </CallButton>
+          <CallButton
+            active={call.deafened}
+            label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
+            onClick={onToggleDeafen}
+          >
+            <HeadphonesIcon deafened={call.deafened} />
+          </CallButton>
+          <button
+            type="button"
+            onClick={onEnd}
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35"
+            aria-label={copy.calls.leave}
+            title={copy.calls.leave}
+          >
+            <HangUpIcon />
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function ParticipantTile({
+  participant,
+}: {
+  participant: CallSession['participants'][number];
+}) {
+  const audioPercent =
+    participant.audioLevel === undefined
+      ? null
+      : Math.min(100, Math.round(participant.audioLevel * 100));
+  const latencyLabel =
+    participant.latencyMs === undefined ? '—' : `${participant.latencyMs} ms`;
+  const packetLossLabel =
+    participant.packetsLost === undefined
+      ? '—'
+      : String(participant.packetsLost);
+  const audioLabel = audioPercent === null ? '—' : `${audioPercent}%`;
+  const participantHandle = participant.identity?.profile.handle?.trim();
+  const participantSubtitle = participantHandle
+    ? `@${participantHandle}`
+    : shortId(participant.identityId);
+  const participantName =
+    participant.identity?.profile.name?.trim() ||
+    participant.name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() ||
+    participantSubtitle;
+
+  return (
+    <article
+      className={cx(
+        'flex h-[260px] w-full max-w-[260px] flex-col items-center overflow-hidden rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:h-[280px] sm:max-w-[280px]',
+        participant.speaking
+          ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
+          : 'border-white/10',
+      )}
+    >
+      <div className="mt-3 grid shrink-0 place-items-center">
+        <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24">
+          {participant.picture ? (
+            <img
+              src={participant.picture}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            participantName.slice(0, 1).toUpperCase()
+          )}
+        </div>
+      </div>
+      <div className="mt-2 w-full shrink-0">
+        <h3 className="max-w-full truncate text-base font-black text-white">
+          {participantName}
+        </h3>
+        <p className="mt-0.5 max-w-full truncate text-xs text-white/45">
+          {participantSubtitle}
+        </p>
+      </div>
+      <div className="mt-1 flex min-h-5 flex-wrap justify-center gap-1.5 text-[0.65rem] text-white/45">
+        {participant.muted && (
+          <span className="rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-fuchsia-100">
+            {copy.calls.muted}
+          </span>
+        )}
+        {participant.connectionState && (
+          <span className="rounded-full bg-white/10 px-2 py-0.5">
+            {participant.connectionState}
+          </span>
+        )}
+      </div>
+      <div className="mt-auto h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-emerald-300 transition-all"
+          style={{ width: `${audioPercent ?? 0}%` }}
+        />
+      </div>
+      <dl className="mt-2 grid w-full grid-cols-3 gap-1.5 text-left text-[0.58rem]">
+        <Metric label="Audio" value={audioLabel} />
+        <Metric label="Latency" value={latencyLabel} />
+        <Metric label="Lost" value={packetLossLabel} />
+      </dl>
+    </article>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-white/8 px-1.5 py-1">
+      <dt className="truncate text-white/35">{label}</dt>
+      <dd className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-black text-white/85">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function CallDataPanel({ call }: { call: CallSession }) {
+  const data = {
+    call: call.call ?? null,
+    frontend: {
+      channelId: call.channelId,
+      communityId: call.communityId,
+      conversationId: call.conversationId,
+      hasMicrophone: call.hasMicrophone,
+      kind: call.kind,
+      status: call.status,
+      subtitle: call.subtitle,
+      title: call.title,
+    },
+    participants: call.participants.map((participant) => ({
+      audioLevel: participant.audioLevel,
+      connectionState: participant.connectionState,
+      identityId: participant.identityId,
+      latencyMs: participant.latencyMs,
+      muted: participant.muted,
+      name: participant.name,
+      packetsLost: participant.packetsLost,
+      speaking: participant.speaking,
+      status: participant.status,
+    })),
+  };
+
+  return (
+    <aside className="min-h-0 rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
+      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white/40">
+        Call data
+      </h3>
+      <pre className="mt-3 max-h-full overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/35 p-3 text-xs leading-relaxed text-white/70">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </aside>
   );
 }
 
@@ -224,10 +513,16 @@ function HeadphonesIcon({ deafened }: { deafened: boolean }) {
 
 function HangUpIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-5 w-5 rotate-[135deg]"
+      aria-hidden="true"
+    >
       <path
-        d="M7.2 14.8 5.5 17a1.4 1.4 0 0 0 .2 2l1.2.9a1.4 1.4 0 0 0 1.6 0c2.1-1.2 4.9-1.2 7 0a1.4 1.4 0 0 0 1.6 0l1.2-.9a1.4 1.4 0 0 0 .2-2l-1.7-2.2a2 2 0 0 0-2.1-.7 9.3 9.3 0 0 1-5.4 0 2 2 0 0 0-2.1.7Z"
+        d="M7.8 4.9 6.3 7a2 2 0 0 0-.2 1.9c1.1 2.8 3.2 5 6 6 0.7.2 1.4.2 2-.2l2.1-1.5a1.7 1.7 0 0 1 2.2.2l2 2a1.8 1.8 0 0 1 0 2.5l-1 1a4 4 0 0 1-4.2.9C9.5 17.9 6.1 14.5 4.2 8.8a4 4 0 0 1 .9-4.2l1-1a1.8 1.8 0 0 1 2.5 0l2 2a1.7 1.7 0 0 1 .2 2.2Z"
         stroke="currentColor"
+        strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
       />

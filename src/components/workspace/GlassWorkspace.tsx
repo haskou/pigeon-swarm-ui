@@ -49,6 +49,7 @@ import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
+import { shortId } from '../../utils/formatting';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -82,6 +83,7 @@ type WorkspacePreference = {
   mode?: 'community' | 'messages';
 };
 type CommunityUnreadCounts = Record<string, Record<string, number>>;
+type CommunityVoiceCallIndex = Record<string, string>;
 type PendingSend = {
   attachments: File[];
   content: string;
@@ -95,6 +97,8 @@ const draftsStorageKey = (identityId: string) =>
   `pigeon:conversationDrafts:${identityId}`;
 const workspaceStorageKey = (identityId: string) =>
   `pigeon:workspace:${identityId}`;
+const communityVoiceCallKey = (communityId: string, channelId: string) =>
+  `${communityId}:${channelId}`;
 const communityUnreadStorageKey = (identityId: string) =>
   `pigeon:communityUnread:${identityId}`;
 
@@ -252,6 +256,10 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const activeCallRef = useRef<CallSession | null>(null);
+  const callActionInProgressRef = useRef(false);
+  const callStartupSyncIdentityRef = useRef<string | null>(null);
+  const communityVoiceCallIdByChannelRef = useRef<CommunityVoiceCallIndex>({});
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -267,6 +275,10 @@ export function GlassWorkspace({
     toggleDeafen,
     toggleMute,
   } = useCallSession();
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -506,9 +518,16 @@ export function GlassWorkspace({
       conversationId?: string;
       kind: CallSession['kind'];
       participants: CallParticipant[];
+      subtitle?: string;
       title: string;
     } => {
-      const participants = call.participantIds.map((identityId) => {
+      const participantIds =
+        call.scope.type === 'community_channel'
+          ? call.participants
+              .filter((participant) => participant.status === 'joined')
+              .map((participant) => participant.identityId)
+          : call.participantIds;
+      const participants = participantIds.map((identityId) => {
         const participant = callParticipantForIdentity(identityId);
         const status = call.participants.find(
           (item) => item.identityId === identityId,
@@ -534,9 +553,8 @@ export function GlassWorkspace({
           communityId: scope.communityId,
           kind: 'community-voice',
           participants,
-          title: `${community?.name ?? copy.communities.privateCommunity} · ${
-            channel?.name ?? copy.calls.voiceChannel
-          }`,
+          subtitle: community?.name ?? copy.communities.privateCommunity,
+          title: channel?.name ?? copy.calls.voiceChannel,
         };
       }
 
@@ -550,17 +568,32 @@ export function GlassWorkspace({
             session.keychain,
           )
         : undefined;
-      const title =
-        conversation?.name ??
-        conversation?.title ??
-        (peerIdentityId ? identityNames[peerIdentityId] : undefined) ??
+      const peerIdentity = peerIdentityId
+        ? identityProfiles[peerIdentityId]
+        : undefined;
+      const peerHandle = peerIdentity?.profile.handle?.trim();
+      const oneToOneTitle =
+        peerIdentity?.profile.name.trim() ||
+        (peerHandle ? `@${peerHandle}` : undefined) ||
+        (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
         copy.chat.noConversation;
+      const groupTitle =
+        conversation?.name ?? conversation?.title ?? copy.chat.noConversation;
+      const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
 
       return {
         conversationId: scope.conversationId,
-        kind: conversation?.type === 'group' ? 'group' : 'one-to-one',
+        kind,
         participants,
-        title,
+        subtitle:
+          kind === 'one-to-one'
+            ? peerHandle
+              ? `@${peerHandle}`
+              : peerIdentityId
+                ? shortId(peerIdentityId)
+                : undefined
+            : undefined,
+        title: kind === 'one-to-one' ? oneToOneTitle : groupTitle,
       };
     },
     [
@@ -568,6 +601,7 @@ export function GlassWorkspace({
       communities,
       conversations,
       identityNames,
+      identityProfiles,
       session.identity.id,
       session.keychain,
     ],
@@ -578,6 +612,51 @@ export function GlassWorkspace({
       const currentParticipant = call.participants.find(
         (participant) => participant.identityId === session.identity.id,
       );
+
+      if (call.scope.type === 'community_channel') {
+        const communityId = call.scope.communityId;
+        const channelId = call.scope.channelId;
+        const voiceCallKey = communityVoiceCallKey(communityId, channelId);
+        const connectedIdentityIds =
+          call.status === 'active'
+            ? [
+                ...new Set(
+                  call.participants
+                    .filter((participant) => participant.status === 'joined')
+                    .map((participant) => participant.identityId),
+                ),
+              ]
+            : [];
+
+        if (call.status === 'active') {
+          communityVoiceCallIdByChannelRef.current = {
+            ...communityVoiceCallIdByChannelRef.current,
+            [voiceCallKey]: call.id,
+          };
+        } else if (
+          communityVoiceCallIdByChannelRef.current[voiceCallKey] === call.id
+        ) {
+          const next = { ...communityVoiceCallIdByChannelRef.current };
+
+          delete next[voiceCallKey];
+          communityVoiceCallIdByChannelRef.current = next;
+        }
+
+        setCommunities((current) =>
+          current.map((community) => {
+            if (community.id !== communityId) return community;
+
+            return {
+              ...community,
+              voiceChannels: (community.voiceChannels ?? []).map((channel) =>
+                channel.id === channelId
+                  ? { ...channel, connectedIdentityIds }
+                  : channel,
+              ),
+            };
+          }),
+        );
+      }
 
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
@@ -612,6 +691,8 @@ export function GlassWorkspace({
       }
 
       if (currentParticipant?.status === 'ringing') {
+        if (details.kind === 'community-voice') return;
+
         const caller = details.participants.find(
           (participant) => participant.identityId === call.creatorIdentityId,
         );
@@ -634,6 +715,7 @@ export function GlassWorkspace({
       incomingCall?.call.id,
       reconcileCall,
       session.identity.id,
+      setCommunities,
     ],
   );
 
@@ -689,6 +771,87 @@ export function GlassWorkspace({
   const stopLocalAudio = (stream: MediaStream | null) => {
     stream?.getTracks().forEach((track) => track.stop());
   };
+  const removeCurrentIdentityFromVoicePresence = useCallback(() => {
+    const identityId = sessionRef.current.identity.id;
+
+    setCommunities((current) =>
+      current.map((community) => ({
+        ...community,
+        voiceChannels: (community.voiceChannels ?? []).map((channel) => ({
+          ...channel,
+          connectedIdentityIds: (channel.connectedIdentityIds ?? []).filter(
+            (connectedIdentityId) => connectedIdentityId !== identityId,
+          ),
+        })),
+      })),
+    );
+  }, [setCommunities]);
+  const leaveCallResource = useCallback(
+    async (call: CallResource): Promise<void> => {
+      const details = callDetailsForResource(call);
+
+      if (details.kind === 'one-to-one') {
+        await pigeonApplication.endCall(sessionRef.current, call.id);
+        return;
+      }
+
+      await pigeonApplication.leaveCall(sessionRef.current, call.id);
+    },
+    [callDetailsForResource],
+  );
+  const cleanupJoinedCalls = useCallback(
+    async (exceptCallId?: string): Promise<void> => {
+      const identityId = sessionRef.current.identity.id;
+      const calls = await pigeonApplication.listCalls(sessionRef.current);
+      const joinedCalls = calls.filter(
+        (call) =>
+          call.status === 'active' &&
+          call.id !== exceptCallId &&
+          call.participants.some(
+            (participant) =>
+              participant.identityId === identityId &&
+              participant.status === 'joined',
+          ),
+      );
+
+      if (joinedCalls.length === 0) return;
+
+      await Promise.all(
+        joinedCalls.map((call) =>
+          leaveCallResource(call).catch(() => undefined),
+        ),
+      );
+      removeCurrentIdentityFromVoicePresence();
+    },
+    [leaveCallResource, removeCurrentIdentityFromVoicePresence],
+  );
+  const leaveCurrentCallForSwitch = useCallback(async (): Promise<void> => {
+    const current = activeCall;
+
+    if (!current) return;
+
+    endCall();
+    removeCurrentIdentityFromVoicePresence();
+
+    if (current.call) {
+      await leaveCallResource(current.call).catch(() => undefined);
+    }
+  }, [
+    activeCall,
+    endCall,
+    leaveCallResource,
+    removeCurrentIdentityFromVoicePresence,
+  ]);
+  const rememberCommunityVoiceCall = useCallback((call: CallResource) => {
+    if (call.scope.type !== 'community_channel') return;
+    if (call.status !== 'active') return;
+
+    communityVoiceCallIdByChannelRef.current = {
+      ...communityVoiceCallIdByChannelRef.current,
+      [communityVoiceCallKey(call.scope.communityId, call.scope.channelId)]:
+        call.id,
+    };
+  }, []);
 
   const startConversationCall = useCallback(
     (input: {
@@ -701,11 +864,14 @@ export function GlassWorkspace({
 
       let localStream: MediaStream | null = null;
 
+      callActionInProgressRef.current = true;
       const localAudioRequest = requestLocalAudio();
 
       void localAudioRequest
         .then(async (stream) => {
           localStream = stream;
+          await leaveCurrentCallForSwitch();
+          await cleanupJoinedCalls();
 
           return await pigeonApplication.startConversationCall(
             sessionRef.current,
@@ -734,58 +900,192 @@ export function GlassWorkspace({
         .catch((caught) => {
           stopLocalAudio(localStream);
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        })
+        .finally(() => {
+          callActionInProgressRef.current = false;
         });
     },
     [
       callDetailsForResource,
       callSignalSender,
+      cleanupJoinedCalls,
+      leaveCurrentCallForSwitch,
       loadCallIceConfig,
       requestLocalAudio,
       startCall,
     ],
   );
   const startCommunityVoiceCall = useCallback(
-    (channel: { id: string; name: string }) => {
+    (channel: {
+      connectedIdentityIds?: string[];
+      id: string;
+      name: string;
+    }) => {
       if (!activeCommunity) return;
+      if (
+        activeCall?.kind === 'community-voice' &&
+        activeCall.communityId === activeCommunity.id &&
+        activeCall.channelId === channel.id
+      ) {
+        return;
+      }
 
       let localStream: MediaStream | null = null;
 
+      callActionInProgressRef.current = true;
+      playAnsweredCallSound();
       const localAudioRequest = requestLocalAudio();
 
       void localAudioRequest
         .then(async (stream) => {
           localStream = stream;
+          await leaveCurrentCallForSwitch();
 
-          return await pigeonApplication.startCommunityChannelCall(
-            sessionRef.current,
-            activeCommunity.id,
-            channel.id,
-          );
+          const calls = await pigeonApplication.listCalls(sessionRef.current);
+          const visibleChannelCall =
+            calls.find(
+              (call) =>
+                call.status === 'active' &&
+                call.scope.type === 'community_channel' &&
+                call.scope.communityId === activeCommunity.id &&
+                call.scope.channelId === channel.id,
+            ) ?? null;
+
+          if (visibleChannelCall) return visibleChannelCall;
+
+          const rememberedCallId =
+            communityVoiceCallIdByChannelRef.current[
+              communityVoiceCallKey(activeCommunity.id, channel.id)
+            ];
+
+          if (!rememberedCallId) return null;
+
+          return await pigeonApplication
+            .getCall(sessionRef.current, rememberedCallId)
+            .then((call) => (call.status === 'active' ? call : null))
+            .catch((): null => null);
         })
         .then(async (call) => {
-          const details = callDetailsForResource(call);
           const iceConfig = await loadCallIceConfig();
+          const currentIdentityId = sessionRef.current.identity.id;
 
+          if (call) rememberCommunityVoiceCall(call);
+
+          if (!call) {
+            const rememberedCallId =
+              communityVoiceCallIdByChannelRef.current[
+                communityVoiceCallKey(activeCommunity.id, channel.id)
+              ];
+
+            if (rememberedCallId) {
+              await cleanupJoinedCalls(rememberedCallId);
+
+              try {
+                const joinedRememberedCall = await pigeonApplication.joinCall(
+                  sessionRef.current,
+                  rememberedCallId,
+                );
+                const details = callDetailsForResource(joinedRememberedCall);
+
+                rememberCommunityVoiceCall(joinedRememberedCall);
+                await startCall({
+                  ...details,
+                  call: joinedRememberedCall,
+                  currentIdentityId,
+                  iceConfig,
+                  id: joinedRememberedCall.id,
+                  localStream,
+                  onSignal: callSignalSender(joinedRememberedCall.id),
+                });
+                return;
+              } catch {
+                const next = { ...communityVoiceCallIdByChannelRef.current };
+
+                delete next[communityVoiceCallKey(activeCommunity.id, channel.id)];
+                communityVoiceCallIdByChannelRef.current = next;
+              }
+            }
+
+            await cleanupJoinedCalls();
+            const createdCall =
+              await pigeonApplication.startCommunityChannelCall(
+                sessionRef.current,
+                activeCommunity.id,
+                channel.id,
+              );
+            const details = callDetailsForResource(createdCall);
+
+            rememberCommunityVoiceCall(createdCall);
+            await startCall({
+              ...details,
+              call: createdCall,
+              currentIdentityId,
+              iceConfig,
+              id: createdCall.id,
+              localStream,
+              onSignal: callSignalSender(createdCall.id),
+            });
+
+            return;
+          }
+
+          const alreadyJoined = call.participants.some(
+            (participant) =>
+              participant.identityId === currentIdentityId &&
+              participant.status === 'joined',
+          );
+
+          await cleanupJoinedCalls(call.id);
+
+          if (alreadyJoined) {
+            const details = callDetailsForResource(call);
+
+            await startCall({
+              ...details,
+              call,
+              currentIdentityId,
+              iceConfig,
+              id: call.id,
+              localStream,
+              onSignal: callSignalSender(call.id),
+            });
+            return;
+          }
+
+          const joinedCall = await pigeonApplication.joinCall(
+            sessionRef.current,
+            call.id,
+          );
+          const details = callDetailsForResource(joinedCall);
+
+          rememberCommunityVoiceCall(joinedCall);
           await startCall({
             ...details,
-            call,
+            call: joinedCall,
             currentIdentityId: sessionRef.current.identity.id,
             iceConfig,
-            id: call.id,
+            id: joinedCall.id,
             localStream,
-            onSignal: callSignalSender(call.id),
+            onSignal: callSignalSender(joinedCall.id),
           });
-          playAnsweredCallSound();
         })
         .catch((caught) => {
           stopLocalAudio(localStream);
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        })
+        .finally(() => {
+          callActionInProgressRef.current = false;
         });
     },
     [
       activeCommunity,
+      activeCall?.channelId,
+      activeCall?.communityId,
+      activeCall?.kind,
       callDetailsForResource,
       callSignalSender,
+      cleanupJoinedCalls,
+      leaveCurrentCallForSwitch,
       loadCallIceConfig,
       requestLocalAudio,
       startCall,
@@ -800,11 +1100,15 @@ export function GlassWorkspace({
     setIncomingCall(null);
     stopIncomingCallSound();
     let localStream: MediaStream | null = null;
+
+    callActionInProgressRef.current = true;
     const localAudioRequest = requestLocalAudio();
 
     void localAudioRequest
       .then(async (stream) => {
         localStream = stream;
+        await leaveCurrentCallForSwitch();
+        await cleanupJoinedCalls(pendingCall.id);
 
         return await pigeonApplication.joinCall(
           sessionRef.current,
@@ -828,11 +1132,16 @@ export function GlassWorkspace({
       .catch((caught) => {
         stopLocalAudio(localStream);
         setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+      })
+      .finally(() => {
+        callActionInProgressRef.current = false;
       });
   }, [
     callDetailsForResource,
     callSignalSender,
+    cleanupJoinedCalls,
     incomingCall,
+    leaveCurrentCallForSwitch,
     loadCallIceConfig,
     requestLocalAudio,
     startCall,
@@ -852,9 +1161,11 @@ export function GlassWorkspace({
 
   const leaveActiveCall = useCallback(() => {
     const callId = activeCall?.id;
+    const isCommunityVoiceCall = activeCall?.kind === 'community-voice';
     const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
 
     endCall();
+    removeCurrentIdentityFromVoicePresence();
     playEndedCallSound();
     if (!callId) return;
 
@@ -862,16 +1173,65 @@ export function GlassWorkspace({
       ? pigeonApplication.endCall(sessionRef.current, callId)
       : pigeonApplication.leaveCall(sessionRef.current, callId);
 
-    void request.catch(() => undefined);
-  }, [activeCall?.id, activeCall?.kind, endCall]);
+    void request
+      .then(async () => {
+        if (!isCommunityVoiceCall) return;
+
+        await pigeonApplication
+          .getCall(sessionRef.current, callId)
+          .then((call) => reconcileCallResourceRef.current(call))
+          .catch(() => onCommunitiesReload());
+      })
+      .catch(() => undefined);
+  }, [
+    activeCall?.id,
+    activeCall?.kind,
+    endCall,
+    onCommunitiesReload,
+    removeCurrentIdentityFromVoicePresence,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
+    const identityId = session.identity.id;
+
+    if (callStartupSyncIdentityRef.current === identityId) return undefined;
+
+    callStartupSyncIdentityRef.current = identityId;
 
     void pigeonApplication
       .listCalls(session)
-      .then((calls) => {
+      .then(async (calls) => {
         if (cancelled) return;
+
+        const staleJoinedCalls = calls.filter(
+          (call) =>
+            call.status === 'active' &&
+            call.scope.type === 'community_channel' &&
+            call.participants.some(
+              (participant) =>
+                participant.identityId === identityId &&
+                participant.status === 'joined',
+            ),
+        );
+
+        if (
+          staleJoinedCalls.length > 0 &&
+          !activeCallRef.current &&
+          !callActionInProgressRef.current
+        ) {
+          await Promise.all(
+            staleJoinedCalls.map((call) =>
+              pigeonApplication
+                .leaveCall(sessionRef.current, call.id)
+                .catch(() => undefined),
+            ),
+          );
+          removeCurrentIdentityFromVoicePresence();
+          await onCommunitiesReload().catch(() => undefined);
+          return;
+        }
+
         calls.forEach((call) => reconcileCallResourceRef.current(call));
       })
       .catch(() => undefined);
@@ -879,7 +1239,7 @@ export function GlassWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [session.identity.id]);
+  }, [onCommunitiesReload, removeCurrentIdentityFromVoicePresence, session]);
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -2034,7 +2394,8 @@ export function GlassWorkspace({
           nodeNetworks={nodeNetworks}
           session={session}
           onClose={() => setIsCreateCommunityOpen(false)}
-          onCreated={(community) => {
+          onCreated={({ community, session: nextSession }) => {
+            setSession(nextSession);
             setCommunities((current) => [community, ...current]);
             setActiveCommunityId(community.id);
             setWorkspaceMode('community');

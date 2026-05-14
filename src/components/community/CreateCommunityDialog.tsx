@@ -12,7 +12,7 @@ import { GlassSelect } from '../common/GlassSelect';
 interface CreateCommunityDialogProps {
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
-  onCreated: (community: Community) => void;
+  onCreated: (input: { community: Community; session: Session }) => void;
   session: Session;
 }
 
@@ -24,7 +24,9 @@ export function CreateCommunityDialog({
 }: CreateCommunityDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [networkId, setNetworkId] = useState(session.identity.networks[0] ?? '');
+  const [networkId, setNetworkId] = useState(
+    session.identity.networks[0] ?? '',
+  );
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
@@ -92,7 +94,7 @@ export function CreateCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const community = await pigeonApplication.createCommunity(session, {
+      const created = await pigeonApplication.createCommunity(session, {
         avatar,
         banner,
         description: description.trim(),
@@ -100,7 +102,14 @@ export function CreateCommunityDialog({
         networkId,
       });
 
-      onCreated(community);
+      onCreated({
+        community: created.community,
+        session: {
+          ...session,
+          keychain: created.keychain,
+          keychainExternalIdentifier: created.keychainExternalIdentifier,
+        },
+      });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.createError));
     }

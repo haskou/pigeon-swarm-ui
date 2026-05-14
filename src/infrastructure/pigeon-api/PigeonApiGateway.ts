@@ -457,16 +457,31 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
     name: string,
-  ): Promise<CommunityTextChannel> {
+  ): Promise<CommunityChannel> {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
     const body = { name };
 
-    return await this.http.request<CommunityTextChannel>(path, {
+    return await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PATCH', path, body),
       method: 'PATCH',
+    });
+  }
+
+  public async deleteCommunityChannel(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
     });
   }
 

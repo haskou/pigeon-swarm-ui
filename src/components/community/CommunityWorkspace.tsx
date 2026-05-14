@@ -1,4 +1,4 @@
-import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
+import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import {
   Fragment,
   type MouseEvent,
@@ -18,6 +18,8 @@ import type {
   Community,
   CommunityChannel,
   CommunityTextChannel,
+  CommunityVoiceChannel,
+  ConversationKeyEntry,
   AttachmentProgress,
   ChatMessage,
   IdentityResource,
@@ -59,6 +61,7 @@ import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
+import { ConversationKeyDialog } from '../workspace/ConversationKeyDialog';
 import { LockIcon } from '../workspace/LockIcon';
 import {
   MessageContextMenu,
@@ -86,7 +89,7 @@ interface CommunityWorkspaceProps {
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
-  onJoinVoiceChannel?: (channel: { id: string; name: string }) => void;
+  onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
@@ -194,6 +197,15 @@ export function CommunityWorkspace({
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [channelDataOpen, setChannelDataOpen] = useState(false);
+  const [communityKeyDialog, setCommunityKeyDialog] = useState<
+    'add' | 'copy' | null
+  >(null);
+  const [communityKeyEncrypted, setCommunityKeyEncrypted] = useState('');
+  const [communityKeyError, setCommunityKeyError] = useState<string | null>(
+    null,
+  );
+  const [communityKeyInput, setCommunityKeyInput] = useState('');
+  const [communityKeySaving, setCommunityKeySaving] = useState(false);
   const [channelMenuOpen, setChannelMenuOpen] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
@@ -221,6 +233,7 @@ export function CommunityWorkspace({
   const selectedChannel = textChannels.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const communityKey = session.keychain.conversations[community.id];
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
@@ -228,6 +241,7 @@ export function CommunityWorkspace({
       : null;
   const channelEncryptionReady =
     !!selectedChannel &&
+    !!communityKey &&
     community.memberIds.every(
       (identityId) =>
         identityId === session.identity.id || memberIdentities[identityId],
@@ -260,8 +274,11 @@ export function CommunityWorkspace({
     [messages],
   );
   const missingCommunityKey =
-    visibleMessages.length > 0 &&
-    visibleMessages.every((message) => message.encrypted);
+    !communityKey &&
+    (!owner ||
+      (visibleMessages.length > 0 &&
+        visibleMessages.every((message) => message.encrypted)));
+
   const members = useMemo<MemberView[]>(
     () =>
       community.memberIds.map((identityId) => ({
@@ -303,6 +320,94 @@ export function CommunityWorkspace({
       },
       anchor,
     );
+  };
+  const closeCommunityKeyDialog = () => {
+    setCommunityKeyDialog(null);
+    setCommunityKeyEncrypted('');
+    setCommunityKeyError(null);
+    setCommunityKeyInput('');
+    setCommunityKeySaving(false);
+  };
+  const openCopyCommunityKeyDialog = () => {
+    if (!communityKey) {
+      setCommunityKeyError(copy.chat.copyPrivateKeyUnavailable);
+      setCommunityKeyDialog('copy');
+
+      return;
+    }
+
+    try {
+      const encrypted = PublicKey.fromPEM(
+        session.identity.encryptedKeyPair.publicKey,
+      )
+        .encrypt(JSON.stringify(communityKey))
+        .toString();
+
+      setCommunityKeyEncrypted(encrypted);
+      setCommunityKeyError(null);
+    } catch {
+      setCommunityKeyError(copy.chat.copyPrivateKeyError);
+    }
+
+    setCommunityKeyDialog('copy');
+  };
+  const importCommunityKey = async () => {
+    const encryptedPayload = communityKeyInput.trim();
+
+    if (!encryptedPayload) {
+      setCommunityKeyError(copy.chat.addPrivateKeyRequired);
+
+      return;
+    }
+
+    setCommunityKeySaving(true);
+    setCommunityKeyError(null);
+
+    try {
+      const decrypted = await session.encryptedKeyPair.decrypt(
+        new EncryptedPayload(encryptedPayload),
+        session.password,
+      );
+      const parsed = JSON.parse(
+        decrypted.toString(),
+      ) as Partial<ConversationKeyEntry>;
+
+      if (parsed.conversationId !== community.id || !parsed.privateKey) {
+        throw new Error(copy.chat.addPrivateKeyError);
+      }
+
+      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
+      const keyEntry: ConversationKeyEntry = {
+        conversationId: community.id,
+        createdAt: parsed.createdAt ?? Date.now(),
+        peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
+        privateKey: privateKey.toString(),
+        publicKey: parsed.publicKey ?? privateKey.getPublicKey().toString(),
+      };
+      const published = await pigeonApplication.publishKeychain(session, {
+        ...session.keychain,
+        conversations: {
+          ...session.keychain.conversations,
+          [community.id]: keyEntry,
+        },
+      });
+
+      onSessionUpdated({
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      });
+      closeCommunityKeyDialog();
+    } catch {
+      setCommunityKeyError(copy.chat.addPrivateKeyError);
+    } finally {
+      setCommunityKeySaving(false);
+    }
+  };
+  const copyCommunityKey = async () => {
+    if (navigator.clipboard && communityKeyEncrypted) {
+      await navigator.clipboard.writeText(communityKeyEncrypted);
+    }
   };
   const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
@@ -777,6 +882,7 @@ export function CommunityWorkspace({
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
           channelId: payload.channelId,
+          communityKey: session.keychain.conversations[community.id],
           communityId: community.id,
           content: payload.content,
           recipients: Object.values(identities),
@@ -1275,6 +1381,24 @@ export function CommunityWorkspace({
                       >
                         {copy.chat.viewData}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (communityKey) {
+                            openCopyCommunityKeyDialog();
+                          } else {
+                            setCommunityKeyError(null);
+                            setCommunityKeyDialog('add');
+                          }
+
+                          setChannelMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {communityKey
+                          ? copy.chat.copyPrivateKey
+                          : copy.chat.addPrivateKey}
+                      </button>
                     </div>
                   </>
                 )}
@@ -1330,6 +1454,16 @@ export function CommunityWorkspace({
                         <div className="mt-2 text-rose-100/65">
                           {copy.messages.missingCommunityKey}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCommunityKeyError(null);
+                            setCommunityKeyDialog('add');
+                          }}
+                          className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+                        >
+                          {copy.chat.addPrivateKey}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1440,7 +1574,7 @@ export function CommunityWorkspace({
               )}
             </div>
             <Composer
-              disabled={messageState === 'loading'}
+              disabled={messageState === 'loading' || !communityKey}
               draft={draft}
               error={sendError}
               onDraftChange={setDraft}
@@ -1594,6 +1728,19 @@ export function CommunityWorkspace({
           title={copy.communities.channelDataTitle}
         />
       )}
+      {communityKeyDialog && (
+        <ConversationKeyDialog
+          encryptedConversationKey={communityKeyEncrypted}
+          error={communityKeyError}
+          input={communityKeyInput}
+          mode={communityKeyDialog}
+          onClose={closeCommunityKeyDialog}
+          onCopy={() => void copyCommunityKey()}
+          onImport={() => void importCommunityKey()}
+          onInputChange={setCommunityKeyInput}
+          saving={communityKeySaving}
+        />
+      )}
     </>
   );
 }
@@ -1624,6 +1771,7 @@ function ManageCommunityDialog({
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
     communityChannels(community),
   );
+  const [deletedChannelIds, setDeletedChannelIds] = useState<string[]>([]);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
@@ -1722,7 +1870,7 @@ function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const updatedCommunity = await pigeonApplication.updateCommunity(
+      let updatedCommunity = await pigeonApplication.updateCommunity(
         session,
         community.id,
         {
@@ -1732,6 +1880,15 @@ function ManageCommunityDialog({
           name: name.trim(),
         },
       );
+
+      for (const channelId of deletedChannelIds) {
+        updatedCommunity = await pigeonApplication.deleteCommunityChannel(
+          session,
+          community.id,
+          channelId,
+        );
+      }
+
       const updatedChannels: CommunityChannel[] = [];
 
       for (const channel of channelOrder) {
@@ -1828,6 +1985,25 @@ function ManageCommunityDialog({
 
     nextChannels.splice(nextIndex, 0, channel);
     setChannelOrder(nextChannels);
+  };
+
+  const deleteChannel = (channel: ManagedCommunityChannel) => {
+    if (!window.confirm(copy.communities.deleteChannelConfirm)) return;
+
+    setChannelOrder((current) =>
+      current.filter((candidate) => candidate.id !== channel.id),
+    );
+    setChannelDrafts((current) => {
+      const { [channel.id]: _deleted, ...remaining } = current;
+
+      return remaining;
+    });
+
+    if (!channel.pending) {
+      setDeletedChannelIds((current) =>
+        current.includes(channel.id) ? current : [...current, channel.id],
+      );
+    }
   };
 
   return createPortal(
@@ -1960,6 +2136,16 @@ function ManageCommunityDialog({
                       aria-label={copy.communities.moveChannelDown}
                     >
                       ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteChannel(channel)}
+                      disabled={state === 'loading'}
+                      className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label={copy.communities.deleteChannel}
+                      title={copy.communities.deleteChannel}
+                    >
+                      <TrashIcon />
                     </button>
                   </div>
                 ))}
@@ -2319,6 +2505,20 @@ function VoiceIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M9 4h6m-9 4h12m-10 0 .7 11h6.6L16 8M10 11v5m4-5v5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 function DialogHeader({
   onClose,
   title,
@@ -2515,6 +2715,7 @@ async function encryptCommunityChannelPayload(input: {
   attachments: MessageAttachment[];
   authorIdentityId: string;
   channelId: string;
+  communityKey?: ConversationKeyEntry;
   communityId: string;
   content: string;
   recipients: IdentityResource[];
@@ -2546,6 +2747,14 @@ async function encryptCommunityChannelPayload(input: {
   );
   const recipients: Record<string, string> = {};
 
+  if (input.communityKey) {
+    recipients[input.communityId] = PublicKey.fromPEM(
+      input.communityKey.publicKey,
+    )
+      .encrypt(rawKeyBase64)
+      .toString();
+  }
+
   for (const identity of input.recipients) {
     recipients[identity.id] = PublicKey.fromPEM(
       identity.encryptedKeyPair.publicKey,
@@ -2572,16 +2781,42 @@ async function decryptCommunityChannelPayload(
     envelope.recipients[normalizeIdentityId(session.identity.id)];
 
   if (!wrappedKey) {
-    throw new Error(copy.messages.missingKey);
+    const communityRecipient = Object.values(session.keychain.conversations)
+      .map((keyEntry) => ({
+        keyEntry,
+        wrappedKey: envelope.recipients[keyEntry.conversationId],
+      }))
+      .find((entry) => entry.wrappedKey);
+
+    if (!communityRecipient?.wrappedKey) {
+      throw new Error(copy.messages.missingKey);
+    }
+
+    const rawCommunityKey = await PrivateKey.fromPEM(
+      communityRecipient.keyEntry.privateKey,
+    ).decrypt(new EncryptedPayload(communityRecipient.wrappedKey));
+
+    return await decryptCommunityEnvelope(
+      envelope,
+      new TextDecoder().decode(rawCommunityKey),
+    );
   }
 
   const rawKey = await session.encryptedKeyPair.decrypt(
     new EncryptedPayload(wrappedKey),
     session.password,
   );
+
+  return await decryptCommunityEnvelope(envelope, rawKey.toString());
+}
+
+async function decryptCommunityEnvelope(
+  envelope: CommunityChannelEnvelope,
+  rawKeyBase64: string,
+): Promise<CommunityChannelPlainPayload> {
   const key = await crypto.subtle.importKey(
     'raw',
-    bytesToArrayBuffer(base64ToBytes(rawKey.toString())),
+    bytesToArrayBuffer(base64ToBytes(rawKeyBase64)),
     { name: 'AES-GCM' },
     false,
     ['decrypt'],

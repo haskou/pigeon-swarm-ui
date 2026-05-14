@@ -1,3 +1,5 @@
+import { KeyPair } from '@haskou/value-objects';
+
 import type {
   CallIceServerConfig,
   CallResource,
@@ -10,6 +12,7 @@ import type {
   Community,
   CommunityChannel,
   CommunityTextChannel,
+  ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
@@ -253,7 +256,11 @@ export class PigeonApplication {
       name: string;
       networkId: string;
     },
-  ): Promise<Community> {
+  ): Promise<{
+    community: Community;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
     const avatarCid = input.avatar
       ? (await this.uploadPublicFile(session, input.avatar)).cid
       : undefined;
@@ -261,13 +268,27 @@ export class PigeonApplication {
       ? (await this.uploadPublicFile(session, input.banner)).cid
       : undefined;
 
-    return await this.gateway.createCommunity(session, {
+    const community = await this.gateway.createCommunity(session, {
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
       name: input.name,
       networkId: input.networkId,
     });
+    const keyEntry = await this.createCommunityKeyEntry(community.id);
+    const published = await this.publishKeychain(session, {
+      ...session.keychain,
+      conversations: {
+        ...session.keychain.conversations,
+        [community.id]: keyEntry,
+      },
+    });
+
+    return {
+      community,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
   }
 
   public async updateCommunity(
@@ -378,12 +399,24 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
     name: string,
-  ): Promise<CommunityTextChannel> {
+  ): Promise<CommunityChannel> {
     return await this.gateway.renameCommunityChannel(
       session,
       communityId,
       channelId,
       name,
+    );
+  }
+
+  public async deleteCommunityChannel(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<Community> {
+    return await this.gateway.deleteCommunityChannel(
+      session,
+      communityId,
+      channelId,
     );
   }
 
@@ -643,5 +676,20 @@ export class PigeonApplication {
       notificationId,
       state,
     );
+  }
+
+  private async createCommunityKeyEntry(
+    communityId: string,
+  ): Promise<ConversationKeyEntry> {
+    const keyPair = await KeyPair.generate();
+    const primitives = keyPair.toPrimitives();
+
+    return {
+      conversationId: communityId,
+      createdAt: Date.now(),
+      peerIdentityId: '',
+      privateKey: primitives.privateKey,
+      publicKey: primitives.publicKey,
+    };
   }
 }
