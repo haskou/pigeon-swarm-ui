@@ -1,4 +1,4 @@
-import { SHA256Hash } from '@haskou/value-objects';
+import { SHA256Hash, UUID } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/types';
@@ -11,7 +11,8 @@ type NonceFactory = () => string;
 export class RequestSigner {
   public constructor(
     private readonly clock: Clock = () => Date.now(),
-    private readonly nonceFactory: NonceFactory = () => crypto.randomUUID(),
+    private readonly nonceFactory: NonceFactory = () =>
+      UUID.generate().toString(),
   ) {}
 
   public async headers(

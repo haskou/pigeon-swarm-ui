@@ -1,3 +1,5 @@
+import { UUID } from '@haskou/value-objects';
+
 import type {
   AttachmentProgress,
   MessageAttachment,
@@ -14,6 +16,7 @@ type WorkerRequest =
   | {
       file: File;
       id: string;
+      uploadFilename: string;
       type: 'encrypt';
     }
   | {
@@ -56,9 +59,15 @@ export class AttachmentCipher {
   ): Promise<PendingMessageAttachment> {
     const result = await this.runWorker<
       Extract<WorkerResponse, { type: 'encrypt-result' }>
-    >({ file, id: crypto.randomUUID(), type: 'encrypt' }, onProgress).catch(
-      () => this.encryptInCurrentThread(file, onProgress),
-    );
+    >(
+      {
+        file,
+        id: UUID.generate().toString(),
+        type: 'encrypt',
+        uploadFilename: `${UUID.generate().toString()}.bin`,
+      },
+      onProgress,
+    ).catch(() => this.encryptInCurrentThread(file, onProgress));
 
     return {
       encryptedBytes: result.encryptedBytes,
@@ -83,7 +92,7 @@ export class AttachmentCipher {
       {
         attachment,
         encryptedBytes,
-        id: crypto.randomUUID(),
+        id: UUID.generate().toString(),
         type: 'decrypt',
       },
       onProgress,
@@ -135,7 +144,7 @@ export class AttachmentCipher {
   ): Promise<Extract<WorkerResponse, { type: 'decrypt-result' }>> {
     return {
       bytes: await this.decryptBytes(attachment, encryptedBytes, onProgress),
-      id: crypto.randomUUID(),
+      id: UUID.generate().toString(),
       type: 'decrypt-result',
     };
   }
@@ -190,9 +199,9 @@ export class AttachmentCipher {
         iv: firstIv,
         key: this.bytesToBase64(new Uint8Array(rawKey)),
       },
-      id: crypto.randomUUID(),
+      id: UUID.generate().toString(),
       type: 'encrypt-result',
-      uploadFilename: `${crypto.randomUUID()}.bin`,
+      uploadFilename: `${UUID.generate().toString()}.bin`,
     };
   }
 
@@ -405,7 +414,7 @@ const encryptFile = async (message) => {
     },
     id: message.id,
     type: 'encrypt-result',
-    uploadFilename: crypto.randomUUID() + '.bin',
+    uploadFilename: message.uploadFilename,
   });
 };
 const decryptAttachment = async (message) => {

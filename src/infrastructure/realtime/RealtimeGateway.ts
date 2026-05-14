@@ -1,3 +1,5 @@
+import { UUID } from '@haskou/value-objects';
+
 import type { Session } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
@@ -39,7 +41,7 @@ export class RealtimeGateway {
   ): Promise<WebSocket> {
     const path = this.path('/ws');
     const timestamp = `${Date.now()}`;
-    const nonce = crypto.randomUUID();
+    const nonce = UUID.generate().toString();
     const signature = await session.encryptedKeyPair.sign(
       this.signer.payload('GET', path, timestamp, nonce, {}),
       session.password,

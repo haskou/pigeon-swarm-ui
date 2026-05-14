@@ -499,7 +499,7 @@ export class PigeonApiGateway {
     const createdAt = input.timestamp ?? Date.now();
     const id =
       input.id ??
-      `${communityId}:${channelId}:${createdAt}:${crypto.randomUUID()}`;
+      `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}`;
     const attachmentExternalIdentifiers =
       input.attachmentExternalIdentifiers ?? [];
     const signaturePayload = {
@@ -584,7 +584,7 @@ export class PigeonApiGateway {
     messageId: string,
   ): Promise<void> {
     const createdAt = Date.now();
-    const id = `${communityId}:${channelId}:${createdAt}:${crypto.randomUUID()}:deleted`;
+    const id = `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}:deleted`;
     const signaturePayload = {
       actorIdentityId: session.identity.id,
       channelId,
@@ -1246,7 +1246,7 @@ export class PigeonApiGateway {
         type: 'MessageSent',
       }),
     );
-    const id = `${conversationId}:${timestamp}:${crypto.randomUUID()}`;
+    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
     const signature = await session.encryptedKeyPair.sign(
       JSON.stringify(
         this.messageSignatures.createSent({
@@ -1289,7 +1289,7 @@ export class PigeonApiGateway {
     messageId: string,
   ): Promise<void> {
     const createdAt = Date.now();
-    const id = `${conversationId}:${createdAt}:${crypto.randomUUID()}:deleted`;
+    const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
     const signature = await session.encryptedKeyPair.sign(
       JSON.stringify(
         this.messageSignatures.createDeleted({

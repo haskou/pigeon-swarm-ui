@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { UUID } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
@@ -1433,7 +1434,7 @@ export function GlassWorkspace({
     if (!activeConversation?.id) return;
     const conversationId = activeConversation.id;
     const optimisticTimestamp = Date.now();
-    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${crypto.randomUUID()}`;
+    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
     setSendError(null);
     setAttachmentProgress(null);

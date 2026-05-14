@@ -1,4 +1,4 @@
-import { SHA256Hash } from '@haskou/value-objects';
+import { SHA256Hash, UUID } from '@haskou/value-objects';
 
 export class ConversationIdFactory {
   public create(
@@ -12,7 +12,7 @@ export class ConversationIdFactory {
       .join(':');
 
     if (!sorted || !networkId) {
-      return `one-to-one:${crypto.randomUUID()}`;
+      return `one-to-one:${UUID.generate().toString()}`;
     }
 
     return `one-to-one:${SHA256Hash.from(`${sorted}:${networkId}`).toString()}`;

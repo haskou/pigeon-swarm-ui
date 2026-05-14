@@ -1,4 +1,9 @@
-import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
+import {
+  EncryptedPayload,
+  PrivateKey,
+  PublicKey,
+  UUID,
+} from '@haskou/value-objects';
 import {
   Fragment,
   type MouseEvent,
@@ -827,7 +832,7 @@ export function CommunityWorkspace({
   const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
     setSendError(null);
     const timestamp = Date.now();
-    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${crypto.randomUUID()}`;
+    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${UUID.generate().toString()}`;
 
     setFailedSends((current) => {
       const next = { ...current };
@@ -2628,7 +2633,7 @@ function normalizeIdentityLookup(value: string): string {
 }
 
 function draftChannelId(): string {
-  return `draft:${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
+  return `draft:${UUID.generate().toString()}`;
 }
 
 async function loadIdentityPicture(
