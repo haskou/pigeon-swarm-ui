@@ -62,6 +62,7 @@ import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
+import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
@@ -1551,7 +1552,7 @@ export function CommunityWorkspace({
                 className="h-full overflow-y-auto p-4 sm:p-6"
               >
                 {messageState === 'loading' && visibleMessages.length === 0 ? (
-                  <ChannelMessageSkeleton />
+                  <MessageListSkeleton />
                 ) : messageState === 'loading' ? (
                   <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
                     {copy.chat.loadingEvents}
@@ -2055,35 +2056,6 @@ function MemberRow({
         </span>
       )}
     </button>
-  );
-}
-
-function ChannelMessageSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[0, 1, 2, 3].map((item) => (
-        <div
-          key={item}
-          className={cx(
-            'flex animate-pulse items-end gap-2',
-            item % 2 === 0 ? 'justify-start' : 'justify-end',
-          )}
-        >
-          {item % 2 === 0 && (
-            <div className="h-9 w-9 rounded-2xl bg-white/10" />
-          )}
-          <div
-            className={cx(
-              'rounded-3xl bg-white/10',
-              item % 2 === 0 ? 'h-16 w-56' : 'h-12 w-44',
-            )}
-          />
-          {item % 2 !== 0 && (
-            <div className="h-9 w-9 rounded-2xl bg-white/10" />
-          )}
-        </div>
-      ))}
-    </div>
   );
 }
 

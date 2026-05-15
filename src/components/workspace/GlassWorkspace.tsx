@@ -1341,6 +1341,8 @@ export function GlassWorkspace({
       const requestId = messageRequestRef.current + 1;
 
       messageRequestRef.current = requestId;
+      setMessages([]);
+      updateMessageCursor(null);
       setMessageLoadState('loading');
       setSendError(null);
       try {

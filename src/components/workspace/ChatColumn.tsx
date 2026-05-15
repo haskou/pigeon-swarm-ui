@@ -30,6 +30,7 @@ import {
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
+import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from './ConversationDataDialog';
@@ -697,12 +698,16 @@ export function ChatColumn({
             onScroll={onScroll}
             className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
           >
-            {messageState === 'loading' && (
-              <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
-                {copy.chat.loadingEvents}
-              </div>
-            )}
-            <div>
+            {messageState === 'loading' && messages.length === 0 ? (
+              <MessageListSkeleton />
+            ) : (
+              <>
+                {messageState === 'loading' && (
+                  <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+                    {copy.chat.loadingEvents}
+                  </div>
+                )}
+                <div>
               {hasReachedMessageStart &&
                 messages.length > 0 &&
                 messageState !== 'loading' && (
@@ -814,8 +819,10 @@ export function ChatColumn({
                     </div>
                   </div>
                 ))}
-              <div ref={bottomRef} />
-            </div>
+                  <div ref={bottomRef} />
+                </div>
+              </>
+            )}
             {newMessageCount > 0 && (
               <button
                 type="button"
