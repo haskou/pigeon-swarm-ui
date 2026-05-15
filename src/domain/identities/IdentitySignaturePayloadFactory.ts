@@ -18,11 +18,11 @@ function profileFrom(
   // Backend validates JSON.stringify order.
   /* eslint-disable perfectionist/sort-objects */
   return {
-    name: input.name,
-    handle: normalizeHandle(input.handle),
-    biography: input.biography,
-    picture: input.picture,
     banner: input.banner,
+    biography: input.biography,
+    handle: normalizeHandle(input.handle),
+    name: input.name,
+    picture: input.picture,
   };
   /* eslint-enable perfectionist/sort-objects */
 }

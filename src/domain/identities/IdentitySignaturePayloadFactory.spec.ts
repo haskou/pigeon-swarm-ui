@@ -103,5 +103,8 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       timestamp: 2,
       version: 2,
     });
+    expect(JSON.stringify(payload)).toContain(
+      '"profile":{"banner":"banner-cid","handle":"ada","name":"Ada Updated"',
+    );
   });
 });
