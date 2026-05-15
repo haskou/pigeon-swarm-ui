@@ -23,13 +23,23 @@ export type RealtimeMessage =
       type: 'connection_ack';
     }
   | {
+      identityId: string;
+      timestamp: number;
+      type: 'heartbeat_ack';
+    }
+  | {
       event: RealtimeDomainEvent;
       type: 'domain_event';
     };
 
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
+const heartbeatIntervalMs = 30000;
+const heartbeatTimeoutMs = heartbeatIntervalMs * 2;
+const heartbeatTimeoutCloseCode = 4000;
 
 export class RealtimeGateway {
+  private readonly heartbeatAcks = new WeakMap<WebSocket, number>();
+
   public constructor(
     private readonly urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
     private readonly signer: RequestSigner = new RequestSigner(),
@@ -66,14 +76,25 @@ export class RealtimeGateway {
       throw caught;
     }
 
+    let stopHeartbeat: (() => void) | undefined;
+
     socket.addEventListener('message', (event) => {
       this.debug('message', event.data);
       const message = this.parseMessage(event.data);
+
+      if (message?.type === 'connection_ack') {
+        stopHeartbeat ??= this.startHeartbeat(socket, url);
+      }
+
+      if (message?.type === 'heartbeat_ack') {
+        this.ackHeartbeat(socket);
+      }
 
       if (message) onMessage(message);
     });
     socket.addEventListener('open', () => this.debug('open', url.pathname));
     socket.addEventListener('close', (event) => {
+      stopHeartbeat?.();
       this.debug('close', `${event.code} ${event.reason}`.trim());
 
       if (event.code !== 1000) {
@@ -108,6 +129,37 @@ export class RealtimeGateway {
 
   private path(path: string): string {
     return this.url(path).pathname;
+  }
+
+  private startHeartbeat(socket: WebSocket, url: URL): () => void {
+    this.ackHeartbeat(socket);
+
+    const timer = globalThis.setInterval(() => {
+      if (Date.now() - this.lastHeartbeatAckAt(socket) >= heartbeatTimeoutMs) {
+        this.logError('heartbeat-timeout', url, {
+          intervalMs: heartbeatIntervalMs,
+          timeoutMs: heartbeatTimeoutMs,
+        });
+        socket.close(heartbeatTimeoutCloseCode, 'Realtime heartbeat timed out');
+
+        return;
+      }
+
+      if (socket.readyState !== 1) return;
+
+      socket.send(JSON.stringify({ type: 'identity_heartbeat' }));
+      this.debug('heartbeat', 'sent');
+    }, heartbeatIntervalMs);
+
+    return () => globalThis.clearInterval(timer);
+  }
+
+  private ackHeartbeat(socket: WebSocket): void {
+    this.heartbeatAcks.set(socket, Date.now());
+  }
+
+  private lastHeartbeatAckAt(socket: WebSocket): number {
+    return this.heartbeatAcks.get(socket) ?? 0;
   }
 
   private url(path: string): URL {
