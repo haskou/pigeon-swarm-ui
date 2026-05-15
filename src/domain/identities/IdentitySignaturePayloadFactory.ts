@@ -15,7 +15,8 @@ function normalizeHandle(handle?: string): string | undefined {
 function profileFrom(
   input: IdentityUpdateProfileInput,
 ): IdentityResource['profile'] {
-  /* eslint-disable sort-keys -- Backend validates JSON.stringify order. */
+  // Backend validates JSON.stringify order.
+  /* eslint-disable perfectionist/sort-objects */
   return {
     name: input.name,
     handle: normalizeHandle(input.handle),
@@ -23,7 +24,7 @@ function profileFrom(
     picture: input.picture,
     banner: input.banner,
   };
-  /* eslint-enable sort-keys */
+  /* eslint-enable perfectionist/sort-objects */
 }
 
 export type IdentityUpdateProfileInput = {

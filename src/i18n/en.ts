@@ -138,6 +138,7 @@ export const copy = {
     createError: 'The community could not be created.',
     createTitle: 'Create community',
     creating: 'Creating community...',
+    communityDataTitle: 'Community data',
     deleteChannel: 'Delete channel',
     deleteChannelConfirm:
       'Delete this channel? Text channel messages will also be deleted.',
@@ -146,6 +147,10 @@ export const copy = {
     done: 'Done',
     empty: 'No communities yet. Create one from the rail.',
     emptyChannel: 'No messages in this channel yet.',
+    leave: 'Leave community',
+    leaveConfirm: 'Leave this community?',
+    leaveError: 'The community could not be left.',
+    leaving: 'Leaving...',
     loadError: 'Communities could not be loaded.',
     manage: 'Manage community',
     memberError: 'The member could not be added.',
@@ -273,6 +278,10 @@ export const copy = {
       IPFSNetworkNotFoundError: 'That IPFS network could not be found.',
       IPFSNetworksNotFoundByIdsError:
         'One or more selected IPFS networks could not be found.',
+      CommunityMemberNotFoundError:
+        'You are not a member of that community.',
+      CommunityOwnerCannotLeaveError:
+        'The community owner cannot leave the community.',
       IPFSPeerIdDuplicatedError:
         'That IPFS peer is already registered in another network.',
       KeychainNotFoundError:

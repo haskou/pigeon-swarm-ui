@@ -329,6 +329,13 @@ export class PigeonApplication {
     await this.gateway.addCommunityMember(session, communityId, identityId);
   }
 
+  public async leaveCommunity(
+    session: Session,
+    communityId: string,
+  ): Promise<Community> {
+    return await this.gateway.leaveCommunity(session, communityId);
+  }
+
   public async createGroupConversationInvitation(
     session: Session,
     conversationId: string,

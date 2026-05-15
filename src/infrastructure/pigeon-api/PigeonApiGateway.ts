@@ -5,11 +5,9 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
-  SHA256Hash,
   StringValueObject,
   UUID,
 } from '@haskou/value-objects';
-import { Buffer } from 'buffer';
 
 import type { Peer } from '../../application/peers/ListPeers';
 import type {
@@ -56,16 +54,14 @@ import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
+import { PigeonCallsApi } from './PigeonCallsApi';
+import { PigeonFilesApi } from './PigeonFilesApi';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
 };
-
-const ipfsPrivateUploadLimitBytes = 50 * 1024 * 1024;
-const ipfsPrivateChunkBytes = 8 * 1024 * 1024;
-const ipfsPrivateChunkUploadPauseMs = 35;
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort();
@@ -76,9 +72,11 @@ type ConversationInvitationType =
   | 'group_conversation_invitation';
 
 export class PigeonApiGateway {
-  private readonly attachmentCipher: AttachmentCipher;
+  private readonly calls: PigeonCallsApi;
 
   private readonly conversations: ConversationMapper;
+
+  private readonly files: PigeonFilesApi;
 
   private readonly http: HttpJsonClient;
 
@@ -91,16 +89,6 @@ export class PigeonApiGateway {
   private readonly messages: MessageProjector;
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
-
-  private readonly privateFileCache = new Map<
-    string,
-    Promise<PrivateFileContent>
-  >();
-
-  private readonly publicFileCache = new Map<
-    string,
-    Promise<PublicFileContent>
-  >();
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
@@ -117,8 +105,9 @@ export class PigeonApiGateway {
     ids: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
-    this.attachmentCipher = attachmentCipher;
+    this.calls = new PigeonCallsApi(http, signer);
     this.conversations = conversations;
+    this.files = new PigeonFilesApi(http, signer, attachmentCipher);
     this.http = http;
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
@@ -178,55 +167,27 @@ export class PigeonApiGateway {
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
-    const path = '/calls/';
-    const result = await this.http.request<
-      { calls?: CallResource[] } | CallResource[]
-    >(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return Array.isArray(result) ? result : (result.calls ?? []);
+    return await this.calls.list(session);
   }
 
   public async getCall(
     session: Session,
     callId: string,
   ): Promise<CallResource> {
-    const path = `/calls/${encodeURIComponent(callId)}`;
-
-    return await this.http.request<CallResource>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    return await this.calls.get(session, callId);
   }
 
   public async getCallIceServers(
     session: Session,
   ): Promise<CallIceServerConfig> {
-    const path = '/calls/ice-servers';
-
-    return await this.http.request<CallIceServerConfig>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    return await this.calls.getIceServers(session);
   }
 
   public async startConversationCall(
     session: Session,
     conversationId: string,
   ): Promise<CallResource> {
-    const path = '/calls/';
-    const body = {
-      conversationId,
-      scopeType: 'conversation',
-    };
-
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.calls.startConversation(session, conversationId);
   }
 
   public async startCommunityChannelCall(
@@ -234,50 +195,26 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): Promise<CallResource> {
-    const path = '/calls/';
-    const body = {
-      channelId,
+    return await this.calls.startCommunityChannel(
+      session,
       communityId,
-      scopeType: 'community_channel',
-    };
-
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+      channelId,
+    );
   }
 
   public async joinCall(
     session: Session,
     callId: string,
   ): Promise<CallResource> {
-    const path = `/calls/${encodeURIComponent(callId)}/participants`;
-    const body = {};
-
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.calls.join(session, callId);
   }
 
   public async leaveCall(session: Session, callId: string): Promise<void> {
-    const path = `/calls/${encodeURIComponent(callId)}/participants/me`;
-
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
+    await this.calls.leave(session, callId);
   }
 
   public async endCall(session: Session, callId: string): Promise<void> {
-    const path = `/calls/${encodeURIComponent(callId)}`;
-
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
+    await this.calls.end(session, callId);
   }
 
   public async sendCallSignal(
@@ -285,18 +222,7 @@ export class PigeonApiGateway {
     callId: string,
     signal: CallSignalPayload,
   ): Promise<void> {
-    const path = `/calls/${encodeURIComponent(callId)}/signals`;
-    const body = {
-      payload: signal.payload,
-      recipientIdentityId: signal.recipientIdentityId,
-      signalType: signal.signalType,
-    };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    await this.calls.sendSignal(session, callId, signal);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -390,6 +316,18 @@ export class PigeonApiGateway {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
+    });
+  }
+
+  public async leaveCommunity(
+    session: Session,
+    communityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(communityId)}/members/me`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
     });
   }
 
@@ -620,39 +558,11 @@ export class PigeonApiGateway {
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    const cached = this.publicFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.http
-      .request<PublicFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
-      .catch((caught: unknown) => {
-        this.publicFileCache.delete(cid);
-
-        throw caught;
-      });
-
-    this.publicFileCache.set(cid, request);
-
-    return await request;
+    return await this.files.getPublicFile(cid);
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    const cached = this.privateFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.http
-      .request<PrivateFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
-      .catch((caught: unknown) => {
-        this.privateFileCache.delete(cid);
-
-        throw caught;
-      });
-
-    this.privateFileCache.set(cid, request);
-
-    return await request;
+    return await this.files.getPrivateFile(cid);
   }
 
   public async createConversation(
@@ -931,48 +841,21 @@ export class PigeonApiGateway {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    const path = '/ipfs/public';
-    const bytes = await file.arrayBuffer();
-
-    return await this.http.request<PublicFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': file.type || 'application/octet-stream',
-        'X-Filename': file.name || 'upload',
-      },
-      method: 'POST',
-    });
+    return await this.files.uploadPublicFile(session, file);
   }
 
   public async uploadPrivateFile(
     session: Session,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
-    return await this.uploadPrivateBytes(
-      session,
-      attachment.encryptedBytes,
-      attachment.uploadFilename,
-    );
+    return await this.files.uploadPrivateFile(session, attachment);
   }
 
   public async downloadAttachment(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    const encryptedBytes = attachment.chunks?.length
-      ? await this.downloadAttachmentChunks(attachment)
-      : this.attachmentCipher.bytesToArrayBuffer(
-          this.attachmentCipher.base64ToBytes(
-            (await this.getPrivateFile(attachment.cid)).encryptedData,
-          ),
-        );
-
-    return await this.attachmentCipher.decrypt(
-      attachment,
-      encryptedBytes,
-      onProgress,
-    );
+    return await this.files.downloadAttachment(attachment, onProgress);
   }
 
   public async createNetwork(name: string, session?: Session): Promise<void> {
@@ -1400,28 +1283,11 @@ export class PigeonApiGateway {
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment[]> {
-    if (attachments.length === 0) return [];
-
-    const uploadedAttachments: MessageAttachment[] = [];
-
-    for (const file of attachments) {
-      const pending = await this.attachmentCipher.encrypt(file, onProgress);
-      const upload = await this.uploadPendingAttachment(
-        session,
-        pending,
-        onProgress,
-      );
-
-      uploadedAttachments.push({
-        ...pending.metadata,
-        cid: upload.cid,
-        ...(upload.chunks ? { chunks: upload.chunks } : {}),
-        encryptedSize: upload.size,
-        ...(upload.type ? { type: upload.type } : {}),
-      });
-    }
-
-    return uploadedAttachments;
+    return await this.files.publishMessageAttachments(
+      session,
+      attachments,
+      onProgress,
+    );
   }
 
   private isMissingRemoteKeychain(caught: unknown): boolean {
@@ -1611,132 +1477,6 @@ export class PigeonApiGateway {
       conversationId,
       messageId,
     )}/around?${query.toString()}`;
-  }
-
-  private async uploadPendingAttachment(
-    session: Session,
-    pending: PendingMessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<{
-    chunks?: MessageAttachment['chunks'];
-    cid: string;
-    size: number;
-    type?: MessageAttachment['type'];
-  }> {
-    if (pending.encryptedBytes.byteLength <= ipfsPrivateUploadLimitBytes) {
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: 0,
-        phase: 'upload',
-      });
-      const upload = await this.uploadPrivateFile(session, pending);
-
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: 100,
-        phase: 'upload',
-      });
-
-      return { cid: upload.cid, size: upload.size };
-    }
-
-    const chunks: NonNullable<MessageAttachment['chunks']> = [];
-    const totalChunks = Math.ceil(
-      pending.encryptedBytes.byteLength / ipfsPrivateChunkBytes,
-    );
-
-    for (let index = 0; index < totalChunks; index += 1) {
-      const offset = index * ipfsPrivateChunkBytes;
-      const chunk = pending.encryptedBytes.slice(
-        offset,
-        Math.min(
-          offset + ipfsPrivateChunkBytes,
-          pending.encryptedBytes.byteLength,
-        ),
-      );
-      const upload = await this.uploadPrivateBytes(
-        session,
-        chunk,
-        `${pending.uploadFilename}.part-${String(index).padStart(4, '0')}`,
-      );
-
-      chunks.push({
-        cid: upload.cid,
-        index,
-        sha256: this.sha256Hex(chunk),
-        size: upload.size,
-      });
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: Math.min(100, Math.round(((index + 1) * 100) / totalChunks)),
-        phase: 'upload',
-      });
-      await this.yieldToBrowser(ipfsPrivateChunkUploadPauseMs);
-    }
-
-    return {
-      chunks,
-      cid: chunks[0]?.cid ?? '',
-      size: pending.encryptedBytes.byteLength,
-      type: 'chunked_file',
-    };
-  }
-
-  private async uploadPrivateBytes(
-    session: Session,
-    bytes: ArrayBuffer,
-    filename: string,
-  ): Promise<PrivateFileUpload> {
-    const path = '/ipfs/private';
-
-    return await this.http.request<PrivateFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': filename,
-      },
-      method: 'POST',
-    });
-  }
-
-  private async downloadAttachmentChunks(
-    attachment: MessageAttachment,
-  ): Promise<ArrayBuffer> {
-    const buffers = await Promise.all(
-      [...(attachment.chunks ?? [])]
-        .sort((left, right) => left.index - right.index)
-        .map(async (chunk) =>
-          this.attachmentCipher.bytesToArrayBuffer(
-            this.attachmentCipher.base64ToBytes(
-              (await this.getPrivateFile(chunk.cid)).encryptedData,
-            ),
-          ),
-        ),
-    );
-    const totalSize = buffers.reduce(
-      (total, buffer) => total + buffer.byteLength,
-      0,
-    );
-    const output = new Uint8Array(totalSize);
-    let offset = 0;
-
-    buffers.forEach((buffer) => {
-      output.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
-    });
-
-    return output.buffer;
-  }
-
-  private sha256Hex(bytes: ArrayBuffer): string {
-    return SHA256Hash.from(Buffer.from(bytes)).toString();
-  }
-
-  private async yieldToBrowser(delayMs = 0): Promise<void> {
-    await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, delayMs);
-    });
   }
 
   private async cachedRequest<T>(

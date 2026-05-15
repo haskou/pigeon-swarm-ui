@@ -90,6 +90,7 @@ interface CommunityWorkspaceProps {
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
+  onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
   onCallEnd?: () => void;
   onCallToggleDeafen?: () => void;
@@ -156,6 +157,7 @@ export function CommunityWorkspace({
   nodeNetworks,
   onChannelSelected,
   onChannelViewed,
+  onCommunityLeft,
   onCommunityUpdated,
   onCallEnd,
   onCallToggleDeafen,
@@ -205,7 +207,7 @@ export function CommunityWorkspace({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
-  const [channelDataOpen, setChannelDataOpen] = useState(false);
+  const [communityDataOpen, setCommunityDataOpen] = useState(false);
   const [communityKeyDialog, setCommunityKeyDialog] = useState<
     'add' | 'copy' | null
   >(null);
@@ -215,7 +217,11 @@ export function CommunityWorkspace({
   );
   const [communityKeyInput, setCommunityKeyInput] = useState('');
   const [communityKeySaving, setCommunityKeySaving] = useState(false);
-  const [channelMenuOpen, setChannelMenuOpen] = useState(false);
+  const [communityMenuOpen, setCommunityMenuOpen] = useState(false);
+  const [communityLeaveError, setCommunityLeaveError] = useState<string | null>(
+    null,
+  );
+  const [communityLeaving, setCommunityLeaving] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
@@ -425,6 +431,29 @@ export function CommunityWorkspace({
       await navigator.clipboard.writeText(communityKeyEncrypted);
     }
   };
+  const leaveCommunity = async () => {
+    if (communityLeaving) return;
+    if (!window.confirm(copy.communities.leaveConfirm)) return;
+
+    setCommunityLeaving(true);
+    setCommunityLeaveError(null);
+
+    try {
+      const updatedCommunity = await pigeonApplication.leaveCommunity(
+        session,
+        community.id,
+      );
+
+      setCommunityMenuOpen(false);
+      onCommunityLeft(updatedCommunity);
+    } catch (caught) {
+      setCommunityLeaveError(
+        toUserErrorMessage(caught, copy.communities.leaveError),
+      );
+    } finally {
+      setCommunityLeaving(false);
+    }
+  };
   const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
@@ -538,7 +567,7 @@ export function CommunityWorkspace({
       callParticipantForIdentity,
     ],
   );
-  const channelData = useMemo(
+  const communityData = useMemo(
     () => ({
       frontendDerived: {
         channelEncryptionReady,
@@ -1368,59 +1397,72 @@ export function CommunityWorkspace({
                 ? copy.chat.realtimeConnected
                 : copy.chat.realtimeReconnecting}
             </button>
-            {selectedChannel ? (
-              <div className="relative ml-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setChannelMenuOpen((isOpen) => !isOpen)}
-                  className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
-                  aria-label={copy.chat.conversationMenu}
-                  aria-expanded={channelMenuOpen}
-                >
-                  ⋮
-                </button>
-                {channelMenuOpen && (
-                  <>
+            <div className="relative ml-auto shrink-0">
+              {communityLeaveError ? (
+                <div className="absolute bottom-[calc(100%+.5rem)] right-0 z-40 w-72 rounded-2xl border border-rose-300/20 bg-rose-500/15 p-3 text-xs font-black text-rose-100 shadow-2xl shadow-black/40">
+                  {communityLeaveError}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setCommunityMenuOpen((isOpen) => !isOpen)}
+                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
+                aria-label={copy.chat.conversationMenu}
+                aria-expanded={communityMenuOpen}
+              >
+                ⋮
+              </button>
+              {communityMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-30 cursor-default"
+                    onClick={() => setCommunityMenuOpen(false)}
+                    aria-label={copy.dialog.close}
+                  />
+                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
                     <button
                       type="button"
-                      className="fixed inset-0 z-30 cursor-default"
-                      onClick={() => setChannelMenuOpen(false)}
-                      aria-label={copy.dialog.close}
-                    />
-                    <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setChannelDataOpen(true);
-                          setChannelMenuOpen(false);
-                        }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {copy.chat.viewData}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (communityKey) {
-                            openCopyCommunityKeyDialog();
-                          } else {
-                            setCommunityKeyError(null);
-                            setCommunityKeyDialog('add');
-                          }
+                      onClick={() => {
+                        setCommunityDataOpen(true);
+                        setCommunityMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {copy.chat.viewData}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (communityKey) {
+                          openCopyCommunityKeyDialog();
+                        } else {
+                          setCommunityKeyError(null);
+                          setCommunityKeyDialog('add');
+                        }
 
-                          setChannelMenuOpen(false);
-                        }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {communityKey
-                          ? copy.chat.copyPrivateKey
-                          : copy.chat.addPrivateKey}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : null}
+                        setCommunityMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {communityKey
+                        ? copy.chat.copyPrivateKey
+                        : copy.chat.addPrivateKey}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void leaveCommunity()}
+                      disabled={communityLeaving}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                    >
+                      {communityLeaving
+                        ? copy.communities.leaving
+                        : copy.communities.leave}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -1738,11 +1780,11 @@ export function CommunityWorkspace({
           onClose={() => setRawMessage(null)}
         />
       )}
-      {channelDataOpen && (
+      {communityDataOpen && (
         <ConversationDataDialog
-          data={channelData}
-          onClose={() => setChannelDataOpen(false)}
-          title={copy.communities.channelDataTitle}
+          data={communityData}
+          onClose={() => setCommunityDataOpen(false)}
+          title={copy.communities.communityDataTitle}
         />
       )}
       {communityKeyDialog && (

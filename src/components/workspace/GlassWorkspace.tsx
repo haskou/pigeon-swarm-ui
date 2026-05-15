@@ -1882,6 +1882,36 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type === 'communities.v1.member.was_left') {
+        const community = communityAttribute(event, 'community');
+        const communityId =
+          community?.id ??
+          eventAggregateId(event) ??
+          stringAttribute(event, 'communityId');
+        const identityId = stringAttribute(event, 'identityId');
+
+        if (identityId === session.identity.id && communityId) {
+          setCommunities((current) =>
+            current.filter((item) => item.id !== communityId),
+          );
+
+          return;
+        }
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        } else if (communityId && identityId) {
+          updateCommunityState(communityId, (current) => ({
+            ...current,
+            memberIds: current.memberIds.filter((id) => id !== identityId),
+          }));
+        }
+
+        return;
+      }
+
       if (event.type.startsWith('communities.')) {
         void onCommunitiesReload().catch(() => undefined);
         return;
@@ -2252,6 +2282,11 @@ export function GlassWorkspace({
                 current.map((item) =>
                   item.id === community.id ? community : item,
                 ),
+              )
+            }
+            onCommunityLeft={(community) =>
+              setCommunities((current) =>
+                current.filter((item) => item.id !== community.id),
               )
             }
             onChannelViewed={(channelId) =>
