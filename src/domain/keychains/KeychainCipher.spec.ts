@@ -3,12 +3,14 @@ import type { Session } from '../types';
 import { KeychainCipher } from './KeychainCipher';
 
 describe(KeychainCipher.name, () => {
-  it('signs only the canonical keychain domain payload', async () => {
+  it('signs the canonical initial keychain domain payload', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
       encryptedKeyPair: { encrypt, sign },
-      identity: { id: 'identity-1' },
+      identity: {
+        id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+      },
       keychain: { conversations: {}, version: 0 },
       keychainExternalIdentifier: null,
       password: 'secret',
@@ -25,6 +27,7 @@ describe(KeychainCipher.name, () => {
 
     expect(JSON.parse(signaturePayload)).toEqual({
       encryptedPayload: 'encrypted',
+      ownerIdentityId: 'identity-1',
       timestamp: expect.any(Number),
       version: 1,
     });
@@ -38,7 +41,7 @@ describe(KeychainCipher.name, () => {
     });
   });
 
-  it('keeps previous keychain external identifier out of the domain signature', async () => {
+  it('signs the previous keychain external identifier when present', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
@@ -49,7 +52,7 @@ describe(KeychainCipher.name, () => {
       password: 'secret',
     } as unknown as Session;
 
-    await new KeychainCipher().encryptForPublish(session, {
+    const result = await new KeychainCipher().encryptForPublish(session, {
       conversations: {},
       version: 2,
     });
@@ -57,8 +60,13 @@ describe(KeychainCipher.name, () => {
 
     expect(JSON.parse(signaturePayload)).toEqual({
       encryptedPayload: 'encrypted',
+      ownerIdentityId: 'identity-1',
+      previousKeychainExternalIdentifier: 'keychain-previous',
       timestamp: expect.any(Number),
       version: 2,
     });
+    expect(result.body.previousKeychainExternalIdentifier).toBe(
+      'keychain-previous',
+    );
   });
 });
