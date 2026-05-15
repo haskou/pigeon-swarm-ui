@@ -44,8 +44,6 @@ type EncryptCommunityChannelPayloadInput = {
 };
 
 const gcmTagBytes = 16;
-const decryptedPayloadCacheLimit = 500;
-const decryptedPayloadCache = new Map<string, CommunityChannelPlainPayload>();
 const privateKeyCache = new Map<string, PrivateKey>();
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -93,23 +91,6 @@ function decryptCommunityEnvelope(
   return JSON.parse(
     new TextDecoder().decode(decrypted),
   ) as CommunityChannelPlainPayload;
-}
-
-function cacheDecryptedPayload(
-  encryptedPayload: string,
-  payload: CommunityChannelPlainPayload,
-): CommunityChannelPlainPayload {
-  decryptedPayloadCache.set(encryptedPayload, payload);
-
-  if (decryptedPayloadCache.size > decryptedPayloadCacheLimit) {
-    const oldestKey = decryptedPayloadCache.keys().next().value as
-      | string
-      | undefined;
-
-    if (oldestKey) decryptedPayloadCache.delete(oldestKey);
-  }
-
-  return payload;
 }
 
 function privateKeyFromPEM(value: string): PrivateKey {
@@ -179,10 +160,6 @@ export async function decryptCommunityChannelPayload(
   missingKeyMessage: string,
   communityId?: string,
 ): Promise<CommunityChannelPlainPayload> {
-  const cached = decryptedPayloadCache.get(encryptedPayload);
-
-  if (cached) return cached;
-
   const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
   const wrappedKey =
     envelope.recipients[session.identity.id] ??
@@ -212,12 +189,9 @@ export async function decryptCommunityChannelPayload(
       communityRecipient.keyEntry.privateKey,
     ).decrypt(new EncryptedPayload(communityRecipient.wrappedKey));
 
-    return cacheDecryptedPayload(
-      encryptedPayload,
-      decryptCommunityEnvelope(
-        envelope,
-        new TextDecoder().decode(rawCommunityKey),
-      ),
+    return decryptCommunityEnvelope(
+      envelope,
+      new TextDecoder().decode(rawCommunityKey),
     );
   }
 
@@ -226,8 +200,5 @@ export async function decryptCommunityChannelPayload(
     session.password,
   );
 
-  return cacheDecryptedPayload(
-    encryptedPayload,
-    decryptCommunityEnvelope(envelope, rawKey.toString()),
-  );
+  return decryptCommunityEnvelope(envelope, rawKey.toString());
 }
