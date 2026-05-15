@@ -766,6 +766,7 @@ export function CommunityWorkspace({
           session,
           rawMessage.encryptedPayload ?? '',
           copy.messages.missingKey,
+          community.id,
         );
 
         return {

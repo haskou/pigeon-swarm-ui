@@ -44,6 +44,9 @@ type EncryptCommunityChannelPayloadInput = {
 };
 
 const gcmTagBytes = 16;
+const decryptedPayloadCacheLimit = 500;
+const decryptedPayloadCache = new Map<string, CommunityChannelPlainPayload>();
+const privateKeyCache = new Map<string, PrivateKey>();
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -90,6 +93,35 @@ function decryptCommunityEnvelope(
   return JSON.parse(
     new TextDecoder().decode(decrypted),
   ) as CommunityChannelPlainPayload;
+}
+
+function cacheDecryptedPayload(
+  encryptedPayload: string,
+  payload: CommunityChannelPlainPayload,
+): CommunityChannelPlainPayload {
+  decryptedPayloadCache.set(encryptedPayload, payload);
+
+  if (decryptedPayloadCache.size > decryptedPayloadCacheLimit) {
+    const oldestKey = decryptedPayloadCache.keys().next().value as
+      | string
+      | undefined;
+
+    if (oldestKey) decryptedPayloadCache.delete(oldestKey);
+  }
+
+  return payload;
+}
+
+function privateKeyFromPEM(value: string): PrivateKey {
+  const cached = privateKeyCache.get(value);
+
+  if (cached) return cached;
+
+  const privateKey = PrivateKey.fromPEM(value);
+
+  privateKeyCache.set(value, privateKey);
+
+  return privateKey;
 }
 
 export function encryptCommunityChannelPayload(
@@ -145,31 +177,47 @@ export async function decryptCommunityChannelPayload(
   session: Session,
   encryptedPayload: string,
   missingKeyMessage: string,
+  communityId?: string,
 ): Promise<CommunityChannelPlainPayload> {
+  const cached = decryptedPayloadCache.get(encryptedPayload);
+
+  if (cached) return cached;
+
   const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
   const wrappedKey =
     envelope.recipients[session.identity.id] ??
     envelope.recipients[normalizeIdentityId(session.identity.id)];
 
   if (!wrappedKey) {
-    const communityRecipient = Object.values(session.keychain.conversations)
-      .map((keyEntry) => ({
-        keyEntry,
-        wrappedKey: envelope.recipients[keyEntry.conversationId],
-      }))
-      .find((entry) => entry.wrappedKey);
+    const directKeyEntry = communityId
+      ? session.keychain.conversations[communityId]
+      : undefined;
+    const communityRecipient = directKeyEntry
+      ? {
+          keyEntry: directKeyEntry,
+          wrappedKey: envelope.recipients[directKeyEntry.conversationId],
+        }
+      : Object.values(session.keychain.conversations)
+          .map((keyEntry) => ({
+            keyEntry,
+            wrappedKey: envelope.recipients[keyEntry.conversationId],
+          }))
+          .find((entry) => entry.wrappedKey);
 
     if (!communityRecipient?.wrappedKey) {
       throw new Error(missingKeyMessage);
     }
 
-    const rawCommunityKey = await PrivateKey.fromPEM(
+    const rawCommunityKey = await privateKeyFromPEM(
       communityRecipient.keyEntry.privateKey,
     ).decrypt(new EncryptedPayload(communityRecipient.wrappedKey));
 
-    return decryptCommunityEnvelope(
-      envelope,
-      new TextDecoder().decode(rawCommunityKey),
+    return cacheDecryptedPayload(
+      encryptedPayload,
+      decryptCommunityEnvelope(
+        envelope,
+        new TextDecoder().decode(rawCommunityKey),
+      ),
     );
   }
 
@@ -178,5 +226,8 @@ export async function decryptCommunityChannelPayload(
     session.password,
   );
 
-  return decryptCommunityEnvelope(envelope, rawKey.toString());
+  return cacheDecryptedPayload(
+    encryptedPayload,
+    decryptCommunityEnvelope(envelope, rawKey.toString()),
+  );
 }
