@@ -689,6 +689,10 @@ export function GlassWorkspace({
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
         if (activeCall?.id === call.id) {
+          logCallWarning('workspace:call:ended-by-resource-status', {
+            callId: call.id,
+            status: call.status,
+          });
           playEndedCallSound();
           endCall();
         }
@@ -698,6 +702,9 @@ export function GlassWorkspace({
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
         if (activeCall?.id === call.id) {
+          logCallWarning('workspace:call:ended-unsupported-group-call', {
+            callId: call.id,
+          });
           playEndedCallSound();
           endCall();
         }
@@ -713,6 +720,15 @@ export function GlassWorkspace({
             ['declined', 'left', 'missed'].includes(participant.status),
         )
       ) {
+        const remoteParticipant = call.participants.find(
+          (participant) => participant.identityId !== session.identity.id,
+        );
+
+        logCallWarning('workspace:call:ended-by-remote-participant-status', {
+          callId: call.id,
+          remoteIdentityId: remoteParticipant?.identityId,
+          remoteStatus: remoteParticipant?.status,
+        });
         playEndedCallSound();
         endCall();
         return;
@@ -883,6 +899,22 @@ export function GlassWorkspace({
       title: string;
     }) => {
       if (input.kind === 'group') return;
+      if (callActionInProgressRef.current) {
+        logCallWarning('workspace:conversation-call:ignored-action-in-progress', {
+          conversationId: input.conversationId,
+        });
+        return;
+      }
+      if (
+        activeCall?.kind === input.kind &&
+        activeCall.conversationId === input.conversationId
+      ) {
+        logCallWarning('workspace:conversation-call:ignored-already-active', {
+          callId: activeCall.id,
+          conversationId: input.conversationId,
+        });
+        return;
+      }
 
       let localStream: MediaStream | null = null;
 
@@ -895,12 +927,23 @@ export function GlassWorkspace({
           await leaveCurrentCallForSwitch();
           await cleanupJoinedCalls();
 
+          logCallDebug('workspace:conversation-call:create-request', {
+            conversationId: input.conversationId,
+          });
           return await pigeonApplication.startConversationCall(
             sessionRef.current,
             input.conversationId,
           );
         })
         .then(async (call) => {
+          logCallDebug('workspace:conversation-call:created', {
+            callId: call.id,
+            conversationId: input.conversationId,
+            participantStatuses: call.participants.map((participant) => ({
+              identityId: participant.identityId,
+              status: participant.status,
+            })),
+          });
           const details = callDetailsForResource(call);
           const iceConfig = await loadCallIceConfig();
 
@@ -928,6 +971,9 @@ export function GlassWorkspace({
         });
     },
     [
+      activeCall?.conversationId,
+      activeCall?.id,
+      activeCall?.kind,
       callDetailsForResource,
       callSignalSender,
       cleanupJoinedCalls,
@@ -1047,6 +1093,12 @@ export function GlassWorkspace({
 
   const acceptIncomingCall = useCallback(() => {
     if (!incomingCall) return;
+    if (callActionInProgressRef.current) {
+      logCallWarning('workspace:incoming-call:accept-ignored-action-in-progress', {
+        callId: incomingCall.call.id,
+      });
+      return;
+    }
 
     const pendingCall = incomingCall.call;
 
@@ -1063,12 +1115,22 @@ export function GlassWorkspace({
         await leaveCurrentCallForSwitch();
         await cleanupJoinedCalls(pendingCall.id);
 
+        logCallDebug('workspace:incoming-call:join-request', {
+          callId: pendingCall.id,
+        });
         return await pigeonApplication.joinCall(
           sessionRef.current,
           pendingCall.id,
         );
       })
       .then(async (call) => {
+        logCallDebug('workspace:incoming-call:joined', {
+          callId: call.id,
+          participantStatuses: call.participants.map((participant) => ({
+            identityId: participant.identityId,
+            status: participant.status,
+          })),
+        });
         const details = callDetailsForResource(call);
         const iceConfig = await loadCallIceConfig();
 
@@ -1806,9 +1868,17 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('calls.')) {
+        const eventCallId =
+          eventAggregateId(event) ?? stringAttribute(event, 'callId');
+
+        logCallDebug('workspace:realtime-call-event', {
+          activeCallId: activeCallRef.current?.id,
+          callId: eventCallId,
+          eventType: event.type,
+        });
+
         if (event.type === 'calls.v1.signal.sent') {
-          const callId =
-            eventAggregateId(event) ?? stringAttribute(event, 'callId');
+          const callId = eventCallId;
           const senderIdentityId = stringAttribute(event, 'senderIdentityId');
           const recipientIdentityId = stringAttribute(
             event,
@@ -1841,9 +1911,23 @@ export function GlassWorkspace({
         void pigeonApplication
           .getCall(sessionRef.current, callId)
           .then((call) => {
+            logCallDebug('workspace:realtime-call-event:resource-loaded', {
+              activeCallId: activeCallRef.current?.id,
+              callId: call.id,
+              participantStatuses: call.participants.map((participant) => ({
+                identityId: participant.identityId,
+                status: participant.status,
+              })),
+              status: call.status,
+            });
             reconcileCallResource(call);
           })
-          .catch(() => undefined);
+          .catch((caught) => {
+            logCallError('workspace:realtime-call-event:resource-load-failed', caught, {
+              callId,
+              eventType: event.type,
+            });
+          });
         return;
       }
 
