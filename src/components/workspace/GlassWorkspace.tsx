@@ -70,6 +70,7 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
@@ -158,6 +159,8 @@ interface GlassWorkspaceProps {
   onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
+  onPendingCommunityInviteHandled?: () => void;
+  pendingCommunityInvite?: PendingCommunityInviteLink | null;
   peers: Peer[];
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
@@ -171,6 +174,8 @@ export function GlassWorkspace({
   onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
+  onPendingCommunityInviteHandled,
+  pendingCommunityInvite,
   peers,
   session,
   setCommunities,
@@ -244,6 +249,7 @@ export function GlassWorkspace({
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callStartupSyncIdentityRef = useRef<string | null>(null);
+  const pendingCommunityInviteRef = useRef<string | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -447,6 +453,57 @@ export function GlassWorkspace({
     onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
+
+  useEffect(() => {
+    if (!pendingCommunityInvite) return;
+    if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
+      return;
+    }
+
+    pendingCommunityInviteRef.current = pendingCommunityInvite.token;
+    setSendError(null);
+    void (async () => {
+      const acceptedCommunity = await pigeonApplication.acceptCommunityInviteLink(
+        sessionRef.current,
+        pendingCommunityInvite.token,
+      );
+      let nextSession = sessionRef.current;
+
+      if (pendingCommunityInvite.keyEntry) {
+        const published = await pigeonApplication.publishKeychain(nextSession, {
+          ...nextSession.keychain,
+          conversations: {
+            ...nextSession.keychain.conversations,
+            [pendingCommunityInvite.keyEntry.conversationId]:
+              pendingCommunityInvite.keyEntry,
+          },
+        });
+
+        nextSession = {
+          ...nextSession,
+          keychain: published.keychain,
+          keychainExternalIdentifier: published.keychainExternalIdentifier,
+        };
+        setSession(nextSession);
+      }
+
+      setCommunities((current) => [
+        acceptedCommunity,
+        ...current.filter((community) => community.id !== acceptedCommunity.id),
+      ]);
+      setActiveCommunityId(acceptedCommunity.id);
+      setWorkspaceMode('community');
+      onPendingCommunityInviteHandled?.();
+    })().catch((caught) => {
+      pendingCommunityInviteRef.current = null;
+      setSendError(toUserErrorMessage(caught, copy.communities.memberError));
+    });
+  }, [
+    onPendingCommunityInviteHandled,
+    pendingCommunityInvite,
+    setCommunities,
+    setSession,
+  ]);
   const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(

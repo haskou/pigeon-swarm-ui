@@ -11,6 +11,7 @@ import type {
   ChatMessage,
   Community,
   CommunityChannel,
+  CommunityInviteLinkResource,
   CommunityTextChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -361,6 +362,30 @@ export class PigeonApplication {
       communityId,
       recipientIdentityId,
     );
+  }
+
+  public async createCommunityInviteLink(
+    session: Session,
+    communityId: string,
+    input: { expiresAt?: string; maxUses?: number } = {},
+  ): Promise<{
+    invite: CommunityInviteLinkResource;
+    keyEntry: ConversationKeyEntry;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    return await this.gateway.createCommunityInviteLink(
+      session,
+      communityId,
+      input,
+    );
+  }
+
+  public async acceptCommunityInviteLink(
+    session: Session,
+    inviteToken: string,
+  ): Promise<Community> {
+    return await this.gateway.acceptCommunityInviteLink(session, inviteToken);
   }
 
   public async listCommunityMembers(

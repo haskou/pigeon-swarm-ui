@@ -6,6 +6,7 @@ import type { Community, IdentityResource, Session } from '../../domain/types';
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
+import { createCommunityInviteUrl } from '../../utils/communityInviteLink';
 import { identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Field } from '../auth/Field';
@@ -37,6 +38,10 @@ export function AddCommunityMemberDialog({
   );
   const [memberPictureUrl, setMemberPictureUrl] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const [linkState, setLinkState] = useState<'copied' | 'idle' | 'loading'>(
+    'idle',
+  );
+  const [inviteLink, setInviteLink] = useState('');
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -125,6 +130,49 @@ export function AddCommunityMemberDialog({
     setState('idle');
   };
 
+  const createInviteLink = async () => {
+    if (linkState === 'loading') return;
+
+    setLinkState('loading');
+    setError(null);
+    try {
+      const result = await pigeonApplication.createCommunityInviteLink(
+        session,
+        communityId,
+      );
+      const token = result.invite.inviteToken ?? result.invite.token;
+
+      if (!token) throw new Error(copy.communities.linkError);
+
+      const link = createCommunityInviteUrl({
+        keyEntry: result.keyEntry,
+        token,
+      });
+
+      if (
+        result.keychain !== session.keychain ||
+        result.keychainExternalIdentifier !== session.keychainExternalIdentifier
+      ) {
+        onSessionUpdated({
+          ...session,
+          keychain: result.keychain,
+          keychainExternalIdentifier: result.keychainExternalIdentifier,
+        });
+      }
+
+      setInviteLink(link);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(link);
+        setLinkState('copied');
+      } else {
+        setLinkState('idle');
+      }
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.linkError));
+      setLinkState('idle');
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
       <button
@@ -173,6 +221,31 @@ export function AddCommunityMemberDialog({
         >
           {copy.communities.addMember}
         </button>
+        <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div className="text-xs leading-5 text-white/55">
+            {copy.communities.linkHelp}
+          </div>
+          {inviteLink && (
+            <input
+              readOnly
+              value={inviteLink}
+              className="mt-3 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70 outline-none"
+              onFocus={(event) => event.target.select()}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => void createInviteLink()}
+            disabled={linkState === 'loading'}
+            className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {linkState === 'loading'
+              ? copy.profile.saving
+              : linkState === 'copied'
+                ? copy.communities.linkCopied
+                : copy.communities.linkInvite}
+          </button>
+        </div>
       </section>
     </div>,
     document.body,
