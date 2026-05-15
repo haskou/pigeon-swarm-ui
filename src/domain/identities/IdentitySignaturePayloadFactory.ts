@@ -6,6 +6,26 @@ function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];
 }
 
+function normalizeHandle(handle?: string): string | undefined {
+  const normalized = handle?.trim().replace(/^@+/, '').toLowerCase();
+
+  return normalized || undefined;
+}
+
+function profileFrom(
+  input: IdentityUpdateProfileInput,
+): IdentityResource['profile'] {
+  /* eslint-disable sort-keys -- Backend validates JSON.stringify order. */
+  return {
+    name: input.name,
+    handle: normalizeHandle(input.handle),
+    biography: input.biography,
+    picture: input.picture,
+    banner: input.banner,
+  };
+  /* eslint-enable sort-keys */
+}
+
 export type IdentityUpdateProfileInput = {
   banner?: string;
   biography?: string;
@@ -16,6 +36,24 @@ export type IdentityUpdateProfileInput = {
 };
 
 export class IdentitySignaturePayloadFactory {
+  public createInitial(input: {
+    encryptedKeyPair: IdentityResource['encryptedKeyPair'];
+    id: string;
+    networks: string[];
+    profile: IdentityUpdateProfileInput;
+    timestamp: number;
+  }): Omit<IdentityResource, 'signature'> {
+    return {
+      encryptedKeyPair: input.encryptedKeyPair,
+      id: normalizeIdentityId(input.id),
+      networks: uniqueNetworks(input.networks),
+      previousIdentityExternalIdentifier: undefined,
+      profile: profileFrom(input.profile),
+      timestamp: input.timestamp,
+      version: 1,
+    };
+  }
+
   public createUpdate(input: {
     encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
     identity: IdentityResource;
@@ -33,13 +71,7 @@ export class IdentitySignaturePayloadFactory {
       ]),
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
-      profile: {
-        banner: input.profile.banner,
-        biography: input.profile.biography,
-        handle: input.profile.handle,
-        name: input.profile.name,
-        picture: input.profile.picture,
-      },
+      profile: profileFrom(input.profile),
       timestamp: input.timestamp,
       version: input.identity.version + 1,
     };

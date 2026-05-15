@@ -3,6 +3,54 @@ import type { IdentityResource } from '../types';
 import { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 
 describe(IdentitySignaturePayloadFactory.name, () => {
+  it('builds the canonical initial identity payload', () => {
+    const payload = new IdentitySignaturePayloadFactory().createInitial({
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted',
+        publicKey: 'public',
+      },
+      id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+      networks: ['network-1', 'network-1'],
+      profile: {
+        biography: undefined,
+        handle: ' @Ada ',
+        name: 'Ada',
+      },
+      timestamp: 1,
+    });
+
+    expect(Object.keys(payload)).toEqual([
+      'encryptedKeyPair',
+      'id',
+      'networks',
+      'previousIdentityExternalIdentifier',
+      'profile',
+      'timestamp',
+      'version',
+    ]);
+    expect(JSON.stringify(payload)).not.toContain(
+      'previousIdentityExternalIdentifier',
+    );
+    expect(payload).toEqual({
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted',
+        publicKey: 'public',
+      },
+      id: 'identity-1',
+      networks: ['network-1'],
+      previousIdentityExternalIdentifier: undefined,
+      profile: {
+        banner: undefined,
+        biography: undefined,
+        handle: 'ada',
+        name: 'Ada',
+        picture: undefined,
+      },
+      timestamp: 1,
+      version: 1,
+    });
+  });
+
   it('builds the canonical identity update payload', () => {
     const identity = {
       encryptedKeyPair: {

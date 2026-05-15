@@ -121,11 +121,33 @@ export class EncryptedKeyPair {
     public readonly publicKey: PublicKey,
     public readonly encryptedPrivateKey: EncryptedPrivateKey,
   ) {}
+
+  public async sign(): Promise<Signature> {
+    return new Signature('encrypted-keypair-signature');
+  }
+
+  public toPrimitives(): { encryptedPrivateKey: string; publicKey: string } {
+    return {
+      encryptedPrivateKey: this.encryptedPrivateKey.toString(),
+      publicKey: this.publicKey.toString(),
+    };
+  }
 }
 
 export class KeyPair {
   public static async generate(): Promise<KeyPair> {
     return new KeyPair();
+  }
+
+  public async encryptKeyPair(): Promise<EncryptedKeyPair> {
+    return new EncryptedKeyPair(
+      new PublicKey('public-key'),
+      new EncryptedPrivateKey('encrypted-private-key'),
+    );
+  }
+
+  public sign(): Signature {
+    return new Signature('keypair-signature');
   }
 
   public toPrimitives(): { privateKey: string; publicKey: string } {

@@ -51,6 +51,7 @@ import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { copy } from '../../i18n/en';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
@@ -818,13 +819,35 @@ export class PigeonApiGateway {
     networks: string[],
     handle?: string,
   ): Promise<IdentityResource> {
-    return await this.http.request<IdentityResource>('/identities/', {
-      body: JSON.stringify({
-        handle,
-        name,
-        networks: networks.filter(Boolean),
-        password,
-      }),
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const encryptedKeyPairPrimitives = encryptedKeyPair.toPrimitives();
+    const identityId = normalizeIdentityId(keyPair.toPrimitives().publicKey);
+    const path = '/identities/';
+    const unsigned = this.identitySignatures.createInitial({
+      encryptedKeyPair: encryptedKeyPairPrimitives,
+      id: identityId,
+      networks,
+      profile: { handle, name },
+      timestamp: Date.now(),
+    });
+    const signature = keyPair.sign(JSON.stringify(unsigned));
+    const body = {
+      ...unsigned,
+      signature: signature.toString(),
+    };
+    const signingSession = {
+      encryptedKeyPair,
+      identity: {
+        ...body,
+      },
+      keychain: defaultKeychain,
+      password,
+    } as Session;
+
+    return await this.http.request<IdentityResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(signingSession, 'POST', path, body),
       method: 'POST',
     });
   }
@@ -865,7 +888,8 @@ export class PigeonApiGateway {
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
   ): Promise<IdentityResource> {
-    const currentIdentity = await this.getIdentity(session.identity.id);
+    const identityId = normalizeIdentityId(session.identity.id);
+    const currentIdentity = await this.getIdentity(identityId);
     const previousIdentityExternalIdentifier =
       currentIdentity.identityExternalIdentifier ??
       currentIdentity.previousIdentityExternalIdentifier ??
@@ -879,7 +903,7 @@ export class PigeonApiGateway {
     const encryptedKeyPair = newPassword
       ? await this.reEncryptKeyPair(session, newPassword)
       : undefined;
-    const path = `/identities/${encodeURIComponent(session.identity.id)}`;
+    const path = `/identities/${encodeURIComponent(identityId)}`;
     const unsigned = this.identitySignatures.createUpdate({
       encryptedKeyPair,
       identity: currentIdentity,
@@ -892,15 +916,8 @@ export class PigeonApiGateway {
       session.password,
     );
     const body = {
-      encryptedKeyPair: unsigned.encryptedKeyPair,
-      id: unsigned.id,
-      networks: unsigned.networks,
-      previousIdentityExternalIdentifier:
-        unsigned.previousIdentityExternalIdentifier,
-      profile: unsigned.profile,
+      ...unsigned,
       signature: signature.toString(),
-      timestamp: unsigned.timestamp,
-      version: unsigned.version,
     };
 
     return await this.http.request<IdentityResource>(path, {
