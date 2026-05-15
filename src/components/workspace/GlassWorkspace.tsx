@@ -48,6 +48,10 @@ import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirect
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
+import {
+  requestPwaNotificationPermission,
+  showPwaNotification,
+} from '../../presentation/notifications/PwaNotifications';
 import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -122,6 +126,21 @@ function replyPreviewFromMessage(
     ...(image ? { image } : {}),
     messageId: message.id,
   };
+}
+
+function communityNotificationBody(
+  communities: Community[],
+  communityId: string,
+  channelId: string,
+): string {
+  const community = communities.find((item) => item.id === communityId);
+  const channel = community
+    ? communityChannels(community).find((item) => item.id === channelId)
+    : undefined;
+
+  return channel
+    ? `${community?.name ?? communityId} #${channel.name}`
+    : (community?.name ?? communityId);
 }
 
 interface GlassWorkspaceProps {
@@ -271,6 +290,7 @@ export function GlassWorkspace({
 
   const openNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
+    void requestPwaNotificationPermission();
     setNotificationsOpen(true);
   }, [suppressMessageLoadsBriefly]);
 
@@ -1727,6 +1747,11 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('notifications.')) {
         playNotificationSound();
+        void showPwaNotification({
+          body: copy.notifications.open,
+          tag: `notification-${event.event_id}`,
+          title: copy.notifications.title,
+        });
         void refreshNotifications();
         return;
       }
@@ -1763,6 +1788,15 @@ export function GlassWorkspace({
           authorIdentityId !== session.identity.id
         ) {
           playNotificationSound();
+          void showPwaNotification({
+            body: communityNotificationBody(
+              communities,
+              communityId,
+              channelId,
+            ),
+            tag: `community-${communityId}-${channelId}`,
+            title: copy.communities.channelMessageNotification,
+          });
           markCommunityChannelUnread(communityId, channelId);
         }
 
@@ -1952,6 +1986,11 @@ export function GlassWorkspace({
           const unreadMessageId = messageId ?? timelineMessage?.id;
 
           playNotificationSound();
+          void showPwaNotification({
+            body: copy.chat.newMessage,
+            tag: `conversation-${conversationId}`,
+            title: copy.chat.directMessage,
+          });
           if (unreadMessageId)
             markUnreadMessage(conversationId, unreadMessageId);
         }
@@ -2039,6 +2078,7 @@ export function GlassWorkspace({
       activeConversation?.id,
       activeConversationKeyId,
       clearUnreadMessages,
+      communities,
       fetchRealtimeMessage,
       isScrolledNearBottom,
       markCommunityChannelUnread,
