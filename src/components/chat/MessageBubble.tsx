@@ -186,7 +186,7 @@ export function MessageBubble({
               message.attachments.length === 0 &&
               'flex items-end gap-2',
             mine
-              ? 'bg-fuchsia-500 text-right text-white shadow-xl shadow-fuchsia-950/20'
+              ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
               : 'border border-white/10 bg-black/25 text-white',
           )}
         >
