@@ -1041,8 +1041,6 @@ export function CommunityWorkspace({
   };
 
   useEffect(() => {
-    if (selectedChannelId === resolvedChannelId) return;
-
     setSelectedChannelId(resolvedChannelId);
     setNewChannelMessageCount(0);
 
@@ -1050,7 +1048,7 @@ export function CommunityWorkspace({
       onChannelViewedRef.current?.(resolvedChannelId);
       onChannelSelectedRef.current(resolvedChannelId);
     }
-  }, [resolvedChannelId, selectedChannelId]);
+  }, [resolvedChannelId]);
 
   useEffect(() => {
     if (!selectedChannelId) {
@@ -1063,6 +1061,9 @@ export function CommunityWorkspace({
 
     let cancelled = false;
 
+    setMessages([]);
+    setMessageCursor(null);
+    setNewChannelMessageCount(0);
     setMessageLoadState('loading');
     setSendError(null);
     void loadChannelMessagesRef
