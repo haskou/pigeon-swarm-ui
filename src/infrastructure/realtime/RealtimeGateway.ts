@@ -56,7 +56,15 @@ export class RealtimeGateway {
     url.searchParams.set('nonce', nonce);
     url.searchParams.set('signature', signature.toString());
 
-    const socket = new WebSocket(url.toString());
+    let socket: WebSocket;
+
+    try {
+      socket = new WebSocket(url.toString());
+    } catch (caught) {
+      this.logError('constructor', url, caught);
+
+      throw caught;
+    }
 
     socket.addEventListener('message', (event) => {
       this.debug('message', event.data);
@@ -65,10 +73,23 @@ export class RealtimeGateway {
       if (message) onMessage(message);
     });
     socket.addEventListener('open', () => this.debug('open', url.pathname));
-    socket.addEventListener('close', (event) =>
-      this.debug('close', `${event.code} ${event.reason}`.trim()),
-    );
-    socket.addEventListener('error', () => this.debug('error', url.pathname));
+    socket.addEventListener('close', (event) => {
+      this.debug('close', `${event.code} ${event.reason}`.trim());
+
+      if (event.code !== 1000) {
+        this.logError('close', url, {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        });
+      }
+    });
+    socket.addEventListener('error', (event) => {
+      this.debug('error', url.pathname);
+      this.logError('error', url, {
+        type: event.type,
+      });
+    });
 
     return socket;
   }
@@ -86,15 +107,31 @@ export class RealtimeGateway {
   }
 
   private path(path: string): string {
-    return new URL(this.urls.build(path)).pathname;
+    return this.url(path).pathname;
   }
 
   private url(path: string): URL {
-    const url = new URL(this.urls.build(path));
+    const url = new URL(this.urls.build(path), this.currentOrigin());
 
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
     return url;
+  }
+
+  private currentOrigin(): string {
+    return globalThis.location?.origin ?? 'http://localhost';
+  }
+
+  private logError(event: string, url: URL, data: unknown): void {
+    const safeUrl = new URL(url.toString());
+
+    safeUrl.searchParams.delete('signature');
+
+    // eslint-disable-next-line no-console
+    console.error('[pigeon realtime] websocket', event, {
+      data,
+      url: safeUrl.toString(),
+    });
   }
 
   private debug(event: string, data: unknown): void {

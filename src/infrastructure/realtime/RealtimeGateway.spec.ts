@@ -28,6 +28,12 @@ class WebSocketMock {
       .get('message')
       ?.forEach((listener) => listener({ data } as MessageEvent));
   }
+
+  public emitError(): void {
+    this.listeners
+      .get('error')
+      ?.forEach((listener) => listener({ type: 'error' } as MessageEvent));
+  }
 }
 
 const nonce = '00000000-0000-4000-8000-000000000001';
@@ -76,6 +82,59 @@ describe(RealtimeGateway.name, () => {
     expect(sign).toHaveBeenCalledWith(
       signer.payload('GET', '/api/ws', '1778536870557', nonce, {}),
       'secret',
+    );
+  });
+
+  it('resolves relative websocket URLs against the current origin', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('/api'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    await gateway.connect(session, jest.fn());
+
+    const url = new URL(WebSocketMock.instances[0]?.url ?? '');
+
+    expect(url.pathname).toBe('/api/ws');
+    expect(['ws:', 'wss:']).toContain(url.protocol);
+  });
+
+  it('logs websocket errors without leaking the signature', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('https://example.com/api'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    await gateway.connect(session, jest.fn());
+    WebSocketMock.instances[0]?.emitError();
+
+    expect(consoleError).toHaveBeenCalledWith(
+      '[pigeon realtime] websocket',
+      'error',
+      expect.objectContaining({
+        url: expect.not.stringContaining('signature='),
+      }),
     );
   });
 
