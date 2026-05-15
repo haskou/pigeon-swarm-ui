@@ -719,9 +719,9 @@ export function GlassWorkspace({
     return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
   }, []);
   const requestLocalAudio =
-    useCallback(async (): Promise<MediaStream | null> => {
+    useCallback(async (): Promise<MediaStream> => {
       if (!navigator.mediaDevices?.getUserMedia) {
-        return null;
+        throw new Error(copy.calls.microphoneUnavailable);
       }
 
       try {
@@ -730,7 +730,7 @@ export function GlassWorkspace({
           video: false,
         });
       } catch {
-        return null;
+        throw new Error(copy.calls.microphoneUnavailable);
       }
     }, []);
   const stopLocalAudio = (stream: MediaStream | null) => {
