@@ -91,21 +91,34 @@ export class MessageProjector {
     session: Session,
     message: MessageResource,
   ): Omit<ChatMessage, 'content' | 'encrypted'> {
-    const authorIdentityId =
-      message.authorIdentityId ?? message.authorId ?? 'unknown';
+    const authorIdentityId = this.authorIdentityId(message);
 
     return {
       attachments: [],
       authorIdentityId,
-      id:
-        message.id ??
-        message.messageId ??
-        `${message.timestamp ?? Date.now()}-${Math.random()}`,
+      id: this.messageId(message),
       mine: authorIdentityId === session.identity.id,
       raw: message,
+      reactions: message.reactions ?? [],
       replyToMessageId: message.replyToMessageId,
-      timestamp: message.timestamp ?? message.createdAt ?? Date.now(),
+      timestamp: this.messageTimestamp(message),
     };
+  }
+
+  private authorIdentityId(message: MessageResource): string {
+    return message.authorIdentityId ?? message.authorId ?? 'unknown';
+  }
+
+  private messageId(message: MessageResource): string {
+    return (
+      message.id ??
+      message.messageId ??
+      `${this.messageTimestamp(message)}-${Math.random()}`
+    );
+  }
+
+  private messageTimestamp(message: MessageResource): number {
+    return message.timestamp ?? message.createdAt ?? Date.now();
   }
 
   private conversationKey(session: Session, conversationId: string) {

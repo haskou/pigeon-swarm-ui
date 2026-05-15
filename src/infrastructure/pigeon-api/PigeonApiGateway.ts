@@ -1287,6 +1287,38 @@ export class PigeonApiGateway {
     });
   }
 
+  public async addMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.messageReactionsPath(conversationId, messageId);
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async removeMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.messageReactionsPath(conversationId, messageId);
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
+  }
+
   public async updateNotification(
     session: Session,
     notificationId: string,
@@ -1525,6 +1557,13 @@ export class PigeonApiGateway {
     return `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages/${encodeURIComponent(messageId)}`;
+  }
+
+  private messageReactionsPath(
+    conversationId: string,
+    messageId: string,
+  ): string {
+    return `${this.messagePath(conversationId, messageId)}/reactions`;
   }
 
   private messagesAroundPath(

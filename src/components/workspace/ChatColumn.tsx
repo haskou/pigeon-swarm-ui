@@ -76,6 +76,11 @@ interface ChatColumnProps {
   onEscape: () => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onReactionToggle: (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
@@ -138,6 +143,7 @@ export function ChatColumn({
   onJumpToLatest,
   onMessageMenuOpen,
   onOpenSidebar,
+  onReactionToggle,
   onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
@@ -770,6 +776,7 @@ export function ChatColumn({
                           )
                         }
                         onMessageMenuOpen={onMessageMenuOpen}
+                        onReactionToggle={onReactionToggle}
                         onReplyReferenceClick={onReplyReferenceClick}
                         onRetryMessage={onRetryMessage}
                         replyImage={

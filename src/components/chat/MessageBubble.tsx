@@ -28,6 +28,11 @@ interface MessageBubbleProps {
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onReactionToggle?: (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
   replyImage?: MessageAttachment;
@@ -51,6 +56,7 @@ export function MessageBubble({
   onAttachmentPreview,
   onAvatarClick,
   onMessageMenuOpen,
+  onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
   replyAuthorName,
@@ -70,6 +76,7 @@ export function MessageBubble({
     images: LightboxImage[];
     index: number;
   } | null>(null);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indexedAttachments = useMemo(
@@ -94,6 +101,10 @@ export function MessageBubble({
   const linkPreview = useMemo(
     () => firstLinkPreview(message.content),
     [message.content],
+  );
+  const reactionGroups = useMemo(
+    () => groupMessageReactions(message.reactions, currentIdentityId),
+    [currentIdentityId, message.reactions],
   );
 
   useEffect(() => {
@@ -317,6 +328,19 @@ export function MessageBubble({
             )}
             <span>{formatTime(message.timestamp)}</span>
           </div>
+          {onReactionToggle && (
+            <MessageReactions
+              groups={reactionGroups}
+              onPickerToggle={() =>
+                setReactionPickerOpen((isOpen) => !isOpen)
+              }
+              onToggle={(emoji, reacted) => {
+                onReactionToggle(message, emoji, reacted);
+                setReactionPickerOpen(false);
+              }}
+              pickerOpen={reactionPickerOpen}
+            />
+          )}
         </div>
       </div>
       {lightbox && (
@@ -327,6 +351,101 @@ export function MessageBubble({
         />
       )}
     </>
+  );
+}
+
+type ReactionGroup = {
+  count: number;
+  emoji: string;
+  reacted: boolean;
+};
+
+const messageReactionOptions = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
+function MessageReactions({
+  groups,
+  onPickerToggle,
+  onToggle,
+  pickerOpen,
+}: {
+  groups: ReactionGroup[];
+  onPickerToggle: () => void;
+  onToggle: (emoji: string, reacted: boolean) => void;
+  pickerOpen: boolean;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {groups.map((group) => (
+        <button
+          type="button"
+          key={group.emoji}
+          onClick={() => onToggle(group.emoji, group.reacted)}
+          className={cx(
+            'rounded-full border px-2 py-0.5 text-xs font-black transition',
+            group.reacted
+              ? 'border-white/40 bg-white/20 text-white'
+              : 'border-white/10 bg-black/15 text-white/75 hover:bg-white/10',
+          )}
+          aria-label={`${group.emoji} ${group.count}`}
+        >
+          <span>{group.emoji}</span>
+          <span className="ml-1">{group.count}</span>
+        </button>
+      ))}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onPickerToggle}
+          className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-xs font-black text-white/70 transition hover:bg-white/10 hover:text-white"
+          aria-label={copy.messages.addReaction}
+        >
+          +
+        </button>
+        {pickerOpen && (
+          <div className="absolute bottom-full right-0 z-10 mb-1 flex gap-1 rounded-2xl border border-white/10 bg-[#15172d] p-1 shadow-2xl shadow-black/35">
+            {messageReactionOptions.map((emoji) => {
+              const group = groups.find((item) => item.emoji === emoji);
+
+              return (
+                <button
+                  type="button"
+                  key={emoji}
+                  onClick={() => onToggle(emoji, group?.reacted ?? false)}
+                  className="grid h-8 w-8 place-items-center rounded-xl text-base transition hover:bg-white/10"
+                  aria-label={`${copy.messages.addReaction} ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function groupMessageReactions(
+  reactions: ChatMessage['reactions'],
+  currentIdentityId: string,
+): ReactionGroup[] {
+  const byEmoji = new Map<string, ReactionGroup>();
+
+  for (const reaction of reactions) {
+    const current = byEmoji.get(reaction.emoji) ?? {
+      count: 0,
+      emoji: reaction.emoji,
+      reacted: false,
+    };
+
+    current.count += 1;
+    current.reacted =
+      current.reacted || reaction.authorIdentityId === currentIdentityId;
+    byEmoji.set(reaction.emoji, current);
+  }
+
+  return [...byEmoji.values()].sort((left, right) =>
+    left.emoji.localeCompare(right.emoji),
   );
 }
 

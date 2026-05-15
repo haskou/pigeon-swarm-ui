@@ -395,6 +395,7 @@ describe(PigeonApiGateway.name, () => {
         id: 'sent-message',
         mine: true,
         raw: { id: 'sent-message' },
+        reactions: [],
         timestamp: 1,
       }),
     };
@@ -928,6 +929,68 @@ describe(PigeonApiGateway.name, () => {
       previousMessageIds: ['message/to-delete'],
       targetMessageId: 'message/to-delete',
       type: 'deleted',
+    });
+  });
+
+  it('adds message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.addMessageReaction(
+        session,
+        'one-to-one:conversation',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('removes message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.removeMessageReaction(
+        session,
+        'one-to-one:conversation',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
     });
   });
 

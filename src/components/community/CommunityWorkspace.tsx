@@ -754,6 +754,7 @@ export function CommunityWorkspace({
         id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
         mine: authorIdentityId === session.identity.id,
         raw: rawMessage,
+        reactions: rawMessage.reactions ?? [],
         timestamp: rawMessage.createdAt ?? Date.now(),
       };
 
@@ -938,6 +939,7 @@ export function CommunityWorkspace({
           id: optimisticId,
           type: 'sent',
         },
+        reactions: [],
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
         timestamp,

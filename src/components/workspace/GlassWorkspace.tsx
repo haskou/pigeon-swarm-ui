@@ -149,6 +149,31 @@ function communityNotificationBody(
     : (community?.name ?? communityId);
 }
 
+function updateMessageReaction(
+  message: ChatMessage,
+  authorIdentityId: string,
+  emoji: string,
+  action: 'add' | 'remove',
+): ChatMessage {
+  const withoutReaction = message.reactions.filter(
+    (reaction) =>
+      reaction.authorIdentityId !== authorIdentityId || reaction.emoji !== emoji,
+  );
+  const reactions =
+    action === 'add'
+      ? [
+          ...withoutReaction,
+          { authorIdentityId, createdAt: Date.now(), emoji },
+        ]
+      : withoutReaction;
+
+  return {
+    ...message,
+    raw: { ...message.raw, reactions },
+    reactions,
+  };
+}
+
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -1612,6 +1637,7 @@ export function GlassWorkspace({
         id: optimisticId,
         mine: true,
         raw: { id: optimisticId, type: 'sent' },
+        reactions: [],
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
         timestamp: optimisticTimestamp,
@@ -1778,6 +1804,67 @@ export function GlassWorkspace({
       );
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
+    }
+  };
+
+  const handleToggleMessageReaction = async (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => {
+    if (!activeConversation?.id) return;
+
+    const conversationId = activeConversation.id;
+
+    setSendError(null);
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === message.id
+          ? updateMessageReaction(
+              item,
+              session.identity.id,
+              emoji,
+              reacted ? 'remove' : 'add',
+            )
+          : item,
+      ),
+    );
+
+    try {
+      if (reacted) {
+        await pigeonApplication.removeMessageReaction(
+          session,
+          conversationId,
+          message.id,
+          emoji,
+        );
+      } else {
+        await pigeonApplication.addMessageReaction(
+          session,
+          conversationId,
+          message.id,
+          emoji,
+        );
+      }
+
+      const refreshed = await pigeonApplication.loadMessage(
+        session,
+        conversationId,
+        message.id,
+      );
+
+      if (refreshed) {
+        setMessages((current) => mergeMessages(current, [refreshed]));
+      }
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
+      const refreshed = await pigeonApplication
+        .loadMessage(session, conversationId, message.id)
+        .catch(() => null);
+
+      if (refreshed) {
+        setMessages((current) => mergeMessages(current, [refreshed]));
+      }
     }
   };
 
@@ -2158,6 +2245,9 @@ export function GlassWorkspace({
           | MessageResource
           | undefined;
         const authorId = stringAttribute(event, 'authorId', 'author_id');
+        const isReactionEvent =
+          event.type === 'conversations.v1.message.reaction.was_added' ||
+          event.type === 'conversations.v1.message.reaction.was_removed';
         const isActiveConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
@@ -2171,6 +2261,7 @@ export function GlassWorkspace({
 
         if (
           !isActiveConversation &&
+          !isReactionEvent &&
           authorId !== session.identity.id &&
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
@@ -2205,6 +2296,18 @@ export function GlassWorkspace({
             return;
           }
 
+          if (isReactionEvent && messageId) {
+            void pigeonApplication
+              .loadMessage(session, conversationId, messageId)
+              .then((message) => {
+                if (!message) return;
+
+                setMessages((current) => mergeMessages(current, [message]));
+              })
+              .catch(() => undefined);
+            return;
+          }
+
           if (timelineMessage) {
             const shouldAutoScroll = isScrolledNearBottom();
             const message: ChatMessage = {
@@ -2219,6 +2322,7 @@ export function GlassWorkspace({
               kind: 'call-event',
               mine: timelineMessage.actorIdentityId === session.identity.id,
               raw: timelineMessage,
+              reactions: timelineMessage.reactions ?? [],
               timestamp: timelineMessage.createdAt ?? event.occurred_on,
             };
 
@@ -2435,6 +2539,9 @@ export function GlassWorkspace({
               onEscape={closeTransientUi}
               onJumpToLatest={jumpToLatestMessages}
               onMessageMenuOpen={handleMessageMenuOpen}
+              onReactionToggle={(message, emoji, reacted) =>
+                void handleToggleMessageReaction(message, emoji, reacted)
+              }
               onReplyReferenceClick={(messageId) =>
                 void handleReplyReferenceClick(messageId)
               }

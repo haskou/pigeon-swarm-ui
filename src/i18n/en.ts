@@ -333,6 +333,7 @@ export const copy = {
     storedOneKeys: 'Stored keys',
   },
   messages: {
+    addReaction: 'Add reaction',
     cancelReply: 'Cancel reply',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
@@ -346,6 +347,7 @@ export const copy = {
       '[encrypted] This conversation key is missing from the keychain.',
     originalMessage: 'original message',
     rawTitle: 'Raw message',
+    reactionError: 'The reaction could not be updated.',
     reply: 'Reply',
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
