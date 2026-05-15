@@ -5,6 +5,7 @@ import type {
   ConversationKeyEntry,
   IdentityResource,
   MessageAttachment,
+  MessageReplyPreview,
   Session,
 } from '../types';
 
@@ -16,6 +17,8 @@ export type CommunityChannelPlainPayload = {
   channelId?: string;
   communityId?: string;
   content?: string;
+  reply?: MessageReplyPreview;
+  replyToMessageId?: string;
   timestamp?: number;
   type?: string;
 };
@@ -35,6 +38,8 @@ type EncryptCommunityChannelPayloadInput = {
   communityId: string;
   content: string;
   recipients: IdentityResource[];
+  replyPreview?: MessageReplyPreview;
+  replyToMessageId?: string;
   timestamp: number;
 };
 
@@ -100,6 +105,10 @@ export function encryptCommunityChannelPayload(
       channelId: input.channelId,
       communityId: input.communityId,
       content: input.content,
+      ...(input.replyPreview ? { reply: input.replyPreview } : {}),
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       timestamp: input.timestamp,
       type: 'CommunityChannelMessageSent',
     }),

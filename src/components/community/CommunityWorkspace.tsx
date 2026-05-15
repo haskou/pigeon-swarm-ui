@@ -29,6 +29,7 @@ import type {
   ChatMessage,
   IdentityResource,
   MessageAttachment,
+  MessageReplyPreview,
   MessageResource,
   Session,
 } from '../../domain/types';
@@ -48,6 +49,7 @@ import {
   encryptCommunityChannelPayload,
 } from '../../domain/communities/communityChannelPayloadCipher';
 import { copy } from '../../i18n/en';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import {
   formatDateSeparator,
@@ -128,7 +130,25 @@ type CommunityPendingSend = {
   attachments: File[];
   channelId: string;
   content: string;
+  replyTarget: ChatMessage | null;
 };
+
+function replyPreviewFromMessage(
+  message?: ChatMessage | null,
+): MessageReplyPreview | undefined {
+  if (!message) return undefined;
+
+  const image = message.attachments.find((attachment) =>
+    isBrowserPreviewImage(attachment.contentType),
+  );
+
+  return {
+    authorIdentityId: message.authorIdentityId,
+    ...(message.content ? { content: message.content.slice(0, 180) } : {}),
+    ...(image ? { image } : {}),
+    messageId: message.id,
+  };
+}
 
 function profileAnchorFromTarget(
   target: HTMLElement | null | undefined,
@@ -230,6 +250,7 @@ export function CommunityWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>
   >({});
@@ -755,6 +776,8 @@ export function CommunityWorkspace({
           mine:
             (payload.authorIdentityId ?? base.authorIdentityId) ===
             session.identity.id,
+          replyPreview: payload.reply,
+          replyToMessageId: payload.replyToMessageId,
           timestamp: payload.timestamp ?? base.timestamp,
         };
       } catch {
@@ -871,7 +894,9 @@ export function CommunityWorkspace({
       attachments,
       channelId: selectedChannelId,
       content,
+      replyTarget,
     });
+    setReplyTarget(null);
 
     return Promise.resolve();
   };
@@ -906,6 +931,8 @@ export function CommunityWorkspace({
           id: optimisticId,
           type: 'sent',
         },
+        replyPreview: replyPreviewFromMessage(payload.replyTarget),
+        replyToMessageId: payload.replyTarget?.id,
         timestamp,
       },
     ]);
@@ -938,6 +965,8 @@ export function CommunityWorkspace({
           communityId: community.id,
           content: payload.content,
           recipients: Object.values(identities),
+          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyToMessageId: payload.replyTarget?.id,
           timestamp,
         });
         const created = await pigeonApplication.createCommunityChannelMessage(
@@ -986,6 +1015,32 @@ export function CommunityWorkspace({
 
     setMessages((current) => current.filter((item) => item.id !== message.id));
     void sendPendingChannelMessage(pending);
+  };
+
+  const scrollToChannelMessage = (messageId: string) => {
+    requestAnimationFrame(() => {
+      const element = scrollerRef.current?.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+
+      if (!element) return;
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('message-focus-ring');
+      window.setTimeout(
+        () => element.classList.remove('message-focus-ring'),
+        1600,
+      );
+    });
+  };
+
+  const handleReplyReferenceClick = (messageId: string) => {
+    if (messages.some((message) => message.id === messageId)) {
+      scrollToChannelMessage(messageId);
+      return;
+    }
+
+    setSendError(copy.messages.replyTargetNotFound);
   };
 
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
@@ -1042,6 +1097,7 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     setSelectedChannelId(resolvedChannelId);
+    setReplyTarget(null);
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
@@ -1063,6 +1119,7 @@ export function CommunityWorkspace({
 
     setMessages([]);
     setMessageCursor(null);
+    setReplyTarget(null);
     setNewChannelMessageCount(0);
     setMessageLoadState('loading');
     setSendError(null);
@@ -1535,6 +1592,11 @@ export function CommunityWorkspace({
                     visibleMessages.map((message, index) => {
                       const previousMessage = visibleMessages[index - 1];
                       const nextMessage = visibleMessages[index + 1];
+                      const replyMessage = message.replyToMessageId
+                        ? visibleMessages.find(
+                            (item) => item.id === message.replyToMessageId,
+                          )
+                        : undefined;
                       const startsNewDay =
                         !previousMessage ||
                         !isSameDay(
@@ -1601,8 +1663,36 @@ export function CommunityWorkspace({
                                   y,
                                 })
                               }
-                              onReplyReferenceClick={() => undefined}
+                              onReplyReferenceClick={handleReplyReferenceClick}
                               onRetryMessage={retryChannelMessage}
+                              replyImage={
+                                replyMessage?.attachments.find((attachment) =>
+                                  isBrowserPreviewImage(
+                                    attachment.contentType,
+                                  ),
+                                ) ?? message.replyPreview?.image
+                              }
+                              replyAuthorName={
+                                replyMessage
+                                  ? memberDisplayName(
+                                      memberIdentities[
+                                        replyMessage.authorIdentityId
+                                      ],
+                                      replyMessage.authorIdentityId,
+                                    )
+                                  : message.replyPreview
+                                    ? memberDisplayName(
+                                        memberIdentities[
+                                          message.replyPreview.authorIdentityId
+                                        ],
+                                        message.replyPreview.authorIdentityId,
+                                      )
+                                    : undefined
+                              }
+                              replyPreview={
+                                replyMessage?.content ??
+                                message.replyPreview?.content
+                              }
                               showAvatar={showAvatar}
                             />
                           </div>
@@ -1642,10 +1732,20 @@ export function CommunityWorkspace({
               draft={draft}
               error={sendError}
               focusKey={selectedChannelId}
+              onCancelReply={() => setReplyTarget(null)}
               onDraftChange={setDraft}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
               progress={attachmentProgress}
+              replyTo={replyTarget}
+              replyToAuthorName={
+                replyTarget
+                  ? memberDisplayName(
+                      memberIdentities[replyTarget.authorIdentityId],
+                      replyTarget.authorIdentityId,
+                    )
+                  : undefined
+              }
             />
           </>
         )}
@@ -1774,6 +1874,10 @@ export function CommunityWorkspace({
                   void handleDeleteChannelMessage(messageContextMenu.message)
               : undefined
           }
+          onReply={() => {
+            setReplyTarget(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
