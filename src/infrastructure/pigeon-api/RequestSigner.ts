@@ -1,8 +1,10 @@
-import { SHA256Hash } from '@haskou/value-objects';
+import { SHA256Hash, UUID } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/types';
 
+import { API_SERVER_URL } from '../../config';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 
 type Clock = () => number;
@@ -11,7 +13,8 @@ type NonceFactory = () => string;
 export class RequestSigner {
   public constructor(
     private readonly clock: Clock = () => Date.now(),
-    private readonly nonceFactory: NonceFactory = () => crypto.randomUUID(),
+    private readonly nonceFactory: NonceFactory = () =>
+      UUID.generate().toString(),
   ) {}
 
   public async headers(
@@ -23,12 +26,12 @@ export class RequestSigner {
     const timestamp = `${this.clock()}`;
     const nonce = this.nonceFactory();
     const signature = await session.encryptedKeyPair.sign(
-      await this.asyncPayload(method, path, timestamp, nonce, body),
+      this.payload(method, path, timestamp, nonce, body),
       session.password,
     );
 
     return {
-      'X-Identity-Id': session.identity.id,
+      'X-Identity-Id': normalizeIdentityId(session.identity.id),
       'X-Nonce': nonce,
       'X-Signature': signature.toString(),
       'X-Timestamp': timestamp,
@@ -46,54 +49,38 @@ export class RequestSigner {
       bodyHash: this.bodyHash(body),
       method: method.toUpperCase(),
       nonce,
-      path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
+      path: this.signablePath(path),
       timestamp,
     });
   }
 
-  private async asyncPayload(
-    method: string,
-    path: string,
-    timestamp: string,
-    nonce: string,
-    body?: unknown,
-  ): Promise<string> {
-    return JSON.stringify({
-      bodyHash: await this.asyncBodyHash(body),
-      method: method.toUpperCase(),
-      nonce,
-      path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
-      timestamp,
-    });
-  }
+  private signablePath(path: string): string {
+    const requestPath = ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path);
+    const routePrefix = this.routePrefix();
 
-  private async asyncBodyHash(body?: unknown): Promise<string> {
-    if (body instanceof ArrayBuffer) {
-      return await this.sha256Hex(body);
+    if (
+      routePrefix === '/' ||
+      requestPath === routePrefix ||
+      requestPath.startsWith(`${routePrefix}/`)
+    ) {
+      return requestPath;
     }
 
-    if (ArrayBuffer.isView(body)) {
-      const bytes = new Uint8Array(
-        body.buffer,
-        body.byteOffset,
-        body.byteLength,
-      );
-      const copy = new Uint8Array(bytes.byteLength);
-
-      copy.set(bytes);
-
-      return await this.sha256Hex(copy.buffer);
-    }
-
-    return this.bodyHash(body);
+    return `${routePrefix}${requestPath}`;
   }
 
-  private async sha256Hex(body: ArrayBuffer): Promise<string> {
-    const hash = await crypto.subtle.digest('SHA-256', body);
+  private routePrefix(): string {
+    if (!API_SERVER_URL) return '/';
 
-    return [...new Uint8Array(hash)]
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
+    if (/^https?:\/\//i.test(API_SERVER_URL)) {
+      const pathname = new URL(API_SERVER_URL).pathname;
+
+      return ApiUrlBuilder.normalizePath(ApiUrlBuilder.trimSlashes(pathname));
+    }
+
+    return ApiUrlBuilder.normalizePath(
+      ApiUrlBuilder.trimSlashes(API_SERVER_URL),
+    );
   }
 
   private bodyHash(body?: unknown): string {

@@ -10,10 +10,16 @@ import {
 } from '@haskou/value-objects';
 
 import type { Peer } from '../../application/peers/ListPeers';
+import type {
+  CallIceServerConfig,
+  CallResource,
+  CallSignalPayload,
+} from '../../domain/calls/CallSession';
 import type { IdentityUpdateProfileInput } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   ChatMessage,
   Community,
+  CommunityChannel,
   CommunityTextChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -43,20 +49,19 @@ import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { copy } from '../../i18n/en';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
+import { PigeonCallsApi } from './PigeonCallsApi';
+import { PigeonFilesApi } from './PigeonFilesApi';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
 };
-
-const ipfsPrivateUploadLimitBytes = 50 * 1024 * 1024;
-const ipfsPrivateChunkBytes = 8 * 1024 * 1024;
-const ipfsPrivateChunkUploadPauseMs = 35;
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort();
@@ -67,9 +72,11 @@ type ConversationInvitationType =
   | 'group_conversation_invitation';
 
 export class PigeonApiGateway {
-  private readonly attachmentCipher: AttachmentCipher;
+  private readonly calls: PigeonCallsApi;
 
   private readonly conversations: ConversationMapper;
+
+  private readonly files: PigeonFilesApi;
 
   private readonly http: HttpJsonClient;
 
@@ -82,16 +89,6 @@ export class PigeonApiGateway {
   private readonly messages: MessageProjector;
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
-
-  private readonly privateFileCache = new Map<
-    string,
-    Promise<PrivateFileContent>
-  >();
-
-  private readonly publicFileCache = new Map<
-    string,
-    Promise<PublicFileContent>
-  >();
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
@@ -108,8 +105,9 @@ export class PigeonApiGateway {
     ids: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
-    this.attachmentCipher = attachmentCipher;
+    this.calls = new PigeonCallsApi(http, signer);
     this.conversations = conversations;
+    this.files = new PigeonFilesApi(http, signer, attachmentCipher);
     this.http = http;
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
@@ -166,6 +164,65 @@ export class PigeonApiGateway {
     );
 
     return result.peers;
+  }
+
+  public async listCalls(session: Session): Promise<CallResource[]> {
+    return await this.calls.list(session);
+  }
+
+  public async getCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    return await this.calls.get(session, callId);
+  }
+
+  public async getCallIceServers(
+    session: Session,
+  ): Promise<CallIceServerConfig> {
+    return await this.calls.getIceServers(session);
+  }
+
+  public async startConversationCall(
+    session: Session,
+    conversationId: string,
+  ): Promise<CallResource> {
+    return await this.calls.startConversation(session, conversationId);
+  }
+
+  public async startCommunityChannelCall(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CallResource> {
+    return await this.calls.startCommunityChannel(
+      session,
+      communityId,
+      channelId,
+    );
+  }
+
+  public async joinCall(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    return await this.calls.join(session, callId);
+  }
+
+  public async leaveCall(session: Session, callId: string): Promise<void> {
+    await this.calls.leave(session, callId);
+  }
+
+  public async endCall(session: Session, callId: string): Promise<void> {
+    await this.calls.end(session, callId);
+  }
+
+  public async sendCallSignal(
+    session: Session,
+    callId: string,
+    signal: CallSignalPayload,
+  ): Promise<void> {
+    await this.calls.sendSignal(session, callId, signal);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -262,6 +319,18 @@ export class PigeonApiGateway {
     });
   }
 
+  public async leaveCommunity(
+    session: Session,
+    communityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(communityId)}/members/me`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
   public async listCommunityMembers(
     session: Session,
     communityId: string,
@@ -292,13 +361,30 @@ export class PigeonApiGateway {
     });
   }
 
+  public async createCommunityVoiceChannel(
+    session: Session,
+    communityId: string,
+    name: string,
+  ): Promise<CommunityChannel> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/voice`;
+    const body = { name };
+
+    return await this.http.request<CommunityChannel>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
   public async listCommunityChannels(
     session: Session,
     communityId: string,
-  ): Promise<CommunityTextChannel[]> {
+  ): Promise<CommunityChannel[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/channels`;
     const result = await this.http.request<{
-      channels: CommunityTextChannel[];
+      channels: CommunityChannel[];
     }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
@@ -312,16 +398,31 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
     name: string,
-  ): Promise<CommunityTextChannel> {
+  ): Promise<CommunityChannel> {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
     const body = { name };
 
-    return await this.http.request<CommunityTextChannel>(path, {
+    return await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PATCH', path, body),
       method: 'PATCH',
+    });
+  }
+
+  public async deleteCommunityChannel(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
     });
   }
 
@@ -339,7 +440,7 @@ export class PigeonApiGateway {
     const createdAt = input.timestamp ?? Date.now();
     const id =
       input.id ??
-      `${communityId}:${channelId}:${createdAt}:${crypto.randomUUID()}`;
+      `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}`;
     const attachmentExternalIdentifiers =
       input.attachmentExternalIdentifiers ?? [];
     const signaturePayload = {
@@ -424,7 +525,7 @@ export class PigeonApiGateway {
     messageId: string,
   ): Promise<void> {
     const createdAt = Date.now();
-    const id = `${communityId}:${channelId}:${createdAt}:${crypto.randomUUID()}:deleted`;
+    const id = `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}:deleted`;
     const signaturePayload = {
       actorIdentityId: session.identity.id,
       channelId,
@@ -457,39 +558,11 @@ export class PigeonApiGateway {
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    const cached = this.publicFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.http
-      .request<PublicFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
-      .catch((caught: unknown) => {
-        this.publicFileCache.delete(cid);
-
-        throw caught;
-      });
-
-    this.publicFileCache.set(cid, request);
-
-    return await request;
+    return await this.files.getPublicFile(cid);
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    const cached = this.privateFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.http
-      .request<PrivateFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
-      .catch((caught: unknown) => {
-        this.privateFileCache.delete(cid);
-
-        throw caught;
-      });
-
-    this.privateFileCache.set(cid, request);
-
-    return await request;
+    return await this.files.getPrivateFile(cid);
   }
 
   public async createConversation(
@@ -645,6 +718,7 @@ export class PigeonApiGateway {
       recipientIdentity,
       keyEntry,
     );
+    await this.addCommunityMember(session, communityId, recipientIdentity.id);
 
     return published;
   }
@@ -655,13 +729,35 @@ export class PigeonApiGateway {
     networks: string[],
     handle?: string,
   ): Promise<IdentityResource> {
-    return await this.http.request<IdentityResource>('/identities/', {
-      body: JSON.stringify({
-        handle,
-        name,
-        networks: networks.filter(Boolean),
-        password,
-      }),
+    const keyPair = await KeyPair.generate();
+    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const encryptedKeyPairPrimitives = encryptedKeyPair.toPrimitives();
+    const identityId = normalizeIdentityId(keyPair.toPrimitives().publicKey);
+    const path = '/identities/';
+    const unsigned = this.identitySignatures.createInitial({
+      encryptedKeyPair: encryptedKeyPairPrimitives,
+      id: identityId,
+      networks,
+      profile: { handle, name },
+      timestamp: Date.now(),
+    });
+    const signature = keyPair.sign(JSON.stringify(unsigned));
+    const body = {
+      ...unsigned,
+      signature: signature.toString(),
+    };
+    const signingSession = {
+      encryptedKeyPair,
+      identity: {
+        ...body,
+      },
+      keychain: defaultKeychain,
+      password,
+    } as Session;
+
+    return await this.http.request<IdentityResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(signingSession, 'POST', path, body),
       method: 'POST',
     });
   }
@@ -702,7 +798,8 @@ export class PigeonApiGateway {
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
   ): Promise<IdentityResource> {
-    const currentIdentity = await this.getIdentity(session.identity.id);
+    const identityId = normalizeIdentityId(session.identity.id);
+    const currentIdentity = await this.getIdentity(identityId);
     const previousIdentityExternalIdentifier =
       currentIdentity.identityExternalIdentifier ??
       currentIdentity.previousIdentityExternalIdentifier ??
@@ -716,7 +813,7 @@ export class PigeonApiGateway {
     const encryptedKeyPair = newPassword
       ? await this.reEncryptKeyPair(session, newPassword)
       : undefined;
-    const path = `/identities/${encodeURIComponent(session.identity.id)}`;
+    const path = `/identities/${encodeURIComponent(identityId)}`;
     const unsigned = this.identitySignatures.createUpdate({
       encryptedKeyPair,
       identity: currentIdentity,
@@ -744,48 +841,21 @@ export class PigeonApiGateway {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    const path = '/ipfs/public';
-    const bytes = await file.arrayBuffer();
-
-    return await this.http.request<PublicFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': file.type || 'application/octet-stream',
-        'X-Filename': file.name || 'upload',
-      },
-      method: 'POST',
-    });
+    return await this.files.uploadPublicFile(session, file);
   }
 
   public async uploadPrivateFile(
     session: Session,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
-    return await this.uploadPrivateBytes(
-      session,
-      attachment.encryptedBytes,
-      attachment.uploadFilename,
-    );
+    return await this.files.uploadPrivateFile(session, attachment);
   }
 
   public async downloadAttachment(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    const encryptedBytes = attachment.chunks?.length
-      ? await this.downloadAttachmentChunks(attachment)
-      : this.attachmentCipher.bytesToArrayBuffer(
-          this.attachmentCipher.base64ToBytes(
-            (await this.getPrivateFile(attachment.cid)).encryptedData,
-          ),
-        );
-
-    return await this.attachmentCipher.decrypt(
-      attachment,
-      encryptedBytes,
-      onProgress,
-    );
+    return await this.files.downloadAttachment(attachment, onProgress);
   }
 
   public async createNetwork(name: string, session?: Session): Promise<void> {
@@ -833,6 +903,23 @@ export class PigeonApiGateway {
     });
 
     return this.conversations.list(raw);
+  }
+
+  public async markConversationReadUntil(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages/read-until`;
+    const body = { messageId };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
   }
 
   public async listNotifications(
@@ -1068,7 +1155,7 @@ export class PigeonApiGateway {
         type: 'MessageSent',
       }),
     );
-    const id = `${conversationId}:${timestamp}:${crypto.randomUUID()}`;
+    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
     const signature = await session.encryptedKeyPair.sign(
       JSON.stringify(
         this.messageSignatures.createSent({
@@ -1111,7 +1198,7 @@ export class PigeonApiGateway {
     messageId: string,
   ): Promise<void> {
     const createdAt = Date.now();
-    const id = `${conversationId}:${createdAt}:${crypto.randomUUID()}:deleted`;
+    const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
     const signature = await session.encryptedKeyPair.sign(
       JSON.stringify(
         this.messageSignatures.createDeleted({
@@ -1163,6 +1250,10 @@ export class PigeonApiGateway {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
+    if (notification.type === 'missed_call') {
+      throw new Error('Missed call notifications cannot be accepted.');
+    }
+
     const encryptedKey =
       notification.type === 'community_invitation'
         ? notification.payload.encryptedCommunityKey
@@ -1192,28 +1283,11 @@ export class PigeonApiGateway {
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment[]> {
-    if (attachments.length === 0) return [];
-
-    const uploadedAttachments: MessageAttachment[] = [];
-
-    for (const file of attachments) {
-      const pending = await this.attachmentCipher.encrypt(file, onProgress);
-      const upload = await this.uploadPendingAttachment(
-        session,
-        pending,
-        onProgress,
-      );
-
-      uploadedAttachments.push({
-        ...pending.metadata,
-        cid: upload.cid,
-        ...(upload.chunks ? { chunks: upload.chunks } : {}),
-        encryptedSize: upload.size,
-        ...(upload.type ? { type: upload.type } : {}),
-      });
-    }
-
-    return uploadedAttachments;
+    return await this.files.publishMessageAttachments(
+      session,
+      attachments,
+      onProgress,
+    );
   }
 
   private isMissingRemoteKeychain(caught: unknown): boolean {
@@ -1403,136 +1477,6 @@ export class PigeonApiGateway {
       conversationId,
       messageId,
     )}/around?${query.toString()}`;
-  }
-
-  private async uploadPendingAttachment(
-    session: Session,
-    pending: PendingMessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<{
-    chunks?: MessageAttachment['chunks'];
-    cid: string;
-    size: number;
-    type?: MessageAttachment['type'];
-  }> {
-    if (pending.encryptedBytes.byteLength <= ipfsPrivateUploadLimitBytes) {
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: 0,
-        phase: 'upload',
-      });
-      const upload = await this.uploadPrivateFile(session, pending);
-
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: 100,
-        phase: 'upload',
-      });
-
-      return { cid: upload.cid, size: upload.size };
-    }
-
-    const chunks: NonNullable<MessageAttachment['chunks']> = [];
-    const totalChunks = Math.ceil(
-      pending.encryptedBytes.byteLength / ipfsPrivateChunkBytes,
-    );
-
-    for (let index = 0; index < totalChunks; index += 1) {
-      const offset = index * ipfsPrivateChunkBytes;
-      const chunk = pending.encryptedBytes.slice(
-        offset,
-        Math.min(
-          offset + ipfsPrivateChunkBytes,
-          pending.encryptedBytes.byteLength,
-        ),
-      );
-      const upload = await this.uploadPrivateBytes(
-        session,
-        chunk,
-        `${pending.uploadFilename}.part-${String(index).padStart(4, '0')}`,
-      );
-
-      chunks.push({
-        cid: upload.cid,
-        index,
-        sha256: await this.sha256Hex(chunk),
-        size: upload.size,
-      });
-      onProgress?.({
-        filename: pending.metadata.filename,
-        percent: Math.min(100, Math.round(((index + 1) * 100) / totalChunks)),
-        phase: 'upload',
-      });
-      await this.yieldToBrowser(ipfsPrivateChunkUploadPauseMs);
-    }
-
-    return {
-      chunks,
-      cid: chunks[0]?.cid ?? '',
-      size: pending.encryptedBytes.byteLength,
-      type: 'chunked_file',
-    };
-  }
-
-  private async uploadPrivateBytes(
-    session: Session,
-    bytes: ArrayBuffer,
-    filename: string,
-  ): Promise<PrivateFileUpload> {
-    const path = '/ipfs/private';
-
-    return await this.http.request<PrivateFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': filename,
-      },
-      method: 'POST',
-    });
-  }
-
-  private async downloadAttachmentChunks(
-    attachment: MessageAttachment,
-  ): Promise<ArrayBuffer> {
-    const buffers = await Promise.all(
-      [...(attachment.chunks ?? [])]
-        .sort((left, right) => left.index - right.index)
-        .map(async (chunk) =>
-          this.attachmentCipher.bytesToArrayBuffer(
-            this.attachmentCipher.base64ToBytes(
-              (await this.getPrivateFile(chunk.cid)).encryptedData,
-            ),
-          ),
-        ),
-    );
-    const totalSize = buffers.reduce(
-      (total, buffer) => total + buffer.byteLength,
-      0,
-    );
-    const output = new Uint8Array(totalSize);
-    let offset = 0;
-
-    buffers.forEach((buffer) => {
-      output.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
-    });
-
-    return output.buffer;
-  }
-
-  private async sha256Hex(bytes: ArrayBuffer): Promise<string> {
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-
-    return [...new Uint8Array(hash)]
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  private async yieldToBrowser(delayMs = 0): Promise<void> {
-    await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, delayMs);
-    });
   }
 
   private async cachedRequest<T>(

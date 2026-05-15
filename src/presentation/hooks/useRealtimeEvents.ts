@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import type { Session } from '../../domain/types';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 
@@ -27,6 +27,7 @@ export function useRealtimeEvents(
     let reconnectTimer: number | undefined;
     let socket: WebSocket | null = null;
     let attempt = 0;
+    let connect = (): Promise<void> => Promise.resolve();
 
     const scheduleReconnect = () => {
       if (cancelled) return;
@@ -41,16 +42,32 @@ export function useRealtimeEvents(
       }, delay + jitter);
     };
 
-    const connect = async () => {
+    connect = async () => {
       try {
-        socket = await pigeonApplication.connectRealtime(session, (message) => {
-          if (message.type === 'connection_ack') {
-            handlersRef.current.onConnected?.();
-            return;
-          }
+        const nextSocket = await pigeonApplication.connectRealtime(
+          session,
+          (message) => {
+            if (cancelled) return;
 
-          handlersRef.current.onDomainEvent(message.event);
-        });
+            if (message.type === 'connection_ack') {
+              handlersRef.current.onConnected?.();
+
+              return;
+            }
+
+            if (message.type === 'heartbeat_ack') return;
+
+            handlersRef.current.onDomainEvent(message.event);
+          },
+        );
+
+        if (cancelled) {
+          nextSocket.close();
+
+          return;
+        }
+
+        socket = nextSocket;
 
         socket.addEventListener('open', () => {
           attempt = 0;
@@ -69,6 +86,7 @@ export function useRealtimeEvents(
 
     return () => {
       cancelled = true;
+
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       handlersRef.current.onDisconnected?.();
       socket?.close();

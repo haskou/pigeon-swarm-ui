@@ -1,4 +1,10 @@
-import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
+import {
+  EncryptedPayload,
+  PrivateKey,
+  PublicKey,
+  StringValueObject,
+  UUID,
+} from '@haskou/value-objects';
 import {
   Fragment,
   type MouseEvent,
@@ -10,13 +16,15 @@ import {
   useRef,
   useState,
 } from 'react';
-import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import type {
   Community,
+  CommunityChannel,
   CommunityTextChannel,
+  CommunityVoiceChannel,
+  ConversationKeyEntry,
   AttachmentProgress,
   ChatMessage,
   IdentityResource,
@@ -24,9 +32,21 @@ import type {
   MessageResource,
   Session,
 } from '../../domain/types';
+import type {
+  CallParticipant,
+  CallSession,
+} from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import {
+  communityTextChannels,
+  communityVoiceChannels,
+} from '../../domain/communities/communityChannels';
+import {
+  decryptCommunityChannelPayload,
+  encryptCommunityChannelPayload,
+} from '../../domain/communities/communityChannelPayloadCipher';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import {
@@ -34,20 +54,15 @@ import {
   isSameDay,
   shortId,
 } from '../../utils/formatting';
-import {
-  identityName,
-  identityPicture,
-  profilePictureDataUrl,
-} from '../../utils/identityDisplay';
-import { normalizeIdentityId } from '../../utils/identityId';
+import { identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
+import { ConversationKeyDialog } from '../workspace/ConversationKeyDialog';
 import { LockIcon } from '../workspace/LockIcon';
 import {
   MessageContextMenu,
@@ -55,9 +70,18 @@ import {
 } from '../workspace/MessageContextMenu';
 import { RawMessageDialog } from '../workspace/RawMessageDialog';
 import { UserProfileDropdown } from '../workspace/Sidebar';
+import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
+import { VoiceIcon } from './communityDialogPrimitives';
+import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import {
+  memberDisplayName,
+  memberPrimaryName,
+} from './communityMemberNames';
+import { ManageCommunityDialog } from './ManageCommunityDialog';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
+  activeCall?: CallSession | null;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
   mobileMembersOpen: boolean;
@@ -66,11 +90,17 @@ interface CommunityWorkspaceProps {
   nodeNetworks: NodeNetwork[];
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
+  onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
+  onCallEnd?: () => void;
+  onCallToggleDeafen?: () => void;
+  onCallToggleMute?: () => void;
   onLogout: () => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
+  onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
+  onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -117,6 +147,7 @@ function profileAnchorFromTarget(
 }
 
 export function CommunityWorkspace({
+  activeCall,
   activeChannelId,
   channelUnreadCounts = {},
   community,
@@ -126,19 +157,33 @@ export function CommunityWorkspace({
   nodeNetworks,
   onChannelSelected,
   onChannelViewed,
+  onCommunityLeft,
   onCommunityUpdated,
+  onCallEnd,
+  onCallToggleDeafen,
+  onCallToggleMute,
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenMobileSidebar,
+  onJoinVoiceChannel,
+  onRealtimeEventsOpen,
   onSessionUpdated,
   realtimeEvent,
   realtimeStatus = 'connected',
   session,
 }: CommunityWorkspaceProps) {
+  const textChannels = useMemo(
+    () => communityTextChannels(community),
+    [community],
+  );
+  const voiceChannels = useMemo(
+    () => communityVoiceChannels(community),
+    [community],
+  );
   const resolvedChannelId = useMemo(
-    () => resolveCommunityChannelId(activeChannelId, community.textChannels),
-    [activeChannelId, community.textChannels],
+    () => resolveCommunityChannelId(activeChannelId, textChannels),
+    [activeChannelId, textChannels],
   );
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
     resolvedChannelId,
@@ -162,8 +207,21 @@ export function CommunityWorkspace({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
-  const [channelDataOpen, setChannelDataOpen] = useState(false);
-  const [channelMenuOpen, setChannelMenuOpen] = useState(false);
+  const [communityDataOpen, setCommunityDataOpen] = useState(false);
+  const [communityKeyDialog, setCommunityKeyDialog] = useState<
+    'add' | 'copy' | null
+  >(null);
+  const [communityKeyEncrypted, setCommunityKeyEncrypted] = useState('');
+  const [communityKeyError, setCommunityKeyError] = useState<string | null>(
+    null,
+  );
+  const [communityKeyInput, setCommunityKeyInput] = useState('');
+  const [communityKeySaving, setCommunityKeySaving] = useState(false);
+  const [communityMenuOpen, setCommunityMenuOpen] = useState(false);
+  const [communityLeaveError, setCommunityLeaveError] = useState<string | null>(
+    null,
+  );
+  const [communityLeaving, setCommunityLeaving] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
@@ -171,26 +229,37 @@ export function CommunityWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
-  const [failedSends, setFailedSends] = useState<Record<string, CommunityPendingSend>>(
-    {},
-  );
+  const [failedSends, setFailedSends] = useState<
+    Record<string, CommunityPendingSend>
+  >({});
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const keepChannelBottomUntilRef = useRef(0);
   const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
   const sendQueueRef = useRef(Promise.resolve());
+  const onChannelSelectedRef = useRef(onChannelSelected);
+  const onChannelViewedRef = useRef(onChannelViewed);
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
   const networkName = network?.name ?? shortId(community.networkId);
-  const selectedChannel = community.textChannels.find(
+  const selectedChannel = textChannels.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const communityKey = session.keychain.conversations[community.id];
+  const activeVoiceChannelId =
+    activeCall?.kind === 'community-voice' &&
+    activeCall.communityId === community.id
+      ? activeCall.channelId
+      : null;
   const channelEncryptionReady =
     !!selectedChannel &&
+    !!communityKey &&
     community.memberIds.every(
-      (identityId) => identityId === session.identity.id || memberIdentities[identityId],
+      (identityId) =>
+        identityId === session.identity.id || memberIdentities[identityId],
     );
 
   const setMessageLoadState = useCallback(
@@ -204,6 +273,11 @@ export function CommunityWorkspace({
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
   }, [memberIdentities]);
+
+  useEffect(() => {
+    onChannelSelectedRef.current = onChannelSelected;
+    onChannelViewedRef.current = onChannelViewed;
+  }, [onChannelSelected, onChannelViewed]);
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
@@ -215,8 +289,11 @@ export function CommunityWorkspace({
     [messages],
   );
   const missingCommunityKey =
-    visibleMessages.length > 0 &&
-    visibleMessages.every((message) => message.encrypted);
+    !communityKey &&
+    (!owner ||
+      (visibleMessages.length > 0 &&
+        visibleMessages.every((message) => message.encrypted)));
+
   const members = useMemo<MemberView[]>(
     () =>
       community.memberIds.map((identityId) => ({
@@ -225,6 +302,17 @@ export function CommunityWorkspace({
         pictureUrl: memberPictures[identityId] ?? null,
       })),
     [community.memberIds, memberIdentities, memberPictures],
+  );
+  const communityMemberIdsKey = useMemo(
+    () => community.memberIds.join('\u0000'),
+    [community.memberIds],
+  );
+  const communityMemberIds = useMemo(
+    () =>
+      communityMemberIdsKey.length > 0
+        ? communityMemberIdsKey.split('\u0000')
+        : [],
+    [communityMemberIdsKey],
   );
   const openMemberProfile = (
     member: MemberView,
@@ -248,22 +336,168 @@ export function CommunityWorkspace({
       anchor,
     );
   };
-  const visibleChannels = useMemo(() => {
+  const closeCommunityKeyDialog = () => {
+    setCommunityKeyDialog(null);
+    setCommunityKeyEncrypted('');
+    setCommunityKeyError(null);
+    setCommunityKeyInput('');
+    setCommunityKeySaving(false);
+  };
+  const openCopyCommunityKeyDialog = () => {
+    if (!communityKey) {
+      setCommunityKeyError(copy.chat.copyPrivateKeyUnavailable);
+      setCommunityKeyDialog('copy');
+
+      return;
+    }
+
+    try {
+      const encrypted = PublicKey.fromPEM(
+        session.identity.encryptedKeyPair.publicKey,
+      )
+        .encrypt(JSON.stringify(communityKey))
+        .toString();
+
+      setCommunityKeyEncrypted(encrypted);
+      setCommunityKeyError(null);
+    } catch {
+      setCommunityKeyError(copy.chat.copyPrivateKeyError);
+    }
+
+    setCommunityKeyDialog('copy');
+  };
+  const importCommunityKey = async () => {
+    const encryptedPayload = communityKeyInput.trim();
+
+    if (!encryptedPayload) {
+      setCommunityKeyError(copy.chat.addPrivateKeyRequired);
+
+      return;
+    }
+
+    setCommunityKeySaving(true);
+    setCommunityKeyError(null);
+
+    try {
+      const decrypted = await session.encryptedKeyPair.decrypt(
+        new EncryptedPayload(encryptedPayload),
+        session.password,
+      );
+      const parsed = JSON.parse(
+        decrypted.toString(),
+      ) as Partial<ConversationKeyEntry>;
+
+      if (
+        !parsed.conversationId ||
+        new StringValueObject(
+          parsed.conversationId,
+          Number.MAX_SAFE_INTEGER,
+        ).isNotEqual(new StringValueObject(community.id, Number.MAX_SAFE_INTEGER)) ||
+        !parsed.privateKey
+      ) {
+        throw new Error(copy.chat.addPrivateKeyError);
+      }
+
+      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
+      const keyEntry: ConversationKeyEntry = {
+        conversationId: community.id,
+        createdAt: parsed.createdAt ?? Date.now(),
+        peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
+        privateKey: privateKey.toString(),
+        publicKey: parsed.publicKey ?? privateKey.getPublicKey().toString(),
+      };
+      const published = await pigeonApplication.publishKeychain(session, {
+        ...session.keychain,
+        conversations: {
+          ...session.keychain.conversations,
+          [community.id]: keyEntry,
+        },
+      });
+
+      onSessionUpdated({
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      });
+      closeCommunityKeyDialog();
+    } catch {
+      setCommunityKeyError(copy.chat.addPrivateKeyError);
+    } finally {
+      setCommunityKeySaving(false);
+    }
+  };
+  const copyCommunityKey = async () => {
+    if (navigator.clipboard && communityKeyEncrypted) {
+      await navigator.clipboard.writeText(communityKeyEncrypted);
+    }
+  };
+  const leaveCommunity = async () => {
+    if (communityLeaving) return;
+    if (!window.confirm(copy.communities.leaveConfirm)) return;
+
+    setCommunityLeaving(true);
+    setCommunityLeaveError(null);
+
+    try {
+      const updatedCommunity = await pigeonApplication.leaveCommunity(
+        session,
+        community.id,
+      );
+
+      setCommunityMenuOpen(false);
+      onCommunityLeft(updatedCommunity);
+    } catch (caught) {
+      setCommunityLeaveError(
+        toUserErrorMessage(caught, copy.communities.leaveError),
+      );
+    } finally {
+      setCommunityLeaving(false);
+    }
+  };
+  const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
-    if (!query) return community.textChannels;
+    if (!query) return textChannels;
 
-    return community.textChannels.filter((channel) =>
+    return textChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [channelSearch, community.textChannels]);
+  }, [channelSearch, textChannels]);
+  const visibleVoiceChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return voiceChannels;
+
+    return voiceChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, voiceChannels]);
   const isScrolledNearBottom = useCallback(() => {
     const scroller = scrollerRef.current;
 
     if (!scroller) return true;
 
-    return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
+    return (
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140
+    );
   }, []);
+  const scrollChannelToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
+      const scroll = () => bottomRef.current?.scrollIntoView({ behavior });
+
+      if (keepPinned) {
+        keepChannelBottomUntilRef.current = Date.now() + 5000;
+      }
+
+      requestAnimationFrame(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+        window.setTimeout(scroll, 120);
+        window.setTimeout(scroll, 450);
+      });
+    },
+    [],
+  );
   const handleChannelSelected = useCallback(
     (channelId: string) => {
       setSelectedChannelId(channelId);
@@ -281,7 +515,59 @@ export function CommunityWorkspace({
         : {},
     [memberPictures, session.identity.id],
   );
-  const channelData = useMemo(
+  const callParticipantForIdentity = useCallback(
+    (identityId: string): CallParticipant => {
+      const identity =
+        identityId === session.identity.id
+          ? session.identity
+          : memberIdentities[identityId];
+
+      return {
+        identity,
+        identityId,
+        muted: false,
+        name: identity
+          ? (identityName(identity) ?? shortId(identityId))
+          : shortId(identityId),
+        picture: memberPictures[identityId] ?? null,
+      };
+    },
+    [memberIdentities, memberPictures, session.identity],
+  );
+  const voiceParticipantsForChannel = useCallback(
+    (channel: CommunityChannel): CallParticipant[] => {
+      if (channel.type !== 'voice') return [];
+
+      const activeParticipants =
+        activeVoiceChannelId === channel.id
+          ? (activeCall?.participants ?? [])
+          : [];
+      const activeByIdentityId = new Map(
+        activeParticipants.map((participant) => [
+          participant.identityId,
+          participant,
+        ]),
+      );
+      const identityIds = Array.from(
+        new Set([
+          ...(channel.connectedIdentityIds ?? []),
+          ...activeParticipants.map((participant) => participant.identityId),
+        ]),
+      );
+
+      return identityIds.map(
+        (identityId) =>
+          activeByIdentityId.get(identityId) ??
+          callParticipantForIdentity(identityId),
+      );
+    },
+    [
+      activeCall?.participants,
+      activeVoiceChannelId,
+      callParticipantForIdentity,
+    ],
+  );
+  const communityData = useMemo(
     () => ({
       frontendDerived: {
         channelEncryptionReady,
@@ -306,27 +592,20 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     const nextSelectedChannel =
-      community.textChannels.find((channel) => channel.id === activeChannelId)
-        ?.id ??
-      community.textChannels.find((channel) => channel.id === selectedChannelId)
-        ?.id ??
-      community.textChannels[0]?.id ??
+      textChannels.find((channel) => channel.id === activeChannelId)?.id ??
+      textChannels.find((channel) => channel.id === selectedChannelId)?.id ??
+      textChannels[0]?.id ??
       null;
 
     setSelectedChannelId(nextSelectedChannel);
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
-  }, [
-    activeChannelId,
-    community.textChannels,
-    onChannelSelected,
-    selectedChannelId,
-  ]);
+  }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
 
   useEffect(() => {
     let cancelled = false;
 
     void Promise.all(
-      community.memberIds.map(async (identityId) => {
+      communityMemberIds.map(async (identityId) => {
         try {
           const identity = await pigeonApplication.getIdentity(identityId);
           const pictureUrl = await loadIdentityPicture(identity);
@@ -354,7 +633,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [community.memberIds]);
+  }, [communityMemberIds]);
 
   useEffect(() => {
     const avatar = community.avatar?.trim();
@@ -392,7 +671,9 @@ export function CommunityWorkspace({
   }, [community.banner]);
 
   const refreshCommunity = async () => {
-    onCommunityUpdated(await pigeonApplication.getCommunity(session, community.id));
+    onCommunityUpdated(
+      await pigeonApplication.getCommunity(session, community.id),
+    );
   };
 
   const resolveMemberIdentities = useCallback(async () => {
@@ -407,7 +688,10 @@ export function CommunityWorkspace({
         if (cached) return [identityId, cached] as const;
 
         try {
-          return [identityId, await pigeonApplication.getIdentity(identityId)] as const;
+          return [
+            identityId,
+            await pigeonApplication.getIdentity(identityId),
+          ] as const;
         } catch {
           return [identityId, undefined] as const;
         }
@@ -420,26 +704,40 @@ export function CommunityWorkspace({
     }
 
     return nextIdentities;
-  }, [community.memberIds, session.identity]);
+  }, [communityMemberIds, session.identity]);
 
   const projectChannelMessage = useCallback(
     async (
       rawMessage: MessageResource,
       identities: Record<string, IdentityResource>,
     ): Promise<ChatMessage> => {
+      const authorIdentityId =
+        rawMessage.authorIdentityId ??
+        rawMessage.actorIdentityId ??
+        session.identity.id;
       const base = {
         attachments: [],
-        authorIdentityId: rawMessage.authorIdentityId ?? 'unknown',
+        authorIdentityId,
         id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
-        mine: rawMessage.authorIdentityId === session.identity.id,
+        mine: authorIdentityId === session.identity.id,
         raw: rawMessage,
         timestamp: rawMessage.createdAt ?? Date.now(),
       };
+
+      if (rawMessage.type === 'call_event') {
+        return {
+          ...base,
+          content: '',
+          encrypted: false,
+          kind: 'call-event',
+        };
+      }
 
       try {
         const payload = await decryptCommunityChannelPayload(
           session,
           rawMessage.encryptedPayload ?? '',
+          copy.messages.missingKey,
         );
 
         return {
@@ -480,7 +778,9 @@ export function CommunityWorkspace({
         ),
       ]);
       const loadedMessages = await Promise.all(
-        result.messages.map((message) => projectChannelMessage(message, identities)),
+        result.messages.map((message) =>
+          projectChannelMessage(message, identities),
+        ),
       );
 
       return {
@@ -490,6 +790,39 @@ export function CommunityWorkspace({
     },
     [community.id, projectChannelMessage, resolveMemberIdentities, session],
   );
+  const loadChannelMessagesRef = useRef(loadChannelMessages);
+
+  useEffect(() => {
+    loadChannelMessagesRef.current = loadChannelMessages;
+  }, [loadChannelMessages]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const handleMediaLayoutChange = () => {
+      if (Date.now() > keepChannelBottomUntilRef.current) return;
+
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+      });
+    };
+
+    scroller.addEventListener('load', handleMediaLayoutChange, true);
+    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
+    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
+
+    return () => {
+      scroller.removeEventListener('load', handleMediaLayoutChange, true);
+      scroller.removeEventListener(
+        'loadedmetadata',
+        handleMediaLayoutChange,
+        true,
+      );
+      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
+    };
+  }, []);
 
   const handleMessagesScroll = () => {
     const scroller = scrollerRef.current;
@@ -540,7 +873,7 @@ export function CommunityWorkspace({
   const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
     setSendError(null);
     const timestamp = Date.now();
-    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${crypto.randomUUID()}`;
+    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${UUID.generate().toString()}`;
 
     setFailedSends((current) => {
       const next = { ...current };
@@ -570,9 +903,7 @@ export function CommunityWorkspace({
         timestamp,
       },
     ]);
-    requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ block: 'end' });
-    });
+    scrollChannelToBottom('smooth');
 
     sendQueueRef.current = sendQueueRef.current.then(async () => {
       try {
@@ -597,6 +928,7 @@ export function CommunityWorkspace({
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
           channelId: payload.channelId,
+          communityKey: session.keychain.conversations[community.id],
           communityId: community.id,
           content: payload.content,
           recipients: Object.values(identities),
@@ -622,9 +954,7 @@ export function CommunityWorkspace({
             [projected],
           ),
         );
-        requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-        });
+        scrollChannelToBottom('smooth', true);
       } catch (caught) {
         setSendError(toUserErrorMessage(caught, copy.communities.messageError));
         setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
@@ -665,7 +995,9 @@ export function CommunityWorkspace({
         selectedChannelId,
         message.id,
       );
-      setMessages((current) => current.filter((item) => item.id !== message.id));
+      setMessages((current) =>
+        current.filter((item) => item.id !== message.id),
+      );
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
     }
@@ -709,15 +1041,10 @@ export function CommunityWorkspace({
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
-      onChannelViewed?.(resolvedChannelId);
-      onChannelSelected(resolvedChannelId);
+      onChannelViewedRef.current?.(resolvedChannelId);
+      onChannelSelectedRef.current(resolvedChannelId);
     }
-  }, [
-    onChannelSelected,
-    onChannelViewed,
-    resolvedChannelId,
-    selectedChannelId,
-  ]);
+  }, [resolvedChannelId, selectedChannelId]);
 
   useEffect(() => {
     if (!selectedChannelId) {
@@ -732,16 +1059,15 @@ export function CommunityWorkspace({
 
     setMessageLoadState('loading');
     setSendError(null);
-    void loadChannelMessages(selectedChannelId)
+    void loadChannelMessagesRef
+      .current(selectedChannelId)
       .then(({ cursor, loadedMessages }) => {
         if (cancelled) return;
         setMessages(loadedMessages);
         setMessageCursor(cursor);
         setNewChannelMessageCount(0);
-        onChannelViewed?.(selectedChannelId);
-        requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView({ block: 'end' });
-        });
+        onChannelViewedRef.current?.(selectedChannelId);
+        scrollChannelToBottom('auto', true);
       })
       .catch(() => {
         if (!cancelled) setMessageLoadState('error');
@@ -753,12 +1079,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [
-    loadChannelMessages,
-    onChannelViewed,
-    selectedChannelId,
-    setMessageLoadState,
-  ]);
+  }, [scrollChannelToBottom, selectedChannelId, setMessageLoadState]);
 
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
@@ -781,7 +1102,10 @@ export function CommunityWorkspace({
       return;
     }
 
-    if (realtimeEvent.type !== 'communities.v1.channel.message.was_sent') {
+    if (
+      realtimeEvent.type !== 'communities.v1.channel.message.was_sent' &&
+      realtimeEvent.type !== 'communities.v1.call.event.was_recorded'
+    ) {
       return;
     }
 
@@ -810,9 +1134,7 @@ export function CommunityWorkspace({
         if (shouldStickToBottom) {
           setNewChannelMessageCount(0);
           onChannelViewed?.(channelId);
-          requestAnimationFrame(() => {
-            bottomRef.current?.scrollIntoView({ block: 'end' });
-          });
+          scrollChannelToBottom('smooth', true);
         } else {
           setNewChannelMessageCount((current) => current + 1);
         }
@@ -831,6 +1153,7 @@ export function CommunityWorkspace({
     resolveMemberIdentities,
     selectedChannelId,
     session.identity.id,
+    scrollChannelToBottom,
   ]);
 
   return (
@@ -875,7 +1198,9 @@ export function CommunityWorkspace({
                   </div>
                 )}
                 <div className="p-4">
-                  <h2 className="truncate text-xl font-black">{community.name}</h2>
+                  <h2 className="truncate text-xl font-black">
+                    {community.name}
+                  </h2>
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
                     {community.description}
                   </p>
@@ -903,45 +1228,88 @@ export function CommunityWorkspace({
                 placeholder={copy.communities.searchChannels}
               />
               <div className="space-y-2">
-                {community.textChannels.length === 0 ? (
+                {textChannels.length === 0 && voiceChannels.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noChannels}
                   </div>
-                ) : visibleChannels.length === 0 ? (
+                ) : visibleTextChannels.length === 0 &&
+                  visibleVoiceChannels.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noMatchingChannels}
                   </div>
                 ) : (
-                  visibleChannels.map((channel) => (
-                    <button
-                      key={channel.id}
-                      type="button"
-                      onClick={() => handleChannelSelected(channel.id)}
-                      className={cx(
-                        'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
-                        selectedChannelId === channel.id
-                          ? 'bg-white text-slate-950'
-                          : 'bg-white/8 text-white hover:bg-white/14',
-                      )}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        # {channel.name}
-                      </span>
-                      {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
-                        <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
-                          {(channelUnreadCounts[channel.id] ?? 0) > 9
-                            ? '9+'
-                            : channelUnreadCounts[channel.id]}
+                  <>
+                    {visibleTextChannels.map((channel) => (
+                      <button
+                        key={channel.id}
+                        type="button"
+                        onClick={() => handleChannelSelected(channel.id)}
+                        className={cx(
+                          'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
+                          selectedChannelId === channel.id
+                            ? 'bg-white text-slate-950'
+                            : 'bg-white/8 text-white hover:bg-white/14',
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          # {channel.name}
                         </span>
-                      )}
-                    </button>
-                  ))
+                        {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
+                          <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
+                            {(channelUnreadCounts[channel.id] ?? 0) > 9
+                              ? '9+'
+                              : channelUnreadCounts[channel.id]}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                    {visibleVoiceChannels.length > 0 && (
+                      <div className="pt-3">
+                        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                          {copy.calls.voiceChannels}
+                        </div>
+                        <div className="space-y-2">
+                          {visibleVoiceChannels.map((channel) => (
+                            <VoiceChannelButton
+                              key={channel.id}
+                              active={activeVoiceChannelId === channel.id}
+                              channel={channel}
+                              onJoin={() => onJoinVoiceChannel?.(channel)}
+                              onParticipantClick={(participant, event) =>
+                                openMemberProfile(
+                                  {
+                                    identity:
+                                      participant.identityId ===
+                                      session.identity.id
+                                        ? session.identity
+                                        : memberIdentities[
+                                            participant.identityId
+                                          ],
+                                    identityId: participant.identityId,
+                                    pictureUrl: participant.picture ?? null,
+                                  },
+                                  profileAnchorFromTarget(event.currentTarget),
+                                )
+                              }
+                              participants={voiceParticipantsForChannel(
+                                channel,
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
             <UserProfileDropdown
+              activeCall={activeCall}
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
+              onCallEnd={onCallEnd}
+              onCallToggleDeafen={onCallToggleDeafen}
+              onCallToggleMute={onCallToggleMute}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}
               session={session}
@@ -963,7 +1331,11 @@ export function CommunityWorkspace({
             </button>
             <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 community.name.slice(0, 1).toUpperCase()
               )}
@@ -998,12 +1370,14 @@ export function CommunityWorkspace({
                 </p>
               )}
             </div>
-            <div
+            <button
+              type="button"
+              onClick={onRealtimeEventsOpen}
               className={cx(
-                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
                 realtimeStatus === 'connected'
-                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
+                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
               )}
               title={
                 realtimeStatus === 'connected'
@@ -1022,42 +1396,73 @@ export function CommunityWorkspace({
               {realtimeStatus === 'connected'
                 ? copy.chat.realtimeConnected
                 : copy.chat.realtimeReconnecting}
-            </div>
-            {selectedChannel ? (
-              <div className="relative ml-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setChannelMenuOpen((isOpen) => !isOpen)}
-                  className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
-                  aria-label={copy.chat.conversationMenu}
-                  aria-expanded={channelMenuOpen}
-                >
-                  ⋮
-                </button>
-                {channelMenuOpen && (
-                  <>
+            </button>
+            <div className="relative ml-auto shrink-0">
+              {communityLeaveError ? (
+                <div className="absolute bottom-[calc(100%+.5rem)] right-0 z-40 w-72 rounded-2xl border border-rose-300/20 bg-rose-500/15 p-3 text-xs font-black text-rose-100 shadow-2xl shadow-black/40">
+                  {communityLeaveError}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setCommunityMenuOpen((isOpen) => !isOpen)}
+                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
+                aria-label={copy.chat.conversationMenu}
+                aria-expanded={communityMenuOpen}
+              >
+                ⋮
+              </button>
+              {communityMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-30 cursor-default"
+                    onClick={() => setCommunityMenuOpen(false)}
+                    aria-label={copy.dialog.close}
+                  />
+                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
                     <button
                       type="button"
-                      className="fixed inset-0 z-30 cursor-default"
-                      onClick={() => setChannelMenuOpen(false)}
-                      aria-label={copy.dialog.close}
-                    />
-                    <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setChannelDataOpen(true);
-                          setChannelMenuOpen(false);
-                        }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {copy.chat.viewData}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : null}
+                      onClick={() => {
+                        setCommunityDataOpen(true);
+                        setCommunityMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {copy.chat.viewData}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (communityKey) {
+                          openCopyCommunityKeyDialog();
+                        } else {
+                          setCommunityKeyError(null);
+                          setCommunityKeyDialog('add');
+                        }
+
+                        setCommunityMenuOpen(false);
+                      }}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                    >
+                      {communityKey
+                        ? copy.chat.copyPrivateKey
+                        : copy.chat.addPrivateKey}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void leaveCommunity()}
+                      disabled={communityLeaving}
+                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                    >
+                      {communityLeaving
+                        ? copy.communities.leaving
+                        : copy.communities.leave}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -1091,104 +1496,121 @@ export function CommunityWorkspace({
                   </div>
                 ) : null}
                 <div>
-                {!messageCursor &&
-                  visibleMessages.length > 0 &&
-                  messageState !== 'loading' && (
-                    <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                      {copy.chat.noMoreMessages}
+                  {!messageCursor &&
+                    visibleMessages.length > 0 &&
+                    messageState !== 'loading' && (
+                      <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                        {copy.chat.noMoreMessages}
+                      </div>
+                    )}
+                  {missingCommunityKey && (
+                    <div className="grid min-h-[28vh] place-items-center">
+                      <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                        <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                          <LockIcon locked={false} />
+                        </div>
+                        <div className="font-black">{copy.chat.e2eMissing}</div>
+                        <div className="mt-2 text-rose-100/65">
+                          {copy.messages.missingCommunityKey}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCommunityKeyError(null);
+                            setCommunityKeyDialog('add');
+                          }}
+                          className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+                        >
+                          {copy.chat.addPrivateKey}
+                        </button>
+                      </div>
                     </div>
                   )}
-                {missingCommunityKey && (
-                  <div className="grid min-h-[28vh] place-items-center">
-                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                        <LockIcon locked={false} />
-                      </div>
-                      <div className="font-black">{copy.chat.e2eMissing}</div>
-                      <div className="mt-2 text-rose-100/65">
-                        {copy.messages.missingCommunityKey}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!missingCommunityKey &&
-                  visibleMessages.map((message, index) => {
-                    const previousMessage = visibleMessages[index - 1];
-                    const nextMessage = visibleMessages[index + 1];
-                    const startsNewDay =
-                      !previousMessage ||
-                      !isSameDay(previousMessage.timestamp, message.timestamp);
-                    const startsNewAuthorRun =
-                      !previousMessage ||
-                      previousMessage.authorIdentityId !==
-                        message.authorIdentityId;
-                    const showAvatar =
-                      !nextMessage ||
-                      nextMessage.authorIdentityId !== message.authorIdentityId;
+                  {!missingCommunityKey &&
+                    visibleMessages.map((message, index) => {
+                      const previousMessage = visibleMessages[index - 1];
+                      const nextMessage = visibleMessages[index + 1];
+                      const startsNewDay =
+                        !previousMessage ||
+                        !isSameDay(
+                          previousMessage.timestamp,
+                          message.timestamp,
+                        );
+                      const startsNewAuthorRun =
+                        !previousMessage ||
+                        previousMessage.authorIdentityId !==
+                          message.authorIdentityId;
+                      const showAvatar =
+                        !nextMessage ||
+                        nextMessage.authorIdentityId !==
+                          message.authorIdentityId;
 
-                    return (
-                      <Fragment key={message.id}>
-                        {startsNewDay && (
-                          <DateSeparator
-                            label={formatDateSeparator(message.timestamp)}
-                          />
-                        )}
-                        <div
-                          className={
-                            startsNewDay || startsNewAuthorRun
-                              ? 'mt-4'
-                              : 'mt-1'
-                          }
-                        >
-                          <MessageBubble
-                            message={message}
-                            currentIdentityId={session.identity.id}
-                            authorName={
-                              message.mine
-                                ? session.identity.profile.name
-                                : memberDisplayName(
-                                    memberIdentities[message.authorIdentityId],
-                                    message.authorIdentityId,
-                                  )
+                      return (
+                        <Fragment key={message.id}>
+                          {startsNewDay && (
+                            <DateSeparator
+                              label={formatDateSeparator(message.timestamp)}
+                            />
+                          )}
+                          <div
+                            className={
+                              startsNewDay || startsNewAuthorRun
+                                ? 'mt-4'
+                                : 'mt-1'
                             }
-                            authorPicture={
-                              message.mine
-                                ? memberPictures[session.identity.id]
-                                : memberPictures[message.authorIdentityId]
-                            }
-                            onAttachmentOpen={(attachmentIndex) =>
-                              void openAttachment(
-                                message.attachments[attachmentIndex],
-                              )
-                            }
-                            onAttachmentPreview={loadAttachmentPreview}
-                            onAvatarClick={(event) =>
-                              openMessageAuthorProfile(
-                                message,
-                                profileAnchorFromTarget(event.currentTarget),
-                              )
-                            }
-                            onMessageMenuOpen={(targetMessage, x, y) =>
-                              setMessageContextMenu({
-                                message: targetMessage,
-                                x,
-                                y,
-                              })
-                            }
-                            onReplyReferenceClick={() => undefined}
-                            onRetryMessage={retryChannelMessage}
-                            showAvatar={showAvatar}
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                {visibleMessages.length === 0 && messageState !== 'loading' && (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                    {copy.communities.emptyChannel}
-                  </div>
-                )}
-                <div ref={bottomRef} />
+                          >
+                            <MessageBubble
+                              message={message}
+                              currentIdentityId={session.identity.id}
+                              authorName={
+                                message.mine
+                                  ? session.identity.profile.name
+                                  : memberDisplayName(
+                                      memberIdentities[
+                                        message.authorIdentityId
+                                      ],
+                                      message.authorIdentityId,
+                                    )
+                              }
+                              authorPicture={
+                                message.mine
+                                  ? memberPictures[session.identity.id]
+                                  : memberPictures[message.authorIdentityId]
+                              }
+                              onAttachmentOpen={(attachmentIndex) =>
+                                void openAttachment(
+                                  message.attachments[attachmentIndex],
+                                )
+                              }
+                              onAttachmentPreview={loadAttachmentPreview}
+                              onAvatarClick={(event) =>
+                                openMessageAuthorProfile(
+                                  message,
+                                  profileAnchorFromTarget(event.currentTarget),
+                                )
+                              }
+                              onMessageMenuOpen={(targetMessage, x, y) =>
+                                setMessageContextMenu({
+                                  message: targetMessage,
+                                  x,
+                                  y,
+                                })
+                              }
+                              onReplyReferenceClick={() => undefined}
+                              onRetryMessage={retryChannelMessage}
+                              showAvatar={showAvatar}
+                            />
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                  {visibleMessages.length === 0 &&
+                    messageState !== 'loading' && (
+                      <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                        {copy.communities.emptyChannel}
+                      </div>
+                    )}
+                  <div ref={bottomRef} />
                 </div>
               </div>
               {(newChannelMessageCount > 0 || isAwayFromBottom) && (
@@ -1211,7 +1633,7 @@ export function CommunityWorkspace({
               )}
             </div>
             <Composer
-              disabled={messageState === 'loading'}
+              disabled={messageState === 'loading' || !communityKey}
               draft={draft}
               error={sendError}
               onDraftChange={setDraft}
@@ -1317,6 +1739,7 @@ export function CommunityWorkspace({
         <AddCommunityMemberDialog
           communityId={community.id}
           onClose={() => setMemberOpen(false)}
+          onCommunityUpdated={onCommunityUpdated}
           onSessionUpdated={onSessionUpdated}
           session={session}
         />
@@ -1326,7 +1749,10 @@ export function CommunityWorkspace({
           anchor={profileViewer.anchor}
           identity={profileViewer.identity}
           identityId={profileViewer.identityId}
-          name={memberDisplayName(profileViewer.identity, profileViewer.identityId)}
+          name={memberDisplayName(
+            profileViewer.identity,
+            profileViewer.identityId,
+          )}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
           picture={profileViewer.pictureUrl}
@@ -1338,7 +1764,8 @@ export function CommunityWorkspace({
           onClose={() => setMessageContextMenu(null)}
           onDelete={
             messageContextMenu.message.mine
-              ? () => void handleDeleteChannelMessage(messageContextMenu.message)
+              ? () =>
+                  void handleDeleteChannelMessage(messageContextMenu.message)
               : undefined
           }
           onViewRaw={() => {
@@ -1353,507 +1780,109 @@ export function CommunityWorkspace({
           onClose={() => setRawMessage(null)}
         />
       )}
-      {channelDataOpen && (
+      {communityDataOpen && (
         <ConversationDataDialog
-          data={channelData}
-          onClose={() => setChannelDataOpen(false)}
-          title={copy.communities.channelDataTitle}
+          data={communityData}
+          onClose={() => setCommunityDataOpen(false)}
+          title={copy.communities.communityDataTitle}
+        />
+      )}
+      {communityKeyDialog && (
+        <ConversationKeyDialog
+          encryptedConversationKey={communityKeyEncrypted}
+          error={communityKeyError}
+          input={communityKeyInput}
+          mode={communityKeyDialog}
+          onClose={closeCommunityKeyDialog}
+          onCopy={() => void copyCommunityKey()}
+          onImport={() => void importCommunityKey()}
+          onInputChange={setCommunityKeyInput}
+          saving={communityKeySaving}
         />
       )}
     </>
   );
 }
 
-function ManageCommunityDialog({
-  community,
-  onClose,
-  onCommunityUpdated,
-  session,
+function VoiceChannelButton({
+  active,
+  channel,
+  onJoin,
+  onParticipantClick,
+  participants,
 }: {
-  community: Community;
-  onClose: () => void;
-  onCommunityUpdated: (community: Community) => void;
-  session: Session;
+  active: boolean;
+  channel: { id: string; name: string };
+  onJoin: () => void;
+  onParticipantClick: (
+    participant: {
+      identityId: string;
+      muted: boolean;
+      name: string;
+      picture?: null | string;
+    },
+    event: MouseEvent<HTMLButtonElement>,
+  ) => void;
+  participants: Array<{
+    identityId: string;
+    muted: boolean;
+    name: string;
+    picture?: null | string;
+  }>;
 }) {
-  const [name, setName] = useState(community.name);
-  const [description, setDescription] = useState(community.description);
-  const [avatar, setAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [banner, setBanner] = useState<File | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [channelName, setChannelName] = useState('');
-  const [channelOrder, setChannelOrder] = useState<CommunityTextChannel[]>(
-    community.textChannels,
-  );
-  const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      community.textChannels.map((channel) => [channel.id, channel.name]),
-    ),
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const bannerInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!avatar) {
-      setAvatarPreview(null);
-
-      return undefined;
-    }
-
-    const nextPreview = URL.createObjectURL(avatar);
-
-    setAvatarPreview(nextPreview);
-
-    return () => URL.revokeObjectURL(nextPreview);
-  }, [avatar]);
-
-  useEffect(() => {
-    if (!banner) {
-      setBannerPreview(null);
-
-      return undefined;
-    }
-
-    const nextPreview = URL.createObjectURL(banner);
-
-    setBannerPreview(nextPreview);
-
-    return () => URL.revokeObjectURL(nextPreview);
-  }, [banner]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setCurrentAvatarUrl(null);
-    if (!community.avatar) return undefined;
-
-    void loadPublicImage(community.avatar).then((url) => {
-      if (!cancelled) setCurrentAvatarUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.avatar]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setCurrentBannerUrl(null);
-    if (!community.banner) return undefined;
-
-    void loadPublicImage(community.banner).then((url) => {
-      if (!cancelled) setCurrentBannerUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.banner]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const saveChanges = async (): Promise<boolean> => {
-    if (state === 'loading') return false;
-
-    if (
-      channelOrder.some(
-        (channel) => !(channelDrafts[channel.id] ?? channel.name).trim(),
-      )
-    ) {
-      setError(copy.communities.channelError);
-
-      return false;
-    }
-
-    setState('loading');
-    setError(null);
-    try {
-      const updatedCommunity = await pigeonApplication.updateCommunity(
-        session,
-        community.id,
-        {
-          avatar: avatar ?? community.avatar,
-          banner: banner ?? community.banner,
-          description: description.trim(),
-          name: name.trim(),
-        },
-      );
-      const updatedChannels: CommunityTextChannel[] = [];
-
-      for (const channel of channelOrder) {
-        const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
-
-        if (nextName === channel.name) {
-          updatedChannels.push(channel);
-        } else {
-          updatedChannels.push(
-            await pigeonApplication.renameCommunityChannel(
-              session,
-              community.id,
-              channel.id,
-              nextName,
-            ),
-          );
-        }
-      }
-
-      onCommunityUpdated({
-        ...updatedCommunity,
-        textChannels: updatedChannels,
-      });
-      return true;
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.updateError));
-      return false;
-    } finally {
-      setState('idle');
-    }
-  };
-
-  const finishManage = async () => {
-    const saved = await saveChanges();
-
-    if (!saved) return;
-    onClose();
-  };
-
-  const createChannel = async () => {
-    const nextName = channelName.trim();
-
-    if (!nextName || state === 'loading') return;
-
-    setState('loading');
-    setError(null);
-    try {
-      const channel = await pigeonApplication.createCommunityTextChannel(
-        session,
-        community.id,
-        nextName,
-      );
-
-      setChannelName('');
-      setChannelOrder((current) => [...current, channel]);
-      onCommunityUpdated({
-        ...community,
-        textChannels: [...channelOrder, channel],
-      });
-      setChannelDrafts((current) => ({ ...current, [channel.id]: channel.name }));
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.channelError));
-    }
-    setState('idle');
-  };
-
-  const moveChannel = (channelId: string, direction: -1 | 1) => {
-    const index = channelOrder.findIndex(
-      (channel) => channel.id === channelId,
-    );
-    const nextIndex = index + direction;
-
-    if (index < 0 || nextIndex < 0 || nextIndex >= channelOrder.length)
-      return;
-
-    const nextChannels = [...channelOrder];
-    const [channel] = nextChannels.splice(index, 1);
-
-    nextChannels.splice(nextIndex, 0, channel);
-    setChannelOrder(nextChannels);
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+  return (
+    <div
+      className={cx(
+        'overflow-hidden rounded-2xl',
+        active ? 'bg-white/10' : 'bg-white/5',
+      )}
+    >
       <button
         type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-2xl sm:rounded-[2rem]">
-        <DialogHeader title={copy.communities.manage} onClose={onClose} />
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-4">
-            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
-                aria-label={copy.communities.banner}
-              >
-                {bannerPreview || currentBannerUrl ? (
+        onClick={onJoin}
+        className={cx(
+          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-black transition',
+          active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/8',
+        )}
+        title={copy.calls.joinVoice}
+      >
+        <span className="text-emerald-300">
+          <VoiceIcon />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+      </button>
+      {participants.length > 0 && (
+        <div className="space-y-1 px-3 pb-3">
+          {participants.map((participant) => (
+            <button
+              key={participant.identityId}
+              type="button"
+              onClick={(event) => onParticipantClick(participant, event)}
+              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm text-white/55 transition hover:bg-white/8 hover:text-white"
+            >
+              <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+                {participant.picture ? (
                   <img
-                    src={bannerPreview ?? currentBannerUrl ?? ''}
+                    src={participant.picture}
                     alt=""
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
-                    {community.name.slice(0, 1).toUpperCase()}
-                  </span>
+                  participant.name.slice(0, 1).toUpperCase()
                 )}
-                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                  ✎
-                </span>
-              </button>
-              <div className="relative px-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
-                  aria-label={copy.communities.avatar}
-                >
-                  {avatarPreview || currentAvatarUrl ? (
-                    <img
-                      src={avatarPreview ?? currentAvatarUrl ?? ''}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    community.name.slice(0, 1).toUpperCase()
-                  )}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                    ✎
-                  </span>
-                </button>
-                <div className="mt-4 grid gap-3">
-                  <input
-                    aria-label={copy.communities.name}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                  <textarea
-                    aria-label={copy.communities.description}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                </div>
               </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-                className="sr-only"
-              />
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
-                className="sr-only"
-              />
-            </div>
-          </div>
-
-          <div className="mt-6 border-t border-white/10 pt-5">
-            <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              {copy.communities.channels}
-            </div>
-            <div className="space-y-2">
-              {channelOrder.map((channel, index) => (
-                <div
-                  key={channel.id}
-                  className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
-                >
-                  <span className="px-2 text-white/45">#</span>
-                  <input
-                    value={channelDrafts[channel.id] ?? channel.name}
-                    onChange={(event) =>
-                      setChannelDrafts((current) => ({
-                        ...current,
-                        [channel.id]: event.target.value,
-                      }))
-                    }
-                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => moveChannel(channel.id, -1)}
-                    disabled={index === 0}
-                    className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                    aria-label={copy.communities.moveChannelUp}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveChannel(channel.id, 1)}
-                    disabled={index === channelOrder.length - 1}
-                    className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                    aria-label={copy.communities.moveChannelDown}
-                  >
-                    ↓
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={channelName}
-                onChange={(event) => setChannelName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  event.preventDefault();
-                  void createChannel();
-                }}
-                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                placeholder={copy.communities.addChannelPlaceholder}
-              />
-              <button
-                type="button"
-                onClick={() => void createChannel()}
-                disabled={!channelName.trim() || state === 'loading'}
-                className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                +
-              </button>
-            </div>
-          </div>
-          {error && (
-            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-              {error}
-            </div>
-          )}
+              <span className="min-w-0 flex-1 truncate">
+                {participant.name}
+              </span>
+              {participant.muted && (
+                <span className="text-xs text-fuchsia-200">
+                  {copy.calls.muted}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
-        <button
-          type="button"
-          onClick={() => void finishManage()}
-          disabled={!name.trim() || state === 'loading'}
-          className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.profile.save}
-        </button>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function AddCommunityMemberDialog({
-  communityId,
-  onClose,
-  onSessionUpdated,
-  session,
-}: {
-  communityId: string;
-  onClose: () => void;
-  onSessionUpdated: (session: Session) => void;
-  session: Session;
-}) {
-  const [identityInput, setIdentityInput] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const addMember = async () => {
-    const identityId = normalizeIdentityLookup(identityInput);
-
-    if (!identityId || state === 'loading') return;
-
-    setState('loading');
-    setError(null);
-    try {
-      const result = await pigeonApplication.createCommunityInvitation(
-        session,
-        communityId,
-        identityId,
-      );
-      onSessionUpdated({
-        ...session,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      });
-      onClose();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.memberError));
-    }
-    setState('idle');
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]">
-        <DialogHeader title={copy.communities.addMember} onClose={onClose} />
-        <Field label={copy.communities.memberIdentity}>
-          <input
-            autoFocus
-            value={identityInput}
-            onChange={(event) => setIdentityInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return;
-              event.preventDefault();
-              void addMember();
-            }}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="@ada or identity id"
-          />
-        </Field>
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-            {error}
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => void addMember()}
-          disabled={!identityInput.trim() || state === 'loading'}
-          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.communities.addMember}
-        </button>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function DialogHeader({
-  onClose,
-  title,
-}: {
-  onClose: () => void;
-  title: string;
-}) {
-  return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-      <button
-        type="button"
-        onClick={onClose}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-        aria-label={copy.dialog.close}
-      >
-        ×
-      </button>
+      )}
     </div>
   );
 }
@@ -1934,46 +1963,6 @@ function ChannelMessageSkeleton() {
   );
 }
 
-function normalizeIdentityLookup(value: string): string {
-  const trimmed = value.trim();
-
-  return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
-}
-
-async function loadIdentityPicture(
-  identity: IdentityResource,
-): Promise<string | null> {
-  const directPicture = identityPicture(identity);
-
-  if (directPicture) return directPicture;
-
-  const pictureCid = identity.profile.picture?.trim();
-
-  if (!pictureCid) return null;
-
-  try {
-    return await loadPublicImage(pictureCid);
-  } catch {
-    return null;
-  }
-}
-
-async function loadPublicImage(cid: string): Promise<string | null> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const content = await pigeonApplication.getPublicFile(cid);
-
-      return profilePictureDataUrl(content);
-    } catch {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, 250 * (attempt + 1)),
-      );
-    }
-  }
-
-  return null;
-}
-
 function resolveCommunityChannelId(
   channelId: null | string | undefined,
   channels: CommunityTextChannel[],
@@ -1983,123 +1972,6 @@ function resolveCommunityChannelId(
   }
 
   return channels[0]?.id ?? null;
-}
-
-function memberDisplayName(
-  identity: IdentityResource | undefined,
-  identityId: string,
-): string {
-  return identity ? (identityName(identity) ?? shortId(identity.id)) : shortId(identityId);
-}
-
-function memberPrimaryName(
-  identity: IdentityResource | undefined,
-  identityId: string,
-): string {
-  const name = identity?.profile.name.trim();
-
-  if (name) return name;
-
-  const handle = identity?.profile.handle?.trim();
-
-  return handle ? `@${handle}` : shortId(identityId);
-}
-
-type CommunityChannelPlainPayload = {
-  attachments?: MessageAttachment[];
-  authorIdentityId?: string;
-  channelId?: string;
-  communityId?: string;
-  content?: string;
-  timestamp?: number;
-  type?: string;
-};
-
-type CommunityChannelEnvelope = {
-  algorithm: 'community-channel.v1';
-  ciphertext: string;
-  iv: string;
-  recipients: Record<string, string>;
-};
-
-async function encryptCommunityChannelPayload(input: {
-  attachments: MessageAttachment[];
-  authorIdentityId: string;
-  channelId: string;
-  communityId: string;
-  content: string;
-  recipients: IdentityResource[];
-  timestamp: number;
-}): Promise<string> {
-  const key = await crypto.subtle.generateKey(
-    { length: 256, name: 'AES-GCM' },
-    true,
-    ['decrypt', 'encrypt'],
-  );
-  const rawKey = await crypto.subtle.exportKey('raw', key);
-  const rawKeyBase64 = bytesToBase64(new Uint8Array(rawKey));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plaintext = new TextEncoder().encode(
-    JSON.stringify({
-      attachments: input.attachments,
-      authorIdentityId: input.authorIdentityId,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      content: input.content,
-      timestamp: input.timestamp,
-      type: 'CommunityChannelMessageSent',
-    }),
-  );
-  const encrypted = await crypto.subtle.encrypt({ iv, name: 'AES-GCM' }, key, plaintext);
-  const recipients: Record<string, string> = {};
-
-  for (const identity of input.recipients) {
-    recipients[identity.id] = PublicKey.fromPEM(
-      identity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(rawKeyBase64)
-      .toString();
-  }
-
-  return JSON.stringify({
-    algorithm: 'community-channel.v1',
-    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
-    iv: bytesToBase64(iv),
-    recipients,
-  } satisfies CommunityChannelEnvelope);
-}
-
-async function decryptCommunityChannelPayload(
-  session: Session,
-  encryptedPayload: string,
-): Promise<CommunityChannelPlainPayload> {
-  const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
-  const wrappedKey =
-    envelope.recipients[session.identity.id] ??
-    envelope.recipients[normalizeIdentityId(session.identity.id)];
-
-  if (!wrappedKey) {
-    throw new Error(copy.messages.missingKey);
-  }
-
-  const rawKey = await session.encryptedKeyPair.decrypt(
-    new EncryptedPayload(wrappedKey),
-    session.password,
-  );
-  const key = await crypto.subtle.importKey(
-    'raw',
-    bytesToArrayBuffer(base64ToBytes(rawKey.toString())),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
-  const decrypted = await crypto.subtle.decrypt(
-    { iv: bytesToArrayBuffer(base64ToBytes(envelope.iv)), name: 'AES-GCM' },
-    key,
-    bytesToArrayBuffer(base64ToBytes(envelope.ciphertext)),
-  );
-
-  return JSON.parse(new TextDecoder().decode(decrypted)) as CommunityChannelPlainPayload;
 }
 
 function mergeChatMessages(
@@ -2131,33 +2003,4 @@ function realtimeMessageAttribute(
   const value = event.attributes.message;
 
   return value && typeof value === 'object' ? (value as MessageResource) : null;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copyBytes = new Uint8Array(bytes.byteLength);
-
-  copyBytes.set(bytes);
-
-  return copyBytes.buffer;
 }

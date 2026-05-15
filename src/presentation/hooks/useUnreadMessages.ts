@@ -10,9 +10,7 @@ type ConversationWithUnread = ConversationResource & {
   unreadCount: number;
 };
 
-export function useUnreadMessages(
-  conversations: ConversationResource[],
-): {
+export function useUnreadMessages(conversations: ConversationResource[]): {
   clearUnreadMessages: (conversationId: string) => void;
   conversationsWithUnread: ConversationWithUnread[];
   markUnreadMessage: (conversationId: string, messageId: string) => void;
@@ -25,9 +23,10 @@ export function useUnreadMessages(
       sortConversationsByLatestMessage(
         conversations.map((conversation) => ({
           ...conversation,
-          unreadCount:
-            (conversation.unreadCount ?? 0) +
-            (unreadMessages[conversation.id]?.length ?? 0),
+          unreadCount: Math.max(
+            conversation.unreadCount ?? 0,
+            unreadMessages[conversation.id]?.length ?? 0,
+          ),
         })),
       ),
     [conversations, unreadMessages],

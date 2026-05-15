@@ -1,5 +1,32 @@
 import type { IdentityResource } from '../types';
 
+import { normalizeIdentityId } from '../../utils/identityId';
+
+function uniqueNetworks(networks: string[]): string[] {
+  return [...new Set(networks.filter(Boolean))];
+}
+
+function normalizeHandle(handle?: string): string | undefined {
+  const normalized = handle?.trim().replace(/^@+/, '').toLowerCase();
+
+  return normalized || undefined;
+}
+
+function profileFrom(
+  input: IdentityUpdateProfileInput,
+): IdentityResource['profile'] {
+  // Backend validates JSON.stringify order.
+  /* eslint-disable perfectionist/sort-objects */
+  return {
+    banner: input.banner,
+    biography: input.biography,
+    handle: normalizeHandle(input.handle),
+    name: input.name,
+    picture: input.picture,
+  };
+  /* eslint-enable perfectionist/sort-objects */
+}
+
 export type IdentityUpdateProfileInput = {
   banner?: string;
   biography?: string;
@@ -10,27 +37,42 @@ export type IdentityUpdateProfileInput = {
 };
 
 export class IdentitySignaturePayloadFactory {
+  public createInitial(input: {
+    encryptedKeyPair: IdentityResource['encryptedKeyPair'];
+    id: string;
+    networks: string[];
+    profile: IdentityUpdateProfileInput;
+    timestamp: number;
+  }): Omit<IdentityResource, 'signature'> {
+    return {
+      encryptedKeyPair: input.encryptedKeyPair,
+      id: normalizeIdentityId(input.id),
+      networks: uniqueNetworks(input.networks),
+      previousIdentityExternalIdentifier: undefined,
+      profile: profileFrom(input.profile),
+      timestamp: input.timestamp,
+      version: 1,
+    };
+  }
+
   public createUpdate(input: {
     encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
     identity: IdentityResource;
-    previousIdentityExternalIdentifier: string;
+    previousIdentityExternalIdentifier?: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
     return {
       encryptedKeyPair:
         input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
-      id: input.identity.id,
-      networks: input.profile.networks ?? input.identity.networks,
+      id: normalizeIdentityId(input.identity.id),
+      networks: uniqueNetworks([
+        ...input.identity.networks,
+        ...(input.profile.networks ?? []),
+      ]),
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
-      profile: {
-        banner: input.profile.banner,
-        biography: input.profile.biography,
-        handle: input.profile.handle,
-        name: input.profile.name,
-        picture: input.profile.picture,
-      },
+      profile: profileFrom(input.profile),
       timestamp: input.timestamp,
       version: input.identity.version + 1,
     };

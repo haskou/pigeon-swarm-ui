@@ -22,6 +22,10 @@ interface NotificationsPanelProps {
 }
 
 function notificationTitle(notification: NotificationResource): string {
+  if (notification.type === 'missed_call') {
+    return copy.notifications.missedCallTitle;
+  }
+
   if (notification.type === 'community_invitation') {
     return copy.notifications.communityInvitationTitle;
   }
@@ -44,6 +48,13 @@ function notificationTarget(notification: NotificationResource): {
     };
   }
 
+  if (notification.type === 'missed_call') {
+    return {
+      label: copy.notifications.call,
+      value: notification.payload.callId,
+    };
+  }
+
   return {
     label: copy.notifications.conversation,
     value: notification.payload.conversationId,
@@ -61,8 +72,14 @@ export function NotificationsPanel({
   onDecline,
 }: NotificationsPanelProps) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:pointer-events-none lg:bg-transparent lg:backdrop-blur-none">
-      <section className="glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-[2rem] p-4 shadow-2xl shadow-black/35 lg:pointer-events-auto lg:h-auto lg:max-h-[calc(100vh-2rem)]">
+    <div
+      className="fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
+      onClick={onClose}
+    >
+      <section
+        className="glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-[2rem] p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -97,83 +114,89 @@ export function NotificationsPanel({
 
           {notifications.map((notification) => {
             const target = notificationTarget(notification);
+            const inviterIdentityId =
+              notification.type === 'missed_call'
+                ? notification.payload.callerIdentityId
+                : notification.payload.inviterIdentityId;
+            const canRespond =
+              notification.state === 'pending' &&
+              notification.type !== 'missed_call';
 
             return (
               <article
                 key={notification.id}
                 className="rounded-3xl border border-white/10 bg-black/25 p-4"
               >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-black text-white">
-                    {notificationTitle(notification)}
-                  </h3>
-                  <p className="mt-1 text-sm text-white/55">
-                    {copy.notifications.invitedBy}{' '}
-                    <span className="font-semibold text-white/75">
-                      {identityDisplayName(
-                        notification.payload.inviterIdentityId,
-                        identityNames,
-                      )}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-black text-white">
+                      {notificationTitle(notification)}
+                    </h3>
+                    <p className="mt-1 text-sm text-white/55">
+                      {notification.type === 'missed_call'
+                        ? copy.notifications.calledBy
+                        : copy.notifications.invitedBy}{' '}
+                      <span className="font-semibold text-white/75">
+                        {identityDisplayName(inviterIdentityId, identityNames)}
+                      </span>
+                    </p>
+                  </div>
+                  <span
+                    className={cx(
+                      'shrink-0 rounded-full px-2.5 py-1 text-xs font-black',
+                      notification.state === 'pending'
+                        ? 'bg-cyan-300/15 text-cyan-100'
+                        : 'bg-white/10 text-white/55',
+                    )}
+                  >
+                    {copy.notifications.states[notification.state]}
+                  </span>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{target.label}</span>
+                    <span className="truncate font-semibold text-white/70">
+                      {shortId(target.value)}
                     </span>
-                  </p>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span>{copy.notifications.createdAt}</span>
+                    <span className="font-semibold text-white/70">
+                      {formatTime(notification.createdAt)}
+                    </span>
+                  </div>
                 </div>
-                <span
-                  className={cx(
-                    'shrink-0 rounded-full px-2.5 py-1 text-xs font-black',
-                    notification.state === 'pending'
-                      ? 'bg-cyan-300/15 text-cyan-100'
-                      : 'bg-white/10 text-white/55',
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {canRespond && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onAccept(notification)}
+                        disabled={action === 'accept'}
+                        className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
+                      >
+                        {copy.notifications.accept}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDecline(notification.id)}
+                        disabled={action === 'decline'}
+                        className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
+                      >
+                        {copy.notifications.decline}
+                      </button>
+                    </>
                   )}
-                >
-                  {copy.notifications.states[notification.state]}
-                </span>
-              </div>
-
-              <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
-                <div className="flex items-center justify-between gap-3">
-                  <span>{target.label}</span>
-                  <span className="truncate font-semibold text-white/70">
-                    {shortId(target.value)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onArchive(notification.id)}
+                    className="rounded-2xl bg-white/7 px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/12"
+                  >
+                    {copy.notifications.archive}
+                  </button>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>{copy.notifications.createdAt}</span>
-                  <span className="font-semibold text-white/70">
-                    {formatTime(notification.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {notification.state === 'pending' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onAccept(notification)}
-                      disabled={action === 'accept'}
-                      className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
-                    >
-                      {copy.notifications.accept}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDecline(notification.id)}
-                      disabled={action === 'decline'}
-                      className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
-                    >
-                      {copy.notifications.decline}
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onArchive(notification.id)}
-                  className="rounded-2xl bg-white/7 px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/12"
-                >
-                  {copy.notifications.archive}
-                </button>
-              </div>
               </article>
             );
           })}

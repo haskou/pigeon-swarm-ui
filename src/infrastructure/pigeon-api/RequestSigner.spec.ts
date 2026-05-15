@@ -1,5 +1,6 @@
 import type { Session } from '../../domain/types';
 
+import { API_SERVER_URL } from '../../config';
 import { RequestSigner } from './RequestSigner';
 
 type SignedRequestPayload = {
@@ -22,6 +23,31 @@ function signedPassword(sign: jest.Mock): string {
   return password;
 }
 
+function routePrefix(): string {
+  if (!API_SERVER_URL) return '/';
+
+  const pathname = /^https?:\/\//i.test(API_SERVER_URL)
+    ? new URL(API_SERVER_URL).pathname
+    : API_SERVER_URL;
+  const trimmed = pathname.replace(/^\/+|\/+$/g, '');
+
+  return trimmed ? `/${trimmed}` : '/';
+}
+
+function expectedSignedPath(path: string): string {
+  const requestPath = `/${path.replace(/^\/+/, '').split('?')[0]}`;
+  const prefix = routePrefix();
+
+  if (
+    prefix === '/' ||
+    requestPath === prefix ||
+    requestPath.startsWith(`${prefix}/`)
+  ) {
+    return requestPath;
+  }
+
+  return `${prefix}${requestPath}`;
+}
 describe(RequestSigner.name, () => {
   it('builds the canonical payload used for signatures', () => {
     const signer = new RequestSigner(
@@ -39,7 +65,7 @@ describe(RequestSigner.name, () => {
       bodyHash: expect.any(String),
       method: 'POST',
       nonce: 'nonce-1',
-      path: '/conversations/',
+      path: expectedSignedPath('/conversations/'),
       timestamp: '123',
     });
   });
@@ -58,7 +84,7 @@ describe(RequestSigner.name, () => {
       bodyHash: expect.any(String),
       method: 'GET',
       nonce: 'nonce-1',
-      path: '/notifications/',
+      path: expectedSignedPath('/notifications/'),
       timestamp: '123',
     });
   });
@@ -86,10 +112,50 @@ describe(RequestSigner.name, () => {
       bodyHash: expect.any(String),
       method: 'GET',
       nonce: 'nonce-1',
-      path: '/messages',
+      path: expectedSignedPath('/messages'),
       timestamp: '123',
     });
     expect(signedPassword(sign)).toBe('secret');
+  });
+
+  it('does not prefix an already-prefixed request path twice', () => {
+    const signer = new RequestSigner(
+      () => 123,
+      () => 'nonce-1',
+    );
+
+    const payload = JSON.parse(
+      signer.payload('GET', '/api/ws', '123', 'nonce-1', {}),
+    ) as SignedRequestPayload;
+
+    expect(payload).toEqual({
+      bodyHash: expect.any(String),
+      method: 'GET',
+      nonce: 'nonce-1',
+      path: '/api/ws',
+      timestamp: '123',
+    });
+  });
+
+  it('normalizes PEM identity ids in HTTP signature headers', async () => {
+    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
+    const signer = new RequestSigner(
+      () => 123,
+      () => 'nonce-1',
+    );
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: {
+        id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+      },
+      password: 'secret',
+    } as unknown as Session;
+
+    await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual(
+      expect.objectContaining({
+        'X-Identity-Id': 'identity-1',
+      }),
+    );
   });
 
   it('signs long request payloads without string value object limits', async () => {
@@ -111,7 +177,7 @@ describe(RequestSigner.name, () => {
       bodyHash: expect.any(String),
       method: 'POST',
       nonce: 'nonce-1',
-      path: '/keychains/',
+      path: expectedSignedPath('/keychains/'),
       timestamp: '123',
     });
     expect(signedPassword(sign)).toBe('secret');
@@ -145,7 +211,7 @@ describe(RequestSigner.name, () => {
       bodyHash: typedArrayPayload.bodyHash,
       method: 'POST',
       nonce: 'nonce-1',
-      path: '/ipfs/public',
+      path: expectedSignedPath('/ipfs/public'),
       timestamp: '123',
     });
     expect(arrayBufferPayload.bodyHash).not.toBe(jsonPayload.bodyHash);

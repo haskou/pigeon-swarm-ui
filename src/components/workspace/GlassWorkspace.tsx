@@ -8,16 +8,25 @@ import {
   useRef,
   useState,
 } from 'react';
+import { UUID } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
   AttachmentProgress,
   Community,
+  CommunityChannel,
   ConversationKeyEntry,
   ConversationResource,
+  MessageResource,
   MessageReplyPreview,
   Session,
 } from '../../domain/types';
+import type {
+  CallParticipant,
+  CallResource,
+  CallSignalType,
+  CallSession,
+} from '../../domain/calls/CallSession';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
 
@@ -29,97 +38,74 @@ import {
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import { mergeMessages } from '../../domain/messages/mergeMessages';
+import {
+  communityChannels,
+  communityTextChannels,
+} from '../../domain/communities/communityChannels';
 import { copy } from '../../i18n/en';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
+import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
+import { shortId } from '../../utils/formatting';
+import {
+  playAnsweredCallSound,
+  playEndedCallSound,
+  playIncomingCallSound,
+  playNotificationSound,
+  stopIncomingCallSound,
+} from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
+import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
+import { RealtimeEventsDialog } from './RealtimeEventsDialog';
 import {
   MessageContextMenu,
   type MessageContextMenuState,
 } from './MessageContextMenu';
 import { RawMessageDialog } from './RawMessageDialog';
+import {
+  callSignalTypeAttribute,
+  communityAttribute,
+  communityChannelAttribute,
+  eventAggregateId,
+  recordAttribute,
+  stringAttribute,
+} from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
+import {
+  communityUnreadStorageKey,
+  type CommunityUnreadCounts,
+  type ConversationDrafts,
+  draftsStorageKey,
+  initialConversationId,
+  lastConversationStorageKey,
+  loadCommunityUnreadCounts,
+  loadDrafts,
+  loadWorkspacePreference,
+  type WorkspacePreference,
+  workspaceStorageKey,
+} from './workspacePersistence';
 
 type LoadState = 'idle' | 'loading' | 'error';
-type ConversationDrafts = Record<string, string>;
-type WorkspacePreference = {
-  channelByCommunityId?: Record<string, string>;
-  communityId?: null | string;
-  mode?: 'community' | 'messages';
-};
-type CommunityUnreadCounts = Record<string, Record<string, number>>;
 type PendingSend = {
   attachments: File[];
   content: string;
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
-
-const lastConversationStorageKey = (identityId: string) =>
-  `pigeon:lastConversation:${identityId}`;
-const draftsStorageKey = (identityId: string) =>
-  `pigeon:conversationDrafts:${identityId}`;
-const workspaceStorageKey = (identityId: string) =>
-  `pigeon:workspace:${identityId}`;
-const communityUnreadStorageKey = (identityId: string) =>
-  `pigeon:communityUnread:${identityId}`;
-
-function initialConversationId(
-  conversations: ConversationResource[],
-  identityId: string,
-): string | null {
-  const storedId = globalThis.localStorage?.getItem(
-    lastConversationStorageKey(identityId),
-  );
-
-  return conversations.some((conversation) => conversation.id === storedId)
-    ? storedId
-    : (conversations[0]?.id ?? null);
-}
-
-function loadDrafts(identityId: string): ConversationDrafts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
-    ) as ConversationDrafts;
-  } catch {
-    return {};
-  }
-}
-
-function loadWorkspacePreference(identityId: string): WorkspacePreference {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
-    ) as WorkspacePreference;
-  } catch {
-    return {};
-  }
-}
-
-function loadCommunityUnreadCounts(identityId: string): CommunityUnreadCounts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
-        '{}',
-    ) as CommunityUnreadCounts;
-  } catch {
-    return {};
-  }
-}
 
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
@@ -196,6 +182,10 @@ export function GlassWorkspace({
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
   >('reconnecting');
+  const [realtimeEventsOpen, setRealtimeEventsOpen] = useState(false);
+  const [realtimeEventLog, setRealtimeEventLog] = useState<
+    RealtimeDomainEvent[]
+  >([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -211,6 +201,12 @@ export function GlassWorkspace({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<{
+    call: CallResource;
+    caller?: CallParticipant;
+    participants: CallParticipant[];
+    title: string;
+  } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -221,9 +217,28 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const activeCallRef = useRef<CallSession | null>(null);
+  const callActionInProgressRef = useRef(false);
+  const callStartupSyncIdentityRef = useRef<string | null>(null);
+  const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
+    () => undefined,
+  );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
+  const {
+    activeCall,
+    endCall,
+    receiveSignal,
+    reconcileCall,
+    startCall,
+    toggleDeafen,
+    toggleMute,
+  } = useCallSession();
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -236,6 +251,14 @@ export function GlassWorkspace({
   useEffect(() => {
     messageStateRef.current = messageState;
   }, [messageState]);
+
+  useEffect(() => {
+    if (!incomingCall) return undefined;
+
+    playIncomingCallSound();
+
+    return stopIncomingCallSound;
+  }, [incomingCall?.call.id]);
 
   const setMessageLoadState = useCallback((state: LoadState) => {
     messageStateRef.current = state;
@@ -255,6 +278,11 @@ export function GlassWorkspace({
     suppressMessageLoadsBriefly();
     setNotificationsOpen(false);
   }, [suppressMessageLoadsBriefly]);
+
+  const openRealtimeEvents = useCallback(() => {
+    setRealtimeEventLog([]);
+    setRealtimeEventsOpen(true);
+  }, []);
 
   const updateMessageCursor = useCallback((cursor: null | string) => {
     messageCursorRef.current = cursor;
@@ -277,23 +305,29 @@ export function GlassWorkspace({
       communities[0],
     [activeCommunityId, communities],
   );
+  const activeCommunityTextChannels = useMemo(
+    () => (activeCommunity ? communityTextChannels(activeCommunity) : []),
+    [activeCommunity],
+  );
   const activeCommunityChannelId = useMemo(() => {
     if (!activeCommunity) return null;
 
     const storedId = communityChannelById[activeCommunity.id];
 
     return storedId &&
-      activeCommunity.textChannels.some((channel) => channel.id === storedId)
+      activeCommunityTextChannels.some((channel) => channel.id === storedId)
       ? storedId
-      : (activeCommunity.textChannels[0]?.id ?? null);
-  }, [activeCommunity, communityChannelById]);
+      : (activeCommunityTextChannels[0]?.id ?? null);
+  }, [activeCommunity, activeCommunityTextChannels, communityChannelById]);
   const communityUnreadCounts = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(communityUnreadCountsById).map(([communityId, channels]) => [
-          communityId,
-          Object.values(channels).reduce((total, count) => total + count, 0),
-        ]),
+        Object.entries(communityUnreadCountsById).map(
+          ([communityId, channels]) => [
+            communityId,
+            Object.values(channels).reduce((total, count) => total + count, 0),
+          ],
+        ),
       ) as Record<string, number>,
     [communityUnreadCountsById],
   );
@@ -337,11 +371,8 @@ export function GlassWorkspace({
     },
     [activeConversation?.id],
   );
-  const {
-    clearUnreadMessages,
-    conversationsWithUnread,
-    markUnreadMessage,
-  } = useUnreadMessages(conversations);
+  const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
+    useUnreadMessages(conversations);
   const unreadMessageCount = useMemo(
     () =>
       conversationsWithUnread.reduce(
@@ -353,6 +384,7 @@ export function GlassWorkspace({
   const handleNotificationAccepted = useCallback(
     (next: {
       communities?: Community[];
+      communityId?: string;
       conversationId?: string;
       conversations?: ConversationResource[];
       session: Session;
@@ -366,6 +398,11 @@ export function GlassWorkspace({
       }
       if (next.conversationId) {
         setActiveConversationId(next.conversationId);
+        setWorkspaceMode('messages');
+      }
+      if (next.communityId) {
+        setActiveCommunityId(next.communityId);
+        setWorkspaceMode('community');
       }
     },
     [setCommunities, setConversations, setSession],
@@ -412,6 +449,625 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
+  const callParticipantForIdentity = useCallback(
+    (identityId: string): CallParticipant => {
+      const identity =
+        identityId === session.identity.id
+          ? session.identity
+          : identityProfiles[identityId];
+
+      return {
+        identity,
+        identityId,
+        muted: false,
+        name:
+          identityNames[identityId] ??
+          identity?.profile.name?.trim() ??
+          identityId,
+        picture: identityPictures[identityId] ?? null,
+      };
+    },
+    [identityNames, identityPictures, identityProfiles, session.identity],
+  );
+  const callDetailsForResource = useCallback(
+    (
+      call: CallResource,
+    ): {
+      channelId?: string;
+      communityId?: string;
+      conversationId?: string;
+      kind: CallSession['kind'];
+      participants: CallParticipant[];
+      subtitle?: string;
+      title: string;
+    } => {
+      const participantIds =
+        call.scope.type === 'community_channel'
+          ? call.participants
+              .filter((participant) => participant.status === 'joined')
+              .map((participant) => participant.identityId)
+          : call.participantIds;
+      const participants = participantIds.map((identityId) => {
+        const participant = callParticipantForIdentity(identityId);
+        const status = call.participants.find(
+          (item) => item.identityId === identityId,
+        )?.status;
+
+        return { ...participant, status };
+      });
+
+      const scope = call.scope;
+
+      if (scope.type === 'community_channel') {
+        const community = communities.find(
+          (item) => item.id === scope.communityId,
+        );
+        const channel = community
+          ? communityChannels(community).find(
+              (item) => item.id === scope.channelId,
+            )
+          : undefined;
+
+        return {
+          channelId: scope.channelId,
+          communityId: scope.communityId,
+          kind: 'community-voice',
+          participants,
+          subtitle: community?.name ?? copy.communities.privateCommunity,
+          title: channel?.name ?? copy.calls.voiceChannel,
+        };
+      }
+
+      const conversation = conversations.find(
+        (item) => item.id === scope.conversationId,
+      );
+      const peerIdentityId = conversation
+        ? conversationPeerIdentityId(
+            conversation,
+            session.identity.id,
+            session.keychain,
+          )
+        : undefined;
+      const peerIdentity = peerIdentityId
+        ? identityProfiles[peerIdentityId]
+        : undefined;
+      const peerHandle = peerIdentity?.profile.handle?.trim();
+      const oneToOneTitle =
+        peerIdentity?.profile.name.trim() ||
+        (peerHandle ? `@${peerHandle}` : undefined) ||
+        (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
+        copy.chat.noConversation;
+      const groupTitle =
+        conversation?.name ?? conversation?.title ?? copy.chat.noConversation;
+      const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
+
+      return {
+        conversationId: scope.conversationId,
+        kind,
+        participants,
+        subtitle:
+          kind === 'one-to-one'
+            ? peerHandle
+              ? `@${peerHandle}`
+              : peerIdentityId
+                ? shortId(peerIdentityId)
+                : undefined
+            : undefined,
+        title: kind === 'one-to-one' ? oneToOneTitle : groupTitle,
+      };
+    },
+    [
+      callParticipantForIdentity,
+      communities,
+      conversations,
+      identityNames,
+      identityProfiles,
+      session.identity.id,
+      session.keychain,
+    ],
+  );
+  const reconcileCallResource = useCallback(
+    (call: CallResource) => {
+      const details = callDetailsForResource(call);
+      const currentParticipant = call.participants.find(
+        (participant) => participant.identityId === session.identity.id,
+      );
+
+      if (call.scope.type === 'community_channel') {
+        const communityId = call.scope.communityId;
+        const channelId = call.scope.channelId;
+        const connectedIdentityIds =
+          call.status === 'active'
+            ? [
+                ...new Set(
+                  call.participants
+                    .filter((participant) => participant.status === 'joined')
+                    .map((participant) => participant.identityId),
+                ),
+              ]
+            : [];
+
+        setCommunities((current) =>
+          current.map((community) => {
+            if (community.id !== communityId) return community;
+
+            return {
+              ...community,
+              voiceChannels: (community.voiceChannels ?? []).map((channel) =>
+                channel.id === channelId
+                  ? { ...channel, connectedIdentityIds }
+                  : channel,
+              ),
+            };
+          }),
+        );
+      }
+
+      if (call.status !== 'active') {
+        if (incomingCall?.call.id === call.id) setIncomingCall(null);
+        if (activeCall?.id === call.id) {
+          playEndedCallSound();
+          endCall();
+        }
+        return;
+      }
+
+      if (details.kind === 'group') {
+        if (incomingCall?.call.id === call.id) setIncomingCall(null);
+        if (activeCall?.id === call.id) {
+          playEndedCallSound();
+          endCall();
+        }
+        return;
+      }
+
+      if (
+        details.kind === 'one-to-one' &&
+        activeCall?.id === call.id &&
+        call.participants.some(
+          (participant) =>
+            participant.identityId !== session.identity.id &&
+            ['declined', 'left', 'missed'].includes(participant.status),
+        )
+      ) {
+        playEndedCallSound();
+        endCall();
+        return;
+      }
+
+      if (currentParticipant?.status === 'ringing') {
+        if (details.kind === 'community-voice') return;
+
+        const caller = details.participants.find(
+          (participant) => participant.identityId === call.creatorIdentityId,
+        );
+
+        setIncomingCall({
+          call,
+          caller,
+          participants: details.participants,
+          title: details.title,
+        });
+        return;
+      }
+
+      if (activeCall?.id === call.id) reconcileCall(call, details);
+    },
+    [
+      activeCall?.id,
+      callDetailsForResource,
+      endCall,
+      incomingCall?.call.id,
+      reconcileCall,
+      session.identity.id,
+      setCommunities,
+    ],
+  );
+
+  useEffect(() => {
+    reconcileCallResourceRef.current = reconcileCallResource;
+  }, [reconcileCallResource]);
+
+  const callSignalSender = useCallback(
+    (callId: string) =>
+      async (
+        recipientIdentityId: string,
+        signalType: CallSignalType,
+        payload: Record<string, unknown>,
+      ) => {
+        await pigeonApplication.sendCallSignal(sessionRef.current, callId, {
+          payload,
+          recipientIdentityId,
+          signalType,
+        });
+      },
+    [],
+  );
+  const loadCallIceConfig = useCallback(async () => {
+    const fallbackIceConfig = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    };
+
+    let iceConfig;
+
+    try {
+      iceConfig = await pigeonApplication.getCallIceServers(sessionRef.current);
+    } catch {
+      return fallbackIceConfig;
+    }
+
+    return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
+  }, []);
+  const requestLocalAudio =
+    useCallback(async (): Promise<MediaStream | null> => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return null;
+      }
+
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false,
+        });
+      } catch {
+        return null;
+      }
+    }, []);
+  const stopLocalAudio = (stream: MediaStream | null) => {
+    stream?.getTracks().forEach((track) => track.stop());
+  };
+  const removeCurrentIdentityFromVoicePresence = useCallback(() => {
+    const identityId = sessionRef.current.identity.id;
+
+    setCommunities((current) =>
+      current.map((community) => ({
+        ...community,
+        voiceChannels: (community.voiceChannels ?? []).map((channel) => ({
+          ...channel,
+          connectedIdentityIds: (channel.connectedIdentityIds ?? []).filter(
+            (connectedIdentityId) => connectedIdentityId !== identityId,
+          ),
+        })),
+      })),
+    );
+  }, [setCommunities]);
+  const leaveCallResource = useCallback(
+    async (call: CallResource): Promise<void> => {
+      const details = callDetailsForResource(call);
+
+      if (details.kind === 'one-to-one') {
+        await pigeonApplication.endCall(sessionRef.current, call.id);
+        return;
+      }
+
+      await pigeonApplication.leaveCall(sessionRef.current, call.id);
+    },
+    [callDetailsForResource],
+  );
+  const cleanupJoinedCalls = useCallback(
+    async (exceptCallId?: string): Promise<void> => {
+      const identityId = sessionRef.current.identity.id;
+      const calls = await pigeonApplication.listCalls(sessionRef.current);
+      const joinedCalls = calls.filter(
+        (call) =>
+          call.status === 'active' &&
+          call.id !== exceptCallId &&
+          call.participants.some(
+            (participant) =>
+              participant.identityId === identityId &&
+              participant.status === 'joined',
+          ),
+      );
+
+      if (joinedCalls.length === 0) return;
+
+      await Promise.all(
+        joinedCalls.map((call) =>
+          leaveCallResource(call).catch(() => undefined),
+        ),
+      );
+      removeCurrentIdentityFromVoicePresence();
+    },
+    [leaveCallResource, removeCurrentIdentityFromVoicePresence],
+  );
+  const leaveCurrentCallForSwitch = useCallback(async (): Promise<void> => {
+    const current = activeCall;
+
+    if (!current) return;
+
+    endCall();
+    removeCurrentIdentityFromVoicePresence();
+
+    if (current.call) {
+      await leaveCallResource(current.call).catch(() => undefined);
+    }
+  }, [
+    activeCall,
+    endCall,
+    leaveCallResource,
+    removeCurrentIdentityFromVoicePresence,
+  ]);
+  const startConversationCall = useCallback(
+    (input: {
+      conversationId: string;
+      kind: 'group' | 'one-to-one';
+      participants: CallParticipant[];
+      title: string;
+    }) => {
+      if (input.kind === 'group') return;
+
+      let localStream: MediaStream | null = null;
+
+      callActionInProgressRef.current = true;
+      const localAudioRequest = requestLocalAudio();
+
+      void localAudioRequest
+        .then(async (stream) => {
+          localStream = stream;
+          await leaveCurrentCallForSwitch();
+          await cleanupJoinedCalls();
+
+          return await pigeonApplication.startConversationCall(
+            sessionRef.current,
+            input.conversationId,
+          );
+        })
+        .then(async (call) => {
+          const details = callDetailsForResource(call);
+          const iceConfig = await loadCallIceConfig();
+
+          await startCall({
+            ...details,
+            call,
+            currentIdentityId: sessionRef.current.identity.id,
+            iceConfig,
+            id: call.id,
+            localStream,
+            onSignal: callSignalSender(call.id),
+            participants:
+              details.participants.length > 0
+                ? details.participants
+                : input.participants,
+            title: details.title || input.title,
+          });
+        })
+        .catch((caught) => {
+          stopLocalAudio(localStream);
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        })
+        .finally(() => {
+          callActionInProgressRef.current = false;
+        });
+    },
+    [
+      callDetailsForResource,
+      callSignalSender,
+      cleanupJoinedCalls,
+      leaveCurrentCallForSwitch,
+      loadCallIceConfig,
+      requestLocalAudio,
+      startCall,
+    ],
+  );
+  const startCommunityVoiceCall = useCallback(
+    (channel: {
+      connectedIdentityIds?: string[];
+      id: string;
+      name: string;
+    }) => {
+      if (!activeCommunity) return;
+      if (
+        activeCall?.kind === 'community-voice' &&
+        activeCall.communityId === activeCommunity.id &&
+        activeCall.channelId === channel.id
+      ) {
+        return;
+      }
+
+      let localStream: MediaStream | null = null;
+
+      callActionInProgressRef.current = true;
+      playAnsweredCallSound();
+      const localAudioRequest = requestLocalAudio();
+
+      void localAudioRequest
+        .then(async (stream) => {
+          localStream = stream;
+          await leaveCurrentCallForSwitch();
+          await cleanupJoinedCalls();
+
+          return await pigeonApplication.startCommunityChannelCall(
+            sessionRef.current,
+            activeCommunity.id,
+            channel.id,
+          );
+        })
+        .then(async (call) => {
+          const iceConfig = await loadCallIceConfig();
+          const currentIdentityId = sessionRef.current.identity.id;
+          const details = callDetailsForResource(call);
+
+          await startCall({
+            ...details,
+            call,
+            currentIdentityId,
+            iceConfig,
+            id: call.id,
+            localStream,
+            onSignal: callSignalSender(call.id),
+          });
+        })
+        .catch((caught) => {
+          stopLocalAudio(localStream);
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        })
+        .finally(() => {
+          callActionInProgressRef.current = false;
+        });
+    },
+    [
+      activeCommunity,
+      activeCall?.channelId,
+      activeCall?.communityId,
+      activeCall?.kind,
+      callDetailsForResource,
+      callSignalSender,
+      cleanupJoinedCalls,
+      leaveCurrentCallForSwitch,
+      loadCallIceConfig,
+      requestLocalAudio,
+      startCall,
+    ],
+  );
+
+  const acceptIncomingCall = useCallback(() => {
+    if (!incomingCall) return;
+
+    const pendingCall = incomingCall.call;
+
+    setIncomingCall(null);
+    stopIncomingCallSound();
+    let localStream: MediaStream | null = null;
+
+    callActionInProgressRef.current = true;
+    const localAudioRequest = requestLocalAudio();
+
+    void localAudioRequest
+      .then(async (stream) => {
+        localStream = stream;
+        await leaveCurrentCallForSwitch();
+        await cleanupJoinedCalls(pendingCall.id);
+
+        return await pigeonApplication.joinCall(
+          sessionRef.current,
+          pendingCall.id,
+        );
+      })
+      .then(async (call) => {
+        const details = callDetailsForResource(call);
+        const iceConfig = await loadCallIceConfig();
+
+        await startCall({
+          ...details,
+          call,
+          currentIdentityId: sessionRef.current.identity.id,
+          iceConfig,
+          id: call.id,
+          localStream,
+          onSignal: callSignalSender(call.id),
+        });
+      })
+      .catch((caught) => {
+        stopLocalAudio(localStream);
+        setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+      })
+      .finally(() => {
+        callActionInProgressRef.current = false;
+      });
+  }, [
+    callDetailsForResource,
+    callSignalSender,
+    cleanupJoinedCalls,
+    incomingCall,
+    leaveCurrentCallForSwitch,
+    loadCallIceConfig,
+    requestLocalAudio,
+    startCall,
+  ]);
+
+  const declineIncomingCall = useCallback(() => {
+    if (!incomingCall) return;
+
+    const callId = incomingCall.call.id;
+
+    setIncomingCall(null);
+    stopIncomingCallSound();
+    void pigeonApplication
+      .leaveCall(sessionRef.current, callId)
+      .catch(() => undefined);
+  }, [incomingCall]);
+
+  const leaveActiveCall = useCallback(() => {
+    const callId = activeCall?.id;
+    const isCommunityVoiceCall = activeCall?.kind === 'community-voice';
+    const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
+
+    endCall();
+    removeCurrentIdentityFromVoicePresence();
+    playEndedCallSound();
+    if (!callId) return;
+
+    const request = shouldEndForEveryone
+      ? pigeonApplication.endCall(sessionRef.current, callId)
+      : pigeonApplication.leaveCall(sessionRef.current, callId);
+
+    void request
+      .then(async () => {
+        if (!isCommunityVoiceCall) return;
+
+        await pigeonApplication
+          .getCall(sessionRef.current, callId)
+          .then((call) => reconcileCallResourceRef.current(call))
+          .catch(() => onCommunitiesReload());
+      })
+      .catch(() => undefined);
+  }, [
+    activeCall?.id,
+    activeCall?.kind,
+    endCall,
+    onCommunitiesReload,
+    removeCurrentIdentityFromVoicePresence,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const identityId = session.identity.id;
+
+    if (callStartupSyncIdentityRef.current === identityId) return undefined;
+
+    callStartupSyncIdentityRef.current = identityId;
+
+    void pigeonApplication
+      .listCalls(session)
+      .then(async (calls) => {
+        if (cancelled) return;
+
+        const staleJoinedCalls = calls.filter(
+          (call) =>
+            call.status === 'active' &&
+            call.scope.type === 'community_channel' &&
+            call.participants.some(
+              (participant) =>
+                participant.identityId === identityId &&
+                participant.status === 'joined',
+            ),
+        );
+
+        if (
+          staleJoinedCalls.length > 0 &&
+          !activeCallRef.current &&
+          !callActionInProgressRef.current
+        ) {
+          await Promise.all(
+            staleJoinedCalls.map((call) =>
+              pigeonApplication
+                .leaveCall(sessionRef.current, call.id)
+                .catch(() => undefined),
+            ),
+          );
+          removeCurrentIdentityFromVoicePresence();
+          await onCommunitiesReload().catch(() => undefined);
+          return;
+        }
+
+        calls.forEach((call) => reconcileCallResourceRef.current(call));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onCommunitiesReload, removeCurrentIdentityFromVoicePresence, session]);
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -419,7 +1075,9 @@ export function GlassWorkspace({
     if (
       activeConversationId &&
       conversations.length > 0 &&
-      !conversations.some((conversation) => conversation.id === activeConversationId)
+      !conversations.some(
+        (conversation) => conversation.id === activeConversationId,
+      )
     ) {
       setActiveConversationId(conversations[0].id);
     }
@@ -427,7 +1085,9 @@ export function GlassWorkspace({
 
   useEffect(() => {
     setDrafts(loadDrafts(session.identity.id));
-    setCommunityUnreadCountsById(loadCommunityUnreadCounts(session.identity.id));
+    setCommunityUnreadCountsById(
+      loadCommunityUnreadCounts(session.identity.id),
+    );
   }, [session.identity.id]);
 
   useEffect(() => {
@@ -566,10 +1226,38 @@ export function GlassWorkspace({
     setIsCreateCommunityOpen(false);
     closeNotificationsPanel();
     setNodeSettingsOpen(false);
+    setRealtimeEventsOpen(false);
     setInspectorOpen(false);
     setCommunityMembersOpen(false);
     setSidebarOpen(false);
   }, [closeNotificationsPanel]);
+
+  const markConversationReadUntil = useCallback(
+    (conversationId: string, loadedMessages: ChatMessage[]) => {
+      const lastMessage = [...loadedMessages]
+        .reverse()
+        .find((message) => !message.deliveryStatus);
+
+      if (!lastMessage) return;
+
+      clearUnreadMessages(conversationId);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, unreadCount: 0 }
+            : conversation,
+        ),
+      );
+      void pigeonApplication
+        .markConversationReadUntil(
+          sessionRef.current,
+          conversationId,
+          lastMessage.id,
+        )
+        .catch(() => undefined);
+    },
+    [clearUnreadMessages, setConversations],
+  );
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -598,6 +1286,7 @@ export function GlassWorkspace({
 
         setMessages(result.messages);
         updateMessageCursor(result.nextCursor ?? null);
+        markConversationReadUntil(conversationId, result.messages);
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
@@ -614,7 +1303,12 @@ export function GlassWorkspace({
 
       setMessageLoadState('idle');
     },
-    [scrollMessagesToBottom, setMessageLoadState, updateMessageCursor],
+    [
+      markConversationReadUntil,
+      scrollMessagesToBottom,
+      setMessageLoadState,
+      updateMessageCursor,
+    ],
   );
 
   useEffect(() => {
@@ -678,9 +1372,7 @@ export function GlassWorkspace({
         lastScrollTopRef.current = nextTop;
       });
     } catch (caught) {
-      setSendError(
-        toUserErrorMessage(caught, copy.workspace.loadOlderError),
-      );
+      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     }
     if (messageRequestRef.current !== requestId) return;
 
@@ -704,16 +1396,12 @@ export function GlassWorkspace({
     if (!activeConversation?.id) return;
     const conversationId = activeConversation.id;
     const optimisticTimestamp = Date.now();
-    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${crypto.randomUUID()}`;
+    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
     setSendError(null);
     setAttachmentProgress(null);
     setConversations((current) =>
-      bumpConversationActivity(
-        current,
-        conversationId,
-        optimisticTimestamp,
-      ),
+      bumpConversationActivity(current, conversationId, optimisticTimestamp),
     );
     setFailedSends((current) => {
       const next = { ...current };
@@ -879,9 +1567,7 @@ export function GlassWorkspace({
 
       setSendError(copy.messages.replyTargetNotFound);
     } catch (caught) {
-      setSendError(
-        toUserErrorMessage(caught, copy.workspace.loadOlderError),
-      );
+      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     } finally {
       setMessageLoadState('idle');
     }
@@ -957,6 +1643,7 @@ export function GlassWorkspace({
 
         setMessages((current) => mergeMessages(current, [message]));
         if (shouldAutoScroll) {
+          markConversationReadUntil(conversationId, [message]);
           scrollMessagesToBottom('smooth', true);
         } else {
           setNewMessageCount((current) => current + 1);
@@ -967,16 +1654,79 @@ export function GlassWorkspace({
         );
       }
     },
-    [scrollMessagesToBottom, session],
+    [markConversationReadUntil, scrollMessagesToBottom, session],
+  );
+  const updateCommunityState = useCallback(
+    (communityId: string, updater: (community: Community) => Community) => {
+      setCommunities((current) =>
+        current.map((community) =>
+          community.id === communityId ? updater(community) : community,
+        ),
+      );
+    },
+    [setCommunities],
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
+      if (realtimeEventsOpen) {
+        setRealtimeEventLog((current) => {
+          if (current.some((item) => item.event_id === event.event_id)) {
+            return current;
+          }
+
+          return [...current.slice(-99), event];
+        });
+      }
+
+      if (event.type.startsWith('calls.')) {
+        if (event.type === 'calls.v1.signal.sent') {
+          const callId =
+            eventAggregateId(event) ?? stringAttribute(event, 'callId');
+          const senderIdentityId = stringAttribute(event, 'senderIdentityId');
+          const recipientIdentityId = stringAttribute(
+            event,
+            'recipientIdentityId',
+          );
+          const signalType = callSignalTypeAttribute(event);
+          const payload = recordAttribute(event, 'payload');
+
+          if (
+            callId &&
+            senderIdentityId &&
+            recipientIdentityId === session.identity.id &&
+            signalType &&
+            payload
+          ) {
+            void receiveSignal({
+              callId,
+              payload,
+              senderIdentityId,
+              signalType,
+            }).catch(() => undefined);
+          }
+          return;
+        }
+
+        const callId = eventAggregateId(event);
+
+        if (!callId) return;
+
+        void pigeonApplication
+          .getCall(sessionRef.current, callId)
+          .then((call) => {
+            reconcileCallResource(call);
+          })
+          .catch(() => undefined);
+        return;
+      }
+
       if (event.type.startsWith('nodes.')) {
         void onPeersReload().catch(() => undefined);
         return;
       }
 
       if (event.type.startsWith('notifications.')) {
+        playNotificationSound();
         void refreshNotifications();
         return;
       }
@@ -1012,6 +1762,7 @@ export function GlassWorkspace({
           !isActiveChannel &&
           authorIdentityId !== session.identity.id
         ) {
+          playNotificationSound();
           markCommunityChannelUnread(communityId, channelId);
         }
 
@@ -1019,8 +1770,145 @@ export function GlassWorkspace({
         return;
       }
 
-      if (event.type === 'communities.v1.channel.message.was_deleted') {
+      if (
+        event.type === 'communities.v1.channel.message.was_deleted' ||
+        event.type === 'communities.v1.call.event.was_recorded'
+      ) {
         setCommunityRealtimeEvent(event);
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_created') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channel = communityChannelAttribute(event, 'channel');
+
+        if (communityId && channel) {
+          updateCommunityState(communityId, (community) => {
+            const channels = communityChannels(community);
+
+            if (channels.some((item) => item.id === channel.id)) {
+              return community;
+            }
+
+            return channel.type === 'voice'
+              ? {
+                  ...community,
+                  voiceChannels: [...(community.voiceChannels ?? []), channel],
+                }
+              : {
+                  ...community,
+                  textChannels: [...community.textChannels, channel],
+                };
+          });
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_renamed') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+        const name = stringAttribute(event, 'name');
+
+        if (communityId && channelId && name) {
+          updateCommunityState(communityId, (community) => ({
+            ...community,
+            textChannels: community.textChannels.map((channel) =>
+              channel.id === channelId ? { ...channel, name } : channel,
+            ),
+            voiceChannels: (community.voiceChannels ?? []).map((channel) =>
+              channel.id === channelId ? { ...channel, name } : channel,
+            ),
+          }));
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.channel.was_deleted') {
+        const communityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+        const channelId = stringAttribute(event, 'channelId');
+
+        if (communityId && channelId) {
+          updateCommunityState(communityId, (community) => ({
+            ...community,
+            textChannels: community.textChannels.filter(
+              (channel) => channel.id !== channelId,
+            ),
+            voiceChannels: (community.voiceChannels ?? []).filter(
+              (channel) => channel.id !== channelId,
+            ),
+          }));
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.community.was_updated') {
+        const community = communityAttribute(event, 'community');
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.member.was_added') {
+        const community = communityAttribute(event, 'community');
+        const communityId =
+          community?.id ??
+          eventAggregateId(event) ??
+          stringAttribute(event, 'communityId');
+        const identityId = stringAttribute(event, 'identityId');
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        } else if (communityId && identityId) {
+          updateCommunityState(communityId, (current) =>
+            current.memberIds.includes(identityId)
+              ? current
+              : { ...current, memberIds: [...current.memberIds, identityId] },
+          );
+        }
+
+        return;
+      }
+
+      if (event.type === 'communities.v1.member.was_left') {
+        const community = communityAttribute(event, 'community');
+        const communityId =
+          community?.id ??
+          eventAggregateId(event) ??
+          stringAttribute(event, 'communityId');
+        const identityId = stringAttribute(event, 'identityId');
+
+        if (identityId === session.identity.id && communityId) {
+          setCommunities((current) =>
+            current.filter((item) => item.id !== communityId),
+          );
+
+          return;
+        }
+
+        if (community) {
+          setCommunities((current) =>
+            current.map((item) => (item.id === community.id ? community : item)),
+          );
+        } else if (communityId && identityId) {
+          updateCommunityState(communityId, (current) => ({
+            ...current,
+            memberIds: current.memberIds.filter((id) => id !== identityId),
+          }));
+        }
+
         return;
       }
 
@@ -1034,24 +1922,38 @@ export function GlassWorkspace({
         return;
       }
 
-      if (event.type.startsWith('conversations.v1.message.')) {
+      if (
+        event.type.startsWith('conversations.v1.message.') ||
+        event.type === 'conversations.v1.call.event.was_recorded'
+      ) {
         void refreshConversations().catch(() => undefined);
         const conversationId = eventAggregateId(event);
         const messageId = stringAttribute(event, 'messageId', 'message_id');
+        const timelineMessage = recordAttribute(event, 'message') as
+          | MessageResource
+          | undefined;
         const authorId = stringAttribute(event, 'authorId', 'author_id');
         const isActiveConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
           conversationId === activeConversation?.id;
 
-        if (!messageId || !conversationId) return;
+        if ((!messageId && !timelineMessage) || !conversationId) return;
 
         setConversations((current) =>
           bumpConversationActivity(current, conversationId, event.occurred_on),
         );
 
-        if (!isActiveConversation && authorId !== session.identity.id) {
-          markUnreadMessage(conversationId, messageId);
+        if (
+          !isActiveConversation &&
+          authorId !== session.identity.id &&
+          timelineMessage?.actorIdentityId !== session.identity.id
+        ) {
+          const unreadMessageId = messageId ?? timelineMessage?.id;
+
+          playNotificationSound();
+          if (unreadMessageId)
+            markUnreadMessage(conversationId, unreadMessageId);
         }
 
         if (isActiveConversation) {
@@ -1073,8 +1975,31 @@ export function GlassWorkspace({
             return;
           }
 
+          if (timelineMessage) {
+            const shouldAutoScroll = isScrolledNearBottom();
+            const message: ChatMessage = {
+              attachments: [],
+              authorIdentityId:
+                timelineMessage.actorIdentityId ??
+                timelineMessage.authorIdentityId ??
+                'system',
+              content: '',
+              encrypted: false,
+              id: timelineMessage.id ?? `${event.event_id}:call-event`,
+              kind: 'call-event',
+              mine: timelineMessage.actorIdentityId === session.identity.id,
+              raw: timelineMessage,
+              timestamp: timelineMessage.createdAt ?? event.occurred_on,
+            };
+
+            setMessages((current) => mergeMessages(current, [message]));
+            if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+            return;
+          }
+
           if (
             !activeConversationKeyId ||
+            !messageId ||
             messages.some((message) => message.id === messageId)
           ) {
             return;
@@ -1084,6 +2009,26 @@ export function GlassWorkspace({
             conversationId,
             messageId,
             isScrolledNearBottom() || authorId === session.identity.id,
+          );
+        }
+      }
+
+      if (event.type === 'conversations.v1.messages.were_read') {
+        const conversationId = eventAggregateId(event);
+        const readerIdentityId = stringAttribute(
+          event,
+          'readerIdentityId',
+          'reader_identity_id',
+        );
+
+        if (conversationId && readerIdentityId === session.identity.id) {
+          clearUnreadMessages(conversationId);
+          setConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === conversationId
+                ? { ...conversation, unreadCount: 0 }
+                : conversation,
+            ),
           );
         }
       }
@@ -1104,9 +2049,14 @@ export function GlassWorkspace({
       refreshConversations,
       refreshNotifications,
       refreshSession,
+      realtimeEventsOpen,
+      receiveSignal,
+      reconcileCallResource,
       session,
       setConversations,
+      setCommunities,
       setSession,
+      updateCommunityState,
       workspaceMode,
     ],
   );
@@ -1126,7 +2076,9 @@ export function GlassWorkspace({
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}
-          activeCommunityId={workspaceMode === 'community' ? activeCommunity?.id : null}
+          activeCommunityId={
+            workspaceMode === 'community' ? activeCommunity?.id : null
+          }
           communities={communities}
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
@@ -1179,28 +2131,32 @@ export function GlassWorkspace({
                   peerCount={peers.length}
                   settingsAttention={nodeUnclaimed}
                 />
-              <Sidebar
-                session={session}
-                conversations={conversationsWithUnread}
-                identityNames={identityNames}
-                identityPictures={identityPictures}
-                identityProfiles={identityProfiles}
-                nodeNetworks={nodeNetworks}
-                activeConversationId={activeConversation?.id ?? null}
-                onSelect={(id) => {
-                  clearUnreadMessages(id);
-                  setNewMessageCount(0);
-                  setActiveConversationId(id);
-                  setSidebarOpen(false);
-                }}
-                onCreate={() => setIsCreateOpen(true)}
-                onClose={() => setSidebarOpen(false)}
-                onLogout={() => setSession(null)}
-                onSessionUpdated={(nextSession) => {
-                  setSession(nextSession);
-                  rememberIdentity(nextSession.identity);
-                }}
-              />
+                <Sidebar
+                  activeCall={activeCall}
+                  session={session}
+                  conversations={conversationsWithUnread}
+                  identityNames={identityNames}
+                  identityPictures={identityPictures}
+                  identityProfiles={identityProfiles}
+                  nodeNetworks={nodeNetworks}
+                  activeConversationId={activeConversation?.id ?? null}
+                  onSelect={(id) => {
+                    clearUnreadMessages(id);
+                    setNewMessageCount(0);
+                    setActiveConversationId(id);
+                    setSidebarOpen(false);
+                  }}
+                  onCreate={() => setIsCreateOpen(true)}
+                  onClose={() => setSidebarOpen(false)}
+                  onCallEnd={leaveActiveCall}
+                  onCallToggleDeafen={toggleDeafen}
+                  onCallToggleMute={toggleMute}
+                  onLogout={() => setSession(null)}
+                  onSessionUpdated={(nextSession) => {
+                    setSession(nextSession);
+                    rememberIdentity(nextSession.identity);
+                  }}
+                />
               </div>
             </div>
 
@@ -1254,9 +2210,11 @@ export function GlassWorkspace({
               onCreate={() => setIsCreateOpen(true)}
               progress={attachmentProgress}
               realtimeStatus={realtimeStatus}
+              onRealtimeEventsOpen={openRealtimeEvents}
               replyToMessage={replyTarget}
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}
+              onStartCall={startConversationCall}
             />
 
             <Inspector
@@ -1304,6 +2262,10 @@ export function GlassWorkspace({
               />
             }
             nodeNetworks={nodeNetworks}
+            activeCall={activeCall}
+            onCallEnd={leaveActiveCall}
+            onCallToggleDeafen={toggleDeafen}
+            onCallToggleMute={toggleMute}
             realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>
@@ -1322,6 +2284,11 @@ export function GlassWorkspace({
                 ),
               )
             }
+            onCommunityLeft={(community) =>
+              setCommunities((current) =>
+                current.filter((item) => item.id !== community.id),
+              )
+            }
             onChannelViewed={(channelId) =>
               clearCommunityChannelUnread(activeCommunity.id, channelId)
             }
@@ -1334,7 +2301,9 @@ export function GlassWorkspace({
               rememberIdentity(nextSession.identity);
             }}
             realtimeStatus={realtimeStatus}
+            onRealtimeEventsOpen={openRealtimeEvents}
             session={session}
+            onJoinVoiceChannel={startCommunityVoiceCall}
           />
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55 sm:rounded-[2rem]">
@@ -1404,7 +2373,8 @@ export function GlassWorkspace({
           nodeNetworks={nodeNetworks}
           session={session}
           onClose={() => setIsCreateCommunityOpen(false)}
-          onCreated={(community) => {
+          onCreated={({ community, session: nextSession }) => {
+            setSession(nextSession);
             setCommunities((current) => [community, ...current]);
             setActiveCommunityId(community.id);
             setWorkspaceMode('community');
@@ -1437,41 +2407,20 @@ export function GlassWorkspace({
           session={session}
         />
       )}
+      {realtimeEventsOpen && (
+        <RealtimeEventsDialog
+          events={realtimeEventLog}
+          onClose={() => setRealtimeEventsOpen(false)}
+        />
+      )}
+      {incomingCall && (
+        <IncomingCallDialog
+          caller={incomingCall.caller}
+          onAccept={acceptIncomingCall}
+          onDecline={declineIncomingCall}
+          title={incomingCall.title}
+        />
+      )}
     </section>
   );
-}
-
-function mergeMessages(
-  currentMessages: ChatMessage[],
-  incomingMessages: ChatMessage[],
-): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>();
-
-  for (const message of currentMessages) byId.set(message.id, message);
-  for (const message of incomingMessages) byId.set(message.id, message);
-
-  return [...byId.values()].sort((left, right) => left.timestamp - right.timestamp);
-}
-
-function stringAttribute(
-  event: RealtimeDomainEvent,
-  ...keys: string[]
-): string | undefined {
-  for (const key of keys) {
-    const value = event.attributes[key];
-
-    if (typeof value === 'string' && value.length > 0) return value;
-  }
-
-  return undefined;
-}
-
-function eventAggregateId(event: RealtimeDomainEvent): string | undefined {
-  const aggregateId =
-    event.aggregate_id ??
-    (event as RealtimeDomainEvent & { aggregateId?: string }).aggregateId;
-
-  return typeof aggregateId === 'string' && aggregateId.length > 0
-    ? aggregateId
-    : undefined;
 }

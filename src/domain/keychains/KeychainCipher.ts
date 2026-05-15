@@ -2,10 +2,20 @@ import { EncryptedPayload } from '@haskou/value-objects';
 
 import type { KeychainResource, LocalKeychain, Session } from '../types';
 
+import { normalizeIdentityId } from '../../utils/identityId';
+
 type PublishedKeychainPayload = {
   encryptedPayload: string;
-  previousKeychainExternalIdentifier: string | null;
+  previousKeychainExternalIdentifier: null | string;
   signature: string;
+  timestamp: number;
+  version: number;
+};
+
+type KeychainDomainSignaturePayload = {
+  encryptedPayload: string;
+  ownerIdentityId: string;
+  previousKeychainExternalIdentifier?: string;
   timestamp: number;
   version: number;
 };
@@ -43,14 +53,15 @@ export class KeychainCipher {
       .toString();
     const previousKeychainExternalIdentifier =
       session.keychainExternalIdentifier ?? undefined;
+    const domainPayload: KeychainDomainSignaturePayload = {
+      encryptedPayload,
+      ownerIdentityId: normalizeIdentityId(session.identity.id),
+      previousKeychainExternalIdentifier,
+      timestamp,
+      version,
+    };
     const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        encryptedPayload,
-        ownerIdentityId: session.identity.id,
-        previousKeychainExternalIdentifier,
-        timestamp,
-        version,
-      }),
+      JSON.stringify(domainPayload),
       session.password,
     );
 
@@ -58,7 +69,7 @@ export class KeychainCipher {
       body: {
         encryptedPayload,
         previousKeychainExternalIdentifier:
-          session.keychainExternalIdentifier ?? null,
+          previousKeychainExternalIdentifier ?? null,
         signature: signature.toString(),
         timestamp,
         version,

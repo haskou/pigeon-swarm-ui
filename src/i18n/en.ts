@@ -88,10 +88,37 @@ export const copy = {
     noConversationHint: 'Create a conversation to start',
     noMoreMessages: 'No more messages',
     realtimeConnected: 'Live',
+    realtimeEventsEmpty:
+      'No WebSocket events captured while this viewer has been open.',
+    realtimeEventsTitle: 'WebSocket events',
     realtimeReconnecting: 'Reconnecting',
     sendInvite: 'Send invite',
     viewData: 'View data',
     you: 'You',
+  },
+  calls: {
+    answer: 'Answer',
+    deafen: 'Silence call audio',
+    decline: 'Decline',
+    declined: 'Call declined',
+    ended: 'Call ended',
+    incoming: 'Incoming call',
+    incomingCallDirection: 'Incoming',
+    iceServersUnavailable: 'Calls are not configured on this node.',
+    joinVoice: 'Join voice',
+    leave: 'Leave call',
+    microphoneUnavailable:
+      'Microphone permission is unavailable. Check browser permissions.',
+    mute: 'Mute microphone',
+    muted: 'Muted',
+    missed: 'Missed call',
+    outgoingCallDirection: 'Outgoing',
+    startCall: 'Start call',
+    undeafen: 'Enable call audio',
+    unmute: 'Unmute microphone',
+    voiceChannel: 'Voice channel',
+    voiceChannels: 'Voice channels',
+    waitingForParticipants: 'Waiting for participants',
   },
   communities: {
     addChannelPlaceholder: 'Add channel',
@@ -101,7 +128,7 @@ export const copy = {
     channelDataTitle: 'Channel data',
     channelError: 'The channel could not be created.',
     channelMetadataOnly: 'Community channel.',
-    channels: 'Text channels',
+    channels: 'Channels',
     channelsAreMetadata: 'Channels are ready for metadata',
     channelsAreMetadataBody:
       'This MVP creates private communities and text channels. Messages inside community channels will be wired in a later backend contract.',
@@ -111,11 +138,19 @@ export const copy = {
     createError: 'The community could not be created.',
     createTitle: 'Create community',
     creating: 'Creating community...',
+    communityDataTitle: 'Community data',
+    deleteChannel: 'Delete channel',
+    deleteChannelConfirm:
+      'Delete this channel? Text channel messages will also be deleted.',
     description: 'Description',
     descriptionPlaceholder: 'A private space for a team, project or crew.',
     done: 'Done',
     empty: 'No communities yet. Create one from the rail.',
     emptyChannel: 'No messages in this channel yet.',
+    leave: 'Leave community',
+    leaveConfirm: 'Leave this community?',
+    leaveError: 'The community could not be left.',
+    leaving: 'Leaving...',
     loadError: 'Communities could not be loaded.',
     manage: 'Manage community',
     memberError: 'The member could not be added.',
@@ -137,7 +172,9 @@ export const copy = {
     owner: 'Owner',
     privateCommunity: 'Private community',
     searchChannels: 'Search channels',
+    textChannel: 'Text',
     updateError: 'The community could not be updated.',
+    voiceChannel: 'Voice',
   },
   composer: {
     attach: 'Attach files',
@@ -241,6 +278,10 @@ export const copy = {
       IPFSNetworkNotFoundError: 'That IPFS network could not be found.',
       IPFSNetworksNotFoundByIdsError:
         'One or more selected IPFS networks could not be found.',
+      CommunityMemberNotFoundError:
+        'You are not a member of that community.',
+      CommunityOwnerCannotLeaveError:
+        'The community owner cannot leave the community.',
       IPFSPeerIdDuplicatedError:
         'That IPFS peer is already registered in another network.',
       KeychainNotFoundError:
@@ -363,6 +404,8 @@ export const copy = {
   notifications: {
     accept: 'Accept',
     archive: 'Archive',
+    call: 'Call',
+    calledBy: 'Called by',
     close: 'Close notifications',
     conversation: 'Conversation',
     createdAt: 'Created',
@@ -375,6 +418,7 @@ export const copy = {
     invitationTitle: 'Conversation invitation',
     invitedBy: 'Invited by',
     kicker: 'Inbox',
+    missedCallTitle: 'Missed call',
     open: 'Open notifications',
     refresh: 'Refresh notifications',
     states: {

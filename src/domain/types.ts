@@ -57,6 +57,13 @@ export type CommunityInvitationPayload = {
   recipientIdentityId: string;
 };
 
+export type MissedCallPayload = {
+  callId: string;
+  callerIdentityId: string;
+  networkId: string;
+  recipientIdentityId: string;
+};
+
 type BaseNotificationResource = {
   createdAt: string;
   id: string;
@@ -77,9 +84,15 @@ export type CommunityInvitationNotificationResource =
     type: 'community_invitation';
   };
 
+export type MissedCallNotificationResource = BaseNotificationResource & {
+  payload: MissedCallPayload;
+  type: 'missed_call';
+};
+
 export type NotificationResource =
   | CommunityInvitationNotificationResource
-  | ConversationInvitationNotificationResource;
+  | ConversationInvitationNotificationResource
+  | MissedCallNotificationResource;
 
 export type PublicFileUpload = {
   cid: string;
@@ -183,6 +196,16 @@ export type CommunityTextChannel = {
   createdAt: number;
 };
 
+export type CommunityVoiceChannel = {
+  connectedIdentityIds?: string[];
+  id: string;
+  name: string;
+  type: 'voice';
+  createdAt: number;
+};
+
+export type CommunityChannel = CommunityTextChannel | CommunityVoiceChannel;
+
 export type Community = {
   id: string;
   networkId: string;
@@ -194,6 +217,7 @@ export type Community = {
   memberIds: string[];
   textChannels: CommunityTextChannel[];
   visibility: 'private';
+  voiceChannels?: CommunityVoiceChannel[];
   createdAt: number;
 };
 
@@ -212,6 +236,10 @@ export type MessageResource = {
   signature?: string;
   timestamp?: number;
   createdAt?: number;
+  callEventType?: 'declined' | 'ended' | 'missed';
+  callId?: string;
+  actorIdentityId?: string;
+  durationMs?: number;
   previousMessageIds?: string[];
   replyToMessageId?: string;
   targetMessageId?: string;
@@ -237,6 +265,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
+  kind?: 'call-event' | 'message';
   deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;

@@ -122,6 +122,42 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('leaves communities with a signed member request', async () => {
+    const community = {
+      createdAt: 1,
+      description: 'Description',
+      id: 'community-1',
+      memberIds: ['identity-2'],
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-2',
+      textChannels: [],
+      visibility: 'private',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/communities/community-1/members/me';
+
+    await expect(gateway.leaveCommunity(session, 'community-1')).resolves.toBe(
+      community,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
+    });
+  });
+
   it('creates community text channels with signed owner requests', async () => {
     const channel = {
       createdAt: 1,
@@ -383,6 +419,101 @@ describe(PigeonApiGateway.name, () => {
     );
   });
 
+  it('creates identities with a signed client keypair payload', async () => {
+    const createdIdentity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      id: 'public-key',
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'keypair-signature',
+      timestamp: 1234,
+      version: 1,
+    } satisfies IdentityResource;
+    const http = {
+      request: jest.fn().mockResolvedValue(createdIdentity),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1234);
+    const gateway = new PigeonApiGateway(http, signer);
+
+    try {
+      await expect(
+        gateway.createIdentity('Ada', 'secret', ['network-1'], ' @Ada '),
+      ).resolves.toBe(createdIdentity);
+    } finally {
+      now.mockRestore();
+    }
+
+    const [, postInit] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(postInit.body as string) as Partial<
+      IdentityResource & { password?: string }
+    >;
+
+    expect(body).not.toHaveProperty('password');
+    expect(body).not.toHaveProperty('previousIdentityExternalIdentifier');
+    expect(Object.keys(body)).toEqual([
+      'encryptedKeyPair',
+      'id',
+      'networks',
+      'profile',
+      'timestamp',
+      'version',
+      'signature',
+    ]);
+    expect(body).toEqual({
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      id: 'public-key',
+      networks: ['network-1'],
+      profile: {
+        handle: 'ada',
+        name: 'Ada',
+      },
+      signature: 'keypair-signature',
+      timestamp: 1234,
+      version: 1,
+    });
+    const signingBody = (signer.headers as jest.Mock).mock.calls[0][3] as
+      | IdentityResource
+      | undefined;
+
+    expect(Object.keys(signingBody ?? {})).toEqual([
+      'encryptedKeyPair',
+      'id',
+      'networks',
+      'previousIdentityExternalIdentifier',
+      'profile',
+      'timestamp',
+      'version',
+      'signature',
+    ]);
+    expect(signingBody?.previousIdentityExternalIdentifier).toBeUndefined();
+    expect(signer.headers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ id: 'public-key' }),
+        password: 'secret',
+      }),
+      'POST',
+      '/identities/',
+      signingBody,
+    );
+    expect(http.request).toHaveBeenCalledWith('/identities/', {
+      body: postInit.body,
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -447,10 +578,20 @@ describe(PigeonApiGateway.name, () => {
     ];
     const body = JSON.parse(putInit.body as string) as IdentityResource;
 
+    expect(Object.keys(body)).toEqual([
+      'encryptedKeyPair',
+      'id',
+      'networks',
+      'previousIdentityExternalIdentifier',
+      'profile',
+      'timestamp',
+      'version',
+      'signature',
+    ]);
+    expect(body.version).toBe(8);
     expect(body.previousIdentityExternalIdentifier).toBe(
       'current-identity-cid',
     );
-    expect(body.version).toBe(8);
     expect(body.signature).toBe('identity-signature');
     const [signedPayload, signedPassword] = (
       session.encryptedKeyPair.sign as jest.Mock

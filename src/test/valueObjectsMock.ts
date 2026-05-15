@@ -1,7 +1,22 @@
-import { createHash } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'crypto';
+
+const gcmTagBytes = 16;
 
 export class StringValueObject {
   public constructor(private readonly value: string) {}
+
+  public isEqual(other: StringValueObject): boolean {
+    return this.value === other.valueOf();
+  }
+
+  public isNotEqual(other: StringValueObject): boolean {
+    return !this.isEqual(other);
+  }
 
   public isEmpty(): boolean {
     return this.value.length === 0;
@@ -25,6 +40,53 @@ export class SHA256Hash extends StringValueObject {
     return new SHA256Hash(
       createHash('sha256').update(value.toString()).digest('hex'),
     );
+  }
+}
+
+export class UUID extends StringValueObject {
+  public static generate(): UUID {
+    return new UUID(globalThis.crypto.randomUUID());
+  }
+}
+
+export class CryptoAdapter {
+  public static decryptAes256Gcm(
+    key: Uint8Array,
+    iv: Uint8Array,
+    cipherText: Uint8Array,
+    tag: Uint8Array,
+  ): Buffer {
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+
+    decipher.setAuthTag(Buffer.from(tag));
+
+    return Buffer.concat([
+      decipher.update(Buffer.from(cipherText)),
+      decipher.final(),
+    ]);
+  }
+
+  public static encryptAes256Gcm(
+    key: Uint8Array,
+    iv: Uint8Array,
+    message: Uint8Array,
+  ): { cipherText: Uint8Array; tag: Uint8Array } {
+    const cipher = createCipheriv('aes-256-gcm', key, iv, {
+      authTagLength: gcmTagBytes,
+    });
+    const encrypted = Buffer.concat([
+      cipher.update(Buffer.from(message)),
+      cipher.final(),
+    ]);
+
+    return {
+      cipherText: encrypted,
+      tag: cipher.getAuthTag(),
+    };
+  }
+
+  public static randomBytes(size: number): Buffer {
+    return randomBytes(size);
   }
 }
 
@@ -59,11 +121,33 @@ export class EncryptedKeyPair {
     public readonly publicKey: PublicKey,
     public readonly encryptedPrivateKey: EncryptedPrivateKey,
   ) {}
+
+  public async sign(): Promise<Signature> {
+    return new Signature('encrypted-keypair-signature');
+  }
+
+  public toPrimitives(): { encryptedPrivateKey: string; publicKey: string } {
+    return {
+      encryptedPrivateKey: this.encryptedPrivateKey.toString(),
+      publicKey: this.publicKey.toString(),
+    };
+  }
 }
 
 export class KeyPair {
   public static async generate(): Promise<KeyPair> {
     return new KeyPair();
+  }
+
+  public async encryptKeyPair(): Promise<EncryptedKeyPair> {
+    return new EncryptedKeyPair(
+      new PublicKey('public-key'),
+      new EncryptedPrivateKey('encrypted-private-key'),
+    );
+  }
+
+  public sign(): Signature {
+    return new Signature('keypair-signature');
   }
 
   public toPrimitives(): { privateKey: string; publicKey: string } {

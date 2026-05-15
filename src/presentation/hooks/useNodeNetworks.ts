@@ -28,13 +28,16 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
     setError(null);
 
     try {
-      const [nodeInfo, nodeNetworks] = await Promise.all([
-        pigeonApplication.getNodeInfo(),
-        pigeonApplication.listNodeNetworks(session ?? undefined),
-      ]);
+      const nodeInfo = await pigeonApplication.getNodeInfo();
 
       setNode(nodeInfo);
-      setNetworks(nodeNetworks);
+      try {
+        setNetworks(
+          await pigeonApplication.listNodeNetworks(session ?? undefined),
+        );
+      } catch {
+        setNetworks([]);
+      }
     } catch (caught) {
       setError(new Error(toUserErrorMessage(caught, copy.nodeSettings.error)));
     } finally {

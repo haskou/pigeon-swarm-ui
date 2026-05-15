@@ -12,6 +12,7 @@ import type {
   MessageAttachment,
   Session,
 } from '../../domain/types';
+import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -78,10 +79,17 @@ interface ChatColumnProps {
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
+  onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
+  onStartCall?: (input: {
+    conversationId: string;
+    kind: 'group' | 'one-to-one';
+    participants: CallParticipant[];
+    title: string;
+  }) => void;
 }
 
 function profileAnchorFromTarget(
@@ -129,10 +137,12 @@ export function ChatColumn({
   onJumpToLatest,
   onMessageMenuOpen,
   onOpenSidebar,
+  onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
   onScroll,
   onSend,
+  onStartCall,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -464,7 +474,10 @@ export function ChatColumn({
           <button
             type="button"
             onClick={openConversationHeader}
-            disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
+            disabled={
+              !activeConversation ||
+              (!isGroupConversation && !canOpenPeerProfile)
+            }
             className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
@@ -487,7 +500,10 @@ export function ChatColumn({
               <button
                 type="button"
                 onClick={openConversationHeader}
-                disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
+                disabled={
+                  !activeConversation ||
+                  (!isGroupConversation && !canOpenPeerProfile)
+                }
                 className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
               >
                 {activeConversation
@@ -529,12 +545,14 @@ export function ChatColumn({
               </div>
             )}
           </div>
-          <div
+          <button
+            type="button"
+            onClick={onRealtimeEventsOpen}
             className={cx(
-              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black sm:flex',
+              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
               realtimeStatus === 'connected'
-                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                : 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
+                : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
             )}
             title={
               realtimeStatus === 'connected'
@@ -553,9 +571,9 @@ export function ChatColumn({
             {realtimeStatus === 'connected'
               ? copy.chat.realtimeConnected
               : copy.chat.realtimeReconnecting}
-          </div>
+          </button>
           {activeConversation ? (
-            <div className="relative ml-auto shrink-0">
+            <div className="relative ml-auto flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
@@ -574,6 +592,34 @@ export function ChatColumn({
                     aria-label={copy.dialog.close}
                   />
                   <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+                    {onStartCall && !isGroupConversation ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onStartCall({
+                            conversationId: activeConversation.id,
+                            kind: 'one-to-one',
+                            participants: groupParticipants.map(
+                              (participant) => ({
+                                identity: participant.identity,
+                                identityId: participant.identityId,
+                                muted: false,
+                                name: participant.name,
+                                picture: participant.picture,
+                              }),
+                            ),
+                            title:
+                              activeConversationTitle ??
+                              activeConversationName ??
+                              activeConversation.id,
+                          });
+                          setConversationMenuOpen(false);
+                        }}
+                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      >
+                        {copy.calls.startCall}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {
@@ -666,7 +712,6 @@ export function ChatColumn({
                 )}
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1];
-                const nextMessage = messages[index + 1];
                 const replyMessage = message.replyToMessageId
                   ? messages.find(
                       (item) => item.id === message.replyToMessageId,
@@ -678,14 +723,13 @@ export function ChatColumn({
                 const startsNewAuthorRun =
                   !previousMessage ||
                   previousMessage.authorIdentityId !== message.authorIdentityId;
-                const showAvatar =
-                  !nextMessage ||
-                  nextMessage.authorIdentityId !== message.authorIdentityId;
 
                 return (
                   <Fragment key={message.id}>
                     {startsNewDay && (
-                      <DateSeparator label={formatDateSeparator(message.timestamp)} />
+                      <DateSeparator
+                        label={formatDateSeparator(message.timestamp)}
+                      />
                     )}
                     <div
                       className={
@@ -744,7 +788,8 @@ export function ChatColumn({
                         replyPreview={
                           replyMessage?.content ?? message.replyPreview?.content
                         }
-                        showAvatar={showAvatar}
+                        reserveAvatarSpace={false}
+                        showAvatar={false}
                       />
                     </div>
                   </Fragment>
@@ -913,6 +958,19 @@ export function ChatColumn({
         />
       )}
     </section>
+  );
+}
+
+function CallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M7.2 4.8 9 7.9a1.6 1.6 0 0 1-.3 1.9l-1 1a12.2 12.2 0 0 0 5.5 5.5l1-1a1.6 1.6 0 0 1 1.9-.3l3.1 1.8a1.6 1.6 0 0 1 .8 1.7l-.4 2a1.8 1.8 0 0 1-1.8 1.4A15.8 15.8 0 0 1 2.1 6.2a1.8 1.8 0 0 1 1.4-1.8l2-.4a1.6 1.6 0 0 1 1.7.8Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 

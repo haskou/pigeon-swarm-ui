@@ -44,7 +44,8 @@ export function useIdentityDirectory({
   rememberIdentity: (identity: IdentityResource) => void;
 } {
   const [identityNames, setIdentityNames] = useState<IdentityNames>(() => ({
-    [session.identity.id]: identityName(session.identity) ?? session.identity.id,
+    [session.identity.id]:
+      identityName(session.identity) ?? session.identity.id,
   }));
   const [identityProfiles, setIdentityProfiles] = useState<
     Record<string, IdentityResource>
@@ -94,17 +95,33 @@ export function useIdentityDirectory({
         session.keychain,
       );
 
-      if (peerIdentityId) ids.add(peerIdentityId);
+      if (isResolvableIdentityId(peerIdentityId)) ids.add(peerIdentityId);
       conversation.participantIdentityIds?.forEach((identityId) =>
-        ids.add(identityId),
+        isResolvableIdentityId(identityId) ? ids.add(identityId) : undefined,
       );
-      conversation.participantIds?.forEach((identityId) => ids.add(identityId));
+      conversation.participantIds?.forEach((identityId) =>
+        isResolvableIdentityId(identityId) ? ids.add(identityId) : undefined,
+      );
     });
     notifications.forEach((notification) => {
-      ids.add(notification.payload.inviterIdentityId);
-      ids.add(notification.payload.recipientIdentityId);
+      if (notification.type === 'missed_call') {
+        if (isResolvableIdentityId(notification.payload.callerIdentityId)) {
+          ids.add(notification.payload.callerIdentityId);
+        }
+      } else {
+        if (isResolvableIdentityId(notification.payload.inviterIdentityId)) {
+          ids.add(notification.payload.inviterIdentityId);
+        }
+      }
+      if (isResolvableIdentityId(notification.payload.recipientIdentityId)) {
+        ids.add(notification.payload.recipientIdentityId);
+      }
     });
-    messages.forEach((message) => ids.add(message.authorIdentityId));
+    messages.forEach((message) => {
+      if (isResolvableIdentityId(message.authorIdentityId)) {
+        ids.add(message.authorIdentityId);
+      }
+    });
     ids.delete(session.identity.id);
 
     return [...ids].filter(
@@ -179,6 +196,18 @@ export function useIdentityDirectory({
     identityProfiles,
     rememberIdentity,
   };
+}
+
+function isResolvableIdentityId(
+  identityId?: null | string,
+): identityId is string {
+  if (!identityId) return false;
+
+  const normalized = identityId.trim().toLowerCase();
+
+  return (
+    normalized !== '' && normalized !== 'system' && normalized !== 'unknown'
+  );
 }
 
 async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
