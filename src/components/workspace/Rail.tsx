@@ -62,12 +62,8 @@ export function Rail({
             alt="Pigeon Swarm"
             className="h-14 w-14 rounded-2xl shadow-xl"
           />
-          {messageNotificationCount > 0 && (
-            <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
-              {messageNotificationCount > 9 ? '9+' : messageNotificationCount}
-            </span>
-          )}
         </button>
+        <RailBadge count={messageNotificationCount} />
       </div>
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
@@ -87,14 +83,8 @@ export function Rail({
               <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
                 <CommunityRailAvatar community={community} />
               </span>
-              {(communityUnreadCounts[community.id] ?? 0) > 0 && (
-                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-white">
-                  {(communityUnreadCounts[community.id] ?? 0) > 9
-                    ? '9+'
-                    : communityUnreadCounts[community.id]}
-                </span>
-              )}
             </button>
+            <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
           </div>
         ))}
         <button
@@ -197,6 +187,16 @@ export function Rail({
         )}
       </button>
     </aside>
+  );
+}
+
+function RailBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  return (
+    <span className="pointer-events-none absolute right-0 top-0 z-20 min-w-5 rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-center text-[0.65rem] font-black leading-none text-white shadow-[0_0_12px_rgba(217,70,239,0.55)]">
+      {count > 9 ? '9+' : count}
+    </span>
   );
 }
 
