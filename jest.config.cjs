@@ -1,6 +1,8 @@
 module.exports = {
   moduleNameMapper: {
     '^@haskou/value-objects$': '<rootDir>/src/test/valueObjectsMock.ts',
+    '^@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter$':
+      '<rootDir>/src/test/valueObjectsMock.ts',
   },
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',

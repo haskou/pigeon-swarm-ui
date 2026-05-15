@@ -1,4 +1,5 @@
 import { UUID } from '@haskou/value-objects';
+import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
 
 import type {
   AttachmentProgress,
@@ -8,6 +9,7 @@ import type {
 } from '../types';
 
 const chunkSize = 8 * 1024 * 1024;
+const gcmTagBytes = 16;
 const largeAttachmentBytes = 5 * 1024 * 1024;
 
 type AttachmentProgressHandler = (progress: AttachmentProgress) => void;
@@ -51,8 +53,6 @@ type WorkerResponse =
     };
 
 export class AttachmentCipher {
-  private workerUrl?: string;
-
   public async encrypt(
     file: File,
     onProgress?: AttachmentProgressHandler,
@@ -137,29 +137,24 @@ export class AttachmentCipher {
     return this.encryptBytes(file.name || 'attachment', bytes, onProgress);
   }
 
-  private async decryptInCurrentThread(
+  private decryptInCurrentThread(
     attachment: MessageAttachment,
     encryptedBytes: ArrayBuffer,
     onProgress?: AttachmentProgressHandler,
-  ): Promise<Extract<WorkerResponse, { type: 'decrypt-result' }>> {
+  ): Extract<WorkerResponse, { type: 'decrypt-result' }> {
     return {
-      bytes: await this.decryptBytes(attachment, encryptedBytes, onProgress),
+      bytes: this.decryptBytes(attachment, encryptedBytes, onProgress),
       id: UUID.generate().toString(),
       type: 'decrypt-result',
     };
   }
 
-  private async encryptBytes(
+  private encryptBytes(
     filename: string,
     bytes: ArrayBuffer,
     onProgress?: AttachmentProgressHandler,
-  ): Promise<Extract<WorkerResponse, { type: 'encrypt-result' }>> {
-    const key = await crypto.subtle.generateKey(
-      { length: 256, name: 'AES-GCM' },
-      true,
-      ['decrypt', 'encrypt'],
-    );
-    const rawKey = await crypto.subtle.exportKey('raw', key);
+  ): Extract<WorkerResponse, { type: 'encrypt-result' }> {
+    const key = CryptoAdapter.randomBytes(32);
     const encryptedParts: ArrayBuffer[] = [];
     const chunks: { iv: string; size: number }[] = [];
     const totalChunks = Math.ceil(bytes.byteLength / chunkSize) || 1;
@@ -170,15 +165,22 @@ export class AttachmentCipher {
         offset,
         Math.min(offset + chunkSize, bytes.byteLength),
       );
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const encrypted = await crypto.subtle.encrypt(
-        { iv, name: 'AES-GCM' },
+      const iv = CryptoAdapter.randomBytes(12);
+      const encrypted = CryptoAdapter.encryptAes256Gcm(
         key,
-        chunk,
+        iv,
+        new Uint8Array(chunk),
+      );
+      const encryptedChunk = this.concatBytes(
+        encrypted.cipherText,
+        encrypted.tag,
       );
 
-      encryptedParts.push(encrypted);
-      chunks.push({ iv: this.bytesToBase64(iv), size: encrypted.byteLength });
+      encryptedParts.push(this.bytesToArrayBuffer(encryptedChunk));
+      chunks.push({
+        iv: this.bytesToBase64(iv),
+        size: encryptedChunk.byteLength,
+      });
       this.reportProgress(
         'encrypt',
         filename,
@@ -197,7 +199,7 @@ export class AttachmentCipher {
         chunks,
         chunkSize,
         iv: firstIv,
-        key: this.bytesToBase64(new Uint8Array(rawKey)),
+        key: this.bytesToBase64(key),
       },
       id: UUID.generate().toString(),
       type: 'encrypt-result',
@@ -205,18 +207,12 @@ export class AttachmentCipher {
     };
   }
 
-  private async decryptBytes(
+  private decryptBytes(
     attachment: MessageAttachment,
     encryptedBytes: ArrayBuffer,
     onProgress?: AttachmentProgressHandler,
-  ): Promise<ArrayBuffer> {
-    const key = await crypto.subtle.importKey(
-      'raw',
-      this.base64ToArrayBuffer(attachment.encryption.key),
-      { name: 'AES-GCM' },
-      false,
-      ['decrypt'],
-    );
+  ): ArrayBuffer {
+    const key = this.base64ToBytes(attachment.encryption.key);
     const chunks = attachment.encryption.chunks ?? [
       { iv: attachment.encryption.iv, size: encryptedBytes.byteLength },
     ];
@@ -226,16 +222,15 @@ export class AttachmentCipher {
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
       const encryptedChunk = encryptedBytes.slice(offset, offset + chunk.size);
-      const decrypted = await crypto.subtle.decrypt(
-        {
-          iv: this.base64ToArrayBuffer(chunk.iv),
-          name: attachment.encryption.algorithm,
-        },
+      const encryptedChunkBytes = new Uint8Array(encryptedChunk);
+      const decrypted = CryptoAdapter.decryptAes256Gcm(
         key,
-        encryptedChunk,
+        this.base64ToBytes(chunk.iv),
+        encryptedChunkBytes.subarray(0, -gcmTagBytes),
+        encryptedChunkBytes.subarray(-gcmTagBytes),
       );
 
-      decryptedParts.push(decrypted);
+      decryptedParts.push(this.bytesToArrayBuffer(decrypted));
       offset += chunk.size;
       this.reportProgress(
         'decrypt',
@@ -268,52 +263,14 @@ export class AttachmentCipher {
     });
   }
 
-  private async runWorker<T extends WorkerResponse>(
+  private runWorker<T extends WorkerResponse>(
     request: WorkerRequest,
     onProgress?: AttachmentProgressHandler,
   ): Promise<T> {
-    if (typeof Worker === 'undefined' || typeof Blob === 'undefined') {
-      throw new Error('Workers are not available');
-    }
+    void request;
+    void onProgress;
 
-    const worker = new Worker(this.workerObjectUrl());
-
-    return await new Promise<T>((resolve, reject) => {
-      worker.addEventListener(
-        'message',
-        (event: MessageEvent<WorkerResponse>) => {
-          const message = event.data;
-
-          if (message.id !== request.id) return;
-
-          if (message.type === 'progress') {
-            onProgress?.(message.progress);
-
-            return;
-          }
-
-          worker.terminate();
-
-          if (message.type === 'error') reject(new Error(message.error));
-          else resolve(message as T);
-        },
-      );
-      worker.addEventListener('error', (event) => {
-        worker.terminate();
-        reject(event.error ?? new Error(event.message));
-      });
-      worker.postMessage(request);
-    });
-  }
-
-  private workerObjectUrl(): string {
-    if (this.workerUrl) return this.workerUrl;
-
-    this.workerUrl = URL.createObjectURL(
-      new Blob([this.workerSource()], { type: 'text/javascript' }),
-    );
-
-    return this.workerUrl;
+    return Promise.reject(new Error('Attachment workers are not available'));
   }
 
   private concatArrayBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
@@ -332,6 +289,15 @@ export class AttachmentCipher {
     return output.buffer;
   }
 
+  private concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
+    const output = new Uint8Array(left.byteLength + right.byteLength);
+
+    output.set(left);
+    output.set(right, left.byteLength);
+
+    return output;
+  }
+
   private bytesToBase64(bytes: Uint8Array): string {
     let binary = '';
 
@@ -340,125 +306,5 @@ export class AttachmentCipher {
     });
 
     return btoa(binary);
-  }
-
-  private workerSource(): string {
-    return `
-const chunkSize = ${chunkSize};
-const largeAttachmentBytes = ${largeAttachmentBytes};
-const bytesToBase64 = (bytes) => {
-  let binary = '';
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary);
-};
-const base64ToBytes = (value) => {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-};
-const concatArrayBuffers = (buffers) => {
-  const totalSize = buffers.reduce((total, buffer) => total + buffer.byteLength, 0);
-  const output = new Uint8Array(totalSize);
-  let offset = 0;
-  buffers.forEach((buffer) => {
-    output.set(new Uint8Array(buffer), offset);
-    offset += buffer.byteLength;
-  });
-  return output.buffer;
-};
-const reportProgress = (id, phase, filename, size, index) => {
-  if (size < largeAttachmentBytes) return;
-  self.postMessage({
-    id,
-    progress: {
-      filename,
-      percent: Math.min(100, Math.round(((index + 1) * chunkSize * 100) / size)),
-      phase,
-    },
-    type: 'progress',
-  });
-};
-const encryptFile = async (message) => {
-  const filename = message.file.name || 'attachment';
-  const bytes = await message.file.arrayBuffer();
-  const key = await crypto.subtle.generateKey(
-    { length: 256, name: 'AES-GCM' },
-    true,
-    ['decrypt', 'encrypt'],
-  );
-  const rawKey = await crypto.subtle.exportKey('raw', key);
-  const encryptedParts = [];
-  const chunks = [];
-  const totalChunks = Math.ceil(bytes.byteLength / chunkSize) || 1;
-  for (let index = 0; index < totalChunks; index += 1) {
-    const offset = index * chunkSize;
-    const chunk = bytes.slice(offset, Math.min(offset + chunkSize, bytes.byteLength));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encrypted = await crypto.subtle.encrypt({ iv, name: 'AES-GCM' }, key, chunk);
-    encryptedParts.push(encrypted);
-    chunks.push({ iv: bytesToBase64(iv), size: encrypted.byteLength });
-    reportProgress(message.id, 'encrypt', filename, bytes.byteLength, index);
-  }
-  const firstIv = chunks[0]?.iv ?? bytesToBase64(new Uint8Array(12));
-  self.postMessage({
-    encryptedBytes: concatArrayBuffers(encryptedParts),
-    encryption: {
-      algorithm: 'AES-GCM',
-      chunkSize: chunkSize,
-      chunks,
-      iv: firstIv,
-      key: bytesToBase64(new Uint8Array(rawKey)),
-    },
-    id: message.id,
-    type: 'encrypt-result',
-    uploadFilename: message.uploadFilename,
-  });
-};
-const decryptAttachment = async (message) => {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    base64ToBytes(message.attachment.encryption.key),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
-  const chunks = message.attachment.encryption.chunks ?? [
-    { iv: message.attachment.encryption.iv, size: message.encryptedBytes.byteLength },
-  ];
-  const decryptedParts = [];
-  let offset = 0;
-  for (let index = 0; index < chunks.length; index += 1) {
-    const chunk = chunks[index];
-    const encryptedChunk = message.encryptedBytes.slice(offset, offset + chunk.size);
-    const decrypted = await crypto.subtle.decrypt(
-      { iv: base64ToBytes(chunk.iv), name: message.attachment.encryption.algorithm },
-      key,
-      encryptedChunk,
-    );
-    decryptedParts.push(decrypted);
-    offset += chunk.size;
-    reportProgress(message.id, 'decrypt', message.attachment.filename, message.attachment.size, index);
-  }
-  self.postMessage({
-    bytes: concatArrayBuffers(decryptedParts),
-    id: message.id,
-    type: 'decrypt-result',
-  });
-};
-self.addEventListener('message', (event) => {
-  const message = event.data;
-  const action = message.type === 'encrypt' ? encryptFile : decryptAttachment;
-  action(message).catch((error) => {
-    self.postMessage({
-      error: error instanceof Error ? error.message : 'Attachment crypto failed',
-      id: message.id,
-      type: 'error',
-    });
-  });
-});
-`;
   }
 }

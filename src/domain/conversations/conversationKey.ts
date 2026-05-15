@@ -1,4 +1,12 @@
+import { StringValueObject } from '@haskou/value-objects';
+
 import type { ConversationKeyEntry, LocalKeychain } from '../types';
+
+function sameValue(left: string, right: string): boolean {
+  return new StringValueObject(left, Number.MAX_SAFE_INTEGER).isEqual(
+    new StringValueObject(right, Number.MAX_SAFE_INTEGER),
+  );
+}
 
 export function conversationKeyEntry(
   keychain: LocalKeychain,
@@ -9,8 +17,8 @@ export function conversationKeyEntry(
     keychain.conversations[conversationId] ??
     Object.values(keychain.conversations).find(
       (key) =>
-        key.conversationId === conversationId &&
-        key.peerIdentityId !== currentIdentityId,
+        sameValue(key.conversationId, conversationId) &&
+        !sameValue(key.peerIdentityId, currentIdentityId),
     )
   );
 }

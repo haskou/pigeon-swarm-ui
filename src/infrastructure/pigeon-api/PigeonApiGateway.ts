@@ -5,9 +5,11 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
+  SHA256Hash,
   StringValueObject,
   UUID,
 } from '@haskou/value-objects';
+import { Buffer } from 'buffer';
 
 import type { Peer } from '../../application/peers/ListPeers';
 import type {
@@ -1637,7 +1639,7 @@ export class PigeonApiGateway {
       chunks.push({
         cid: upload.cid,
         index,
-        sha256: await this.sha256Hex(chunk),
+        sha256: this.sha256Hex(chunk),
         size: upload.size,
       });
       onProgress?.({
@@ -1703,12 +1705,8 @@ export class PigeonApiGateway {
     return output.buffer;
   }
 
-  private async sha256Hex(bytes: ArrayBuffer): Promise<string> {
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-
-    return [...new Uint8Array(hash)]
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
+  private sha256Hex(bytes: ArrayBuffer): string {
+    return SHA256Hash.from(Buffer.from(bytes)).toString();
   }
 
   private async yieldToBrowser(delayMs = 0): Promise<void> {

@@ -4,6 +4,7 @@ import {
   PublicKey,
   UUID,
 } from '@haskou/value-objects';
+import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
 import {
   Fragment,
   type MouseEvent,
@@ -2720,6 +2721,8 @@ type CommunityChannelEnvelope = {
   recipients: Record<string, string>;
 };
 
+const gcmTagBytes = 16;
+
 async function encryptCommunityChannelPayload(input: {
   attachments: MessageAttachment[];
   authorIdentityId: string;
@@ -2730,14 +2733,9 @@ async function encryptCommunityChannelPayload(input: {
   recipients: IdentityResource[];
   timestamp: number;
 }): Promise<string> {
-  const key = await crypto.subtle.generateKey(
-    { length: 256, name: 'AES-GCM' },
-    true,
-    ['decrypt', 'encrypt'],
-  );
-  const rawKey = await crypto.subtle.exportKey('raw', key);
-  const rawKeyBase64 = bytesToBase64(new Uint8Array(rawKey));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = CryptoAdapter.randomBytes(32);
+  const rawKeyBase64 = bytesToBase64(key);
+  const iv = CryptoAdapter.randomBytes(12);
   const plaintext = new TextEncoder().encode(
     JSON.stringify({
       attachments: input.attachments,
@@ -2749,11 +2747,12 @@ async function encryptCommunityChannelPayload(input: {
       type: 'CommunityChannelMessageSent',
     }),
   );
-  const encrypted = await crypto.subtle.encrypt(
-    { iv, name: 'AES-GCM' },
+  const encrypted = CryptoAdapter.encryptAes256Gcm(
     key,
+    iv,
     plaintext,
   );
+  const ciphertext = concatBytes(encrypted.cipherText, encrypted.tag);
   const recipients: Record<string, string> = {};
 
   if (input.communityKey) {
@@ -2774,7 +2773,7 @@ async function encryptCommunityChannelPayload(input: {
 
   return JSON.stringify({
     algorithm: 'community-channel.v1',
-    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
+    ciphertext: bytesToBase64(ciphertext),
     iv: bytesToBase64(iv),
     recipients,
   } satisfies CommunityChannelEnvelope);
@@ -2823,17 +2822,12 @@ async function decryptCommunityEnvelope(
   envelope: CommunityChannelEnvelope,
   rawKeyBase64: string,
 ): Promise<CommunityChannelPlainPayload> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    bytesToArrayBuffer(base64ToBytes(rawKeyBase64)),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt'],
-  );
-  const decrypted = await crypto.subtle.decrypt(
-    { iv: bytesToArrayBuffer(base64ToBytes(envelope.iv)), name: 'AES-GCM' },
-    key,
-    bytesToArrayBuffer(base64ToBytes(envelope.ciphertext)),
+  const ciphertext = base64ToBytes(envelope.ciphertext);
+  const decrypted = CryptoAdapter.decryptAes256Gcm(
+    base64ToBytes(rawKeyBase64),
+    base64ToBytes(envelope.iv),
+    ciphertext.subarray(0, -gcmTagBytes),
+    ciphertext.subarray(-gcmTagBytes),
   );
 
   return JSON.parse(
@@ -2893,10 +2887,11 @@ function base64ToBytes(value: string): Uint8Array {
   return bytes;
 }
 
-function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copyBytes = new Uint8Array(bytes.byteLength);
+function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
+  const output = new Uint8Array(left.byteLength + right.byteLength);
 
-  copyBytes.set(bytes);
+  output.set(left);
+  output.set(right, left.byteLength);
 
-  return copyBytes.buffer;
+  return output;
 }
