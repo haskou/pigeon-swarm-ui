@@ -884,42 +884,33 @@ export function GlassWorkspace({
         return;
       }
 
-      let localStream: MediaStream | null = null;
-
       callActionInProgressRef.current = true;
       setSendError(null);
-      const localAudioRequest = requestLocalAudio();
 
-      void localAudioRequest
-        .then(async (stream) => {
-          localStream = stream;
-          await leaveCurrentCallForSwitch();
-          await cleanupJoinedCalls();
+      void (async () => {
+        await leaveCurrentCallForSwitch();
+        await cleanupJoinedCalls();
 
-          return await pigeonApplication.startCommunityChannelCall(
-            sessionRef.current,
-            activeCommunity.id,
-            channel.id,
-          );
-        })
-        .then(async (call) => {
-          const iceConfig = await loadCallIceConfig();
-          const currentIdentityId = sessionRef.current.identity.id;
-          const details = callDetailsForResource(call);
+        const call = await pigeonApplication.startCommunityChannelCall(
+          sessionRef.current,
+          activeCommunity.id,
+          channel.id,
+        );
+        const iceConfig = await loadCallIceConfig();
+        const currentIdentityId = sessionRef.current.identity.id;
+        const details = callDetailsForResource(call);
 
-          await startCall({
-            ...details,
-            call,
-            currentIdentityId,
-            iceConfig,
-            id: call.id,
-            localStream,
-            onSignal: callSignalSender(call.id),
-          });
-          playAnsweredCallSound();
-        })
+        await startCall({
+          ...details,
+          call,
+          currentIdentityId,
+          iceConfig,
+          id: call.id,
+          onSignal: callSignalSender(call.id),
+        });
+        playAnsweredCallSound();
+      })()
         .catch((caught) => {
-          stopLocalAudio(localStream);
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
         })
         .finally(() => {
@@ -936,7 +927,6 @@ export function GlassWorkspace({
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
-      requestLocalAudio,
       startCall,
     ],
   );
