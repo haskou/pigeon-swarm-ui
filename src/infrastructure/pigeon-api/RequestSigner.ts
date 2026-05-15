@@ -3,6 +3,8 @@ import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/types';
 
+import { API_SERVER_URL } from '../../config';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 
 type Clock = () => number;
@@ -29,7 +31,7 @@ export class RequestSigner {
     );
 
     return {
-      'X-Identity-Id': session.identity.id,
+      'X-Identity-Id': normalizeIdentityId(session.identity.id),
       'X-Nonce': nonce,
       'X-Signature': signature.toString(),
       'X-Timestamp': timestamp,
@@ -47,9 +49,38 @@ export class RequestSigner {
       bodyHash: this.bodyHash(body),
       method: method.toUpperCase(),
       nonce,
-      path: ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path),
+      path: this.signablePath(path),
       timestamp,
     });
+  }
+
+  private signablePath(path: string): string {
+    const requestPath = ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path);
+    const routePrefix = this.routePrefix();
+
+    if (
+      routePrefix === '/' ||
+      requestPath === routePrefix ||
+      requestPath.startsWith(`${routePrefix}/`)
+    ) {
+      return requestPath;
+    }
+
+    return `${routePrefix}${requestPath}`;
+  }
+
+  private routePrefix(): string {
+    if (!API_SERVER_URL) return '/';
+
+    if (/^https?:\/\//i.test(API_SERVER_URL)) {
+      const pathname = new URL(API_SERVER_URL).pathname;
+
+      return ApiUrlBuilder.normalizePath(ApiUrlBuilder.trimSlashes(pathname));
+    }
+
+    return ApiUrlBuilder.normalizePath(
+      ApiUrlBuilder.trimSlashes(API_SERVER_URL),
+    );
   }
 
   private bodyHash(body?: unknown): string {

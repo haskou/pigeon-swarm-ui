@@ -13,7 +13,6 @@ export class IdentitySignaturePayloadFactory {
   public createUpdate(input: {
     encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
     identity: IdentityResource;
-    previousIdentityExternalIdentifier: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
@@ -22,8 +21,6 @@ export class IdentitySignaturePayloadFactory {
         input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
       id: input.identity.id,
       networks: input.profile.networks ?? input.identity.networks,
-      previousIdentityExternalIdentifier:
-        input.previousIdentityExternalIdentifier,
       profile: {
         banner: input.profile.banner,
         biography: input.profile.biography,

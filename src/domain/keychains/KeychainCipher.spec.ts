@@ -3,7 +3,7 @@ import type { Session } from '../types';
 import { KeychainCipher } from './KeychainCipher';
 
 describe(KeychainCipher.name, () => {
-  it('signs keychain payloads with owner identity and undefined previous keychain', async () => {
+  it('signs only the canonical keychain domain payload', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
@@ -25,7 +25,6 @@ describe(KeychainCipher.name, () => {
 
     expect(JSON.parse(signaturePayload)).toEqual({
       encryptedPayload: 'encrypted',
-      ownerIdentityId: 'identity-1',
       timestamp: expect.any(Number),
       version: 1,
     });
@@ -39,7 +38,7 @@ describe(KeychainCipher.name, () => {
     });
   });
 
-  it('includes previous keychain external identifier in the signed payload when present', async () => {
+  it('keeps previous keychain external identifier out of the domain signature', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
@@ -58,8 +57,6 @@ describe(KeychainCipher.name, () => {
 
     expect(JSON.parse(signaturePayload)).toEqual({
       encryptedPayload: 'encrypted',
-      ownerIdentityId: 'identity-1',
-      previousKeychainExternalIdentifier: 'keychain-previous',
       timestamp: expect.any(Number),
       version: 2,
     });

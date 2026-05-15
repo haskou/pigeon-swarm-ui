@@ -866,16 +866,6 @@ export class PigeonApiGateway {
     newPassword?: string,
   ): Promise<IdentityResource> {
     const currentIdentity = await this.getIdentity(session.identity.id);
-    const previousIdentityExternalIdentifier =
-      currentIdentity.identityExternalIdentifier ??
-      currentIdentity.previousIdentityExternalIdentifier ??
-      session.identity.identityExternalIdentifier ??
-      session.identity.previousIdentityExternalIdentifier;
-
-    if (!previousIdentityExternalIdentifier) {
-      throw new Error(copy.profile.missingIdentityExternalIdentifier);
-    }
-
     const encryptedKeyPair = newPassword
       ? await this.reEncryptKeyPair(session, newPassword)
       : undefined;
@@ -883,7 +873,6 @@ export class PigeonApiGateway {
     const unsigned = this.identitySignatures.createUpdate({
       encryptedKeyPair,
       identity: currentIdentity,
-      previousIdentityExternalIdentifier,
       profile,
       timestamp: Date.now(),
     });
@@ -892,8 +881,13 @@ export class PigeonApiGateway {
       session.password,
     );
     const body = {
-      ...unsigned,
+      encryptedKeyPair: unsigned.encryptedKeyPair,
+      id: unsigned.id,
+      networks: unsigned.networks,
+      profile: unsigned.profile,
       signature: signature.toString(),
+      timestamp: unsigned.timestamp,
+      version: unsigned.version,
     };
 
     return await this.http.request<IdentityResource>(path, {

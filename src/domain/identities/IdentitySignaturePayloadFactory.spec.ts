@@ -19,7 +19,6 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     const payload = new IdentitySignaturePayloadFactory().createUpdate({
       identity,
-      previousIdentityExternalIdentifier: 'cid-1',
       profile: {
         banner: 'banner-cid',
         biography: undefined,
@@ -34,7 +33,6 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       'encryptedKeyPair',
       'id',
       'networks',
-      'previousIdentityExternalIdentifier',
       'profile',
       'timestamp',
       'version',
@@ -43,7 +41,6 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       encryptedKeyPair: identity.encryptedKeyPair,
       id: 'identity-1',
       networks: ['network-1'],
-      previousIdentityExternalIdentifier: 'cid-1',
       profile: {
         banner: 'banner-cid',
         biography: undefined,

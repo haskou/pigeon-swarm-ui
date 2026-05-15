@@ -447,9 +447,16 @@ describe(PigeonApiGateway.name, () => {
     ];
     const body = JSON.parse(putInit.body as string) as IdentityResource;
 
-    expect(body.previousIdentityExternalIdentifier).toBe(
-      'current-identity-cid',
-    );
+    expect(body).not.toHaveProperty('previousIdentityExternalIdentifier');
+    expect(Object.keys(body)).toEqual([
+      'encryptedKeyPair',
+      'id',
+      'networks',
+      'profile',
+      'signature',
+      'timestamp',
+      'version',
+    ]);
     expect(body.version).toBe(8);
     expect(body.signature).toBe('identity-signature');
     const [signedPayload, signedPassword] = (
@@ -463,7 +470,6 @@ describe(PigeonApiGateway.name, () => {
       encryptedKeyPair: currentIdentity.encryptedKeyPair,
       id: currentIdentity.id,
       networks: currentIdentity.networks,
-      previousIdentityExternalIdentifier: 'current-identity-cid',
       profile: {
         biography: 'Hi',
         handle: 'ada',

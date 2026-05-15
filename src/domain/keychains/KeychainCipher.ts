@@ -10,6 +10,12 @@ type PublishedKeychainPayload = {
   version: number;
 };
 
+type KeychainDomainSignaturePayload = {
+  encryptedPayload: string;
+  timestamp: number;
+  version: number;
+};
+
 export class KeychainCipher {
   public async decrypt(
     session: Session,
@@ -41,16 +47,13 @@ export class KeychainCipher {
     const encryptedPayload = session.encryptedKeyPair
       .encrypt(JSON.stringify(keychain))
       .toString();
-    const previousKeychainExternalIdentifier =
-      session.keychainExternalIdentifier ?? undefined;
+    const domainPayload: KeychainDomainSignaturePayload = {
+      encryptedPayload,
+      timestamp,
+      version,
+    };
     const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        encryptedPayload,
-        ownerIdentityId: session.identity.id,
-        previousKeychainExternalIdentifier,
-        timestamp,
-        version,
-      }),
+      JSON.stringify(domainPayload),
       session.password,
     );
 
