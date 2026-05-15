@@ -261,6 +261,7 @@ export function GlassWorkspace({
     endCall,
     receiveSignal,
     reconcileCall,
+    setParticipantVolume,
     startCall,
     toggleDeafen,
     toggleMute,
@@ -2295,6 +2296,7 @@ export function GlassWorkspace({
                   onCreate={() => setIsCreateOpen(true)}
                   onClose={() => setSidebarOpen(false)}
                   onCallEnd={leaveActiveCall}
+                  onCallParticipantVolumeChange={setParticipantVolume}
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
                   onLogout={() => setSession(null)}
@@ -2410,6 +2412,7 @@ export function GlassWorkspace({
             nodeNetworks={nodeNetworks}
             activeCall={activeCall}
             onCallEnd={leaveActiveCall}
+            onCallParticipantVolumeChange={setParticipantVolume}
             onCallToggleDeafen={toggleDeafen}
             onCallToggleMute={toggleMute}
             realtimeEvent={communityRealtimeEvent}

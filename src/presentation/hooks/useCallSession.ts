@@ -58,6 +58,7 @@ export function useCallSession(): {
     >,
   ) => void;
   startCall: (input: StartCallInput) => Promise<void>;
+  setParticipantVolume: (identityId: string, volumePercent: number) => void;
   toggleDeafen: () => void;
   toggleMute: () => void;
 } {
@@ -145,6 +146,7 @@ export function useCallSession(): {
       channelId: input.channelId,
       communityId: input.communityId,
       conversationId: input.conversationId,
+      currentIdentityId: input.currentIdentityId,
       id: input.id,
       kind: input.kind,
       participants: input.participants,
@@ -265,6 +267,7 @@ export function useCallSession(): {
       {
         ...input,
         call,
+        currentIdentityId,
         deafened: activeCallRef.current?.deafened ?? false,
         hasMicrophone: activeCallRef.current?.hasMicrophone ?? false,
         id: call.id,
@@ -367,11 +370,19 @@ export function useCallSession(): {
     });
   };
 
+  const setParticipantVolume = (
+    identityId: string,
+    volumePercent: number,
+  ) => {
+    peerManager.setPeerVolume(identityId, volumePercent);
+  };
+
   return {
     activeCall,
     endCall,
     receiveSignal,
     reconcileCall,
+    setParticipantVolume,
     startCall,
     toggleDeafen,
     toggleMute,

@@ -97,6 +97,10 @@ interface CommunityWorkspaceProps {
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
   onCallEnd?: () => void;
+  onCallParticipantVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
   onLogout: () => void;
@@ -182,6 +186,7 @@ export function CommunityWorkspace({
   onCommunityLeft,
   onCommunityUpdated,
   onCallEnd,
+  onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
   onLogout,
@@ -1372,6 +1377,7 @@ export function CommunityWorkspace({
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
               onCallEnd={onCallEnd}
+              onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
               onLogout={onLogout}

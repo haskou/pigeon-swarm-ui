@@ -13,6 +13,10 @@ import { dialingCallSoundUrl, playAnsweredCallSound } from '../../utils/sounds';
 interface GlobalCallBarProps {
   call: CallSession;
   onEnd: () => void;
+  onParticipantVolumeChange: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
 }
@@ -20,6 +24,7 @@ interface GlobalCallBarProps {
 export function GlobalCallBar({
   call,
   onEnd,
+  onParticipantVolumeChange,
   onToggleDeafen,
   onToggleMute,
 }: GlobalCallBarProps) {
@@ -148,6 +153,7 @@ export function GlobalCallBar({
             onClose={() => setStageOpen(false)}
             onDataToggle={() => setDataOpen((isOpen) => !isOpen)}
             onEnd={onEnd}
+            onParticipantVolumeChange={onParticipantVolumeChange}
             onToggleDeafen={onToggleDeafen}
             onToggleMute={onToggleMute}
             subtitle={subtitle}
@@ -198,6 +204,7 @@ function CallStageDialog({
   onClose,
   onDataToggle,
   onEnd,
+  onParticipantVolumeChange,
   onToggleDeafen,
   onToggleMute,
   subtitle,
@@ -207,6 +214,10 @@ function CallStageDialog({
   onClose: () => void;
   onDataToggle: () => void;
   onEnd: () => void;
+  onParticipantVolumeChange: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   subtitle: string;
@@ -271,6 +282,9 @@ function CallStageDialog({
             {call.participants.map((participant) => (
               <ParticipantTile
                 key={participant.identityId}
+                call={call}
+                onParticipantVolumeChange={onParticipantVolumeChange}
+                onToggleMute={onToggleMute}
                 participant={participant}
               />
             ))}
@@ -315,21 +329,28 @@ function CallStageDialog({
 }
 
 function ParticipantTile({
+  call,
+  onParticipantVolumeChange,
+  onToggleMute,
   participant,
 }: {
+  call: CallSession;
+  onParticipantVolumeChange: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
+  onToggleMute: () => void;
   participant: CallSession['participants'][number];
 }) {
-  const audioPercent =
-    participant.audioLevel === undefined
-      ? null
-      : Math.min(100, Math.round(participant.audioLevel * 100));
+  const [volumePercent, setVolumePercent] = useState(100);
+  const isCurrentIdentity = participant.identityId === call.currentIdentityId;
   const latencyLabel =
     participant.latencyMs === undefined ? '—' : `${participant.latencyMs} ms`;
   const packetLossLabel =
     participant.packetsLost === undefined
       ? '—'
       : String(participant.packetsLost);
-  const audioLabel = audioPercent === null ? '—' : `${audioPercent}%`;
+  const connectionLabel = callParticipantStatus(participant, call);
   const participantHandle = participant.identity?.profile.handle?.trim();
   const participantSubtitle = participantHandle
     ? `@${participantHandle}`
@@ -338,6 +359,22 @@ function ParticipantTile({
     participant.identity?.profile.name?.trim() ||
     participant.name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() ||
     participantSubtitle;
+  const muted = isCurrentIdentity ? call.muted : volumePercent === 0;
+
+  const updateVolume = (nextVolume: number) => {
+    setVolumePercent(nextVolume);
+    if (!isCurrentIdentity) {
+      onParticipantVolumeChange(participant.identityId, nextVolume);
+    }
+  };
+  const toggleParticipantMute = () => {
+    if (isCurrentIdentity) {
+      onToggleMute();
+      return;
+    }
+
+    updateVolume(volumePercent === 0 ? 100 : 0);
+  };
 
   return (
     <article
@@ -370,30 +407,57 @@ function ParticipantTile({
         </p>
       </div>
       <div className="mt-1 flex min-h-5 flex-wrap justify-center gap-1.5 text-[0.65rem] text-white/45">
-        {participant.muted && (
-          <span className="rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-fuchsia-100">
-            {copy.calls.muted}
-          </span>
-        )}
-        {participant.connectionState && (
-          <span className="rounded-full bg-white/10 px-2 py-0.5">
-            {participant.connectionState}
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={toggleParticipantMute}
+          disabled={isCurrentIdentity && !call.hasMicrophone}
+          className={cx(
+            'rounded-full px-2 py-0.5 font-black transition',
+            muted
+              ? 'bg-fuchsia-500/25 text-fuchsia-100 hover:bg-fuchsia-500/35'
+              : 'bg-white/10 text-white/65 hover:bg-white/15 hover:text-white',
+            isCurrentIdentity &&
+              !call.hasMicrophone &&
+              'cursor-not-allowed opacity-40',
+          )}
+        >
+          {muted ? copy.calls.unmute : copy.calls.mute}
+        </button>
       </div>
-      <div className="mt-auto h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-emerald-300 transition-all"
-          style={{ width: `${audioPercent ?? 0}%` }}
+      <label className="mt-auto w-full text-left text-[0.65rem] font-black text-white/55">
+        <span className="flex items-center justify-between gap-2">
+          <span>Volume</span>
+          <span className="text-white/85">{volumePercent}%</span>
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={250}
+          step={5}
+          value={isCurrentIdentity ? 100 : volumePercent}
+          disabled={isCurrentIdentity}
+          onChange={(event) => updateVolume(Number(event.target.value))}
+          className="mt-2 h-2 w-full accent-emerald-300 disabled:cursor-not-allowed disabled:opacity-35"
         />
-      </div>
+      </label>
       <dl className="mt-2 grid w-full grid-cols-3 gap-1.5 text-left text-[0.58rem]">
-        <Metric label="Audio" value={audioLabel} />
+        <Metric label="Status" value={connectionLabel} />
         <Metric label="Latency" value={latencyLabel} />
         <Metric label="Lost" value={packetLossLabel} />
       </dl>
     </article>
   );
+}
+
+function callParticipantStatus(
+  participant: CallSession['participants'][number],
+  call: CallSession,
+): string {
+  if (participant.identityId === call.currentIdentityId) return call.status;
+  if (participant.connectionState) return participant.connectionState;
+  if (participant.status) return participant.status;
+
+  return call.status;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
