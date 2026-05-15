@@ -2,9 +2,9 @@ import {
   EncryptedPayload,
   PrivateKey,
   PublicKey,
+  StringValueObject,
   UUID,
 } from '@haskou/value-objects';
-import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
 import {
   Fragment,
   type MouseEvent,
@@ -16,7 +16,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -41,11 +40,13 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import {
-  communityChannels,
   communityTextChannels,
   communityVoiceChannels,
-  splitCommunityChannels,
 } from '../../domain/communities/communityChannels';
+import {
+  decryptCommunityChannelPayload,
+  encryptCommunityChannelPayload,
+} from '../../domain/communities/communityChannelPayloadCipher';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import {
@@ -53,14 +54,8 @@ import {
   isSameDay,
   shortId,
 } from '../../utils/formatting';
-import {
-  identityName,
-  identityPicture,
-  profilePictureDataUrl,
-} from '../../utils/identityDisplay';
-import { normalizeIdentityId } from '../../utils/identityId';
+import { identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
@@ -75,6 +70,14 @@ import {
 } from '../workspace/MessageContextMenu';
 import { RawMessageDialog } from '../workspace/RawMessageDialog';
 import { UserProfileDropdown } from '../workspace/Sidebar';
+import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
+import { VoiceIcon } from './communityDialogPrimitives';
+import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import {
+  memberDisplayName,
+  memberPrimaryName,
+} from './communityMemberNames';
+import { ManageCommunityDialog } from './ManageCommunityDialog';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -378,7 +381,14 @@ export function CommunityWorkspace({
         decrypted.toString(),
       ) as Partial<ConversationKeyEntry>;
 
-      if (parsed.conversationId !== community.id || !parsed.privateKey) {
+      if (
+        !parsed.conversationId ||
+        new StringValueObject(
+          parsed.conversationId,
+          Number.MAX_SAFE_INTEGER,
+        ).isNotEqual(new StringValueObject(community.id, Number.MAX_SAFE_INTEGER)) ||
+        !parsed.privateKey
+      ) {
         throw new Error(copy.chat.addPrivateKeyError);
       }
 
@@ -698,6 +708,7 @@ export function CommunityWorkspace({
         const payload = await decryptCommunityChannelPayload(
           session,
           rawMessage.encryptedPayload ?? '',
+          copy.messages.missingKey,
         );
 
         return {
@@ -1751,668 +1762,6 @@ export function CommunityWorkspace({
   );
 }
 
-function ManageCommunityDialog({
-  community,
-  onClose,
-  onCommunityUpdated,
-  session,
-}: {
-  community: Community;
-  onClose: () => void;
-  onCommunityUpdated: (community: Community) => void;
-  session: Session;
-}) {
-  type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
-
-  const [name, setName] = useState(community.name);
-  const [description, setDescription] = useState(community.description);
-  const [avatar, setAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [banner, setBanner] = useState<File | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [channelName, setChannelName] = useState('');
-  const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
-  const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
-    communityChannels(community),
-  );
-  const [deletedChannelIds, setDeletedChannelIds] = useState<string[]>([]);
-  const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        communityChannels(community).map((channel) => [
-          channel.id,
-          channel.name,
-        ]),
-      ),
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const bannerInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!avatar) {
-      setAvatarPreview(null);
-
-      return undefined;
-    }
-
-    const nextPreview = URL.createObjectURL(avatar);
-
-    setAvatarPreview(nextPreview);
-
-    return () => URL.revokeObjectURL(nextPreview);
-  }, [avatar]);
-
-  useEffect(() => {
-    if (!banner) {
-      setBannerPreview(null);
-
-      return undefined;
-    }
-
-    const nextPreview = URL.createObjectURL(banner);
-
-    setBannerPreview(nextPreview);
-
-    return () => URL.revokeObjectURL(nextPreview);
-  }, [banner]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setCurrentAvatarUrl(null);
-    if (!community.avatar) return undefined;
-
-    void loadPublicImage(community.avatar).then((url) => {
-      if (!cancelled) setCurrentAvatarUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.avatar]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setCurrentBannerUrl(null);
-    if (!community.banner) return undefined;
-
-    void loadPublicImage(community.banner).then((url) => {
-      if (!cancelled) setCurrentBannerUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.banner]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const saveChanges = async (): Promise<boolean> => {
-    if (state === 'loading') return false;
-
-    if (
-      channelOrder.some(
-        (channel) => !(channelDrafts[channel.id] ?? channel.name).trim(),
-      )
-    ) {
-      setError(copy.communities.channelError);
-
-      return false;
-    }
-
-    setState('loading');
-    setError(null);
-    try {
-      let updatedCommunity = await pigeonApplication.updateCommunity(
-        session,
-        community.id,
-        {
-          avatar: avatar ?? community.avatar,
-          banner: banner ?? community.banner,
-          description: description.trim(),
-          name: name.trim(),
-        },
-      );
-
-      for (const channelId of deletedChannelIds) {
-        updatedCommunity = await pigeonApplication.deleteCommunityChannel(
-          session,
-          community.id,
-          channelId,
-        );
-      }
-
-      const updatedChannels: CommunityChannel[] = [];
-
-      for (const channel of channelOrder) {
-        const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
-
-        if (channel.pending) {
-          updatedChannels.push(
-            channel.type === 'text'
-              ? await pigeonApplication.createCommunityTextChannel(
-                  session,
-                  community.id,
-                  nextName,
-                )
-              : await pigeonApplication.createCommunityVoiceChannel(
-                  session,
-                  community.id,
-                  nextName,
-                ),
-          );
-        } else if (nextName === channel.name) {
-          updatedChannels.push(channel);
-        } else {
-          updatedChannels.push(
-            await pigeonApplication.renameCommunityChannel(
-              session,
-              community.id,
-              channel.id,
-              nextName,
-            ),
-          );
-        }
-      }
-
-      onCommunityUpdated({
-        ...updatedCommunity,
-        ...splitCommunityChannels(updatedChannels),
-      });
-      return true;
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.updateError));
-      return false;
-    } finally {
-      setState('idle');
-    }
-  };
-
-  const finishManage = async () => {
-    const saved = await saveChanges();
-
-    if (!saved) return;
-    onClose();
-  };
-
-  const createChannel = () => {
-    const nextName = channelName.trim();
-
-    if (!nextName || state === 'loading') return;
-
-    setError(null);
-    const channel: ManagedCommunityChannel =
-      channelType === 'text'
-        ? {
-            createdAt: Date.now(),
-            id: draftChannelId(),
-            name: nextName,
-            pending: true,
-            type: 'text',
-          }
-        : {
-            connectedIdentityIds: [],
-            createdAt: Date.now(),
-            id: draftChannelId(),
-            name: nextName,
-            pending: true,
-            type: 'voice',
-          };
-
-    setChannelName('');
-    setChannelOrder((current) => [...current, channel]);
-    setChannelDrafts((current) => ({
-      ...current,
-      [channel.id]: channel.name,
-    }));
-  };
-
-  const moveChannel = (channelId: string, direction: -1 | 1) => {
-    const index = channelOrder.findIndex((channel) => channel.id === channelId);
-    const nextIndex = index + direction;
-
-    if (index < 0 || nextIndex < 0 || nextIndex >= channelOrder.length) return;
-
-    const nextChannels = [...channelOrder];
-    const [channel] = nextChannels.splice(index, 1);
-
-    nextChannels.splice(nextIndex, 0, channel);
-    setChannelOrder(nextChannels);
-  };
-
-  const deleteChannel = (channel: ManagedCommunityChannel) => {
-    if (
-      channel.type === 'text' &&
-      !window.confirm(copy.communities.deleteChannelConfirm)
-    )
-      return;
-
-    setChannelOrder((current) =>
-      current.filter((candidate) => candidate.id !== channel.id),
-    );
-    setChannelDrafts((current) => {
-      const { [channel.id]: _deleted, ...remaining } = current;
-
-      return remaining;
-    });
-
-    if (!channel.pending) {
-      setDeletedChannelIds((current) =>
-        current.includes(channel.id) ? current : [...current, channel.id],
-      );
-    }
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-[2rem]">
-        <DialogHeader title={copy.communities.manage} onClose={onClose} />
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
-            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
-                aria-label={copy.communities.banner}
-              >
-                {bannerPreview || currentBannerUrl ? (
-                  <img
-                    src={bannerPreview ?? currentBannerUrl ?? ''}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
-                    {community.name.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                  ✎
-                </span>
-              </button>
-              <div className="relative px-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
-                  aria-label={copy.communities.avatar}
-                >
-                  {avatarPreview || currentAvatarUrl ? (
-                    <img
-                      src={avatarPreview ?? currentAvatarUrl ?? ''}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    community.name.slice(0, 1).toUpperCase()
-                  )}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                    ✎
-                  </span>
-                </button>
-                <div className="mt-4 grid gap-3">
-                  <input
-                    aria-label={copy.communities.name}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                  <textarea
-                    aria-label={copy.communities.description}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                </div>
-              </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-                className="sr-only"
-              />
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
-                className="sr-only"
-              />
-            </div>
-
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
-              <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.channels}
-              </div>
-              <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
-                {channelOrder.map((channel, index) => (
-                  <div
-                    key={channel.id}
-                    className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
-                  >
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/8 text-white/55">
-                      {channel.type === 'voice' ? <VoiceIcon /> : '#'}
-                    </span>
-                    <input
-                      value={channelDrafts[channel.id] ?? channel.name}
-                      onChange={(event) =>
-                        setChannelDrafts((current) => ({
-                          ...current,
-                          [channel.id]: event.target.value,
-                        }))
-                      }
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
-                    />
-                    <span className="hidden rounded-xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
-                      {channel.type === 'voice'
-                        ? copy.communities.voiceChannel
-                        : copy.communities.textChannel}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => moveChannel(channel.id, -1)}
-                      disabled={index === 0}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.moveChannelUp}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveChannel(channel.id, 1)}
-                      disabled={index === channelOrder.length - 1}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.moveChannelDown}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteChannel(channel)}
-                      disabled={state === 'loading'}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.deleteChannel}
-                      title={copy.communities.deleteChannel}
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
-                {(['text', 'voice'] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setChannelType(type)}
-                    className={cx(
-                      'rounded-xl px-3 py-2 text-xs font-black transition',
-                      channelType === type
-                        ? 'bg-white text-slate-950'
-                        : 'text-white/55 hover:bg-white/10',
-                    )}
-                  >
-                    {type === 'voice'
-                      ? copy.communities.voiceChannel
-                      : copy.communities.textChannel}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={channelName}
-                  onChange={(event) => setChannelName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    void createChannel();
-                  }}
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.communities.addChannelPlaceholder}
-                />
-                <button
-                  type="button"
-                  onClick={() => void createChannel()}
-                  disabled={!channelName.trim() || state === 'loading'}
-                  className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-          {error && (
-            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-              {error}
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => void finishManage()}
-          disabled={!name.trim() || state === 'loading'}
-          className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.profile.save}
-        </button>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function AddCommunityMemberDialog({
-  communityId,
-  onClose,
-  onCommunityUpdated,
-  onSessionUpdated,
-  session,
-}: {
-  communityId: string;
-  onClose: () => void;
-  onCommunityUpdated: (community: Community) => void;
-  onSessionUpdated: (session: Session) => void;
-  session: Session;
-}) {
-  const [identityInput, setIdentityInput] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'ready'>(
-    'idle',
-  );
-  const [memberIdentity, setMemberIdentity] = useState<IdentityResource | null>(
-    null,
-  );
-  const [memberPictureUrl, setMemberPictureUrl] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
-    const identityId = normalizeIdentityLookup(identityInput);
-
-    setError(null);
-    setMemberIdentity(null);
-    setMemberPictureUrl(null);
-
-    if (!identityId) {
-      setLookupState('idle');
-
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    setLookupState('loading');
-    const timeout = window.setTimeout(() => {
-      void pigeonApplication
-        .getIdentity(identityId)
-        .then((identity) => {
-          if (cancelled) return;
-
-          setMemberIdentity(identity);
-          setLookupState('ready');
-
-          void loadIdentityPicture(identity).then((picture) => {
-            if (!cancelled) setMemberPictureUrl(picture);
-          });
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setLookupState('idle');
-        });
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [identityInput]);
-
-  const addMember = async () => {
-    const identityId = memberIdentity?.id;
-
-    if (!identityId || state === 'loading') return;
-
-    setState('loading');
-    setError(null);
-    try {
-      const result = await pigeonApplication.createCommunityInvitation(
-        session,
-        communityId,
-        identityId,
-      );
-      if (
-        result.keychain !== session.keychain ||
-        result.keychainExternalIdentifier !== session.keychainExternalIdentifier
-      ) {
-        onSessionUpdated({
-          ...session,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        });
-      }
-      onCommunityUpdated(
-        await pigeonApplication.getCommunity(session, communityId),
-      );
-      onClose();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.memberError));
-    }
-    setState('idle');
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label={copy.dialog.close}
-      />
-      <section className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]">
-        <DialogHeader title={copy.communities.addMember} onClose={onClose} />
-        <Field label={copy.communities.memberIdentity}>
-          <input
-            autoFocus
-            value={identityInput}
-            onChange={(event) => setIdentityInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return;
-              event.preventDefault();
-              void addMember();
-            }}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-            placeholder="@ada or identity id"
-          />
-        </Field>
-        {lookupState === 'loading' && (
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
-            {copy.dialog.loadingIdentity}
-          </div>
-        )}
-        {memberIdentity && lookupState === 'ready' && (
-          <IdentityPreviewCard
-            identity={memberIdentity}
-            pictureUrl={memberPictureUrl}
-          />
-        )}
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-            {error}
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => void addMember()}
-          disabled={!memberIdentity || state === 'loading'}
-          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.communities.addMember}
-        </button>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function IdentityPreviewCard({
-  identity,
-  pictureUrl,
-}: {
-  identity: IdentityResource;
-  pictureUrl: null | string;
-}) {
-  const name = identityName(identity) ?? shortId(identity.id);
-  const handle = identity.profile.handle
-    ? `@${identity.profile.handle}`
-    : identity.id;
-
-  return (
-    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-        {pictureUrl ? (
-          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          name.slice(0, 1).toUpperCase()
-        )}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-black">{name}</p>
-        <p className="truncate text-xs text-white/45">{handle}</p>
-      </div>
-    </div>
-  );
-}
-
 function VoiceChannelButton({
   active,
   channel,
@@ -2496,61 +1845,6 @@ function VoiceChannelButton({
   );
 }
 
-function VoiceIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-      <path
-        d="M4 9.5v5h3.2L12 18.2V5.8L7.2 9.5H4Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-      <path
-        d="M9 4h6m-9 4h12m-10 0 .7 11h6.6L16 8M10 11v5m4-5v5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function DialogHeader({
-  onClose,
-  title,
-}: {
-  onClose: () => void;
-  title: string;
-}) {
-  return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-      <button
-        type="button"
-        onClick={onClose}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-        aria-label={copy.dialog.close}
-      >
-        ×
-      </button>
-    </div>
-  );
-}
-
 function MemberRow({
   identity,
   identityId,
@@ -2627,50 +1921,6 @@ function ChannelMessageSkeleton() {
   );
 }
 
-function normalizeIdentityLookup(value: string): string {
-  const trimmed = value.trim();
-
-  return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
-}
-
-function draftChannelId(): string {
-  return `draft:${UUID.generate().toString()}`;
-}
-
-async function loadIdentityPicture(
-  identity: IdentityResource,
-): Promise<string | null> {
-  const directPicture = identityPicture(identity);
-
-  if (directPicture) return directPicture;
-
-  const pictureCid = identity.profile.picture?.trim();
-
-  if (!pictureCid) return null;
-
-  try {
-    return await loadPublicImage(pictureCid);
-  } catch {
-    return null;
-  }
-}
-
-async function loadPublicImage(cid: string): Promise<string | null> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const content = await pigeonApplication.getPublicFile(cid);
-
-      return profilePictureDataUrl(content);
-    } catch {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, 250 * (attempt + 1)),
-      );
-    }
-  }
-
-  return null;
-}
-
 function resolveCommunityChannelId(
   channelId: null | string | undefined,
   channels: CommunityTextChannel[],
@@ -2680,159 +1930,6 @@ function resolveCommunityChannelId(
   }
 
   return channels[0]?.id ?? null;
-}
-
-function memberDisplayName(
-  identity: IdentityResource | undefined,
-  identityId: string,
-): string {
-  return identity
-    ? (identityName(identity) ?? shortId(identity.id))
-    : shortId(identityId);
-}
-
-function memberPrimaryName(
-  identity: IdentityResource | undefined,
-  identityId: string,
-): string {
-  const name = identity?.profile.name.trim();
-
-  if (name) return name;
-
-  const handle = identity?.profile.handle?.trim();
-
-  return handle ? `@${handle}` : shortId(identityId);
-}
-
-type CommunityChannelPlainPayload = {
-  attachments?: MessageAttachment[];
-  authorIdentityId?: string;
-  channelId?: string;
-  communityId?: string;
-  content?: string;
-  timestamp?: number;
-  type?: string;
-};
-
-type CommunityChannelEnvelope = {
-  algorithm: 'community-channel.v1';
-  ciphertext: string;
-  iv: string;
-  recipients: Record<string, string>;
-};
-
-const gcmTagBytes = 16;
-
-async function encryptCommunityChannelPayload(input: {
-  attachments: MessageAttachment[];
-  authorIdentityId: string;
-  channelId: string;
-  communityKey?: ConversationKeyEntry;
-  communityId: string;
-  content: string;
-  recipients: IdentityResource[];
-  timestamp: number;
-}): Promise<string> {
-  const key = CryptoAdapter.randomBytes(32);
-  const rawKeyBase64 = bytesToBase64(key);
-  const iv = CryptoAdapter.randomBytes(12);
-  const plaintext = new TextEncoder().encode(
-    JSON.stringify({
-      attachments: input.attachments,
-      authorIdentityId: input.authorIdentityId,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      content: input.content,
-      timestamp: input.timestamp,
-      type: 'CommunityChannelMessageSent',
-    }),
-  );
-  const encrypted = CryptoAdapter.encryptAes256Gcm(
-    key,
-    iv,
-    plaintext,
-  );
-  const ciphertext = concatBytes(encrypted.cipherText, encrypted.tag);
-  const recipients: Record<string, string> = {};
-
-  if (input.communityKey) {
-    recipients[input.communityId] = PublicKey.fromPEM(
-      input.communityKey.publicKey,
-    )
-      .encrypt(rawKeyBase64)
-      .toString();
-  }
-
-  for (const identity of input.recipients) {
-    recipients[identity.id] = PublicKey.fromPEM(
-      identity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(rawKeyBase64)
-      .toString();
-  }
-
-  return JSON.stringify({
-    algorithm: 'community-channel.v1',
-    ciphertext: bytesToBase64(ciphertext),
-    iv: bytesToBase64(iv),
-    recipients,
-  } satisfies CommunityChannelEnvelope);
-}
-
-async function decryptCommunityChannelPayload(
-  session: Session,
-  encryptedPayload: string,
-): Promise<CommunityChannelPlainPayload> {
-  const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
-  const wrappedKey =
-    envelope.recipients[session.identity.id] ??
-    envelope.recipients[normalizeIdentityId(session.identity.id)];
-
-  if (!wrappedKey) {
-    const communityRecipient = Object.values(session.keychain.conversations)
-      .map((keyEntry) => ({
-        keyEntry,
-        wrappedKey: envelope.recipients[keyEntry.conversationId],
-      }))
-      .find((entry) => entry.wrappedKey);
-
-    if (!communityRecipient?.wrappedKey) {
-      throw new Error(copy.messages.missingKey);
-    }
-
-    const rawCommunityKey = await PrivateKey.fromPEM(
-      communityRecipient.keyEntry.privateKey,
-    ).decrypt(new EncryptedPayload(communityRecipient.wrappedKey));
-
-    return await decryptCommunityEnvelope(
-      envelope,
-      new TextDecoder().decode(rawCommunityKey),
-    );
-  }
-
-  const rawKey = await session.encryptedKeyPair.decrypt(
-    new EncryptedPayload(wrappedKey),
-    session.password,
-  );
-
-  return await decryptCommunityEnvelope(envelope, rawKey.toString());
-}
-
-async function decryptCommunityEnvelope(
-  envelope: CommunityChannelEnvelope,
-  rawKeyBase64: string,
-): Promise<CommunityChannelPlainPayload> {
-  const ciphertext = base64ToBytes(envelope.ciphertext);
-  const decrypted = CryptoAdapter.decryptAes256Gcm(
-    base64ToBytes(rawKeyBase64),
-    base64ToBytes(envelope.iv),
-    ciphertext.subarray(0, -gcmTagBytes),
-    ciphertext.subarray(-gcmTagBytes),
-  );
-
-  return JSON.parse(
-    new TextDecoder().decode(decrypted),
-  ) as CommunityChannelPlainPayload;
 }
 
 function mergeChatMessages(
@@ -2864,34 +1961,4 @@ function realtimeMessageAttribute(
   const value = event.attributes.message;
 
   return value && typeof value === 'object' ? (value as MessageResource) : null;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
-  const output = new Uint8Array(left.byteLength + right.byteLength);
-
-  output.set(left);
-  output.set(right, left.byteLength);
-
-  return output;
 }

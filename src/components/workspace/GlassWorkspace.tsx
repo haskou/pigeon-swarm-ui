@@ -38,6 +38,7 @@ import {
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import { mergeMessages } from '../../domain/messages/mergeMessages';
 import {
   communityChannels,
   communityTextChannels,
@@ -75,75 +76,36 @@ import {
   type MessageContextMenuState,
 } from './MessageContextMenu';
 import { RawMessageDialog } from './RawMessageDialog';
+import {
+  callSignalTypeAttribute,
+  communityAttribute,
+  communityChannelAttribute,
+  eventAggregateId,
+  recordAttribute,
+  stringAttribute,
+} from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
+import {
+  communityUnreadStorageKey,
+  type CommunityUnreadCounts,
+  type ConversationDrafts,
+  draftsStorageKey,
+  initialConversationId,
+  lastConversationStorageKey,
+  loadCommunityUnreadCounts,
+  loadDrafts,
+  loadWorkspacePreference,
+  type WorkspacePreference,
+  workspaceStorageKey,
+} from './workspacePersistence';
 
 type LoadState = 'idle' | 'loading' | 'error';
-type ConversationDrafts = Record<string, string>;
-type WorkspacePreference = {
-  channelByCommunityId?: Record<string, string>;
-  communityId?: null | string;
-  mode?: 'community' | 'messages';
-};
-type CommunityUnreadCounts = Record<string, Record<string, number>>;
 type PendingSend = {
   attachments: File[];
   content: string;
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
-
-const lastConversationStorageKey = (identityId: string) =>
-  `pigeon:lastConversation:${identityId}`;
-const draftsStorageKey = (identityId: string) =>
-  `pigeon:conversationDrafts:${identityId}`;
-const workspaceStorageKey = (identityId: string) =>
-  `pigeon:workspace:${identityId}`;
-const communityUnreadStorageKey = (identityId: string) =>
-  `pigeon:communityUnread:${identityId}`;
-
-function initialConversationId(
-  conversations: ConversationResource[],
-  identityId: string,
-): string | null {
-  const storedId = globalThis.localStorage?.getItem(
-    lastConversationStorageKey(identityId),
-  );
-
-  return conversations.some((conversation) => conversation.id === storedId)
-    ? storedId
-    : (conversations[0]?.id ?? null);
-}
-
-function loadDrafts(identityId: string): ConversationDrafts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
-    ) as ConversationDrafts;
-  } catch {
-    return {};
-  }
-}
-
-function loadWorkspacePreference(identityId: string): WorkspacePreference {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
-    ) as WorkspacePreference;
-  } catch {
-    return {};
-  }
-}
-
-function loadCommunityUnreadCounts(identityId: string): CommunityUnreadCounts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
-        '{}',
-    ) as CommunityUnreadCounts;
-  } catch {
-    return {};
-  }
-}
 
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
@@ -2426,111 +2388,4 @@ export function GlassWorkspace({
       )}
     </section>
   );
-}
-
-function mergeMessages(
-  currentMessages: ChatMessage[],
-  incomingMessages: ChatMessage[],
-): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>();
-
-  for (const message of currentMessages) byId.set(message.id, message);
-  for (const message of incomingMessages) byId.set(message.id, message);
-
-  return [...byId.values()].sort(
-    (left, right) => left.timestamp - right.timestamp,
-  );
-}
-
-function stringAttribute(
-  event: RealtimeDomainEvent,
-  ...keys: string[]
-): string | undefined {
-  for (const key of keys) {
-    const value = event.attributes[key];
-
-    if (typeof value === 'string' && value.length > 0) return value;
-  }
-
-  return undefined;
-}
-
-function recordAttribute(
-  event: RealtimeDomainEvent,
-  key: string,
-): Record<string, unknown> | undefined {
-  const value = event.attributes[key];
-
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function communityChannelAttribute(
-  event: RealtimeDomainEvent,
-  key: string,
-): CommunityChannel | undefined {
-  const value = recordAttribute(event, key);
-
-  if (!value) return undefined;
-
-  const { id, name, type } = value;
-  const createdAt =
-    typeof value.createdAt === 'number' ? value.createdAt : Date.now();
-
-  if (typeof id !== 'string' || typeof name !== 'string') return undefined;
-
-  if (type === 'text') {
-    return { createdAt, id, name, type };
-  }
-
-  if (type === 'voice') {
-    const connectedIdentityIds = Array.isArray(value.connectedIdentityIds)
-      ? value.connectedIdentityIds.filter(
-          (identityId): identityId is string => typeof identityId === 'string',
-        )
-      : [];
-
-    return { connectedIdentityIds, createdAt, id, name, type };
-  }
-
-  return undefined;
-}
-
-function communityAttribute(
-  event: RealtimeDomainEvent,
-  key: string,
-): Community | undefined {
-  const value = recordAttribute(event, key);
-
-  return value &&
-    typeof value.id === 'string' &&
-    typeof value.networkId === 'string' &&
-    typeof value.ownerIdentityId === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.description === 'string' &&
-    Array.isArray(value.memberIds) &&
-    Array.isArray(value.textChannels)
-    ? (value as Community)
-    : undefined;
-}
-
-function callSignalTypeAttribute(
-  event: RealtimeDomainEvent,
-): CallSignalType | undefined {
-  const value = stringAttribute(event, 'signalType');
-
-  return value === 'answer' || value === 'ice_candidate' || value === 'offer'
-    ? value
-    : undefined;
-}
-
-function eventAggregateId(event: RealtimeDomainEvent): string | undefined {
-  const aggregateId =
-    event.aggregate_id ??
-    (event as RealtimeDomainEvent & { aggregateId?: string }).aggregateId;
-
-  return typeof aggregateId === 'string' && aggregateId.length > 0
-    ? aggregateId
-    : undefined;
 }
