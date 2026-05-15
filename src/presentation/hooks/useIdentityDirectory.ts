@@ -10,6 +10,7 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
+import { normalizeIdentityId } from '../../utils/identityId';
 import {
   identityName,
   identityPicture,
@@ -126,8 +127,7 @@ export function useIdentityDirectory({
 
     return [...ids].filter(
       (identityId) =>
-        !identityNames[identityId] &&
-        !resolvingIdentityIds.includes(identityId),
+        !identityNames[identityId] && !resolvingIdentityIds.includes(identityId),
     );
   }, [
     conversations,
@@ -212,7 +212,9 @@ function isResolvableIdentityId(
 
 async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
   try {
-    const identity = await pigeonApplication.getIdentity(identityId);
+    const identity = await pigeonApplication.getIdentity(
+      normalizeIdentityId(identityId),
+    );
     const picture = await loadIdentityPicture(identity).catch(() => null);
 
     return [
@@ -225,6 +227,7 @@ async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
     return [identityId, identityId, null, null] as const;
   }
 }
+
 
 async function loadIdentityPicture(
   identity: IdentityResource,

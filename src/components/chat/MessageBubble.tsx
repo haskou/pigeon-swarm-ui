@@ -91,6 +91,10 @@ export function MessageBubble({
       ),
     [indexedAttachments],
   );
+  const linkPreview = useMemo(
+    () => firstLinkPreview(message.content),
+    [message.content],
+  );
 
   useEffect(() => {
     if (!replyImage) {
@@ -267,12 +271,22 @@ export function MessageBubble({
           {message.content && (
             <p
               className={cx(
+                'whitespace-pre-wrap break-words',
                 message.attachments.length > 0 && 'mt-3',
                 message.encrypted && 'text-white/55',
               )}
             >
-              {message.content}
+              <MessageTextWithLinks content={message.content} mine={mine} />
             </p>
+          )}
+          {linkPreview && (
+            <LinkPreviewCard
+              description={linkPreview.description}
+              hostname={linkPreview.hostname}
+              mine={mine}
+              title={linkPreview.title}
+              url={linkPreview.url}
+            />
           )}
           <div
             className={cx(
@@ -314,6 +328,146 @@ export function MessageBubble({
       )}
     </>
   );
+}
+
+type LinkPreview = {
+  description: string;
+  hostname: string;
+  title: string;
+  url: string;
+};
+
+const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+
+function MessageTextWithLinks({
+  content,
+  mine,
+}: {
+  content: string;
+  mine: boolean;
+}) {
+  const parts = splitTextByLinks(content);
+
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.url ? (
+          <a
+            key={`${part.text}-${index}`}
+            href={part.url}
+            target="_blank"
+            rel="noreferrer"
+            className={cx(
+              'font-bold underline decoration-2 underline-offset-2',
+              mine
+                ? 'text-white decoration-white/50'
+                : 'text-cyan-200 decoration-cyan-200/50',
+            )}
+          >
+            {part.text}
+          </a>
+        ) : (
+          <span key={`${part.text}-${index}`}>{part.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function LinkPreviewCard({
+  description,
+  hostname,
+  mine,
+  title,
+  url,
+}: LinkPreview & { mine: boolean }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className={cx(
+        'mt-3 block overflow-hidden rounded-2xl border p-3 text-left transition hover:brightness-110',
+        mine
+          ? 'border-white/20 bg-white/10'
+          : 'border-white/10 bg-white/8',
+      )}
+    >
+      <span className="block truncate text-xs font-black uppercase text-white/45">
+        {hostname}
+      </span>
+      <span className="mt-1 block truncate text-sm font-black text-white">
+        {title}
+      </span>
+      <span className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
+        {description}
+      </span>
+    </a>
+  );
+}
+
+function firstLinkPreview(content: string): LinkPreview | null {
+  const match = content.match(urlPattern)?.[0];
+
+  if (!match) return null;
+
+  const cleaned = cleanTrailingUrlPunctuation(match);
+
+  try {
+    const url = new URL(cleaned);
+    const path = `${url.pathname}${url.search}`.replace(/^\/$/, '');
+
+    return {
+      description: path ? `${url.hostname}${path}` : url.origin,
+      hostname: url.hostname,
+      title: readableLinkTitle(url),
+      url: url.toString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function splitTextByLinks(
+  content: string,
+): Array<{ text: string; url?: string }> {
+  const parts: Array<{ text: string; url?: string }> = [];
+  let lastIndex = 0;
+
+  for (const match of content.matchAll(urlPattern)) {
+    const rawUrl = match[0];
+    const index = match.index ?? 0;
+    const cleanedUrl = cleanTrailingUrlPunctuation(rawUrl);
+
+    if (index > lastIndex) {
+      parts.push({ text: content.slice(lastIndex, index) });
+    }
+    parts.push({ text: cleanedUrl, url: cleanedUrl });
+    lastIndex = index + rawUrl.length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({ text: content.slice(lastIndex) });
+  }
+
+  return parts.length > 0 ? parts : [{ text: content }];
+}
+
+function cleanTrailingUrlPunctuation(value: string): string {
+  return value.replace(/[),.;:!?]+$/g, '');
+}
+
+function readableLinkTitle(url: URL): string {
+  const pathnameTitle = url.pathname
+    .split('/')
+    .filter(Boolean)
+    .pop()
+    ?.replace(/[-_]+/g, ' ')
+    .trim();
+
+  if (pathnameTitle) return pathnameTitle;
+
+  return url.hostname.replace(/^www\./, '');
 }
 
 function CallEventMessage({

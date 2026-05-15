@@ -2094,7 +2094,7 @@ export function GlassWorkspace({
           void fetchRealtimeMessage(
             conversationId,
             messageId,
-            isScrolledNearBottom() || authorId === session.identity.id,
+            isScrolledNearBottom(),
           );
         }
       }

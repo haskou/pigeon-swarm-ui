@@ -1,9 +1,6 @@
 import type { CallSignalType } from '../../domain/calls/CallSession';
-import {
-  logCallDebug,
-  logCallError,
-  logCallWarning,
-} from './callDebugLogger';
+
+import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 
 export type PeerMediaStats = {
   audioLevel?: number;
@@ -120,6 +117,7 @@ export class CallPeerConnectionManager {
         peerIdentityId,
         shouldOffer,
       });
+
       return;
     }
 
@@ -258,6 +256,7 @@ export class CallPeerConnectionManager {
           peerIdentityId,
           readyState: track.readyState,
         });
+
         if (this.localStream) peer.addTrack(track, this.localStream);
       });
     } else {
@@ -289,6 +288,7 @@ export class CallPeerConnectionManager {
         logCallDebug('peer-manager:ice-candidate:gathering-complete', {
           peerIdentityId,
         });
+
         return;
       }
 
@@ -311,6 +311,7 @@ export class CallPeerConnectionManager {
           0,
         ),
       });
+
       if (stream) this.playRemoteStream(peerIdentityId, stream);
     });
     this.peers.set(peerIdentityId, peer);

@@ -789,7 +789,7 @@ export function ChatColumn({
                           replyMessage?.content ?? message.replyPreview?.content
                         }
                         reserveAvatarSpace={false}
-                        showAvatar={false}
+                        showAvatar={isGroupConversation && startsNewAuthorRun}
                       />
                     </div>
                   </Fragment>
@@ -832,6 +832,7 @@ export function ChatColumn({
             disabled={messageState === 'loading' || !hasConversationKey}
             draft={draft}
             error={sendError ?? attachmentError}
+            focusKey={activeConversation.id}
             onDraftChange={onDraftChange}
             onEscape={onEscape}
             onSend={onSend}

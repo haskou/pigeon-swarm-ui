@@ -33,6 +33,7 @@ interface ComposerProps {
   onSend: (content: string, attachments: File[]) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
+  focusKey?: string | null;
   placeholder?: string;
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
@@ -44,6 +45,7 @@ export function Composer({
   disabled,
   draft,
   error,
+  focusKey,
   onDraftChange,
   onEscape,
   onSend,
@@ -115,6 +117,12 @@ export function Composer({
 
     textInputRef.current?.focus();
   }, [disabled, replyTo, sending]);
+
+  useEffect(() => {
+    if (!focusKey || disabled || sending) return;
+
+    requestAnimationFrame(() => textInputRef.current?.focus());
+  }, [disabled, focusKey, sending]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     setAttachmentError(null);

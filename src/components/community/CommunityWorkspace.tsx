@@ -54,6 +54,7 @@ import {
   isSameDay,
   shortId,
 } from '../../utils/formatting';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
@@ -607,7 +608,12 @@ export function CommunityWorkspace({
     void Promise.all(
       communityMemberIds.map(async (identityId) => {
         try {
-          const identity = await pigeonApplication.getIdentity(identityId);
+          const identity =
+            identityId === session.identity.id
+              ? session.identity
+              : await pigeonApplication.getIdentity(
+                  normalizeIdentityId(identityId),
+                );
           const pictureUrl = await loadIdentityPicture(identity);
 
           return [identityId, identity, pictureUrl] as const;
@@ -633,7 +639,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [communityMemberIds]);
+  }, [communityMemberIds, session.identity]);
 
   useEffect(() => {
     const avatar = community.avatar?.trim();
@@ -690,7 +696,7 @@ export function CommunityWorkspace({
         try {
           return [
             identityId,
-            await pigeonApplication.getIdentity(identityId),
+            await pigeonApplication.getIdentity(normalizeIdentityId(identityId)),
           ] as const;
         } catch {
           return [identityId, undefined] as const;
@@ -1113,9 +1119,7 @@ export function CommunityWorkspace({
 
     if (!message) return;
 
-    const shouldStickToBottom =
-      isScrolledNearBottom() ||
-      message.authorIdentityId === session.identity.id;
+    const shouldStickToBottom = isScrolledNearBottom();
     let cancelled = false;
 
     void resolveMemberIdentities()
@@ -1636,6 +1640,7 @@ export function CommunityWorkspace({
               disabled={messageState === 'loading' || !communityKey}
               draft={draft}
               error={sendError}
+              focusKey={selectedChannelId}
               onDraftChange={setDraft}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
