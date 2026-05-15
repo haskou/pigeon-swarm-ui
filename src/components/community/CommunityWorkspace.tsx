@@ -1825,6 +1825,7 @@ function VoiceChannelButton({
       muted: boolean;
       name: string;
       picture?: null | string;
+      speaking?: boolean;
     },
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
@@ -1833,6 +1834,7 @@ function VoiceChannelButton({
     muted: boolean;
     name: string;
     picture?: null | string;
+    speaking?: boolean;
   }>;
 }) {
   return (
@@ -1863,9 +1865,21 @@ function VoiceChannelButton({
               key={participant.identityId}
               type="button"
               onClick={(event) => onParticipantClick(participant, event)}
-              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm text-white/55 transition hover:bg-white/8 hover:text-white"
+              className={cx(
+                'flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
+                active && participant.speaking
+                  ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
+                  : 'border-transparent text-white/55',
+              )}
             >
-              <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+              <div
+                className={cx(
+                  'grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950',
+                  active &&
+                    participant.speaking &&
+                    'ring-2 ring-emerald-200/60',
+                )}
+              >
                 {participant.picture ? (
                   <img
                     src={participant.picture}
