@@ -353,6 +353,7 @@ export const copy = {
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
     retrySend: 'Retry',
+    searchReaction: 'Search emoji',
     sendFailed: 'Failed',
     sending: 'Sending',
     viewRaw: 'View raw',

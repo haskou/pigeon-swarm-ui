@@ -543,6 +543,16 @@ export function CommunityWorkspace({
         : {},
     [memberPictures, session.identity.id],
   );
+  const reactionAuthorNames = useMemo(
+    () =>
+      Object.fromEntries(
+        community.memberIds.map((identityId) => [
+          identityId,
+          memberDisplayName(memberIdentities[identityId], identityId),
+        ]),
+      ),
+    [community.memberIds, memberIdentities],
+  );
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
       const identity =
@@ -1675,6 +1685,7 @@ export function CommunityWorkspace({
                               }
                               onReplyReferenceClick={handleReplyReferenceClick}
                               onRetryMessage={retryChannelMessage}
+                              reactionAuthorNames={reactionAuthorNames}
                               replyImage={
                                 replyMessage?.attachments.find((attachment) =>
                                   isBrowserPreviewImage(

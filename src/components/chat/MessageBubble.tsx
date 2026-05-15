@@ -35,6 +35,7 @@ interface MessageBubbleProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
+  reactionAuthorNames?: Record<string, string>;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -59,6 +60,7 @@ export function MessageBubble({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  reactionAuthorNames = {},
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -76,7 +78,6 @@ export function MessageBubble({
     images: LightboxImage[];
     index: number;
   } | null>(null);
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indexedAttachments = useMemo(
@@ -103,8 +104,13 @@ export function MessageBubble({
     [message.content],
   );
   const reactionGroups = useMemo(
-    () => groupMessageReactions(message.reactions, currentIdentityId),
-    [currentIdentityId, message.reactions],
+    () =>
+      groupMessageReactions(
+        message.reactions,
+        currentIdentityId,
+        reactionAuthorNames,
+      ),
+    [currentIdentityId, message.reactions, reactionAuthorNames],
   );
 
   useEffect(() => {
@@ -195,6 +201,7 @@ export function MessageBubble({
             'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
               message.attachments.length === 0 &&
+              reactionGroups.length === 0 &&
               'flex items-end gap-2',
             mine
               ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
@@ -328,17 +335,12 @@ export function MessageBubble({
             )}
             <span>{formatTime(message.timestamp)}</span>
           </div>
-          {onReactionToggle && (
+          {reactionGroups.length > 0 && (
             <MessageReactions
               groups={reactionGroups}
-              onPickerToggle={() =>
-                setReactionPickerOpen((isOpen) => !isOpen)
-              }
               onToggle={(emoji, reacted) => {
-                onReactionToggle(message, emoji, reacted);
-                setReactionPickerOpen(false);
+                onReactionToggle?.(message, emoji, reacted);
               }}
-              pickerOpen={reactionPickerOpen}
             />
           )}
         </div>
@@ -355,23 +357,18 @@ export function MessageBubble({
 }
 
 type ReactionGroup = {
+  authors: string[];
   count: number;
   emoji: string;
   reacted: boolean;
 };
 
-const messageReactionOptions = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
-
 function MessageReactions({
   groups,
-  onPickerToggle,
   onToggle,
-  pickerOpen,
 }: {
   groups: ReactionGroup[];
-  onPickerToggle: () => void;
   onToggle: (emoji: string, reacted: boolean) => void;
-  pickerOpen: boolean;
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -381,46 +378,18 @@ function MessageReactions({
           key={group.emoji}
           onClick={() => onToggle(group.emoji, group.reacted)}
           className={cx(
-            'rounded-full border px-2 py-0.5 text-xs font-black transition',
+            'rounded-full border px-2 py-0.5 text-xs font-black transition hover:brightness-110',
             group.reacted
-              ? 'border-white/40 bg-white/20 text-white'
+              ? 'border-sky-300/40 bg-sky-500/35 text-sky-50'
               : 'border-white/10 bg-black/15 text-white/75 hover:bg-white/10',
           )}
           aria-label={`${group.emoji} ${group.count}`}
+          title={group.authors.join(', ')}
         >
           <span>{group.emoji}</span>
           <span className="ml-1">{group.count}</span>
         </button>
       ))}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={onPickerToggle}
-          className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-xs font-black text-white/70 transition hover:bg-white/10 hover:text-white"
-          aria-label={copy.messages.addReaction}
-        >
-          +
-        </button>
-        {pickerOpen && (
-          <div className="absolute bottom-full right-0 z-10 mb-1 flex gap-1 rounded-2xl border border-white/10 bg-[#15172d] p-1 shadow-2xl shadow-black/35">
-            {messageReactionOptions.map((emoji) => {
-              const group = groups.find((item) => item.emoji === emoji);
-
-              return (
-                <button
-                  type="button"
-                  key={emoji}
-                  onClick={() => onToggle(emoji, group?.reacted ?? false)}
-                  className="grid h-8 w-8 place-items-center rounded-xl text-base transition hover:bg-white/10"
-                  aria-label={`${copy.messages.addReaction} ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -428,16 +397,19 @@ function MessageReactions({
 function groupMessageReactions(
   reactions: ChatMessage['reactions'],
   currentIdentityId: string,
+  authorNames: Record<string, string>,
 ): ReactionGroup[] {
   const byEmoji = new Map<string, ReactionGroup>();
 
   for (const reaction of reactions) {
     const current = byEmoji.get(reaction.emoji) ?? {
+      authors: [],
       count: 0,
       emoji: reaction.emoji,
       reacted: false,
     };
 
+    current.authors.push(authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId);
     current.count += 1;
     current.reacted =
       current.reacted || reaction.authorIdentityId === currentIdentityId;

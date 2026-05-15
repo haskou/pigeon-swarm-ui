@@ -174,6 +174,16 @@ export function ChatColumn({
   const [groupInviteInput, setGroupInviteInput] = useState('');
   const [groupInviteError, setGroupInviteError] = useState<string | null>(null);
   const [groupInviteLoading, setGroupInviteLoading] = useState(false);
+  const reactionAuthorNames = useMemo(
+    () => ({
+      ...identityNames,
+      [session.identity.id]:
+        session.identity.profile.name.trim() ||
+        identityNames[session.identity.id] ||
+        session.identity.id,
+    }),
+    [identityNames, session.identity.id, session.identity.profile.name],
+  );
   const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
@@ -779,6 +789,7 @@ export function ChatColumn({
                         onReactionToggle={onReactionToggle}
                         onReplyReferenceClick={onReplyReferenceClick}
                         onRetryMessage={onRetryMessage}
+                        reactionAuthorNames={reactionAuthorNames}
                         replyImage={
                           replyMessage?.attachments.find((attachment) =>
                             isBrowserPreviewImage(attachment.contentType),

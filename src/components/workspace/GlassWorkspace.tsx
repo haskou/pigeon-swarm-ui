@@ -2674,6 +2674,7 @@ export function GlassWorkspace({
 
       {messageContextMenu && (
         <MessageContextMenu
+          currentIdentityId={session.identity.id}
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
           onDelete={
@@ -2685,6 +2686,9 @@ export function GlassWorkspace({
             setReplyTarget(messageContextMenu.message);
             setMessageContextMenu(null);
           }}
+          onReactionToggle={(message, emoji, reacted) =>
+            void handleToggleMessageReaction(message, emoji, reacted)
+          }
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
