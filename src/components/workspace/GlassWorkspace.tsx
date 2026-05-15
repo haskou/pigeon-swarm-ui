@@ -2111,8 +2111,8 @@ export function GlassWorkspace({
   });
 
   return (
-    <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
-      <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+    <section className="relative z-10 min-h-full">
+      <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100dvh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}

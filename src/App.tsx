@@ -69,7 +69,7 @@ function App() {
 
   if (nodeNetworks.error && !session) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
+      <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
         <ServerConnectionScreen
           error={nodeNetworks.error}
@@ -82,7 +82,7 @@ function App() {
   // If we're still loading, show a loading state
   if ((!session && nodeNetworks.loading) || restoreState === 'loading') {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white flex items-center justify-center">
+      <main className="app-viewport relative flex items-center justify-center overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
         <div className="text-xl">{copy.app.loading}</div>
       </main>
@@ -91,7 +91,7 @@ function App() {
 
   if (!session && nodeNetworks.networks.length === 0 && !nodeNetworks.error) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
+      <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
         <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
       </main>
@@ -99,7 +99,7 @@ function App() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#080a25] text-white">
+    <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
       <BackgroundGlow />
       {!session ? (
         <AuthScreen
