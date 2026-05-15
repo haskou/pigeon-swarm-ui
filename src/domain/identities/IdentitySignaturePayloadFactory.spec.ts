@@ -9,7 +9,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         encryptedPrivateKey: 'encrypted',
         publicKey: 'public',
       },
-      id: 'identity-1',
+      id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
       networks: ['network-1'],
       profile: { name: 'Ada' },
       signature: 'signature',
@@ -19,11 +19,13 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     const payload = new IdentitySignaturePayloadFactory().createUpdate({
       identity,
+      previousIdentityExternalIdentifier: 'cid-1',
       profile: {
         banner: 'banner-cid',
         biography: undefined,
         handle: 'ada',
         name: 'Ada Updated',
+        networks: ['network-2', 'network-1'],
         picture: undefined,
       },
       timestamp: 2,
@@ -33,6 +35,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       'encryptedKeyPair',
       'id',
       'networks',
+      'previousIdentityExternalIdentifier',
       'profile',
       'timestamp',
       'version',
@@ -40,7 +43,8 @@ describe(IdentitySignaturePayloadFactory.name, () => {
     expect(payload).toEqual({
       encryptedKeyPair: identity.encryptedKeyPair,
       id: 'identity-1',
-      networks: ['network-1'],
+      networks: ['network-1', 'network-2'],
+      previousIdentityExternalIdentifier: 'cid-1',
       profile: {
         banner: 'banner-cid',
         biography: undefined,
