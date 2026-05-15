@@ -515,8 +515,8 @@ function callEventDirection(
   if (!actorIdentityId) return null;
 
   return actorIdentityId === currentIdentityId
-    ? copy.calls.outgoingCallDirection
-    : copy.calls.incomingCallDirection;
+    ? copy.calls.incomingCallDirection
+    : copy.calls.outgoingCallDirection;
 }
 
 function callEventLabel(eventType: MessageResource['callEventType']): string {
