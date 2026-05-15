@@ -474,7 +474,10 @@ export function ChatColumn({
           <button
             type="button"
             onClick={openConversationHeader}
-            disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
+            disabled={
+              !activeConversation ||
+              (!isGroupConversation && !canOpenPeerProfile)
+            }
             className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
             aria-label={activeConversationName ?? copy.chat.noConversation}
           >
@@ -497,7 +500,10 @@ export function ChatColumn({
               <button
                 type="button"
                 onClick={openConversationHeader}
-                disabled={!activeConversation || (!isGroupConversation && !canOpenPeerProfile)}
+                disabled={
+                  !activeConversation ||
+                  (!isGroupConversation && !canOpenPeerProfile)
+                }
                 className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
               >
                 {activeConversation
@@ -593,13 +599,15 @@ export function ChatColumn({
                           onStartCall({
                             conversationId: activeConversation.id,
                             kind: 'one-to-one',
-                            participants: groupParticipants.map((participant) => ({
-                              identity: participant.identity,
-                              identityId: participant.identityId,
-                              muted: false,
-                              name: participant.name,
-                              picture: participant.picture,
-                            })),
+                            participants: groupParticipants.map(
+                              (participant) => ({
+                                identity: participant.identity,
+                                identityId: participant.identityId,
+                                muted: false,
+                                name: participant.name,
+                                picture: participant.picture,
+                              }),
+                            ),
                             title:
                               activeConversationTitle ??
                               activeConversationName ??
@@ -704,7 +712,6 @@ export function ChatColumn({
                 )}
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1];
-                const nextMessage = messages[index + 1];
                 const replyMessage = message.replyToMessageId
                   ? messages.find(
                       (item) => item.id === message.replyToMessageId,
@@ -716,14 +723,13 @@ export function ChatColumn({
                 const startsNewAuthorRun =
                   !previousMessage ||
                   previousMessage.authorIdentityId !== message.authorIdentityId;
-                const showAvatar =
-                  !nextMessage ||
-                  nextMessage.authorIdentityId !== message.authorIdentityId;
 
                 return (
                   <Fragment key={message.id}>
                     {startsNewDay && (
-                      <DateSeparator label={formatDateSeparator(message.timestamp)} />
+                      <DateSeparator
+                        label={formatDateSeparator(message.timestamp)}
+                      />
                     )}
                     <div
                       className={
@@ -782,7 +788,8 @@ export function ChatColumn({
                         replyPreview={
                           replyMessage?.content ?? message.replyPreview?.content
                         }
-                        showAvatar={showAvatar}
+                        reserveAvatarSpace={false}
+                        showAvatar={false}
                       />
                     </div>
                   </Fragment>

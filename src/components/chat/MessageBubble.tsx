@@ -33,6 +33,7 @@ interface MessageBubbleProps {
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
+  reserveAvatarSpace?: boolean;
   showAvatar: boolean;
 }
 
@@ -55,6 +56,7 @@ export function MessageBubble({
   replyAuthorName,
   replyImage,
   replyPreview,
+  reserveAvatarSpace = true,
   showAvatar,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
@@ -164,9 +166,9 @@ export function MessageBubble({
               onClick={onAvatarClick}
               picture={authorPicture}
             />
-          ) : (
+          ) : reserveAvatarSpace ? (
             <div className="w-11 shrink-0" />
-          ))}
+          ) : null)}
         <div
           onContextMenu={handleContextMenu}
           onPointerCancel={clearLongPressTimer}
@@ -302,17 +304,6 @@ export function MessageBubble({
             <span>{formatTime(message.timestamp)}</span>
           </div>
         </div>
-        {mine &&
-          (showAvatar ? (
-            <Avatar
-              label={authorName}
-              mine
-              onClick={onAvatarClick}
-              picture={authorPicture}
-            />
-          ) : (
-            <div className="w-11 shrink-0" />
-          ))}
       </div>
       {lightbox && (
         <ImageLightbox
