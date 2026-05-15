@@ -177,7 +177,7 @@ export function AuthScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong app-screen rounded-none p-5 sm:min-h-0 sm:rounded-[2.5rem] sm:p-7"
+          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-[2.5rem] sm:p-7"
         >
           <SegmentedControl
             value={mode}
