@@ -887,7 +887,7 @@ export function GlassWorkspace({
       let localStream: MediaStream | null = null;
 
       callActionInProgressRef.current = true;
-      playAnsweredCallSound();
+      setSendError(null);
       const localAudioRequest = requestLocalAudio();
 
       void localAudioRequest
@@ -916,6 +916,7 @@ export function GlassWorkspace({
             localStream,
             onSignal: callSignalSender(call.id),
           });
+          playAnsweredCallSound();
         })
         .catch((caught) => {
           stopLocalAudio(localStream);
