@@ -396,6 +396,22 @@ export class PigeonApplication {
     return await this.gateway.acceptCommunityInviteLink(session, inviteToken);
   }
 
+  public async acceptCommunityInviteLinkWithKey(
+    session: Session,
+    inviteToken: string,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<{
+    community: Community;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    return await this.gateway.acceptCommunityInviteLinkWithKey(
+      session,
+      inviteToken,
+      keyEntry,
+    );
+  }
+
   public async listCommunityMembers(
     session: Session,
     communityId: string,

@@ -489,28 +489,28 @@ export function GlassWorkspace({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      const acceptedCommunity = await pigeonApplication.acceptCommunityInviteLink(
-        sessionRef.current,
-        pendingCommunityInvite.token,
-      );
       let nextSession = sessionRef.current;
+      let acceptedCommunity;
 
       if (pendingCommunityInvite.keyEntry) {
-        const published = await pigeonApplication.publishKeychain(nextSession, {
-          ...nextSession.keychain,
-          conversations: {
-            ...nextSession.keychain.conversations,
-            [pendingCommunityInvite.keyEntry.conversationId]:
-              pendingCommunityInvite.keyEntry,
-          },
-        });
+        const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
+          nextSession,
+          pendingCommunityInvite.token,
+          pendingCommunityInvite.keyEntry,
+        );
 
+        acceptedCommunity = accepted.community;
         nextSession = {
           ...nextSession,
-          keychain: published.keychain,
-          keychainExternalIdentifier: published.keychainExternalIdentifier,
+          keychain: accepted.keychain,
+          keychainExternalIdentifier: accepted.keychainExternalIdentifier,
         };
         setSession(nextSession);
+      } else {
+        acceptedCommunity = await pigeonApplication.acceptCommunityInviteLink(
+          nextSession,
+          pendingCommunityInvite.token,
+        );
       }
 
       setCommunities((current) => [

@@ -368,6 +368,194 @@ describe(PigeonApiGateway.name, () => {
     expect(result.keychainExternalIdentifier).toBe('keychain-next');
   });
 
+  it('accepts group invitations by publishing the decrypted keychain entry', async () => {
+    const keyEntry = {
+      conversationId: 'group:conversation',
+      createdAt: 1,
+      peerIdentityId: 'identity-2',
+      privateKey: 'private-key',
+      publicKey: 'public-key',
+    };
+    const updatedNotification = {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'accepted',
+      status: 'read',
+      type: 'group_conversation_invitation',
+    } as const;
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce(updatedNotification),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const session = {
+      encryptedKeyPair: {
+        decrypt: jest.fn().mockResolvedValue({
+          toString: () => JSON.stringify(keyEntry),
+        }),
+      },
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptConversationInvitation(session, {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
+    });
+
+    expect(keychains.encryptForPublish).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        conversations: {
+          'group:conversation': keyEntry,
+        },
+        version: 1,
+      }),
+    );
+    expect(http.request).toHaveBeenNthCalledWith(1, '/keychains/', {
+      body: JSON.stringify({ encryptedPayload: 'encrypted-keychain' }),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(result.keychain.conversations['group:conversation']).toEqual(
+      keyEntry,
+    );
+    expect(result.keychainExternalIdentifier).toBe('keychain-next');
+    expect(result.notification).toBe(updatedNotification);
+  });
+
+  it('publishes the community invite link key before accepting the invite', async () => {
+    const keyEntry = {
+      conversationId: 'community-1',
+      createdAt: 1,
+      peerIdentityId: '',
+      privateKey: 'private-key',
+      publicKey: 'public-key',
+    };
+    const community = {
+      createdAt: 1,
+      description: 'Description',
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Community',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-2',
+      textChannels: [],
+      visibility: 'private',
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptCommunityInviteLinkWithKey(
+      session,
+      'invite-token',
+      keyEntry,
+    );
+
+    expect(keychains.encryptForPublish).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        conversations: {
+          'community-1': keyEntry,
+        },
+        version: 1,
+      }),
+    );
+    expect(http.request).toHaveBeenNthCalledWith(1, '/keychains/', {
+      body: JSON.stringify({ encryptedPayload: 'encrypted-keychain' }),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(
+      2,
+      '/communities/invites/invite-token/accept',
+      {
+        body: JSON.stringify({}),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+    expect(result.community).toBe(community);
+    expect(result.keychain.conversations['community-1']).toEqual(keyEntry);
+    expect(result.keychainExternalIdentifier).toBe('keychain-next');
+  });
+
   it('does not project deleted messages when loading conversation messages', async () => {
     const http = {
       request: jest.fn().mockResolvedValue({

@@ -783,6 +783,33 @@ export class PigeonApiGateway {
     });
   }
 
+  public async acceptCommunityInviteLinkWithKey(
+    session: Session,
+    inviteToken: string,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<{
+    community: Community;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
+    const published = await this.publishKeychain(session, nextKeychain);
+    const community = await this.acceptCommunityInviteLink(
+      {
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      },
+      inviteToken,
+    );
+
+    return {
+      community,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
   public async createIdentity(
     name: string,
     password: string,

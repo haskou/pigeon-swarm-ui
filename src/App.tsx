@@ -16,6 +16,7 @@ import {
 import { useCommunities } from './presentation/hooks/useCommunities';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 import { usePeers } from './presentation/hooks/usePeers';
+import { requestPwaNotificationPermission } from './presentation/notifications/PwaNotifications';
 import {
   clearCommunityInviteUrl,
   parseCommunityInviteUrl,
@@ -73,6 +74,10 @@ function App() {
   const handleNetworkCreated = () => {
     window.location.reload();
   };
+
+  useEffect(() => {
+    void requestPwaNotificationPermission();
+  }, []);
 
   if (nodeNetworks.error && !session) {
     return (
