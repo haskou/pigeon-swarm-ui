@@ -10,8 +10,8 @@ import { cx } from '../../utils/classNameHelper';
 import { formatTime, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
-  identityName,
   type IdentityNames,
+  type IdentityPictures,
 } from '../../utils/identityDisplay';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
@@ -19,11 +19,13 @@ type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 interface NotificationsPanelProps {
   action: NotificationAction | null;
   communities: Community[];
+  communityAvatarUrls: Record<string, string>;
   communityPreviews: Record<string, Community>;
   conversations: ConversationResource[];
   error: string | null;
   notifications: NotificationResource[];
   identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
   onAccept: (notification: NotificationResource) => void;
   onArchive: (notificationId: string) => void;
@@ -74,10 +76,12 @@ function notificationTarget(notification: NotificationResource): {
 export function NotificationsPanel({
   action,
   communities,
+  communityAvatarUrls,
   communityPreviews,
   conversations,
   error,
   identityNames,
+  identityPictures,
   identityProfiles,
   notifications,
   onAccept,
@@ -131,8 +135,10 @@ export function NotificationsPanel({
             const preview = notificationPreview(notification, {
               communities,
               communityPreviews,
+              communityAvatarUrls,
               conversations,
               identityNames,
+              identityPictures,
               identityProfiles,
             });
             const inviterIdentityId =
@@ -175,15 +181,18 @@ export function NotificationsPanel({
                 </div>
 
                 <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
-                  <div className="mb-3 border-b border-white/10 pb-3">
-                    <div className="text-sm font-black text-white/85">
-                      {preview.title}
-                    </div>
-                    {preview.subtitle && (
-                      <div className="mt-1 line-clamp-2 text-xs font-semibold text-white/50">
-                        {preview.subtitle}
+                  <div className="mb-3 flex items-center gap-3 border-b border-white/10 pb-3">
+                    <PreviewAvatar preview={preview} />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-white/85">
+                        {preview.title}
                       </div>
-                    )}
+                      {preview.subtitle && (
+                        <div className="mt-1 line-clamp-2 text-xs font-semibold text-white/50">
+                          {preview.subtitle}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>{target.label}</span>
@@ -237,16 +246,40 @@ export function NotificationsPanel({
   );
 }
 
+type NotificationPreview = {
+  avatarUrl?: string;
+  subtitle?: string;
+  title: string;
+};
+
+function PreviewAvatar({ preview }: { preview: NotificationPreview }) {
+  return (
+    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
+      {preview.avatarUrl ? (
+        <img
+          src={preview.avatarUrl}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        preview.title.slice(0, 1).toUpperCase()
+      )}
+    </div>
+  );
+}
+
 function notificationPreview(
   notification: NotificationResource,
   context: {
     communities: Community[];
+    communityAvatarUrls: Record<string, string>;
     communityPreviews: Record<string, Community>;
     conversations: ConversationResource[];
     identityNames: IdentityNames;
+    identityPictures: IdentityPictures;
     identityProfiles: Record<string, IdentityResource>;
   },
-): { subtitle?: string; title: string } {
+): NotificationPreview {
   if (notification.type === 'community_invitation') {
     const community =
       context.communityPreviews[notification.payload.communityId] ??
@@ -255,6 +288,7 @@ function notificationPreview(
       );
 
     return {
+      avatarUrl: context.communityAvatarUrls[notification.payload.communityId],
       subtitle:
         community?.description ||
         `${community?.memberIds.length ?? 0} ${copy.communities.members}`,
@@ -265,19 +299,10 @@ function notificationPreview(
   }
 
   if (notification.type === 'conversation_invitation') {
-    const identity =
-      context.identityProfiles[notification.payload.inviterIdentityId];
-    const displayName =
-      (identity ? identityName(identity) : null) ??
-      identityDisplayName(
-        notification.payload.inviterIdentityId,
-        context.identityNames,
-      );
-
-    return {
-      subtitle: shortId(notification.payload.inviterIdentityId),
-      title: displayName,
-    };
+    return identityNotificationPreview(
+      notification.payload.inviterIdentityId,
+      context,
+    );
   }
 
   if (notification.type === 'group_conversation_invitation') {
@@ -295,14 +320,55 @@ function notificationPreview(
   }
 
   if (notification.type === 'missed_call') {
+    const preview = identityNotificationPreview(
+      notification.payload.callerIdentityId,
+      context,
+    );
+
     return {
+      ...preview,
       subtitle: shortId(notification.payload.callId),
-      title: identityDisplayName(
-        notification.payload.callerIdentityId,
-        context.identityNames,
-      ),
     };
   }
 
   return { title: copy.notifications.invitationTitle };
+}
+
+function identityNotificationPreview(
+  identityId: string,
+  context: {
+    identityNames: IdentityNames;
+    identityPictures: IdentityPictures;
+    identityProfiles: Record<string, IdentityResource>;
+  },
+): NotificationPreview {
+  const identity = context.identityProfiles[identityId];
+  const name = identity?.profile.name.trim();
+  const handle = identity?.profile.handle?.trim();
+  const cachedName = splitCachedIdentityName(context.identityNames[identityId]);
+
+  return {
+    avatarUrl: context.identityPictures[identityId],
+    subtitle:
+      handle ? `@${handle}` : (cachedName.handle ?? shortId(identityId)),
+    title:
+      name ||
+      cachedName.name ||
+      (handle
+        ? `@${handle}`
+        : identityDisplayName(identityId, context.identityNames)),
+  };
+}
+
+function splitCachedIdentityName(value?: string): {
+  handle?: string;
+  name?: string;
+} {
+  if (!value) return {};
+
+  const match = /^(.*?)\s+\(@([^)]+)\)$/.exec(value.trim());
+
+  if (!match) return { name: value };
+
+  return { handle: `@${match[2]}`, name: match[1] };
 }

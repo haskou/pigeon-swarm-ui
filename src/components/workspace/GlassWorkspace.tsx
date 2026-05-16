@@ -77,6 +77,7 @@ import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
+import { loadPublicImage } from '../community/communityImages';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
@@ -267,6 +268,10 @@ export function GlassWorkspace({
   >([]);
   const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
     useState<Record<string, Community>>({});
+  const [
+    notificationCommunityAvatarUrls,
+    setNotificationCommunityAvatarUrls,
+  ] = useState<Record<string, string>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -549,6 +554,63 @@ export function GlassWorkspace({
       cancelled = true;
     };
   }, [communities, notificationCommunityPreviews, session, visibleNotifications]);
+
+  useEffect(() => {
+    const communityIds = [
+      ...new Set(
+        visibleNotifications
+          .filter(
+            (notification) => notification.type === 'community_invitation',
+          )
+          .map((notification) => notification.payload.communityId),
+      ),
+    ];
+    const communitiesById = new Map(
+      [...communities, ...Object.values(notificationCommunityPreviews)].map(
+        (community) => [community.id, community],
+      ),
+    );
+    const avatarEntries = communityIds
+      .map((communityId) => communitiesById.get(communityId))
+      .filter(
+        (community): community is Community =>
+          !!community?.avatar && !notificationCommunityAvatarUrls[community.id],
+      );
+
+    if (avatarEntries.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      avatarEntries.map((community) =>
+        loadPublicImage(community.avatar as string)
+          .then((url) => (url ? ([community.id, url] as const) : null))
+          .catch(() => null),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+
+      const loaded = results.filter(
+        (result): result is readonly [string, string] => result !== null,
+      );
+
+      if (loaded.length === 0) return;
+
+      setNotificationCommunityAvatarUrls((current) => ({
+        ...current,
+        ...Object.fromEntries(loaded),
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    communities,
+    notificationCommunityAvatarUrls,
+    notificationCommunityPreviews,
+    visibleNotifications,
+  ]);
 
   useEffect(() => {
     if (!pendingCommunityInvite) return;
@@ -2830,10 +2892,12 @@ export function GlassWorkspace({
         <NotificationsPanel
           action={notificationAction}
           communities={communities}
+          communityAvatarUrls={notificationCommunityAvatarUrls}
           communityPreviews={notificationCommunityPreviews}
           conversations={conversations}
           error={notificationError}
           identityNames={identityNames}
+          identityPictures={identityPictures}
           identityProfiles={identityProfiles}
           notifications={visibleNotifications}
           onAccept={(notification) => void acceptNotification(notification)}
