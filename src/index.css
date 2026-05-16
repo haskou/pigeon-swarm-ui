@@ -64,19 +64,6 @@ button, input, textarea { font: inherit; }
 .app-workspace {
   height: 100vh;
   height: 100dvh;
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-top: env(safe-area-inset-top);
-}
-
-@media (min-width: 640px) {
-  .app-workspace {
-    height: calc(100dvh - 1rem);
-    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
-    padding-left: max(env(safe-area-inset-left), 1rem);
-    padding-right: max(env(safe-area-inset-right), 1rem);
-  }
 }
 
 button:not(:disabled),
