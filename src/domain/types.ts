@@ -57,6 +57,14 @@ export type CommunityInvitationPayload = {
   recipientIdentityId: string;
 };
 
+export type CommunityInviteLinkResource = {
+  communityId?: string;
+  expiresAt?: string | null;
+  inviteToken?: string;
+  maxUses?: number;
+  token?: string;
+};
+
 export type MissedCallPayload = {
   callId: string;
   callerIdentityId: string;

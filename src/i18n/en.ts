@@ -152,6 +152,11 @@ export const copy = {
     leaveConfirm: 'Leave this community?',
     leaveError: 'The community could not be left.',
     leaving: 'Leaving...',
+    linkCopied: 'Invite link copied',
+    linkError: 'The invite link could not be created.',
+    linkHelp:
+      'Creates a one-use link. The community key is stored in the URL fragment and is not sent to the server.',
+    linkInvite: 'Invite by link',
     loadError: 'Communities could not be loaded.',
     manage: 'Manage community',
     memberError: 'The member could not be added.',

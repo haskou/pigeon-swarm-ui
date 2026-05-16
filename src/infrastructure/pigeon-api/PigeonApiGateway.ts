@@ -20,6 +20,7 @@ import type {
   ChatMessage,
   Community,
   CommunityChannel,
+  CommunityInviteLinkResource,
   CommunityTextChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -721,6 +722,65 @@ export class PigeonApiGateway {
     await this.addCommunityMember(session, communityId, recipientIdentity.id);
 
     return published;
+  }
+
+  public async createCommunityInviteLink(
+    session: Session,
+    communityId: string,
+    input: { expiresAt?: string; maxUses?: number } = {},
+  ): Promise<{
+    invite: CommunityInviteLinkResource;
+    keyEntry: ConversationKeyEntry;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    const existingKeyEntry = session.keychain.conversations[communityId];
+    const keyEntry =
+      existingKeyEntry ??
+      (await this.createGroupConversationKeyEntry(communityId));
+    const published =
+      existingKeyEntry && session.keychainExternalIdentifier
+        ? {
+            keychain: session.keychain,
+            keychainExternalIdentifier: session.keychainExternalIdentifier,
+          }
+        : await this.publishKeychain(
+            session,
+            this.withConversationKey(session.keychain, keyEntry),
+          );
+    const path = `/communities/${encodeURIComponent(communityId)}/invites`;
+    const body = {
+      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+      ...(input.maxUses ? { maxUses: input.maxUses } : {}),
+    };
+    const invite = await this.http.request<CommunityInviteLinkResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+
+    return {
+      invite,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+      keyEntry,
+    };
+  }
+
+  public async acceptCommunityInviteLink(
+    session: Session,
+    inviteToken: string,
+  ): Promise<Community> {
+    const path = `/communities/invites/${encodeURIComponent(
+      inviteToken,
+    )}/accept`;
+    const body = {};
+
+    return await this.http.request<Community>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
   }
 
   public async createIdentity(

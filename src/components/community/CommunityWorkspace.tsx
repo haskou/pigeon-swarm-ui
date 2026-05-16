@@ -29,6 +29,7 @@ import type {
   ChatMessage,
   IdentityResource,
   MessageAttachment,
+  MessageReplyPreview,
   MessageResource,
   Session,
 } from '../../domain/types';
@@ -48,17 +49,20 @@ import {
   encryptCommunityChannelPayload,
 } from '../../domain/communities/communityChannelPayloadCipher';
 import { copy } from '../../i18n/en';
+import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import {
   formatDateSeparator,
   isSameDay,
   shortId,
 } from '../../utils/formatting';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
+import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { MessageBubble } from '../chat/MessageBubble';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
@@ -93,6 +97,10 @@ interface CommunityWorkspaceProps {
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
   onCallEnd?: () => void;
+  onCallParticipantVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
   onLogout: () => void;
@@ -127,7 +135,25 @@ type CommunityPendingSend = {
   attachments: File[];
   channelId: string;
   content: string;
+  replyTarget: ChatMessage | null;
 };
+
+function replyPreviewFromMessage(
+  message?: ChatMessage | null,
+): MessageReplyPreview | undefined {
+  if (!message) return undefined;
+
+  const image = message.attachments.find((attachment) =>
+    isBrowserPreviewImage(attachment.contentType),
+  );
+
+  return {
+    authorIdentityId: message.authorIdentityId,
+    ...(message.content ? { content: message.content.slice(0, 180) } : {}),
+    ...(image ? { image } : {}),
+    messageId: message.id,
+  };
+}
 
 function profileAnchorFromTarget(
   target: HTMLElement | null | undefined,
@@ -160,6 +186,7 @@ export function CommunityWorkspace({
   onCommunityLeft,
   onCommunityUpdated,
   onCallEnd,
+  onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
   onLogout,
@@ -229,6 +256,7 @@ export function CommunityWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>
   >({});
@@ -607,7 +635,12 @@ export function CommunityWorkspace({
     void Promise.all(
       communityMemberIds.map(async (identityId) => {
         try {
-          const identity = await pigeonApplication.getIdentity(identityId);
+          const identity =
+            identityId === session.identity.id
+              ? session.identity
+              : await pigeonApplication.getIdentity(
+                  normalizeIdentityId(identityId),
+                );
           const pictureUrl = await loadIdentityPicture(identity);
 
           return [identityId, identity, pictureUrl] as const;
@@ -633,7 +666,7 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [communityMemberIds]);
+  }, [communityMemberIds, session.identity]);
 
   useEffect(() => {
     const avatar = community.avatar?.trim();
@@ -690,7 +723,7 @@ export function CommunityWorkspace({
         try {
           return [
             identityId,
-            await pigeonApplication.getIdentity(identityId),
+            await pigeonApplication.getIdentity(normalizeIdentityId(identityId)),
           ] as const;
         } catch {
           return [identityId, undefined] as const;
@@ -738,6 +771,7 @@ export function CommunityWorkspace({
           session,
           rawMessage.encryptedPayload ?? '',
           copy.messages.missingKey,
+          community.id,
         );
 
         return {
@@ -749,6 +783,8 @@ export function CommunityWorkspace({
           mine:
             (payload.authorIdentityId ?? base.authorIdentityId) ===
             session.identity.id,
+          replyPreview: payload.reply,
+          replyToMessageId: payload.replyToMessageId,
           timestamp: payload.timestamp ?? base.timestamp,
         };
       } catch {
@@ -865,7 +901,9 @@ export function CommunityWorkspace({
       attachments,
       channelId: selectedChannelId,
       content,
+      replyTarget,
     });
+    setReplyTarget(null);
 
     return Promise.resolve();
   };
@@ -900,6 +938,8 @@ export function CommunityWorkspace({
           id: optimisticId,
           type: 'sent',
         },
+        replyPreview: replyPreviewFromMessage(payload.replyTarget),
+        replyToMessageId: payload.replyTarget?.id,
         timestamp,
       },
     ]);
@@ -932,6 +972,8 @@ export function CommunityWorkspace({
           communityId: community.id,
           content: payload.content,
           recipients: Object.values(identities),
+          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyToMessageId: payload.replyTarget?.id,
           timestamp,
         });
         const created = await pigeonApplication.createCommunityChannelMessage(
@@ -980,6 +1022,32 @@ export function CommunityWorkspace({
 
     setMessages((current) => current.filter((item) => item.id !== message.id));
     void sendPendingChannelMessage(pending);
+  };
+
+  const scrollToChannelMessage = (messageId: string) => {
+    requestAnimationFrame(() => {
+      const element = scrollerRef.current?.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+
+      if (!element) return;
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('message-focus-ring');
+      window.setTimeout(
+        () => element.classList.remove('message-focus-ring'),
+        1600,
+      );
+    });
+  };
+
+  const handleReplyReferenceClick = (messageId: string) => {
+    if (messages.some((message) => message.id === messageId)) {
+      scrollToChannelMessage(messageId);
+      return;
+    }
+
+    setSendError(copy.messages.replyTargetNotFound);
   };
 
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
@@ -1035,16 +1103,15 @@ export function CommunityWorkspace({
   };
 
   useEffect(() => {
-    if (selectedChannelId === resolvedChannelId) return;
-
     setSelectedChannelId(resolvedChannelId);
+    setReplyTarget(null);
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
       onChannelViewedRef.current?.(resolvedChannelId);
       onChannelSelectedRef.current(resolvedChannelId);
     }
-  }, [resolvedChannelId, selectedChannelId]);
+  }, [resolvedChannelId]);
 
   useEffect(() => {
     if (!selectedChannelId) {
@@ -1057,6 +1124,10 @@ export function CommunityWorkspace({
 
     let cancelled = false;
 
+    setMessages([]);
+    setMessageCursor(null);
+    setReplyTarget(null);
+    setNewChannelMessageCount(0);
     setMessageLoadState('loading');
     setSendError(null);
     void loadChannelMessagesRef
@@ -1113,9 +1184,7 @@ export function CommunityWorkspace({
 
     if (!message) return;
 
-    const shouldStickToBottom =
-      isScrolledNearBottom() ||
-      message.authorIdentityId === session.identity.id;
+    const shouldStickToBottom = isScrolledNearBottom();
     let cancelled = false;
 
     void resolveMemberIdentities()
@@ -1308,6 +1377,7 @@ export function CommunityWorkspace({
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
               onCallEnd={onCallEnd}
+              onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
               onLogout={onLogout}
@@ -1489,7 +1559,7 @@ export function CommunityWorkspace({
                 className="h-full overflow-y-auto p-4 sm:p-6"
               >
                 {messageState === 'loading' && visibleMessages.length === 0 ? (
-                  <ChannelMessageSkeleton />
+                  <MessageListSkeleton />
                 ) : messageState === 'loading' ? (
                   <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
                     {copy.chat.loadingEvents}
@@ -1530,6 +1600,11 @@ export function CommunityWorkspace({
                     visibleMessages.map((message, index) => {
                       const previousMessage = visibleMessages[index - 1];
                       const nextMessage = visibleMessages[index + 1];
+                      const replyMessage = message.replyToMessageId
+                        ? visibleMessages.find(
+                            (item) => item.id === message.replyToMessageId,
+                          )
+                        : undefined;
                       const startsNewDay =
                         !previousMessage ||
                         !isSameDay(
@@ -1596,8 +1671,36 @@ export function CommunityWorkspace({
                                   y,
                                 })
                               }
-                              onReplyReferenceClick={() => undefined}
+                              onReplyReferenceClick={handleReplyReferenceClick}
                               onRetryMessage={retryChannelMessage}
+                              replyImage={
+                                replyMessage?.attachments.find((attachment) =>
+                                  isBrowserPreviewImage(
+                                    attachment.contentType,
+                                  ),
+                                ) ?? message.replyPreview?.image
+                              }
+                              replyAuthorName={
+                                replyMessage
+                                  ? memberDisplayName(
+                                      memberIdentities[
+                                        replyMessage.authorIdentityId
+                                      ],
+                                      replyMessage.authorIdentityId,
+                                    )
+                                  : message.replyPreview
+                                    ? memberDisplayName(
+                                        memberIdentities[
+                                          message.replyPreview.authorIdentityId
+                                        ],
+                                        message.replyPreview.authorIdentityId,
+                                      )
+                                    : undefined
+                              }
+                              replyPreview={
+                                replyMessage?.content ??
+                                message.replyPreview?.content
+                              }
                               showAvatar={showAvatar}
                             />
                           </div>
@@ -1636,10 +1739,21 @@ export function CommunityWorkspace({
               disabled={messageState === 'loading' || !communityKey}
               draft={draft}
               error={sendError}
+              focusKey={selectedChannelId}
+              onCancelReply={() => setReplyTarget(null)}
               onDraftChange={setDraft}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
               progress={attachmentProgress}
+              replyTo={replyTarget}
+              replyToAuthorName={
+                replyTarget
+                  ? memberDisplayName(
+                      memberIdentities[replyTarget.authorIdentityId],
+                      replyTarget.authorIdentityId,
+                    )
+                  : undefined
+              }
             />
           </>
         )}
@@ -1768,6 +1882,10 @@ export function CommunityWorkspace({
                   void handleDeleteChannelMessage(messageContextMenu.message)
               : undefined
           }
+          onReply={() => {
+            setReplyTarget(messageContextMenu.message);
+            setMessageContextMenu(null);
+          }}
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
@@ -1820,6 +1938,7 @@ function VoiceChannelButton({
       muted: boolean;
       name: string;
       picture?: null | string;
+      speaking?: boolean;
     },
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
@@ -1828,6 +1947,7 @@ function VoiceChannelButton({
     muted: boolean;
     name: string;
     picture?: null | string;
+    speaking?: boolean;
   }>;
 }) {
   return (
@@ -1858,9 +1978,21 @@ function VoiceChannelButton({
               key={participant.identityId}
               type="button"
               onClick={(event) => onParticipantClick(participant, event)}
-              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm text-white/55 transition hover:bg-white/8 hover:text-white"
+              className={cx(
+                'flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
+                active && participant.speaking
+                  ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
+                  : 'border-transparent text-white/55',
+              )}
             >
-              <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+              <div
+                className={cx(
+                  'grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950',
+                  active &&
+                    participant.speaking &&
+                    'ring-2 ring-emerald-200/60',
+                )}
+              >
                 {participant.picture ? (
                   <img
                     src={participant.picture}
@@ -1931,35 +2063,6 @@ function MemberRow({
         </span>
       )}
     </button>
-  );
-}
-
-function ChannelMessageSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[0, 1, 2, 3].map((item) => (
-        <div
-          key={item}
-          className={cx(
-            'flex animate-pulse items-end gap-2',
-            item % 2 === 0 ? 'justify-start' : 'justify-end',
-          )}
-        >
-          {item % 2 === 0 && (
-            <div className="h-9 w-9 rounded-2xl bg-white/10" />
-          )}
-          <div
-            className={cx(
-              'rounded-3xl bg-white/10',
-              item % 2 === 0 ? 'h-16 w-56' : 'h-12 w-44',
-            )}
-          />
-          {item % 2 !== 0 && (
-            <div className="h-9 w-9 rounded-2xl bg-white/10" />
-          )}
-        </div>
-      ))}
-    </div>
   );
 }
 

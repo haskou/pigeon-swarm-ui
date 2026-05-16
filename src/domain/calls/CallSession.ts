@@ -71,6 +71,7 @@ export type CallParticipant = {
 export type CallSession = {
   call?: CallResource;
   id: string;
+  currentIdentityId: string;
   communityId?: string;
   channelId?: string;
   conversationId?: string;

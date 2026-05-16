@@ -11,7 +11,6 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
 import {
-  identityName,
   identityPicture,
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
@@ -50,6 +49,10 @@ export function CreateConversationDialog({
   const [selectedNetworkId, setSelectedNetworkId] = useState('');
   const [groupName, setGroupName] = useState('');
   const [groupIdentityInput, setGroupIdentityInput] = useState('');
+  const [groupIdentityLookupState, setGroupIdentityLookupState] =
+    useState<IdentityLookupState>('idle');
+  const [groupIdentityPreview, setGroupIdentityPreview] =
+    useState<SelectedIdentity | null>(null);
   const [groupParticipants, setGroupParticipants] = useState<
     SelectedIdentity[]
   >([]);
@@ -89,7 +92,7 @@ export function CreateConversationDialog({
     value: networkId,
   }));
   const peerDisplayName = peerIdentity
-    ? (identityName(peerIdentity) ?? shortId(peerIdentity.id))
+    ? identityPrimaryName(peerIdentity)
     : null;
   const canSubmitDirect =
     !!peerIdentity && !!selectedNetworkId && state !== 'loading';
@@ -146,6 +149,46 @@ export function CreateConversationDialog({
       window.clearTimeout(timeout);
     };
   }, [peerIdentityId, session.identity.networks]);
+
+  useEffect(() => {
+    const identityLookup = normalizeIdentityLookup(groupIdentityInput);
+
+    setError(null);
+    setGroupIdentityPreview(null);
+
+    if (!identityLookup) {
+      setGroupIdentityLookupState('idle');
+
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    setGroupIdentityLookupState('loading');
+    const timeout = window.setTimeout(() => {
+      void pigeonApplication
+        .getIdentity(identityLookup)
+        .then((identity) => {
+          if (cancelled) return;
+
+          setGroupIdentityLookupState('ready');
+          setGroupIdentityPreview({ identity, pictureUrl: null });
+          void loadDialogIdentityPicture(identity).then((pictureUrl) => {
+            if (!cancelled) {
+              setGroupIdentityPreview({ identity, pictureUrl });
+            }
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setGroupIdentityLookupState('idle');
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [groupIdentityInput]);
 
   useEffect(() => {
     if (groupNetworkId && groupSharedNetworkIds.includes(groupNetworkId)) {
@@ -244,16 +287,14 @@ export function CreateConversationDialog({
   };
 
   const addGroupParticipant = async () => {
-    const identityLookup = normalizeIdentityLookup(groupIdentityInput);
+    const identity = groupIdentityPreview?.identity;
 
-    if (!identityLookup) return;
+    if (!identity) return;
 
     if (
-      identityLookup === session.identity.id ||
+      identity.id === session.identity.id ||
       groupParticipants.some(
-        ({ identity }) =>
-          identity.id === identityLookup ||
-          identity.profile.handle?.toLowerCase() === identityLookup,
+        (participant) => participant.identity.id === identity.id,
       )
     ) {
       setGroupIdentityInput('');
@@ -264,34 +305,19 @@ export function CreateConversationDialog({
     setState('loading');
     setError(null);
     try {
-      const identity = await pigeonApplication.getIdentity(identityLookup);
-
-      if (!identity) {
-        throw new Error(copy.errors.notFound);
-      }
-
-      const alreadyAdded =
-        identity.id === session.identity.id ||
-        groupParticipants.some(
-          (participant) => participant.identity.id === identity.id,
-        );
+      const alreadyAdded = groupParticipants.some(
+        (participant) => participant.identity.id === identity.id,
+      );
 
       if (!alreadyAdded) {
         setGroupParticipants((participants) => [
           ...participants,
-          { identity, pictureUrl: null },
+          groupIdentityPreview,
         ]);
-        void loadDialogIdentityPicture(identity).then((pictureUrl) => {
-          setGroupParticipants((participants) =>
-            participants.map((participant) =>
-              participant.identity.id === identity.id
-                ? { ...participant, pictureUrl }
-                : participant,
-            ),
-          );
-        });
       }
       setGroupIdentityInput('');
+      setGroupIdentityPreview(null);
+      setGroupIdentityLookupState('idle');
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.errors.notFound));
     }
@@ -362,6 +388,17 @@ export function CreateConversationDialog({
 
         {mode === 'direct' ? (
           <>
+            <div className="mt-2">
+              <Field label={copy.dialog.remoteIdentityId}>
+                <input
+                  value={peerIdentityId}
+                  onChange={(event) => setPeerIdentityId(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+                  autoComplete="off"
+                />
+              </Field>
+            </div>
             {lookupState === 'loading' && (
               <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
                 {copy.dialog.loadingIdentity}
@@ -375,17 +412,6 @@ export function CreateConversationDialog({
                 pictureUrl={peerPictureUrl}
               />
             )}
-            <div className="mt-2">
-              <Field label={copy.dialog.remoteIdentityId}>
-                <input
-                  value={peerIdentityId}
-                  onChange={(event) => setPeerIdentityId(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
-                  autoComplete="off"
-                />
-              </Field>
-            </div>
             {peerIdentity &&
               lookupState === 'ready' &&
               sharedNetworkIds.length === 0 && (
@@ -443,6 +469,18 @@ export function CreateConversationDialog({
                 </button>
               </div>
             </Field>
+            {groupIdentityLookupState === 'loading' && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
+                {copy.dialog.loadingIdentity}
+              </div>
+            )}
+            {groupIdentityPreview && (
+              <IdentityPreview
+                identity={groupIdentityPreview.identity}
+                name={identityPrimaryName(groupIdentityPreview.identity)}
+                pictureUrl={groupIdentityPreview.pictureUrl}
+              />
+            )}
 
             <div className="grid gap-2">
               <div className="text-sm font-black text-white/70">
@@ -455,7 +493,7 @@ export function CreateConversationDialog({
               ) : (
                 <div className="grid gap-2">
                   {groupParticipants.map(({ identity, pictureUrl }) => {
-                    const name = identityName(identity) ?? shortId(identity.id);
+                    const name = identityPrimaryName(identity);
 
                     return (
                       <div
@@ -466,9 +504,7 @@ export function CreateConversationDialog({
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-black">{name}</p>
                           <p className="truncate text-xs text-white/45">
-                            {identity.profile.handle
-                              ? `@${identity.profile.handle}`
-                              : identity.id}
+                            {identitySecondaryName(identity)}
                           </p>
                         </div>
                         <button
@@ -550,10 +586,22 @@ function IdentityPreview({
       <Avatar name={name} pictureUrl={pictureUrl} />
       <div className="min-w-0">
         <p className="truncate font-black">{name}</p>
-        <p className="truncate text-xs text-white/45">{identity.id}</p>
+        <p className="truncate text-xs text-white/45">
+          {identitySecondaryName(identity)}
+        </p>
       </div>
     </div>
   );
+}
+
+function identityPrimaryName(identity: IdentityResource): string {
+  return identity.profile.name.trim() || shortId(identity.id);
+}
+
+function identitySecondaryName(identity: IdentityResource): string {
+  const handle = identity.profile.handle?.trim();
+
+  return handle ? `@${handle}` : identity.id;
 }
 
 function Avatar({

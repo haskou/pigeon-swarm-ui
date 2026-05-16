@@ -70,6 +70,7 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
@@ -158,6 +159,8 @@ interface GlassWorkspaceProps {
   onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
+  onPendingCommunityInviteHandled?: () => void;
+  pendingCommunityInvite?: PendingCommunityInviteLink | null;
   peers: Peer[];
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
@@ -171,6 +174,8 @@ export function GlassWorkspace({
   onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
+  onPendingCommunityInviteHandled,
+  pendingCommunityInvite,
   peers,
   session,
   setCommunities,
@@ -244,6 +249,7 @@ export function GlassWorkspace({
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callStartupSyncIdentityRef = useRef<string | null>(null);
+  const pendingCommunityInviteRef = useRef<string | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -255,6 +261,7 @@ export function GlassWorkspace({
     endCall,
     receiveSignal,
     reconcileCall,
+    setParticipantVolume,
     startCall,
     toggleDeafen,
     toggleMute,
@@ -447,6 +454,57 @@ export function GlassWorkspace({
     onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
+
+  useEffect(() => {
+    if (!pendingCommunityInvite) return;
+    if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
+      return;
+    }
+
+    pendingCommunityInviteRef.current = pendingCommunityInvite.token;
+    setSendError(null);
+    void (async () => {
+      const acceptedCommunity = await pigeonApplication.acceptCommunityInviteLink(
+        sessionRef.current,
+        pendingCommunityInvite.token,
+      );
+      let nextSession = sessionRef.current;
+
+      if (pendingCommunityInvite.keyEntry) {
+        const published = await pigeonApplication.publishKeychain(nextSession, {
+          ...nextSession.keychain,
+          conversations: {
+            ...nextSession.keychain.conversations,
+            [pendingCommunityInvite.keyEntry.conversationId]:
+              pendingCommunityInvite.keyEntry,
+          },
+        });
+
+        nextSession = {
+          ...nextSession,
+          keychain: published.keychain,
+          keychainExternalIdentifier: published.keychainExternalIdentifier,
+        };
+        setSession(nextSession);
+      }
+
+      setCommunities((current) => [
+        acceptedCommunity,
+        ...current.filter((community) => community.id !== acceptedCommunity.id),
+      ]);
+      setActiveCommunityId(acceptedCommunity.id);
+      setWorkspaceMode('community');
+      onPendingCommunityInviteHandled?.();
+    })().catch((caught) => {
+      pendingCommunityInviteRef.current = null;
+      setSendError(toUserErrorMessage(caught, copy.communities.memberError));
+    });
+  }, [
+    onPendingCommunityInviteHandled,
+    pendingCommunityInvite,
+    setCommunities,
+    setSession,
+  ]);
   const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
@@ -631,6 +689,10 @@ export function GlassWorkspace({
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
         if (activeCall?.id === call.id) {
+          logCallWarning('workspace:call:ended-by-resource-status', {
+            callId: call.id,
+            status: call.status,
+          });
           playEndedCallSound();
           endCall();
         }
@@ -640,6 +702,9 @@ export function GlassWorkspace({
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
         if (activeCall?.id === call.id) {
+          logCallWarning('workspace:call:ended-unsupported-group-call', {
+            callId: call.id,
+          });
           playEndedCallSound();
           endCall();
         }
@@ -655,6 +720,15 @@ export function GlassWorkspace({
             ['declined', 'left', 'missed'].includes(participant.status),
         )
       ) {
+        const remoteParticipant = call.participants.find(
+          (participant) => participant.identityId !== session.identity.id,
+        );
+
+        logCallWarning('workspace:call:ended-by-remote-participant-status', {
+          callId: call.id,
+          remoteIdentityId: remoteParticipant?.identityId,
+          remoteStatus: remoteParticipant?.status,
+        });
         playEndedCallSound();
         endCall();
         return;
@@ -825,6 +899,22 @@ export function GlassWorkspace({
       title: string;
     }) => {
       if (input.kind === 'group') return;
+      if (callActionInProgressRef.current) {
+        logCallWarning('workspace:conversation-call:ignored-action-in-progress', {
+          conversationId: input.conversationId,
+        });
+        return;
+      }
+      if (
+        activeCall?.kind === input.kind &&
+        activeCall.conversationId === input.conversationId
+      ) {
+        logCallWarning('workspace:conversation-call:ignored-already-active', {
+          callId: activeCall.id,
+          conversationId: input.conversationId,
+        });
+        return;
+      }
 
       let localStream: MediaStream | null = null;
 
@@ -837,12 +927,23 @@ export function GlassWorkspace({
           await leaveCurrentCallForSwitch();
           await cleanupJoinedCalls();
 
+          logCallDebug('workspace:conversation-call:create-request', {
+            conversationId: input.conversationId,
+          });
           return await pigeonApplication.startConversationCall(
             sessionRef.current,
             input.conversationId,
           );
         })
         .then(async (call) => {
+          logCallDebug('workspace:conversation-call:created', {
+            callId: call.id,
+            conversationId: input.conversationId,
+            participantStatuses: call.participants.map((participant) => ({
+              identityId: participant.identityId,
+              status: participant.status,
+            })),
+          });
           const details = callDetailsForResource(call);
           const iceConfig = await loadCallIceConfig();
 
@@ -870,6 +971,9 @@ export function GlassWorkspace({
         });
     },
     [
+      activeCall?.conversationId,
+      activeCall?.id,
+      activeCall?.kind,
       callDetailsForResource,
       callSignalSender,
       cleanupJoinedCalls,
@@ -989,6 +1093,12 @@ export function GlassWorkspace({
 
   const acceptIncomingCall = useCallback(() => {
     if (!incomingCall) return;
+    if (callActionInProgressRef.current) {
+      logCallWarning('workspace:incoming-call:accept-ignored-action-in-progress', {
+        callId: incomingCall.call.id,
+      });
+      return;
+    }
 
     const pendingCall = incomingCall.call;
 
@@ -1005,12 +1115,22 @@ export function GlassWorkspace({
         await leaveCurrentCallForSwitch();
         await cleanupJoinedCalls(pendingCall.id);
 
+        logCallDebug('workspace:incoming-call:join-request', {
+          callId: pendingCall.id,
+        });
         return await pigeonApplication.joinCall(
           sessionRef.current,
           pendingCall.id,
         );
       })
       .then(async (call) => {
+        logCallDebug('workspace:incoming-call:joined', {
+          callId: call.id,
+          participantStatuses: call.participants.map((participant) => ({
+            identityId: participant.identityId,
+            status: participant.status,
+          })),
+        });
         const details = callDetailsForResource(call);
         const iceConfig = await loadCallIceConfig();
 
@@ -1341,6 +1461,8 @@ export function GlassWorkspace({
       const requestId = messageRequestRef.current + 1;
 
       messageRequestRef.current = requestId;
+      setMessages([]);
+      updateMessageCursor(null);
       setMessageLoadState('loading');
       setSendError(null);
       try {
@@ -1746,9 +1868,17 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('calls.')) {
+        const eventCallId =
+          eventAggregateId(event) ?? stringAttribute(event, 'callId');
+
+        logCallDebug('workspace:realtime-call-event', {
+          activeCallId: activeCallRef.current?.id,
+          callId: eventCallId,
+          eventType: event.type,
+        });
+
         if (event.type === 'calls.v1.signal.sent') {
-          const callId =
-            eventAggregateId(event) ?? stringAttribute(event, 'callId');
+          const callId = eventCallId;
           const senderIdentityId = stringAttribute(event, 'senderIdentityId');
           const recipientIdentityId = stringAttribute(
             event,
@@ -1781,9 +1911,23 @@ export function GlassWorkspace({
         void pigeonApplication
           .getCall(sessionRef.current, callId)
           .then((call) => {
+            logCallDebug('workspace:realtime-call-event:resource-loaded', {
+              activeCallId: activeCallRef.current?.id,
+              callId: call.id,
+              participantStatuses: call.participants.map((participant) => ({
+                identityId: participant.identityId,
+                status: participant.status,
+              })),
+              status: call.status,
+            });
             reconcileCallResource(call);
           })
-          .catch(() => undefined);
+          .catch((caught) => {
+            logCallError('workspace:realtime-call-event:resource-load-failed', caught, {
+              callId,
+              eventType: event.type,
+            });
+          });
         return;
       }
 
@@ -2094,7 +2238,7 @@ export function GlassWorkspace({
           void fetchRealtimeMessage(
             conversationId,
             messageId,
-            isScrolledNearBottom() || authorId === session.identity.id,
+            isScrolledNearBottom(),
           );
         }
       }
@@ -2236,6 +2380,7 @@ export function GlassWorkspace({
                   onCreate={() => setIsCreateOpen(true)}
                   onClose={() => setSidebarOpen(false)}
                   onCallEnd={leaveActiveCall}
+                  onCallParticipantVolumeChange={setParticipantVolume}
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
                   onLogout={() => setSession(null)}
@@ -2351,6 +2496,7 @@ export function GlassWorkspace({
             nodeNetworks={nodeNetworks}
             activeCall={activeCall}
             onCallEnd={leaveActiveCall}
+            onCallParticipantVolumeChange={setParticipantVolume}
             onCallToggleDeafen={toggleDeafen}
             onCallToggleMute={toggleMute}
             realtimeEvent={communityRealtimeEvent}

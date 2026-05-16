@@ -61,6 +61,10 @@ interface SidebarProps {
   onSessionUpdated: (session: Session) => void;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
+  onCallParticipantVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
 }
@@ -76,6 +80,7 @@ export function Sidebar({
   onCreate,
   activeCall,
   onCallEnd,
+  onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
   onLogout,
@@ -254,6 +259,7 @@ export function Sidebar({
         session={session}
         activeCall={activeCall}
         onCallEnd={onCallEnd}
+        onCallParticipantVolumeChange={onCallParticipantVolumeChange}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
       />
@@ -270,6 +276,7 @@ export function UserProfileDropdown({
   session,
   activeCall,
   onCallEnd,
+  onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
 }: {
@@ -281,6 +288,10 @@ export function UserProfileDropdown({
   session: Session;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
+  onCallParticipantVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
 }) {
@@ -335,14 +346,19 @@ export function UserProfileDropdown({
 
   return (
     <div ref={profileRef} className="relative mt-4">
-      {activeCall && onCallEnd && onCallToggleDeafen && onCallToggleMute && (
-        <GlobalCallBar
-          call={activeCall}
-          onEnd={onCallEnd}
-          onToggleDeafen={onCallToggleDeafen}
-          onToggleMute={onCallToggleMute}
-        />
-      )}
+      {activeCall &&
+        onCallEnd &&
+        onCallParticipantVolumeChange &&
+        onCallToggleDeafen &&
+        onCallToggleMute && (
+          <GlobalCallBar
+            call={activeCall}
+            onEnd={onCallEnd}
+            onParticipantVolumeChange={onCallParticipantVolumeChange}
+            onToggleDeafen={onCallToggleDeafen}
+            onToggleMute={onCallToggleMute}
+          />
+        )}
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}

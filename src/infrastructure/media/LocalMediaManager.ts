@@ -1,7 +1,19 @@
-import {
-  logCallDebug,
-  logCallError,
-} from './callDebugLogger';
+import { logCallDebug, logCallError } from './callDebugLogger';
+
+function describeTrack(track: MediaStreamTrack): Record<string, unknown> {
+  return {
+    enabled: track.enabled,
+    id: track.id,
+    kind: track.kind,
+    label: track.label,
+    muted: track.muted,
+    readyState: track.readyState,
+  };
+}
+
+function describeTracks(stream: MediaStream): Array<Record<string, unknown>> {
+  return stream.getTracks().map(describeTrack);
+}
 
 export class LocalMediaManager {
   private stream: MediaStream | null = null;
@@ -18,8 +30,8 @@ export class LocalMediaManager {
 
   public async startAudio(): Promise<MediaStream> {
     logCallDebug('local-media:start-audio:requesting-permission', {
-      hasMediaDevices: Boolean(navigator.mediaDevices),
       hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+      hasMediaDevices: Boolean(navigator.mediaDevices),
       isSecureContext: window.isSecureContext,
       permissionApiAvailable: Boolean(navigator.permissions?.query),
     });
@@ -31,8 +43,8 @@ export class LocalMediaManager {
       });
     } catch (error) {
       logCallError('local-media:start-audio:failed', error, {
-        hasMediaDevices: Boolean(navigator.mediaDevices),
         hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+        hasMediaDevices: Boolean(navigator.mediaDevices),
         isSecureContext: window.isSecureContext,
       });
       throw error;
@@ -65,19 +77,4 @@ export class LocalMediaManager {
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
   }
-}
-
-function describeTracks(stream: MediaStream): Array<Record<string, unknown>> {
-  return stream.getTracks().map(describeTrack);
-}
-
-function describeTrack(track: MediaStreamTrack): Record<string, unknown> {
-  return {
-    enabled: track.enabled,
-    id: track.id,
-    kind: track.kind,
-    label: track.label,
-    muted: track.muted,
-    readyState: track.readyState,
-  };
 }

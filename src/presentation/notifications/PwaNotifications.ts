@@ -25,6 +25,12 @@ export async function showPwaNotification(
 ): Promise<void> {
   if (!canUsePwaNotifications()) return;
 
+  if (Notification.permission === 'default') {
+    const permission = await requestPwaNotificationPermission();
+
+    if (permission !== 'granted') return;
+  }
+
   if (Notification.permission !== 'granted') return;
 
   if (document.visibilityState === 'visible') return;

@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 type CallDebugContext = Record<string, unknown>;
 
 const prefix = '[pigeon:calls]';

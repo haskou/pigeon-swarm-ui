@@ -16,6 +16,11 @@ import {
 import { useCommunities } from './presentation/hooks/useCommunities';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 import { usePeers } from './presentation/hooks/usePeers';
+import {
+  clearCommunityInviteUrl,
+  parseCommunityInviteUrl,
+  type PendingCommunityInviteLink,
+} from './utils/communityInviteLink';
 
 type RestoreState = 'idle' | 'loading' | 'done';
 
@@ -31,6 +36,8 @@ function App() {
   const nodeNetworks = useNodeNetworks(session);
   const peers = usePeers();
   const communities = useCommunities(session);
+  const [pendingCommunityInvite, setPendingCommunityInvite] =
+    useState<PendingCommunityInviteLink | null>(() => parseCommunityInviteUrl());
 
   const handleAuthenticated = (
     nextSession: Session,
@@ -123,6 +130,11 @@ function App() {
           onCommunitiesReload={communities.reload}
           setCommunities={communities.setCommunities}
           setConversations={setConversations}
+          pendingCommunityInvite={pendingCommunityInvite}
+          onPendingCommunityInviteHandled={() => {
+            clearCommunityInviteUrl();
+            setPendingCommunityInvite(null);
+          }}
         />
       )}
     </main>

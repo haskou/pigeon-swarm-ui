@@ -5,6 +5,7 @@ import type {
   ConversationKeyEntry,
   IdentityResource,
   MessageAttachment,
+  MessageReplyPreview,
   Session,
 } from '../types';
 
@@ -16,6 +17,8 @@ export type CommunityChannelPlainPayload = {
   channelId?: string;
   communityId?: string;
   content?: string;
+  reply?: MessageReplyPreview;
+  replyToMessageId?: string;
   timestamp?: number;
   type?: string;
 };
@@ -35,10 +38,13 @@ type EncryptCommunityChannelPayloadInput = {
   communityId: string;
   content: string;
   recipients: IdentityResource[];
+  replyPreview?: MessageReplyPreview;
+  replyToMessageId?: string;
   timestamp: number;
 };
 
 const gcmTagBytes = 16;
+const privateKeyCache = new Map<string, PrivateKey>();
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -87,6 +93,18 @@ function decryptCommunityEnvelope(
   ) as CommunityChannelPlainPayload;
 }
 
+function privateKeyFromPEM(value: string): PrivateKey {
+  const cached = privateKeyCache.get(value);
+
+  if (cached) return cached;
+
+  const privateKey = PrivateKey.fromPEM(value);
+
+  privateKeyCache.set(value, privateKey);
+
+  return privateKey;
+}
+
 export function encryptCommunityChannelPayload(
   input: EncryptCommunityChannelPayloadInput,
 ): string {
@@ -100,6 +118,10 @@ export function encryptCommunityChannelPayload(
       channelId: input.channelId,
       communityId: input.communityId,
       content: input.content,
+      ...(input.replyPreview ? { reply: input.replyPreview } : {}),
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       timestamp: input.timestamp,
       type: 'CommunityChannelMessageSent',
     }),
@@ -136,6 +158,7 @@ export async function decryptCommunityChannelPayload(
   session: Session,
   encryptedPayload: string,
   missingKeyMessage: string,
+  communityId?: string,
 ): Promise<CommunityChannelPlainPayload> {
   const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
   const wrappedKey =
@@ -143,18 +166,26 @@ export async function decryptCommunityChannelPayload(
     envelope.recipients[normalizeIdentityId(session.identity.id)];
 
   if (!wrappedKey) {
-    const communityRecipient = Object.values(session.keychain.conversations)
-      .map((keyEntry) => ({
-        keyEntry,
-        wrappedKey: envelope.recipients[keyEntry.conversationId],
-      }))
-      .find((entry) => entry.wrappedKey);
+    const directKeyEntry = communityId
+      ? session.keychain.conversations[communityId]
+      : undefined;
+    const communityRecipient = directKeyEntry
+      ? {
+          keyEntry: directKeyEntry,
+          wrappedKey: envelope.recipients[directKeyEntry.conversationId],
+        }
+      : Object.values(session.keychain.conversations)
+          .map((keyEntry) => ({
+            keyEntry,
+            wrappedKey: envelope.recipients[keyEntry.conversationId],
+          }))
+          .find((entry) => entry.wrappedKey);
 
     if (!communityRecipient?.wrappedKey) {
       throw new Error(missingKeyMessage);
     }
 
-    const rawCommunityKey = await PrivateKey.fromPEM(
+    const rawCommunityKey = await privateKeyFromPEM(
       communityRecipient.keyEntry.privateKey,
     ).decrypt(new EncryptedPayload(communityRecipient.wrappedKey));
 
