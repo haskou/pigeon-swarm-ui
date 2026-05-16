@@ -33,6 +33,7 @@ export function GlobalCallBar({
   const subtitle =
     call.subtitle ||
     call.participants.map((participant) => participant.name).join(', ');
+  const microphoneWarningVisible = !call.hasMicrophone;
   const ringingParticipantCount = useMemo(
     () =>
       call.call?.participants.filter(
@@ -107,6 +108,11 @@ export function GlobalCallBar({
                 ? copy.calls.microphoneUnavailable
                 : subtitle || copy.calls.waitingForParticipants}
             </p>
+            {microphoneWarningVisible && (
+              <p className="mt-1 truncate text-[0.68rem] font-bold text-amber-200/85">
+                {copy.calls.microphoneUnavailable}
+              </p>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <CallButton
@@ -222,6 +228,8 @@ function CallStageDialog({
   onToggleMute: () => void;
   subtitle: string;
 }) {
+  const microphoneWarningVisible = !call.hasMicrophone;
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -254,6 +262,11 @@ function CallStageDialog({
                 ? copy.calls.microphoneUnavailable
                 : subtitle || copy.calls.waitingForParticipants}
             </p>
+            {microphoneWarningVisible && (
+              <p className="mt-1 text-xs font-bold text-amber-200/85">
+                {copy.calls.microphoneUnavailable}
+              </p>
+            )}
           </div>
           <button
             type="button"
