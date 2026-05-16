@@ -56,7 +56,6 @@ import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
-import { MessageDecryptWorkerClient } from './MessageDecryptWorkerClient';
 import { PigeonCallsApi } from './PigeonCallsApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
 import { RequestSigner } from './RequestSigner';
@@ -80,6 +79,10 @@ function throwIfMessageLoadAborted(signal?: AbortSignal): void {
 
   error.name = 'AbortError';
   throw error;
+}
+
+function hasEncryptedPayload(message: MessageResource): boolean {
+  return Boolean(message.encryptedPayload ?? message.payload);
 }
 
 async function yieldAfterMessageDecryptBatch(): Promise<void> {
@@ -111,8 +114,6 @@ export class PigeonApiGateway {
 
   private readonly messages: MessageProjector;
 
-  private readonly messageDecryptWorker: MessageDecryptWorkerClient | null;
-
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -137,8 +138,6 @@ export class PigeonApiGateway {
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.keychains = keychains;
-    this.messageDecryptWorker =
-      typeof Worker === 'undefined' ? null : new MessageDecryptWorkerClient();
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.signer = signer;
@@ -1484,14 +1483,20 @@ export class PigeonApiGateway {
     const pendingMessages = messages.filter(
       (message) => message.type !== 'deleted',
     );
-    const key = conversationKeyEntry(
-      session.keychain,
-      session.identity.id,
-      conversationId,
-    );
+    const key = pendingMessages.some(hasEncryptedPayload)
+      ? conversationKeyEntry(
+          session.keychain,
+          session.identity.id,
+          conversationId,
+        )
+      : undefined;
 
-    if (this.messageDecryptWorker) {
-      return await this.messageDecryptWorker.decrypt(
+    if (typeof Worker !== 'undefined') {
+      const { MessageDecryptWorkerClient } =
+        await import('./MessageDecryptWorkerClient');
+      const worker = new MessageDecryptWorkerClient();
+
+      return await worker.decrypt(
         {
           copy: copy.messages,
           currentIdentityId: session.identity.id,

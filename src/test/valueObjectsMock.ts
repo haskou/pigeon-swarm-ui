@@ -7,8 +7,21 @@ import {
 
 const gcmTagBytes = 16;
 
+export function assert(condition: unknown, error: Error | string): void {
+  if (condition) return;
+
+  throw typeof error === 'string' ? new Error(error) : error;
+}
+
 export class StringValueObject {
-  public constructor(private readonly value: string) {}
+  public constructor(
+    private readonly value: string,
+    maxLength?: number,
+  ) {
+    if (maxLength !== undefined && value.length > maxLength) {
+      throw new Error('InvalidStringLengthError');
+    }
+  }
 
   public isEqual(other: StringValueObject): boolean {
     return this.value === other.valueOf();
