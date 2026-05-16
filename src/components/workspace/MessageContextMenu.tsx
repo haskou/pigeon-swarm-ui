@@ -56,7 +56,7 @@ export function MessageContextMenu({
   const toggleReaction = (emoji: string) => {
     const reacted = Boolean(
       currentIdentityId &&
-        menu.message.reactions.some(
+        messageReactions(menu.message).some(
           (reaction) =>
             reaction.authorIdentityId === currentIdentityId &&
             reaction.emoji === emoji,
@@ -190,7 +190,7 @@ function hasReacted(
   currentIdentityId: string,
   emoji: string,
 ): boolean {
-  return message.reactions.some(
+  return messageReactions(message).some(
     (reaction) =>
       reaction.authorIdentityId === currentIdentityId &&
       reaction.emoji === emoji,
@@ -203,7 +203,7 @@ function quickReactionOptions(
 ): string[] {
   const byEmoji = new Map<string, number>();
 
-  for (const reaction of message.reactions) {
+  for (const reaction of messageReactions(message)) {
     byEmoji.set(reaction.emoji, (byEmoji.get(reaction.emoji) ?? 0) + 1);
   }
 
@@ -213,4 +213,10 @@ function quickReactionOptions(
   const merged = [...recentEmojis, ...existing, ...defaultReactionOptions];
 
   return [...new Set(merged)].slice(0, 6);
+}
+
+function messageReactions(
+  message: ChatMessage,
+): NonNullable<ChatMessage['reactions']> {
+  return message.reactions ?? [];
 }
