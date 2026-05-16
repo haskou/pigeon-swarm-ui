@@ -72,8 +72,11 @@ export function MessageBubble({
     message.raw.type === 'call_event' || message.kind === 'call-event';
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
+  const hasReply = Boolean(replyMessageId);
   const compactTimestamp =
-    message.content.length <= 36 && !message.content.includes('\n');
+    !hasReply &&
+    message.content.length <= 36 &&
+    !message.content.includes('\n');
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -208,7 +211,7 @@ export function MessageBubble({
               : 'border border-white/10 bg-black/25 text-white',
           )}
         >
-          {replyMessageId && (
+          {hasReply && replyMessageId && (
             <button
               type="button"
               onClick={() => onReplyReferenceClick(replyMessageId)}
@@ -290,7 +293,7 @@ export function MessageBubble({
             <p
               className={cx(
                 'whitespace-pre-wrap break-words',
-                message.attachments.length > 0 && 'mt-3',
+                (hasReply || message.attachments.length > 0) && 'mt-3',
                 message.encrypted && 'text-white/55',
               )}
             >
