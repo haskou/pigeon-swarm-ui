@@ -138,7 +138,13 @@ export const copy = {
       'Create a private workspace inside one IPFS network. Members and text channels are visible only to community members.',
     createError: 'The community could not be created.',
     createTitle: 'Create community',
+    createTooltip: 'Create a new community',
     creating: 'Creating community...',
+    initialChannelName: 'Channel name',
+    initialChannels: 'Initial channels',
+    initialChannelsBody:
+      'Add the text or voice channels that should exist when the community opens.',
+    addInitialChannel: 'Add channel',
     communityDataTitle: 'Community data',
     deleteChannel: 'Delete channel',
     deleteChannelConfirm:

@@ -22,6 +22,7 @@ import type {
   CommunityChannel,
   CommunityInviteLinkResource,
   CommunityTextChannel,
+  CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
   AttachmentProgress,
@@ -366,13 +367,13 @@ export class PigeonApiGateway {
     session: Session,
     communityId: string,
     name: string,
-  ): Promise<CommunityChannel> {
+  ): Promise<CommunityVoiceChannel> {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/voice`;
     const body = { name };
 
-    return await this.http.request<CommunityChannel>(path, {
+    return await this.http.request<CommunityVoiceChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',

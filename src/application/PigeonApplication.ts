@@ -13,6 +13,7 @@ import type {
   CommunityChannel,
   CommunityInviteLinkResource,
   CommunityTextChannel,
+  CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
@@ -261,6 +262,7 @@ export class PigeonApplication {
     input: {
       avatar?: File | null;
       banner?: File | null;
+      channels?: Array<{ name: string; type: 'text' | 'voice' }>;
       description: string;
       name: string;
       networkId: string;
@@ -292,9 +294,32 @@ export class PigeonApplication {
         [community.id]: keyEntry,
       },
     });
+    const channelSession = {
+      ...session,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+    const initialChannels = await this.createInitialCommunityChannels(
+      channelSession,
+      community.id,
+      input.channels ?? [],
+    );
 
     return {
-      community,
+      community: {
+        ...community,
+        textChannels: [
+          ...community.textChannels,
+          ...initialChannels.textChannels,
+        ],
+        voiceChannels:
+          initialChannels.voiceChannels.length > 0
+            ? [
+                ...(community.voiceChannels ?? []),
+                ...initialChannels.voiceChannels,
+              ]
+            : community.voiceChannels,
+      },
       keychain: published.keychain,
       keychainExternalIdentifier: published.keychainExternalIdentifier,
     };
@@ -435,7 +460,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     name: string,
-  ): Promise<CommunityChannel> {
+  ): Promise<CommunityVoiceChannel> {
     return await this.gateway.createCommunityVoiceChannel(
       session,
       communityId,
@@ -775,5 +800,39 @@ export class PigeonApplication {
       privateKey: primitives.privateKey,
       publicKey: primitives.publicKey,
     };
+  }
+
+  private async createInitialCommunityChannels(
+    session: Session,
+    communityId: string,
+    channels: Array<{ name: string; type: 'text' | 'voice' }>,
+  ): Promise<{
+    textChannels: CommunityTextChannel[];
+    voiceChannels: CommunityVoiceChannel[];
+  }> {
+    const textChannels = [];
+    const voiceChannels = [];
+
+    for (const channel of channels) {
+      if (channel.type === 'voice') {
+        voiceChannels.push(
+          await this.createCommunityVoiceChannel(
+            session,
+            communityId,
+            channel.name,
+          ),
+        );
+      } else {
+        textChannels.push(
+          await this.createCommunityTextChannel(
+            session,
+            communityId,
+            channel.name,
+          ),
+        );
+      }
+    }
+
+    return { textChannels, voiceChannels };
   }
 }

@@ -1,4 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Community, Session } from '../../domain/types';
@@ -15,6 +22,11 @@ interface CreateCommunityDialogProps {
   session: Session;
 }
 
+type InitialChannelDraft = {
+  name: string;
+  type: 'text' | 'voice';
+};
+
 export function CreateCommunityDialog({
   nodeNetworks,
   onClose,
@@ -30,6 +42,11 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState('general');
+  const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
+  const [channels, setChannels] = useState<InitialChannelDraft[]>([
+    { name: 'general', type: 'text' },
+  ]);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -93,6 +110,22 @@ export function CreateCommunityDialog({
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
     setBanner(event.target.files?.[0] ?? null);
   };
+  const addChannel = () => {
+    const trimmed = channelName.trim();
+
+    if (!trimmed) return;
+
+    setChannels((current) => [
+      ...current,
+      { name: trimmed, type: channelType },
+    ]);
+    setChannelName('');
+  };
+  const removeChannel = (indexToRemove: number) => {
+    setChannels((current) =>
+      current.filter((_, index) => index !== indexToRemove),
+    );
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -104,6 +137,9 @@ export function CreateCommunityDialog({
       const created = await pigeonApplication.createCommunity(session, {
         avatar,
         banner,
+        channels: channels
+          .map((channel) => ({ ...channel, name: channel.name.trim() }))
+          .filter((channel) => channel.name.length > 0),
         description: description.trim(),
         name: name.trim(),
         networkId,
@@ -245,6 +281,58 @@ export function CreateCommunityDialog({
               <p className="mt-3 text-xs leading-relaxed text-white/45">
                 {copy.communities.createBody}
               </p>
+            </div>
+            <div className="mt-4 rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.initialChannels}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/45">
+                {copy.communities.initialChannelsBody}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={channelName}
+                  onChange={(event) => setChannelName(event.target.value)}
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  placeholder={copy.communities.initialChannelName}
+                />
+                <GlassSelect
+                  ariaLabel={copy.communities.channels}
+                  value={channelType}
+                  onChange={(value) =>
+                    setChannelType(value === 'voice' ? 'voice' : 'text')
+                  }
+                  options={[
+                    { label: 'Text', value: 'text' },
+                    { label: 'Voice', value: 'voice' },
+                  ]}
+                />
+                <button
+                  type="button"
+                  onClick={addChannel}
+                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15"
+                >
+                  {copy.communities.addInitialChannel}
+                </button>
+              </div>
+              {channels.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {channels.map((channel, index) => (
+                    <button
+                      type="button"
+                      key={`${channel.type}:${channel.name}:${index}`}
+                      onClick={() => removeChannel(index)}
+                      className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70 transition hover:bg-rose-500/15 hover:text-rose-100"
+                      title={copy.messages.delete}
+                    >
+                      {channel.type === 'voice' ? 'Voice' : 'Text'} #{
+                        channel.name
+                      }{' '}
+                      ×
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

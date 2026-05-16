@@ -17,6 +17,7 @@ import type {
   CommunityChannel,
   ConversationKeyEntry,
   ConversationResource,
+  IdentityResource,
   MessageResource,
   MessageReplyPreview,
   Session,
@@ -62,6 +63,7 @@ import {
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
+import { identityDisplayName } from '../../utils/identityDisplay';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -134,19 +136,66 @@ function replyPreviewFromMessage(
   };
 }
 
-function communityNotificationBody(
+function communityNotificationPreview(
   communities: Community[],
   communityId: string,
   channelId: string,
-): string {
+  authorIdentityId: string | undefined,
+  identityNames: Record<string, string>,
+): { body: string; title: string } {
   const community = communities.find((item) => item.id === communityId);
   const channel = community
     ? communityChannels(community).find((item) => item.id === channelId)
     : undefined;
+  const author = authorIdentityId ? identityNames[authorIdentityId] : undefined;
+  const location = channel ? `#${channel.name}` : copy.chat.newMessage;
 
-  return channel
-    ? `${community?.name ?? communityId} #${channel.name}`
-    : (community?.name ?? communityId);
+  return {
+    body: author
+      ? `${author} · ${location}`
+      : `${location} · ${copy.chat.newMessage}`,
+    title: community?.name ?? copy.communities.channelMessageNotification,
+  };
+}
+
+function conversationNotificationPreview(
+  conversations: ConversationResource[],
+  conversationId: string,
+  session: Session,
+  identityNames: Record<string, string>,
+  identityProfiles: Record<string, IdentityResource>,
+): { body: string; title: string } {
+  const conversation = conversations.find((item) => item.id === conversationId);
+
+  if (!conversation) {
+    return { body: copy.chat.newMessage, title: copy.chat.directMessage };
+  }
+
+  if (conversation.type === 'group') {
+    return {
+      body: copy.chat.newMessage,
+      title: conversation.name ?? conversation.title ?? copy.chat.groupMessage,
+    };
+  }
+
+  const peerIdentityId = conversationPeerIdentityId(
+    conversation,
+    session.identity.id,
+    session.keychain,
+  );
+  const peerIdentity = peerIdentityId
+    ? identityProfiles[peerIdentityId]
+    : undefined;
+  const peerHandle = peerIdentity?.profile.handle?.trim();
+  const peerName =
+    peerIdentity?.profile.name.trim() ||
+    (peerHandle ? `@${peerHandle}` : undefined) ||
+    (peerIdentityId
+      ? identityDisplayName(peerIdentityId, identityNames)
+      : undefined) ||
+    copy.chat.directMessage;
+
+  return { body: copy.chat.directMessage, title: peerName };
 }
 
 function updateMessageReaction(
@@ -2065,15 +2114,19 @@ export function GlassWorkspace({
           !isActiveChannel &&
           authorIdentityId !== session.identity.id
         ) {
+          const preview = communityNotificationPreview(
+            communities,
+            communityId,
+            channelId,
+            authorIdentityId,
+            identityNames,
+          );
+
           playNotificationSound();
           void showPwaNotification({
-            body: communityNotificationBody(
-              communities,
-              communityId,
-              channelId,
-            ),
+            body: preview.body,
             tag: `community-${communityId}-${channelId}`,
-            title: copy.communities.channelMessageNotification,
+            title: preview.title,
           });
           markCommunityChannelUnread(communityId, channelId);
         }
@@ -2266,12 +2319,19 @@ export function GlassWorkspace({
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
           const unreadMessageId = messageId ?? timelineMessage?.id;
+          const preview = conversationNotificationPreview(
+            conversations,
+            conversationId,
+            session,
+            identityNames,
+            identityProfiles,
+          );
 
           playNotificationSound();
           void showPwaNotification({
-            body: copy.chat.newMessage,
+            body: preview.body,
             tag: `conversation-${conversationId}`,
-            title: copy.chat.directMessage,
+            title: preview.title,
           });
           if (unreadMessageId)
             markUnreadMessage(conversationId, unreadMessageId);
@@ -2374,7 +2434,10 @@ export function GlassWorkspace({
       activeConversationKeyId,
       clearUnreadMessages,
       communities,
+      conversations,
       fetchRealtimeMessage,
+      identityNames,
+      identityProfiles,
       isScrolledNearBottom,
       markCommunityChannelUnread,
       markUnreadMessage,
