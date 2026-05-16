@@ -303,6 +303,8 @@ export function MessageBubble({
           {linkPreview && (
             <LinkPreviewCard
               description={linkPreview.description}
+              displayUrl={linkPreview.displayUrl}
+              faviconUrl={linkPreview.faviconUrl}
               hostname={linkPreview.hostname}
               mine={mine}
               title={linkPreview.title}
@@ -431,12 +433,14 @@ function groupMessageReactions(
 
 type LinkPreview = {
   description: string;
+  displayUrl: string;
+  faviconUrl: string;
   hostname: string;
   title: string;
   url: string;
 };
 
-const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+const urlPattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 
 function MessageTextWithLinks({
   content,
@@ -475,6 +479,8 @@ function MessageTextWithLinks({
 
 function LinkPreviewCard({
   description,
+  displayUrl,
+  faviconUrl,
   hostname,
   mine,
   title,
@@ -492,14 +498,25 @@ function LinkPreviewCard({
           : 'border-white/10 bg-white/8',
       )}
     >
-      <span className="block truncate text-xs font-black uppercase text-white/45">
-        {hostname}
+      <span className="flex items-center gap-2 text-xs font-black uppercase text-white/45">
+        <img
+          src={faviconUrl}
+          alt=""
+          className="h-4 w-4 shrink-0 rounded-sm"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+        <span className="truncate">{hostname}</span>
       </span>
       <span className="mt-1 block truncate text-sm font-black text-white">
         {title}
       </span>
       <span className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
         {description}
+      </span>
+      <span className="mt-2 block truncate text-[0.68rem] font-bold text-white/35">
+        {displayUrl}
       </span>
     </a>
   );
@@ -511,13 +528,16 @@ function firstLinkPreview(content: string): LinkPreview | null {
   if (!match) return null;
 
   const cleaned = cleanTrailingUrlPunctuation(match);
+  const normalized = normalizePreviewUrl(cleaned);
 
   try {
-    const url = new URL(cleaned);
+    const url = new URL(normalized);
     const path = `${url.pathname}${url.search}`.replace(/^\/$/, '');
 
     return {
       description: path ? `${url.hostname}${path}` : url.origin,
+      displayUrl: displayPreviewUrl(url),
+      faviconUrl: `${url.origin}/favicon.ico`,
       hostname: url.hostname,
       title: readableLinkTitle(url),
       url: url.toString(),
@@ -537,11 +557,12 @@ function splitTextByLinks(
     const rawUrl = match[0];
     const index = match.index ?? 0;
     const cleanedUrl = cleanTrailingUrlPunctuation(rawUrl);
+    const normalizedUrl = normalizePreviewUrl(cleanedUrl);
 
     if (index > lastIndex) {
       parts.push({ text: content.slice(lastIndex, index) });
     }
-    parts.push({ text: cleanedUrl, url: cleanedUrl });
+    parts.push({ text: cleanedUrl, url: normalizedUrl });
     lastIndex = index + rawUrl.length;
   }
 
@@ -554,6 +575,14 @@ function splitTextByLinks(
 
 function cleanTrailingUrlPunctuation(value: string): string {
   return value.replace(/[),.;:!?]+$/g, '');
+}
+
+function normalizePreviewUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function displayPreviewUrl(url: URL): string {
+  return `${url.hostname}${url.pathname}${url.search}`.replace(/\/$/, '');
 }
 
 function readableLinkTitle(url: URL): string {
