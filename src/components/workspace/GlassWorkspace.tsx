@@ -24,6 +24,7 @@ import type {
 } from '../../domain/types';
 import type {
   CallParticipant,
+  CallParticipantStatus,
   CallResource,
   CallSignalType,
   CallSession,
@@ -305,6 +306,9 @@ export function GlassWorkspace({
   const messagesRef = useRef<ChatMessage[]>([]);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
+  const callParticipantStatusesRef = useRef<
+    Record<string, Record<string, CallParticipantStatus>>
+  >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const pendingCommunityInviteRef = useRef<string | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
@@ -812,6 +816,33 @@ export function GlassWorkspace({
       const currentParticipant = call.participants.find(
         (participant) => participant.identityId === session.identity.id,
       );
+      const previousParticipantStatuses =
+        callParticipantStatusesRef.current[call.id] ?? {};
+      const nextParticipantStatuses = Object.fromEntries(
+        call.participants.map((participant) => [
+          participant.identityId,
+          participant.status,
+        ]),
+      ) as Record<string, CallParticipantStatus>;
+      const remoteParticipantLeftActiveCommunityVoice =
+        call.scope.type === 'community_channel' &&
+        activeCallRef.current?.id === call.id &&
+        call.status === 'active' &&
+        call.participants.some(
+          (participant) =>
+            participant.identityId !== session.identity.id &&
+            previousParticipantStatuses[participant.identityId] === 'joined' &&
+            participant.status === 'left',
+        );
+
+      callParticipantStatusesRef.current = {
+        ...callParticipantStatusesRef.current,
+        [call.id]: nextParticipantStatuses,
+      };
+
+      if (remoteParticipantLeftActiveCommunityVoice) {
+        playEndedCallSound();
+      }
 
       if (call.scope.type === 'community_channel') {
         const communityId = call.scope.communityId;
