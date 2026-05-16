@@ -15,6 +15,7 @@ import { cx } from '../../utils/classNameHelper';
 import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { MarkdownMessage } from './MarkdownMessage';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -290,15 +291,15 @@ export function MessageBubble({
             </div>
           )}
           {message.content && (
-            <p
+            <div
               className={cx(
                 'whitespace-pre-wrap break-words',
                 (hasReply || message.attachments.length > 0) && 'mt-3',
                 message.encrypted && 'text-white/55',
               )}
             >
-              <MessageTextWithLinks content={message.content} mine={mine} />
-            </p>
+              <MarkdownMessage content={message.content} mine={mine} />
+            </div>
           )}
           {linkPreview && (
             <LinkPreviewCard
@@ -446,41 +447,6 @@ type LinkPreview = {
 
 const urlPattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 
-function MessageTextWithLinks({
-  content,
-  mine,
-}: {
-  content: string;
-  mine: boolean;
-}) {
-  const parts = splitTextByLinks(content);
-
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.url ? (
-          <a
-            key={`${part.text}-${index}`}
-            href={part.url}
-            target="_blank"
-            rel="noreferrer"
-            className={cx(
-              'font-bold underline decoration-2 underline-offset-2',
-              mine
-                ? 'text-white decoration-white/50'
-                : 'text-cyan-200 decoration-cyan-200/50',
-            )}
-          >
-            {part.text}
-          </a>
-        ) : (
-          <span key={`${part.text}-${index}`}>{part.text}</span>
-        ),
-      )}
-    </>
-  );
-}
-
 function LinkPreviewCard({
   description,
   displayUrl,
@@ -582,32 +548,6 @@ function firstLinkPreview(content: string): LinkPreview | null {
   } catch {
     return null;
   }
-}
-
-function splitTextByLinks(
-  content: string,
-): Array<{ text: string; url?: string }> {
-  const parts: Array<{ text: string; url?: string }> = [];
-  let lastIndex = 0;
-
-  for (const match of content.matchAll(urlPattern)) {
-    const rawUrl = match[0];
-    const index = match.index ?? 0;
-    const cleanedUrl = cleanTrailingUrlPunctuation(rawUrl);
-    const normalizedUrl = normalizePreviewUrl(cleanedUrl);
-
-    if (index > lastIndex) {
-      parts.push({ text: content.slice(lastIndex, index) });
-    }
-    parts.push({ text: cleanedUrl, url: normalizedUrl });
-    lastIndex = index + rawUrl.length;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push({ text: content.slice(lastIndex) });
-  }
-
-  return parts.length > 0 ? parts : [{ text: content }];
 }
 
 function cleanTrailingUrlPunctuation(value: string): string {
