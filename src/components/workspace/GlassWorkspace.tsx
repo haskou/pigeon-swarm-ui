@@ -1872,24 +1872,20 @@ export function GlassWorkspace({
         );
       }
 
-      const refreshed = await pigeonApplication.loadMessage(
-        session,
-        conversationId,
-        message.id,
-      );
-
-      if (refreshed) {
-        setMessages((current) => mergeMessages(current, [refreshed]));
-      }
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
-      const refreshed = await pigeonApplication
-        .loadMessage(session, conversationId, message.id)
-        .catch(() => null);
-
-      if (refreshed) {
-        setMessages((current) => mergeMessages(current, [refreshed]));
-      }
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === message.id
+            ? updateMessageReaction(
+                item,
+                session.identity.id,
+                emoji,
+                reacted ? 'add' : 'remove',
+              )
+            : item,
+        ),
+      );
     }
   };
 
@@ -2335,14 +2331,31 @@ export function GlassWorkspace({
           }
 
           if (isReactionEvent && messageId) {
-            void pigeonApplication
-              .loadMessage(session, conversationId, messageId)
-              .then((message) => {
-                if (!message) return;
+            const reactionAuthorId = stringAttribute(
+              event,
+              'authorId',
+              'authorIdentityId',
+              'author_id',
+            );
+            const emoji = stringAttribute(event, 'emoji');
 
-                setMessages((current) => mergeMessages(current, [message]));
-              })
-              .catch(() => undefined);
+            if (!reactionAuthorId || !emoji) return;
+
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === messageId
+                  ? updateMessageReaction(
+                      message,
+                      reactionAuthorId,
+                      emoji,
+                      event.type.endsWith('.was_added') ? 'add' : 'remove',
+                      typeof event.attributes.createdAt === 'number'
+                        ? event.attributes.createdAt
+                        : event.occurred_on,
+                    )
+                  : message,
+              ),
+            );
             return;
           }
 

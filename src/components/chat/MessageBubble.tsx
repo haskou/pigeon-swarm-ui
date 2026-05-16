@@ -363,6 +363,7 @@ type ReactionGroup = {
   authors: string[];
   count: number;
   emoji: string;
+  lastCreatedAt: number;
   reacted: boolean;
 };
 
@@ -409,19 +410,23 @@ function groupMessageReactions(
       authors: [],
       count: 0,
       emoji: reaction.emoji,
+      lastCreatedAt: reaction.createdAt,
       reacted: false,
     };
 
     current.authors.push(authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId);
     current.count += 1;
+    current.lastCreatedAt = Math.max(current.lastCreatedAt, reaction.createdAt);
     current.reacted =
       current.reacted || reaction.authorIdentityId === currentIdentityId;
     byEmoji.set(reaction.emoji, current);
   }
 
-  return [...byEmoji.values()].sort((left, right) =>
-    left.emoji.localeCompare(right.emoji),
-  );
+  return [...byEmoji.values()].sort((left, right) => {
+    const createdAtDiff = left.lastCreatedAt - right.lastCreatedAt;
+
+    return createdAtDiff === 0 ? left.emoji.localeCompare(right.emoji) : createdAtDiff;
+  });
 }
 
 type LinkPreview = {
