@@ -81,7 +81,7 @@ function App() {
 
   if (nodeNetworks.error && !session) {
     return (
-      <main className="app-viewport relative flex items-center justify-center overflow-hidden bg-[#080a25] text-white">
+      <main className="app-compact relative flex justify-center overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
         <ServerConnectionScreen
           error={nodeNetworks.error}

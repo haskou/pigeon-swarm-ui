@@ -49,6 +49,13 @@ button, input, textarea { font: inherit; }
   padding-top: env(safe-area-inset-top);
 }
 
+.app-compact {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-top: env(safe-area-inset-top);
+}
+
 .app-screen {
   min-height: 100vh;
   min-height: 100dvh;

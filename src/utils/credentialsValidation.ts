@@ -1,11 +1,17 @@
+import { ProfileHandle } from '../domain/identities/profile/ProfileHandle';
+
 export function normalizeHandleInput(value: string): string {
   return value.trim().replace(/^@+/, '').toLowerCase();
 }
 
 export function isValidHandle(value: string): boolean {
-  const handle = normalizeHandleInput(value);
+  try {
+    new ProfileHandle(normalizeHandleInput(value));
 
-  return /^[a-z0-9._-]{3,32}$/.test(handle);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function passwordValidationError(value: string): string | null {

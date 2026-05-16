@@ -18,6 +18,9 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
+import { ProfileBiography } from '../../domain/identities/profile/ProfileBiography';
+import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
+import { ProfileName } from '../../domain/identities/profile/ProfileName';
 import { copy } from '../../i18n/en';
 import {
   getInitialLanguage,
@@ -859,6 +862,7 @@ function ProfileEditor({
                   aria-label={copy.profile.name}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
+                  maxLength={ProfileName.MAX_LENGTH}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
                 <input
@@ -867,6 +871,7 @@ function ProfileEditor({
                   onChange={(event) =>
                     setHandle(normalizeHandle(event.target.value))
                   }
+                  maxLength={ProfileHandle.MAX_LENGTH}
                   placeholder="@ada"
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
@@ -874,6 +879,7 @@ function ProfileEditor({
                   aria-label={copy.profile.biography}
                   value={biography}
                   onChange={(event) => setBiography(event.target.value)}
+                  maxLength={ProfileBiography.MAX_LENGTH}
                   className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
               </div>

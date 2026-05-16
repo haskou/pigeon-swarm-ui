@@ -4,6 +4,8 @@ import type { ConversationResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
+import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
+import { ProfileName } from '../../domain/identities/profile/ProfileName';
 import { copy } from '../../i18n/en';
 import {
   clearSavedCredentials,
@@ -202,6 +204,7 @@ export function AuthScreen({
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
+                    maxLength={ProfileName.MAX_LENGTH}
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="Ada"
                     autoComplete="name"
@@ -213,6 +216,7 @@ export function AuthScreen({
                     onChange={(event) =>
                       setHandle(normalizeHandleInput(event.target.value))
                     }
+                    maxLength={ProfileHandle.MAX_LENGTH}
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="@ada"
                     autoComplete="username"
