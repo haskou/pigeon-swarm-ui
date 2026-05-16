@@ -1224,7 +1224,15 @@ export function GlassWorkspace({
       let localStream: MediaStream | null = null;
 
       void (async () => {
-        localStream = await requestLocalAudio();
+        localStream = await requestLocalAudio().catch((caught): null => {
+          logCallWarning('workspace:community-voice:microphone-unavailable', {
+            channelId: channel.id,
+            communityId: activeCommunity.id,
+            error: caught,
+          });
+
+          return null;
+        });
 
         logCallDebug('workspace:community-voice:leaving-current-call', {
           channelId: channel.id,
@@ -1295,7 +1303,6 @@ export function GlassWorkspace({
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
-      requestLocalAudio,
       startCall,
     ],
   );
