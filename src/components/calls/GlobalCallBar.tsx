@@ -355,8 +355,10 @@ function ParticipantTile({
   onToggleMute: () => void;
   participant: CallSession['participants'][number];
 }) {
-  const [volumePercent, setVolumePercent] = useState(100);
   const isCurrentIdentity = participant.identityId === call.currentIdentityId;
+  const volumePercent = isCurrentIdentity
+    ? 100
+    : (call.participantVolumes[participant.identityId] ?? 100);
   const latencyLabel =
     participant.latencyMs === undefined ? '—' : `${participant.latencyMs} ms`;
   const packetLossLabel =
@@ -375,7 +377,6 @@ function ParticipantTile({
   const muted = isCurrentIdentity ? call.muted : volumePercent === 0;
 
   const updateVolume = (nextVolume: number) => {
-    setVolumePercent(nextVolume);
     if (!isCurrentIdentity) {
       onParticipantVolumeChange(participant.identityId, nextVolume);
     }

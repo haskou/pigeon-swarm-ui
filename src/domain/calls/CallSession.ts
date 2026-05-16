@@ -80,6 +80,7 @@ export type CallSession = {
   hasMicrophone: boolean;
   deafened: boolean;
   participants: CallParticipant[];
+  participantVolumes: Record<string, number>;
   startedAt: number;
   status:
     | 'connecting'

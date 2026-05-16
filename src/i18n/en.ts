@@ -163,6 +163,8 @@ export const copy = {
     linkHelp:
       'Creates a one-use link. The community key is stored in the URL fragment and is not sent to the server.',
     linkInvite: 'Invite by link',
+    linkKeyMissing:
+      'This invite link is missing the community key. Ask for a fresh link before joining.',
     loadError: 'Communities could not be loaded.',
     manage: 'Manage community',
     memberError: 'The member could not be added.',

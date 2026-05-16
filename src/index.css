@@ -70,6 +70,15 @@ button, input, textarea { font: inherit; }
   padding-top: env(safe-area-inset-top);
 }
 
+@media (min-width: 640px) {
+  .app-workspace {
+    height: calc(100dvh - 1rem);
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+    padding-left: max(env(safe-area-inset-left), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
+  }
+}
+
 button:not(:disabled),
 a[href],
 summary,

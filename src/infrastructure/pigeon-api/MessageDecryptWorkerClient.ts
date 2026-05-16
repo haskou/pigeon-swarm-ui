@@ -70,7 +70,12 @@ export class MessageDecryptWorkerClient {
       this.pending.set(requestId, { reject, resolve });
     });
     const abort = () => {
+      const pendingRequest = this.pending.get(requestId);
+
+      if (!pendingRequest) return;
+
       this.pending.delete(requestId);
+      pendingRequest.reject(abortError());
       this.worker.postMessage({ requestId, type: 'cancel' });
     };
 
