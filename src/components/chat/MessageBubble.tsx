@@ -486,6 +486,33 @@ function LinkPreviewCard({
   title,
   url,
 }: LinkPreview & { mine: boolean }) {
+  const [metaImageUrl, setMetaImageUrl] = useState<string | null>(() =>
+    directImagePreviewUrl(url),
+  );
+
+  useEffect(() => {
+    if (directImagePreviewUrl(url)) {
+      setMetaImageUrl(directImagePreviewUrl(url));
+
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setMetaImageUrl(null);
+    void loadMetaImageUrl(url, controller.signal)
+      .then((imageUrl) => {
+        if (!cancelled) setMetaImageUrl(imageUrl);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [url]);
+
   return (
     <a
       href={url}
@@ -498,6 +525,14 @@ function LinkPreviewCard({
           : 'border-white/10 bg-white/8',
       )}
     >
+      {metaImageUrl && (
+        <img
+          src={metaImageUrl}
+          alt=""
+          className="-mx-3 -mt-3 mb-3 aspect-[1.91/1] w-[calc(100%+1.5rem)] object-cover"
+          onError={() => setMetaImageUrl(null)}
+        />
+      )}
       <span className="flex items-center gap-2 text-xs font-black uppercase text-white/45">
         <img
           src={faviconUrl}
@@ -596,6 +631,53 @@ function readableLinkTitle(url: URL): string {
   if (pathnameTitle) return pathnameTitle;
 
   return url.hostname.replace(/^www\./, '');
+}
+
+function directImagePreviewUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const extension = url.pathname.split('.').pop()?.toLowerCase();
+
+    return extension &&
+      ['avif', 'gif', 'jpeg', 'jpg', 'png', 'webp'].includes(extension)
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadMetaImageUrl(
+  value: string,
+  signal: AbortSignal,
+): Promise<null | string> {
+  const response = await fetch(value, { signal });
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!response.ok || !contentType.includes('text/html')) return null;
+
+  const html = await response.text();
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const image =
+    metaContent(document, 'property', 'og:image:secure_url') ??
+    metaContent(document, 'property', 'og:image') ??
+    metaContent(document, 'name', 'twitter:image') ??
+    metaContent(document, 'name', 'twitter:image:src');
+
+  return image ? new URL(image, value).toString() : null;
+}
+
+function metaContent(
+  document: Document,
+  attribute: 'name' | 'property',
+  value: string,
+): null | string {
+  const content = document
+    .querySelector(`meta[${attribute}="${value}"]`)
+    ?.getAttribute('content')
+    ?.trim();
+
+  return content || null;
 }
 
 function CallEventMessage({
