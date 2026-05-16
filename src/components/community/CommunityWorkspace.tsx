@@ -48,6 +48,7 @@ import {
   decryptCommunityChannelPayload,
   encryptCommunityChannelPayload,
 } from '../../domain/communities/communityChannelPayloadCipher';
+import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
@@ -1083,6 +1084,64 @@ export function CommunityWorkspace({
     }
   };
 
+  const handleToggleChannelMessageReaction = async (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => {
+    if (!selectedChannelId) return;
+
+    const channelId = selectedChannelId;
+
+    setSendError(null);
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === message.id
+          ? updateMessageReaction(
+              item,
+              session.identity.id,
+              emoji,
+              reacted ? 'remove' : 'add',
+            )
+          : item,
+      ),
+    );
+
+    try {
+      if (reacted) {
+        await pigeonApplication.removeCommunityChannelMessageReaction(
+          session,
+          community.id,
+          channelId,
+          message.id,
+          emoji,
+        );
+      } else {
+        await pigeonApplication.addCommunityChannelMessageReaction(
+          session,
+          community.id,
+          channelId,
+          message.id,
+          emoji,
+        );
+      }
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === message.id
+            ? updateMessageReaction(
+                item,
+                session.identity.id,
+                emoji,
+                reacted ? 'add' : 'remove',
+              )
+            : item,
+        ),
+      );
+    }
+  };
+
   const loadAttachmentPreview = useCallback(
     async (
       attachment: MessageAttachment,
@@ -1181,6 +1240,38 @@ export function CommunityWorkspace({
 
       setMessages((current) =>
         current.filter((message) => message.id !== targetMessageId),
+      );
+      return;
+    }
+
+    if (
+      realtimeEvent.type === 'communities.v1.channel.message.reaction.was_added' ||
+      realtimeEvent.type ===
+        'communities.v1.channel.message.reaction.was_removed'
+    ) {
+      const messageId = realtimeStringAttribute(realtimeEvent, 'messageId');
+      const authorIdentityId = realtimeStringAttribute(
+        realtimeEvent,
+        'authorId',
+      );
+      const emoji = realtimeStringAttribute(realtimeEvent, 'emoji');
+
+      if (!messageId || !authorIdentityId || !emoji) return;
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? updateMessageReaction(
+                message,
+                authorIdentityId,
+                emoji,
+                realtimeEvent.type.endsWith('.was_added') ? 'add' : 'remove',
+                typeof realtimeEvent.attributes.createdAt === 'number'
+                  ? realtimeEvent.attributes.createdAt
+                  : realtimeEvent.occurred_on,
+              )
+            : message,
+        ),
       );
       return;
     }
@@ -1683,6 +1774,13 @@ export function CommunityWorkspace({
                                   y,
                                 })
                               }
+                              onReactionToggle={(targetMessage, emoji, reacted) =>
+                                void handleToggleChannelMessageReaction(
+                                  targetMessage,
+                                  emoji,
+                                  reacted,
+                                )
+                              }
                               onReplyReferenceClick={handleReplyReferenceClick}
                               onRetryMessage={retryChannelMessage}
                               reactionAuthorNames={reactionAuthorNames}
@@ -1887,6 +1985,7 @@ export function CommunityWorkspace({
       )}
       {messageContextMenu && (
         <MessageContextMenu
+          currentIdentityId={session.identity.id}
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
           onDelete={
@@ -1899,6 +1998,9 @@ export function CommunityWorkspace({
             setReplyTarget(messageContextMenu.message);
             setMessageContextMenu(null);
           }}
+          onReactionToggle={(message, emoji, reacted) =>
+            void handleToggleChannelMessageReaction(message, emoji, reacted)
+          }
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);

@@ -1182,6 +1182,70 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('adds community channel message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.addCommunityChannelMessageReaction(
+        session,
+        'community/1',
+        'channel/1',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/communities/community%2F1/channels/channel%2F1/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('removes community channel message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.removeCommunityChannelMessageReaction(
+        session,
+        'community/1',
+        'channel/1',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/communities/community%2F1/channels/channel%2F1/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
+    });
+  });
+
   it('loads public IPFS content by encoded cid', async () => {
     const content = {
       cid: 'bafy/avatar',

@@ -8,6 +8,10 @@ import {
   type EmojiSuggestion,
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
+import {
+  loadRecentReactionEmojis,
+  saveRecentReactionEmoji,
+} from '../../utils/recentReactionEmojis';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -38,9 +42,12 @@ export function MessageContextMenu({
 }) {
   const [emojiSearchOpen, setEmojiSearchOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState('');
+  const [recentEmojis, setRecentEmojis] = useState(() =>
+    loadRecentReactionEmojis(currentIdentityId),
+  );
   const quickReactions = useMemo(
-    () => quickReactionOptions(menu.message),
-    [menu.message],
+    () => quickReactionOptions(menu.message, recentEmojis),
+    [menu.message, recentEmojis],
   );
   const emojiSuggestions = useMemo(
     () => searchEmojiSuggestions(emojiQuery, 24),
@@ -56,6 +63,7 @@ export function MessageContextMenu({
         ),
     );
 
+    setRecentEmojis(saveRecentReactionEmoji(currentIdentityId, emoji));
     onReactionToggle?.(menu.message, emoji, reacted);
     onClose();
   };
@@ -189,7 +197,10 @@ function hasReacted(
   );
 }
 
-function quickReactionOptions(message: ChatMessage): string[] {
+function quickReactionOptions(
+  message: ChatMessage,
+  recentEmojis: string[],
+): string[] {
   const byEmoji = new Map<string, number>();
 
   for (const reaction of message.reactions) {
@@ -199,7 +210,7 @@ function quickReactionOptions(message: ChatMessage): string[] {
   const existing = [...byEmoji.entries()]
     .sort((left, right) => right[1] - left[1])
     .map(([emoji]) => emoji);
-  const merged = [...existing, ...defaultReactionOptions];
+  const merged = [...recentEmojis, ...existing, ...defaultReactionOptions];
 
   return [...new Set(merged)].slice(0, 6);
 }

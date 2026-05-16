@@ -642,6 +642,38 @@ export class PigeonApplication {
     );
   }
 
+  public async addCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.gateway.addCommunityChannelMessageReaction(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      emoji,
+    );
+  }
+
+  public async removeCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.gateway.removeCommunityChannelMessageReaction(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      emoji,
+    );
+  }
+
   public async updateIdentityProfile(
     session: Session,
     profile: IdentityUpdateProfileInput,

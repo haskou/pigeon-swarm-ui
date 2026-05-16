@@ -559,6 +559,48 @@ export class PigeonApiGateway {
     });
   }
 
+  public async addCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.communityChannelMessageReactionsPath(
+      communityId,
+      channelId,
+      messageId,
+    );
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async removeCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.communityChannelMessageReactionsPath(
+      communityId,
+      channelId,
+      messageId,
+    );
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
+  }
+
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
     return await this.files.getPublicFile(cid);
   }
@@ -1592,6 +1634,18 @@ export class PigeonApiGateway {
     messageId: string,
   ): string {
     return `${this.messagePath(conversationId, messageId)}/reactions`;
+  }
+
+  private communityChannelMessageReactionsPath(
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): string {
+    return `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/reactions`;
   }
 
   private messagesAroundPath(

@@ -40,6 +40,7 @@ import {
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { mergeMessages } from '../../domain/messages/mergeMessages';
+import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import {
   communityChannels,
   communityTextChannels,
@@ -196,31 +197,6 @@ function conversationNotificationPreview(
     copy.chat.directMessage;
 
   return { body: copy.chat.directMessage, title: peerName };
-}
-
-function updateMessageReaction(
-  message: ChatMessage,
-  authorIdentityId: string,
-  emoji: string,
-  action: 'add' | 'remove',
-): ChatMessage {
-  const withoutReaction = message.reactions.filter(
-    (reaction) =>
-      reaction.authorIdentityId !== authorIdentityId || reaction.emoji !== emoji,
-  );
-  const reactions =
-    action === 'add'
-      ? [
-          ...withoutReaction,
-          { authorIdentityId, createdAt: Date.now(), emoji },
-        ]
-      : withoutReaction;
-
-  return {
-    ...message,
-    raw: { ...message.raw, reactions },
-    reactions,
-  };
 }
 
 interface GlassWorkspaceProps {
@@ -2137,6 +2113,8 @@ export function GlassWorkspace({
 
       if (
         event.type === 'communities.v1.channel.message.was_deleted' ||
+        event.type === 'communities.v1.channel.message.reaction.was_added' ||
+        event.type === 'communities.v1.channel.message.reaction.was_removed' ||
         event.type === 'communities.v1.call.event.was_recorded'
       ) {
         setCommunityRealtimeEvent(event);
