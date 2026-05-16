@@ -736,11 +736,13 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     before?: null | string,
+    options?: { signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
     return await this.loadMessagesUseCase.execute(
       session,
       conversationId,
       before,
+      options,
     );
   }
 

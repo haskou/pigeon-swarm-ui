@@ -301,6 +301,7 @@ export function GlassWorkspace({
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
   const messageCursorRef = useRef<string | null>(null);
+  const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -1647,7 +1648,10 @@ export function GlassWorkspace({
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
       const requestId = messageRequestRef.current + 1;
+      const controller = new AbortController();
 
+      messageAbortRef.current?.abort();
+      messageAbortRef.current = controller;
       messageRequestRef.current = requestId;
       setMessages([]);
       updateMessageCursor(null);
@@ -1657,16 +1661,22 @@ export function GlassWorkspace({
         const result = await pigeonApplication.loadMessages(
           sessionRef.current,
           conversationId,
+          null,
+          { signal: controller.signal },
         );
 
         if (messageRequestRef.current !== requestId) return;
 
-        setMessages(result.messages);
-        updateMessageCursor(result.nextCursor ?? null);
+        startTransition(() => {
+          setMessages(result.messages);
+          updateMessageCursor(result.nextCursor ?? null);
+          setMessageLoadState('idle');
+        });
         markConversationReadUntil(conversationId, result.messages);
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
+        if (controller.signal.aborted) return;
 
         setMessages([]);
         setMessageLoadState('error');
@@ -1678,7 +1688,9 @@ export function GlassWorkspace({
       }
       if (messageRequestRef.current !== requestId) return;
 
-      setMessageLoadState('idle');
+      if (messageAbortRef.current === controller) {
+        messageAbortRef.current = null;
+      }
     },
     [
       markConversationReadUntil,
@@ -1696,6 +1708,8 @@ export function GlassWorkspace({
     lastScrollTopRef.current = 0;
 
     if (!activeConversationKeyId) {
+      messageAbortRef.current?.abort();
+      messageAbortRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;

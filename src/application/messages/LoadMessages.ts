@@ -9,7 +9,13 @@ export class LoadMessages {
     session: Session,
     conversationId: string,
     before?: null | string,
+    options?: { signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.gateway.loadMessages(session, conversationId, before);
+    return await this.gateway.loadMessages(
+      session,
+      conversationId,
+      before,
+      options,
+    );
   }
 }
