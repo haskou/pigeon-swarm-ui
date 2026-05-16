@@ -404,7 +404,7 @@ function groupMessageReactions(
 ): ReactionGroup[] {
   const byEmoji = new Map<string, ReactionGroup>();
 
-  for (const reaction of reactions) {
+  for (const reaction of reactions ?? []) {
     const current = byEmoji.get(reaction.emoji) ?? {
       authors: [],
       count: 0,
