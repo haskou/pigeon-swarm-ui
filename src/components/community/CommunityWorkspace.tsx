@@ -1253,6 +1253,7 @@ export function CommunityWorkspace({
       const authorIdentityId = realtimeStringAttribute(
         realtimeEvent,
         'authorId',
+        'authorIdentityId',
       );
       const emoji = realtimeStringAttribute(realtimeEvent, 'emoji');
 
@@ -2208,11 +2209,15 @@ function mergeChatMessages(
 
 function realtimeStringAttribute(
   event: RealtimeDomainEvent,
-  key: string,
+  ...keys: string[]
 ): string | undefined {
-  const value = event.attributes[key];
+  for (const key of keys) {
+    const value = event.attributes[key];
 
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+
+  return undefined;
 }
 
 function realtimeMessageAttribute(
