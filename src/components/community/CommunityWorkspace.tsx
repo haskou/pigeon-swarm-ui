@@ -48,6 +48,7 @@ import {
   decryptCommunityChannelPayload,
   encryptCommunityChannelPayload,
 } from '../../domain/communities/communityChannelPayloadCipher';
+import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
@@ -57,7 +58,7 @@ import {
   shortId,
 } from '../../utils/formatting';
 import { normalizeIdentityId } from '../../utils/identityId';
-import { identityName } from '../../utils/identityDisplay';
+import { identityBanner, identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
@@ -108,6 +109,10 @@ interface CommunityWorkspaceProps {
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
   onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
+  onOpenConversationWithIdentity?: (
+    identityId: string,
+    identity?: IdentityResource,
+  ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
@@ -194,6 +199,7 @@ export function CommunityWorkspace({
   onMobileSidebarClose,
   onOpenMobileSidebar,
   onJoinVoiceChannel,
+  onOpenConversationWithIdentity,
   onRealtimeEventsOpen,
   onSessionUpdated,
   realtimeEvent,
@@ -543,6 +549,16 @@ export function CommunityWorkspace({
         : {},
     [memberPictures, session.identity.id],
   );
+  const reactionAuthorNames = useMemo(
+    () =>
+      Object.fromEntries(
+        community.memberIds.map((identityId) => [
+          identityId,
+          memberDisplayName(memberIdentities[identityId], identityId),
+        ]),
+      ),
+    [community.memberIds, memberIdentities],
+  );
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
       const identity =
@@ -754,6 +770,7 @@ export function CommunityWorkspace({
         id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
         mine: authorIdentityId === session.identity.id,
         raw: rawMessage,
+        reactions: rawMessage.reactions ?? [],
         timestamp: rawMessage.createdAt ?? Date.now(),
       };
 
@@ -938,6 +955,7 @@ export function CommunityWorkspace({
           id: optimisticId,
           type: 'sent',
         },
+        reactions: [],
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
         timestamp,
@@ -1071,6 +1089,64 @@ export function CommunityWorkspace({
     }
   };
 
+  const handleToggleChannelMessageReaction = async (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => {
+    if (!selectedChannelId) return;
+
+    const channelId = selectedChannelId;
+
+    setSendError(null);
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === message.id
+          ? updateMessageReaction(
+              item,
+              session.identity.id,
+              emoji,
+              reacted ? 'remove' : 'add',
+            )
+          : item,
+      ),
+    );
+
+    try {
+      if (reacted) {
+        await pigeonApplication.removeCommunityChannelMessageReaction(
+          session,
+          community.id,
+          channelId,
+          message.id,
+          emoji,
+        );
+      } else {
+        await pigeonApplication.addCommunityChannelMessageReaction(
+          session,
+          community.id,
+          channelId,
+          message.id,
+          emoji,
+        );
+      }
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === message.id
+            ? updateMessageReaction(
+                item,
+                session.identity.id,
+                emoji,
+                reacted ? 'add' : 'remove',
+              )
+            : item,
+        ),
+      );
+    }
+  };
+
   const loadAttachmentPreview = useCallback(
     async (
       attachment: MessageAttachment,
@@ -1174,6 +1250,39 @@ export function CommunityWorkspace({
     }
 
     if (
+      realtimeEvent.type === 'communities.v1.channel.message.reaction.was_added' ||
+      realtimeEvent.type ===
+        'communities.v1.channel.message.reaction.was_removed'
+    ) {
+      const messageId = realtimeStringAttribute(realtimeEvent, 'messageId');
+      const authorIdentityId = realtimeStringAttribute(
+        realtimeEvent,
+        'authorId',
+        'authorIdentityId',
+      );
+      const emoji = realtimeStringAttribute(realtimeEvent, 'emoji');
+
+      if (!messageId || !authorIdentityId || !emoji) return;
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? updateMessageReaction(
+                message,
+                authorIdentityId,
+                emoji,
+                realtimeEvent.type.endsWith('.was_added') ? 'add' : 'remove',
+                typeof realtimeEvent.attributes.createdAt === 'number'
+                  ? realtimeEvent.attributes.createdAt
+                  : realtimeEvent.occurred_on,
+              )
+            : message,
+        ),
+      );
+      return;
+    }
+
+    if (
       realtimeEvent.type !== 'communities.v1.channel.message.was_sent' &&
       realtimeEvent.type !== 'communities.v1.call.event.was_recorded'
     ) {
@@ -1240,14 +1349,14 @@ export function CommunityWorkspace({
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
-        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
           <div className="lg:hidden">{mobileRail}</div>
-          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
             <div className="min-w-0">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.privateCommunity}
               </div>
-              <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
+              <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
                 {bannerUrl ? (
                   <button
                     type="button"
@@ -1298,12 +1407,12 @@ export function CommunityWorkspace({
               />
               <div className="space-y-2">
                 {textChannels.length === 0 && voiceChannels.length === 0 ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noChannels}
                   </div>
                 ) : visibleTextChannels.length === 0 &&
                   visibleVoiceChannels.length === 0 ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noMatchingChannels}
                   </div>
                 ) : (
@@ -1388,7 +1497,7 @@ export function CommunityWorkspace({
         </div>
       </aside>
 
-      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
+      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
         <header className="border-b border-white/10 p-4 sm:p-5">
           <div className="flex items-center gap-3">
             <button
@@ -1497,7 +1606,7 @@ export function CommunityWorkspace({
                         setCommunityDataOpen(true);
                         setCommunityMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {copy.chat.viewData}
                     </button>
@@ -1513,7 +1622,7 @@ export function CommunityWorkspace({
 
                         setCommunityMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {communityKey
                         ? copy.chat.copyPrivateKey
@@ -1523,7 +1632,7 @@ export function CommunityWorkspace({
                       type="button"
                       onClick={() => void leaveCommunity()}
                       disabled={communityLeaving}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
                     >
                       {communityLeaving
                         ? copy.communities.leaving
@@ -1539,7 +1648,7 @@ export function CommunityWorkspace({
         {!selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
             <div className="max-w-md">
-              <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 text-3xl font-black">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10 text-3xl font-black">
                 #
               </div>
               <h2 className="mt-5 text-2xl font-black">
@@ -1575,7 +1684,7 @@ export function CommunityWorkspace({
                     )}
                   {missingCommunityKey && (
                     <div className="grid min-h-[28vh] place-items-center">
-                      <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
                         <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
                           <LockIcon locked={false} />
                         </div>
@@ -1671,8 +1780,16 @@ export function CommunityWorkspace({
                                   y,
                                 })
                               }
+                              onReactionToggle={(targetMessage, emoji, reacted) =>
+                                void handleToggleChannelMessageReaction(
+                                  targetMessage,
+                                  emoji,
+                                  reacted,
+                                )
+                              }
                               onReplyReferenceClick={handleReplyReferenceClick}
                               onRetryMessage={retryChannelMessage}
+                              reactionAuthorNames={reactionAuthorNames}
                               replyImage={
                                 replyMessage?.attachments.find((attachment) =>
                                   isBrowserPreviewImage(
@@ -1709,7 +1826,7 @@ export function CommunityWorkspace({
                     })}
                   {visibleMessages.length === 0 &&
                     messageState !== 'loading' && (
-                      <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                         {copy.communities.emptyChannel}
                       </div>
                     )}
@@ -1759,7 +1876,7 @@ export function CommunityWorkspace({
         )}
       </section>
 
-      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-[2rem] p-4 xl:block">
+      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block">
         <button
           type="button"
           onClick={() => setMemberOpen(true)}
@@ -1869,11 +1986,22 @@ export function CommunityWorkspace({
           )}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          onOpenConversation={
+            profileViewer.identityId === session.identity.id ||
+            !onOpenConversationWithIdentity
+              ? undefined
+              : () =>
+                  onOpenConversationWithIdentity(
+                    profileViewer.identityId,
+                    profileViewer.identity,
+                  )
+          }
           picture={profileViewer.pictureUrl}
         />
       )}
       {messageContextMenu && (
         <MessageContextMenu
+          currentIdentityId={session.identity.id}
           menu={messageContextMenu}
           onClose={() => setMessageContextMenu(null)}
           onDelete={
@@ -1886,6 +2014,9 @@ export function CommunityWorkspace({
             setReplyTarget(messageContextMenu.message);
             setMessageContextMenu(null);
           }}
+          onReactionToggle={(message, emoji, reacted) =>
+            void handleToggleChannelMessageReaction(message, emoji, reacted)
+          }
           onViewRaw={() => {
             setRawMessage(messageContextMenu.message);
             setMessageContextMenu(null);
@@ -1979,7 +2110,7 @@ function VoiceChannelButton({
               type="button"
               onClick={(event) => onParticipantClick(participant, event)}
               className={cx(
-                'flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
+                'flex w-full items-center gap-2 rounded-2xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
                 active && participant.speaking
                   ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
                   : 'border-transparent text-white/55',
@@ -2034,21 +2165,35 @@ function MemberRow({
 }) {
   const name = memberPrimaryName(identity, identityId);
   const handle = identity?.profile.handle?.trim();
+  const bannerUrl = useIdentityBannerUrl(identity);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative flex w-full items-center gap-3 rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
     >
-      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+      {bannerUrl && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${bannerUrl})`,
+            maskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+            WebkitMaskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+          }}
+        />
+      )}
+      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
         {pictureUrl ? (
           <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           name.slice(0, 1).toUpperCase()
         )}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1">
         <div className="truncate text-sm font-black">{name}</div>
         <div className="truncate text-xs text-white/45">
           {handle ? `@${handle}` : shortId(identityId)}
@@ -2064,6 +2209,42 @@ function MemberRow({
       )}
     </button>
   );
+}
+
+function useIdentityBannerUrl(identity?: IdentityResource): string | null {
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!identity?.profile.banner) {
+      setBannerUrl(null);
+
+      return;
+    }
+
+    const directBanner = identityBanner(identity);
+
+    if (directBanner) {
+      setBannerUrl(directBanner);
+
+      return;
+    }
+
+    let cancelled = false;
+    const bannerCid = identity.profile.banner.trim();
+
+    setBannerUrl(null);
+    void loadPublicImage(bannerCid)
+      .then((loadedBanner) => {
+        if (!cancelled) setBannerUrl(loadedBanner);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
+  return bannerUrl;
 }
 
 function resolveCommunityChannelId(
@@ -2093,11 +2274,15 @@ function mergeChatMessages(
 
 function realtimeStringAttribute(
   event: RealtimeDomainEvent,
-  key: string,
+  ...keys: string[]
 ): string | undefined {
-  const value = event.attributes[key];
+  for (const key of keys) {
+    const value = event.attributes[key];
 
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+
+  return undefined;
 }
 
 function realtimeMessageAttribute(

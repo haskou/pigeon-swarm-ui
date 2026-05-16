@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { RefObject } from 'react';
 
 import type { Session } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -12,6 +13,24 @@ type RealtimeHandlers = {
   onReconnecting?: () => void;
 };
 
+type RealtimeSubscription = {
+  handlersRef: RefObject<RealtimeHandlers>;
+};
+
+type SharedRealtimeConnection = {
+  attempt: number;
+  closeTimer?: number;
+  connect: () => Promise<void>;
+  connectPromise: Promise<void> | null;
+  reconnectTimer?: number;
+  session: Session;
+  socket: WebSocket | null;
+  subscribers: Set<RealtimeSubscription>;
+};
+
+const realtimeConnections = new Map<string, SharedRealtimeConnection>();
+const sharedConnectionCloseDelayMs = 1000;
+
 export function useRealtimeEvents(
   session: Session,
   handlers: RealtimeHandlers,
@@ -23,73 +42,159 @@ export function useRealtimeEvents(
   }, [handlers]);
 
   useEffect(() => {
-    let cancelled = false;
-    let reconnectTimer: number | undefined;
-    let socket: WebSocket | null = null;
-    let attempt = 0;
-    let connect = (): Promise<void> => Promise.resolve();
+    const subscription = { handlersRef };
+    const connection = subscribeRealtime(session, subscription);
 
-    const scheduleReconnect = () => {
-      if (cancelled) return;
-
-      handlersRef.current.onReconnecting?.();
-      const delay = Math.min(30000, 1000 * 2 ** attempt);
-      const jitter = Math.floor(Math.random() * 500);
-
-      attempt += 1;
-      reconnectTimer = window.setTimeout(() => {
-        void connect();
-      }, delay + jitter);
+    return () => {
+      unsubscribeRealtime(connection, subscription);
     };
+  }, [session.encryptedKeyPair, session.identity.id, session.password]);
+}
 
-    connect = async () => {
-      try {
-        const nextSocket = await pigeonApplication.connectRealtime(
-          session,
-          (message) => {
-            if (cancelled) return;
+function subscribeRealtime(
+  session: Session,
+  subscription: RealtimeSubscription,
+): SharedRealtimeConnection {
+  const key = realtimeConnectionKey(session);
+  const connection =
+    realtimeConnections.get(key) ?? createRealtimeConnection(key, session);
 
-            if (message.type === 'connection_ack') {
-              handlersRef.current.onConnected?.();
+  if (connection.closeTimer !== undefined) {
+    window.clearTimeout(connection.closeTimer);
+    connection.closeTimer = undefined;
+  }
 
-              return;
-            }
+  connection.subscribers.add(subscription);
 
-            if (message.type === 'heartbeat_ack') return;
+  if (!connection.socket && !connection.connectPromise) {
+    void connection.connect();
+  } else if (connection.socket?.readyState === WebSocket.OPEN) {
+    subscription.handlersRef.current.onConnected?.();
+  }
 
-            handlersRef.current.onDomainEvent(message.event);
-          },
-        );
+  return connection;
+}
 
-        if (cancelled) {
-          nextSocket.close();
+function unsubscribeRealtime(
+  connection: SharedRealtimeConnection,
+  subscription: RealtimeSubscription,
+): void {
+  connection.subscribers.delete(subscription);
+  subscription.handlersRef.current.onDisconnected?.();
+
+  if (connection.subscribers.size > 0) return;
+
+  if (connection.reconnectTimer !== undefined) {
+    window.clearTimeout(connection.reconnectTimer);
+    connection.reconnectTimer = undefined;
+  }
+
+  connection.closeTimer = window.setTimeout(() => {
+    if (connection.subscribers.size > 0) return;
+
+    connection.socket?.close();
+    connection.socket = null;
+    connection.connectPromise = null;
+    realtimeConnections.delete(realtimeConnectionKey(connection.session));
+  }, sharedConnectionCloseDelayMs);
+}
+
+function createRealtimeConnection(
+  key: string,
+  session: Session,
+): SharedRealtimeConnection {
+  const connection: SharedRealtimeConnection = {
+    attempt: 0,
+    connect: () => Promise.resolve(),
+    connectPromise: null,
+    session,
+    socket: null,
+    subscribers: new Set(),
+  };
+
+  connection.connect = async () => {
+    if (connection.connectPromise) return connection.connectPromise;
+
+    connection.connectPromise = connectRealtime(connection).finally(() => {
+      connection.connectPromise = null;
+    });
+
+    return connection.connectPromise;
+  };
+
+  realtimeConnections.set(key, connection);
+
+  return connection;
+}
+
+async function connectRealtime(
+  connection: SharedRealtimeConnection,
+): Promise<void> {
+  try {
+    const nextSocket = await pigeonApplication.connectRealtime(
+      connection.session,
+      (message) => {
+        if (message.type === 'connection_ack') {
+          notifySubscribers(connection, (handlers) => handlers.onConnected?.());
 
           return;
         }
 
-        socket = nextSocket;
+        if (message.type === 'heartbeat_ack') return;
 
-        socket.addEventListener('open', () => {
-          attempt = 0;
-        });
-        socket.addEventListener('close', scheduleReconnect);
-        socket.addEventListener('error', () => {
-          handlersRef.current.onDisconnected?.();
-          socket?.close();
-        });
-      } catch {
-        scheduleReconnect();
-      }
-    };
+        notifySubscribers(connection, (handlers) =>
+          handlers.onDomainEvent(message.event),
+        );
+      },
+    );
 
-    void connect();
+    if (connection.subscribers.size === 0) {
+      nextSocket.close();
 
-    return () => {
-      cancelled = true;
+      return;
+    }
 
-      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
-      handlersRef.current.onDisconnected?.();
-      socket?.close();
-    };
-  }, [session.encryptedKeyPair, session.identity.id, session.password]);
+    connection.socket = nextSocket;
+    nextSocket.addEventListener('open', () => {
+      connection.attempt = 0;
+    });
+    nextSocket.addEventListener('close', () => {
+      if (connection.socket === nextSocket) connection.socket = null;
+      scheduleRealtimeReconnect(connection);
+    });
+    nextSocket.addEventListener('error', () => {
+      notifySubscribers(connection, (handlers) => handlers.onDisconnected?.());
+      nextSocket.close();
+    });
+  } catch {
+    scheduleRealtimeReconnect(connection);
+  }
+}
+
+function scheduleRealtimeReconnect(connection: SharedRealtimeConnection): void {
+  if (connection.subscribers.size === 0) return;
+  if (connection.reconnectTimer !== undefined) return;
+
+  notifySubscribers(connection, (handlers) => handlers.onReconnecting?.());
+  const delay = Math.min(30000, 1000 * 2 ** connection.attempt);
+  const jitter = Math.floor(Math.random() * 500);
+
+  connection.attempt += 1;
+  connection.reconnectTimer = window.setTimeout(() => {
+    connection.reconnectTimer = undefined;
+    void connection.connect();
+  }, delay + jitter);
+}
+
+function notifySubscribers(
+  connection: SharedRealtimeConnection,
+  notify: (handlers: RealtimeHandlers) => void,
+): void {
+  connection.subscribers.forEach((subscription) => {
+    notify(subscription.handlersRef.current);
+  });
+}
+
+function realtimeConnectionKey(session: Session): string {
+  return session.identity.id;
 }

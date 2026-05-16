@@ -1,4 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Community, Session } from '../../domain/types';
@@ -7,6 +14,7 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 
 interface CreateCommunityDialogProps {
   nodeNetworks: NodeNetwork[];
@@ -14,6 +22,11 @@ interface CreateCommunityDialogProps {
   onCreated: (input: { community: Community; session: Session }) => void;
   session: Session;
 }
+
+type InitialChannelDraft = {
+  name: string;
+  type: 'text' | 'voice';
+};
 
 export function CreateCommunityDialog({
   nodeNetworks,
@@ -30,6 +43,15 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [imageEditor, setImageEditor] = useState<{
+    file: File;
+    shape: 'avatar' | 'banner';
+  } | null>(null);
+  const [channelName, setChannelName] = useState('general');
+  const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
+  const [channels, setChannels] = useState<InitialChannelDraft[]>([
+    { name: 'general', type: 'text' },
+  ]);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,11 +109,33 @@ export function CreateCommunityDialog({
   }, [banner]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setAvatar(event.target.files?.[0] ?? null);
+    const file = event.target.files?.[0];
+
+    if (file) setImageEditor({ file, shape: 'avatar' });
+    event.target.value = '';
   };
 
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setBanner(event.target.files?.[0] ?? null);
+    const file = event.target.files?.[0];
+
+    if (file) setImageEditor({ file, shape: 'banner' });
+    event.target.value = '';
+  };
+  const addChannel = () => {
+    const trimmed = channelName.trim();
+
+    if (!trimmed) return;
+
+    setChannels((current) => [
+      ...current,
+      { name: trimmed, type: channelType },
+    ]);
+    setChannelName('');
+  };
+  const removeChannel = (indexToRemove: number) => {
+    setChannels((current) =>
+      current.filter((_, index) => index !== indexToRemove),
+    );
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -104,6 +148,9 @@ export function CreateCommunityDialog({
       const created = await pigeonApplication.createCommunity(session, {
         avatar,
         banner,
+        channels: channels
+          .map((channel) => ({ ...channel, name: channel.name.trim() }))
+          .filter((channel) => channel.name.length > 0),
         description: description.trim(),
         name: name.trim(),
         networkId,
@@ -133,7 +180,7 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-[2rem]"
+        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -156,7 +203,7 @@ export function CreateCommunityDialog({
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
-            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+            <div className="overflow-hidden rounded-2xl bg-black/25">
               <button
                 type="button"
                 onClick={() => bannerInputRef.current?.click()}
@@ -182,7 +229,7 @@ export function CreateCommunityDialog({
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                   aria-label={copy.communities.avatar}
                 >
                   {avatarPreview ? (
@@ -232,7 +279,7 @@ export function CreateCommunityDialog({
               />
             </div>
 
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.network}
               </div>
@@ -245,6 +292,58 @@ export function CreateCommunityDialog({
               <p className="mt-3 text-xs leading-relaxed text-white/45">
                 {copy.communities.createBody}
               </p>
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.communities.initialChannels}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/45">
+                {copy.communities.initialChannelsBody}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={channelName}
+                  onChange={(event) => setChannelName(event.target.value)}
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  placeholder={copy.communities.initialChannelName}
+                />
+                <GlassSelect
+                  ariaLabel={copy.communities.channels}
+                  value={channelType}
+                  onChange={(value) =>
+                    setChannelType(value === 'voice' ? 'voice' : 'text')
+                  }
+                  options={[
+                    { label: 'Text', value: 'text' },
+                    { label: 'Voice', value: 'voice' },
+                  ]}
+                />
+                <button
+                  type="button"
+                  onClick={addChannel}
+                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15"
+                >
+                  {copy.communities.addInitialChannel}
+                </button>
+              </div>
+              {channels.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {channels.map((channel, index) => (
+                    <button
+                      type="button"
+                      key={`${channel.type}:${channel.name}:${index}`}
+                      onClick={() => removeChannel(index)}
+                      className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70 transition hover:bg-rose-500/15 hover:text-rose-100"
+                      title={copy.messages.delete}
+                    >
+                      {channel.type === 'voice' ? 'Voice' : 'Text'} #{
+                        channel.name
+                      }{' '}
+                      ×
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -272,6 +371,22 @@ export function CreateCommunityDialog({
               : copy.communities.create}
           </button>
         </div>
+        {imageEditor && (
+          <ImageCropEditor
+            file={imageEditor.file}
+            shape={imageEditor.shape}
+            onClose={() => setImageEditor(null)}
+            onApply={(file, previewUrl) => {
+              if (imageEditor.shape === 'avatar') {
+                setAvatar(file);
+                setAvatarPreview(previewUrl);
+              } else {
+                setBanner(file);
+                setBannerPreview(previewUrl);
+              }
+            }}
+          />
+        )}
       </form>
     </div>
   );

@@ -42,6 +42,14 @@ self.addEventListener('fetch', (event) => {
 
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
+  if (
+    url.pathname.startsWith('/node_modules/.vite/') ||
+    url.pathname.startsWith('/@vite/') ||
+    url.pathname.startsWith('/@react-refresh') ||
+    url.pathname.startsWith('/src/')
+  ) {
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -71,7 +79,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(cacheVersion).then((cache) => cache.put(request, copy));
 
           return response;
-        }),
+        }).catch(() => cached ?? Response.error()),
     ),
   );
 });

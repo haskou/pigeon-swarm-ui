@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DDD Subagent Output Schema",
+  "type": "object",
+  "required": [
+    "agent_role",
+    "analyzed_modules",
+    "new_module_candidates",
+    "global_risks"
+  ],
+  "properties": {
+    "agent_role": {
+      "enum": [
+        "domain",
+        "application",
+        "infrastructure",
+        "presentation"
+      ]
+    },
+    "analyzed_modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "module",
+          "confidence",
+          "summary",
+          "ubiquitous_language_terms",
+          "elements",
+          "misplaced_responsibilities",
+          "open_questions"
+        ],
+        "properties": {
+          "module": {
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "name",
+                "target_path",
+                "current_paths",
+                "evidence",
+                "confidence"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "target_path": {
+                  "type": "string"
+                },
+                "current_paths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "evidence": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                }
+              }
+            }
+          },
+          "misplaced_responsibilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "current_path",
+                "issue",
+                "recommended_layer",
+                "confidence"
+              ],
+              "properties": {
+                "current_path": {
+                  "type": "string"
+                },
+                "issue": {
+                  "type": "string"
+                },
+                "recommended_layer": {
+                  "enum": [
+                    "domain",
+                    "application",
+                    "infrastructure",
+                    "presentation"
+                  ]
+                },
+                "confidence": {
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                }
+              }
+            }
+          },
+          "open_questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ubiquitous_language_terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "new_module_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "evidence",
+          "reason",
+          "confidence"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        }
+      }
+    },
+    "global_risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -139,7 +139,7 @@ export function NodeSettingsDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[2rem] shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
           <div>
             <h2 className="text-xl font-black">
@@ -161,7 +161,7 @@ export function NodeSettingsDialog({
 
         <div className="grid min-h-0 gap-5 overflow-y-auto p-5 lg:grid-cols-[1fr_1.1fr]">
           <div className="min-w-0">
-            <div className="mb-5 rounded-3xl bg-black/20 p-4">
+            <div className="mb-5 rounded-2xl bg-black/20 p-4">
               <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                 {copy.nodeSettings.server}
               </div>
@@ -241,7 +241,7 @@ export function NodeSettingsDialog({
                       type="button"
                       disabled
                       className={cx(
-                        'grid h-9 w-9 place-items-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-55',
+                        'grid h-9 w-9 place-items-center rounded-2xl transition disabled:cursor-not-allowed disabled:opacity-55',
                         selectedNetwork?.id === network.id
                           ? 'bg-slate-950/10 text-slate-700'
                           : 'bg-rose-500/10 text-rose-100',
@@ -272,7 +272,7 @@ export function NodeSettingsDialog({
 
           {isOwner ? (
             <div className="min-w-0 space-y-5">
-              <form onSubmit={handleJoin} className="rounded-3xl bg-black/20 p-4">
+              <form onSubmit={handleJoin} className="rounded-2xl bg-black/20 p-4">
                 <label className="block">
                   <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
                     {copy.nodeSettings.joinLabel}
@@ -296,7 +296,7 @@ export function NodeSettingsDialog({
                 </button>
               </form>
 
-            <div className="min-w-0 rounded-3xl bg-black/20 p-4">
+            <div className="min-w-0 rounded-2xl bg-black/20 p-4">
               <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                 {copy.nodeSettings.shareLabel}
               </div>
@@ -321,7 +321,7 @@ export function NodeSettingsDialog({
             </div>
           ) : (
             error && (
-              <div className="rounded-3xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
+              <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
                 {error}
               </div>
             )

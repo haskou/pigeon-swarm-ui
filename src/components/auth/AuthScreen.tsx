@@ -4,6 +4,8 @@ import type { ConversationResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
+import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
+import { ProfileName } from '../../domain/identities/profile/ProfileName';
 import { copy } from '../../i18n/en';
 import {
   clearSavedCredentials,
@@ -146,11 +148,11 @@ export function AuthScreen({
     <section className="app-screen relative z-10 grid place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
-          <div className="glass-panel-strong rounded-[2.5rem] p-8">
+          <div className="glass-panel-strong rounded-2xl p-8">
             <img
               src="/logo.png"
               alt="Pigeon Swarm"
-              className="floaty h-28 w-28 rounded-[2rem] shadow-2xl shadow-indigo-950/40"
+              className="floaty h-28 w-28 rounded-2xl shadow-2xl shadow-indigo-950/40"
             />
             <h1 className="mt-8 max-w-xl text-6xl font-black tracking-[-.07em]">
               {copy.auth.heroTitle}
@@ -177,7 +179,7 @@ export function AuthScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-[2.5rem] sm:p-7"
+          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-2xl sm:p-7"
         >
           <SegmentedControl
             value={mode}
@@ -202,6 +204,7 @@ export function AuthScreen({
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
+                    maxLength={ProfileName.MAX_LENGTH}
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="Ada"
                     autoComplete="name"
@@ -213,6 +216,7 @@ export function AuthScreen({
                     onChange={(event) =>
                       setHandle(normalizeHandleInput(event.target.value))
                     }
+                    maxLength={ProfileHandle.MAX_LENGTH}
                     className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                     placeholder="@ada"
                     autoComplete="username"

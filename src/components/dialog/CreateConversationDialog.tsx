@@ -334,7 +334,7 @@ export function CreateConversationDialog({
     <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-[2rem] sm:p-6"
+        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-2xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -364,8 +364,8 @@ export function CreateConversationDialog({
             }}
             className={
               mode === 'direct'
-                ? 'rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950'
-                : 'rounded-xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
+                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
+                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
             }
           >
             {copy.dialog.directConversation}
@@ -378,8 +378,8 @@ export function CreateConversationDialog({
             }}
             className={
               mode === 'group'
-                ? 'rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950'
-                : 'rounded-xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
+                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
+                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
             }
           >
             {copy.dialog.groupConversation}
@@ -510,7 +510,7 @@ export function CreateConversationDialog({
                         <button
                           type="button"
                           onClick={() => removeGroupParticipant(identity.id)}
-                          className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-lg font-black text-white/70 transition hover:bg-white/15"
+                          className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 text-lg font-black text-white/70 transition hover:bg-white/15"
                           aria-label={copy.dialog.removeParticipant}
                         >
                           ×

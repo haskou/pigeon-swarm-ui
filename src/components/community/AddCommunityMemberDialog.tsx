@@ -188,7 +188,7 @@ export function AddCommunityMemberDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]">
+      <section className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-2xl">
         <DialogHeader title={copy.communities.addMember} onClose={onClose} />
         <SegmentedControl
           className="mt-5"
@@ -243,7 +243,7 @@ export function AddCommunityMemberDialog({
               <input
                 readOnly
                 value={inviteLink}
-                className="mt-3 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70 outline-none"
+                className="mt-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70 outline-none"
                 onFocus={(event) => event.target.select()}
               />
             )}

@@ -22,6 +22,7 @@ import type {
   CommunityChannel,
   CommunityInviteLinkResource,
   CommunityTextChannel,
+  CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
   AttachmentProgress,
@@ -55,6 +56,7 @@ import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
+import { MessageDecryptWorkerClient } from './MessageDecryptWorkerClient';
 import { PigeonCallsApi } from './PigeonCallsApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
 import { RequestSigner } from './RequestSigner';
@@ -63,6 +65,26 @@ const defaultKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
 };
+
+const messageDecryptBatchSize = 5;
+
+type MessageLoadOptions = {
+  limit?: number;
+  signal?: AbortSignal;
+};
+
+function throwIfMessageLoadAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+
+  const error = new Error('Message load aborted');
+
+  error.name = 'AbortError';
+  throw error;
+}
+
+async function yieldAfterMessageDecryptBatch(): Promise<void> {
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+}
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort();
@@ -89,6 +111,8 @@ export class PigeonApiGateway {
 
   private readonly messages: MessageProjector;
 
+  private readonly messageDecryptWorker: MessageDecryptWorkerClient | null;
+
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -113,6 +137,8 @@ export class PigeonApiGateway {
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.keychains = keychains;
+    this.messageDecryptWorker =
+      typeof Worker === 'undefined' ? null : new MessageDecryptWorkerClient();
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.signer = signer;
@@ -366,13 +392,13 @@ export class PigeonApiGateway {
     session: Session,
     communityId: string,
     name: string,
-  ): Promise<CommunityChannel> {
+  ): Promise<CommunityVoiceChannel> {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/voice`;
     const body = { name };
 
-    return await this.http.request<CommunityChannel>(path, {
+    return await this.http.request<CommunityVoiceChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
@@ -550,6 +576,48 @@ export class PigeonApiGateway {
     )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
       messageId,
     )}`;
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
+  }
+
+  public async addCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.communityChannelMessageReactionsPath(
+      communityId,
+      channelId,
+      messageId,
+    );
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async removeCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.communityChannelMessageReactionsPath(
+      communityId,
+      channelId,
+      messageId,
+    );
+    const body = { emoji };
 
     await this.http.request(path, {
       body: JSON.stringify(body),
@@ -783,6 +851,33 @@ export class PigeonApiGateway {
     });
   }
 
+  public async acceptCommunityInviteLinkWithKey(
+    session: Session,
+    inviteToken: string,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<{
+    community: Community;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
+    const published = await this.publishKeychain(session, nextKeychain);
+    const community = await this.acceptCommunityInviteLink(
+      {
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      },
+      inviteToken,
+    );
+
+    return {
+      community,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
   public async createIdentity(
     name: string,
     password: string,
@@ -1002,8 +1097,13 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
     before?: null | string,
-    limit = 30,
+    limitOrOptions: MessageLoadOptions | number = 30,
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
+    const options =
+      typeof limitOrOptions === 'number'
+        ? { limit: limitOrOptions }
+        : limitOrOptions;
+    const limit = options.limit ?? 30;
     const path = this.messagesPath(conversationId, before, limit);
     const raw = await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
@@ -1016,12 +1116,11 @@ export class PigeonApiGateway {
     const normalized = this.messages.list(raw);
 
     return {
-      messages: await Promise.all(
-        normalized.messages
-          .filter((message) => message.type !== 'deleted')
-          .map((message) =>
-            this.decryptMessage(session, conversationId, message),
-          ),
+      messages: await this.decryptMessages(
+        session,
+        conversationId,
+        normalized.messages,
+        options.signal,
       ),
       nextCursor: normalized.nextCursor,
     };
@@ -1065,13 +1164,7 @@ export class PigeonApiGateway {
     const messages = envelope.messages ?? [];
 
     return {
-      messages: await Promise.all(
-        messages
-          .filter((message) => message.type !== 'deleted')
-          .map((message) =>
-            this.decryptMessage(session, conversationId, message),
-          ),
-      ),
+      messages: await this.decryptMessages(session, conversationId, messages),
       nextCursor: envelope.nextCursor ?? null,
       previousCursor: envelope.previousCursor ?? null,
     };
@@ -1287,6 +1380,38 @@ export class PigeonApiGateway {
     });
   }
 
+  public async addMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.messageReactionsPath(conversationId, messageId);
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async removeMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const path = this.messageReactionsPath(conversationId, messageId);
+    const body = { emoji };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
+  }
+
   public async updateNotification(
     session: Session,
     notificationId: string,
@@ -1348,6 +1473,65 @@ export class PigeonApiGateway {
       attachments,
       onProgress,
     );
+  }
+
+  private async decryptMessages(
+    session: Session,
+    conversationId: string,
+    messages: MessageResource[],
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]> {
+    const pendingMessages = messages.filter(
+      (message) => message.type !== 'deleted',
+    );
+    const key = conversationKeyEntry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+    );
+
+    if (this.messageDecryptWorker) {
+      return await this.messageDecryptWorker.decrypt(
+        {
+          copy: copy.messages,
+          currentIdentityId: session.identity.id,
+          messages: pendingMessages,
+          privateKey: key?.privateKey,
+        },
+        signal,
+      );
+    }
+
+    const decrypted: ChatMessage[] = [];
+
+    for (
+      let index = 0;
+      index < pendingMessages.length;
+      index += messageDecryptBatchSize
+    ) {
+      throwIfMessageLoadAborted(signal);
+
+      const batch = pendingMessages.slice(
+        index,
+        index + messageDecryptBatchSize,
+      );
+
+      decrypted.push(
+        ...(await Promise.all(
+          batch.map((message) =>
+            this.decryptMessage(session, conversationId, message),
+          ),
+        )),
+      );
+
+      throwIfMessageLoadAborted(signal);
+
+      if (index + messageDecryptBatchSize < pendingMessages.length) {
+        await yieldAfterMessageDecryptBatch();
+      }
+    }
+
+    return decrypted;
   }
 
   private isMissingRemoteKeychain(caught: unknown): boolean {
@@ -1525,6 +1709,25 @@ export class PigeonApiGateway {
     return `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages/${encodeURIComponent(messageId)}`;
+  }
+
+  private messageReactionsPath(
+    conversationId: string,
+    messageId: string,
+  ): string {
+    return `${this.messagePath(conversationId, messageId)}/reactions`;
+  }
+
+  private communityChannelMessageReactionsPath(
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): string {
+    return `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/reactions`;
   }
 
   private messagesAroundPath(

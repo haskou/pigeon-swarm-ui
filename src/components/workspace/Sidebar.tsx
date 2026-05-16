@@ -18,6 +18,9 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
+import { ProfileBiography } from '../../domain/identities/profile/ProfileBiography';
+import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
+import { ProfileName } from '../../domain/identities/profile/ProfileName';
 import { copy } from '../../i18n/en';
 import {
   getInitialLanguage,
@@ -32,6 +35,7 @@ import {
 } from '../../utils/credentialsValidation';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import {
+  identityBanner,
   identityDisplayName,
   identityPicture,
   type IdentityNames,
@@ -43,8 +47,10 @@ import {
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 import { SectionTitle } from '../common/SectionTitle';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
+import { loadPublicImage } from '../community/communityImages';
 
 interface SidebarProps {
   session: Session;
@@ -89,6 +95,14 @@ export function Sidebar({
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
+  const conversationBannerUrls = useIdentityBannerUrls(
+    identityProfiles,
+    filteredConversationPeerIdentityIds(
+      conversations,
+      session.identity.id,
+      session.keychain,
+    ),
+  );
   const conversationPeerId = (conversation: ConversationResource) =>
     conversationPeerIdentityId(
       conversation,
@@ -162,7 +176,7 @@ export function Sidebar({
   }, [conversationSearch, conversations, identityNames, identityProfiles]);
 
   return (
-    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
       <div className="mb-4 flex items-center justify-end lg:hidden">
         <button
           type="button"
@@ -191,7 +205,7 @@ export function Sidebar({
         />
         <div className="space-y-2">
           {filteredConversations.length === 0 && (
-            <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
               {copy.sidebar.emptyConversations}
             </div>
           )}
@@ -200,13 +214,26 @@ export function Sidebar({
               key={conversation.id}
               onClick={() => onSelect(conversation.id)}
               className={cx(
-                'w-full rounded-3xl p-3 text-left transition',
+                'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
                 activeConversationId === conversation.id
                   ? 'bg-white text-slate-950'
                   : 'bg-white/8 text-white hover:bg-white/14',
               )}
             >
-              <div className="flex items-center gap-3">
+              {conversationBannerUrls[conversation.id] && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${conversationBannerUrls[conversation.id]})`,
+                    maskImage:
+                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+                    WebkitMaskImage:
+                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+                  }}
+                />
+              )}
+              <div className="relative flex items-center gap-3">
                 <div
                   className={cx(
                     'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
@@ -265,6 +292,78 @@ export function Sidebar({
       />
     </aside>
   );
+}
+
+function filteredConversationPeerIdentityIds(
+  conversations: ConversationResource[],
+  currentIdentityId: string,
+  keychain: Session['keychain'],
+): Record<string, string> {
+  return Object.fromEntries(
+    conversations
+      .map((conversation) => [
+        conversation.id,
+        conversationPeerIdentityId(conversation, currentIdentityId, keychain),
+      ])
+      .filter((entry): entry is [string, string] => !!entry[1]),
+  );
+}
+
+function useIdentityBannerUrls(
+  identities: Record<string, IdentityResource>,
+  identityIdsByKey: Record<string, string>,
+): Record<string, string> {
+  const [bannerUrls, setBannerUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const entries = Object.entries(identityIdsByKey)
+      .map(([key, identityId]) => [key, identities[identityId]] as const)
+      .filter(
+        (entry): entry is readonly [string, IdentityResource] =>
+          !!entry[1]?.profile.banner && !bannerUrls[entry[0]],
+      );
+
+    if (entries.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      entries.map(async ([key, identity]) => {
+        const directBanner = identityBanner(identity);
+
+        if (directBanner) return [key, directBanner] as const;
+
+        const bannerCid = identity.profile.banner?.trim();
+
+        if (!bannerCid) return null;
+
+        const loadedBanner = await loadPublicImage(bannerCid);
+
+        return loadedBanner ? ([key, loadedBanner] as const) : null;
+      }),
+    )
+      .then((loaded) => {
+        if (cancelled) return;
+
+        const nextUrls = loaded.filter(
+          (entry): entry is readonly [string, string] => entry !== null,
+        );
+
+        if (nextUrls.length === 0) return;
+
+        setBannerUrls((current) => ({
+          ...current,
+          ...Object.fromEntries(nextUrls),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bannerUrls, identities, identityIdsByKey]);
+
+  return bannerUrls;
 }
 
 export function UserProfileDropdown({
@@ -345,24 +444,26 @@ export function UserProfileDropdown({
   }, [profileOpen]);
 
   return (
-    <div ref={profileRef} className="relative mt-4">
+    <div ref={profileRef} className="relative mt-4 shrink-0">
       {activeCall &&
         onCallEnd &&
         onCallParticipantVolumeChange &&
         onCallToggleDeafen &&
         onCallToggleMute && (
-          <GlobalCallBar
-            call={activeCall}
-            onEnd={onCallEnd}
-            onParticipantVolumeChange={onCallParticipantVolumeChange}
-            onToggleDeafen={onCallToggleDeafen}
-            onToggleMute={onCallToggleMute}
-          />
+          <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
+            <GlobalCallBar
+              call={activeCall}
+              onEnd={onCallEnd}
+              onParticipantVolumeChange={onCallParticipantVolumeChange}
+              onToggleDeafen={onCallToggleDeafen}
+              onToggleMute={onCallToggleMute}
+            />
+          </div>
         )}
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
         <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
@@ -392,7 +493,14 @@ export function UserProfileDropdown({
       </button>
 
       {profileOpen && (
-        <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
+        <div
+          className={cx(
+            'absolute left-0 right-0 z-40 rounded-2xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl',
+            activeCall
+              ? 'bottom-[calc(100%+5.75rem)]'
+              : 'bottom-[calc(100%+.5rem)]',
+          )}
+        >
           <div className="flex items-center gap-3 border-b border-white/10 pb-3">
             <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
             <div className="min-w-0">
@@ -421,7 +529,7 @@ export function UserProfileDropdown({
                 <button
                   type="button"
                   onClick={copyIdentityId}
-                  className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950"
                 >
                   {identityCopied ? copy.profile.copied : copy.profile.copy}
                 </button>
@@ -553,6 +661,10 @@ function ProfileEditor({
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [imageEditor, setImageEditor] = useState<{
+    file: File;
+    shape: 'avatar' | 'banner';
+  } | null>(null);
   const pictureInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
@@ -633,29 +745,15 @@ function ProfileEditor({
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setPicturePreview(reader.result);
-    });
-    setPictureFile(file);
-    reader.readAsDataURL(file);
+    if (file) setImageEditor({ file, shape: 'avatar' });
+    event.target.value = '';
   };
 
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setBannerPreview(reader.result);
-    });
-    setBannerFile(file);
-    reader.readAsDataURL(file);
+    if (file) setImageEditor({ file, shape: 'banner' });
+    event.target.value = '';
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -706,7 +804,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2rem] p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -721,7 +819,7 @@ function ProfileEditor({
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
-          <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+          <div className="overflow-hidden rounded-2xl bg-black/25">
             <button
               type="button"
               onClick={() => bannerInputRef.current?.click()}
@@ -743,7 +841,7 @@ function ProfileEditor({
               <button
                 type="button"
                 onClick={() => pictureInputRef.current?.click()}
-                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                 aria-label={copy.profile.changePicture}
               >
                 {picturePreview ? (
@@ -764,6 +862,7 @@ function ProfileEditor({
                   aria-label={copy.profile.name}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
+                  maxLength={ProfileName.MAX_LENGTH}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
                 <input
@@ -772,6 +871,7 @@ function ProfileEditor({
                   onChange={(event) =>
                     setHandle(normalizeHandle(event.target.value))
                   }
+                  maxLength={ProfileHandle.MAX_LENGTH}
                   placeholder="@ada"
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
@@ -779,6 +879,7 @@ function ProfileEditor({
                   aria-label={copy.profile.biography}
                   value={biography}
                   onChange={(event) => setBiography(event.target.value)}
+                  maxLength={ProfileBiography.MAX_LENGTH}
                   className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                 />
               </div>
@@ -799,7 +900,7 @@ function ProfileEditor({
             />
           </div>
           <div className="grid gap-4">
-            <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
+            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
               </div>
@@ -849,7 +950,7 @@ function ProfileEditor({
                 </button>
               </div>
             </section>
-            <section className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+            <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <button
                 type="button"
                 onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
@@ -913,6 +1014,22 @@ function ProfileEditor({
           {state === 'loading' ? copy.profile.saving : copy.profile.save}
         </button>
       </form>
+      {imageEditor && (
+        <ImageCropEditor
+          file={imageEditor.file}
+          shape={imageEditor.shape}
+          onClose={() => setImageEditor(null)}
+          onApply={(file, previewUrl) => {
+            if (imageEditor.shape === 'avatar') {
+              setPictureFile(file);
+              setPicturePreview(previewUrl);
+            } else {
+              setBannerFile(file);
+              setBannerPreview(previewUrl);
+            }
+          }}
+        />
+      )}
     </div>,
     document.body,
   );

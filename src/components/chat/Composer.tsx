@@ -25,6 +25,7 @@ import {
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 
 const MESSAGE_MAX_LENGTH = 4000;
+const COMPOSER_MAX_ROWS = 4;
 
 interface ComposerProps {
   disabled: boolean;
@@ -73,7 +74,8 @@ export function Composer({
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const canAttach = !disabled && !sending;
   const canSend =
     (draft.trim().length > 0 || attachments.length > 0) &&
@@ -138,6 +140,25 @@ export function Composer({
   const syncCaret = () => {
     setCaretIndex(textInputRef.current?.selectionStart ?? draft.length);
   };
+
+  const resizeTextInput = useCallback(() => {
+    const input = textInputRef.current;
+
+    if (!input) return;
+
+    input.style.height = 'auto';
+
+    const style = window.getComputedStyle(input);
+    const lineHeight = Number.parseFloat(style.lineHeight) || 20;
+    const verticalPadding =
+      Number.parseFloat(style.paddingTop) +
+      Number.parseFloat(style.paddingBottom);
+    const maxHeight = lineHeight * COMPOSER_MAX_ROWS + verticalPadding;
+    const nextHeight = Math.min(input.scrollHeight, maxHeight);
+
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
 
   const insertEmoji = useCallback(
     (suggestion: EmojiSuggestion) => {
@@ -220,6 +241,10 @@ export function Composer({
     };
   }, [addFiles, canAttach]);
 
+  useEffect(() => {
+    resizeTextInput();
+  }, [draft, resizeTextInput]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = draft.trim();
@@ -245,13 +270,15 @@ export function Composer({
     event.target.value = '';
   };
 
-  const handleContentChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleContentChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     onDraftChange(event.target.value);
     setCaretIndex(event.target.selectionStart ?? event.target.value.length);
     setDismissedEmojiTrigger(null);
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && event.shiftKey) return;
+
     if (emojiPanelOpen) {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -284,9 +311,14 @@ export function Composer({
       onEscape?.();
       return;
     }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      formRef.current?.requestSubmit();
+    }
   };
 
-  const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     if (!canAttach) return;
 
     const imageFiles = Array.from(event.clipboardData.items)
@@ -327,6 +359,7 @@ export function Composer({
   return (
     <>
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="border-t border-white/10 p-4 sm:p-5"
       >
@@ -351,7 +384,7 @@ export function Composer({
             <button
               type="button"
               onClick={onCancelReply}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
               aria-label={copy.messages.cancelReply}
             >
               ×
@@ -387,7 +420,7 @@ export function Composer({
                     type="button"
                     onClick={() => removeAttachment(attachment.index)}
                     disabled={disabled || sending}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
                     aria-label={copy.composer.removeAttachment}
                   >
                     ×
@@ -420,7 +453,7 @@ export function Composer({
         )}
         <div
           className={cx(
-            'relative flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2 transition',
+            'relative flex items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-2 transition',
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
@@ -449,7 +482,7 @@ export function Composer({
             onChange={handleFilesSelected}
             className="hidden"
           />
-          <input
+          <textarea
             ref={textInputRef}
             value={draft}
             onChange={handleContentChange}
@@ -460,7 +493,8 @@ export function Composer({
             onSelect={syncCaret}
             disabled={disabled || sending}
             maxLength={MESSAGE_MAX_LENGTH}
-            className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
+            rows={1}
+            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
             placeholder={placeholder}
           />
             <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
@@ -484,7 +518,7 @@ export function Composer({
       {draggingFiles &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-[140] grid place-items-center bg-black/70 p-6 backdrop-blur-md">
-            <div className="grid h-full w-full place-items-center rounded-[2rem] border-2 border-dashed border-fuchsia-300/70 bg-fuchsia-500/10 text-center shadow-2xl shadow-black/40">
+            <div className="grid h-full w-full place-items-center rounded-2xl border-2 border-dashed border-fuchsia-300/70 bg-fuchsia-500/10 text-center shadow-2xl shadow-black/40">
               <div>
                 <div className="text-4xl font-black text-white">+</div>
                 <div className="mt-3 text-2xl font-black text-white">
@@ -570,7 +604,7 @@ function ComposerImageAlbum({
               type="button"
               onClick={() => onRemove(attachment.index)}
               disabled={disabled}
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
               aria-label={copy.composer.removeAttachment}
             >
               ×
@@ -604,7 +638,7 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
 
   return (
     <div className="grid h-28 w-56 place-items-center bg-black/20 p-4">
-      <div className="relative h-16 w-12 rounded-lg border border-white/20 bg-white/10">
+      <div className="relative h-16 w-12 rounded-2xl border border-white/20 bg-white/10">
         <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
         <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
         <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
@@ -642,7 +676,7 @@ function EmojiSuggestionPanel({
               onSelect(suggestion);
             }}
             className={cx(
-              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition',
+              'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition',
               index === selectedIndex ? 'bg-white/12' : 'hover:bg-white/8',
             )}
             aria-label={`${copy.composer.insertEmoji} :${suggestion.shortcode}:`}

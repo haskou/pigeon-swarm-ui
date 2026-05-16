@@ -33,7 +33,7 @@ export function ConversationKeyDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-2xl p-5 shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-black">
@@ -61,7 +61,7 @@ export function ConversationKeyDialog({
             <textarea
               readOnly
               value={encryptedConversationKey}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
+              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
             />
             <button
               type="button"
@@ -78,7 +78,7 @@ export function ConversationKeyDialog({
               value={input}
               onChange={(event) => onInputChange(event.target.value)}
               placeholder={copy.chat.addPrivateKeyPlaceholder}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
+              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
             />
             <button
               type="button"

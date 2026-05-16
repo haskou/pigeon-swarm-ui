@@ -169,13 +169,30 @@ export function useCallSession(): {
       status: nextCall.status,
     });
 
+    let stream: MediaStream | null = null;
+
     try {
-      const stream =
+      stream =
         input.localStream === null
           ? null
           : input.localStream
             ? mediaManager.useStream(input.localStream)
-            : await mediaManager.startAudio();
+            : await mediaManager.startAudio().catch((error): null => {
+                logCallWarning('session:start-call:microphone-unavailable', {
+                  callId: nextCall.id,
+                  error,
+                });
+
+                return null;
+              });
+
+      if (!stream) {
+        setActiveCall((current) =>
+          current?.id === nextCall.id
+            ? { ...current, hasMicrophone: false, muted: true }
+            : current,
+        );
+      }
 
       logCallDebug('session:start-call:local-media-ready', {
         callId: nextCall.id,

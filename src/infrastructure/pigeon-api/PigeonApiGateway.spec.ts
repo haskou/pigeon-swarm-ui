@@ -368,6 +368,194 @@ describe(PigeonApiGateway.name, () => {
     expect(result.keychainExternalIdentifier).toBe('keychain-next');
   });
 
+  it('accepts group invitations by publishing the decrypted keychain entry', async () => {
+    const keyEntry = {
+      conversationId: 'group:conversation',
+      createdAt: 1,
+      peerIdentityId: 'identity-2',
+      privateKey: 'private-key',
+      publicKey: 'public-key',
+    };
+    const updatedNotification = {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'accepted',
+      status: 'read',
+      type: 'group_conversation_invitation',
+    } as const;
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce(updatedNotification),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const session = {
+      encryptedKeyPair: {
+        decrypt: jest.fn().mockResolvedValue({
+          toString: () => JSON.stringify(keyEntry),
+        }),
+      },
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptConversationInvitation(session, {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
+    });
+
+    expect(keychains.encryptForPublish).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        conversations: {
+          'group:conversation': keyEntry,
+        },
+        version: 1,
+      }),
+    );
+    expect(http.request).toHaveBeenNthCalledWith(1, '/keychains/', {
+      body: JSON.stringify({ encryptedPayload: 'encrypted-keychain' }),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(result.keychain.conversations['group:conversation']).toEqual(
+      keyEntry,
+    );
+    expect(result.keychainExternalIdentifier).toBe('keychain-next');
+    expect(result.notification).toBe(updatedNotification);
+  });
+
+  it('publishes the community invite link key before accepting the invite', async () => {
+    const keyEntry = {
+      conversationId: 'community-1',
+      createdAt: 1,
+      peerIdentityId: '',
+      privateKey: 'private-key',
+      publicKey: 'public-key',
+    };
+    const community = {
+      createdAt: 1,
+      description: 'Description',
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Community',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-2',
+      textChannels: [],
+      visibility: 'private',
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptCommunityInviteLinkWithKey(
+      session,
+      'invite-token',
+      keyEntry,
+    );
+
+    expect(keychains.encryptForPublish).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        conversations: {
+          'community-1': keyEntry,
+        },
+        version: 1,
+      }),
+    );
+    expect(http.request).toHaveBeenNthCalledWith(1, '/keychains/', {
+      body: JSON.stringify({ encryptedPayload: 'encrypted-keychain' }),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(
+      2,
+      '/communities/invites/invite-token/accept',
+      {
+        body: JSON.stringify({}),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+    expect(result.community).toBe(community);
+    expect(result.keychain.conversations['community-1']).toEqual(keyEntry);
+    expect(result.keychainExternalIdentifier).toBe('keychain-next');
+  });
+
   it('does not project deleted messages when loading conversation messages', async () => {
     const http = {
       request: jest.fn().mockResolvedValue({
@@ -395,6 +583,7 @@ describe(PigeonApiGateway.name, () => {
         id: 'sent-message',
         mine: true,
         raw: { id: 'sent-message' },
+        reactions: [],
         timestamp: 1,
       }),
     };
@@ -928,6 +1117,132 @@ describe(PigeonApiGateway.name, () => {
       previousMessageIds: ['message/to-delete'],
       targetMessageId: 'message/to-delete',
       type: 'deleted',
+    });
+  });
+
+  it('adds message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.addMessageReaction(
+        session,
+        'one-to-one:conversation',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('removes message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.removeMessageReaction(
+        session,
+        'one-to-one:conversation',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
+    });
+  });
+
+  it('adds community channel message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.addCommunityChannelMessageReaction(
+        session,
+        'community/1',
+        'channel/1',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/communities/community%2F1/channels/channel%2F1/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+  });
+
+  it('removes community channel message reactions with a signed body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.removeCommunityChannelMessageReaction(
+        session,
+        'community/1',
+        'channel/1',
+        'message/to-react',
+        '👍',
+      ),
+    ).resolves.toBeUndefined();
+
+    const path =
+      '/communities/community%2F1/channels/channel%2F1/messages/message%2Fto-react/reactions';
+    const body = { emoji: '👍' };
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'DELETE',
     });
   });
 

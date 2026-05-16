@@ -31,7 +31,7 @@ export function SegmentedControl<TValue extends string>({
           type="button"
           onClick={() => onChange(option.value)}
           className={cx(
-            'rounded-xl px-4 py-3 text-sm font-black transition',
+            'rounded-2xl px-4 py-3 text-sm font-black transition',
             value === option.value
               ? 'bg-white text-slate-950'
               : 'text-white/60 hover:text-white',

@@ -138,7 +138,13 @@ export const copy = {
       'Create a private workspace inside one IPFS network. Members and text channels are visible only to community members.',
     createError: 'The community could not be created.',
     createTitle: 'Create community',
+    createTooltip: 'Create a new community',
     creating: 'Creating community...',
+    initialChannelName: 'Channel name',
+    initialChannels: 'Initial channels',
+    initialChannelsBody:
+      'Add the text or voice channels that should exist when the community opens.',
+    addInitialChannel: 'Add channel',
     communityDataTitle: 'Community data',
     deleteChannel: 'Delete channel',
     deleteChannelConfirm:
@@ -319,6 +325,17 @@ export const copy = {
     validation:
       'The request data is not valid. Please review it and try again.',
   },
+  imageEditor: {
+    apply: 'Apply crop',
+    avatar: 'Square avatar, resized to 512 x 512.',
+    banner: 'Wide banner, resized to 1600 x 533.',
+    dragHelp: 'Drag the image to reposition it. Works with mouse and touch.',
+    horizontal: 'Horizontal',
+    reset: 'Reset',
+    title: 'Adjust image',
+    vertical: 'Vertical',
+    zoom: 'Zoom',
+  },
   inspector: {
     conversationKeychain: 'Keychain',
     eventsProjectedLocally: 'events projected locally',
@@ -333,6 +350,7 @@ export const copy = {
     storedOneKeys: 'Stored keys',
   },
   messages: {
+    addReaction: 'Add reaction',
     cancelReply: 'Cancel reply',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
@@ -346,11 +364,13 @@ export const copy = {
       '[encrypted] This conversation key is missing from the keychain.',
     originalMessage: 'original message',
     rawTitle: 'Raw message',
+    reactionError: 'The reaction could not be updated.',
     reply: 'Reply',
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
     retrySend: 'Retry',
+    searchReaction: 'Search emoji',
     sendFailed: 'Failed',
     sending: 'Sending',
     viewRaw: 'View raw',
@@ -479,6 +499,7 @@ export const copy = {
     noBiography: 'No bio',
     noNetworks: 'No networks',
     openBanner: 'Open profile banner',
+    openConversation: 'Open direct message',
     openPicture: 'Open profile picture',
     passwordRequirements: {
       lowercase: 'Lowercase',

@@ -21,6 +21,14 @@ function isJavaScriptMimeType(contentType: string): boolean {
 async function registerServiceWorker(): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
 
+  if (import.meta.env.DEV) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+
+    return;
+  }
+
   const response = await fetch(serviceWorkerPath, {
     cache: 'no-store',
     credentials: 'same-origin',

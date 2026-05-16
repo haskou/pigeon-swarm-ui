@@ -51,11 +51,11 @@ export function NetworkCreationScreen({
     <section className="app-screen relative z-10 grid place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
-          <div className="glass-panel-strong rounded-[2.5rem] p-8">
+          <div className="glass-panel-strong rounded-2xl p-8">
             <img
               src="/logo.png"
               alt="Pigeon Swarm"
-              className="floaty h-28 w-28 rounded-[2rem] shadow-2xl shadow-indigo-950/40"
+              className="floaty h-28 w-28 rounded-2xl shadow-2xl shadow-indigo-950/40"
             />
             <h1 className="mt-8 max-w-xl text-6xl font-black tracking-[-.07em]">
               {copy.network.heroTitle}
@@ -82,7 +82,7 @@ export function NetworkCreationScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong app-screen rounded-none p-5 sm:min-h-0 sm:rounded-[2.5rem] sm:p-7"
+          className="glass-panel-strong app-screen rounded-none p-5 sm:min-h-0 sm:rounded-2xl sm:p-7"
         >
           <div className="flex items-center gap-3">
             <img

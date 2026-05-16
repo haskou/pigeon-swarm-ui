@@ -15,6 +15,7 @@ import { cx } from '../../utils/classNameHelper';
 import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { MarkdownMessage } from './MarkdownMessage';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -28,8 +29,14 @@ interface MessageBubbleProps {
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onReactionToggle?: (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
+  reactionAuthorNames?: Record<string, string>;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -51,8 +58,10 @@ export function MessageBubble({
   onAttachmentPreview,
   onAvatarClick,
   onMessageMenuOpen,
+  onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  reactionAuthorNames = {},
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -64,8 +73,11 @@ export function MessageBubble({
     message.raw.type === 'call_event' || message.kind === 'call-event';
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
+  const hasReply = Boolean(replyMessageId);
   const compactTimestamp =
-    message.content.length <= 36 && !message.content.includes('\n');
+    !hasReply &&
+    message.content.length <= 36 &&
+    !message.content.includes('\n');
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -94,6 +106,15 @@ export function MessageBubble({
   const linkPreview = useMemo(
     () => firstLinkPreview(message.content),
     [message.content],
+  );
+  const reactionGroups = useMemo(
+    () =>
+      groupMessageReactions(
+        message.reactions,
+        currentIdentityId,
+        reactionAuthorNames,
+      ),
+    [currentIdentityId, message.reactions, reactionAuthorNames],
   );
 
   useEffect(() => {
@@ -184,18 +205,19 @@ export function MessageBubble({
             'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
               message.attachments.length === 0 &&
+              reactionGroups.length === 0 &&
               'flex items-end gap-2',
             mine
               ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
               : 'border border-white/10 bg-black/25 text-white',
           )}
         >
-          {replyMessageId && (
+          {hasReply && replyMessageId && (
             <button
               type="button"
               onClick={() => onReplyReferenceClick(replyMessageId)}
               className={cx(
-                'mb-6 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
                 mine
                   ? 'border-white/20 bg-white/10 hover:bg-white/15'
                   : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
@@ -269,19 +291,21 @@ export function MessageBubble({
             </div>
           )}
           {message.content && (
-            <p
+            <div
               className={cx(
                 'whitespace-pre-wrap break-words',
-                message.attachments.length > 0 && 'mt-3',
+                (hasReply || message.attachments.length > 0) && 'mt-3',
                 message.encrypted && 'text-white/55',
               )}
             >
-              <MessageTextWithLinks content={message.content} mine={mine} />
-            </p>
+              <MarkdownMessage content={message.content} mine={mine} />
+            </div>
           )}
           {linkPreview && (
             <LinkPreviewCard
               description={linkPreview.description}
+              displayUrl={linkPreview.displayUrl}
+              faviconUrl={linkPreview.faviconUrl}
               hostname={linkPreview.hostname}
               mine={mine}
               title={linkPreview.title}
@@ -317,6 +341,14 @@ export function MessageBubble({
             )}
             <span>{formatTime(message.timestamp)}</span>
           </div>
+          {reactionGroups.length > 0 && (
+            <MessageReactions
+              groups={reactionGroups}
+              onToggle={(emoji, reacted) => {
+                onReactionToggle?.(message, emoji, reacted);
+              }}
+            />
+          )}
         </div>
       </div>
       {lightbox && (
@@ -330,57 +362,127 @@ export function MessageBubble({
   );
 }
 
+type ReactionGroup = {
+  authors: string[];
+  count: number;
+  emoji: string;
+  lastCreatedAt: number;
+  reacted: boolean;
+};
+
+function MessageReactions({
+  groups,
+  onToggle,
+}: {
+  groups: ReactionGroup[];
+  onToggle: (emoji: string, reacted: boolean) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {groups.map((group) => (
+        <button
+          type="button"
+          key={group.emoji}
+          onClick={() => onToggle(group.emoji, group.reacted)}
+          className={cx(
+            'rounded-full border px-2 py-0.5 text-xs font-black transition hover:brightness-110',
+            group.reacted
+              ? 'border-sky-300/40 bg-sky-500/35 text-sky-50'
+              : 'border-white/10 bg-black/15 text-white/75 hover:bg-white/10',
+          )}
+          aria-label={`${group.emoji} ${group.count}`}
+          title={group.authors.join(', ')}
+        >
+          <span>{group.emoji}</span>
+          <span className="ml-1">{group.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function groupMessageReactions(
+  reactions: ChatMessage['reactions'],
+  currentIdentityId: string,
+  authorNames: Record<string, string>,
+): ReactionGroup[] {
+  const byEmoji = new Map<string, ReactionGroup>();
+
+  for (const reaction of reactions ?? []) {
+    const current = byEmoji.get(reaction.emoji) ?? {
+      authors: [],
+      count: 0,
+      emoji: reaction.emoji,
+      lastCreatedAt: reaction.createdAt,
+      reacted: false,
+    };
+
+    current.authors.push(
+      authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId,
+    );
+    current.count += 1;
+    current.lastCreatedAt = Math.max(current.lastCreatedAt, reaction.createdAt);
+    current.reacted =
+      current.reacted || reaction.authorIdentityId === currentIdentityId;
+    byEmoji.set(reaction.emoji, current);
+  }
+
+  return [...byEmoji.values()].sort((left, right) => {
+    const createdAtDiff = left.lastCreatedAt - right.lastCreatedAt;
+
+    return createdAtDiff === 0
+      ? left.emoji.localeCompare(right.emoji)
+      : createdAtDiff;
+  });
+}
+
 type LinkPreview = {
   description: string;
+  displayUrl: string;
+  faviconUrl: string;
   hostname: string;
   title: string;
   url: string;
 };
 
-const urlPattern = /https?:\/\/[^\s<>"']+/gi;
-
-function MessageTextWithLinks({
-  content,
-  mine,
-}: {
-  content: string;
-  mine: boolean;
-}) {
-  const parts = splitTextByLinks(content);
-
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.url ? (
-          <a
-            key={`${part.text}-${index}`}
-            href={part.url}
-            target="_blank"
-            rel="noreferrer"
-            className={cx(
-              'font-bold underline decoration-2 underline-offset-2',
-              mine
-                ? 'text-white decoration-white/50'
-                : 'text-cyan-200 decoration-cyan-200/50',
-            )}
-          >
-            {part.text}
-          </a>
-        ) : (
-          <span key={`${part.text}-${index}`}>{part.text}</span>
-        ),
-      )}
-    </>
-  );
-}
+const urlPattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 
 function LinkPreviewCard({
   description,
+  displayUrl,
+  faviconUrl,
   hostname,
   mine,
   title,
   url,
 }: LinkPreview & { mine: boolean }) {
+  const [metaImageUrl, setMetaImageUrl] = useState<string | null>(() =>
+    directImagePreviewUrl(url),
+  );
+
+  useEffect(() => {
+    if (directImagePreviewUrl(url)) {
+      setMetaImageUrl(directImagePreviewUrl(url));
+
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setMetaImageUrl(null);
+    void loadMetaImageUrl(url, controller.signal)
+      .then((imageUrl) => {
+        if (!cancelled) setMetaImageUrl(imageUrl);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [url]);
+
   return (
     <a
       href={url}
@@ -388,19 +490,36 @@ function LinkPreviewCard({
       rel="noreferrer"
       className={cx(
         'mt-3 block overflow-hidden rounded-2xl border p-3 text-left transition hover:brightness-110',
-        mine
-          ? 'border-white/20 bg-white/10'
-          : 'border-white/10 bg-white/8',
+        mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
-      <span className="block truncate text-xs font-black uppercase text-white/45">
-        {hostname}
+      {metaImageUrl && (
+        <img
+          src={metaImageUrl}
+          alt=""
+          className="-mx-3 -mt-3 mb-3 aspect-[1.91/1] w-[calc(100%+1.5rem)] object-cover"
+          onError={() => setMetaImageUrl(null)}
+        />
+      )}
+      <span className="flex items-center gap-2 text-xs font-black uppercase text-white/45">
+        <img
+          src={faviconUrl}
+          alt=""
+          className="h-4 w-4 shrink-0 rounded-sm"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+        <span className="truncate">{hostname}</span>
       </span>
       <span className="mt-1 block truncate text-sm font-black text-white">
         {title}
       </span>
       <span className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
         {description}
+      </span>
+      <span className="mt-2 block truncate text-[0.68rem] font-bold text-white/35">
+        {displayUrl}
       </span>
     </a>
   );
@@ -412,13 +531,16 @@ function firstLinkPreview(content: string): LinkPreview | null {
   if (!match) return null;
 
   const cleaned = cleanTrailingUrlPunctuation(match);
+  const normalized = normalizePreviewUrl(cleaned);
 
   try {
-    const url = new URL(cleaned);
+    const url = new URL(normalized);
     const path = `${url.pathname}${url.search}`.replace(/^\/$/, '');
 
     return {
       description: path ? `${url.hostname}${path}` : url.origin,
+      displayUrl: displayPreviewUrl(url),
+      faviconUrl: `${url.origin}/favicon.ico`,
       hostname: url.hostname,
       title: readableLinkTitle(url),
       url: url.toString(),
@@ -428,33 +550,16 @@ function firstLinkPreview(content: string): LinkPreview | null {
   }
 }
 
-function splitTextByLinks(
-  content: string,
-): Array<{ text: string; url?: string }> {
-  const parts: Array<{ text: string; url?: string }> = [];
-  let lastIndex = 0;
-
-  for (const match of content.matchAll(urlPattern)) {
-    const rawUrl = match[0];
-    const index = match.index ?? 0;
-    const cleanedUrl = cleanTrailingUrlPunctuation(rawUrl);
-
-    if (index > lastIndex) {
-      parts.push({ text: content.slice(lastIndex, index) });
-    }
-    parts.push({ text: cleanedUrl, url: cleanedUrl });
-    lastIndex = index + rawUrl.length;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push({ text: content.slice(lastIndex) });
-  }
-
-  return parts.length > 0 ? parts : [{ text: content }];
-}
-
 function cleanTrailingUrlPunctuation(value: string): string {
   return value.replace(/[),.;:!?]+$/g, '');
+}
+
+function normalizePreviewUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function displayPreviewUrl(url: URL): string {
+  return `${url.hostname}${url.pathname}${url.search}`.replace(/\/$/, '');
 }
 
 function readableLinkTitle(url: URL): string {
@@ -468,6 +573,53 @@ function readableLinkTitle(url: URL): string {
   if (pathnameTitle) return pathnameTitle;
 
   return url.hostname.replace(/^www\./, '');
+}
+
+function directImagePreviewUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const extension = url.pathname.split('.').pop()?.toLowerCase();
+
+    return extension &&
+      ['avif', 'gif', 'jpeg', 'jpg', 'png', 'webp'].includes(extension)
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadMetaImageUrl(
+  value: string,
+  signal: AbortSignal,
+): Promise<null | string> {
+  const response = await fetch(value, { signal });
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!response.ok || !contentType.includes('text/html')) return null;
+
+  const html = await response.text();
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const image =
+    metaContent(document, 'property', 'og:image:secure_url') ??
+    metaContent(document, 'property', 'og:image') ??
+    metaContent(document, 'name', 'twitter:image') ??
+    metaContent(document, 'name', 'twitter:image:src');
+
+  return image ? new URL(image, value).toString() : null;
+}
+
+function metaContent(
+  document: Document,
+  attribute: 'name' | 'property',
+  value: string,
+): null | string {
+  const content = document
+    .querySelector(`meta[${attribute}="${value}"]`)
+    ?.getAttribute('content')
+    ?.trim();
+
+  return content || null;
 }
 
 function CallEventMessage({
@@ -521,6 +673,7 @@ function callEventDirection(
 
 function callEventLabel(eventType: MessageResource['callEventType']): string {
   if (eventType === 'missed') return copy.calls.missed;
+
   if (eventType === 'declined') return copy.calls.declined;
 
   return copy.calls.ended;

@@ -1,15 +1,24 @@
 import type { IdentityResource } from '../types';
 
 import { normalizeIdentityId } from '../../utils/identityId';
+import { ProfileBiography } from './profile/ProfileBiography';
+import { ProfileHandle } from './profile/ProfileHandle';
+import { ProfileName } from './profile/ProfileName';
 
 function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];
 }
 
 function normalizeHandle(handle?: string): string | undefined {
-  const normalized = handle?.trim().replace(/^@+/, '').toLowerCase();
+  const normalized = handle?.trim().replace(/^@+/, '');
 
-  return normalized || undefined;
+  return normalized ? new ProfileHandle(normalized).valueOf() : undefined;
+}
+
+function normalizeBiography(biography?: string): string | undefined {
+  const normalized = biography?.trim();
+
+  return normalized ? new ProfileBiography(normalized).valueOf() : undefined;
 }
 
 function profileFrom(
@@ -19,9 +28,9 @@ function profileFrom(
   /* eslint-disable perfectionist/sort-objects */
   return {
     banner: input.banner,
-    biography: input.biography,
+    biography: normalizeBiography(input.biography),
     handle: normalizeHandle(input.handle),
-    name: input.name,
+    name: new ProfileName(input.name.trim()).valueOf(),
     picture: input.picture,
   };
   /* eslint-enable perfectionist/sort-objects */

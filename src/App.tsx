@@ -16,6 +16,7 @@ import {
 import { useCommunities } from './presentation/hooks/useCommunities';
 import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
 import { usePeers } from './presentation/hooks/usePeers';
+import { requestPwaNotificationPermission } from './presentation/notifications/PwaNotifications';
 import {
   clearCommunityInviteUrl,
   parseCommunityInviteUrl,
@@ -74,9 +75,13 @@ function App() {
     window.location.reload();
   };
 
+  useEffect(() => {
+    void requestPwaNotificationPermission();
+  }, []);
+
   if (nodeNetworks.error && !session) {
     return (
-      <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
+      <main className="app-compact relative flex justify-center overflow-hidden bg-[#080a25] text-white">
         <BackgroundGlow />
         <ServerConnectionScreen
           error={nodeNetworks.error}

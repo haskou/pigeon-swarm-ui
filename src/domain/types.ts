@@ -249,9 +249,16 @@ export type MessageResource = {
   actorIdentityId?: string;
   durationMs?: number;
   previousMessageIds?: string[];
+  reactions?: MessageReaction[];
   replyToMessageId?: string;
   targetMessageId?: string;
   type?: string;
+};
+
+export type MessageReaction = {
+  authorIdentityId: string;
+  createdAt: number;
+  emoji: string;
 };
 
 export type MessageSignaturePayload = {
@@ -281,6 +288,7 @@ export type ChatMessage = {
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   raw: MessageResource;
+  reactions: MessageReaction[];
 };
 
 export type Session = {

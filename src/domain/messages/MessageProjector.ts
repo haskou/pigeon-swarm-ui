@@ -3,6 +3,7 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 import type {
   ChatMessage,
   MessageAttachment,
+  MessageReaction,
   MessageResource,
   MessageReplyPreview,
   Session,
@@ -30,6 +31,13 @@ type PlainMessage = {
 export type MessageProjectionCopy = {
   decryptFailed: string;
   missingKey: string;
+};
+
+type MessageReactionRecord = {
+  authorId?: unknown;
+  authorIdentityId?: unknown;
+  createdAt?: unknown;
+  emoji?: unknown;
 };
 
 export class MessageProjector {
@@ -91,21 +99,35 @@ export class MessageProjector {
     session: Session,
     message: MessageResource,
   ): Omit<ChatMessage, 'content' | 'encrypted'> {
-    const authorIdentityId =
-      message.authorIdentityId ?? message.authorId ?? 'unknown';
+    const authorIdentityId = this.authorIdentityId(message);
+    const reactions = normalizeMessageReactions(message.reactions);
 
     return {
       attachments: [],
       authorIdentityId,
-      id:
-        message.id ??
-        message.messageId ??
-        `${message.timestamp ?? Date.now()}-${Math.random()}`,
+      id: this.messageId(message),
       mine: authorIdentityId === session.identity.id,
-      raw: message,
+      raw: { ...message, reactions },
+      reactions,
       replyToMessageId: message.replyToMessageId,
-      timestamp: message.timestamp ?? message.createdAt ?? Date.now(),
+      timestamp: this.messageTimestamp(message),
     };
+  }
+
+  private authorIdentityId(message: MessageResource): string {
+    return message.authorIdentityId ?? message.authorId ?? 'unknown';
+  }
+
+  private messageId(message: MessageResource): string {
+    return (
+      message.id ??
+      message.messageId ??
+      `${this.messageTimestamp(message)}-${Math.random()}`
+    );
+  }
+
+  private messageTimestamp(message: MessageResource): number {
+    return message.timestamp ?? message.createdAt ?? Date.now();
   }
 
   private conversationKey(session: Session, conversationId: string) {
@@ -202,4 +224,36 @@ export class MessageProjector {
       timestamp: parsed.timestamp ?? base.timestamp,
     };
   }
+}
+
+function normalizeMessageReactions(value: unknown): MessageReaction[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((reaction): MessageReaction[] => {
+    if (!reaction || typeof reaction !== 'object') return [];
+
+    const reactionRecord = reaction as MessageReactionRecord;
+    const authorIdentityId =
+      typeof reactionRecord.authorIdentityId === 'string'
+        ? reactionRecord.authorIdentityId
+        : reactionRecord.authorId;
+
+    if (
+      typeof authorIdentityId !== 'string' ||
+      typeof reactionRecord.emoji !== 'string'
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        authorIdentityId,
+        createdAt:
+          typeof reactionRecord.createdAt === 'number'
+            ? reactionRecord.createdAt
+            : 0,
+        emoji: reactionRecord.emoji,
+      },
+    ];
+  });
 }

@@ -13,6 +13,7 @@ import type {
   CommunityChannel,
   CommunityInviteLinkResource,
   CommunityTextChannel,
+  CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
@@ -40,10 +41,12 @@ import {
 import { ListConversations } from './conversations/ListConversations';
 import { LoginIdentity } from './identities/LoginIdentity';
 import { RegisterIdentity } from './identities/RegisterIdentity';
+import { AddMessageReaction } from './messages/AddMessageReaction';
 import { DeleteMessage } from './messages/DeleteMessage';
 import { LoadMessage } from './messages/LoadMessage';
 import { LoadMessages } from './messages/LoadMessages';
 import { LoadMessagesAround } from './messages/LoadMessagesAround';
+import { RemoveMessageReaction } from './messages/RemoveMessageReaction';
 import { SendMessage } from './messages/SendMessage';
 import { CreateNetwork } from './networks/CreateNetwork';
 import { JoinNetwork } from './networks/JoinNetwork';
@@ -75,6 +78,8 @@ export class PigeonApplication {
 
   private readonly deleteMessageUseCase: DeleteMessage;
 
+  private readonly addMessageReactionUseCase: AddMessageReaction;
+
   private readonly listConversationsUseCase: ListConversations;
 
   private readonly listNodeNetworksUseCase: ListNodeNetworks;
@@ -93,6 +98,8 @@ export class PigeonApplication {
 
   private readonly registerIdentityUseCase: RegisterIdentity;
 
+  private readonly removeMessageReactionUseCase: RemoveMessageReaction;
+
   private readonly sendMessageUseCase: SendMessage;
 
   private readonly updateNotificationUseCase: UpdateNotification;
@@ -107,6 +114,7 @@ export class PigeonApplication {
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
+    this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.joinNetworkUseCase = new JoinNetwork(gateway);
     this.listConversationsUseCase = new ListConversations(gateway);
@@ -118,6 +126,7 @@ export class PigeonApplication {
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.registerIdentityUseCase = new RegisterIdentity(gateway);
+    this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
     this.sendMessageUseCase = new SendMessage(gateway);
     this.updateNotificationUseCase = new UpdateNotification(gateway);
   }
@@ -253,6 +262,7 @@ export class PigeonApplication {
     input: {
       avatar?: File | null;
       banner?: File | null;
+      channels?: Array<{ name: string; type: 'text' | 'voice' }>;
       description: string;
       name: string;
       networkId: string;
@@ -284,9 +294,32 @@ export class PigeonApplication {
         [community.id]: keyEntry,
       },
     });
+    const channelSession = {
+      ...session,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+    const initialChannels = await this.createInitialCommunityChannels(
+      channelSession,
+      community.id,
+      input.channels ?? [],
+    );
 
     return {
-      community,
+      community: {
+        ...community,
+        textChannels: [
+          ...community.textChannels,
+          ...initialChannels.textChannels,
+        ],
+        voiceChannels:
+          initialChannels.voiceChannels.length > 0
+            ? [
+                ...(community.voiceChannels ?? []),
+                ...initialChannels.voiceChannels,
+              ]
+            : community.voiceChannels,
+      },
       keychain: published.keychain,
       keychainExternalIdentifier: published.keychainExternalIdentifier,
     };
@@ -388,6 +421,22 @@ export class PigeonApplication {
     return await this.gateway.acceptCommunityInviteLink(session, inviteToken);
   }
 
+  public async acceptCommunityInviteLinkWithKey(
+    session: Session,
+    inviteToken: string,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<{
+    community: Community;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: string;
+  }> {
+    return await this.gateway.acceptCommunityInviteLinkWithKey(
+      session,
+      inviteToken,
+      keyEntry,
+    );
+  }
+
   public async listCommunityMembers(
     session: Session,
     communityId: string,
@@ -411,7 +460,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     name: string,
-  ): Promise<CommunityChannel> {
+  ): Promise<CommunityVoiceChannel> {
     return await this.gateway.createCommunityVoiceChannel(
       session,
       communityId,
@@ -565,6 +614,66 @@ export class PigeonApplication {
     await this.deleteMessageUseCase.execute(session, conversationId, messageId);
   }
 
+  public async addMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.addMessageReactionUseCase.execute(
+      session,
+      conversationId,
+      messageId,
+      emoji,
+    );
+  }
+
+  public async removeMessageReaction(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.removeMessageReactionUseCase.execute(
+      session,
+      conversationId,
+      messageId,
+      emoji,
+    );
+  }
+
+  public async addCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.gateway.addCommunityChannelMessageReaction(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      emoji,
+    );
+  }
+
+  public async removeCommunityChannelMessageReaction(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.gateway.removeCommunityChannelMessageReaction(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      emoji,
+    );
+  }
+
   public async updateIdentityProfile(
     session: Session,
     profile: IdentityUpdateProfileInput,
@@ -627,11 +736,13 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     before?: null | string,
+    options?: { signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
     return await this.loadMessagesUseCase.execute(
       session,
       conversationId,
       before,
+      options,
     );
   }
 
@@ -723,5 +834,39 @@ export class PigeonApplication {
       privateKey: primitives.privateKey,
       publicKey: primitives.publicKey,
     };
+  }
+
+  private async createInitialCommunityChannels(
+    session: Session,
+    communityId: string,
+    channels: Array<{ name: string; type: 'text' | 'voice' }>,
+  ): Promise<{
+    textChannels: CommunityTextChannel[];
+    voiceChannels: CommunityVoiceChannel[];
+  }> {
+    const textChannels = [];
+    const voiceChannels = [];
+
+    for (const channel of channels) {
+      if (channel.type === 'voice') {
+        voiceChannels.push(
+          await this.createCommunityVoiceChannel(
+            session,
+            communityId,
+            channel.name,
+          ),
+        );
+      } else {
+        textChannels.push(
+          await this.createCommunityTextChannel(
+            session,
+            communityId,
+            channel.name,
+          ),
+        );
+      }
+    }
+
+    return { textChannels, voiceChannels };
   }
 }

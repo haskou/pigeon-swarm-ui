@@ -76,10 +76,19 @@ interface ChatColumnProps {
   onEscape: () => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onReactionToggle: (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
+  onOpenConversationWithIdentity?: (
+    identityId: string,
+    identity?: IdentityResource,
+  ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -137,7 +146,9 @@ export function ChatColumn({
   onEscape,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenConversationWithIdentity,
   onOpenSidebar,
+  onReactionToggle,
   onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
@@ -168,6 +179,16 @@ export function ChatColumn({
   const [groupInviteInput, setGroupInviteInput] = useState('');
   const [groupInviteError, setGroupInviteError] = useState<string | null>(null);
   const [groupInviteLoading, setGroupInviteLoading] = useState(false);
+  const reactionAuthorNames = useMemo(
+    () => ({
+      ...identityNames,
+      [session.identity.id]:
+        session.identity.profile.name.trim() ||
+        identityNames[session.identity.id] ||
+        session.identity.id,
+    }),
+    [identityNames, session.identity.id, session.identity.profile.name],
+  );
   const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [conversationKeyDialog, setConversationKeyDialog] = useState<
     'add' | 'copy' | null
@@ -462,7 +483,7 @@ export function ChatColumn({
   };
 
   return (
-    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
+    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <header className="border-b border-white/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <button
@@ -616,7 +637,7 @@ export function ChatColumn({
                           });
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {copy.calls.startCall}
                       </button>
@@ -627,7 +648,7 @@ export function ChatColumn({
                         setConversationDataOpen(true);
                         setConversationMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {copy.chat.viewData}
                     </button>
@@ -643,7 +664,7 @@ export function ChatColumn({
                           }
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {hasConversationKey
                           ? copy.chat.copyPrivateKey
@@ -658,7 +679,7 @@ export function ChatColumn({
                           setGroupInviteOpen(true);
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {copy.chat.invite}
                       </button>
@@ -770,8 +791,10 @@ export function ChatColumn({
                           )
                         }
                         onMessageMenuOpen={onMessageMenuOpen}
+                        onReactionToggle={onReactionToggle}
                         onReplyReferenceClick={onReplyReferenceClick}
                         onRetryMessage={onRetryMessage}
+                        reactionAuthorNames={reactionAuthorNames}
                         replyImage={
                           replyMessage?.attachments.find((attachment) =>
                             isBrowserPreviewImage(attachment.contentType),
@@ -803,12 +826,12 @@ export function ChatColumn({
               {messages.length === 0 &&
                 messageState !== 'loading' &&
                 (hasConversationKey ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                     {copy.chat.emptyMessages}
                   </div>
                 ) : (
                   <div className="grid min-h-[42vh] place-items-center">
-                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                    <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
                       <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
                         <LockIcon locked={false} />
                       </div>
@@ -878,7 +901,7 @@ export function ChatColumn({
           />
           <form
             onSubmit={(event) => void sendGroupInvitation(event)}
-            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]"
+            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-2xl"
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -943,6 +966,16 @@ export function ChatColumn({
           name={profileViewer.name}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          onOpenConversation={
+            profileViewer.identityId === session.identity.id ||
+            !onOpenConversationWithIdentity
+              ? undefined
+              : () =>
+                  onOpenConversationWithIdentity(
+                    profileViewer.identityId,
+                    profileViewer.identity,
+                  )
+          }
           picture={profileViewer.picture}
         />
       )}
