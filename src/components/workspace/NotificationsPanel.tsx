@@ -1,10 +1,16 @@
-import type { NotificationResource } from '../../domain/types';
+import type {
+  Community,
+  ConversationResource,
+  IdentityResource,
+  NotificationResource,
+} from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { formatTime, shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
+  identityName,
   type IdentityNames,
 } from '../../utils/identityDisplay';
 
@@ -12,9 +18,13 @@ type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
 interface NotificationsPanelProps {
   action: NotificationAction | null;
+  communities: Community[];
+  communityPreviews: Record<string, Community>;
+  conversations: ConversationResource[];
   error: string | null;
   notifications: NotificationResource[];
   identityNames: IdentityNames;
+  identityProfiles: Record<string, IdentityResource>;
   onAccept: (notification: NotificationResource) => void;
   onArchive: (notificationId: string) => void;
   onClose: () => void;
@@ -63,8 +73,12 @@ function notificationTarget(notification: NotificationResource): {
 
 export function NotificationsPanel({
   action,
+  communities,
+  communityPreviews,
+  conversations,
   error,
   identityNames,
+  identityProfiles,
   notifications,
   onAccept,
   onArchive,
@@ -114,6 +128,13 @@ export function NotificationsPanel({
 
           {notifications.map((notification) => {
             const target = notificationTarget(notification);
+            const preview = notificationPreview(notification, {
+              communities,
+              communityPreviews,
+              conversations,
+              identityNames,
+              identityProfiles,
+            });
             const inviterIdentityId =
               notification.type === 'missed_call'
                 ? notification.payload.callerIdentityId
@@ -154,6 +175,16 @@ export function NotificationsPanel({
                 </div>
 
                 <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
+                  <div className="mb-3 border-b border-white/10 pb-3">
+                    <div className="text-sm font-black text-white/85">
+                      {preview.title}
+                    </div>
+                    {preview.subtitle && (
+                      <div className="mt-1 line-clamp-2 text-xs font-semibold text-white/50">
+                        {preview.subtitle}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>{target.label}</span>
                     <span className="truncate font-semibold text-white/70">
@@ -204,4 +235,74 @@ export function NotificationsPanel({
       </section>
     </div>
   );
+}
+
+function notificationPreview(
+  notification: NotificationResource,
+  context: {
+    communities: Community[];
+    communityPreviews: Record<string, Community>;
+    conversations: ConversationResource[];
+    identityNames: IdentityNames;
+    identityProfiles: Record<string, IdentityResource>;
+  },
+): { subtitle?: string; title: string } {
+  if (notification.type === 'community_invitation') {
+    const community =
+      context.communityPreviews[notification.payload.communityId] ??
+      context.communities.find(
+        (item) => item.id === notification.payload.communityId,
+      );
+
+    return {
+      subtitle:
+        community?.description ||
+        `${community?.memberIds.length ?? 0} ${copy.communities.members}`,
+      title:
+        community?.name ??
+        `${copy.notifications.community} ${shortId(notification.payload.communityId)}`,
+    };
+  }
+
+  if (notification.type === 'conversation_invitation') {
+    const identity =
+      context.identityProfiles[notification.payload.inviterIdentityId];
+    const displayName =
+      (identity ? identityName(identity) : null) ??
+      identityDisplayName(
+        notification.payload.inviterIdentityId,
+        context.identityNames,
+      );
+
+    return {
+      subtitle: shortId(notification.payload.inviterIdentityId),
+      title: displayName,
+    };
+  }
+
+  if (notification.type === 'group_conversation_invitation') {
+    const conversation = context.conversations.find(
+      (item) => item.id === notification.payload.conversationId,
+    );
+
+    return {
+      subtitle: shortId(notification.payload.conversationId),
+      title:
+        conversation?.name ??
+        conversation?.title ??
+        copy.notifications.groupInvitationTitle,
+    };
+  }
+
+  if (notification.type === 'missed_call') {
+    return {
+      subtitle: shortId(notification.payload.callId),
+      title: identityDisplayName(
+        notification.payload.callerIdentityId,
+        context.identityNames,
+      ),
+    };
+  }
+
+  return { title: copy.notifications.invitationTitle };
 }

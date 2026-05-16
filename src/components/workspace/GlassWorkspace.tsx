@@ -265,6 +265,8 @@ export function GlassWorkspace({
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
+  const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
+    useState<Record<string, Community>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -504,6 +506,49 @@ export function GlassWorkspace({
     onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
+
+  useEffect(() => {
+    const communityIds = visibleNotifications
+      .filter(
+        (notification) => notification.type === 'community_invitation',
+      )
+      .map((notification) => notification.payload.communityId)
+      .filter(
+        (communityId) =>
+          !communities.some((community) => community.id === communityId) &&
+          !notificationCommunityPreviews[communityId],
+      );
+
+    if (communityIds.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      [...new Set(communityIds)].map((communityId) =>
+        pigeonApplication
+          .getCommunity(session, communityId)
+          .then((community) => [communityId, community] as const)
+          .catch(() => null),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+
+      const loaded = results.filter(
+        (result): result is readonly [string, Community] => result !== null,
+      );
+
+      if (loaded.length === 0) return;
+
+      setNotificationCommunityPreviews((current) => ({
+        ...current,
+        ...Object.fromEntries(loaded),
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [communities, notificationCommunityPreviews, session, visibleNotifications]);
 
   useEffect(() => {
     if (!pendingCommunityInvite) return;
@@ -2784,8 +2829,12 @@ export function GlassWorkspace({
       {notificationsOpen && (
         <NotificationsPanel
           action={notificationAction}
+          communities={communities}
+          communityPreviews={notificationCommunityPreviews}
+          conversations={conversations}
           error={notificationError}
           identityNames={identityNames}
+          identityProfiles={identityProfiles}
           notifications={visibleNotifications}
           onAccept={(notification) => void acceptNotification(notification)}
           onArchive={archiveNotification}
