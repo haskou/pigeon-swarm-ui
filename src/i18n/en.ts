@@ -128,6 +128,7 @@ export const copy = {
     channelDataTitle: 'Channel data',
     channelError: 'The channel could not be created.',
     channelMetadataOnly: 'Community channel.',
+    channelMessageNotification: 'New community message',
     channels: 'Channels',
     channelsAreMetadata: 'Channels are ready for metadata',
     channelsAreMetadataBody:

@@ -75,3 +75,22 @@ self.addEventListener('fetch', (event) => {
     ),
   );
 });
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/';
+  const url = new URL(targetUrl, self.location.origin).toString();
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ includeUncontrolled: true, type: 'window' })
+      .then((clients) => {
+        const focusedClient = clients.find((client) => client.url === url);
+
+        if (focusedClient) return focusedClient.focus();
+
+        return self.clients.openWindow(url);
+      }),
+  );
+});

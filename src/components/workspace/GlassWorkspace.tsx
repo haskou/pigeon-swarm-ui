@@ -48,6 +48,10 @@ import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirect
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
+import {
+  requestPwaNotificationPermission,
+  showPwaNotification,
+} from '../../presentation/notifications/PwaNotifications';
 import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -122,6 +126,21 @@ function replyPreviewFromMessage(
     ...(image ? { image } : {}),
     messageId: message.id,
   };
+}
+
+function communityNotificationBody(
+  communities: Community[],
+  communityId: string,
+  channelId: string,
+): string {
+  const community = communities.find((item) => item.id === communityId);
+  const channel = community
+    ? communityChannels(community).find((item) => item.id === channelId)
+    : undefined;
+
+  return channel
+    ? `${community?.name ?? communityId} #${channel.name}`
+    : (community?.name ?? communityId);
 }
 
 interface GlassWorkspaceProps {
@@ -271,6 +290,7 @@ export function GlassWorkspace({
 
   const openNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
+    void requestPwaNotificationPermission();
     setNotificationsOpen(true);
   }, [suppressMessageLoadsBriefly]);
 
@@ -1727,6 +1747,11 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('notifications.')) {
         playNotificationSound();
+        void showPwaNotification({
+          body: copy.notifications.open,
+          tag: `notification-${event.event_id}`,
+          title: copy.notifications.title,
+        });
         void refreshNotifications();
         return;
       }
@@ -1763,6 +1788,15 @@ export function GlassWorkspace({
           authorIdentityId !== session.identity.id
         ) {
           playNotificationSound();
+          void showPwaNotification({
+            body: communityNotificationBody(
+              communities,
+              communityId,
+              channelId,
+            ),
+            tag: `community-${communityId}-${channelId}`,
+            title: copy.communities.channelMessageNotification,
+          });
           markCommunityChannelUnread(communityId, channelId);
         }
 
@@ -1952,6 +1986,11 @@ export function GlassWorkspace({
           const unreadMessageId = messageId ?? timelineMessage?.id;
 
           playNotificationSound();
+          void showPwaNotification({
+            body: copy.chat.newMessage,
+            tag: `conversation-${conversationId}`,
+            title: copy.chat.directMessage,
+          });
           if (unreadMessageId)
             markUnreadMessage(conversationId, unreadMessageId);
         }
@@ -2039,6 +2078,7 @@ export function GlassWorkspace({
       activeConversation?.id,
       activeConversationKeyId,
       clearUnreadMessages,
+      communities,
       fetchRealtimeMessage,
       isScrolledNearBottom,
       markCommunityChannelUnread,
@@ -2071,8 +2111,8 @@ export function GlassWorkspace({
   });
 
   return (
-    <section className="relative z-10 min-h-screen pt-0 sm:pt-4">
-      <div className="mx-auto grid h-screen max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100vh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+    <section className="relative z-10 min-h-full">
+      <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100dvh-1rem)] sm:gap-3 sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}
