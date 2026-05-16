@@ -58,7 +58,7 @@ import {
   shortId,
 } from '../../utils/formatting';
 import { normalizeIdentityId } from '../../utils/identityId';
-import { identityName } from '../../utils/identityDisplay';
+import { identityBanner, identityName } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
@@ -2150,21 +2150,35 @@ function MemberRow({
 }) {
   const name = memberPrimaryName(identity, identityId);
   const handle = identity?.profile.handle?.trim();
+  const bannerUrl = useIdentityBannerUrl(identity);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative flex w-full items-center gap-3 rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
     >
-      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+      {bannerUrl && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${bannerUrl})`,
+            maskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+            WebkitMaskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+          }}
+        />
+      )}
+      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
         {pictureUrl ? (
           <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           name.slice(0, 1).toUpperCase()
         )}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1">
         <div className="truncate text-sm font-black">{name}</div>
         <div className="truncate text-xs text-white/45">
           {handle ? `@${handle}` : shortId(identityId)}
@@ -2180,6 +2194,42 @@ function MemberRow({
       )}
     </button>
   );
+}
+
+function useIdentityBannerUrl(identity?: IdentityResource): string | null {
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!identity?.profile.banner) {
+      setBannerUrl(null);
+
+      return;
+    }
+
+    const directBanner = identityBanner(identity);
+
+    if (directBanner) {
+      setBannerUrl(directBanner);
+
+      return;
+    }
+
+    let cancelled = false;
+    const bannerCid = identity.profile.banner.trim();
+
+    setBannerUrl(null);
+    void loadPublicImage(bannerCid)
+      .then((loadedBanner) => {
+        if (!cancelled) setBannerUrl(loadedBanner);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
+  return bannerUrl;
 }
 
 function resolveCommunityChannelId(

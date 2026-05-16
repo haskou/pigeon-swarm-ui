@@ -216,7 +216,7 @@ export function MessageBubble({
               type="button"
               onClick={() => onReplyReferenceClick(replyMessageId)}
               className={cx(
-                'mb-6 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
                 mine
                   ? 'border-white/20 bg-white/10 hover:bg-white/15'
                   : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
@@ -416,7 +416,9 @@ function groupMessageReactions(
       reacted: false,
     };
 
-    current.authors.push(authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId);
+    current.authors.push(
+      authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId,
+    );
     current.count += 1;
     current.lastCreatedAt = Math.max(current.lastCreatedAt, reaction.createdAt);
     current.reacted =
@@ -427,7 +429,9 @@ function groupMessageReactions(
   return [...byEmoji.values()].sort((left, right) => {
     const createdAtDiff = left.lastCreatedAt - right.lastCreatedAt;
 
-    return createdAtDiff === 0 ? left.emoji.localeCompare(right.emoji) : createdAtDiff;
+    return createdAtDiff === 0
+      ? left.emoji.localeCompare(right.emoji)
+      : createdAtDiff;
   });
 }
 
@@ -520,9 +524,7 @@ function LinkPreviewCard({
       rel="noreferrer"
       className={cx(
         'mt-3 block overflow-hidden rounded-2xl border p-3 text-left transition hover:brightness-110',
-        mine
-          ? 'border-white/20 bg-white/10'
-          : 'border-white/10 bg-white/8',
+        mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
       {metaImageUrl && (
@@ -731,6 +733,7 @@ function callEventDirection(
 
 function callEventLabel(eventType: MessageResource['callEventType']): string {
   if (eventType === 'missed') return copy.calls.missed;
+
   if (eventType === 'declined') return copy.calls.declined;
 
   return copy.calls.ended;

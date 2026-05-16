@@ -32,6 +32,7 @@ import {
 } from '../../utils/credentialsValidation';
 import { conversationTitle, shortId } from '../../utils/formatting';
 import {
+  identityBanner,
   identityDisplayName,
   identityPicture,
   type IdentityNames,
@@ -45,6 +46,7 @@ import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 import { SectionTitle } from '../common/SectionTitle';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
+import { loadPublicImage } from '../community/communityImages';
 
 interface SidebarProps {
   session: Session;
@@ -89,6 +91,14 @@ export function Sidebar({
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
+  const conversationBannerUrls = useIdentityBannerUrls(
+    identityProfiles,
+    filteredConversationPeerIdentityIds(
+      conversations,
+      session.identity.id,
+      session.keychain,
+    ),
+  );
   const conversationPeerId = (conversation: ConversationResource) =>
     conversationPeerIdentityId(
       conversation,
@@ -200,13 +210,26 @@ export function Sidebar({
               key={conversation.id}
               onClick={() => onSelect(conversation.id)}
               className={cx(
-                'w-full rounded-2xl p-3 text-left transition',
+                'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
                 activeConversationId === conversation.id
                   ? 'bg-white text-slate-950'
                   : 'bg-white/8 text-white hover:bg-white/14',
               )}
             >
-              <div className="flex items-center gap-3">
+              {conversationBannerUrls[conversation.id] && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${conversationBannerUrls[conversation.id]})`,
+                    maskImage:
+                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+                    WebkitMaskImage:
+                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+                  }}
+                />
+              )}
+              <div className="relative flex items-center gap-3">
                 <div
                   className={cx(
                     'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
@@ -265,6 +288,78 @@ export function Sidebar({
       />
     </aside>
   );
+}
+
+function filteredConversationPeerIdentityIds(
+  conversations: ConversationResource[],
+  currentIdentityId: string,
+  keychain: Session['keychain'],
+): Record<string, string> {
+  return Object.fromEntries(
+    conversations
+      .map((conversation) => [
+        conversation.id,
+        conversationPeerIdentityId(conversation, currentIdentityId, keychain),
+      ])
+      .filter((entry): entry is [string, string] => !!entry[1]),
+  );
+}
+
+function useIdentityBannerUrls(
+  identities: Record<string, IdentityResource>,
+  identityIdsByKey: Record<string, string>,
+): Record<string, string> {
+  const [bannerUrls, setBannerUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const entries = Object.entries(identityIdsByKey)
+      .map(([key, identityId]) => [key, identities[identityId]] as const)
+      .filter(
+        (entry): entry is readonly [string, IdentityResource] =>
+          !!entry[1]?.profile.banner && !bannerUrls[entry[0]],
+      );
+
+    if (entries.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      entries.map(async ([key, identity]) => {
+        const directBanner = identityBanner(identity);
+
+        if (directBanner) return [key, directBanner] as const;
+
+        const bannerCid = identity.profile.banner?.trim();
+
+        if (!bannerCid) return null;
+
+        const loadedBanner = await loadPublicImage(bannerCid);
+
+        return loadedBanner ? ([key, loadedBanner] as const) : null;
+      }),
+    )
+      .then((loaded) => {
+        if (cancelled) return;
+
+        const nextUrls = loaded.filter(
+          (entry): entry is readonly [string, string] => entry !== null,
+        );
+
+        if (nextUrls.length === 0) return;
+
+        setBannerUrls((current) => ({
+          ...current,
+          ...Object.fromEntries(nextUrls),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bannerUrls, identities, identityIdsByKey]);
+
+  return bannerUrls;
 }
 
 export function UserProfileDropdown({
