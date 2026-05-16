@@ -44,6 +44,7 @@ import {
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 import { SectionTitle } from '../common/SectionTitle';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { loadPublicImage } from '../community/communityImages';
@@ -657,6 +658,10 @@ function ProfileEditor({
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [imageEditor, setImageEditor] = useState<{
+    file: File;
+    shape: 'avatar' | 'banner';
+  } | null>(null);
   const pictureInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
@@ -737,29 +742,15 @@ function ProfileEditor({
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setPicturePreview(reader.result);
-    });
-    setPictureFile(file);
-    reader.readAsDataURL(file);
+    if (file) setImageEditor({ file, shape: 'avatar' });
+    event.target.value = '';
   };
 
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') setBannerPreview(reader.result);
-    });
-    setBannerFile(file);
-    reader.readAsDataURL(file);
+    if (file) setImageEditor({ file, shape: 'banner' });
+    event.target.value = '';
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -1017,6 +1008,22 @@ function ProfileEditor({
           {state === 'loading' ? copy.profile.saving : copy.profile.save}
         </button>
       </form>
+      {imageEditor && (
+        <ImageCropEditor
+          file={imageEditor.file}
+          shape={imageEditor.shape}
+          onClose={() => setImageEditor(null)}
+          onApply={(file, previewUrl) => {
+            if (imageEditor.shape === 'avatar') {
+              setPictureFile(file);
+              setPicturePreview(previewUrl);
+            } else {
+              setBannerFile(file);
+              setBannerPreview(previewUrl);
+            }
+          }}
+        />
+      )}
     </div>,
     document.body,
   );

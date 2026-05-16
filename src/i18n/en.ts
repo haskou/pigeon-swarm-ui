@@ -325,6 +325,17 @@ export const copy = {
     validation:
       'The request data is not valid. Please review it and try again.',
   },
+  imageEditor: {
+    apply: 'Apply crop',
+    avatar: 'Square avatar, resized to 512 x 512.',
+    banner: 'Wide banner, resized to 1600 x 533.',
+    dragHelp: 'Drag the image to reposition it. Works with mouse and touch.',
+    horizontal: 'Horizontal',
+    reset: 'Reset',
+    title: 'Adjust image',
+    vertical: 'Vertical',
+    zoom: 'Zoom',
+  },
   inspector: {
     conversationKeychain: 'Keychain',
     eventsProjectedLocally: 'events projected locally',

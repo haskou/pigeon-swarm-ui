@@ -18,6 +18,7 @@ import {
   VoiceIcon,
 } from './communityDialogPrimitives';
 import { loadPublicImage } from './communityImages';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 
 type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
 
@@ -40,6 +41,10 @@ export function ManageCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [imageEditor, setImageEditor] = useState<{
+    file: File;
+    shape: 'avatar' | 'banner';
+  } | null>(null);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
   const [channelName, setChannelName] = useState('');
@@ -361,14 +366,24 @@ export function ManageCommunityDialog({
                 ref={avatarInputRef}
                 type="file"
                 accept="image/*"
-                onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+
+                  if (file) setImageEditor({ file, shape: 'avatar' });
+                  event.target.value = '';
+                }}
                 className="sr-only"
               />
               <input
                 ref={bannerInputRef}
                 type="file"
                 accept="image/*"
-                onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+
+                  if (file) setImageEditor({ file, shape: 'banner' });
+                  event.target.value = '';
+                }}
                 className="sr-only"
               />
             </div>
@@ -488,6 +503,22 @@ export function ManageCommunityDialog({
         >
           {copy.profile.save}
         </button>
+        {imageEditor && (
+          <ImageCropEditor
+            file={imageEditor.file}
+            shape={imageEditor.shape}
+            onClose={() => setImageEditor(null)}
+            onApply={(file, previewUrl) => {
+              if (imageEditor.shape === 'avatar') {
+                setAvatar(file);
+                setAvatarPreview(previewUrl);
+              } else {
+                setBanner(file);
+                setBannerPreview(previewUrl);
+              }
+            }}
+          />
+        )}
       </section>
     </div>,
     document.body,

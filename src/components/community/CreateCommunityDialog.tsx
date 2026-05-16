@@ -14,6 +14,7 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 
 interface CreateCommunityDialogProps {
   nodeNetworks: NodeNetwork[];
@@ -42,6 +43,10 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [imageEditor, setImageEditor] = useState<{
+    file: File;
+    shape: 'avatar' | 'banner';
+  } | null>(null);
   const [channelName, setChannelName] = useState('general');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channels, setChannels] = useState<InitialChannelDraft[]>([
@@ -104,11 +109,17 @@ export function CreateCommunityDialog({
   }, [banner]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setAvatar(event.target.files?.[0] ?? null);
+    const file = event.target.files?.[0];
+
+    if (file) setImageEditor({ file, shape: 'avatar' });
+    event.target.value = '';
   };
 
   const handleBannerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setBanner(event.target.files?.[0] ?? null);
+    const file = event.target.files?.[0];
+
+    if (file) setImageEditor({ file, shape: 'banner' });
+    event.target.value = '';
   };
   const addChannel = () => {
     const trimmed = channelName.trim();
@@ -360,6 +371,22 @@ export function CreateCommunityDialog({
               : copy.communities.create}
           </button>
         </div>
+        {imageEditor && (
+          <ImageCropEditor
+            file={imageEditor.file}
+            shape={imageEditor.shape}
+            onClose={() => setImageEditor(null)}
+            onApply={(file, previewUrl) => {
+              if (imageEditor.shape === 'avatar') {
+                setAvatar(file);
+                setAvatarPreview(previewUrl);
+              } else {
+                setBanner(file);
+                setBannerPreview(previewUrl);
+              }
+            }}
+          />
+        )}
       </form>
     </div>
   );
