@@ -7,7 +7,7 @@ export function updateMessageReaction(
   action: 'add' | 'remove',
   createdAt = Date.now(),
 ): ChatMessage {
-  const withoutReaction = message.reactions.filter(
+  const withoutReaction = (message.reactions ?? []).filter(
     (reaction) =>
       reaction.authorIdentityId !== authorIdentityId ||
       reaction.emoji !== emoji,
