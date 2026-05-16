@@ -15,9 +15,6 @@ import {
 } from '../../utils/identityDisplay';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
-type NotificationPreviewTarget =
-  | { id: string; type: 'community' }
-  | { id: string; type: 'identity' };
 
 interface NotificationsPanelProps {
   action: NotificationAction | null;
@@ -34,7 +31,6 @@ interface NotificationsPanelProps {
   onArchive: (notificationId: string) => void;
   onClose: () => void;
   onDecline: (notificationId: string) => void;
-  onPreviewTarget: (target: NotificationPreviewTarget) => void;
 }
 
 function notificationTitle(notification: NotificationResource): string {
@@ -92,7 +88,6 @@ export function NotificationsPanel({
   onArchive,
   onClose,
   onDecline,
-  onPreviewTarget,
 }: NotificationsPanelProps) {
   return (
     <div
@@ -146,7 +141,6 @@ export function NotificationsPanel({
               identityPictures,
               identityProfiles,
             });
-            const previewTarget = notificationPreviewTarget(notification);
             const inviterIdentityId =
               notification.type === 'missed_call'
                 ? notification.payload.callerIdentityId
@@ -187,18 +181,7 @@ export function NotificationsPanel({
                 </div>
 
                 <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
-                  <button
-                    type="button"
-                    disabled={!previewTarget}
-                    onClick={() => {
-                      if (previewTarget) onPreviewTarget(previewTarget);
-                    }}
-                    className={cx(
-                      'mb-3 flex w-full items-center gap-3 border-b border-white/10 pb-3 text-left transition',
-                      previewTarget &&
-                        'rounded-2xl hover:bg-white/8 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/50',
-                    )}
-                  >
+                  <div className="mb-3 flex items-center gap-3 border-b border-white/10 pb-3">
                     <PreviewAvatar preview={preview} />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-black text-white/85">
@@ -210,7 +193,7 @@ export function NotificationsPanel({
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>{target.label}</span>
                     <span className="truncate font-semibold text-white/70">
@@ -261,24 +244,6 @@ export function NotificationsPanel({
       </section>
     </div>
   );
-}
-
-function notificationPreviewTarget(
-  notification: NotificationResource,
-): NotificationPreviewTarget | undefined {
-  if (notification.type === 'community_invitation') {
-    return { id: notification.payload.communityId, type: 'community' };
-  }
-
-  if (notification.type === 'conversation_invitation') {
-    return { id: notification.payload.inviterIdentityId, type: 'identity' };
-  }
-
-  if (notification.type === 'missed_call') {
-    return { id: notification.payload.callerIdentityId, type: 'identity' };
-  }
-
-  return undefined;
 }
 
 type NotificationPreview = {

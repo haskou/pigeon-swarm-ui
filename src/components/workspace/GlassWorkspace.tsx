@@ -80,7 +80,6 @@ import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { loadPublicImage } from '../community/communityImages';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { ChatColumn } from './ChatColumn';
-import { ConversationDataDialog } from './ConversationDataDialog';
 import { Inspector } from './Inspector';
 import { NodeSettingsDialog } from './NodeSettingsDialog';
 import { NotificationsPanel } from './NotificationsPanel';
@@ -91,7 +90,6 @@ import {
   type MessageContextMenuState,
 } from './MessageContextMenu';
 import { RawMessageDialog } from './RawMessageDialog';
-import { UserProfileDialog } from '../profile/UserProfileDialog';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -280,10 +278,6 @@ export function GlassWorkspace({
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
-  const [notificationCommunityPreview, setNotificationCommunityPreview] =
-    useState<Community | null>(null);
-  const [notificationIdentityPreviewId, setNotificationIdentityPreviewId] =
-    useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [drafts, setDrafts] = useState<ConversationDrafts>(() =>
     loadDrafts(session.identity.id),
@@ -517,37 +511,6 @@ export function GlassWorkspace({
     onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
-  const openNotificationPreview = useCallback(
-    (target: { id: string; type: 'community' | 'identity' }) => {
-      if (target.type === 'identity') {
-        setNotificationIdentityPreviewId(target.id);
-
-        return;
-      }
-
-      const community =
-        notificationCommunityPreviews[target.id] ??
-        communities.find((item) => item.id === target.id);
-
-      if (community) {
-        setNotificationCommunityPreview(community);
-
-        return;
-      }
-
-      void pigeonApplication
-        .getCommunity(session, target.id)
-        .then((loadedCommunity) => {
-          setNotificationCommunityPreviews((current) => ({
-            ...current,
-            [loadedCommunity.id]: loadedCommunity,
-          }));
-          setNotificationCommunityPreview(loadedCommunity);
-        })
-        .catch(() => undefined);
-    },
-    [communities, notificationCommunityPreviews, session],
-  );
 
   useEffect(() => {
     const communityIds = visibleNotifications
@@ -2943,26 +2906,6 @@ export function GlassWorkspace({
           onDecline={(notificationId) =>
             void declineNotification(notificationId)
           }
-          onPreviewTarget={openNotificationPreview}
-        />
-      )}
-
-      {notificationIdentityPreviewId && (
-        <UserProfileDialog
-          identity={identityProfiles[notificationIdentityPreviewId]}
-          identityId={notificationIdentityPreviewId}
-          name={identityDisplayName(notificationIdentityPreviewId, identityNames)}
-          nodeNetworks={nodeNetworks}
-          onClose={() => setNotificationIdentityPreviewId(null)}
-          picture={identityPictures[notificationIdentityPreviewId]}
-        />
-      )}
-
-      {notificationCommunityPreview && (
-        <ConversationDataDialog
-          data={notificationCommunityPreview}
-          onClose={() => setNotificationCommunityPreview(null)}
-          title={copy.communities.communityDataTitle}
         />
       )}
 
