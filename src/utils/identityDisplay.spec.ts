@@ -28,6 +28,7 @@ describe('identity display helpers', () => {
   it('validates handles', () => {
     expect(isValidHandle('ada_42')).toBe(true);
     expect(isValidHandle('@al')).toBe(false);
+    expect(isValidHandle('Ada_42')).toBe(true);
     expect(isValidHandle('Ada!')).toBe(false);
   });
 
