@@ -82,7 +82,7 @@ export function NetworkCreationScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong app-screen rounded-none p-5 sm:min-h-0 sm:rounded-2xl sm:p-7"
+          className="glass-panel-strong min-h-dvh rounded-none p-5 sm:min-h-0 sm:rounded-2xl sm:p-7"
         >
           <div className="flex items-center gap-3">
             <img

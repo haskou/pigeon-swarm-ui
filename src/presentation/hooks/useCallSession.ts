@@ -155,6 +155,7 @@ export function useCallSession(): {
       deafened: false,
       hasMicrophone: input.localStream !== null,
       muted: input.localStream === null,
+      participantVolumes: {},
       startedAt: Date.now(),
       status: 'connecting',
     };
@@ -266,6 +267,7 @@ export function useCallSession(): {
         ...input,
         call,
         participants: mergeParticipantStatuses(input.participants, call),
+        participantVolumes: current.participantVolumes,
         status:
           call.status === 'active'
             ? current.status
@@ -290,6 +292,7 @@ export function useCallSession(): {
         id: call.id,
         muted: activeCallRef.current?.muted ?? false,
         participants: mergeParticipantStatuses(input.participants, call),
+        participantVolumes: activeCallRef.current?.participantVolumes ?? {},
         startedAt: activeCallRef.current?.startedAt ?? Date.now(),
         status: activeCallRef.current?.status ?? 'live',
       },
@@ -392,6 +395,17 @@ export function useCallSession(): {
     volumePercent: number,
   ) => {
     peerManager.setPeerVolume(identityId, volumePercent);
+    setActiveCall((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        participantVolumes: {
+          ...current.participantVolumes,
+          [identityId]: volumePercent,
+        },
+      };
+    });
   };
 
   return {

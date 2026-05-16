@@ -19,6 +19,11 @@ type MessageDecryptRequest = {
   requestId: number;
 };
 
+type MessageDecryptCancelRequest = {
+  requestId: number;
+  type: 'cancel';
+};
+
 type MessageDecryptResponse =
   | {
       messages: ChatMessage[];
@@ -46,13 +51,31 @@ type PlainMessage = {
   timestamp?: number;
 };
 
-self.onmessage = async (event: MessageEvent<MessageDecryptRequest>) => {
+const cancelledRequestIds = new Set<number>();
+
+function isCancelRequest(
+  request: MessageDecryptCancelRequest | MessageDecryptRequest,
+): request is MessageDecryptCancelRequest {
+  return 'type' in request && request.type === 'cancel';
+}
+
+self.onmessage = async (
+  event: MessageEvent<MessageDecryptCancelRequest | MessageDecryptRequest>,
+) => {
   const request = event.data;
+
+  if (isCancelRequest(request)) {
+    cancelledRequestIds.add(request.requestId);
+
+    return;
+  }
 
   try {
     const messages = await Promise.all(
       request.messages.map((message) => projectMessage(request, message)),
     );
+
+    if (cancelledRequestIds.delete(request.requestId)) return;
 
     postResponse({
       messages,
@@ -60,6 +83,8 @@ self.onmessage = async (event: MessageEvent<MessageDecryptRequest>) => {
       type: 'success',
     });
   } catch (caught) {
+    if (cancelledRequestIds.delete(request.requestId)) return;
+
     postResponse({
       message:
         caught instanceof Error ? caught.message : 'Message decrypt failed',

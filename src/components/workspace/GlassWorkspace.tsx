@@ -644,29 +644,25 @@ export function GlassWorkspace({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      let nextSession = sessionRef.current;
-      let acceptedCommunity;
-
-      if (pendingCommunityInvite.keyEntry) {
-        const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
-          nextSession,
-          pendingCommunityInvite.token,
-          pendingCommunityInvite.keyEntry,
-        );
-
-        acceptedCommunity = accepted.community;
-        nextSession = {
-          ...nextSession,
-          keychain: accepted.keychain,
-          keychainExternalIdentifier: accepted.keychainExternalIdentifier,
-        };
-        setSession(nextSession);
-      } else {
-        acceptedCommunity = await pigeonApplication.acceptCommunityInviteLink(
-          nextSession,
-          pendingCommunityInvite.token,
-        );
+      if (!pendingCommunityInvite.keyEntry) {
+        throw new Error(copy.communities.linkKeyMissing);
       }
+
+      let nextSession = sessionRef.current;
+
+      const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
+        nextSession,
+        pendingCommunityInvite.token,
+        pendingCommunityInvite.keyEntry,
+      );
+
+      const acceptedCommunity = accepted.community;
+      nextSession = {
+        ...nextSession,
+        keychain: accepted.keychain,
+        keychainExternalIdentifier: accepted.keychainExternalIdentifier,
+      };
+      setSession(nextSession);
 
       setCommunities((current) => [
         acceptedCommunity,
@@ -1225,8 +1221,11 @@ export function GlassWorkspace({
 
       callActionInProgressRef.current = true;
       setSendError(null);
+      let localStream: MediaStream | null = null;
 
       void (async () => {
+        localStream = await requestLocalAudio();
+
         logCallDebug('workspace:community-voice:leaving-current-call', {
           channelId: channel.id,
           communityId: activeCommunity.id,
@@ -1266,6 +1265,7 @@ export function GlassWorkspace({
           currentIdentityId,
           iceConfig,
           id: call.id,
+          localStream,
           onSignal: callSignalSender(call.id),
         });
         logCallDebug('workspace:community-voice:start-local-session-complete', {
@@ -1274,6 +1274,7 @@ export function GlassWorkspace({
         playAnsweredCallSound();
       })()
         .catch((caught) => {
+          stopLocalAudio(localStream);
           logCallError('workspace:community-voice:failed', caught, {
             channelId: channel.id,
             communityId: activeCommunity.id,
@@ -1294,6 +1295,7 @@ export function GlassWorkspace({
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
+      requestLocalAudio,
       startCall,
     ],
   );
@@ -2700,7 +2702,7 @@ export function GlassWorkspace({
 
   return (
     <section className="relative z-10 min-h-full">
-      <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 sm:h-[calc(100dvh-1rem)] sm:px-4 sm:pb-4 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+      <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}
