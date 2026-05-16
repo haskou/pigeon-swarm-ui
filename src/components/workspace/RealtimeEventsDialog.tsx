@@ -14,7 +14,7 @@ export function RealtimeEventsDialog({
 }: RealtimeEventsDialogProps) {
   return (
     <div className="fixed inset-0 z-[95] bg-black/55 p-3 backdrop-blur-sm sm:p-5">
-      <section className="glass-panel-strong mx-auto flex h-full w-full max-w-4xl flex-col rounded-[2rem] p-4 shadow-2xl shadow-black/45">
+      <section className="glass-panel-strong mx-auto flex h-full w-full max-w-4xl flex-col rounded-2xl p-4 shadow-2xl shadow-black/45">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">

@@ -484,7 +484,7 @@ export function Composer({
       {draggingFiles &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-[140] grid place-items-center bg-black/70 p-6 backdrop-blur-md">
-            <div className="grid h-full w-full place-items-center rounded-[2rem] border-2 border-dashed border-fuchsia-300/70 bg-fuchsia-500/10 text-center shadow-2xl shadow-black/40">
+            <div className="grid h-full w-full place-items-center rounded-2xl border-2 border-dashed border-fuchsia-300/70 bg-fuchsia-500/10 text-center shadow-2xl shadow-black/40">
               <div>
                 <div className="text-4xl font-black text-white">+</div>
                 <div className="mt-3 text-2xl font-black text-white">

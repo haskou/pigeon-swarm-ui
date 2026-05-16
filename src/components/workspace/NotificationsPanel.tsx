@@ -95,7 +95,7 @@ export function NotificationsPanel({
       onClick={onClose}
     >
       <section
-        className="glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-[2rem] p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        className="glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
@@ -320,15 +320,10 @@ function notificationPreview(
   }
 
   if (notification.type === 'missed_call') {
-    const preview = identityNotificationPreview(
+    return identityNotificationPreview(
       notification.payload.callerIdentityId,
       context,
     );
-
-    return {
-      ...preview,
-      subtitle: shortId(notification.payload.callId),
-    };
   }
 
   return { title: copy.notifications.invitationTitle };
@@ -349,8 +344,7 @@ function identityNotificationPreview(
 
   return {
     avatarUrl: context.identityPictures[identityId],
-    subtitle:
-      handle ? `@${handle}` : (cachedName.handle ?? shortId(identityId)),
+    subtitle: handle ? `@${handle}` : (cachedName.handle ?? identityId),
     title:
       name ||
       cachedName.name ||

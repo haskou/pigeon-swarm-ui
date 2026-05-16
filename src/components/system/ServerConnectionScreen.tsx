@@ -12,7 +12,7 @@ export function ServerConnectionScreen({
 }: ServerConnectionScreenProps) {
   return (
     <section className="relative z-10 mx-auto grid min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-3xl place-items-center px-4 py-6 sm:py-8">
-      <div className="glass-panel-strong flex w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] p-6 text-center sm:rounded-[2.5rem] sm:p-8">
+      <div className="glass-panel-strong flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl p-6 text-center sm:p-8">
         <img
           src="/connectionLost.png"
           alt={copy.connection.imageAlt}

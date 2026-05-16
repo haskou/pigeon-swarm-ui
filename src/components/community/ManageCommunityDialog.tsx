@@ -296,7 +296,7 @@ export function ManageCommunityDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-[2rem]">
+      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">

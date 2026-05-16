@@ -162,7 +162,7 @@ export function Sidebar({
   }, [conversationSearch, conversations, identityNames, identityProfiles]);
 
   return (
-    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
       <div className="mb-4 flex items-center justify-end lg:hidden">
         <button
           type="button"
@@ -706,7 +706,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[2rem] p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>

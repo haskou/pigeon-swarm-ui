@@ -169,7 +169,7 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-[2rem]"
+        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

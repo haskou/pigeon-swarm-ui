@@ -45,7 +45,7 @@ export function Rail({
   return (
     <aside
       className={cx(
-        'glass-panel flex h-full flex-col items-center gap-3 rounded-none px-1 py-3 sm:rounded-[2rem]',
+        'glass-panel flex h-full flex-col items-center gap-3 rounded-none px-1 py-3',
         className,
       )}
     >

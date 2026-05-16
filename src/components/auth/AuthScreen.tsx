@@ -146,7 +146,7 @@ export function AuthScreen({
     <section className="app-screen relative z-10 grid place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
-          <div className="glass-panel-strong rounded-[2.5rem] p-8">
+          <div className="glass-panel-strong rounded-2xl p-8">
             <img
               src="/logo.png"
               alt="Pigeon Swarm"
@@ -177,7 +177,7 @@ export function AuthScreen({
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-[2.5rem] sm:p-7"
+          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-2xl sm:p-7"
         >
           <SegmentedControl
             value={mode}

@@ -38,7 +38,7 @@ export function Inspector({
     : undefined;
 
   return (
-    <aside className={cx('glass-panel rounded-[2rem] p-4', className)}>
+    <aside className={cx('glass-panel rounded-none p-4', className)}>
       <div className="flex items-center justify-between gap-3">
         <SectionTitle title={copy.inspector.identity} />
         {onClose && (
@@ -177,7 +177,7 @@ function PeersDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex h-full w-full flex-col overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/40 sm:h-[min(92vh,48rem)] sm:max-w-5xl">
+      <section className="glass-panel-strong relative z-10 flex h-full w-full flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40 sm:h-[min(92vh,48rem)] sm:max-w-5xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-black uppercase text-white/45">

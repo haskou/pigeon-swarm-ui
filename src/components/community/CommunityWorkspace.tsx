@@ -1344,9 +1344,9 @@ export function CommunityWorkspace({
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
-        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-3 lg:block">
+        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
           <div className="lg:hidden">{mobileRail}</div>
-          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4 sm:rounded-[2rem]">
+          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
             <div className="min-w-0">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.privateCommunity}
@@ -1492,7 +1492,7 @@ export function CommunityWorkspace({
         </div>
       </aside>
 
-      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
+      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
         <header className="border-b border-white/10 p-4 sm:p-5">
           <div className="flex items-center gap-3">
             <button
@@ -1871,7 +1871,7 @@ export function CommunityWorkspace({
         )}
       </section>
 
-      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-[2rem] p-4 xl:block">
+      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block">
         <button
           type="button"
           onClick={() => setMemberOpen(true)}

@@ -33,7 +33,7 @@ export function ConversationKeyDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-2xl p-5 shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-black">

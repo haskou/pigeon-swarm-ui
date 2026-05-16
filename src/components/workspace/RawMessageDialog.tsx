@@ -17,7 +17,7 @@ export function RawMessageDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] p-5 shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-black">{copy.messages.rawTitle}</h2>
           <button

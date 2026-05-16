@@ -238,7 +238,7 @@ function CallStageDialog({
       onClick={onClose}
     >
       <section
-        className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/60"
+        className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl shadow-black/60"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex flex-wrap items-center gap-3 border-b border-white/10 p-4 sm:p-5">

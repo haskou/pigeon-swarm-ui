@@ -478,7 +478,7 @@ export function ChatColumn({
   };
 
   return (
-    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none sm:rounded-[2rem]">
+    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <header className="border-b border-white/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <button
@@ -896,7 +896,7 @@ export function ChatColumn({
           />
           <form
             onSubmit={(event) => void sendGroupInvitation(event)}
-            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-[2rem]"
+            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-2xl"
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>

@@ -139,7 +139,7 @@ export function NodeSettingsDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[2rem] shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
           <div>
             <h2 className="text-xl font-black">
