@@ -61,7 +61,7 @@ export function ConversationKeyDialog({
             <textarea
               readOnly
               value={encryptedConversationKey}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
+              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
             />
             <button
               type="button"
@@ -78,7 +78,7 @@ export function ConversationKeyDialog({
               value={input}
               onChange={(event) => onInputChange(event.target.value)}
               placeholder={copy.chat.addPrivateKeyPlaceholder}
-              className="mt-5 h-40 w-full resize-none rounded-3xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
+              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
             />
             <button
               type="button"

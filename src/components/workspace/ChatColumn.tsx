@@ -632,7 +632,7 @@ export function ChatColumn({
                           });
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {copy.calls.startCall}
                       </button>
@@ -643,7 +643,7 @@ export function ChatColumn({
                         setConversationDataOpen(true);
                         setConversationMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {copy.chat.viewData}
                     </button>
@@ -659,7 +659,7 @@ export function ChatColumn({
                           }
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {hasConversationKey
                           ? copy.chat.copyPrivateKey
@@ -674,7 +674,7 @@ export function ChatColumn({
                           setGroupInviteOpen(true);
                           setConversationMenuOpen(false);
                         }}
-                        className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                       >
                         {copy.chat.invite}
                       </button>
@@ -821,12 +821,12 @@ export function ChatColumn({
               {messages.length === 0 &&
                 messageState !== 'loading' &&
                 (hasConversationKey ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                     {copy.chat.emptyMessages}
                   </div>
                 ) : (
                   <div className="grid min-h-[42vh] place-items-center">
-                    <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                    <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
                       <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
                         <LockIcon locked={false} />
                       </div>

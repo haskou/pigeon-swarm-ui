@@ -192,7 +192,7 @@ export function CreateCommunityDialog({
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
-            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+            <div className="overflow-hidden rounded-2xl bg-black/25">
               <button
                 type="button"
                 onClick={() => bannerInputRef.current?.click()}
@@ -218,7 +218,7 @@ export function CreateCommunityDialog({
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                   aria-label={copy.communities.avatar}
                 >
                   {avatarPreview ? (
@@ -268,7 +268,7 @@ export function CreateCommunityDialog({
               />
             </div>
 
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.network}
               </div>
@@ -282,7 +282,7 @@ export function CreateCommunityDialog({
                 {copy.communities.createBody}
               </p>
             </div>
-            <div className="mt-4 rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.initialChannels}
               </div>

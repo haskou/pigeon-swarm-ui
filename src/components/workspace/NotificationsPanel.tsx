@@ -130,7 +130,7 @@ export function NotificationsPanel({
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {notifications.length === 0 && (
-            <div className="rounded-3xl border border-white/10 bg-white/7 p-4 text-sm text-white/55">
+            <div className="rounded-2xl border border-white/10 bg-white/7 p-4 text-sm text-white/55">
               {copy.notifications.empty}
             </div>
           )}
@@ -158,7 +158,7 @@ export function NotificationsPanel({
             return (
               <article
                 key={notification.id}
-                className="rounded-3xl border border-white/10 bg-black/25 p-4"
+                className="rounded-2xl border border-white/10 bg-black/25 p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

@@ -243,7 +243,7 @@ export function AddCommunityMemberDialog({
               <input
                 readOnly
                 value={inviteLink}
-                className="mt-3 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70 outline-none"
+                className="mt-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70 outline-none"
                 onFocus={(event) => event.target.select()}
               />
             )}

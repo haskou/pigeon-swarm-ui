@@ -300,7 +300,7 @@ export function ManageCommunityDialog({
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
-            <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+            <div className="overflow-hidden rounded-2xl bg-black/25">
               <button
                 type="button"
                 onClick={() => bannerInputRef.current?.click()}
@@ -326,7 +326,7 @@ export function ManageCommunityDialog({
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                   aria-label={copy.communities.avatar}
                 >
                   {avatarPreview || currentAvatarUrl ? (
@@ -373,7 +373,7 @@ export function ManageCommunityDialog({
               />
             </div>
 
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.channels}
               </div>
@@ -383,7 +383,7 @@ export function ManageCommunityDialog({
                     key={channel.id}
                     className="flex items-center gap-2 rounded-2xl bg-white/8 p-2"
                   >
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/8 text-white/55">
+                    <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/8 text-white/55">
                       {channel.type === 'voice' ? <VoiceIcon /> : '#'}
                     </span>
                     <input
@@ -394,9 +394,9 @@ export function ManageCommunityDialog({
                           [channel.id]: event.target.value,
                         }))
                       }
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
                     />
-                    <span className="hidden rounded-xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
+                    <span className="hidden rounded-2xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
                       {channel.type === 'voice'
                         ? copy.communities.voiceChannel
                         : copy.communities.textChannel}
@@ -405,7 +405,7 @@ export function ManageCommunityDialog({
                       type="button"
                       onClick={() => moveChannel(channel.id, -1)}
                       disabled={index === 0}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                      className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label={copy.communities.moveChannelUp}
                     >
                       ↑
@@ -414,7 +414,7 @@ export function ManageCommunityDialog({
                       type="button"
                       onClick={() => moveChannel(channel.id, 1)}
                       disabled={index === channelOrder.length - 1}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                      className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label={copy.communities.moveChannelDown}
                     >
                       ↓
@@ -423,7 +423,7 @@ export function ManageCommunityDialog({
                       type="button"
                       onClick={() => deleteChannel(channel)}
                       disabled={state === 'loading'}
-                      className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
+                      className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label={copy.communities.deleteChannel}
                       title={copy.communities.deleteChannel}
                     >
@@ -439,7 +439,7 @@ export function ManageCommunityDialog({
                     type="button"
                     onClick={() => setChannelType(type)}
                     className={cx(
-                      'rounded-xl px-3 py-2 text-xs font-black transition',
+                      'rounded-2xl px-3 py-2 text-xs font-black transition',
                       channelType === type
                         ? 'bg-white text-slate-950'
                         : 'text-white/55 hover:bg-white/10',

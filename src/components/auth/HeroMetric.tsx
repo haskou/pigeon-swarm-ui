@@ -19,7 +19,7 @@ export function HeroMetric({ label, onClick, value }: HeroMetricProps) {
       <button
         type="button"
         onClick={onClick}
-        className="glass-card rounded-3xl p-4 text-left transition hover:bg-white/10"
+        className="glass-card rounded-2xl p-4 text-left transition hover:bg-white/10"
       >
         {content}
       </button>
@@ -27,7 +27,7 @@ export function HeroMetric({ label, onClick, value }: HeroMetricProps) {
   }
 
   return (
-    <div className="glass-card rounded-3xl p-4">
+    <div className="glass-card rounded-2xl p-4">
       {content}
     </div>
   );

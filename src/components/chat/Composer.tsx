@@ -351,7 +351,7 @@ export function Composer({
             <button
               type="button"
               onClick={onCancelReply}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
               aria-label={copy.messages.cancelReply}
             >
               ×
@@ -387,7 +387,7 @@ export function Composer({
                     type="button"
                     onClick={() => removeAttachment(attachment.index)}
                     disabled={disabled || sending}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
                     aria-label={copy.composer.removeAttachment}
                   >
                     ×
@@ -420,7 +420,7 @@ export function Composer({
         )}
         <div
           className={cx(
-            'relative flex items-center gap-2 rounded-3xl border border-white/10 bg-black/20 p-2 transition',
+            'relative flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 p-2 transition',
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
@@ -570,7 +570,7 @@ function ComposerImageAlbum({
               type="button"
               onClick={() => onRemove(attachment.index)}
               disabled={disabled}
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
               aria-label={copy.composer.removeAttachment}
             >
               ×
@@ -604,7 +604,7 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
 
   return (
     <div className="grid h-28 w-56 place-items-center bg-black/20 p-4">
-      <div className="relative h-16 w-12 rounded-lg border border-white/20 bg-white/10">
+      <div className="relative h-16 w-12 rounded-2xl border border-white/20 bg-white/10">
         <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
         <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
         <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
@@ -642,7 +642,7 @@ function EmojiSuggestionPanel({
               onSelect(suggestion);
             }}
             className={cx(
-              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition',
+              'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition',
               index === selectedIndex ? 'bg-white/12' : 'hover:bg-white/8',
             )}
             aria-label={`${copy.composer.insertEmoji} :${suggestion.shortcode}:`}

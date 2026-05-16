@@ -90,7 +90,7 @@ export function GlobalCallBar({
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') setStageOpen(true);
         }}
-        className="mb-2 cursor-pointer rounded-3xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl transition hover:bg-[#191b29]/95"
+        className="mb-2 cursor-pointer rounded-2xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl transition hover:bg-[#191b29]/95"
       >
         <div className="flex items-center gap-2.5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
@@ -386,7 +386,7 @@ function ParticipantTile({
       )}
     >
       <div className="mt-3 grid shrink-0 place-items-center">
-        <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24">
+        <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24">
           {participant.picture ? (
             <img
               src={participant.picture}
@@ -462,7 +462,7 @@ function callParticipantStatus(
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-white/8 px-1.5 py-1">
+    <div className="min-w-0 rounded-2xl bg-white/8 px-1.5 py-1">
       <dt className="truncate text-white/35">{label}</dt>
       <dd className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-black text-white/85">
         {value}

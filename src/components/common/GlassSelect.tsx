@@ -142,7 +142,7 @@ export function GlassSelect({
               disabled={option.disabled}
               onClick={() => selectOption(option.value)}
               className={cx(
-                'flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-bold outline-none transition',
+                'flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm font-bold outline-none transition',
                 option.disabled
                   ? 'cursor-not-allowed text-white/25'
                   : option.value === value

@@ -96,7 +96,7 @@ export function Rail({
         >
           +
           <span className="sr-only">{copy.communities.createTooltip}</span>
-          <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
+          <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
             {copy.communities.createTooltip}
           </span>
         </button>

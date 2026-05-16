@@ -1351,7 +1351,7 @@ export function CommunityWorkspace({
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.privateCommunity}
               </div>
-              <div className="mt-3 overflow-hidden rounded-3xl bg-white/8 text-left">
+              <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
                 {bannerUrl ? (
                   <button
                     type="button"
@@ -1402,12 +1402,12 @@ export function CommunityWorkspace({
               />
               <div className="space-y-2">
                 {textChannels.length === 0 && voiceChannels.length === 0 ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noChannels}
                   </div>
                 ) : visibleTextChannels.length === 0 &&
                   visibleVoiceChannels.length === 0 ? (
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
                     {copy.communities.noMatchingChannels}
                   </div>
                 ) : (
@@ -1601,7 +1601,7 @@ export function CommunityWorkspace({
                         setCommunityDataOpen(true);
                         setCommunityMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {copy.chat.viewData}
                     </button>
@@ -1617,7 +1617,7 @@ export function CommunityWorkspace({
 
                         setCommunityMenuOpen(false);
                       }}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                     >
                       {communityKey
                         ? copy.chat.copyPrivateKey
@@ -1627,7 +1627,7 @@ export function CommunityWorkspace({
                       type="button"
                       onClick={() => void leaveCommunity()}
                       disabled={communityLeaving}
-                      className="block w-full rounded-xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
                     >
                       {communityLeaving
                         ? copy.communities.leaving
@@ -1643,7 +1643,7 @@ export function CommunityWorkspace({
         {!selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
             <div className="max-w-md">
-              <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 text-3xl font-black">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10 text-3xl font-black">
                 #
               </div>
               <h2 className="mt-5 text-2xl font-black">
@@ -1679,7 +1679,7 @@ export function CommunityWorkspace({
                     )}
                   {missingCommunityKey && (
                     <div className="grid min-h-[28vh] place-items-center">
-                      <div className="w-full max-w-md rounded-3xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                      <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
                         <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
                           <LockIcon locked={false} />
                         </div>
@@ -1821,7 +1821,7 @@ export function CommunityWorkspace({
                     })}
                   {visibleMessages.length === 0 &&
                     messageState !== 'loading' && (
-                      <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
                         {copy.communities.emptyChannel}
                       </div>
                     )}
@@ -2095,7 +2095,7 @@ function VoiceChannelButton({
               type="button"
               onClick={(event) => onParticipantClick(participant, event)}
               className={cx(
-                'flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
+                'flex w-full items-center gap-2 rounded-2xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
                 active && participant.speaking
                   ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
                   : 'border-transparent text-white/55',

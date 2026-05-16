@@ -191,7 +191,7 @@ export function Sidebar({
         />
         <div className="space-y-2">
           {filteredConversations.length === 0 && (
-            <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
               {copy.sidebar.emptyConversations}
             </div>
           )}
@@ -200,7 +200,7 @@ export function Sidebar({
               key={conversation.id}
               onClick={() => onSelect(conversation.id)}
               className={cx(
-                'w-full rounded-3xl p-3 text-left transition',
+                'w-full rounded-2xl p-3 text-left transition',
                 activeConversationId === conversation.id
                   ? 'bg-white text-slate-950'
                   : 'bg-white/8 text-white hover:bg-white/14',
@@ -362,7 +362,7 @@ export function UserProfileDropdown({
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="flex w-full items-center gap-3 rounded-3xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
         <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
@@ -392,7 +392,7 @@ export function UserProfileDropdown({
       </button>
 
       {profileOpen && (
-        <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-3xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
+        <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-2xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
           <div className="flex items-center gap-3 border-b border-white/10 pb-3">
             <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
             <div className="min-w-0">
@@ -421,7 +421,7 @@ export function UserProfileDropdown({
                 <button
                   type="button"
                   onClick={copyIdentityId}
-                  className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950"
                 >
                   {identityCopied ? copy.profile.copied : copy.profile.copy}
                 </button>
@@ -721,7 +721,7 @@ function ProfileEditor({
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
-          <div className="overflow-hidden rounded-[1.75rem] bg-black/25">
+          <div className="overflow-hidden rounded-2xl bg-black/25">
             <button
               type="button"
               onClick={() => bannerInputRef.current?.click()}
@@ -743,7 +743,7 @@ function ProfileEditor({
               <button
                 type="button"
                 onClick={() => pictureInputRef.current?.click()}
-                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                 aria-label={copy.profile.changePicture}
               >
                 {picturePreview ? (
@@ -799,7 +799,7 @@ function ProfileEditor({
             />
           </div>
           <div className="grid gap-4">
-            <section className="rounded-3xl border border-white/10 bg-black/20 p-4">
+            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
               </div>
@@ -849,7 +849,7 @@ function ProfileEditor({
                 </button>
               </div>
             </section>
-            <section className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+            <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <button
                 type="button"
                 onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}

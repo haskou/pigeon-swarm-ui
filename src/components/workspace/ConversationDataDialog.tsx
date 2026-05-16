@@ -31,7 +31,7 @@ export function ConversationDataDialog({
             &times;
           </button>
         </div>
-        <pre className="mt-4 min-h-0 overflow-auto rounded-3xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+        <pre className="mt-4 min-h-0 overflow-auto rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
           {JSON.stringify(data, null, 2)}
         </pre>
       </section>

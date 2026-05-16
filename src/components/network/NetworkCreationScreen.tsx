@@ -55,7 +55,7 @@ export function NetworkCreationScreen({
             <img
               src="/logo.png"
               alt="Pigeon Swarm"
-              className="floaty h-28 w-28 rounded-[2rem] shadow-2xl shadow-indigo-950/40"
+              className="floaty h-28 w-28 rounded-2xl shadow-2xl shadow-indigo-950/40"
             />
             <h1 className="mt-8 max-w-xl text-6xl font-black tracking-[-.07em]">
               {copy.network.heroTitle}

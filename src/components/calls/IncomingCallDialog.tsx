@@ -30,7 +30,7 @@ export function IncomingCallDialog({
   return (
     <div className="fixed inset-0 z-[95] grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
       <section className="glass-panel-strong w-full max-w-sm rounded-2xl p-5 text-center shadow-2xl shadow-black/50">
-        <div className="mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950">
+        <div className="mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950">
           {caller?.picture ? (
             <img
               src={caller.picture}

@@ -52,7 +52,7 @@ export function Inspector({
           </button>
         )}
       </div>
-      <div className="rounded-3xl bg-white/8 p-4">
+      <div className="rounded-2xl bg-white/8 p-4">
         <div className="font-black">{session.identity.profile.name}</div>
         <div className="mt-1 break-all text-xs text-white/45">
           {session.identity.id}
@@ -69,7 +69,7 @@ export function Inspector({
         title={copy.inspector.conversationKeychain}
         className="mt-6"
       />
-      <div className="rounded-3xl bg-white/8 p-4">
+      <div className="rounded-2xl bg-white/8 p-4">
         <div className="flex justify-between gap-3 text-sm">
           <span className="text-white/50">{copy.inspector.privateKey}</span>
           <b className={key ? 'text-emerald-300' : 'text-rose-300'}>
@@ -106,7 +106,7 @@ export function Inspector({
       <SectionTitle title={copy.peers.title} className="mt-6" />
       <div className="grid max-h-72 gap-2 overflow-y-auto pr-1">
         {peers.length === 0 ? (
-          <div className="rounded-3xl bg-white/8 p-4 text-sm text-white/45">
+          <div className="rounded-2xl bg-white/8 p-4 text-sm text-white/45">
             {copy.peers.empty}
           </div>
         ) : (
@@ -148,7 +148,7 @@ function MetricCard({
       <button
         type="button"
         onClick={onClick}
-        className="rounded-3xl bg-white/8 p-4 text-left transition hover:bg-white/12"
+        className="rounded-2xl bg-white/8 p-4 text-left transition hover:bg-white/12"
       >
         {content}
       </button>
@@ -156,7 +156,7 @@ function MetricCard({
   }
 
   return (
-    <div className="rounded-3xl bg-white/8 p-4">
+    <div className="rounded-2xl bg-white/8 p-4">
       {content}
     </div>
   );
@@ -196,7 +196,7 @@ function PeersDialog({
         </div>
         <div className="mt-4 min-h-0 overflow-y-auto pr-1">
           {peers.length === 0 ? (
-            <div className="rounded-3xl bg-white/8 p-4 text-sm text-white/45">
+            <div className="rounded-2xl bg-white/8 p-4 text-sm text-white/45">
               {copy.peers.empty}
             </div>
           ) : (
@@ -215,7 +215,7 @@ function PeersDialog({
 
 function PeerSummary({ peer }: { peer: Peer }) {
   return (
-    <article className="rounded-3xl bg-white/8 p-3 text-xs">
+    <article className="rounded-2xl bg-white/8 p-3 text-xs">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate font-black">{shortId(peer.id)}</div>

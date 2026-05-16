@@ -178,7 +178,7 @@ export function UserProfileDialog({
               ]);
             }}
             disabled={!displayPicture}
-            className="-mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-[1.65rem] border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
+            className="-mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
             aria-label={copy.profile.openPicture}
           >
             {displayPicture ? (
@@ -213,7 +213,7 @@ export function UserProfileDialog({
                 <button
                   type="button"
                   onClick={copyIdentityId}
-                  className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950"
                 >
                   {copied ? copy.profile.copied : copy.profile.copy}
                 </button>

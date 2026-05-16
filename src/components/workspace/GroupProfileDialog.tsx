@@ -52,7 +52,7 @@ export function GroupProfileDialog({
       <section className="glass-panel-strong relative z-10 w-full max-w-md overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950">
+            <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950">
               {groupName.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0">
