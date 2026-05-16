@@ -440,19 +440,21 @@ export function UserProfileDropdown({
   }, [profileOpen]);
 
   return (
-    <div ref={profileRef} className="relative mt-4">
+    <div ref={profileRef} className="relative mt-4 shrink-0">
       {activeCall &&
         onCallEnd &&
         onCallParticipantVolumeChange &&
         onCallToggleDeafen &&
         onCallToggleMute && (
-          <GlobalCallBar
-            call={activeCall}
-            onEnd={onCallEnd}
-            onParticipantVolumeChange={onCallParticipantVolumeChange}
-            onToggleDeafen={onCallToggleDeafen}
-            onToggleMute={onCallToggleMute}
-          />
+          <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
+            <GlobalCallBar
+              call={activeCall}
+              onEnd={onCallEnd}
+              onParticipantVolumeChange={onCallParticipantVolumeChange}
+              onToggleDeafen={onCallToggleDeafen}
+              onToggleMute={onCallToggleMute}
+            />
+          </div>
         )}
       <button
         type="button"
@@ -487,7 +489,14 @@ export function UserProfileDropdown({
       </button>
 
       {profileOpen && (
-        <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-20 rounded-2xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl">
+        <div
+          className={cx(
+            'absolute left-0 right-0 z-40 rounded-2xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl',
+            activeCall
+              ? 'bottom-[calc(100%+5.75rem)]'
+              : 'bottom-[calc(100%+.5rem)]',
+          )}
+        >
           <div className="flex items-center gap-3 border-b border-white/10 pb-3">
             <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
             <div className="min-w-0">
