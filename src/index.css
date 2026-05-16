@@ -10,6 +10,36 @@ body {
 }
 button, input, textarea { font: inherit; }
 
+* {
+  scrollbar-color: rgba(217, 70, 239, .7) rgba(255, 255, 255, .06);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: .65rem;
+  width: .65rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, .045);
+}
+
+*::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(180deg, rgba(103, 232, 249, .72), rgba(217, 70, 239, .78));
+  border: 2px solid rgba(8, 10, 37, .72);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(180deg, rgba(165, 243, 252, .9), rgba(232, 121, 249, .95));
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .app-viewport {
   min-height: 100vh;
   min-height: 100dvh;
