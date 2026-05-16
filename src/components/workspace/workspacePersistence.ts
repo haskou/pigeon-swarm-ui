@@ -1,5 +1,7 @@
 import type { ConversationResource } from '../../domain/types';
 
+import { readJsonObjectFromLocalStorage } from '../../infrastructure/storage/JsonLocalStorage';
+
 export type ConversationDrafts = Record<string, string>;
 export type WorkspacePreference = {
   channelByCommunityId?: Record<string, string>;
@@ -31,36 +33,20 @@ export function initialConversationId(
 }
 
 export function loadDrafts(identityId: string): ConversationDrafts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
-    ) as ConversationDrafts;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(draftsStorageKey(identityId), {});
 }
 
 export function loadWorkspacePreference(
   identityId: string,
 ): WorkspacePreference {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
-    ) as WorkspacePreference;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(workspaceStorageKey(identityId), {});
 }
 
 export function loadCommunityUnreadCounts(
   identityId: string,
 ): CommunityUnreadCounts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
-        '{}',
-    ) as CommunityUnreadCounts;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(
+    communityUnreadStorageKey(identityId),
+    {},
+  );
 }
