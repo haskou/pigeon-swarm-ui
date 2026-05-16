@@ -201,6 +201,24 @@ function conversationNotificationPreview(
   return { body: copy.chat.directMessage, title: peerName };
 }
 
+function selectSharedNetworkId(
+  ownNetworkIds: string[],
+  peerNetworkIds: string[] | undefined,
+  preferredNetworkId?: string,
+): string | undefined {
+  const peerNetworks = peerNetworkIds ?? [];
+
+  if (
+    preferredNetworkId &&
+    ownNetworkIds.includes(preferredNetworkId) &&
+    (peerNetworks.length === 0 || peerNetworks.includes(preferredNetworkId))
+  ) {
+    return preferredNetworkId;
+  }
+
+  return peerNetworks.find((networkId) => ownNetworkIds.includes(networkId));
+}
+
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -2057,6 +2075,75 @@ export function GlassWorkspace({
     setSidebarOpen(false);
   };
 
+  const openOrCreateConversationWithIdentity = useCallback(
+    async (
+      identityId: string,
+      identity?: IdentityResource,
+      preferredNetworkId?: string,
+    ) => {
+      if (identityId === session.identity.id) return;
+
+      const existingConversation = conversations.find(
+        (conversation) =>
+          conversationPeerIdentityId(
+            conversation,
+            session.identity.id,
+            session.keychain,
+          ) === identityId,
+      );
+
+      if (existingConversation) {
+        setWorkspaceMode('messages');
+        setActiveConversationId(existingConversation.id);
+        setSidebarOpen(false);
+        setCommunityMembersOpen(false);
+
+        return;
+      }
+
+      const sharedNetworkId = selectSharedNetworkId(
+        session.identity.networks,
+        identity?.networks,
+        preferredNetworkId,
+      );
+
+      if (!sharedNetworkId) throw new Error(copy.dialog.noSharedNetwork);
+
+      const result = await pigeonApplication.createConversation(
+        sessionRef.current,
+        identityId,
+        sharedNetworkId,
+      );
+      const nextSession = {
+        ...sessionRef.current,
+        keychain: result.keychain,
+        keychainExternalIdentifier: result.keychainExternalIdentifier,
+      };
+
+      setSession(nextSession);
+      if (identity) rememberIdentity(identity);
+      setConversations((current) =>
+        sortConversationsByLatestMessage([
+          result.conversation,
+          ...current.filter((item) => item.id !== result.conversation.id),
+        ]),
+      );
+      setWorkspaceMode('messages');
+      setActiveConversationId(result.conversation.id);
+      setSidebarOpen(false);
+      setCommunityMembersOpen(false);
+    },
+    [
+      conversations,
+      rememberIdentity,
+      session.identity.id,
+      session.identity.networks,
+      session.keychain,
+      setConversations,
+      setSession,
+    ],
+  );
+
   const handleConversationKeyImported = async (
     keyEntry: ConversationKeyEntry,
   ) => {
@@ -2753,6 +2840,13 @@ export function GlassWorkspace({
               }
               onOpenSidebar={() => setSidebarOpen(true)}
               onCreate={() => setIsCreateOpen(true)}
+              onOpenConversationWithIdentity={(identityId, identity) =>
+                openOrCreateConversationWithIdentity(
+                  identityId,
+                  identity,
+                  activeConversation?.networkId,
+                )
+              }
               progress={attachmentProgress}
               realtimeStatus={realtimeStatus}
               onRealtimeEventsOpen={openRealtimeEvents}
@@ -2842,6 +2936,13 @@ export function GlassWorkspace({
             onMobileSidebarClose={() => setSidebarOpen(false)}
             onMobileMembersClose={() => setCommunityMembersOpen(false)}
             onOpenMobileSidebar={() => setSidebarOpen(true)}
+            onOpenConversationWithIdentity={(identityId, identity) =>
+              openOrCreateConversationWithIdentity(
+                identityId,
+                identity,
+                activeCommunity.networkId,
+              )
+            }
             onSessionUpdated={(nextSession) => {
               setSession(nextSession);
               rememberIdentity(nextSession.identity);

@@ -12,6 +12,7 @@ import {
   identityPicture,
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { ImageLightbox, type LightboxImage } from '../chat/ImageLightbox';
 
 type ProfilePopoverAnchor = {
@@ -30,6 +31,7 @@ interface UserProfileDialogProps {
   name: string;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
+  onOpenConversation?: () => Promise<void> | void;
   picture?: string | null;
 }
 
@@ -40,9 +42,14 @@ export function UserProfileDialog({
   name,
   nodeNetworks,
   onClose,
+  onOpenConversation,
   picture,
 }: UserProfileDialogProps) {
   const [copied, setCopied] = useState(false);
+  const [conversationError, setConversationError] = useState<string | null>(
+    null,
+  );
+  const [conversationOpening, setConversationOpening] = useState(false);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [lightboxImages, setLightboxImages] = useState<LightboxImage[] | null>(
     null,
@@ -115,6 +122,24 @@ export function UserProfileDialog({
 
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  const openConversation = async () => {
+    if (!onOpenConversation || conversationOpening) return;
+
+    setConversationOpening(true);
+    setConversationError(null);
+
+    try {
+      await onOpenConversation();
+      onClose();
+    } catch (caught) {
+      setConversationError(
+        toUserErrorMessage(caught, copy.dialog.createConversationError),
+      );
+    } finally {
+      setConversationOpening(false);
+    }
   };
 
   return createPortal(
@@ -192,10 +217,30 @@ export function UserProfileDialog({
             )}
           </button>
 
-          <div className="mt-3 min-w-0">
-            <h2 className="truncate text-2xl font-black">{displayName}</h2>
-            <p className="truncate text-sm text-white/45">{displayHandle}</p>
+          <div className="mt-3 flex min-w-0 items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-2xl font-black">{displayName}</h2>
+              <p className="truncate text-sm text-white/45">{displayHandle}</p>
+            </div>
+            {onOpenConversation && (
+              <button
+                type="button"
+                onClick={() => void openConversation()}
+                disabled={conversationOpening}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-fuchsia-500 disabled:cursor-wait disabled:opacity-60"
+                aria-label={copy.profile.openConversation}
+                title={copy.profile.openConversation}
+              >
+                <ConversationIcon />
+              </button>
+            )}
           </div>
+
+          {conversationError && (
+            <p className="mt-3 rounded-2xl border border-rose-200/20 bg-rose-500/10 p-3 text-xs font-bold text-rose-100">
+              {conversationError}
+            </p>
+          )}
 
           <p className="mt-4 max-h-28 overflow-y-auto text-sm leading-6 text-white/70">
             {biography}
@@ -309,5 +354,30 @@ function ProfileField({ label, value }: { label: string; value: string }) {
         {value}
       </div>
     </div>
+  );
+}
+
+function ConversationIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-5 w-5"
+    >
+      <path
+        d="M5 6.5A3.5 3.5 0 0 1 8.5 3h7A3.5 3.5 0 0 1 19 6.5v5A3.5 3.5 0 0 1 15.5 15H11l-4.5 4v-4A3.5 3.5 0 0 1 3 11.5v-5Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 8h8M8 11h5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }

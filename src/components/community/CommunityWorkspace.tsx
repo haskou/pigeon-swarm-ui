@@ -109,6 +109,10 @@ interface CommunityWorkspaceProps {
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
   onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
+  onOpenConversationWithIdentity?: (
+    identityId: string,
+    identity?: IdentityResource,
+  ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
@@ -195,6 +199,7 @@ export function CommunityWorkspace({
   onMobileSidebarClose,
   onOpenMobileSidebar,
   onJoinVoiceChannel,
+  onOpenConversationWithIdentity,
   onRealtimeEventsOpen,
   onSessionUpdated,
   realtimeEvent,
@@ -1981,6 +1986,16 @@ export function CommunityWorkspace({
           )}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          onOpenConversation={
+            profileViewer.identityId === session.identity.id ||
+            !onOpenConversationWithIdentity
+              ? undefined
+              : () =>
+                  onOpenConversationWithIdentity(
+                    profileViewer.identityId,
+                    profileViewer.identity,
+                  )
+          }
           picture={profileViewer.pictureUrl}
         />
       )}

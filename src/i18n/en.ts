@@ -488,6 +488,7 @@ export const copy = {
     noBiography: 'No bio',
     noNetworks: 'No networks',
     openBanner: 'Open profile banner',
+    openConversation: 'Open direct message',
     openPicture: 'Open profile picture',
     passwordRequirements: {
       lowercase: 'Lowercase',

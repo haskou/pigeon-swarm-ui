@@ -85,6 +85,10 @@ interface ChatColumnProps {
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onCreate: () => void;
+  onOpenConversationWithIdentity?: (
+    identityId: string,
+    identity?: IdentityResource,
+  ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -142,6 +146,7 @@ export function ChatColumn({
   onEscape,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenConversationWithIdentity,
   onOpenSidebar,
   onReactionToggle,
   onRealtimeEventsOpen,
@@ -961,6 +966,16 @@ export function ChatColumn({
           name={profileViewer.name}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          onOpenConversation={
+            profileViewer.identityId === session.identity.id ||
+            !onOpenConversationWithIdentity
+              ? undefined
+              : () =>
+                  onOpenConversationWithIdentity(
+                    profileViewer.identityId,
+                    profileViewer.identity,
+                  )
+          }
           picture={profileViewer.picture}
         />
       )}
