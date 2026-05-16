@@ -72,6 +72,21 @@ type MessageLoadOptions = {
   signal?: AbortSignal;
 };
 
+type MessageDecryptWorker = {
+  decrypt(
+    request: {
+      copy: {
+        decryptFailed: string;
+        missingKey: string;
+      };
+      currentIdentityId: string;
+      messages: MessageResource[];
+      privateKey?: string;
+    },
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]>;
+};
+
 function throwIfMessageLoadAborted(signal?: AbortSignal): void {
   if (!signal?.aborted) return;
 
@@ -113,6 +128,8 @@ export class PigeonApiGateway {
   private readonly keychains: KeychainCipher;
 
   private readonly messages: MessageProjector;
+
+  private messageDecryptWorker: MessageDecryptWorker | null = null;
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
@@ -1492,9 +1509,7 @@ export class PigeonApiGateway {
       : undefined;
 
     if (typeof Worker !== 'undefined') {
-      const { MessageDecryptWorkerClient } =
-        await import('./MessageDecryptWorkerClient');
-      const worker = new MessageDecryptWorkerClient();
+      const worker = await this.getMessageDecryptWorker();
 
       return await worker.decrypt(
         {
@@ -1537,6 +1552,17 @@ export class PigeonApiGateway {
     }
 
     return decrypted;
+  }
+
+  private async getMessageDecryptWorker(): Promise<MessageDecryptWorker> {
+    if (this.messageDecryptWorker) return this.messageDecryptWorker;
+
+    const { MessageDecryptWorkerClient } =
+      await import('./MessageDecryptWorkerClient');
+
+    this.messageDecryptWorker = new MessageDecryptWorkerClient();
+
+    return this.messageDecryptWorker;
   }
 
   private isMissingRemoteKeychain(caught: unknown): boolean {
