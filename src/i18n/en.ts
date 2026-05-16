@@ -108,7 +108,7 @@ export const copy = {
     joinVoice: 'Join voice',
     leave: 'Leave call',
     microphoneUnavailable:
-      'Microphone permission is unavailable. Check browser permissions.',
+      'Microphone permission is unavailable. Check browser permissions and HTTPS.',
     mute: 'Mute microphone',
     muted: 'Muted',
     missed: 'Missed call',

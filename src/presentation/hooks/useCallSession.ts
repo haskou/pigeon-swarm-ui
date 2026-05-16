@@ -11,6 +11,11 @@ import type {
 import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+import {
+  logCallDebug,
+  logCallError,
+  logCallWarning,
+} from '../../infrastructure/media/callDebugLogger';
 
 type SignalSender = (
   recipientIdentityId: string,
@@ -124,6 +129,15 @@ export function useCallSession(): {
   );
 
   const startCall = async (input: StartCallInput) => {
+    logCallDebug('session:start-call:requested', {
+      callId: input.id,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      conversationId: input.conversationId,
+      hasProvidedLocalStream: input.localStream !== undefined,
+      kind: input.kind,
+      participantCount: input.participants.length,
+    });
     currentIdentityIdRef.current = input.currentIdentityId;
     sendSignalRef.current = input.onSignal;
     const nextCall: CallSession = {
@@ -146,6 +160,12 @@ export function useCallSession(): {
     setActiveCall(nextCall);
     activeCallRef.current = nextCall;
     startingCallIdRef.current = nextCall.id;
+    logCallDebug('session:start-call:active-call-created', {
+      callId: nextCall.id,
+      hasMicrophone: nextCall.hasMicrophone,
+      muted: nextCall.muted,
+      status: nextCall.status,
+    });
 
     try {
       const stream =
@@ -155,6 +175,10 @@ export function useCallSession(): {
             ? mediaManager.useStream(input.localStream)
             : await mediaManager.startAudio();
 
+      logCallDebug('session:start-call:local-media-ready', {
+        callId: nextCall.id,
+        hasStream: Boolean(stream),
+      });
       peerManager.configure(input.iceConfig);
       peerManager.setLocalStream(stream);
       startingCallIdRef.current = null;
@@ -168,7 +192,13 @@ export function useCallSession(): {
       setActiveCall((current) =>
         current?.id === nextCall.id ? { ...current, status: 'live' } : current,
       );
-    } catch {
+      logCallDebug('session:start-call:live', {
+        callId: nextCall.id,
+      });
+    } catch (error) {
+      logCallError('session:start-call:failed', error, {
+        callId: nextCall.id,
+      });
       mediaManager.stop();
       peerManager.reset();
       pendingSignalsRef.current.delete(nextCall.id);
@@ -189,6 +219,10 @@ export function useCallSession(): {
   };
 
   const endCall = () => {
+    logCallDebug('session:end-call', {
+      callId: activeCallRef.current?.id,
+      status: activeCallRef.current?.status,
+    });
     mediaManager.stop();
     peerManager.reset();
     currentIdentityIdRef.current = null;
@@ -245,12 +279,30 @@ export function useCallSession(): {
   };
 
   const receiveSignal = async (input: ReceivedSignal) => {
+    logCallDebug('session:receive-signal', {
+      activeCallId: activeCallRef.current?.id,
+      callId: input.callId,
+      senderIdentityId: input.senderIdentityId,
+      signalType: input.signalType,
+      startingCallId: startingCallIdRef.current,
+    });
     const sendSignal = sendSignalRef.current;
     const activeCallId = activeCallRef.current?.id;
 
-    if (activeCallId && activeCallId !== input.callId) return;
+    if (activeCallId && activeCallId !== input.callId) {
+      logCallWarning('session:receive-signal:ignored-other-call', {
+        activeCallId,
+        callId: input.callId,
+      });
+      return;
+    }
 
     if (!sendSignal || startingCallIdRef.current === input.callId) {
+      logCallDebug('session:receive-signal:queued', {
+        callId: input.callId,
+        hasSignalSender: Boolean(sendSignal),
+        signalType: input.signalType,
+      });
       queuePendingSignal(input);
 
       return;
@@ -266,11 +318,24 @@ export function useCallSession(): {
 
   const toggleMute = () => {
     setActiveCall((current) => {
-      if (!current) return current;
-      if (!current.hasMicrophone) return current;
+      if (!current) {
+        logCallWarning('session:toggle-mute:ignored-no-active-call');
+        return current;
+      }
+      if (!current.hasMicrophone) {
+        logCallWarning('session:toggle-mute:ignored-no-microphone', {
+          callId: current.id,
+          status: current.status,
+        });
+        return current;
+      }
 
       const muted = !current.muted;
 
+      logCallDebug('session:toggle-mute', {
+        callId: current.id,
+        muted,
+      });
       mediaManager.setMicrophoneMuted(muted);
 
       return {
@@ -285,10 +350,17 @@ export function useCallSession(): {
 
   const toggleDeafen = () => {
     setActiveCall((current) => {
-      if (!current) return current;
+      if (!current) {
+        logCallWarning('session:toggle-deafen:ignored-no-active-call');
+        return current;
+      }
 
       const deafened = !current.deafened;
 
+      logCallDebug('session:toggle-deafen', {
+        callId: current.id,
+        deafened,
+      });
       peerManager.setDeafened(deafened);
 
       return { ...current, deafened };
@@ -316,6 +388,12 @@ export function useCallSession(): {
         .map((participant) => participant.identityId) ?? [],
     );
 
+    logCallDebug('session:connect-joined-peers', {
+      callId: call.id,
+      currentIdentityId,
+      joinedParticipantCount: joinedParticipants.size,
+      participantCount: call.participants.length,
+    });
     await Promise.all(
       call.participants
         .filter((participant) => participant.identityId !== currentIdentityId)
@@ -339,6 +417,10 @@ export function useCallSession(): {
     if (!signals?.length) return;
 
     pendingSignalsRef.current.delete(callId);
+    logCallDebug('session:flush-pending-signals', {
+      callId,
+      signalCount: signals.length,
+    });
 
     for (const signal of signals) {
       await peerManager.handleSignal(
@@ -355,6 +437,11 @@ export function useCallSession(): {
 
     signals.push(signal);
     pendingSignalsRef.current.set(signal.callId, signals.slice(-100));
+    logCallDebug('session:queue-pending-signal', {
+      callId: signal.callId,
+      queuedCount: signals.length,
+      signalType: signal.signalType,
+    });
   }
 }
 

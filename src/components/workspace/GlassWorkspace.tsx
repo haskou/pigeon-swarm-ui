@@ -54,6 +54,11 @@ import {
 } from '../../presentation/notifications/PwaNotifications';
 import { useCallSession } from '../../presentation/hooks/useCallSession';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import {
+  logCallDebug,
+  logCallError,
+  logCallWarning,
+} from '../../infrastructure/media/callDebugLogger';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
@@ -695,6 +700,11 @@ export function GlassWorkspace({
         signalType: CallSignalType,
         payload: Record<string, unknown>,
       ) => {
+        logCallDebug('workspace:send-call-signal', {
+          callId,
+          recipientIdentityId,
+          signalType,
+        });
         await pigeonApplication.sendCallSignal(sessionRef.current, callId, {
           payload,
           recipientIdentityId,
@@ -719,9 +729,9 @@ export function GlassWorkspace({
     return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
   }, []);
   const requestLocalAudio =
-    useCallback(async (): Promise<MediaStream | null> => {
+    useCallback(async (): Promise<MediaStream> => {
       if (!navigator.mediaDevices?.getUserMedia) {
-        return null;
+        throw new Error(copy.calls.microphoneUnavailable);
       }
 
       try {
@@ -730,7 +740,7 @@ export function GlassWorkspace({
           video: false,
         });
       } catch {
-        return null;
+        throw new Error(copy.calls.microphoneUnavailable);
       }
     }, []);
   const stopLocalAudio = (stream: MediaStream | null) => {
@@ -875,50 +885,88 @@ export function GlassWorkspace({
       id: string;
       name: string;
     }) => {
-      if (!activeCommunity) return;
+      logCallDebug('workspace:community-voice-clicked', {
+        activeCallId: activeCall?.id,
+        activeCallKind: activeCall?.kind,
+        channelId: channel.id,
+        channelName: channel.name,
+        communityId: activeCommunity?.id,
+        connectedIdentityCount: channel.connectedIdentityIds?.length ?? 0,
+      });
+      if (!activeCommunity) {
+        logCallWarning('workspace:community-voice:ignored-no-active-community', {
+          channelId: channel.id,
+        });
+        return;
+      }
       if (
         activeCall?.kind === 'community-voice' &&
         activeCall.communityId === activeCommunity.id &&
         activeCall.channelId === channel.id
       ) {
+        logCallWarning('workspace:community-voice:ignored-already-active', {
+          callId: activeCall.id,
+          channelId: channel.id,
+          communityId: activeCommunity.id,
+        });
         return;
       }
 
-      let localStream: MediaStream | null = null;
-
       callActionInProgressRef.current = true;
-      playAnsweredCallSound();
-      const localAudioRequest = requestLocalAudio();
+      setSendError(null);
 
-      void localAudioRequest
-        .then(async (stream) => {
-          localStream = stream;
-          await leaveCurrentCallForSwitch();
-          await cleanupJoinedCalls();
+      void (async () => {
+        logCallDebug('workspace:community-voice:leaving-current-call', {
+          channelId: channel.id,
+          communityId: activeCommunity.id,
+        });
+        await leaveCurrentCallForSwitch();
+        await cleanupJoinedCalls();
 
-          return await pigeonApplication.startCommunityChannelCall(
-            sessionRef.current,
-            activeCommunity.id,
-            channel.id,
-          );
-        })
-        .then(async (call) => {
-          const iceConfig = await loadCallIceConfig();
-          const currentIdentityId = sessionRef.current.identity.id;
-          const details = callDetailsForResource(call);
+        logCallDebug('workspace:community-voice:request-backend-join', {
+          channelId: channel.id,
+          communityId: activeCommunity.id,
+        });
+        const call = await pigeonApplication.startCommunityChannelCall(
+          sessionRef.current,
+          activeCommunity.id,
+          channel.id,
+        );
+        logCallDebug('workspace:community-voice:backend-joined', {
+          callId: call.id,
+          participantCount: call.participants.length,
+          status: call.status,
+        });
+        const iceConfig = await loadCallIceConfig();
+        logCallDebug('workspace:community-voice:ice-config-loaded', {
+          callId: call.id,
+          iceServerCount: iceConfig.iceServers.length,
+        });
+        const currentIdentityId = sessionRef.current.identity.id;
+        const details = callDetailsForResource(call);
 
-          await startCall({
-            ...details,
-            call,
-            currentIdentityId,
-            iceConfig,
-            id: call.id,
-            localStream,
-            onSignal: callSignalSender(call.id),
-          });
-        })
+        logCallDebug('workspace:community-voice:start-local-session', {
+          callId: call.id,
+          participantCount: details.participants.length,
+        });
+        await startCall({
+          ...details,
+          call,
+          currentIdentityId,
+          iceConfig,
+          id: call.id,
+          onSignal: callSignalSender(call.id),
+        });
+        logCallDebug('workspace:community-voice:start-local-session-complete', {
+          callId: call.id,
+        });
+        playAnsweredCallSound();
+      })()
         .catch((caught) => {
-          stopLocalAudio(localStream);
+          logCallError('workspace:community-voice:failed', caught, {
+            channelId: channel.id,
+            communityId: activeCommunity.id,
+          });
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
         })
         .finally(() => {
@@ -935,7 +983,6 @@ export function GlassWorkspace({
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
-      requestLocalAudio,
       startCall,
     ],
   );

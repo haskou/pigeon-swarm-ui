@@ -1,4 +1,9 @@
 import type { CallSignalType } from '../../domain/calls/CallSession';
+import {
+  logCallDebug,
+  logCallError,
+  logCallWarning,
+} from './callDebugLogger';
 
 export type PeerMediaStats = {
   audioLevel?: number;
@@ -58,14 +63,33 @@ export class CallPeerConnectionManager {
 
   public configure(rtcConfiguration: RTCConfiguration): void {
     this.rtcConfiguration = rtcConfiguration;
+    logCallDebug('peer-manager:configure', {
+      iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
+    });
   }
 
   public setLocalStream(stream: MediaStream | null): void {
     this.localStream = stream;
+    logCallDebug('peer-manager:set-local-stream', {
+      hasStream: Boolean(stream),
+      tracks:
+        stream?.getTracks().map((track) => ({
+          enabled: track.enabled,
+          id: track.id,
+          kind: track.kind,
+          label: track.label,
+          muted: track.muted,
+          readyState: track.readyState,
+        })) ?? [],
+    });
   }
 
   public setDeafened(deafened: boolean): void {
     this.deafened = deafened;
+    logCallDebug('peer-manager:set-deafened', {
+      deafened,
+      remoteAudioCount: this.remoteAudio.size,
+    });
 
     for (const audio of this.remoteAudio.values()) {
       audio.muted = deafened;
@@ -83,13 +107,28 @@ export class CallPeerConnectionManager {
     shouldOffer: boolean,
     sendSignal: SignalSender,
   ): Promise<void> {
+    logCallDebug('peer-manager:ensure-peer', {
+      hasExistingPeer: this.peers.has(peerIdentityId),
+      peerIdentityId,
+      shouldOffer,
+    });
     const peer = this.getOrCreatePeer(peerIdentityId, sendSignal);
 
-    if (!shouldOffer || peer.localDescription) return;
+    if (!shouldOffer || peer.localDescription) {
+      logCallDebug('peer-manager:ensure-peer:offer-skipped', {
+        hasLocalDescription: Boolean(peer.localDescription),
+        peerIdentityId,
+        shouldOffer,
+      });
+      return;
+    }
 
     const offer = await peer.createOffer();
 
     await peer.setLocalDescription(offer);
+    logCallDebug('peer-manager:ensure-peer:send-offer', {
+      peerIdentityId,
+    });
     await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
   }
 
@@ -99,10 +138,17 @@ export class CallPeerConnectionManager {
     payload: Record<string, unknown>,
     sendSignal: SignalSender,
   ): Promise<void> {
+    logCallDebug('peer-manager:handle-signal', {
+      senderIdentityId,
+      signalType,
+    });
     const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
 
     if (signalType === 'ice_candidate') {
       if (!peer.remoteDescription) {
+        logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
+          senderIdentityId,
+        });
         this.queueIceCandidate(
           senderIdentityId,
           payload as RTCIceCandidateInit,
@@ -114,6 +160,9 @@ export class CallPeerConnectionManager {
       await peer.addIceCandidate(
         new RTCIceCandidate(payload as RTCIceCandidateInit),
       );
+      logCallDebug('peer-manager:handle-signal:added-ice-candidate', {
+        senderIdentityId,
+      });
 
       return;
     }
@@ -123,6 +172,10 @@ export class CallPeerConnectionManager {
     );
 
     await peer.setRemoteDescription(description);
+    logCallDebug('peer-manager:handle-signal:remote-description-set', {
+      senderIdentityId,
+      signalType,
+    });
     await this.flushIceCandidates(senderIdentityId, peer);
 
     if (signalType !== 'offer') return;
@@ -130,10 +183,17 @@ export class CallPeerConnectionManager {
     const answer = await peer.createAnswer();
 
     await peer.setLocalDescription(answer);
+    logCallDebug('peer-manager:handle-signal:send-answer', {
+      senderIdentityId,
+    });
     await sendSignal(senderIdentityId, 'answer', descriptionPayload(answer));
   }
 
   public reset(): void {
+    logCallDebug('peer-manager:reset', {
+      peerCount: this.peers.size,
+      remoteAudioCount: this.remoteAudio.size,
+    });
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
     this.pendingIceCandidates.clear();
@@ -176,21 +236,66 @@ export class CallPeerConnectionManager {
     if (existing) return existing;
 
     if (!this.rtcConfiguration) {
+      logCallError(
+        'peer-manager:create-peer:missing-rtc-configuration',
+        new Error('RTCPeerConnection configuration is not loaded.'),
+        { peerIdentityId },
+      );
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
     const peer = new RTCPeerConnection(this.rtcConfiguration);
+    logCallDebug('peer-manager:create-peer', {
+      hasLocalStream: Boolean(this.localStream),
+      peerIdentityId,
+    });
 
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
+        logCallDebug('peer-manager:create-peer:add-local-track', {
+          enabled: track.enabled,
+          kind: track.kind,
+          peerIdentityId,
+          readyState: track.readyState,
+        });
         if (this.localStream) peer.addTrack(track, this.localStream);
       });
     } else {
+      logCallWarning('peer-manager:create-peer:recvonly-no-local-stream', {
+        peerIdentityId,
+      });
       peer.addTransceiver('audio', { direction: 'recvonly' });
     }
+    peer.addEventListener('connectionstatechange', () => {
+      logCallDebug('peer-manager:connection-state-change', {
+        connectionState: peer.connectionState,
+        peerIdentityId,
+      });
+    });
+    peer.addEventListener('iceconnectionstatechange', () => {
+      logCallDebug('peer-manager:ice-connection-state-change', {
+        iceConnectionState: peer.iceConnectionState,
+        peerIdentityId,
+      });
+    });
+    peer.addEventListener('signalingstatechange', () => {
+      logCallDebug('peer-manager:signaling-state-change', {
+        peerIdentityId,
+        signalingState: peer.signalingState,
+      });
+    });
     peer.addEventListener('icecandidate', (event) => {
-      if (!event.candidate) return;
+      if (!event.candidate) {
+        logCallDebug('peer-manager:ice-candidate:gathering-complete', {
+          peerIdentityId,
+        });
+        return;
+      }
 
+      logCallDebug('peer-manager:ice-candidate:send', {
+        candidateType: event.candidate.type,
+        peerIdentityId,
+      });
       void sendSignal(peerIdentityId, 'ice_candidate', {
         ...event.candidate.toJSON(),
       });
@@ -198,6 +303,14 @@ export class CallPeerConnectionManager {
     peer.addEventListener('track', (event) => {
       const [stream] = event.streams;
 
+      logCallDebug('peer-manager:track-received', {
+        hasStream: Boolean(stream),
+        peerIdentityId,
+        trackCount: event.streams.reduce(
+          (count, currentStream) => count + currentStream.getTracks().length,
+          0,
+        ),
+      });
       if (stream) this.playRemoteStream(peerIdentityId, stream);
     });
     this.peers.set(peerIdentityId, peer);
@@ -212,6 +325,11 @@ export class CallPeerConnectionManager {
     audio.autoplay = true;
     audio.muted = this.deafened;
     audio.srcObject = stream;
+    logCallDebug('peer-manager:remote-audio:play-requested', {
+      deafened: this.deafened,
+      peerIdentityId,
+      trackCount: stream.getTracks().length,
+    });
 
     if (!this.remoteAudio.has(peerIdentityId)) {
       audio.dataset.peerIdentityId = peerIdentityId;
@@ -226,7 +344,11 @@ export class CallPeerConnectionManager {
       return;
     }
 
-    void audio.play().catch(() => undefined);
+    void audio.play().catch((error: unknown) => {
+      logCallError('peer-manager:remote-audio:play-failed', error, {
+        peerIdentityId,
+      });
+    });
   }
 
   private async flushIceCandidates(
@@ -238,6 +360,10 @@ export class CallPeerConnectionManager {
     if (!candidates?.length) return;
 
     this.pendingIceCandidates.delete(peerIdentityId);
+    logCallDebug('peer-manager:flush-ice-candidates', {
+      candidateCount: candidates.length,
+      peerIdentityId,
+    });
 
     for (const candidate of candidates) {
       await peer.addIceCandidate(new RTCIceCandidate(candidate));
@@ -252,6 +378,10 @@ export class CallPeerConnectionManager {
 
     candidates.push(candidate);
     this.pendingIceCandidates.set(peerIdentityId, candidates);
+    logCallDebug('peer-manager:queue-ice-candidate', {
+      candidateCount: candidates.length,
+      peerIdentityId,
+    });
   }
 
   private async collectPeerStats(
