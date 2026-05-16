@@ -126,7 +126,7 @@ export function UserProfileDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="glass-panel-strong fixed z-10 w-[min(22.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] p-0 shadow-2xl shadow-black/50"
+        className="glass-panel-strong fixed z-10 w-[min(22.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl p-0 shadow-2xl shadow-black/50"
         style={{ left: position.left, top: position.top }}
         onClick={(event) => event.stopPropagation()}
       >
