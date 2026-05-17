@@ -553,14 +553,11 @@ export function UserProfileDropdown({
           <div className="-m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10">
             <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
               {ownBanner && (
-                <>
-                  <img
-                    src={ownBanner}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-900/25 via-fuchsia-950/50 to-cyan-900/45" />
-                </>
+                <img
+                  src={ownBanner}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               )}
             </div>
             <div className="relative px-3 pb-3">
