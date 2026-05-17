@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { cx } from '../../utils/classNameHelper';
 
@@ -61,14 +62,17 @@ export function GlassSelect({
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Escape') {
       setOpen(false);
+
       return;
     }
 
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
+
       if (disabled) return;
 
       setOpen((isOpen) => !isOpen);
+
       return;
     }
 
@@ -79,6 +83,7 @@ export function GlassSelect({
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
+
       if (options.length === 0) return;
 
       const offset = event.key === 'ArrowDown' ? 1 : -1;
@@ -146,8 +151,8 @@ export function GlassSelect({
                 option.disabled
                   ? 'cursor-not-allowed text-white/25'
                   : option.value === value
-                  ? 'bg-white text-slate-950'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white',
+                    ? 'bg-white text-slate-950'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white',
               )}
             >
               <span className="truncate">{option.label}</span>

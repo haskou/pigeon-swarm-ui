@@ -20,8 +20,8 @@ interface NodeSettingsDialogProps {
 }
 
 export function NodeSettingsDialog({
-  node,
   networks,
+  node,
   onClose,
   onNetworksUpdated,
   session,
@@ -37,7 +37,9 @@ export function NodeSettingsDialog({
     node?.owner === session.identity.id ? session.identity : null,
   );
   const isOwner = node?.owner === session.identity.id;
-  const ownerProfile = isOwner ? session.identity.profile : ownerIdentity?.profile;
+  const ownerProfile = isOwner
+    ? session.identity.profile
+    : ownerIdentity?.profile;
   const ownerName = ownerProfile?.name.trim();
   const ownerLabel = !node?.owner
     ? copy.nodeSettings.unclaimed
@@ -54,23 +56,24 @@ export function NodeSettingsDialog({
       networks[0],
     [networks, selectedNetworkId],
   );
-  const selectedNetworkCode =
-    selectedNetwork?.key?.trim()
-      ? NetworkInviteCode.encode({
-          id: selectedNetwork.id,
-          key: selectedNetwork.key,
-          name: selectedNetwork.name,
-        })
-      : '';
+  const selectedNetworkCode = selectedNetwork?.key?.trim()
+    ? NetworkInviteCode.encode({
+        id: selectedNetwork.id,
+        key: selectedNetwork.key,
+        name: selectedNetwork.name,
+      })
+    : '';
 
   useEffect(() => {
     if (!node?.owner) {
       setOwnerIdentity(null);
+
       return;
     }
 
     if (node.owner === session.identity.id) {
       setOwnerIdentity(session.identity);
+
       return;
     }
 
@@ -142,9 +145,7 @@ export function NodeSettingsDialog({
       <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
           <div>
-            <h2 className="text-xl font-black">
-              {copy.nodeSettings.title}
-            </h2>
+            <h2 className="text-xl font-black">{copy.nodeSettings.title}</h2>
             <p className="mt-1 text-sm text-white/50">
               {copy.nodeSettings.body}
             </p>
@@ -272,7 +273,10 @@ export function NodeSettingsDialog({
 
           {isOwner ? (
             <div className="min-w-0 space-y-5">
-              <form onSubmit={handleJoin} className="rounded-2xl bg-black/20 p-4">
+              <form
+                onSubmit={handleJoin}
+                className="rounded-2xl bg-black/20 p-4"
+              >
                 <label className="block">
                   <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
                     {copy.nodeSettings.joinLabel}
@@ -296,28 +300,28 @@ export function NodeSettingsDialog({
                 </button>
               </form>
 
-            <div className="min-w-0 rounded-2xl bg-black/20 p-4">
-              <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                {copy.nodeSettings.shareLabel}
+              <div className="min-w-0 rounded-2xl bg-black/20 p-4">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                  {copy.nodeSettings.shareLabel}
+                </div>
+                <div className="block max-w-full truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
+                  {selectedNetworkCode || copy.nodeSettings.missingNetworkKey}
+                </div>
+                <button
+                  type="button"
+                  onClick={copyNetworkCode}
+                  disabled={!selectedNetworkCode}
+                  className="mt-3 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {copied ? copy.profile.copied : copy.nodeSettings.copyCode}
+                </button>
               </div>
-              <div className="block max-w-full truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
-                {selectedNetworkCode || copy.nodeSettings.missingNetworkKey}
-              </div>
-              <button
-                type="button"
-                onClick={copyNetworkCode}
-                disabled={!selectedNetworkCode}
-                className="mt-3 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {copied ? copy.profile.copied : copy.nodeSettings.copyCode}
-              </button>
-            </div>
 
-            {error && (
-              <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-                {error}
-              </div>
-            )}
+              {error && (
+                <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                  {error}
+                </div>
+              )}
             </div>
           ) : (
             error && (

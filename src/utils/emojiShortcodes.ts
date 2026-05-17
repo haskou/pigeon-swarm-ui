@@ -25,7 +25,7 @@ export function findEmojiTrigger(
   caretIndex: number,
 ): EmojiTrigger | null {
   const beforeCaret = value.slice(0, caretIndex);
-  const match = /(^|\s):([a-zA-Z][a-zA-Z0-9_+\-]*)$/.exec(beforeCaret);
+  const match = /(^|\s):([a-zA-Z][a-zA-Z0-9_+-]*)$/.exec(beforeCaret);
 
   if (!match) return null;
 

@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import type { Community } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
-import { cx } from '../../utils/classNameHelper';
 import { copy } from '../../i18n/en';
+import { cx } from '../../utils/classNameHelper';
 import { profilePictureDataUrl } from '../../utils/identityDisplay';
 
 interface RailProps {
@@ -68,8 +68,13 @@ export function Rail({
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
         {communities.map((community) => (
-          <div key={community.id} className="relative flex w-full justify-center">
-            <RailSelectionIndicator active={activeCommunityId === community.id} />
+          <div
+            key={community.id}
+            className="relative flex w-full justify-center"
+          >
+            <RailSelectionIndicator
+              active={activeCommunityId === community.id}
+            />
             <button
               type="button"
               onClick={() => onCommunityClick?.(community.id)}
@@ -94,8 +99,7 @@ export function Rail({
           aria-label={copy.communities.createTooltip}
           title={copy.communities.createTooltip}
         >
-          +
-          <span className="sr-only">{copy.communities.createTooltip}</span>
+          +<span className="sr-only">{copy.communities.createTooltip}</span>
           <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
             {copy.communities.createTooltip}
           </span>
@@ -224,6 +228,7 @@ function CommunityRailAvatar({ community }: { community: Community }) {
     const avatar = community.avatar?.trim();
 
     setAvatarUrl(null);
+
     if (!avatar) return undefined;
 
     let cancelled = false;

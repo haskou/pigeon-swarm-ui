@@ -20,6 +20,7 @@ export function formatDateSeparator(timestamp: number | string): string {
   yesterday.setDate(today.getDate() - 1);
 
   if (target.getTime() === today.getTime()) return 'Today';
+
   if (target.getTime() === yesterday.getTime()) return 'Yesterday';
 
   return new Intl.DateTimeFormat(undefined, {

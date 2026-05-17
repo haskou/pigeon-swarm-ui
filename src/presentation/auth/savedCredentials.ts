@@ -19,6 +19,7 @@ export function loadSavedCredentials(): SavedCredentials | null {
 
     if (!parsed.identityId || !parsed.password) {
       clearSavedCredentials();
+
       return null;
     }
 
@@ -28,6 +29,7 @@ export function loadSavedCredentials(): SavedCredentials | null {
     };
   } catch {
     clearSavedCredentials();
+
     return null;
   }
 }

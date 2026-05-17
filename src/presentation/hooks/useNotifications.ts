@@ -9,8 +9,8 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
-import { ArchivedNotifications } from '../notifications/ArchivedNotifications';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { ArchivedNotifications } from '../notifications/ArchivedNotifications';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 

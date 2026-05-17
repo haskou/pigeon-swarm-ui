@@ -4,11 +4,11 @@ import { createPortal } from 'react-dom';
 import type { Community, IdentityResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { Field } from '../../contexts/identities/presentation/auth/Field';
 import { copy } from '../../i18n/en';
-import { shortId } from '../../utils/formatting';
 import { createCommunityInviteUrl } from '../../utils/communityInviteLink';
+import { shortId } from '../../utils/formatting';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture } from './communityImages';
@@ -168,6 +168,7 @@ export function AddCommunityMemberDialog({
       }
 
       setInviteLink(link);
+
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(link);
         setLinkState('copied');

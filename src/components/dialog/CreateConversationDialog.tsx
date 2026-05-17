@@ -8,6 +8,7 @@ import type {
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { Field } from '../../contexts/identities/presentation/auth/Field';
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
 import {
@@ -15,7 +16,6 @@ import {
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { GlassSelect } from '../common/GlassSelect';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -225,7 +225,9 @@ export function CreateConversationDialog({
           {
             name: groupName.trim(),
             networkId: groupNetworkId,
-            participantIds: groupParticipants.map(({ identity }) => identity.id),
+            participantIds: groupParticipants.map(
+              ({ identity }) => identity.id,
+            ),
           },
         );
         onCreated(
@@ -246,6 +248,7 @@ export function CreateConversationDialog({
       }
 
       setState('idle');
+
       return;
     }
 
@@ -286,7 +289,7 @@ export function CreateConversationDialog({
     setState('idle');
   };
 
-  const addGroupParticipant = async () => {
+  const addGroupParticipant = () => {
     const identity = groupIdentityPreview?.identity;
 
     if (!identity) return;

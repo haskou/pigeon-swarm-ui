@@ -31,7 +31,10 @@ export function saveRecentReactionEmoji(
     ...loadRecentReactionEmojis(identityId).filter((item) => item !== emoji),
   ].slice(0, maxRecentReactionEmojis);
 
-  globalThis.localStorage?.setItem(storageKey(identityId), JSON.stringify(next));
+  globalThis.localStorage?.setItem(
+    storageKey(identityId),
+    JSON.stringify(next),
+  );
 
   return next;
 }

@@ -1,3 +1,4 @@
+import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
   type SetStateAction,
@@ -8,20 +9,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { UUID } from '@haskou/value-objects';
 
-import type {
-  ChatMessage,
-  AttachmentProgress,
-  Community,
-  CommunityChannel,
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-  MessageResource,
-  MessageReplyPreview,
-  Session,
-} from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { Peer } from '../../application/peers/ListPeers';
 import type {
   CallParticipant,
   CallParticipantStatus,
@@ -29,24 +19,43 @@ import type {
   CallSignalType,
   CallSession,
 } from '../../domain/calls/CallSession';
-import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { Peer } from '../../application/peers/ListPeers';
+import type {
+  ChatMessage,
+  AttachmentProgress,
+  Community,
+  ConversationKeyEntry,
+  ConversationResource,
+  IdentityResource,
+  MessageResource,
+  Session,
+} from '../../domain/types';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
+import type { MessageContextMenuState } from './MessageContextMenu';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import {
+  communityChannels,
+  communityTextChannels,
+} from '../../domain/communities/communityChannels';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import {
   bumpConversationActivity,
   sortConversationsByLatestMessage,
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
-import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { mergeMessages } from '../../domain/messages/mergeMessages';
+import { replyPreviewFromMessage } from '../../domain/messages/messageReplyPreview';
 import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
-import {
-  communityChannels,
-  communityTextChannels,
-} from '../../domain/communities/communityChannels';
+import { selectSharedNetworkId } from '../../domain/networks/selectSharedNetworkId';
 import { copy } from '../../i18n/en';
+import {
+  logCallDebug,
+  logCallError,
+  logCallWarning,
+} from '../../infrastructure/media/callDebugLogger';
+import { useCallSession } from '../../presentation/hooks/useCallSession';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
@@ -55,17 +64,16 @@ import {
   requestPwaNotificationPermission,
   showPwaNotification,
 } from '../../presentation/notifications/PwaNotifications';
-import { useCallSession } from '../../presentation/hooks/useCallSession';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 import {
-  logCallDebug,
-  logCallError,
-  logCallWarning,
-} from '../../infrastructure/media/callDebugLogger';
-import { isBrowserPreviewImage } from '../../utils/browserPreview';
+  communityNotificationPreview,
+  conversationNotificationPreview,
+} from '../../presentation/workspace/notificationPreviews';
+import {
+  useWorkspacePreferences,
+  useWorkspacePreferenceState,
+} from '../../presentation/workspace/useWorkspacePreferences';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
-import { identityDisplayName } from '../../utils/identityDisplay';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -74,23 +82,11 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
-import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
-import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
-import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { loadPublicImage } from '../community/communityImages';
-import { IncomingCallDialog } from '../calls/IncomingCallDialog';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
-import { NodeSettingsDialog } from './NodeSettingsDialog';
-import { NotificationsPanel } from './NotificationsPanel';
 import { Rail } from './Rail';
-import { RealtimeEventsDialog } from './RealtimeEventsDialog';
-import {
-  MessageContextMenu,
-  type MessageContextMenuState,
-} from './MessageContextMenu';
-import { RawMessageDialog } from './RawMessageDialog';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -100,19 +96,7 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
-import {
-  communityUnreadStorageKey,
-  type CommunityUnreadCounts,
-  type ConversationDrafts,
-  draftsStorageKey,
-  initialConversationId,
-  lastConversationStorageKey,
-  loadCommunityUnreadCounts,
-  loadDrafts,
-  loadWorkspacePreference,
-  type WorkspacePreference,
-  workspaceStorageKey,
-} from './workspacePersistence';
+import { WorkspaceDialogs } from './WorkspaceDialogs';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PendingSend = {
@@ -121,103 +105,6 @@ type PendingSend = {
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
-
-function replyPreviewFromMessage(
-  message?: ChatMessage | null,
-): MessageReplyPreview | undefined {
-  if (!message) return undefined;
-
-  const image = message.attachments.find((attachment) =>
-    isBrowserPreviewImage(attachment.contentType),
-  );
-
-  return {
-    authorIdentityId: message.authorIdentityId,
-    ...(message.content ? { content: message.content.slice(0, 180) } : {}),
-    ...(image ? { image } : {}),
-    messageId: message.id,
-  };
-}
-
-function communityNotificationPreview(
-  communities: Community[],
-  communityId: string,
-  channelId: string,
-  authorIdentityId: string | undefined,
-  identityNames: Record<string, string>,
-): { body: string; title: string } {
-  const community = communities.find((item) => item.id === communityId);
-  const channel = community
-    ? communityChannels(community).find((item) => item.id === channelId)
-    : undefined;
-  const author = authorIdentityId ? identityNames[authorIdentityId] : undefined;
-  const location = channel ? `#${channel.name}` : copy.chat.newMessage;
-
-  return {
-    body: author
-      ? `${author} · ${location}`
-      : `${location} · ${copy.chat.newMessage}`,
-    title: community?.name ?? copy.communities.channelMessageNotification,
-  };
-}
-
-function conversationNotificationPreview(
-  conversations: ConversationResource[],
-  conversationId: string,
-  session: Session,
-  identityNames: Record<string, string>,
-  identityProfiles: Record<string, IdentityResource>,
-): { body: string; title: string } {
-  const conversation = conversations.find((item) => item.id === conversationId);
-
-  if (!conversation) {
-    return { body: copy.chat.newMessage, title: copy.chat.directMessage };
-  }
-
-  if (conversation.type === 'group') {
-    return {
-      body: copy.chat.newMessage,
-      title: conversation.name ?? conversation.title ?? copy.chat.groupMessage,
-    };
-  }
-
-  const peerIdentityId = conversationPeerIdentityId(
-    conversation,
-    session.identity.id,
-    session.keychain,
-  );
-  const peerIdentity = peerIdentityId
-    ? identityProfiles[peerIdentityId]
-    : undefined;
-  const peerHandle = peerIdentity?.profile.handle?.trim();
-  const peerName =
-    peerIdentity?.profile.name.trim() ||
-    (peerHandle ? `@${peerHandle}` : undefined) ||
-    (peerIdentityId
-      ? identityDisplayName(peerIdentityId, identityNames)
-      : undefined) ||
-    copy.chat.directMessage;
-
-  return { body: copy.chat.directMessage, title: peerName };
-}
-
-function selectSharedNetworkId(
-  ownNetworkIds: string[],
-  peerNetworkIds: string[] | undefined,
-  preferredNetworkId?: string,
-): string | undefined {
-  const peerNetworks = peerNetworkIds ?? [];
-
-  if (
-    preferredNetworkId &&
-    ownNetworkIds.includes(preferredNetworkId) &&
-    (peerNetworks.length === 0 || peerNetworks.includes(preferredNetworkId))
-  ) {
-    return preferredNetworkId;
-  }
-
-  return peerNetworks.find((networkId) => ownNetworkIds.includes(networkId));
-}
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -237,47 +124,42 @@ interface GlassWorkspaceProps {
 }
 
 export function GlassWorkspace({
-  conversations,
   communities,
+  conversations,
   node,
   nodeNetworks,
   onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
-  pendingCommunityInvite,
   peers,
+  pendingCommunityInvite,
   session,
   setCommunities,
   setConversations,
   setSession,
 }: GlassWorkspaceProps) {
-  const [activeConversationId, setActiveConversationId] = useState<
-    string | null
-  >(() => initialConversationId(conversations, session.identity.id));
+  const {
+    activeCommunityId,
+    activeConversationId,
+    communityChannelById,
+    communityUnreadCountsById,
+    drafts,
+    setActiveCommunityId,
+    setActiveConversationId,
+    setCommunityChannelById,
+    setCommunityUnreadCountsById,
+    setDrafts,
+    setWorkspaceMode,
+    workspaceMode,
+  } = useWorkspacePreferenceState(conversations, session.identity.id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
-  const [workspacePreference] = useState<WorkspacePreference>(() =>
-    loadWorkspacePreference(session.identity.id),
-  );
-  const [workspaceMode, setWorkspaceMode] = useState<'community' | 'messages'>(
-    workspacePreference.mode ?? 'messages',
-  );
-  const [activeCommunityId, setActiveCommunityId] = useState<string | null>(
-    workspacePreference.communityId ?? null,
-  );
-  const [communityChannelById, setCommunityChannelById] = useState<
-    Record<string, string>
-  >(() => workspacePreference.channelByCommunityId ?? {});
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
-  const [communityUnreadCountsById, setCommunityUnreadCountsById] =
-    useState<CommunityUnreadCounts>(() =>
-      loadCommunityUnreadCounts(session.identity.id),
-    );
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
   >('reconnecting');
@@ -287,10 +169,8 @@ export function GlassWorkspace({
   >([]);
   const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
     useState<Record<string, Community>>({});
-  const [
-    notificationCommunityAvatarUrls,
-    setNotificationCommunityAvatarUrls,
-  ] = useState<Record<string, string>>({});
+  const [notificationCommunityAvatarUrls, setNotificationCommunityAvatarUrls] =
+    useState<Record<string, string>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -298,9 +178,6 @@ export function GlassWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
-  const [drafts, setDrafts] = useState<ConversationDrafts>(() =>
-    loadDrafts(session.identity.id),
-  );
   const [failedSends, setFailedSends] = useState<FailedSends>({});
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -343,8 +220,10 @@ export function GlassWorkspace({
     reconcileCall,
     setParticipantVolume,
     startCall,
+    toggleCamera,
     toggleDeafen,
     toggleMute,
+    toggleScreenShare,
   } = useCallSession();
 
   useEffect(() => {
@@ -431,6 +310,17 @@ export function GlassWorkspace({
       ? storedId
       : (activeCommunityTextChannels[0]?.id ?? null);
   }, [activeCommunity, activeCommunityTextChannels, communityChannelById]);
+
+  useWorkspacePreferences({
+    activeCommunityId: activeCommunity?.id ?? activeCommunityId,
+    activeConversationId: activeConversation?.id ?? activeConversationId,
+    communityChannelById,
+    communityUnreadCountsById,
+    drafts,
+    identityId: session.identity.id,
+    workspaceMode,
+  });
+
   const communityUnreadCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -502,16 +392,20 @@ export function GlassWorkspace({
       session: Session;
     }) => {
       setSession(next.session);
+
       if (next.conversations) {
         setConversations(next.conversations);
       }
+
       if (next.communities) {
         setCommunities(next.communities);
       }
+
       if (next.conversationId) {
         setActiveConversationId(next.conversationId);
         setWorkspaceMode('messages');
       }
+
       if (next.communityId) {
         setActiveCommunityId(next.communityId);
         setWorkspaceMode('community');
@@ -537,9 +431,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     const communityIds = visibleNotifications
-      .filter(
-        (notification) => notification.type === 'community_invitation',
-      )
+      .filter((notification) => notification.type === 'community_invitation')
       .map((notification) => notification.payload.communityId)
       .filter(
         (communityId) =>
@@ -576,7 +468,12 @@ export function GlassWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [communities, notificationCommunityPreviews, session, visibleNotifications]);
+  }, [
+    communities,
+    notificationCommunityPreviews,
+    session,
+    visibleNotifications,
+  ]);
 
   useEffect(() => {
     const communityIds = [
@@ -637,6 +534,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     if (!pendingCommunityInvite) return;
+
     if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
       return;
     }
@@ -859,6 +757,15 @@ export function GlassWorkspace({
         playEndedCallSound();
       }
 
+      if (
+        details.kind === 'one-to-one' &&
+        incomingCall?.call.id === call.id &&
+        currentParticipant?.status !== 'ringing'
+      ) {
+        setIncomingCall(null);
+        stopIncomingCallSound();
+      }
+
       if (call.scope.type === 'community_channel') {
         const communityId = call.scope.communityId;
         const channelId = call.scope.channelId;
@@ -891,6 +798,7 @@ export function GlassWorkspace({
 
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
+
         if (activeCall?.id === call.id) {
           logCallWarning('workspace:call:ended-by-resource-status', {
             callId: call.id,
@@ -899,11 +807,13 @@ export function GlassWorkspace({
           playEndedCallSound();
           endCall();
         }
+
         return;
       }
 
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
+
         if (activeCall?.id === call.id) {
           logCallWarning('workspace:call:ended-unsupported-group-call', {
             callId: call.id,
@@ -911,6 +821,7 @@ export function GlassWorkspace({
           playEndedCallSound();
           endCall();
         }
+
         return;
       }
 
@@ -934,6 +845,7 @@ export function GlassWorkspace({
         });
         playEndedCallSound();
         endCall();
+
         return;
       }
 
@@ -950,6 +862,20 @@ export function GlassWorkspace({
           participants: details.participants,
           title: details.title,
         });
+
+        return;
+      }
+
+      if (
+        details.kind === 'one-to-one' &&
+        currentParticipant?.status === 'joined' &&
+        activeCall?.id !== call.id
+      ) {
+        logCallDebug('workspace:call:joined-on-another-device', {
+          callId: call.id,
+          identityId: session.identity.id,
+        });
+
         return;
       }
 
@@ -1005,21 +931,20 @@ export function GlassWorkspace({
 
     return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
   }, []);
-  const requestLocalAudio =
-    useCallback(async (): Promise<MediaStream> => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(copy.calls.microphoneUnavailable);
-      }
+  const requestLocalAudio = useCallback(async (): Promise<MediaStream> => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(copy.calls.microphoneUnavailable);
+    }
 
-      try {
-        return await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false,
-        });
-      } catch {
-        throw new Error(copy.calls.microphoneUnavailable);
-      }
-    }, []);
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+    } catch {
+      throw new Error(copy.calls.microphoneUnavailable);
+    }
+  }, []);
   const stopLocalAudio = (stream: MediaStream | null) => {
     stream?.getTracks().forEach((track) => track.stop());
   };
@@ -1044,6 +969,7 @@ export function GlassWorkspace({
 
       if (details.kind === 'one-to-one') {
         await pigeonApplication.endCall(sessionRef.current, call.id);
+
         return;
       }
 
@@ -1102,12 +1028,18 @@ export function GlassWorkspace({
       title: string;
     }) => {
       if (input.kind === 'group') return;
+
       if (callActionInProgressRef.current) {
-        logCallWarning('workspace:conversation-call:ignored-action-in-progress', {
-          conversationId: input.conversationId,
-        });
+        logCallWarning(
+          'workspace:conversation-call:ignored-action-in-progress',
+          {
+            conversationId: input.conversationId,
+          },
+        );
+
         return;
       }
+
       if (
         activeCall?.kind === input.kind &&
         activeCall.conversationId === input.conversationId
@@ -1116,6 +1048,7 @@ export function GlassWorkspace({
           callId: activeCall.id,
           conversationId: input.conversationId,
         });
+
         return;
       }
 
@@ -1133,6 +1066,7 @@ export function GlassWorkspace({
           logCallDebug('workspace:conversation-call:create-request', {
             conversationId: input.conversationId,
           });
+
           return await pigeonApplication.startConversationCall(
             sessionRef.current,
             input.conversationId,
@@ -1200,12 +1134,18 @@ export function GlassWorkspace({
         communityId: activeCommunity?.id,
         connectedIdentityCount: channel.connectedIdentityIds?.length ?? 0,
       });
+
       if (!activeCommunity) {
-        logCallWarning('workspace:community-voice:ignored-no-active-community', {
-          channelId: channel.id,
-        });
+        logCallWarning(
+          'workspace:community-voice:ignored-no-active-community',
+          {
+            channelId: channel.id,
+          },
+        );
+
         return;
       }
+
       if (
         activeCall?.kind === 'community-voice' &&
         activeCall.communityId === activeCommunity.id &&
@@ -1216,6 +1156,7 @@ export function GlassWorkspace({
           channelId: channel.id,
           communityId: activeCommunity.id,
         });
+
         return;
       }
 
@@ -1309,57 +1250,94 @@ export function GlassWorkspace({
 
   const acceptIncomingCall = useCallback(() => {
     if (!incomingCall) return;
+
     if (callActionInProgressRef.current) {
-      logCallWarning('workspace:incoming-call:accept-ignored-action-in-progress', {
-        callId: incomingCall.call.id,
-      });
+      logCallWarning(
+        'workspace:incoming-call:accept-ignored-action-in-progress',
+        {
+          callId: incomingCall.call.id,
+        },
+      );
+
       return;
     }
 
     const pendingCall = incomingCall.call;
 
-    setIncomingCall(null);
-    stopIncomingCallSound();
     let localStream: MediaStream | null = null;
 
     callActionInProgressRef.current = true;
-    const localAudioRequest = requestLocalAudio();
 
-    void localAudioRequest
-      .then(async (stream) => {
-        localStream = stream;
-        await leaveCurrentCallForSwitch();
-        await cleanupJoinedCalls(pendingCall.id);
+    void (async () => {
+      const latestCall = await pigeonApplication
+        .getCall(sessionRef.current, pendingCall.id)
+        .catch(() => pendingCall);
+      const currentParticipant = latestCall.participants.find(
+        (participant) =>
+          participant.identityId === sessionRef.current.identity.id,
+      );
 
-        logCallDebug('workspace:incoming-call:join-request', {
-          callId: pendingCall.id,
+      if (currentParticipant?.status !== 'ringing') {
+        logCallDebug('workspace:incoming-call:accept-ignored-not-ringing', {
+          callId: latestCall.id,
+          participantStatus: currentParticipant?.status,
         });
-        return await pigeonApplication.joinCall(
-          sessionRef.current,
-          pendingCall.id,
-        );
-      })
-      .then(async (call) => {
-        logCallDebug('workspace:incoming-call:joined', {
+        setIncomingCall(null);
+        stopIncomingCallSound();
+
+        return;
+      }
+
+      setIncomingCall(null);
+      stopIncomingCallSound();
+      localStream = await requestLocalAudio();
+
+      await leaveCurrentCallForSwitch();
+      await cleanupJoinedCalls(pendingCall.id);
+
+      logCallDebug('workspace:incoming-call:join-request', {
+        callId: pendingCall.id,
+      });
+
+      const call = await pigeonApplication.joinCall(
+        sessionRef.current,
+        pendingCall.id,
+      );
+      const joinedParticipant = call.participants.find(
+        (participant) =>
+          participant.identityId === sessionRef.current.identity.id,
+      );
+
+      if (joinedParticipant?.status !== 'joined') {
+        logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
-          participantStatuses: call.participants.map((participant) => ({
-            identityId: participant.identityId,
-            status: participant.status,
-          })),
+          participantStatus: joinedParticipant?.status,
         });
-        const details = callDetailsForResource(call);
-        const iceConfig = await loadCallIceConfig();
+        stopLocalAudio(localStream);
 
-        await startCall({
-          ...details,
-          call,
-          currentIdentityId: sessionRef.current.identity.id,
-          iceConfig,
-          id: call.id,
-          localStream,
-          onSignal: callSignalSender(call.id),
-        });
-      })
+        return;
+      }
+
+      logCallDebug('workspace:incoming-call:joined', {
+        callId: call.id,
+        participantStatuses: call.participants.map((participant) => ({
+          identityId: participant.identityId,
+          status: participant.status,
+        })),
+      });
+      const details = callDetailsForResource(call);
+      const iceConfig = await loadCallIceConfig();
+
+      await startCall({
+        ...details,
+        call,
+        currentIdentityId: sessionRef.current.identity.id,
+        iceConfig,
+        id: call.id,
+        localStream,
+        onSignal: callSignalSender(call.id),
+      });
+    })()
       .catch((caught) => {
         stopLocalAudio(localStream);
         setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
@@ -1398,6 +1376,7 @@ export function GlassWorkspace({
     endCall();
     removeCurrentIdentityFromVoicePresence();
     playEndedCallSound();
+
     if (!callId) return;
 
     const request = shouldEndForEveryone
@@ -1460,6 +1439,7 @@ export function GlassWorkspace({
           );
           removeCurrentIdentityFromVoicePresence();
           await onCommunitiesReload().catch(() => undefined);
+
           return;
         }
 
@@ -1475,6 +1455,7 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversationId && conversations[0])
       setActiveConversationId(conversations[0].id);
+
     if (
       activeConversationId &&
       conversations.length > 0 &&
@@ -1485,63 +1466,6 @@ export function GlassWorkspace({
       setActiveConversationId(conversations[0].id);
     }
   }, [activeConversationId, conversations]);
-
-  useEffect(() => {
-    setDrafts(loadDrafts(session.identity.id));
-    setCommunityUnreadCountsById(
-      loadCommunityUnreadCounts(session.identity.id),
-    );
-  }, [session.identity.id]);
-
-  useEffect(() => {
-    const preference = loadWorkspacePreference(session.identity.id);
-
-    setWorkspaceMode(preference.mode ?? 'messages');
-    setActiveCommunityId(preference.communityId ?? null);
-    setCommunityChannelById(preference.channelByCommunityId ?? {});
-  }, [session.identity.id]);
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem(
-      draftsStorageKey(session.identity.id),
-      JSON.stringify(drafts),
-    );
-  }, [drafts, session.identity.id]);
-
-  useEffect(() => {
-    if (!activeConversation?.id) return;
-
-    globalThis.localStorage?.setItem(
-      lastConversationStorageKey(session.identity.id),
-      activeConversation.id,
-    );
-  }, [activeConversation?.id, session.identity.id]);
-
-  useEffect(() => {
-    const preference: WorkspacePreference = {
-      channelByCommunityId: communityChannelById,
-      communityId: activeCommunity?.id ?? activeCommunityId,
-      mode: workspaceMode,
-    };
-
-    globalThis.localStorage?.setItem(
-      workspaceStorageKey(session.identity.id),
-      JSON.stringify(preference),
-    );
-  }, [
-    activeCommunity?.id,
-    activeCommunityId,
-    communityChannelById,
-    session.identity.id,
-    workspaceMode,
-  ]);
-
-  useEffect(() => {
-    globalThis.localStorage?.setItem(
-      communityUnreadStorageKey(session.identity.id),
-      JSON.stringify(communityUnreadCountsById),
-    );
-  }, [communityUnreadCountsById, session.identity.id]);
 
   const refreshConversations = useCallback(async () => {
     const next = await pigeonApplication.listConversations(session);
@@ -1703,6 +1627,7 @@ export function GlassWorkspace({
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
+
         if (controller.signal.aborted) return;
 
         setMessages([]);
@@ -1713,6 +1638,7 @@ export function GlassWorkspace({
 
         return;
       }
+
       if (messageRequestRef.current !== requestId) return;
 
       if (messageAbortRef.current === controller) {
@@ -1729,6 +1655,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     if (workspaceMode !== 'messages') return;
+
     if (!activeConversation?.id) return;
     setReplyTarget(null);
     setNewMessageCount(0);
@@ -1741,6 +1668,7 @@ export function GlassWorkspace({
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;
       setMessageLoadState('idle');
+
       return;
     }
 
@@ -1776,6 +1704,7 @@ export function GlassWorkspace({
         activeConversation.id,
         messageCursorRef.current,
       );
+
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
@@ -1792,6 +1721,7 @@ export function GlassWorkspace({
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     }
+
     if (messageRequestRef.current !== requestId) return;
 
     setMessageLoadState('idle');
@@ -1804,7 +1734,9 @@ export function GlassWorkspace({
     const isScrollingUp = scrollTop < lastScrollTopRef.current;
 
     lastScrollTopRef.current = scrollTop;
+
     if (Date.now() < suppressMessageLoadsUntilRef.current) return;
+
     if (isScrolledNearBottom()) setNewMessageCount(0);
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
@@ -1962,6 +1894,7 @@ export function GlassWorkspace({
   const handleReplyReferenceClick = async (messageId: string) => {
     if (messages.some((message) => message.id === messageId)) {
       scrollToMessage(messageId);
+
       return;
     }
 
@@ -1981,6 +1914,7 @@ export function GlassWorkspace({
 
       if (result.messages.some((message) => message.id === messageId)) {
         scrollToMessage(messageId);
+
         return;
       }
 
@@ -2050,7 +1984,6 @@ export function GlassWorkspace({
           emoji,
         );
       }
-
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
       setMessages((current) =>
@@ -2130,6 +2063,7 @@ export function GlassWorkspace({
       };
 
       setSession(nextSession);
+
       if (identity) rememberIdentity(identity);
       setConversations((current) =>
         sortConversationsByLatestMessage([
@@ -2187,6 +2121,7 @@ export function GlassWorkspace({
         if (!message) return;
 
         setMessages((current) => mergeMessages(current, [message]));
+
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
           scrollMessagesToBottom('smooth', true);
@@ -2257,6 +2192,7 @@ export function GlassWorkspace({
               signalType,
             }).catch(() => undefined);
           }
+
           return;
         }
 
@@ -2279,16 +2215,22 @@ export function GlassWorkspace({
             reconcileCallResource(call);
           })
           .catch((caught) => {
-            logCallError('workspace:realtime-call-event:resource-load-failed', caught, {
-              callId,
-              eventType: event.type,
-            });
+            logCallError(
+              'workspace:realtime-call-event:resource-load-failed',
+              caught,
+              {
+                callId,
+                eventType: event.type,
+              },
+            );
           });
+
         return;
       }
 
       if (event.type.startsWith('nodes.')) {
         void onPeersReload().catch(() => undefined);
+
         return;
       }
 
@@ -2300,11 +2242,13 @@ export function GlassWorkspace({
           title: copy.notifications.title,
         });
         void refreshNotifications();
+
         return;
       }
 
       if (event.type.startsWith('keychains.')) {
         void refreshSession().catch(() => undefined);
+
         return;
       }
 
@@ -2315,6 +2259,7 @@ export function GlassWorkspace({
             .then((identity) => setSession({ ...session, identity }))
             .catch(() => undefined);
         }
+
         return;
       }
 
@@ -2352,6 +2297,7 @@ export function GlassWorkspace({
         }
 
         setCommunityRealtimeEvent(event);
+
         return;
       }
 
@@ -2362,6 +2308,7 @@ export function GlassWorkspace({
         event.type === 'communities.v1.call.event.was_recorded'
       ) {
         setCommunityRealtimeEvent(event);
+
         return;
       }
 
@@ -2439,7 +2386,9 @@ export function GlassWorkspace({
 
         if (community) {
           setCommunities((current) =>
-            current.map((item) => (item.id === community.id ? community : item)),
+            current.map((item) =>
+              item.id === community.id ? community : item,
+            ),
           );
         }
 
@@ -2456,7 +2405,9 @@ export function GlassWorkspace({
 
         if (community) {
           setCommunities((current) =>
-            current.map((item) => (item.id === community.id ? community : item)),
+            current.map((item) =>
+              item.id === community.id ? community : item,
+            ),
           );
         } else if (communityId && identityId) {
           updateCommunityState(communityId, (current) =>
@@ -2487,7 +2438,9 @@ export function GlassWorkspace({
 
         if (community) {
           setCommunities((current) =>
-            current.map((item) => (item.id === community.id ? community : item)),
+            current.map((item) =>
+              item.id === community.id ? community : item,
+            ),
           );
         } else if (communityId && identityId) {
           updateCommunityState(communityId, (current) => ({
@@ -2501,11 +2454,13 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('communities.')) {
         void onCommunitiesReload().catch(() => undefined);
+
         return;
       }
 
       if (event.type.startsWith('conversations.v1.conversation.')) {
         void refreshConversations().catch(() => undefined);
+
         return;
       }
 
@@ -2555,6 +2510,7 @@ export function GlassWorkspace({
             tag: `conversation-${conversationId}`,
             title: preview.title,
           });
+
           if (unreadMessageId)
             markUnreadMessage(conversationId, unreadMessageId);
         }
@@ -2604,6 +2560,7 @@ export function GlassWorkspace({
                   : message,
               ),
             );
+
             return;
           }
 
@@ -2626,7 +2583,9 @@ export function GlassWorkspace({
             };
 
             setMessages((current) => mergeMessages(current, [message]));
+
             if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+
             return;
           }
 
@@ -2787,8 +2746,10 @@ export function GlassWorkspace({
                   onClose={() => setSidebarOpen(false)}
                   onCallEnd={leaveActiveCall}
                   onCallParticipantVolumeChange={setParticipantVolume}
+                  onCallToggleCamera={toggleCamera}
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
+                  onCallToggleScreenShare={toggleScreenShare}
                   onLogout={() => setSession(null)}
                   onSessionUpdated={(nextSession) => {
                     setSession(nextSession);
@@ -2913,8 +2874,10 @@ export function GlassWorkspace({
             activeCall={activeCall}
             onCallEnd={leaveActiveCall}
             onCallParticipantVolumeChange={setParticipantVolume}
+            onCallToggleCamera={toggleCamera}
             onCallToggleDeafen={toggleDeafen}
             onCallToggleMute={toggleMute}
+            onCallToggleScreenShare={toggleScreenShare}
             realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>
@@ -2968,125 +2931,72 @@ export function GlassWorkspace({
         )}
       </div>
 
-      {inspectorOpen && (
-        <>
-          <button
-            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
-            onClick={() => setInspectorOpen(false)}
-            aria-label={copy.dialog.close}
-          />
-          <div className="fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden">
-            <Inspector
-              className="h-full overflow-y-auto"
-              session={session}
-              activeConversation={activeConversation}
-              messages={messages}
-              onClose={() => setInspectorOpen(false)}
-              peers={peers}
-            />
-          </div>
-        </>
-      )}
-
-      {messageContextMenu && (
-        <MessageContextMenu
-          currentIdentityId={session.identity.id}
-          menu={messageContextMenu}
-          onClose={() => setMessageContextMenu(null)}
-          onDelete={
-            messageContextMenu.message.authorIdentityId === session.identity.id
-              ? () => void handleDeleteMessage(messageContextMenu.message)
-              : undefined
-          }
-          onReply={() => {
-            setReplyTarget(messageContextMenu.message);
-            setMessageContextMenu(null);
-          }}
-          onReactionToggle={(message, emoji, reacted) =>
-            void handleToggleMessageReaction(message, emoji, reacted)
-          }
-          onViewRaw={() => {
-            setRawMessage(messageContextMenu.message);
-            setMessageContextMenu(null);
-          }}
-        />
-      )}
-
-      {rawMessage && (
-        <RawMessageDialog
-          message={rawMessage}
-          onClose={() => setRawMessage(null)}
-        />
-      )}
-
-      {isCreateOpen && (
-        <CreateConversationDialog
-          nodeNetworks={nodeNetworks}
-          session={session}
-          onClose={() => setIsCreateOpen(false)}
-          onCreated={handleConversationCreated}
-        />
-      )}
-
-      {isCreateCommunityOpen && (
-        <CreateCommunityDialog
-          nodeNetworks={nodeNetworks}
-          session={session}
-          onClose={() => setIsCreateCommunityOpen(false)}
-          onCreated={({ community, session: nextSession }) => {
-            setSession(nextSession);
-            setCommunities((current) => [community, ...current]);
-            setActiveCommunityId(community.id);
-            setWorkspaceMode('community');
-            setIsCreateCommunityOpen(false);
-          }}
-        />
-      )}
-
-      {notificationsOpen && (
-        <NotificationsPanel
-          action={notificationAction}
-          communities={communities}
-          communityAvatarUrls={notificationCommunityAvatarUrls}
-          communityPreviews={notificationCommunityPreviews}
-          conversations={conversations}
-          error={notificationError}
-          identityNames={identityNames}
-          identityPictures={identityPictures}
-          identityProfiles={identityProfiles}
-          notifications={visibleNotifications}
-          onAccept={(notification) => void acceptNotification(notification)}
-          onArchive={archiveNotification}
-          onClose={closeNotificationsPanel}
-          onDecline={(notificationId) =>
-            void declineNotification(notificationId)
-          }
-        />
-      )}
-
-      {nodeSettingsOpen && (
-        <NodeSettingsDialog
-          networks={nodeNetworks}
-          node={node}
-          onClose={() => setNodeSettingsOpen(false)}
-          onNetworksUpdated={onNodeNetworksReload}
-          session={session}
-        />
-      )}
-      {realtimeEventsOpen && (
-        <RealtimeEventsDialog
-          events={realtimeEventLog}
-          onClose={() => setRealtimeEventsOpen(false)}
-        />
-      )}
-      {incomingCall && (
-        <IncomingCallDialog
-          caller={incomingCall.caller}
-          onAccept={acceptIncomingCall}
-          onDecline={declineIncomingCall}
-          title={incomingCall.title}
-        />
-      )}
+      <WorkspaceDialogs
+        activeConversation={activeConversation}
+        archiveNotification={archiveNotification}
+        communities={communities}
+        communityAvatarUrls={notificationCommunityAvatarUrls}
+        communityPreviews={notificationCommunityPreviews}
+        conversations={conversations}
+        identityNames={identityNames}
+        identityPictures={identityPictures}
+        identityProfiles={identityProfiles}
+        incomingCall={incomingCall}
+        inspectorOpen={inspectorOpen}
+        isCreateCommunityOpen={isCreateCommunityOpen}
+        isCreateOpen={isCreateOpen}
+        messageContextMenu={messageContextMenu}
+        messages={messages}
+        node={node}
+        nodeNetworks={nodeNetworks}
+        nodeSettingsOpen={nodeSettingsOpen}
+        notificationAction={notificationAction}
+        notificationError={notificationError}
+        notificationsOpen={notificationsOpen}
+        peers={peers}
+        rawMessage={rawMessage}
+        realtimeEventLog={realtimeEventLog}
+        realtimeEventsOpen={realtimeEventsOpen}
+        session={session}
+        visibleNotifications={visibleNotifications}
+        onAcceptIncomingCall={acceptIncomingCall}
+        onAcceptNotification={(notification) =>
+          void acceptNotification(notification)
+        }
+        onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
+        onCloseCreateConversation={() => setIsCreateOpen(false)}
+        onCloseInspector={() => setInspectorOpen(false)}
+        onCloseMessageContextMenu={() => setMessageContextMenu(null)}
+        onCloseNodeSettings={() => setNodeSettingsOpen(false)}
+        onCloseNotifications={closeNotificationsPanel}
+        onCloseRawMessage={() => setRawMessage(null)}
+        onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
+        onCommunityCreated={({ community, session: nextSession }) => {
+          setSession(nextSession);
+          setCommunities((current) => [community, ...current]);
+          setActiveCommunityId(community.id);
+          setWorkspaceMode('community');
+          setIsCreateCommunityOpen(false);
+        }}
+        onConversationCreated={handleConversationCreated}
+        onDeclineIncomingCall={declineIncomingCall}
+        onDeclineNotification={(notificationId) =>
+          void declineNotification(notificationId)
+        }
+        onDeleteMessage={(message) => void handleDeleteMessage(message)}
+        onNetworksUpdated={onNodeNetworksReload}
+        onReplyToMessage={(message) => {
+          setReplyTarget(message);
+          setMessageContextMenu(null);
+        }}
+        onToggleReaction={(message, emoji, reacted) =>
+          void handleToggleMessageReaction(message, emoji, reacted)
+        }
+        onViewRawMessage={(message) => {
+          setRawMessage(message);
+          setMessageContextMenu(null);
+        }}
+      />
     </section>
   );
 }

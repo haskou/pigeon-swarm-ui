@@ -56,11 +56,11 @@ export function MessageContextMenu({
   const toggleReaction = (emoji: string) => {
     const reacted = Boolean(
       currentIdentityId &&
-        messageReactions(menu.message).some(
-          (reaction) =>
-            reaction.authorIdentityId === currentIdentityId &&
-            reaction.emoji === emoji,
-        ),
+      messageReactions(menu.message).some(
+        (reaction) =>
+          reaction.authorIdentityId === currentIdentityId &&
+          reaction.emoji === emoji,
+      ),
     );
 
     setRecentEmojis(saveRecentReactionEmoji(currentIdentityId, emoji));

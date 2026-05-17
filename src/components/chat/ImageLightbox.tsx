@@ -38,8 +38,10 @@ export function ImageLightbox({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
+
       if (event.key === 'ArrowLeft' && hasPrevious)
         setActiveIndex((current) => current - 1);
+
       if (event.key === 'ArrowRight' && hasNext)
         setActiveIndex((current) => current + 1);
     };

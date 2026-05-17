@@ -1,119 +1,123 @@
-import { useEffect, useState } from 'react';
+import type { ReactElement } from 'react';
 
-import type { ConversationResource, Session } from './domain/types';
-
-import { pigeonApplication } from './application/applicationContainer';
-import { AuthScreen } from './components/auth/AuthScreen';
-import { BackgroundGlow } from './components/BackgroundGlow';
 import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
 import { ServerConnectionScreen } from './components/system/ServerConnectionScreen';
 import { GlassWorkspace } from './components/workspace/GlassWorkspace';
+import { AuthScreen } from './contexts/identities/presentation/auth/AuthScreen';
 import { copy } from './i18n/en';
-import {
-  clearSavedCredentials,
-  loadSavedCredentials,
-} from './presentation/auth/savedCredentials';
-import { useCommunities } from './presentation/hooks/useCommunities';
-import { useNodeNetworks } from './presentation/hooks/useNodeNetworks';
-import { usePeers } from './presentation/hooks/usePeers';
-import { requestPwaNotificationPermission } from './presentation/notifications/PwaNotifications';
-import {
-  clearCommunityInviteUrl,
-  parseCommunityInviteUrl,
-  type PendingCommunityInviteLink,
-} from './utils/communityInviteLink';
+import { AppFrame, AppLoadingScreen } from './presentation/app/AppFrame';
+import { useAppBootstrap } from './presentation/app/useAppBootstrap';
 
-type RestoreState = 'idle' | 'loading' | 'done';
+type AppScreen =
+  | 'auth'
+  | 'loading'
+  | 'network-creation'
+  | 'server-connection'
+  | 'workspace';
 
-function App() {
-  const [hasSavedCredentials] = useState(() => loadSavedCredentials() !== null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [conversations, setConversations] = useState<ConversationResource[]>(
-    [],
+function screenFrom(input: {
+  hasNetworkError: boolean;
+  isLoadingNetworks: boolean;
+  isRestoringSession: boolean;
+  networkCount: number;
+  sessionPresent: boolean;
+}): AppScreen {
+  if (isServerConnectionScreen(input)) {
+    return 'server-connection';
+  }
+
+  if (isLoadingScreen(input)) {
+    return 'loading';
+  }
+
+  if (isNetworkCreationScreen(input)) {
+    return 'network-creation';
+  }
+
+  return input.sessionPresent ? 'workspace' : 'auth';
+}
+
+function isServerConnectionScreen(input: {
+  hasNetworkError: boolean;
+  sessionPresent: boolean;
+}): boolean {
+  return input.hasNetworkError && !input.sessionPresent;
+}
+
+function isLoadingScreen(input: {
+  isLoadingNetworks: boolean;
+  isRestoringSession: boolean;
+  sessionPresent: boolean;
+}): boolean {
+  return (
+    (!input.sessionPresent && input.isLoadingNetworks) ||
+    input.isRestoringSession
   );
-  const [restoreState, setRestoreState] = useState<RestoreState>(
-    hasSavedCredentials ? 'loading' : 'done',
+}
+
+function isNetworkCreationScreen(input: {
+  hasNetworkError: boolean;
+  networkCount: number;
+  sessionPresent: boolean;
+}): boolean {
+  return (
+    !input.sessionPresent && input.networkCount === 0 && !input.hasNetworkError
   );
-  const nodeNetworks = useNodeNetworks(session);
-  const peers = usePeers();
-  const communities = useCommunities(session);
-  const [pendingCommunityInvite, setPendingCommunityInvite] =
-    useState<PendingCommunityInviteLink | null>(() => parseCommunityInviteUrl());
+}
 
-  const handleAuthenticated = (
-    nextSession: Session,
-    nextConversations: ConversationResource[],
-  ) => {
-    setSession(nextSession);
-    setConversations(nextConversations);
-  };
+function App(): ReactElement {
+  const bootstrap = useAppBootstrap();
+  const {
+    clearSession,
+    communities,
+    conversations,
+    handleAuthenticated,
+    handleNetworkCreated,
+    isRestoringSession,
+    nodeNetworks,
+    peers,
+    pendingCommunityInvite,
+    session,
+    setCommunities,
+    setConversations,
+    setPendingCommunityInviteHandled,
+    setSession,
+  } = bootstrap;
 
-  useEffect(() => {
-    if (nodeNetworks.loading || nodeNetworks.error || session) return;
-    if (nodeNetworks.networks.length === 0) return;
-    if (restoreState !== 'loading') return;
+  const screen = screenFrom({
+    hasNetworkError: !!nodeNetworks.error,
+    isLoadingNetworks: nodeNetworks.loading,
+    isRestoringSession,
+    networkCount: nodeNetworks.networks.length,
+    sessionPresent: !!session,
+  });
 
-    const savedCredentials = loadSavedCredentials();
-
-    if (!savedCredentials) {
-      setRestoreState('done');
-      return;
-    }
-
-    void pigeonApplication
-      .login(savedCredentials.identityId, savedCredentials.password)
-      .then((result) => {
-        handleAuthenticated(result.session, result.conversations);
-        setRestoreState('done');
-      })
-      .catch(() => {
-        setRestoreState('done');
-      });
-  }, [nodeNetworks, restoreState, session]);
-
-  const handleNetworkCreated = () => {
-    window.location.reload();
-  };
-
-  useEffect(() => {
-    void requestPwaNotificationPermission();
-  }, []);
-
-  if (nodeNetworks.error && !session) {
+  if (screen === 'server-connection' && nodeNetworks.error) {
     return (
-      <main className="app-compact relative flex justify-center overflow-hidden bg-[#080a25] text-white">
-        <BackgroundGlow />
+      <AppFrame compact>
         <ServerConnectionScreen
           error={nodeNetworks.error}
           onRetry={nodeNetworks.reload}
         />
-      </main>
+      </AppFrame>
     );
   }
 
-  // If we're still loading, show a loading state
-  if ((!session && nodeNetworks.loading) || restoreState === 'loading') {
-    return (
-      <main className="app-viewport relative flex items-center justify-center overflow-hidden bg-[#080a25] text-white">
-        <BackgroundGlow />
-        <div className="text-xl">{copy.app.loading}</div>
-      </main>
-    );
+  if (screen === 'loading') {
+    return <AppLoadingScreen label={copy.app.loading} />;
   }
 
-  if (!session && nodeNetworks.networks.length === 0 && !nodeNetworks.error) {
+  if (screen === 'network-creation') {
     return (
-      <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
-        <BackgroundGlow />
+      <AppFrame>
         <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
-      </main>
+      </AppFrame>
     );
   }
 
   return (
-    <main className="app-viewport relative overflow-hidden bg-[#080a25] text-white">
-      <BackgroundGlow />
-      {!session ? (
+    <AppFrame>
+      {screen === 'auth' || !session ? (
         <AuthScreen
           onAuthenticated={handleAuthenticated}
           peerCount={peers.peers.length}
@@ -127,22 +131,24 @@ function App() {
           onPeersReload={peers.reload}
           peers={peers.peers}
           setSession={(nextSession) => {
-            if (!nextSession) clearSavedCredentials();
+            if (!nextSession) {
+              clearSession();
+
+              return;
+            }
+
             setSession(nextSession);
           }}
           conversations={conversations}
           communities={communities.communities}
           onCommunitiesReload={communities.reload}
-          setCommunities={communities.setCommunities}
+          setCommunities={setCommunities}
           setConversations={setConversations}
           pendingCommunityInvite={pendingCommunityInvite}
-          onPendingCommunityInviteHandled={() => {
-            clearCommunityInviteUrl();
-            setPendingCommunityInvite(null);
-          }}
+          onPendingCommunityInviteHandled={setPendingCommunityInviteHandled}
         />
       )}
-    </main>
+    </AppFrame>
   );
 }
 

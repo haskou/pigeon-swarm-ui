@@ -1,32 +1,33 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
-import type { ConversationResource, Session } from '../../domain/types';
+import type { ConversationResource, Session } from '../../../../domain/types';
 
-import { pigeonApplication } from '../../application/applicationContainer';
-import { API_SERVER_URL } from '../../config';
-import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
-import { ProfileName } from '../../domain/identities/profile/ProfileName';
-import { copy } from '../../i18n/en';
+import { pigeonApplication } from '../../../../application/applicationContainer';
+import { SegmentedControl } from '../../../../components/common/SegmentedControl';
+import { API_SERVER_URL } from '../../../../config';
+import { copy } from '../../../../i18n/en';
 import {
   clearSavedCredentials,
   loadSavedCredentials,
   saveCredentials,
-} from '../../presentation/auth/savedCredentials';
-import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
+} from '../../../../presentation/auth/savedCredentials';
+import { useNodeNetworks } from '../../../../presentation/hooks/useNodeNetworks';
 import {
-  isValidHandle,
-  isValidPassword,
   normalizeHandleInput,
   passwordValidationChecks,
-} from '../../utils/credentialsValidation';
-import { cx } from '../../utils/classNameHelper';
-import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { GlassSelect } from '../common/GlassSelect';
-import { SegmentedControl } from '../common/SegmentedControl';
+} from '../../../../utils/credentialsValidation';
+import { toUserErrorMessage } from '../../../../utils/toUserErrorMessage';
+import { AuthFormFields } from './AuthFormFields';
+import {
+  type AuthMode,
+  canSubmitAuthForm,
+  normalizeIdentityLogin,
+  registrationNetworks,
+} from './authFormRules';
 import { Field } from './Field';
 import { HeroMetric } from './HeroMetric';
+import { PasswordChecklist } from './PasswordChecklist';
 
-type AuthMode = 'login' | 'create';
 type LoadState = 'idle' | 'loading' | 'error';
 
 interface AuthScreenProps {
@@ -40,7 +41,7 @@ interface AuthScreenProps {
 export function AuthScreen({
   onAuthenticated,
   peerCount,
-}: AuthScreenProps) {
+}: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
   const [name, setName] = useState('');
@@ -74,14 +75,16 @@ export function AuthScreen({
     }
   }, []);
 
-  const canSubmit =
-    mode === 'login'
-      ? identityId.trim().length > 0 && password.length > 0
-      : name.trim().length > 0 &&
-        (!handle.trim() || isValidHandle(handle)) &&
-        isValidPassword(password) &&
-        password === passwordConfirmation &&
-        (availableNetworks.length === 0 || selectedNetwork !== '');
+  const canSubmit = canSubmitAuthForm({
+    availableNetworkCount: availableNetworks.length,
+    handle,
+    identityId,
+    mode,
+    name,
+    password,
+    passwordConfirmation,
+    selectedNetwork,
+  });
   const passwordChecks = passwordValidationChecks(password);
 
   const handleSubmit = async (event: FormEvent) => {
@@ -93,24 +96,6 @@ export function AuthScreen({
     setError(null);
 
     try {
-      let networksToRegister: string[] = [];
-
-      if (mode === 'create') {
-        // For registration, use selected network or default to empty array
-        if (selectedNetwork) {
-          networksToRegister = [selectedNetwork];
-        } else if (availableNetworks.length === 0 && networks) {
-          // Fallback to comma-separated input if no networks available
-          networksToRegister = networks
-            .split(',')
-            .map((network) => network.trim())
-            .filter(Boolean);
-        } else if (availableNetworks.length === 0) {
-          // If no networks available and no comma-separated input, register with empty array
-          networksToRegister = [];
-        }
-      }
-
       const result =
         mode === 'login'
           ? await pigeonApplication.login(
@@ -120,7 +105,11 @@ export function AuthScreen({
           : await pigeonApplication.register(
               name,
               password,
-              networksToRegister,
+              registrationNetworks({
+                availableNetworkCount: availableNetworks.length,
+                fallbackNetworks: networks,
+                selectedNetwork,
+              }),
               handle.trim() ? normalizeHandleInput(handle) : undefined,
             );
 
@@ -145,7 +134,7 @@ export function AuthScreen({
   };
 
   return (
-    <section className="app-screen relative z-10 grid place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
+    <section className="app-screen relative z-10 grid min-h-[100dvh] place-items-center px-4 py-6 sm:py-8">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
           <div className="glass-panel-strong rounded-2xl p-8">
@@ -169,17 +158,14 @@ export function AuthScreen({
                 label={copy.auth.networksLabel}
                 value={`${availableNetworks.length}`}
               />
-              <HeroMetric
-                label={copy.auth.peersLabel}
-                value={`${peerCount}`}
-              />
+              <HeroMetric label={copy.auth.peersLabel} value={`${peerCount}`} />
             </div>
           </div>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="glass-panel-strong min-h-0 rounded-none p-5 sm:rounded-2xl sm:p-7"
+          className="glass-panel-strong min-h-0 rounded-2xl p-5 sm:p-7"
         >
           <SegmentedControl
             value={mode}
@@ -188,64 +174,20 @@ export function AuthScreen({
           />
 
           <div className="mt-6 space-y-4">
-            {mode === 'login' ? (
-              <Field label={copy.auth.identityIdLabel}>
-                <input
-                  value={identityId}
-                  onChange={(event) => setIdentityId(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="@ada or MCowBQYDK2VwAyEA..."
-                  autoComplete="username"
-                />
-              </Field>
-            ) : (
-              <>
-                <Field label={copy.auth.profileNameLabel}>
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={ProfileName.MAX_LENGTH}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder="Ada"
-                    autoComplete="name"
-                  />
-                </Field>
-                <Field label={copy.auth.handleLabel}>
-                  <input
-                    value={handle}
-                    onChange={(event) =>
-                      setHandle(normalizeHandleInput(event.target.value))
-                    }
-                    maxLength={ProfileHandle.MAX_LENGTH}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder="@ada"
-                    autoComplete="username"
-                  />
-                </Field>
-                {availableNetworks.length > 0 ? (
-                  <Field label={copy.auth.networkLabel}>
-                    <GlassSelect
-                      ariaLabel={copy.auth.networkLabel}
-                      value={selectedNetwork}
-                      onChange={setSelectedNetwork}
-                      options={availableNetworks.map((network) => ({
-                        label: network.name,
-                        value: network.id,
-                      }))}
-                    />
-                  </Field>
-                ) : (
-                  <Field label={copy.auth.fallbackNetworksLabel}>
-                    <input
-                      value={networks}
-                      onChange={(event) => setNetworks(event.target.value)}
-                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                      placeholder="uuid-public, uuid-private"
-                    />
-                  </Field>
-                )}
-              </>
-            )}
+            <AuthFormFields
+              availableNetworks={availableNetworks}
+              handle={handle}
+              identityId={identityId}
+              mode={mode}
+              name={name}
+              networks={networks}
+              selectedNetwork={selectedNetwork}
+              onHandleChange={setHandle}
+              onIdentityIdChange={setIdentityId}
+              onNameChange={setName}
+              onNetworksChange={setNetworks}
+              onSelectedNetworkChange={setSelectedNetwork}
+            />
 
             <Field label={copy.auth.passwordLabel}>
               <input
@@ -329,61 +271,4 @@ export function AuthScreen({
       </div>
     </section>
   );
-}
-
-function PasswordChecklist({
-  checks,
-  variant = 'profile',
-}: {
-  checks: {
-    lowercase: boolean;
-    match: boolean;
-    maxLength: boolean;
-    minLength: boolean;
-    number: boolean;
-    symbol: boolean;
-    uppercase: boolean;
-  };
-  variant?: 'auth' | 'profile';
-}) {
-  const requirements =
-    variant === 'auth'
-      ? copy.auth.passwordRequirementItems
-      : copy.profile.passwordRequirements;
-  const items = [
-    [requirements.minLength, checks.minLength],
-    [requirements.maxLength, checks.maxLength],
-    [requirements.uppercase, checks.uppercase],
-    [requirements.lowercase, checks.lowercase],
-    [requirements.number, checks.number],
-    [requirements.symbol, checks.symbol],
-    [requirements.match, checks.match],
-  ] as const;
-
-  return (
-    <div className="grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
-      {items.map(([label, complete]) => (
-        <div
-          key={label}
-          className={cx(
-            'flex items-center gap-2 rounded-2xl px-3 py-2',
-            complete
-              ? 'bg-emerald-400/10 text-emerald-200'
-              : 'bg-white/5 text-white/45',
-          )}
-        >
-          <span aria-hidden="true">{complete ? '✓' : '×'}</span>
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function normalizeIdentityLogin(value: string): string {
-  const trimmed = value.trim();
-
-  return trimmed.startsWith('@')
-    ? normalizeHandleInput(trimmed)
-    : trimmed;
 }

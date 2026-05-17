@@ -12,13 +12,13 @@ import {
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { ImageCropEditor } from '../common/ImageCropEditor';
 import {
   DialogHeader,
   TrashIcon,
   VoiceIcon,
 } from './communityDialogPrimitives';
 import { loadPublicImage } from './communityImages';
-import { ImageCropEditor } from '../common/ImageCropEditor';
 
 type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
 
@@ -99,6 +99,7 @@ export function ManageCommunityDialog({
     let cancelled = false;
 
     setCurrentAvatarUrl(null);
+
     if (!community.avatar) return undefined;
 
     void loadPublicImage(community.avatar).then((url) => {
@@ -114,6 +115,7 @@ export function ManageCommunityDialog({
     let cancelled = false;
 
     setCurrentBannerUrl(null);
+
     if (!community.banner) return undefined;
 
     void loadPublicImage(community.banner).then((url) => {
@@ -281,7 +283,9 @@ export function ManageCommunityDialog({
       current.filter((candidate) => candidate.id !== channel.id),
     );
     setChannelDrafts((current) => {
-      const { [channel.id]: _deleted, ...remaining } = current;
+      const remaining = { ...current };
+
+      delete remaining[channel.id];
 
       return remaining;
     });

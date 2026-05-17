@@ -134,8 +134,8 @@ export function NotificationsPanel({
             const target = notificationTarget(notification);
             const preview = notificationPreview(notification, {
               communities,
-              communityPreviews,
               communityAvatarUrls,
+              communityPreviews,
               conversations,
               identityNames,
               identityPictures,

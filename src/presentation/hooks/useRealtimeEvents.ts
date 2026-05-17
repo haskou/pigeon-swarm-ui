@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
+
+import { useEffect, useRef } from 'react';
 
 import type { Session } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -173,6 +174,7 @@ async function connectRealtime(
 
 function scheduleRealtimeReconnect(connection: SharedRealtimeConnection): void {
   if (connection.subscribers.size === 0) return;
+
   if (connection.reconnectTimer !== undefined) return;
 
   notifySubscribers(connection, (handlers) => handlers.onReconnecting?.());

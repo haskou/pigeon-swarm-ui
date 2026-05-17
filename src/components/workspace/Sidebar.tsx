@@ -46,10 +46,10 @@ import {
   normalizeHandle,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
 import { ImageCropEditor } from '../common/ImageCropEditor';
 import { SectionTitle } from '../common/SectionTitle';
-import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { loadPublicImage } from '../community/communityImages';
 
 interface SidebarProps {
@@ -71,24 +71,28 @@ interface SidebarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleScreenShare?: () => void;
 }
 
 export function Sidebar({
+  activeCall,
   activeConversationId,
   conversations,
   identityNames,
   identityPictures,
   identityProfiles,
   nodeNetworks,
-  onClose,
-  onCreate,
-  activeCall,
   onCallEnd,
   onCallParticipantVolumeChange,
+  onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleScreenShare,
+  onClose,
+  onCreate,
   onLogout,
   onSelect,
   onSessionUpdated,
@@ -287,8 +291,10 @@ export function Sidebar({
         activeCall={activeCall}
         onCallEnd={onCallEnd}
         onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
+        onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>
   );
@@ -367,17 +373,19 @@ function useIdentityBannerUrls(
 }
 
 export function UserProfileDropdown({
+  activeCall,
   identityNames = {},
   identityPictures = {},
   nodeNetworks,
+  onCallEnd,
+  onCallParticipantVolumeChange,
+  onCallToggleCamera,
+  onCallToggleDeafen,
+  onCallToggleMute,
+  onCallToggleScreenShare,
   onLogout,
   onSessionUpdated,
   session,
-  activeCall,
-  onCallEnd,
-  onCallParticipantVolumeChange,
-  onCallToggleDeafen,
-  onCallToggleMute,
 }: {
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;
@@ -391,8 +399,10 @@ export function UserProfileDropdown({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleScreenShare?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
@@ -448,15 +458,19 @@ export function UserProfileDropdown({
       {activeCall &&
         onCallEnd &&
         onCallParticipantVolumeChange &&
+        onCallToggleCamera &&
         onCallToggleDeafen &&
-        onCallToggleMute && (
+        onCallToggleMute &&
+        onCallToggleScreenShare && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
             <GlobalCallBar
               call={activeCall}
               onEnd={onCallEnd}
               onParticipantVolumeChange={onCallParticipantVolumeChange}
+              onToggleCamera={onCallToggleCamera}
               onToggleDeafen={onCallToggleDeafen}
               onToggleMute={onCallToggleMute}
+              onToggleScreenShare={onCallToggleScreenShare}
             />
           </div>
         )}

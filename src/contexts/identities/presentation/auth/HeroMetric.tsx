@@ -26,9 +26,5 @@ export function HeroMetric({ label, onClick, value }: HeroMetricProps) {
     );
   }
 
-  return (
-    <div className="glass-card rounded-2xl p-4">
-      {content}
-    </div>
-  );
+  return <div className="glass-card rounded-2xl p-4">{content}</div>;
 }

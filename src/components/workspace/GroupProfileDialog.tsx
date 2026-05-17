@@ -3,7 +3,10 @@ import type { MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { ConversationResource, IdentityResource } from '../../domain/types';
+import type {
+  ConversationResource,
+  IdentityResource,
+} from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
@@ -107,9 +110,7 @@ export function GroupProfileDialog({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-black">
-                    {participant.name}
-                  </div>
+                  <div className="truncate font-black">{participant.name}</div>
                   <div className="truncate text-xs text-white/45">
                     {participant.identity?.profile.handle
                       ? `@${participant.identity.profile.handle}`

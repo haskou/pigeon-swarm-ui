@@ -7,15 +7,15 @@ import type {
   CallSignalType,
   CallSession,
 } from '../../domain/calls/CallSession';
-
-import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
-import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+
 import {
   logCallDebug,
   logCallError,
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
+import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
+import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 
 type SignalSender = (
   recipientIdentityId: string,
@@ -46,21 +46,22 @@ type StartCallInput = {
   title: string;
 };
 
+type ReconcileCallInput = Omit<
+  StartCallInput,
+  'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
+>;
+
 export function useCallSession(): {
   activeCall: CallSession | null;
   endCall: () => void;
   receiveSignal: (input: ReceivedSignal) => Promise<void>;
-  reconcileCall: (
-    call: CallResource,
-    input: Omit<
-      StartCallInput,
-      'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
-    >,
-  ) => void;
+  reconcileCall: (call: CallResource, input: ReconcileCallInput) => void;
   startCall: (input: StartCallInput) => Promise<void>;
   setParticipantVolume: (identityId: string, volumePercent: number) => void;
+  toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
   toggleMute: () => void;
+  toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalMediaManager(), []);
   const peerManager = useMemo(() => new CallPeerConnectionManager(), []);
@@ -84,6 +85,9 @@ export function useCallSession(): {
       const stats = await peerManager
         .collectStats()
         .catch((): Record<string, PeerMediaStats> => ({}));
+      const remoteStreams = peerManager.remoteMediaStreams();
+      const localAudioLevel = mediaManager.localAudioLevel();
+      const screenStream = mediaManager.screenPreviewStream();
 
       if (cancelled) return;
 
@@ -92,20 +96,16 @@ export function useCallSession(): {
 
         return {
           ...current,
-          participants: current.participants.map((participant) => {
-            const stat = stats[participant.identityId];
-
-            return stat
-              ? {
-                  ...participant,
-                  audioLevel: stat.audioLevel,
-                  connectionState: stat.connectionState,
-                  latencyMs: stat.latencyMs,
-                  packetsLost: stat.packetsLost,
-                  speaking: stat.speaking,
-                }
-              : participant;
-          }),
+          cameraEnabled: mediaManager.hasCamera(),
+          localPreviewStream: mediaManager.previewStream(),
+          participants: participantsWithMediaState(
+            current,
+            stats,
+            remoteStreams,
+            localAudioLevel,
+            screenStream,
+          ),
+          screenSharing: mediaManager.hasScreenShare(),
         };
       });
     };
@@ -113,7 +113,7 @@ export function useCallSession(): {
     void refreshStats();
     const interval = window.setInterval(() => {
       void refreshStats();
-    }, 1000);
+    }, 250);
 
     return () => {
       cancelled = true;
@@ -147,17 +147,19 @@ export function useCallSession(): {
       communityId: input.communityId,
       conversationId: input.conversationId,
       currentIdentityId: input.currentIdentityId,
-      id: input.id,
-      kind: input.kind,
-      participants: input.participants,
-      subtitle: input.subtitle,
-      title: input.title,
       deafened: false,
       hasMicrophone: input.localStream !== null,
+      id: input.id,
+      cameraEnabled: false,
+      kind: input.kind,
       muted: input.localStream === null,
+      participants: input.participants,
       participantVolumes: {},
+      screenSharing: false,
       startedAt: Date.now(),
       status: 'connecting',
+      subtitle: input.subtitle,
+      title: input.title,
     };
 
     setActiveCall(nextCall);
@@ -201,6 +203,11 @@ export function useCallSession(): {
       });
       peerManager.configure(input.iceConfig);
       peerManager.setLocalStream(stream);
+      setActiveCall((current) =>
+        current?.id === nextCall.id
+          ? { ...current, localPreviewStream: stream ?? undefined }
+          : current,
+      );
       startingCallIdRef.current = null;
       await flushPendingSignals(nextCall.id, input.onSignal);
       await connectJoinedPeers(
@@ -222,6 +229,7 @@ export function useCallSession(): {
       mediaManager.stop();
       peerManager.reset();
       pendingSignalsRef.current.delete(nextCall.id);
+
       if (startingCallIdRef.current === nextCall.id) {
         startingCallIdRef.current = null;
       }
@@ -230,8 +238,8 @@ export function useCallSession(): {
           ? {
               ...current,
               hasMicrophone: false,
-              status: 'permission-denied',
               muted: true,
+              status: 'permission-denied',
             }
           : current,
       );
@@ -252,13 +260,9 @@ export function useCallSession(): {
     setActiveCall(null);
   };
 
-  const reconcileCall = (
-    call: CallResource,
-    input: Omit<
-      StartCallInput,
-      'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
-    >,
-  ) => {
+  const reconcileCall = (call: CallResource, input: ReconcileCallInput) => {
+    const participants = mergeParticipantStatuses(input.participants, call);
+
     setActiveCall((current) => {
       if (!current || current.id !== call.id) return current;
 
@@ -266,14 +270,9 @@ export function useCallSession(): {
         ...current,
         ...input,
         call,
-        participants: mergeParticipantStatuses(input.participants, call),
+        participants,
         participantVolumes: current.participantVolumes,
-        status:
-          call.status === 'active'
-            ? current.status
-            : call.status === 'missed'
-              ? 'missed'
-              : 'ended',
+        status: reconciledCallStatus(call, current),
       };
     });
 
@@ -283,19 +282,13 @@ export function useCallSession(): {
     if (!currentIdentityId || !sendSignal || call.status !== 'active') return;
 
     void connectJoinedPeers(
-      {
-        ...input,
+      callSessionForJoinedPeerConnection(
         call,
         currentIdentityId,
-        deafened: activeCallRef.current?.deafened ?? false,
-        hasMicrophone: activeCallRef.current?.hasMicrophone ?? false,
-        id: call.id,
-        muted: activeCallRef.current?.muted ?? false,
-        participants: mergeParticipantStatuses(input.participants, call),
-        participantVolumes: activeCallRef.current?.participantVolumes ?? {},
-        startedAt: activeCallRef.current?.startedAt ?? Date.now(),
-        status: activeCallRef.current?.status ?? 'live',
-      },
+        input,
+        participants,
+        activeCallRef.current,
+      ),
       currentIdentityId,
       sendSignal,
     );
@@ -317,6 +310,7 @@ export function useCallSession(): {
         activeCallId,
         callId: input.callId,
       });
+
       return;
     }
 
@@ -343,13 +337,16 @@ export function useCallSession(): {
     setActiveCall((current) => {
       if (!current) {
         logCallWarning('session:toggle-mute:ignored-no-active-call');
+
         return current;
       }
+
       if (!current.hasMicrophone) {
         logCallWarning('session:toggle-mute:ignored-no-microphone', {
           callId: current.id,
           status: current.status,
         });
+
         return current;
       }
 
@@ -365,7 +362,9 @@ export function useCallSession(): {
         ...current,
         muted,
         participants: current.participants.map((participant, index) =>
-          index === 0 ? { ...participant, muted } : participant,
+          index === 0
+            ? { ...participant, muted, speaking: false }
+            : participant,
         ),
       };
     });
@@ -375,6 +374,7 @@ export function useCallSession(): {
     setActiveCall((current) => {
       if (!current) {
         logCallWarning('session:toggle-deafen:ignored-no-active-call');
+
         return current;
       }
 
@@ -386,14 +386,85 @@ export function useCallSession(): {
       });
       peerManager.setDeafened(deafened);
 
-      return { ...current, deafened };
+      return {
+        ...current,
+        deafened,
+        participants: current.participants.map((participant) =>
+          participant.identityId === current.currentIdentityId
+            ? { ...participant, deafened }
+            : participant,
+        ),
+      };
     });
   };
 
-  const setParticipantVolume = (
-    identityId: string,
-    volumePercent: number,
-  ) => {
+  const toggleCamera = async () => {
+    const current = activeCallRef.current;
+
+    if (!current) {
+      logCallWarning('session:toggle-camera:ignored-no-active-call');
+
+      return;
+    }
+
+    try {
+      const cameraEnabled = !current.cameraEnabled;
+      const stream = cameraEnabled
+        ? await mediaManager.enableCamera()
+        : mediaManager.disableCamera();
+
+      peerManager.setLocalStream(stream);
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? localMediaSession(active, {
+              cameraEnabled,
+              localPreviewStream: stream ?? undefined,
+              screenStream: mediaManager.screenPreviewStream(),
+              screenSharing: mediaManager.hasScreenShare(),
+            })
+          : active,
+      );
+    } catch (error) {
+      logCallError('session:toggle-camera:failed', error, {
+        callId: current.id,
+      });
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    const current = activeCallRef.current;
+
+    if (!current) {
+      logCallWarning('session:toggle-screen-share:ignored-no-active-call');
+
+      return;
+    }
+
+    try {
+      const screenSharing = !current.screenSharing;
+      const stream = screenSharing
+        ? await mediaManager.enableScreenShare()
+        : mediaManager.disableScreenShare();
+
+      peerManager.setLocalStream(stream);
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? localMediaSession(active, {
+              cameraEnabled: mediaManager.hasCamera(),
+              localPreviewStream: stream ?? undefined,
+              screenStream: mediaManager.screenPreviewStream(),
+              screenSharing,
+            })
+          : active,
+      );
+    } catch (error) {
+      logCallError('session:toggle-screen-share:failed', error, {
+        callId: current.id,
+      });
+    }
+  };
+
+  const setParticipantVolume = (identityId: string, volumePercent: number) => {
     peerManager.setPeerVolume(identityId, volumePercent);
     setActiveCall((current) => {
       if (!current) return current;
@@ -415,8 +486,10 @@ export function useCallSession(): {
     reconcileCall,
     setParticipantVolume,
     startCall,
+    toggleCamera,
     toggleDeafen,
     toggleMute,
+    toggleScreenShare,
   };
 
   async function connectJoinedPeers(
@@ -502,4 +575,126 @@ function mergeParticipantStatuses(
     ...participant,
     status: byIdentityId.get(participant.identityId) ?? participant.status,
   }));
+}
+
+function reconciledCallStatus(
+  call: CallResource,
+  current: CallSession,
+): CallSession['status'] {
+  if (call.status === 'active') return current.status;
+
+  return call.status === 'missed' ? 'missed' : 'ended';
+}
+
+function callSessionForJoinedPeerConnection(
+  call: CallResource,
+  currentIdentityId: string,
+  input: ReconcileCallInput,
+  participants: CallParticipant[],
+  activeCall: CallSession | null,
+): CallSession {
+  return {
+    ...input,
+    call,
+    cameraEnabled: activeCall?.cameraEnabled ?? false,
+    currentIdentityId,
+    deafened: activeCall?.deafened ?? false,
+    hasMicrophone: activeCall?.hasMicrophone ?? false,
+    id: call.id,
+    localPreviewStream: activeCall?.localPreviewStream,
+    muted: activeCall?.muted ?? false,
+    participants,
+    participantVolumes: activeCall?.participantVolumes ?? {},
+    screenSharing: activeCall?.screenSharing ?? false,
+    startedAt: activeCall?.startedAt ?? Date.now(),
+    status: activeCall?.status ?? 'live',
+  };
+}
+
+function participantsWithMediaState(
+  call: CallSession,
+  stats: Record<string, PeerMediaStats>,
+  remoteStreams: Record<string, MediaStream>,
+  localAudioLevel: number,
+  screenStream?: MediaStream,
+): CallParticipant[] {
+  return call.participants.map((participant) =>
+    participant.identityId === call.currentIdentityId
+      ? localParticipantWithMediaState(
+          participant,
+          call,
+          localAudioLevel,
+          screenStream,
+        )
+      : remoteParticipantWithMediaState(participant, stats, remoteStreams),
+  );
+}
+
+function localParticipantWithMediaState(
+  participant: CallParticipant,
+  call: CallSession,
+  audioLevel: number,
+  screenStream?: MediaStream,
+): CallParticipant {
+  return {
+    ...participant,
+    audioLevel,
+    deafened: call.deafened,
+    mediaStream: call.localPreviewStream,
+    screenStream,
+    muted: call.muted,
+    screenSharing: call.screenSharing,
+    speaking: !call.muted && audioLevel > 0.04,
+    videoEnabled: hasVideoTrack(call.localPreviewStream),
+  };
+}
+
+function remoteParticipantWithMediaState(
+  participant: CallParticipant,
+  stats: Record<string, PeerMediaStats>,
+  remoteStreams: Record<string, MediaStream>,
+): CallParticipant {
+  const stat = stats[participant.identityId];
+  const mediaStream = remoteStreams[participant.identityId];
+
+  return {
+    ...participant,
+    audioLevel: stat?.audioLevel,
+    connectionState: stat?.connectionState ?? participant.connectionState,
+    latencyMs: stat?.latencyMs,
+    mediaStream,
+    packetsLost: stat?.packetsLost,
+    speaking: stat?.speaking ?? false,
+    videoEnabled: hasVideoTrack(mediaStream),
+  };
+}
+
+function localMediaSession(
+  call: CallSession,
+  media: Pick<
+    CallSession,
+    'cameraEnabled' | 'localPreviewStream' | 'screenSharing'
+  > & { screenStream?: MediaStream },
+): CallSession {
+  return {
+    ...call,
+    ...media,
+    participants: call.participants.map((participant) =>
+      participant.identityId === call.currentIdentityId
+        ? {
+            ...participant,
+            mediaStream: media.localPreviewStream,
+            screenStream: media.screenStream,
+            screenSharing: media.screenSharing,
+            videoEnabled: hasVideoTrack(media.localPreviewStream),
+          }
+        : participant,
+    ),
+  };
+}
+
+function hasVideoTrack(stream?: MediaStream): boolean {
+  return Boolean(
+    stream?.getVideoTracks().some((track) => track.readyState === 'live'),
+  );
 }

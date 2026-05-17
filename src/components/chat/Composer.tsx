@@ -47,6 +47,7 @@ export function Composer({
   draft,
   error,
   focusKey,
+  onCancelReply,
   onDraftChange,
   onEscape,
   onSend,
@@ -54,7 +55,6 @@ export function Composer({
   progress,
   replyTo,
   replyToAuthorName,
-  onCancelReply,
 }: ComposerProps) {
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
@@ -64,7 +64,6 @@ export function Composer({
     index: number;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [caretIndex, setCaretIndex] = useState(0);
   const [dismissedEmojiTrigger, setDismissedEmojiTrigger] = useState<
@@ -76,19 +75,17 @@ export function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
-  const canAttach = !disabled && !sending;
+  const canAttach = !disabled;
   const canSend =
     (draft.trim().length > 0 || attachments.length > 0) &&
     draft.trim().length <= MESSAGE_MAX_LENGTH &&
-    !disabled &&
-    !sending;
+    !disabled;
   const emojiTrigger = useMemo(
     () => findEmojiTrigger(draft, caretIndex),
     [caretIndex, draft],
   );
   const emojiSuggestions = useMemo(
-    () =>
-      emojiTrigger ? searchEmojiSuggestions(emojiTrigger.query) : [],
+    () => (emojiTrigger ? searchEmojiSuggestions(emojiTrigger.query) : []),
     [emojiTrigger],
   );
   const emojiTriggerKey = emojiTrigger
@@ -115,16 +112,16 @@ export function Composer({
   );
 
   useEffect(() => {
-    if (!replyTo || disabled || sending) return;
+    if (!replyTo || disabled) return;
 
     textInputRef.current?.focus();
-  }, [disabled, replyTo, sending]);
+  }, [disabled, replyTo]);
 
   useEffect(() => {
-    if (!focusKey || disabled || sending) return;
+    if (!focusKey || disabled) return;
 
     requestAnimationFrame(() => textInputRef.current?.focus());
-  }, [disabled, focusKey, sending]);
+  }, [disabled, focusKey]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     setAttachmentError(null);
@@ -164,11 +161,7 @@ export function Composer({
     (suggestion: EmojiSuggestion) => {
       if (!emojiTrigger) return;
 
-      const next = replaceEmojiTrigger(
-        draft,
-        emojiTrigger,
-        suggestion.emoji,
-      );
+      const next = replaceEmojiTrigger(draft, emojiTrigger, suggestion.emoji);
 
       if (next.value.length > MESSAGE_MAX_LENGTH) return;
 
@@ -190,6 +183,7 @@ export function Composer({
     if (!canAttach) {
       dragDepthRef.current = 0;
       setDraggingFiles(false);
+
       return;
     }
 
@@ -218,6 +212,7 @@ export function Composer({
 
       event.preventDefault();
       dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
       if (dragDepthRef.current === 0) setDraggingFiles(false);
     };
     const handleDrop = (event: DragEvent) => {
@@ -245,7 +240,7 @@ export function Composer({
     resizeTextInput();
   }, [draft, resizeTextInput]);
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const trimmed = draft.trim();
 
@@ -261,6 +256,7 @@ export function Composer({
     );
     setAttachments([]);
     setAttachmentError(null);
+
     if (fileInputRef.current) fileInputRef.current.value = '';
     window.setTimeout(() => textInputRef.current?.focus(), 0);
   };
@@ -283,6 +279,7 @@ export function Composer({
       if (event.key === 'Escape') {
         event.preventDefault();
         setDismissedEmojiTrigger(emojiTriggerKey);
+
         return;
       }
 
@@ -291,24 +288,30 @@ export function Composer({
         setSelectedEmojiIndex((current) =>
           Math.min(current + 1, emojiSuggestions.length - 1),
         );
+
         return;
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
         setSelectedEmojiIndex((current) => Math.max(current - 1, 0));
+
         return;
       }
 
       if (event.key === 'Enter' || event.key === 'Tab') {
         event.preventDefault();
-        insertEmoji(emojiSuggestions[selectedEmojiIndex] ?? emojiSuggestions[0]);
+        insertEmoji(
+          emojiSuggestions[selectedEmojiIndex] ?? emojiSuggestions[0],
+        );
+
         return;
       }
     }
 
     if (event.key === 'Escape') {
       onEscape?.();
+
       return;
     }
 
@@ -337,6 +340,7 @@ export function Composer({
       current.filter((attachment, index) => {
         if (index === indexToRemove) {
           URL.revokeObjectURL(attachment.previewUrl);
+
           return false;
         }
 
@@ -396,9 +400,11 @@ export function Composer({
             {imageAttachments.length > 0 && (
               <ComposerImageAlbum
                 attachments={imageAttachments}
-                disabled={disabled || sending}
+                disabled={disabled}
                 lightboxImages={lightboxImages}
-                onOpen={(index) => setLightbox({ images: lightboxImages, index })}
+                onOpen={(index) =>
+                  setLightbox({ images: lightboxImages, index })
+                }
                 onRemove={removeAttachment}
               />
             )}
@@ -419,7 +425,7 @@ export function Composer({
                   <button
                     type="button"
                     onClick={() => removeAttachment(attachment.index)}
-                    disabled={disabled || sending}
+                    disabled={disabled}
                     className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
                     aria-label={copy.composer.removeAttachment}
                   >
@@ -469,7 +475,7 @@ export function Composer({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || sending}
+            disabled={disabled}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 disabled:cursor-not-allowed"
             aria-label={copy.composer.attach}
           >
@@ -491,20 +497,20 @@ export function Composer({
             onKeyUp={syncCaret}
             onPaste={handlePaste}
             onSelect={syncCaret}
-            disabled={disabled || sending}
+            disabled={disabled}
             maxLength={MESSAGE_MAX_LENGTH}
             rows={1}
             className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
             placeholder={placeholder}
           />
-            <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
+          <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
             {draft.length}/{MESSAGE_MAX_LENGTH}
           </span>
           <button
             disabled={!canSend}
             className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {sending ? copy.composer.sending : copy.composer.send}
+            {copy.composer.send}
           </button>
         </div>
       </form>
@@ -623,12 +629,7 @@ function AttachmentPreview({ file, url }: { file: File; url: string }) {
 
   if (file.type.startsWith('video/')) {
     return (
-      <video
-        src={url}
-        className="h-28 w-56 object-cover"
-        controls
-        muted
-      />
+      <video src={url} className="h-28 w-56 object-cover" controls muted />
     );
   }
 
@@ -711,16 +712,23 @@ function clipboardFile(
   index: number,
 ): File | null {
   if (!file) return null;
+
   if (file.name) return file;
 
-  return new File([file], `clipboard-image-${index + 1}.${imageExtension(contentType)}`, {
-    type: contentType,
-  });
+  return new File(
+    [file],
+    `clipboard-image-${index + 1}.${imageExtension(contentType)}`,
+    {
+      type: contentType,
+    },
+  );
 }
 
 function imageExtension(contentType: string): string {
   if (contentType === 'image/jpeg') return 'jpg';
+
   if (contentType === 'image/gif') return 'gif';
+
   if (contentType === 'image/webp') return 'webp';
 
   return 'png';

@@ -1,5 +1,7 @@
 import type { ConversationResource } from '../../domain/types';
 
+import { readJsonObjectFromLocalStorage } from '../../infrastructure/storage/JsonLocalStorage';
+
 export type ConversationDrafts = Record<string, string>;
 export type WorkspacePreference = {
   channelByCommunityId?: Record<string, string>;
@@ -8,13 +10,13 @@ export type WorkspacePreference = {
 };
 export type CommunityUnreadCounts = Record<string, Record<string, number>>;
 
-export const lastConversationStorageKey = (identityId: string) =>
+export const lastConversationStorageKey = (identityId: string): string =>
   `pigeon:lastConversation:${identityId}`;
-export const draftsStorageKey = (identityId: string) =>
+export const draftsStorageKey = (identityId: string): string =>
   `pigeon:conversationDrafts:${identityId}`;
-export const workspaceStorageKey = (identityId: string) =>
+export const workspaceStorageKey = (identityId: string): string =>
   `pigeon:workspace:${identityId}`;
-export const communityUnreadStorageKey = (identityId: string) =>
+export const communityUnreadStorageKey = (identityId: string): string =>
   `pigeon:communityUnread:${identityId}`;
 
 export function initialConversationId(
@@ -31,36 +33,20 @@ export function initialConversationId(
 }
 
 export function loadDrafts(identityId: string): ConversationDrafts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(draftsStorageKey(identityId)) ?? '{}',
-    ) as ConversationDrafts;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(draftsStorageKey(identityId), {});
 }
 
 export function loadWorkspacePreference(
   identityId: string,
 ): WorkspacePreference {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(workspaceStorageKey(identityId)) ?? '{}',
-    ) as WorkspacePreference;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(workspaceStorageKey(identityId), {});
 }
 
 export function loadCommunityUnreadCounts(
   identityId: string,
 ): CommunityUnreadCounts {
-  try {
-    return JSON.parse(
-      globalThis.localStorage?.getItem(communityUnreadStorageKey(identityId)) ??
-        '{}',
-    ) as CommunityUnreadCounts;
-  } catch {
-    return {};
-  }
+  return readJsonObjectFromLocalStorage(
+    communityUnreadStorageKey(identityId),
+    {},
+  );
 }

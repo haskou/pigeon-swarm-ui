@@ -57,15 +57,20 @@ export type CallIceServerConfig = {
 export type CallParticipant = {
   audioLevel?: number;
   connectionState?: RTCPeerConnectionState;
+  deafened?: boolean;
   identity?: IdentityResource;
   identityId: string;
   latencyMs?: number;
+  mediaStream?: MediaStream;
   muted: boolean;
   name: string;
   packetsLost?: number;
   picture?: null | string;
+  screenStream?: MediaStream;
+  screenSharing?: boolean;
   speaking?: boolean;
   status?: CallParticipantStatus;
+  videoEnabled?: boolean;
 };
 
 export type CallSession = {
@@ -78,9 +83,12 @@ export type CallSession = {
   kind: CallKind;
   muted: boolean;
   hasMicrophone: boolean;
+  cameraEnabled: boolean;
   deafened: boolean;
+  localPreviewStream?: MediaStream;
   participants: CallParticipant[];
   participantVolumes: Record<string, number>;
+  screenSharing: boolean;
   startedAt: number;
   status:
     | 'connecting'

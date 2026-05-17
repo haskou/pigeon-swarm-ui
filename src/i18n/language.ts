@@ -14,9 +14,7 @@ export function getInitialLanguage(): AppLanguage {
 
   if (isAppLanguage(storedLanguage)) return storedLanguage;
 
-  const browserLanguage = window.navigator.language
-    .split('-')[0]
-    .toLowerCase();
+  const browserLanguage = window.navigator.language.split('-')[0].toLowerCase();
 
   return isAppLanguage(browserLanguage) ? browserLanguage : fallbackLanguage;
 }

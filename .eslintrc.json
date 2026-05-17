@@ -19,7 +19,10 @@
     "plugin:prettier/recommended"
   ],
   "parserOptions": {
-    "project": ["./tsconfig.json", "./tsconfig.jest.json"],
+    "project": [
+      "./tsconfig.json",
+      "./tsconfig.jest.json"
+    ],
     "sourceType": "module"
   },
   "rules": {
@@ -35,12 +38,21 @@
       {
         "blankLine": "always",
         "prev": "import",
-        "next": ["class", "export", "const", "let", "var"]
+        "next": [
+          "class",
+          "export",
+          "const",
+          "let",
+          "var"
+        ]
       },
       {
         "blankLine": "always",
         "prev": "*",
-        "next": ["return", "if"]
+        "next": [
+          "return",
+          "if"
+        ]
       }
     ],
     "no-extra-boolean-cast": "error",
@@ -48,13 +60,22 @@
     "@typescript-eslint/naming-convention": [
       "error",
       {
-        "selector": ["variable", "function"],
-        "format": ["camelCase", "PascalCase"],
+        "selector": [
+          "variable",
+          "function"
+        ],
+        "format": [
+          "camelCase",
+          "PascalCase",
+          "UPPER_CASE"
+        ],
         "leadingUnderscore": "allow"
       },
       {
         "selector": "interface",
-        "format": ["PascalCase"],
+        "format": [
+          "PascalCase"
+        ],
         "custom": {
           "regex": "^[A-Z]",
           "match": true
@@ -86,7 +107,10 @@
     "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-unsafe-argument": "warn",
-    "max-classes-per-file": ["error", 1],
+    "max-classes-per-file": [
+      "error",
+      1
+    ],
     "no-multiple-empty-lines": [
       1,
       {
@@ -106,7 +130,9 @@
     "@typescript-eslint/explicit-member-accessibility": [
       "error",
       {
-        "ignoredMethodNames": ["constructor"],
+        "ignoredMethodNames": [
+          "constructor"
+        ],
         "accessibility": "explicit"
       }
     ],
@@ -133,12 +159,18 @@
     ],
     "no-unused-labels": "error",
     "object-shorthand": "error",
-    "one-var": ["error", "never"],
+    "one-var": [
+      "error",
+      "never"
+    ],
     "radix": "error",
     "spaced-comment": "error",
     "use-isnan": "error",
     "valid-typeof": "off",
-    "complexity": ["error", 8],
+    "complexity": [
+      "error",
+      8
+    ],
     "@typescript-eslint/member-ordering": [
       "error",
       {
@@ -157,9 +189,18 @@
         ]
       }
     ],
-    "max-params": ["warn", 7],
-    "max-nested-callbacks": ["warn", 2],
-    "max-depth": ["warn", 3],
+    "max-params": [
+      "warn",
+      7
+    ],
+    "max-nested-callbacks": [
+      "warn",
+      2
+    ],
+    "max-depth": [
+      "warn",
+      3
+    ],
     "sonarjs/prefer-single-boolean-return": "error",
     "sonarjs/no-collapsible-if": "error",
     "sonarjs/no-duplicated-branches": "error",
@@ -179,11 +220,16 @@
         "order": "asc"
       }
     ],
-    "sonarjs/cognitive-complexity": ["error", 10],
+    "sonarjs/cognitive-complexity": [
+      "error",
+      10
+    ],
     "@typescript-eslint/explicit-module-boundary-types": [
       "error",
       {
-        "allowedNames": ["toPrimitives"]
+        "allowedNames": [
+          "toPrimitives"
+        ]
       }
     ],
     "no-param-reassign": [
@@ -206,12 +252,41 @@
   },
   "overrides": [
     {
-      "files": ["*.spec.ts"],
+      "files": [
+        "*.spec.ts"
+      ],
       "rules": {
         "no-unsafe-argument": "off",
         "max-statements": "off",
         "max-lines-per-function": "off",
-        "max-nested-callbacks": ["warn", 4]
+        "max-nested-callbacks": [
+          "warn",
+          4
+        ]
+      }
+    },
+    {
+      "files": [
+        "*.d.ts"
+      ],
+      "rules": {
+        "spaced-comment": "off"
+      }
+    },
+    {
+      "files": [
+        "*.tsx"
+      ],
+      "rules": {
+        "@typescript-eslint/explicit-module-boundary-types": "off"
+      }
+    },
+    {
+      "files": [
+        "src/test/HaskouValueObjectsMock.ts"
+      ],
+      "rules": {
+        "max-classes-per-file": "off"
       }
     }
   ]

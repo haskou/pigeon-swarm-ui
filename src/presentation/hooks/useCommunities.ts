@@ -28,6 +28,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
   const reload = useCallback(async () => {
     if (!session) {
       setCommunities([]);
+
       return;
     }
 
