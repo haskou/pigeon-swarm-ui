@@ -87,6 +87,7 @@ export function useCallSession(): {
         .catch((): Record<string, PeerMediaStats> => ({}));
       const remoteStreams = peerManager.remoteMediaStreams();
       const localAudioLevel = mediaManager.localAudioLevel();
+      const screenStream = mediaManager.screenPreviewStream();
 
       if (cancelled) return;
 
@@ -102,6 +103,7 @@ export function useCallSession(): {
             stats,
             remoteStreams,
             localAudioLevel,
+            screenStream,
           ),
           screenSharing: mediaManager.hasScreenShare(),
         };
@@ -417,6 +419,7 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled,
               localPreviewStream: stream ?? undefined,
+              screenStream: mediaManager.screenPreviewStream(),
               screenSharing: mediaManager.hasScreenShare(),
             })
           : active,
@@ -449,6 +452,7 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled: mediaManager.hasCamera(),
               localPreviewStream: stream ?? undefined,
+              screenStream: mediaManager.screenPreviewStream(),
               screenSharing,
             })
           : active,
@@ -612,10 +616,16 @@ function participantsWithMediaState(
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
   localAudioLevel: number,
+  screenStream?: MediaStream,
 ): CallParticipant[] {
   return call.participants.map((participant) =>
     participant.identityId === call.currentIdentityId
-      ? localParticipantWithMediaState(participant, call, localAudioLevel)
+      ? localParticipantWithMediaState(
+          participant,
+          call,
+          localAudioLevel,
+          screenStream,
+        )
       : remoteParticipantWithMediaState(participant, stats, remoteStreams),
   );
 }
@@ -624,12 +634,14 @@ function localParticipantWithMediaState(
   participant: CallParticipant,
   call: CallSession,
   audioLevel: number,
+  screenStream?: MediaStream,
 ): CallParticipant {
   return {
     ...participant,
     audioLevel,
     deafened: call.deafened,
     mediaStream: call.localPreviewStream,
+    screenStream,
     muted: call.muted,
     screenSharing: call.screenSharing,
     speaking: !call.muted && audioLevel > 0.04,
@@ -662,7 +674,7 @@ function localMediaSession(
   media: Pick<
     CallSession,
     'cameraEnabled' | 'localPreviewStream' | 'screenSharing'
-  >,
+  > & { screenStream?: MediaStream },
 ): CallSession {
   return {
     ...call,
@@ -672,6 +684,7 @@ function localMediaSession(
         ? {
             ...participant,
             mediaStream: media.localPreviewStream,
+            screenStream: media.screenStream,
             screenSharing: media.screenSharing,
             videoEnabled: hasVideoTrack(media.localPreviewStream),
           }

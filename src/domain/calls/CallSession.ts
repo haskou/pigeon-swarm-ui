@@ -66,6 +66,7 @@ export type CallParticipant = {
   name: string;
   packetsLost?: number;
   picture?: null | string;
+  screenStream?: MediaStream;
   screenSharing?: boolean;
   speaking?: boolean;
   status?: CallParticipantStatus;

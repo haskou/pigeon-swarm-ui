@@ -8,11 +8,13 @@ import { VideoPreview } from './VideoPreview';
 
 export function ParticipantTile({
   call,
+  onExpandScreen,
   onParticipantVolumeChange,
   onToggleMute,
   participant,
 }: {
   call: CallSession;
+  onExpandScreen?: (participant: CallSession['participants'][number]) => void;
   onParticipantVolumeChange: (
     identityId: string,
     volumePercent: number,
@@ -46,7 +48,7 @@ export function ParticipantTile({
   return (
     <article
       className={cx(
-        'flex h-[310px] w-full max-w-[260px] flex-col items-center overflow-hidden rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:h-[330px] sm:max-w-[280px]',
+        'flex min-h-[310px] w-full max-w-[260px] flex-col items-center rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:min-h-[330px] sm:max-w-[280px]',
         participant.speaking
           ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
           : 'border-white/10',
@@ -55,6 +57,7 @@ export function ParticipantTile({
       <ParticipantMedia
         isCurrentIdentity={isCurrentIdentity}
         name={participantName}
+        onExpandScreen={onExpandScreen}
         participant={participant}
       />
       <div className="mt-2 w-full shrink-0">
@@ -96,16 +99,21 @@ export function ParticipantTile({
 function ParticipantMedia({
   isCurrentIdentity,
   name,
+  onExpandScreen,
   participant,
 }: {
   isCurrentIdentity: boolean;
   name: string;
+  onExpandScreen?: (participant: CallSession['participants'][number]) => void;
   participant: CallSession['participants'][number];
 }) {
   const mediaStream = participant.mediaStream;
   const videoVisible = Boolean(participant.videoEnabled && mediaStream);
+  const canExpandScreen = Boolean(
+    participant.screenSharing && participant.screenStream,
+  );
 
-  return (
+  const media = (
     <div
       className={cx(
         'relative mt-3 grid shrink-0 place-items-center overflow-hidden rounded-2xl',
@@ -114,7 +122,14 @@ function ParticipantMedia({
           : 'h-20 w-20 bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24',
       )}
     >
-      {videoVisible && mediaStream ? (
+      {canExpandScreen && participant.screenStream ? (
+        <VideoPreview
+          fit="contain"
+          label={name}
+          muted={isCurrentIdentity}
+          stream={participant.screenStream}
+        />
+      ) : videoVisible && mediaStream ? (
         <VideoPreview
           label={name}
           muted={isCurrentIdentity}
@@ -135,6 +150,19 @@ function ParticipantMedia({
         </span>
       )}
     </div>
+  );
+
+  if (!canExpandScreen || !onExpandScreen) return media;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onExpandScreen(participant)}
+      className="w-full"
+      title={copy.calls.screen}
+    >
+      {media}
+    </button>
   );
 }
 
@@ -182,7 +210,7 @@ function ParticipantMetrics({
       : String(participant.packetsLost);
 
   return (
-    <dl className="mt-auto grid w-full grid-cols-2 gap-1.5 text-left text-[0.6rem]">
+    <dl className="mt-2 grid w-full grid-cols-3 gap-1.5 text-left text-[0.58rem]">
       <Metric label="Status" value={callParticipantStatus(participant, call)} />
       <Metric label="Latency" value={latencyLabel} />
       <Metric label="Lost" value={packetLossLabel} />
@@ -195,7 +223,6 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div
       className={cx(
         'min-w-0 rounded-xl border border-white/8 bg-white/6 px-2 py-1.5',
-        label === 'Status' && 'col-span-2',
       )}
     >
       <dt className="text-[0.55rem] font-black uppercase text-white/35">

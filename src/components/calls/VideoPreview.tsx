@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 export function VideoPreview({
+  fit = 'cover',
   label,
   muted,
   stream,
 }: {
+  fit?: 'contain' | 'cover';
   label: string;
   muted: boolean;
   stream: MediaStream;
@@ -31,7 +33,11 @@ export function VideoPreview({
       autoPlay
       muted={muted}
       playsInline
-      className="h-full w-full object-cover"
+      className={
+        fit === 'contain'
+          ? 'h-full w-full object-contain'
+          : 'h-full w-full object-cover'
+      }
     />
   );
 }

@@ -157,6 +157,12 @@ export class LocalMediaManager {
     return this.stream ?? undefined;
   }
 
+  public screenPreviewStream(): MediaStream | undefined {
+    return this.screenTrack?.readyState === 'live'
+      ? new MediaStream([this.screenTrack])
+      : undefined;
+  }
+
   public stop(): void {
     logCallDebug('local-media:stop', {
       hadStream: Boolean(this.stream),

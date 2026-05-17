@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { CallSession } from '../../domain/calls/CallSession';
 
@@ -15,6 +15,7 @@ import {
   SpeakerIcon,
 } from './CallIcons';
 import { ParticipantTile } from './ParticipantTile';
+import { VideoPreview } from './VideoPreview';
 
 export function CallStageDialog({
   call,
@@ -44,6 +45,10 @@ export function CallStageDialog({
   onToggleScreenShare: () => void;
   subtitle: string;
 }) {
+  const [expandedScreen, setExpandedScreen] = useState<
+    CallSession['participants'][number] | null
+  >(null);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -73,6 +78,7 @@ export function CallStageDialog({
         <CallStageBody
           call={call}
           dataOpen={dataOpen}
+          onExpandScreen={setExpandedScreen}
           onParticipantVolumeChange={onParticipantVolumeChange}
           onToggleMute={onToggleMute}
         />
@@ -85,6 +91,12 @@ export function CallStageDialog({
           onToggleScreenShare={onToggleScreenShare}
         />
       </section>
+      {expandedScreen?.screenStream && (
+        <ExpandedScreenShare
+          participant={expandedScreen}
+          onClose={() => setExpandedScreen(null)}
+        />
+      )}
     </div>
   );
 }
@@ -142,11 +154,13 @@ function CallStageHeader({
 function CallStageBody({
   call,
   dataOpen,
+  onExpandScreen,
   onParticipantVolumeChange,
   onToggleMute,
 }: {
   call: CallSession;
   dataOpen: boolean;
+  onExpandScreen: (participant: CallSession['participants'][number]) => void;
   onParticipantVolumeChange: (
     identityId: string,
     volumePercent: number,
@@ -165,6 +179,7 @@ function CallStageBody({
           <ParticipantTile
             key={participant.identityId}
             call={call}
+            onExpandScreen={onExpandScreen}
             onParticipantVolumeChange={onParticipantVolumeChange}
             onToggleMute={onToggleMute}
             participant={participant}
@@ -176,6 +191,56 @@ function CallStageBody({
           <CallDataPanel call={call} />
         </div>
       )}
+    </div>
+  );
+}
+
+function ExpandedScreenShare({
+  onClose,
+  participant,
+}: {
+  onClose: () => void;
+  participant: CallSession['participants'][number];
+}) {
+  if (!participant.screenStream) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] bg-black/95 p-4 text-white"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#05060b]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black text-white">
+              {participant.name}
+            </p>
+            <p className="text-xs text-white/45">{copy.calls.screen}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+            aria-label={copy.dialog.close}
+          >
+            x
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 bg-black">
+          <VideoPreview
+            fit="contain"
+            label={`${copy.calls.screen} ${participant.name}`}
+            muted
+            stream={participant.screenStream}
+          />
+        </div>
+      </div>
     </div>
   );
 }

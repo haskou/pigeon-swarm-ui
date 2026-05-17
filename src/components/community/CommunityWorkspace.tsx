@@ -273,6 +273,7 @@ export function CommunityWorkspace({
   const keepChannelBottomUntilRef = useRef(0);
   const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
+  const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const sendQueueRef = useRef(Promise.resolve());
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
@@ -310,9 +311,10 @@ export function CommunityWorkspace({
   }, [memberIdentities]);
 
   useEffect(() => {
+    onCommunityUpdatedRef.current = onCommunityUpdated;
     onChannelSelectedRef.current = onChannelSelected;
     onChannelViewedRef.current = onChannelViewed;
-  }, [onChannelSelected, onChannelViewed]);
+  }, [onChannelSelected, onChannelViewed, onCommunityUpdated]);
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
@@ -348,6 +350,18 @@ export function CommunityWorkspace({
         ? communityMemberIdsKey.split('\u0000')
         : [],
     [communityMemberIdsKey],
+  );
+  const voiceConnectedIdentityIds = useMemo(
+    () =>
+      voiceChannels.flatMap((channel) => channel.connectedIdentityIds ?? []),
+    [voiceChannels],
+  );
+  const identityIdsToLoad = useMemo(
+    () =>
+      Array.from(
+        new Set([...communityMemberIds, ...voiceConnectedIdentityIds]),
+      ),
+    [communityMemberIds, voiceConnectedIdentityIds],
   );
   const openMemberProfile = (
     member: MemberView,
@@ -655,7 +669,7 @@ export function CommunityWorkspace({
     let cancelled = false;
 
     void Promise.all(
-      communityMemberIds.map(async (identityId) => {
+      identityIdsToLoad.map(async (identityId) => {
         try {
           const identity =
             identityId === session.identity.id
@@ -689,7 +703,22 @@ export function CommunityWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [communityMemberIds, session.identity]);
+  }, [identityIdsToLoad, session.identity]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void pigeonApplication
+      .getCommunity(session, community.id)
+      .then((freshCommunity) => {
+        if (!cancelled) onCommunityUpdatedRef.current(freshCommunity);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.id, session]);
 
   useEffect(() => {
     const avatar = community.avatar?.trim();
