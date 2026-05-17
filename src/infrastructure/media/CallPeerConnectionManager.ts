@@ -71,10 +71,8 @@ function isRemoteScreenShareTrack(
   return (
     stream.getAudioTracks().length === 0 &&
     stream.getVideoTracks().length === 1 &&
-    [...remoteStreams.values()].some((remoteStream) =>
-      remoteStream
-        .getVideoTracks()
-        .some((videoTrack) => videoTrack.readyState === 'live'),
+    ![...remoteStreams.values()].some(
+      (remoteStream) => remoteStream.id === stream.id,
     )
   );
 }
@@ -316,6 +314,14 @@ export class CallPeerConnectionManager {
     candidate: RTCIceCandidateInit,
     state: PeerNegotiationState,
   ): Promise<void> {
+    if (state.ignoreOffer) {
+      logCallDebug('peer-manager:handle-signal:drop-ignored-ice-candidate', {
+        senderIdentityId,
+      });
+
+      return;
+    }
+
     if (!peer.remoteDescription) {
       logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
         senderIdentityId,
