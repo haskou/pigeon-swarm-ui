@@ -157,7 +157,7 @@ export const copy = {
     discoverError: 'Communities could not be searched.',
     discoverHint: 'Search private communities visible on your networks.',
     discoverJoin: 'Request to join',
-    discoverJoined: 'Member',
+    discoverJoined: 'Already member',
     discoverLoading: 'Searching communities...',
     discoverPendingInvitation: 'Invited',
     discoverPendingRequest: 'Requested',

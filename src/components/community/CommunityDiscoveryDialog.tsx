@@ -1,4 +1,10 @@
-import { FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
+import {
+  FormEvent,
+  type ReactElement,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -18,7 +24,6 @@ type CommunityDiscoveryDialogProps = {
   headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
-  onCommunityOpen: (communityId: string) => void;
   onJoinRequested: (request: CommunityMembershipRequest) => void;
   session: Session;
 };
@@ -27,7 +32,6 @@ export function CommunityDiscoveryDialog({
   headerControl,
   nodeNetworks,
   onClose,
-  onCommunityOpen,
   onJoinRequested,
   session,
 }: CommunityDiscoveryDialogProps) {
@@ -190,7 +194,6 @@ export function CommunityDiscoveryDialog({
               community={community}
               disabled={joinCommunityId === community.id}
               key={community.id}
-              onOpenCommunity={() => onCommunityOpen(community.id)}
               onRequestJoin={() => void requestJoin(community)}
             />
           ))}
@@ -203,12 +206,10 @@ export function CommunityDiscoveryDialog({
 function CommunityDiscoveryRow({
   community,
   disabled,
-  onOpenCommunity,
   onRequestJoin,
 }: {
   community: CommunityDiscoveryResource;
   disabled: boolean;
-  onOpenCommunity: () => void;
   onRequestJoin: () => void;
 }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -236,7 +237,6 @@ function CommunityDiscoveryRow({
   }, [community.avatar]);
 
   const canRequest = community.membershipStatus === 'none';
-  const canOpen = community.membershipStatus === 'member';
 
   return (
     <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -263,11 +263,11 @@ function CommunityDiscoveryRow({
         </div>
         <button
           type="button"
-          onClick={canOpen ? onOpenCommunity : onRequestJoin}
-          disabled={(!canRequest && !canOpen) || disabled}
+          onClick={onRequestJoin}
+          disabled={!canRequest || disabled}
           className={cx(
             'h-11 shrink-0 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55',
-            canRequest || canOpen
+            canRequest
               ? 'bg-white text-slate-950 hover:bg-cyan-100'
               : 'bg-white/10 text-white/70',
           )}

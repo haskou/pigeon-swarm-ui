@@ -3125,31 +3125,6 @@ export function GlassWorkspace({
           setWorkspaceMode('community');
           setIsCreateCommunityOpen(false);
         }}
-        onCommunityOpen={(communityId) => {
-          const openCommunity = (community: Community) => {
-            setCommunities((current) => [
-              community,
-              ...current.filter((item) => item.id !== community.id),
-            ]);
-            setActiveCommunityId(community.id);
-            setWorkspaceMode('community');
-            setIsCreateCommunityOpen(false);
-          };
-          const existing = communities.find(
-            (community) => community.id === communityId,
-          );
-
-          if (existing) {
-            openCommunity(existing);
-
-            return;
-          }
-
-          void pigeonApplication
-            .getCommunity(sessionRef.current, communityId)
-            .then(openCommunity)
-            .catch(() => onCommunitiesReload());
-        }}
         onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
           setMembershipRequests((current) => [
             request,
