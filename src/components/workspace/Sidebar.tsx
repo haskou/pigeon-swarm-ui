@@ -423,41 +423,6 @@ export function UserProfileDropdown({
     : shortId(session.identity.id);
   const ownPicture =
     identityPictures[session.identity.id] ?? identityPicture(session.identity);
-  const [ownBanner, setOwnBanner] = useState<string | null>(() =>
-    identityBanner(session.identity),
-  );
-
-  useEffect(() => {
-    const directBanner = identityBanner(session.identity);
-
-    if (directBanner) {
-      setOwnBanner(directBanner);
-
-      return;
-    }
-
-    const bannerCid = session.identity.profile.banner?.trim();
-
-    if (!bannerCid) {
-      setOwnBanner(null);
-
-      return;
-    }
-
-    let cancelled = false;
-
-    void loadPublicImage(bannerCid)
-      .then((url) => {
-        if (!cancelled) setOwnBanner(url);
-      })
-      .catch(() => {
-        if (!cancelled) setOwnBanner(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session.identity]);
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -550,41 +515,7 @@ export function UserProfileDropdown({
               : 'bottom-[calc(100%+.5rem)]',
           )}
         >
-          <div className="-m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10">
-            <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
-              {ownBanner && (
-                <img
-                  src={ownBanner}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              )}
-            </div>
-            <div className="relative px-5 pb-5">
-              <div className="-mt-10 flex items-end gap-3">
-                <ProfileAvatar
-                  label={ownDisplayName}
-                  picture={ownPicture}
-                  size="lg"
-                  className="border-4 border-[#1f1f27] shadow-xl shadow-black/35"
-                />
-                <div className="min-w-0 pb-1">
-                  <div className="truncate font-black">{ownProfileName}</div>
-                  <div className="truncate text-xs text-white/45">
-                    {ownProfileHandle}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-3 text-xs">
-            <div className="text-xs text-white/45">
-              {session.identity.profile.biography?.trim() || ''}
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-3 text-xs">
+          <div className="space-y-3 text-xs">
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.identityId}
