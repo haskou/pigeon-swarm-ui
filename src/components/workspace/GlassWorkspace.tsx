@@ -24,6 +24,7 @@ import type {
   ChatMessage,
   AttachmentProgress,
   Community,
+  CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
@@ -57,6 +58,7 @@ import {
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
 import { useCallSession } from '../../presentation/hooks/useCallSession';
+import { useCommunityMembershipRequests } from '../../presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
@@ -106,6 +108,24 @@ type PendingSend = {
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
+
+function canActOnMembershipRequest(
+  request: CommunityMembershipRequest,
+  communities: Community[],
+  currentIdentityId: string,
+): boolean {
+  if (request.status !== 'pending') return false;
+
+  if (request.type === 'invitation') {
+    return request.identityId === currentIdentityId;
+  }
+
+  return communities.some(
+    (community) =>
+      community.id === request.communityId &&
+      community.ownerIdentityId === currentIdentityId,
+  );
+}
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -159,6 +179,7 @@ export function GlassWorkspace({
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
+  const [isDiscoverCommunityOpen, setIsDiscoverCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<
@@ -434,6 +455,27 @@ export function GlassWorkspace({
     onAcceptedPanelClose: closeNotificationsPanel,
     session,
   });
+  const {
+    accept: acceptMembershipRequest,
+    action: membershipRequestAction,
+    decline: declineMembershipRequest,
+    error: membershipRequestError,
+    refresh: refreshMembershipRequests,
+    requests: membershipRequests,
+    setRequests: setMembershipRequests,
+  } = useCommunityMembershipRequests({
+    onCommunitiesReload,
+    session,
+  });
+  const pendingMembershipRequestCount = useMemo(
+    () =>
+      membershipRequests.filter((request) =>
+        canActOnMembershipRequest(request, communities, session.identity.id),
+      ).length,
+    [communities, membershipRequests, session.identity.id],
+  );
+  const inboxNotificationCount =
+    pendingNotificationCount + pendingMembershipRequestCount;
 
   useEffect(() => {
     const communityIds = visibleNotifications
@@ -1408,6 +1450,42 @@ export function GlassWorkspace({
   ]);
 
   useEffect(() => {
+    if (!activeCall || activeCall.status !== 'live') return undefined;
+
+    let failedHeartbeats = 0;
+    let stopped = false;
+
+    const sendHeartbeat = () => {
+      void pigeonApplication
+        .heartbeatCallParticipant(sessionRef.current, activeCall.id)
+        .then(() => {
+          failedHeartbeats = 0;
+        })
+        .catch((caught) => {
+          failedHeartbeats += 1;
+          logCallWarning('workspace:call-heartbeat:failed', {
+            callId: activeCall.id,
+            failedHeartbeats,
+            error: caught,
+          });
+
+          if (!stopped && failedHeartbeats >= 3) {
+            stopped = true;
+            leaveActiveCall();
+          }
+        });
+    };
+
+    sendHeartbeat();
+    const interval = window.setInterval(sendHeartbeat, 2000);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [activeCall?.id, activeCall?.status, leaveActiveCall]);
+
+  useEffect(() => {
     let cancelled = false;
     const identityId = session.identity.id;
 
@@ -2276,6 +2354,16 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type.startsWith('communities.v1.membership_request.')) {
+        void refreshMembershipRequests();
+
+        if (event.type === 'communities.v1.membership_request.was_accepted') {
+          void onCommunitiesReload();
+        }
+
+        return;
+      }
+
       if (event.type === 'communities.v1.channel.message.was_sent') {
         const communityId =
           eventAggregateId(event) ?? stringAttribute(event, 'communityId');
@@ -2656,6 +2744,7 @@ export function GlassWorkspace({
       onCommunitiesReload,
       onPeersReload,
       refreshConversations,
+      refreshMembershipRequests,
       refreshNotifications,
       refreshSession,
       realtimeEventsOpen,
@@ -2734,13 +2823,14 @@ export function GlassWorkspace({
           communities={communities}
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
-          notificationCount={pendingNotificationCount}
+          notificationCount={inboxNotificationCount}
           onCommunityClick={(communityId) => {
             setActiveCommunityId(communityId);
             setWorkspaceMode('community');
             setSidebarOpen(false);
           }}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+          onDiscoverCommunitiesClick={() => setIsDiscoverCommunityOpen(true)}
           onMessagesClick={() => {
             setWorkspaceMode('messages');
             setSidebarOpen(false);
@@ -2766,13 +2856,16 @@ export function GlassWorkspace({
                   communities={communities}
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
-                  notificationCount={pendingNotificationCount}
+                  notificationCount={inboxNotificationCount}
                   onCommunityClick={(communityId) => {
                     setActiveCommunityId(communityId);
                     setWorkspaceMode('community');
                     setSidebarOpen(false);
                   }}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                  onDiscoverCommunitiesClick={() =>
+                    setIsDiscoverCommunityOpen(true)
+                  }
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');
                     setSidebarOpen(false);
@@ -2905,13 +2998,16 @@ export function GlassWorkspace({
                 communities={communities}
                 communityUnreadCounts={communityUnreadCounts}
                 messageNotificationCount={unreadMessageCount}
-                notificationCount={pendingNotificationCount}
+                notificationCount={inboxNotificationCount}
                 onCommunityClick={(communityId) => {
                   setActiveCommunityId(communityId);
                   setWorkspaceMode('community');
                   setSidebarOpen(false);
                 }}
                 onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                onDiscoverCommunitiesClick={() =>
+                  setIsDiscoverCommunityOpen(true)
+                }
                 onMessagesClick={() => {
                   setWorkspaceMode('messages');
                   setSidebarOpen(false);
@@ -3001,6 +3097,10 @@ export function GlassWorkspace({
         inspectorOpen={inspectorOpen}
         isCreateCommunityOpen={isCreateCommunityOpen}
         isCreateOpen={isCreateOpen}
+        isDiscoverCommunityOpen={isDiscoverCommunityOpen}
+        membershipRequestAction={membershipRequestAction}
+        membershipRequestError={membershipRequestError}
+        membershipRequests={membershipRequests}
         messageContextMenu={messageContextMenu}
         messages={messages}
         node={node}
@@ -3021,6 +3121,7 @@ export function GlassWorkspace({
         }
         onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
         onCloseCreateConversation={() => setIsCreateOpen(false)}
+        onCloseDiscoverCommunity={() => setIsDiscoverCommunityOpen(false)}
         onCloseInspector={() => setInspectorOpen(false)}
         onCloseMessageContextMenu={() => setMessageContextMenu(null)}
         onCloseNodeSettings={() => setNodeSettingsOpen(false)}
@@ -3034,8 +3135,21 @@ export function GlassWorkspace({
           setWorkspaceMode('community');
           setIsCreateCommunityOpen(false);
         }}
+        onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
+          setMembershipRequests((current) => [
+            request,
+            ...current.filter((item) => item.id !== request.id),
+          ]);
+          setIsDiscoverCommunityOpen(false);
+        }}
         onConversationCreated={handleConversationCreated}
+        onAcceptMembershipRequest={(requestId) =>
+          void acceptMembershipRequest(requestId)
+        }
         onDeclineIncomingCall={declineIncomingCall}
+        onDeclineMembershipRequest={(requestId) =>
+          void declineMembershipRequest(requestId)
+        }
         onDeclineNotification={(notificationId) =>
           void declineNotification(notificationId)
         }

@@ -229,6 +229,38 @@ export type Community = {
   createdAt: number;
 };
 
+export type CommunityMembershipRequestStatus =
+  | 'accepted'
+  | 'declined'
+  | 'pending';
+
+export type CommunityMembershipRequestType = 'invitation' | 'request';
+
+export type CommunityMembershipRequest = {
+  id: string;
+  communityId: string;
+  creatorIdentityId: string;
+  identityId: string;
+  type: CommunityMembershipRequestType;
+  status: CommunityMembershipRequestStatus;
+  createdAt: number | string;
+  updatedAt: number | string;
+};
+
+export type CommunityDiscoveryResource = {
+  id: string;
+  networkId: string;
+  ownerIdentityId: string;
+  name: string;
+  description: string;
+  avatar?: string | null;
+  banner?: string | null;
+  memberCount: number;
+  membershipStatus: 'invited' | 'member' | 'none' | 'requested';
+  membershipRequest?: CommunityMembershipRequest;
+  visibility: 'private';
+};
+
 export type MessageResource = {
   attachmentExternalIdentifiers?: string[];
   id?: string;

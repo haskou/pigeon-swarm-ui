@@ -2016,7 +2016,6 @@ export function CommunityWorkspace({
         <AddCommunityMemberDialog
           communityId={community.id}
           onClose={() => setMemberOpen(false)}
-          onCommunityUpdated={onCommunityUpdated}
           onSessionUpdated={onSessionUpdated}
           session={session}
         />

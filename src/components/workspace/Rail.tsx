@@ -17,6 +17,7 @@ interface RailProps {
   notificationCount?: number;
   onCommunityClick?: (communityId: string) => void;
   onCreateCommunityClick?: () => void;
+  onDiscoverCommunitiesClick?: () => void;
   onInspectorClick?: () => void;
   onMessagesClick?: () => void;
   onNotificationsClick?: () => void;
@@ -35,6 +36,7 @@ export function Rail({
   notificationCount = 0,
   onCommunityClick,
   onCreateCommunityClick,
+  onDiscoverCommunitiesClick,
   onInspectorClick,
   onMessagesClick,
   onNotificationsClick,
@@ -105,6 +107,36 @@ export function Rail({
           {copy.communities.createTooltip}
         </span>
       </button>
+      {onDiscoverCommunitiesClick && (
+        <button
+          type="button"
+          onClick={onDiscoverCommunitiesClick}
+          className="group relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white"
+          aria-label={copy.communities.discover}
+          title={copy.communities.discover}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <path
+              d="m10.5 13.5-2 2 2-6 6-2-2 6-4 0Z"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+          </svg>
+          <span className="sr-only">{copy.communities.discover}</span>
+        </button>
+      )}
       <button
         type="button"
         onClick={onNotificationsClick}

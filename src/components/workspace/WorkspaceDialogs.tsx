@@ -9,6 +9,7 @@ import type {
 import type {
   ChatMessage,
   Community,
+  CommunityMembershipRequest,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -19,6 +20,7 @@ import type { RealtimeDomainEvent } from '../../infrastructure/realtime/Realtime
 import { copy } from '../../i18n/en';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
+import { CommunityDiscoveryDialog } from '../community/CommunityDiscoveryDialog';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { Inspector } from './Inspector';
 import {
@@ -49,6 +51,10 @@ interface WorkspaceDialogsProps {
   inspectorOpen: boolean;
   isCreateCommunityOpen: boolean;
   isCreateOpen: boolean;
+  isDiscoverCommunityOpen: boolean;
+  membershipRequestAction: 'accept' | 'decline' | 'refresh' | null;
+  membershipRequestError: string | null;
+  membershipRequests: CommunityMembershipRequest[];
   messageContextMenu: MessageContextMenuState | null;
   messages: ChatMessage[];
   node: { id: string; owner: null | string } | null;
@@ -67,6 +73,7 @@ interface WorkspaceDialogsProps {
   onAcceptNotification: (notification: NotificationResource) => void;
   onCloseCreateCommunity: () => void;
   onCloseCreateConversation: () => void;
+  onCloseDiscoverCommunity: () => void;
   onCloseInspector: () => void;
   onCloseMessageContextMenu: () => void;
   onCloseNodeSettings: () => void;
@@ -77,11 +84,14 @@ interface WorkspaceDialogsProps {
     community: Community;
     session: Session;
   }) => void;
+  onCommunityJoinRequested: (request: CommunityMembershipRequest) => void;
   onConversationCreated: (
     nextSession: Session,
     conversation: ConversationResource,
   ) => void;
   onDeclineIncomingCall: () => void;
+  onDeclineMembershipRequest: (requestId: string) => void;
+  onAcceptMembershipRequest: (requestId: string) => void;
   onDeclineNotification: (notificationId: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
@@ -100,6 +110,7 @@ export function WorkspaceDialogs(props: WorkspaceDialogsProps): ReactElement {
       <MobileInspectorDialog {...props} />
       <MessageActionDialogs {...props} />
       <CreateDialogs {...props} />
+      <DiscoverCommunityDialog {...props} />
       <WorkspaceNotificationDialog {...props} />
       <NodeSettingsOverlay {...props} />
       <RealtimeEventsOverlay {...props} />
@@ -201,6 +212,21 @@ function CreateDialogs(props: WorkspaceDialogsProps): ReactElement | null {
   );
 }
 
+function DiscoverCommunityDialog(
+  props: WorkspaceDialogsProps,
+): ReactElement | null {
+  if (!props.isDiscoverCommunityOpen) return null;
+
+  return (
+    <CommunityDiscoveryDialog
+      nodeNetworks={props.nodeNetworks}
+      onClose={props.onCloseDiscoverCommunity}
+      onJoinRequested={props.onCommunityJoinRequested}
+      session={props.session}
+    />
+  );
+}
+
 function WorkspaceNotificationDialog(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
@@ -213,14 +239,20 @@ function WorkspaceNotificationDialog(
       communityAvatarUrls={props.communityAvatarUrls}
       communityPreviews={props.communityPreviews}
       conversations={props.conversations}
+      currentIdentityId={props.session.identity.id}
       error={props.notificationError}
       identityNames={props.identityNames}
       identityPictures={props.identityPictures}
       identityProfiles={props.identityProfiles}
+      membershipAction={props.membershipRequestAction}
+      membershipError={props.membershipRequestError}
+      membershipRequests={props.membershipRequests}
       notifications={props.visibleNotifications}
+      onAcceptMembershipRequest={props.onAcceptMembershipRequest}
       onAccept={props.onAcceptNotification}
       onArchive={props.archiveNotification}
       onClose={props.onCloseNotifications}
+      onDeclineMembershipRequest={props.onDeclineMembershipRequest}
       onDecline={props.onDeclineNotification}
     />
   );

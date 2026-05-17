@@ -20,7 +20,10 @@ import type {
   ChatMessage,
   Community,
   CommunityChannel,
+  CommunityDiscoveryResource,
   CommunityInviteLinkResource,
+  CommunityMembershipRequest,
+  CommunityMembershipRequestStatus,
   CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -256,6 +259,13 @@ export class PigeonApiGateway {
     await this.calls.leave(session, callId);
   }
 
+  public async heartbeatCallParticipant(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.calls.heartbeat(session, callId);
+  }
+
   public async endCall(session: Session, callId: string): Promise<void> {
     await this.calls.end(session, callId);
   }
@@ -292,6 +302,28 @@ export class PigeonApiGateway {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
+  }
+
+  public async discoverCommunities(
+    session: Session,
+    input: { networkId?: string; query?: string },
+  ): Promise<CommunityDiscoveryResource[]> {
+    const path = '/communities/discover';
+    const query = new URLSearchParams();
+    const body = {};
+
+    if (input.query?.trim()) query.set('query', input.query.trim());
+
+    if (input.networkId?.trim()) query.set('networkId', input.networkId.trim());
+
+    const result = await this.http.request<{
+      communities: CommunityDiscoveryResource[];
+    }>(`${path}${query.size > 0 ? `?${query.toString()}` : ''}`, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+
+    return result.communities;
   }
 
   public async createCommunity(
@@ -351,14 +383,61 @@ export class PigeonApiGateway {
     session: Session,
     communityId: string,
     identityId: string,
-  ): Promise<void> {
+  ): Promise<CommunityMembershipRequest> {
     const path = `/communities/${encodeURIComponent(communityId)}/members`;
     const body = { identityId };
 
-    await this.http.request(path, {
+    return await this.http.request<CommunityMembershipRequest>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
+    });
+  }
+
+  public async createCommunityJoinRequest(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityMembershipRequest> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/join-requests`;
+    const body = {};
+
+    return await this.http.request<CommunityMembershipRequest>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async listCommunityMembershipRequests(
+    session: Session,
+  ): Promise<CommunityMembershipRequest[]> {
+    const path = '/communities/membership-requests';
+    const result = await this.http.request<{
+      requests: CommunityMembershipRequest[];
+    }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.requests;
+  }
+
+  public async updateCommunityMembershipRequest(
+    session: Session,
+    requestId: string,
+    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
+  ): Promise<CommunityMembershipRequest> {
+    const path = `/communities/membership-requests/${encodeURIComponent(
+      requestId,
+    )}`;
+    const body = { status };
+
+    return await this.http.request<CommunityMembershipRequest>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
     });
   }
 
