@@ -11,7 +11,10 @@ import type {
   ChatMessage,
   Community,
   CommunityChannel,
+  CommunityDiscoveryResource,
   CommunityInviteLinkResource,
+  CommunityMembershipRequest,
+  CommunityMembershipRequestStatus,
   CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -196,6 +199,13 @@ export class PigeonApplication {
     await this.gateway.leaveCall(session, callId);
   }
 
+  public async heartbeatCallParticipant(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.gateway.heartbeatCallParticipant(session, callId);
+  }
+
   public async endCall(session: Session, callId: string): Promise<void> {
     await this.gateway.endCall(session, callId);
   }
@@ -255,6 +265,13 @@ export class PigeonApplication {
     communityId: string,
   ): Promise<Community> {
     return await this.gateway.getCommunity(session, communityId);
+  }
+
+  public async discoverCommunities(
+    session: Session,
+    input: { networkId?: string; query?: string },
+  ): Promise<CommunityDiscoveryResource[]> {
+    return await this.gateway.discoverCommunities(session, input);
   }
 
   public async createCommunity(
@@ -359,8 +376,37 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     identityId: string,
-  ): Promise<void> {
-    await this.gateway.addCommunityMember(session, communityId, identityId);
+  ): Promise<CommunityMembershipRequest> {
+    return await this.gateway.addCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
+  public async createCommunityJoinRequest(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityMembershipRequest> {
+    return await this.gateway.createCommunityJoinRequest(session, communityId);
+  }
+
+  public async listCommunityMembershipRequests(
+    session: Session,
+  ): Promise<CommunityMembershipRequest[]> {
+    return await this.gateway.listCommunityMembershipRequests(session);
+  }
+
+  public async updateCommunityMembershipRequest(
+    session: Session,
+    requestId: string,
+    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
+  ): Promise<CommunityMembershipRequest> {
+    return await this.gateway.updateCommunityMembershipRequest(
+      session,
+      requestId,
+      status,
+    );
   }
 
   public async leaveCommunity(

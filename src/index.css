@@ -15,6 +15,14 @@ body {
 }
 button, input, textarea { font: inherit; }
 
+button,
+[role="button"],
+input[type="button"],
+input[type="reset"],
+input[type="submit"] {
+  user-select: none;
+}
+
 * {
   scrollbar-color: rgba(217, 70, 239, .7) rgba(255, 255, 255, .06);
   scrollbar-width: thin;

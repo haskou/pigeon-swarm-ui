@@ -1,5 +1,6 @@
 import type {
   Community,
+  CommunityMembershipRequest,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -22,15 +23,21 @@ interface NotificationsPanelProps {
   communityAvatarUrls: Record<string, string>;
   communityPreviews: Record<string, Community>;
   conversations: ConversationResource[];
+  currentIdentityId: string;
   error: string | null;
   notifications: NotificationResource[];
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
+  membershipAction: NotificationAction | null;
+  membershipError: string | null;
+  membershipRequests: CommunityMembershipRequest[];
   onAccept: (notification: NotificationResource) => void;
+  onAcceptMembershipRequest: (requestId: string) => void;
   onArchive: (notificationId: string) => void;
   onClose: () => void;
   onDecline: (notificationId: string) => void;
+  onDeclineMembershipRequest: (requestId: string) => void;
 }
 
 function notificationTitle(notification: NotificationResource): string {
@@ -79,16 +86,26 @@ export function NotificationsPanel({
   communityAvatarUrls,
   communityPreviews,
   conversations,
+  currentIdentityId,
   error,
   identityNames,
   identityPictures,
   identityProfiles,
+  membershipAction,
+  membershipError,
+  membershipRequests,
   notifications,
   onAccept,
+  onAcceptMembershipRequest,
   onArchive,
   onClose,
   onDecline,
+  onDeclineMembershipRequest,
 }: NotificationsPanelProps) {
+  const pendingMembershipRequests = membershipRequests.filter(
+    (request) => request.status === 'pending',
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
@@ -117,18 +134,31 @@ export function NotificationsPanel({
           </button>
         </div>
 
-        {error && (
+        {(error || membershipError) && (
           <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm text-rose-100">
-            {error}
+            {error ?? membershipError}
           </div>
         )}
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-          {notifications.length === 0 && (
+          {notifications.length === 0 && pendingMembershipRequests.length === 0 && (
             <div className="rounded-2xl border border-white/10 bg-white/7 p-4 text-sm text-white/55">
               {copy.notifications.empty}
             </div>
           )}
+
+          {pendingMembershipRequests.map((request) => (
+            <MembershipRequestCard
+              communities={communities}
+              identityNames={identityNames}
+              currentIdentityId={currentIdentityId}
+              key={request.id}
+              onAccept={() => onAcceptMembershipRequest(request.id)}
+              onDecline={() => onDeclineMembershipRequest(request.id)}
+              request={request}
+              working={membershipAction === 'accept' || membershipAction === 'decline'}
+            />
+          ))}
 
           {notifications.map((notification) => {
             const target = notificationTarget(notification);
@@ -265,6 +295,97 @@ function PreviewAvatar({ preview }: { preview: NotificationPreview }) {
         preview.title.slice(0, 1).toUpperCase()
       )}
     </div>
+  );
+}
+
+function MembershipRequestCard({
+  communities,
+  currentIdentityId,
+  identityNames,
+  onAccept,
+  onDecline,
+  request,
+  working,
+}: {
+  communities: Community[];
+  currentIdentityId: string;
+  identityNames: IdentityNames;
+  onAccept: () => void;
+  onDecline: () => void;
+  request: CommunityMembershipRequest;
+  working: boolean;
+}) {
+  const community = communities.find((item) => item.id === request.communityId);
+  const actorIdentityId =
+    request.type === 'request' ? request.identityId : request.creatorIdentityId;
+  const title =
+    request.type === 'request'
+      ? copy.notifications.communityJoinRequestTitle
+      : copy.notifications.communityMembershipInvitationTitle;
+  const actorLabel =
+    request.type === 'request'
+      ? copy.notifications.requestedBy
+      : copy.notifications.invitedBy;
+  const canRespond =
+    request.type === 'invitation'
+      ? request.identityId === currentIdentityId
+      : community?.ownerIdentityId === currentIdentityId;
+
+  return (
+    <article className="rounded-2xl border border-cyan-200/15 bg-cyan-300/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-black text-white">{title}</h3>
+          <p className="mt-1 text-sm text-white/55">
+            {actorLabel}{' '}
+            <span className="font-semibold text-white/75">
+              {identityDisplayName(actorIdentityId, identityNames)}
+            </span>
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-cyan-300/15 px-2.5 py-1 text-xs font-black text-cyan-100">
+          {copy.notifications.states[request.status]}
+        </span>
+      </div>
+
+      <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
+        <div className="flex items-center justify-between gap-3">
+          <span>{copy.notifications.community}</span>
+          <span className="truncate font-semibold text-white/70">
+            {community?.name ?? shortId(request.communityId)}
+          </span>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span>{copy.notifications.createdAt}</span>
+          <span className="font-semibold text-white/70">
+            {formatTime(request.createdAt)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {canRespond && (
+          <>
+            <button
+              type="button"
+              onClick={onAccept}
+              disabled={working}
+              className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
+            >
+              {copy.notifications.accept}
+            </button>
+            <button
+              type="button"
+              onClick={onDecline}
+              disabled={working}
+              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
+            >
+              {copy.notifications.decline}
+            </button>
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 

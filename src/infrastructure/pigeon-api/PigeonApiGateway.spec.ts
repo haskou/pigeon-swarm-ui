@@ -122,6 +122,158 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('discovers communities with signed query metadata', async () => {
+    const response = {
+      communities: [
+        {
+          description: 'Description',
+          id: 'community-1',
+          memberCount: 2,
+          membershipStatus: 'none',
+          name: 'Community',
+          networkId: 'network-1',
+          ownerIdentityId: 'identity-2',
+          visibility: 'private',
+        },
+      ],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.discoverCommunities(session, {
+        networkId: 'network-1',
+        query: 'com',
+      }),
+    ).resolves.toBe(response.communities);
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/communities/discover',
+      {},
+    );
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/discover?query=com&networkId=network-1',
+      {
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('creates community join requests', async () => {
+    const request = {
+      communityId: 'community-1',
+      createdAt: 1,
+      creatorIdentityId: 'identity-1',
+      id: 'request-1',
+      identityId: 'identity-1',
+      status: 'pending',
+      type: 'request',
+      updatedAt: 1,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(request),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.createCommunityJoinRequest(session, 'community-1'),
+    ).resolves.toBe(request);
+
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/community-1/join-requests',
+      {
+        body: JSON.stringify({}),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+  });
+
+  it('updates community membership requests', async () => {
+    const request = {
+      communityId: 'community-1',
+      createdAt: 1,
+      creatorIdentityId: 'identity-1',
+      id: 'request-1',
+      identityId: 'identity-2',
+      status: 'accepted',
+      type: 'invitation',
+      updatedAt: 2,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(request),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-2' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.updateCommunityMembershipRequest(
+        session,
+        'request-1',
+        'accepted',
+      ),
+    ).resolves.toBe(request);
+
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/membership-requests/request-1',
+      {
+        body: JSON.stringify({ status: 'accepted' }),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'PATCH',
+      },
+    );
+  });
+
+  it('sends call participant heartbeat', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await gateway.heartbeatCallParticipant(session, 'call-1');
+
+    expect(http.request).toHaveBeenCalledWith(
+      '/calls/call-1/participants/me/heartbeat',
+      {
+        body: JSON.stringify({}),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+  });
+
   it('leaves communities with a signed member request', async () => {
     const community = {
       createdAt: 1,

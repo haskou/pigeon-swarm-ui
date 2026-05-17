@@ -1,6 +1,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  type ReactElement,
   useEffect,
   useMemo,
   useRef,
@@ -17,6 +18,7 @@ import { GlassSelect } from '../common/GlassSelect';
 import { ImageCropEditor } from '../common/ImageCropEditor';
 
 interface CreateCommunityDialogProps {
+  headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
   onCreated: (input: { community: Community; session: Session }) => void;
@@ -29,6 +31,7 @@ type InitialChannelDraft = {
 };
 
 export function CreateCommunityDialog({
+  headerControl,
   nodeNetworks,
   onClose,
   onCreated,
@@ -201,131 +204,137 @@ export function CreateCommunityDialog({
             ×
           </button>
         </div>
+        {headerControl}
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
-            <div className="overflow-hidden rounded-2xl bg-black/25">
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
-                aria-label={copy.communities.banner}
-              >
-                {bannerPreview ? (
-                  <img
-                    src={bannerPreview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
-                    {name.slice(0, 1).toUpperCase() || 'C'}
-                  </span>
-                )}
-                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                  ✎
-                </span>
-              </button>
-              <div className="relative px-4 pb-4">
+            <div className="grid gap-4">
+              <div className="overflow-hidden rounded-2xl bg-black/25">
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
-                  aria-label={copy.communities.avatar}
+                  onClick={() => bannerInputRef.current?.click()}
+                  className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                  aria-label={copy.communities.banner}
                 >
-                  {avatarPreview ? (
+                  {bannerPreview ? (
                     <img
-                      src={avatarPreview}
+                      src={bannerPreview}
                       alt=""
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    name.slice(0, 1).toUpperCase() || 'C'
+                    <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
+                      {name.slice(0, 1).toUpperCase() || 'C'}
+                    </span>
                   )}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
                     ✎
                   </span>
                 </button>
-                <div className="mt-4 grid gap-3">
-                  <input
-                    aria-label={copy.communities.name}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.communities.namePlaceholder}
-                    autoComplete="off"
-                  />
-                  <textarea
-                    aria-label={copy.communities.description}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.communities.descriptionPlaceholder}
-                  />
+                <div className="relative px-4 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                    aria-label={copy.communities.avatar}
+                  >
+                    {avatarPreview ? (
+                      <img
+                        src={avatarPreview}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      name.slice(0, 1).toUpperCase() || 'C'
+                    )}
+                    <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                      ✎
+                    </span>
+                  </button>
+                  <div className="mt-4 grid gap-3">
+                    <input
+                      aria-label={copy.communities.name}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                      placeholder={copy.communities.namePlaceholder}
+                      autoComplete="off"
+                    />
+                    <textarea
+                      aria-label={copy.communities.description}
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                      placeholder={copy.communities.descriptionPlaceholder}
+                    />
+                  </div>
                 </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="sr-only"
+                />
+                <input
+                  ref={bannerInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBannerChange}
+                  className="sr-only"
+                />
               </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="sr-only"
-              />
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleBannerChange}
-                className="sr-only"
-              />
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.communities.network}
+                </div>
+                <GlassSelect
+                  ariaLabel={copy.communities.network}
+                  value={networkId}
+                  onChange={setNetworkId}
+                  options={networkOptions}
+                />
+                <p className="mt-3 text-xs leading-relaxed text-white/45">
+                  {copy.communities.createBody}
+                </p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.network}
-              </div>
-              <GlassSelect
-                ariaLabel={copy.communities.network}
-                value={networkId}
-                onChange={setNetworkId}
-                options={networkOptions}
-              />
-              <p className="mt-3 text-xs leading-relaxed text-white/45">
-                {copy.communities.createBody}
-              </p>
-            </div>
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.communities.initialChannels}
               </div>
               <p className="mt-2 text-xs leading-relaxed text-white/45">
                 {copy.communities.initialChannelsBody}
               </p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-4 flex flex-col gap-2">
                 <input
                   value={channelName}
                   onChange={(event) => setChannelName(event.target.value)}
                   className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                   placeholder={copy.communities.initialChannelName}
                 />
-                <GlassSelect
-                  ariaLabel={copy.communities.channels}
-                  value={channelType}
-                  onChange={(value) =>
-                    setChannelType(value === 'voice' ? 'voice' : 'text')
-                  }
-                  options={[
-                    { label: 'Text', value: 'text' },
-                    { label: 'Voice', value: 'voice' },
-                  ]}
-                />
-                <button
-                  type="button"
-                  onClick={addChannel}
-                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15"
-                >
-                  {copy.communities.addInitialChannel}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <GlassSelect
+                    ariaLabel={copy.communities.channels}
+                    value={channelType}
+                    onChange={(value) =>
+                      setChannelType(value === 'voice' ? 'voice' : 'text')
+                    }
+                    options={[
+                      { label: 'Text', value: 'text' },
+                      { label: 'Voice', value: 'voice' },
+                    ]}
+                  />
+                  <button
+                    type="button"
+                    onClick={addChannel}
+                    className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15"
+                  >
+                    {copy.communities.addInitialChannel}
+                  </button>
+                </div>
               </div>
               {channels.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">

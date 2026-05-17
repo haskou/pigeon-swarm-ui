@@ -44,10 +44,16 @@ type PeerNegotiationState = {
   polite: boolean;
 };
 
+type DescriptionSignalPayload = RTCSessionDescriptionInit & {
+  screenTrackIds?: string[];
+};
+
 function descriptionPayload(
   description: RTCSessionDescriptionInit,
+  screenTrackIds: string[],
 ): Record<string, unknown> {
   return {
+    screenTrackIds,
     sdp: description.sdp,
     type: description.type,
   };
@@ -59,24 +65,15 @@ function isScreenShareTrack(track: MediaStreamTrack): boolean {
 
 function isRemoteScreenShareTrack(
   track: MediaStreamTrack,
-  stream: MediaStream,
-  remoteStreams: Map<string, MediaStream>,
+  remoteScreenTrackIds: Set<string>,
 ): boolean {
   if (track.kind !== 'video') return false;
 
+  if (remoteScreenTrackIds.has(track.id)) return true;
+
   if (isScreenShareTrack(track)) return true;
 
-  if (/screen|display|window|tab|monitor/i.test(track.label)) return true;
-
-  return (
-    stream.getAudioTracks().length === 0 &&
-    stream.getVideoTracks().length === 1 &&
-    [...remoteStreams.values()].some((remoteStream) =>
-      remoteStream
-        .getVideoTracks()
-        .some((videoTrack) => videoTrack.readyState === 'live'),
-    )
-  );
+  return /screen|display|window|tab|monitor/i.test(track.label);
 }
 
 export class CallPeerConnectionManager {
@@ -103,6 +100,8 @@ export class CallPeerConnectionManager {
   private readonly remoteStreams = new Map<string, MediaStream>();
 
   private readonly remoteScreenStreams = new Map<string, MediaStream>();
+
+  private readonly remoteScreenTrackIds = new Map<string, Set<string>>();
 
   private localStream: MediaStream | null = null;
 
@@ -216,7 +215,11 @@ export class CallPeerConnectionManager {
       logCallDebug('peer-manager:ensure-peer:send-offer', {
         peerIdentityId,
       });
-      await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+      await sendSignal(
+        peerIdentityId,
+        'offer',
+        descriptionPayload(offer, this.localScreenTrackIds()),
+      );
     } finally {
       state.makingOffer = false;
     }
@@ -257,7 +260,7 @@ export class CallPeerConnectionManager {
     await this.handleDescriptionSignal(
       senderIdentityId,
       peer,
-      payload as unknown as RTCSessionDescriptionInit,
+      payload as unknown as DescriptionSignalPayload,
       state,
       sendSignal,
     );
@@ -287,6 +290,7 @@ export class CallPeerConnectionManager {
     this.remoteAudioVolumes.clear();
     this.remoteStreams.clear();
     this.remoteScreenStreams.clear();
+    this.remoteScreenTrackIds.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
     this.deafened = false;
@@ -316,6 +320,14 @@ export class CallPeerConnectionManager {
     candidate: RTCIceCandidateInit,
     state: PeerNegotiationState,
   ): Promise<void> {
+    if (state.ignoreOffer) {
+      logCallDebug('peer-manager:handle-signal:drop-ignored-ice-candidate', {
+        senderIdentityId,
+      });
+
+      return;
+    }
+
     if (!peer.remoteDescription) {
       logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
         senderIdentityId,
@@ -340,7 +352,7 @@ export class CallPeerConnectionManager {
   private async handleDescriptionSignal(
     senderIdentityId: string,
     peer: RTCPeerConnection,
-    payload: RTCSessionDescriptionInit,
+    payload: DescriptionSignalPayload,
     state: PeerNegotiationState,
     sendSignal: SignalSender,
   ): Promise<void> {
@@ -358,7 +370,9 @@ export class CallPeerConnectionManager {
     }
 
     await peer.setRemoteDescription(description);
+    this.rememberRemoteScreenTrackIds(senderIdentityId, payload.screenTrackIds);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
+      screenTrackCount: payload.screenTrackIds?.length ?? 0,
       senderIdentityId,
       signalType: description.type,
     });
@@ -372,7 +386,11 @@ export class CallPeerConnectionManager {
     logCallDebug('peer-manager:handle-signal:send-answer', {
       senderIdentityId,
     });
-    await sendSignal(senderIdentityId, 'answer', descriptionPayload(answer));
+    await sendSignal(
+      senderIdentityId,
+      'answer',
+      descriptionPayload(answer, this.localScreenTrackIds()),
+    );
   }
 
   private async acceptRemoteDescription(
@@ -526,6 +544,25 @@ export class CallPeerConnectionManager {
     return this.localStream ?? new MediaStream([track]);
   }
 
+  private localScreenTrackIds(): string[] {
+    return (
+      this.localStream
+        ?.getVideoTracks()
+        .filter((track) => isScreenShareTrack(track))
+        .map((track) => track.id) ?? []
+    );
+  }
+
+  private rememberRemoteScreenTrackIds(
+    peerIdentityId: string,
+    screenTrackIds?: string[],
+  ): void {
+    this.remoteScreenTrackIds.set(
+      peerIdentityId,
+      new Set(screenTrackIds ?? []),
+    );
+  }
+
   private configureNegotiationState(
     peerIdentityId: string,
     polite: boolean,
@@ -558,7 +595,12 @@ export class CallPeerConnectionManager {
     const [receivedStream] = event.streams;
     const stream = receivedStream ?? new MediaStream([event.track]);
 
-    if (isRemoteScreenShareTrack(event.track, stream, this.remoteStreams)) {
+    if (
+      isRemoteScreenShareTrack(
+        event.track,
+        this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
+      )
+    ) {
       const screenStream = new MediaStream([event.track]);
 
       this.remoteScreenStreams.set(peerIdentityId, screenStream);
@@ -620,7 +662,11 @@ export class CallPeerConnectionManager {
       const offer = await peer.createOffer();
 
       await peer.setLocalDescription(offer);
-      await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+      await sendSignal(
+        peerIdentityId,
+        'offer',
+        descriptionPayload(offer, this.localScreenTrackIds()),
+      );
     } finally {
       state.makingOffer = false;
     }

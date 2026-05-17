@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
@@ -9,6 +9,7 @@ import type {
 import type {
   ChatMessage,
   Community,
+  CommunityMembershipRequest,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -19,6 +20,8 @@ import type { RealtimeDomainEvent } from '../../infrastructure/realtime/Realtime
 import { copy } from '../../i18n/en';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
+import { CommunityDiscoveryDialog } from '../community/CommunityDiscoveryDialog';
+import { SegmentedControl } from '../common/SegmentedControl';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { Inspector } from './Inspector';
 import {
@@ -49,6 +52,9 @@ interface WorkspaceDialogsProps {
   inspectorOpen: boolean;
   isCreateCommunityOpen: boolean;
   isCreateOpen: boolean;
+  membershipRequestAction: 'accept' | 'decline' | 'refresh' | null;
+  membershipRequestError: string | null;
+  membershipRequests: CommunityMembershipRequest[];
   messageContextMenu: MessageContextMenuState | null;
   messages: ChatMessage[];
   node: { id: string; owner: null | string } | null;
@@ -77,11 +83,15 @@ interface WorkspaceDialogsProps {
     community: Community;
     session: Session;
   }) => void;
+  onCommunityOpen: (communityId: string) => void;
+  onCommunityJoinRequested: (request: CommunityMembershipRequest) => void;
   onConversationCreated: (
     nextSession: Session,
     conversation: ConversationResource,
   ) => void;
   onDeclineIncomingCall: () => void;
+  onDeclineMembershipRequest: (requestId: string) => void;
+  onAcceptMembershipRequest: (requestId: string) => void;
   onDeclineNotification: (notificationId: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
@@ -95,16 +105,49 @@ interface WorkspaceDialogsProps {
 }
 
 export function WorkspaceDialogs(props: WorkspaceDialogsProps): ReactElement {
+  const [communityEntryMode, setCommunityEntryMode] =
+    useState<CommunityEntryMode>('discover');
+
+  useEffect(() => {
+    if (props.isCreateCommunityOpen) setCommunityEntryMode('discover');
+  }, [props.isCreateCommunityOpen]);
+
   return (
     <>
       <MobileInspectorDialog {...props} />
       <MessageActionDialogs {...props} />
-      <CreateDialogs {...props} />
+      <CreateDialogs
+        {...props}
+        communityEntryMode={communityEntryMode}
+        onCommunityEntryModeChange={setCommunityEntryMode}
+      />
       <WorkspaceNotificationDialog {...props} />
       <NodeSettingsOverlay {...props} />
       <RealtimeEventsOverlay {...props} />
       <IncomingCallOverlay {...props} />
     </>
+  );
+}
+
+type CommunityEntryMode = 'create' | 'discover';
+
+function CommunityEntryModeControl({
+  mode,
+  onChange,
+}: {
+  mode: CommunityEntryMode;
+  onChange: (mode: CommunityEntryMode) => void;
+}): ReactElement {
+  return (
+    <SegmentedControl
+      className="mt-5"
+      onChange={onChange}
+      value={mode}
+      options={[
+        { label: copy.communities.discover, value: 'discover' },
+        { label: copy.communities.create, value: 'create' },
+      ]}
+    />
   );
 }
 
@@ -177,7 +220,12 @@ function MessageActionDialogs(
   );
 }
 
-function CreateDialogs(props: WorkspaceDialogsProps): ReactElement | null {
+function CreateDialogs(
+  props: WorkspaceDialogsProps & {
+    communityEntryMode: CommunityEntryMode;
+    onCommunityEntryModeChange: (mode: CommunityEntryMode) => void;
+  },
+): ReactElement | null {
   if (props.isCreateOpen) {
     return (
       <CreateConversationDialog
@@ -191,12 +239,33 @@ function CreateDialogs(props: WorkspaceDialogsProps): ReactElement | null {
 
   if (!props.isCreateCommunityOpen) return null;
 
+  const modeControl = (
+    <CommunityEntryModeControl
+      mode={props.communityEntryMode}
+      onChange={props.onCommunityEntryModeChange}
+    />
+  );
+
+  if (props.communityEntryMode === 'create') {
+    return (
+      <CreateCommunityDialog
+        headerControl={modeControl}
+        nodeNetworks={props.nodeNetworks}
+        session={props.session}
+        onClose={props.onCloseCreateCommunity}
+        onCreated={props.onCommunityCreated}
+      />
+    );
+  }
+
   return (
-    <CreateCommunityDialog
+    <CommunityDiscoveryDialog
+      headerControl={modeControl}
       nodeNetworks={props.nodeNetworks}
-      session={props.session}
       onClose={props.onCloseCreateCommunity}
-      onCreated={props.onCommunityCreated}
+      onCommunityOpen={props.onCommunityOpen}
+      onJoinRequested={props.onCommunityJoinRequested}
+      session={props.session}
     />
   );
 }
@@ -213,14 +282,20 @@ function WorkspaceNotificationDialog(
       communityAvatarUrls={props.communityAvatarUrls}
       communityPreviews={props.communityPreviews}
       conversations={props.conversations}
+      currentIdentityId={props.session.identity.id}
       error={props.notificationError}
       identityNames={props.identityNames}
       identityPictures={props.identityPictures}
       identityProfiles={props.identityProfiles}
+      membershipAction={props.membershipRequestAction}
+      membershipError={props.membershipRequestError}
+      membershipRequests={props.membershipRequests}
       notifications={props.visibleNotifications}
+      onAcceptMembershipRequest={props.onAcceptMembershipRequest}
       onAccept={props.onAcceptNotification}
       onArchive={props.archiveNotification}
       onClose={props.onCloseNotifications}
+      onDeclineMembershipRequest={props.onDeclineMembershipRequest}
       onDecline={props.onDeclineNotification}
     />
   );

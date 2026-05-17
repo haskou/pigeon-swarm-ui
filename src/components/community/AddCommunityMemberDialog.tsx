@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Community, IdentityResource, Session } from '../../domain/types';
+import type { IdentityResource, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { Field } from '../../contexts/identities/presentation/auth/Field';
@@ -18,7 +18,6 @@ type AddMemberMode = 'identity' | 'link';
 type AddCommunityMemberDialogProps = {
   communityId: string;
   onClose: () => void;
-  onCommunityUpdated: (community: Community) => void;
   onSessionUpdated: (session: Session) => void;
   session: Session;
 };
@@ -26,7 +25,6 @@ type AddCommunityMemberDialogProps = {
 export function AddCommunityMemberDialog({
   communityId,
   onClose,
-  onCommunityUpdated,
   onSessionUpdated,
   session,
 }: AddCommunityMemberDialogProps) {
@@ -126,9 +124,6 @@ export function AddCommunityMemberDialog({
         });
       }
 
-      onCommunityUpdated(
-        await pigeonApplication.getCommunity(session, communityId),
-      );
       onClose();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.memberError));
