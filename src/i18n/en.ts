@@ -204,7 +204,7 @@ export const copy = {
     emojiMatches: 'Emojis matching',
     encryptingAttachment: 'Encrypting',
     insertEmoji: 'Insert emoji',
-    placeholder: 'Write, encrypt, sign, and push to the swarm...',
+    placeholder: 'write a message',
     removeAttachment: 'Remove attachment',
     send: 'Send',
     sending: 'Sending',

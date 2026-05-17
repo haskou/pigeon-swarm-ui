@@ -504,7 +504,7 @@ export function Composer({
             disabled={disabled}
             maxLength={MESSAGE_MAX_LENGTH}
             rows={1}
-            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:whitespace-nowrap placeholder:text-white/35 disabled:cursor-not-allowed"
+            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
             placeholder={placeholder}
           />
           <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
