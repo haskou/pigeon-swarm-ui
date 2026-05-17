@@ -98,12 +98,14 @@ export function MessageContextMenu({
 
     const gap = 8;
     const rect = element.getBoundingClientRect();
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const preferredTop = coarsePointer ? menu.y - rect.height / 2 : menu.y;
     const nextLeft = Math.min(
       Math.max(gap, menu.x),
       Math.max(gap, window.innerWidth - rect.width - gap),
     );
     const nextTop = Math.min(
-      Math.max(gap, menu.y),
+      Math.max(gap, preferredTop),
       Math.max(gap, window.innerHeight - rect.height - gap),
     );
 

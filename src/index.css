@@ -162,8 +162,8 @@ textarea:disabled,
 
 @supports (anchor-name: --message-menu-anchor) {
   .message-context-menu {
-    left: max(.5rem, min(anchor(left), calc(100vw - 100% - .5rem)));
-    top: max(.5rem, min(anchor(top), calc(100dvh - 100% - .5rem)));
+    left: var(--message-menu-left);
+    top: var(--message-menu-top);
   }
 }
 

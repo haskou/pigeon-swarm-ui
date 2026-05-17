@@ -237,7 +237,7 @@ export function ImageCropEditor({
                 <canvas ref={canvasRef} className="h-full w-full" />
               )}
               {!image && imageUrl && (
-                <div className="grid h-full w-full place-items-center text-sm text-white/50">
+                <div className="absolute inset-0 grid place-items-center text-sm text-white/50">
                   {copy.app.loading}
                 </div>
               )}
