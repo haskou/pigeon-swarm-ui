@@ -86,6 +86,7 @@ export function useCallSession(): {
         .collectStats()
         .catch((): Record<string, PeerMediaStats> => ({}));
       const remoteStreams = peerManager.remoteMediaStreams();
+      const remoteScreenStreams = peerManager.remoteScreenMediaStreams();
       const localAudioLevel = mediaManager.localAudioLevel();
       const screenStream = mediaManager.screenPreviewStream();
 
@@ -102,6 +103,7 @@ export function useCallSession(): {
             current,
             stats,
             remoteStreams,
+            remoteScreenStreams,
             localAudioLevel,
             screenStream,
           ),
@@ -330,6 +332,7 @@ export function useCallSession(): {
       input.signalType,
       input.payload,
       sendSignal,
+      currentIdentityIdRef.current ?? undefined,
     );
   };
 
@@ -543,6 +546,7 @@ export function useCallSession(): {
         signal.signalType,
         signal.payload,
         sendSignal,
+        currentIdentityIdRef.current ?? undefined,
       );
     }
   }
@@ -615,6 +619,7 @@ function participantsWithMediaState(
   call: CallSession,
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
+  remoteScreenStreams: Record<string, MediaStream>,
   localAudioLevel: number,
   screenStream?: MediaStream,
 ): CallParticipant[] {
@@ -626,7 +631,12 @@ function participantsWithMediaState(
           localAudioLevel,
           screenStream,
         )
-      : remoteParticipantWithMediaState(participant, stats, remoteStreams),
+      : remoteParticipantWithMediaState(
+          participant,
+          stats,
+          remoteStreams,
+          remoteScreenStreams,
+        ),
   );
 }
 
@@ -653,9 +663,11 @@ function remoteParticipantWithMediaState(
   participant: CallParticipant,
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
+  remoteScreenStreams: Record<string, MediaStream>,
 ): CallParticipant {
   const stat = stats[participant.identityId];
   const mediaStream = remoteStreams[participant.identityId];
+  const screenStream = remoteScreenStreams[participant.identityId];
 
   return {
     ...participant,
@@ -664,6 +676,8 @@ function remoteParticipantWithMediaState(
     latencyMs: stat?.latencyMs,
     mediaStream,
     packetsLost: stat?.packetsLost,
+    screenSharing: hasVideoTrack(screenStream),
+    screenStream,
     speaking: stat?.speaking ?? false,
     videoEnabled: hasVideoTrack(mediaStream),
   };

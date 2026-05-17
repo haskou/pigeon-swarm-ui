@@ -32,7 +32,7 @@ export function AppLoadingScreen({
 }: AppLoadingScreenProps): ReactElement {
   return (
     <AppFrame>
-      <div className="flex min-h-full items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <div className="text-xl">{label}</div>
       </div>
     </AppFrame>

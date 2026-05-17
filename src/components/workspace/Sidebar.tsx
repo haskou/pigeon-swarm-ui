@@ -423,6 +423,41 @@ export function UserProfileDropdown({
     : shortId(session.identity.id);
   const ownPicture =
     identityPictures[session.identity.id] ?? identityPicture(session.identity);
+  const [ownBanner, setOwnBanner] = useState<string | null>(() =>
+    identityBanner(session.identity),
+  );
+
+  useEffect(() => {
+    const directBanner = identityBanner(session.identity);
+
+    if (directBanner) {
+      setOwnBanner(directBanner);
+
+      return;
+    }
+
+    const bannerCid = session.identity.profile.banner?.trim();
+
+    if (!bannerCid) {
+      setOwnBanner(null);
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadPublicImage(bannerCid)
+      .then((url) => {
+        if (!cancelled) setOwnBanner(url);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnBanner(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.identity]);
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -515,12 +550,29 @@ export function UserProfileDropdown({
               : 'bottom-[calc(100%+.5rem)]',
           )}
         >
-          <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-            <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
-            <div className="min-w-0">
-              <div className="truncate font-black">{ownProfileName}</div>
-              <div className="truncate text-xs text-white/45">
-                {ownProfileHandle}
+          <div className="-m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10">
+            <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
+              {ownBanner && (
+                <img
+                  src={ownBanner}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+            <div className="relative px-3 pb-3">
+              <div className="-mt-10 flex items-end gap-3">
+                <ProfileAvatar
+                  label={ownDisplayName}
+                  picture={ownPicture}
+                  size="lg"
+                />
+                <div className="min-w-0 pb-1">
+                  <div className="truncate font-black">{ownProfileName}</div>
+                  <div className="truncate text-xs text-white/45">
+                    {ownProfileHandle}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

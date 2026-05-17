@@ -92,19 +92,19 @@ export function Rail({
             <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
           </div>
         ))}
-        <button
-          type="button"
-          onClick={onCreateCommunityClick}
-          className="group relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-dashed border-white/25 bg-white/5 text-2xl font-black text-white/60 transition hover:bg-white/12 hover:text-white"
-          aria-label={copy.communities.createTooltip}
-          title={copy.communities.createTooltip}
-        >
-          +<span className="sr-only">{copy.communities.createTooltip}</span>
-          <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
-            {copy.communities.createTooltip}
-          </span>
-        </button>
       </div>
+      <button
+        type="button"
+        onClick={onCreateCommunityClick}
+        className="group relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-dashed border-white/25 bg-white/5 text-2xl font-black text-white/60 transition hover:bg-white/12 hover:text-white"
+        aria-label={copy.communities.createTooltip}
+        title={copy.communities.createTooltip}
+      >
+        +<span className="sr-only">{copy.communities.createTooltip}</span>
+        <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
+          {copy.communities.createTooltip}
+        </span>
+      </button>
       <button
         type="button"
         onClick={onNotificationsClick}

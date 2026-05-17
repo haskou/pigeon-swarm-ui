@@ -1,6 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
+  type PointerEvent,
   type SetStateAction,
   startTransition,
   useCallback,
@@ -200,6 +201,11 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const sidebarGestureRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -1485,8 +1491,15 @@ export function GlassWorkspace({
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
       const scroll = () => {
-        bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
-        lastScrollTopRef.current = scrollerRef.current?.scrollTop ?? 0;
+        const scroller = scrollerRef.current;
+
+        if (!scroller) return;
+
+        scroller.scrollTo({
+          behavior,
+          top: scroller.scrollHeight,
+        });
+        lastScrollTopRef.current = scroller.scrollTop;
       };
 
       if (keepPinned) {
@@ -1525,7 +1538,7 @@ export function GlassWorkspace({
       if (Date.now() > keepMessageBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ block: 'end' });
+        scroller.scrollTop = scroller.scrollHeight;
         lastScrollTopRef.current = scroller.scrollTop;
       });
     };
@@ -2665,9 +2678,52 @@ export function GlassWorkspace({
     onDomainEvent: handleRealtimeEvent,
     onReconnecting: () => setRealtimeStatus('reconnecting'),
   });
+  const handleWorkspacePointerDown = (
+    event: PointerEvent<HTMLElement>,
+  ) => {
+    if (event.pointerType !== 'touch' || sidebarOpen) return;
+
+    if (event.clientX > 28) return;
+
+    sidebarGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+  };
+  const handleWorkspacePointerMove = (
+    event: PointerEvent<HTMLElement>,
+  ) => {
+    const gesture = sidebarGestureRef.current;
+
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = Math.abs(event.clientY - gesture.startY);
+
+    if (deltaX > 54 && deltaY < 42) {
+      setSidebarOpen(true);
+      sidebarGestureRef.current = null;
+    }
+
+    if (deltaX < -16 || deltaY > 72) {
+      sidebarGestureRef.current = null;
+    }
+  };
+  const clearSidebarGesture = (event: PointerEvent<HTMLElement>) => {
+    if (sidebarGestureRef.current?.pointerId === event.pointerId) {
+      sidebarGestureRef.current = null;
+    }
+  };
 
   return (
-    <section className="relative z-10 min-h-full">
+    <section
+      className="relative z-10 min-h-full overflow-hidden overscroll-none"
+      onPointerCancel={clearSidebarGesture}
+      onPointerDown={handleWorkspacePointerDown}
+      onPointerMove={handleWorkspacePointerMove}
+      onPointerUp={clearSidebarGesture}
+    >
       <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"

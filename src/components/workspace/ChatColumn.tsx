@@ -1,7 +1,7 @@
 import type { FormEvent, MouseEvent } from 'react';
 
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallParticipant } from '../../domain/calls/CallSession';
@@ -17,27 +17,20 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
-import { isBrowserPreviewImage } from '../../utils/browserPreview';
-import { cx } from '../../utils/classNameHelper';
-import {
-  formatDateSeparator,
-  isSameDay,
-  shortId,
-} from '../../utils/formatting';
+import { shortId } from '../../utils/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
-import { DateSeparator } from '../chat/DateSeparator';
-import { MessageBubble } from '../chat/MessageBubble';
-import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
+import { ChatConversationHeader } from './ChatConversationHeader';
+import { ChatMessageTimeline } from './ChatMessageTimeline';
 import { ConversationDataDialog } from './ConversationDataDialog';
 import { ConversationKeyDialog } from './ConversationKeyDialog';
 import { GroupProfileDialog } from './GroupProfileDialog';
-import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -200,6 +193,7 @@ export function ChatColumn({
     string | null
   >(null);
   const [conversationKeySaving, setConversationKeySaving] = useState(false);
+  const canAutoFocusInput = useDesktopInputFocus();
   const isGroupConversation = !!(
     activeConversation &&
     (activeConversation.type === 'group' ||
@@ -227,9 +221,6 @@ export function ChatColumn({
     : copy.profile.noNetworks;
   const conversationNetworkTooltip =
     conversationNetworkId ?? copy.profile.noNetworks;
-  const e2eTooltip = hasConversationKey
-    ? copy.chat.e2eReady
-    : copy.chat.e2eMissing;
   const conversationData = useMemo(
     () => ({
       frontendDerived: {
@@ -486,213 +477,104 @@ export function ChatColumn({
 
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
-      <header className="border-b border-white/10 p-4 sm:p-5">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenSidebar}
-            aria-label={copy.chat.menu}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 font-black lg:hidden"
-          >
-            ☰
-          </button>
-          <button
-            type="button"
-            onClick={openConversationHeader}
-            disabled={
-              !activeConversation ||
-              (!isGroupConversation && !canOpenPeerProfile)
-            }
-            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
-            aria-label={activeConversationName ?? copy.chat.noConversation}
-          >
-            {peerPicture ? (
-              <img
-                src={peerPicture}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : activeConversation ? (
-              (activeConversationName ?? activeConversation.id)
-                .slice(0, 1)
-                .toUpperCase()
-            ) : (
-              '∅'
-            )}
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
+      <ChatConversationHeader
+        activeConversation={activeConversation}
+        activeConversationName={activeConversationName}
+        activeConversationTitle={activeConversationTitle}
+        canOpenPeerProfile={canOpenPeerProfile}
+        conversationNetworkName={conversationNetworkName}
+        conversationNetworkTooltip={conversationNetworkTooltip}
+        hasConversationKey={hasConversationKey}
+        isGroupConversation={isGroupConversation}
+        menuOpen={conversationMenuOpen}
+        onConversationOpen={openConversationHeader}
+        onMenuToggle={() => setConversationMenuOpen((isOpen) => !isOpen)}
+        onOpenSidebar={onOpenSidebar}
+        onRealtimeEventsOpen={onRealtimeEventsOpen}
+        peerPicture={peerPicture}
+        realtimeStatus={realtimeStatus}
+      >
+        {conversationMenuOpen && activeConversation && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-30 cursor-default"
+              onClick={() => setConversationMenuOpen(false)}
+              aria-label={copy.dialog.close}
+            />
+            <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+              {onStartCall && !isGroupConversation ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStartCall({
+                      conversationId: activeConversation.id,
+                      kind: 'one-to-one',
+                      participants: groupParticipants.map((participant) => ({
+                        identity: participant.identity,
+                        identityId: participant.identityId,
+                        muted: false,
+                        name: participant.name,
+                        picture: participant.picture,
+                      })),
+                      title:
+                        activeConversationTitle ??
+                        activeConversationName ??
+                        activeConversation.id,
+                    });
+                    setConversationMenuOpen(false);
+                  }}
+                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                >
+                  {copy.calls.startCall}
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={openConversationHeader}
-                disabled={
-                  !activeConversation ||
-                  (!isGroupConversation && !canOpenPeerProfile)
-                }
-                className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
+                onClick={() => {
+                  setConversationDataOpen(true);
+                  setConversationMenuOpen(false);
+                }}
+                className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
               >
-                {activeConversation
-                  ? (activeConversationTitle ?? activeConversation.id)
-                  : copy.chat.noConversation}
+                {copy.chat.viewData}
               </button>
-              {activeConversation ? (
-                <span
-                  className={
-                    hasConversationKey
-                      ? 'shrink-0 text-emerald-300'
-                      : 'shrink-0 text-rose-300'
-                  }
-                  title={e2eTooltip}
-                  aria-label={e2eTooltip}
+              {canShareConversationKey ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasConversationKey) {
+                      openCopyConversationKeyDialog();
+                    } else {
+                      setConversationKeyError(null);
+                      setConversationKeyDialog('add');
+                    }
+                    setConversationMenuOpen(false);
+                  }}
+                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
                 >
-                  <LockIcon locked={hasConversationKey} />
-                </span>
+                  {hasConversationKey
+                    ? copy.chat.copyPrivateKey
+                    : copy.chat.addPrivateKey}
+                </button>
+              ) : null}
+              {isGroupConversation && hasConversationKey ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGroupInviteError(null);
+                    setGroupInviteOpen(true);
+                    setConversationMenuOpen(false);
+                  }}
+                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                >
+                  {copy.chat.invite}
+                </button>
               ) : null}
             </div>
-            {activeConversation ? (
-              <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-white/50">
-                {isGroupConversation ? (
-                  <span className="shrink-0">{copy.chat.groupMessage}</span>
-                ) : (
-                  <span className="shrink-0">{copy.chat.directMessage}</span>
-                )}
-                <span className="text-white/25">·</span>
-                <span
-                  className="min-w-0 truncate"
-                  title={conversationNetworkTooltip}
-                >
-                  {conversationNetworkName}
-                </span>
-              </div>
-            ) : (
-              <div className="truncate text-sm text-white/50">
-                {copy.chat.noConversationHint}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onRealtimeEventsOpen}
-            className={cx(
-              'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
-              realtimeStatus === 'connected'
-                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
-                : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
-            )}
-            title={
-              realtimeStatus === 'connected'
-                ? copy.chat.realtimeConnected
-                : copy.chat.realtimeReconnecting
-            }
-          >
-            <span
-              className={cx(
-                'h-2 w-2 rounded-full',
-                realtimeStatus === 'connected'
-                  ? 'bg-emerald-300'
-                  : 'bg-amber-300',
-              )}
-            />
-            {realtimeStatus === 'connected'
-              ? copy.chat.realtimeConnected
-              : copy.chat.realtimeReconnecting}
-          </button>
-          {activeConversation ? (
-            <div className="relative ml-auto flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setConversationMenuOpen((isOpen) => !isOpen)}
-                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
-                aria-label={copy.chat.conversationMenu}
-                aria-expanded={conversationMenuOpen}
-              >
-                ⋮
-              </button>
-              {conversationMenuOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-30 cursor-default"
-                    onClick={() => setConversationMenuOpen(false)}
-                    aria-label={copy.dialog.close}
-                  />
-                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                    {onStartCall && !isGroupConversation ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onStartCall({
-                            conversationId: activeConversation.id,
-                            kind: 'one-to-one',
-                            participants: groupParticipants.map(
-                              (participant) => ({
-                                identity: participant.identity,
-                                identityId: participant.identityId,
-                                muted: false,
-                                name: participant.name,
-                                picture: participant.picture,
-                              }),
-                            ),
-                            title:
-                              activeConversationTitle ??
-                              activeConversationName ??
-                              activeConversation.id,
-                          });
-                          setConversationMenuOpen(false);
-                        }}
-                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {copy.calls.startCall}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConversationDataOpen(true);
-                        setConversationMenuOpen(false);
-                      }}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {copy.chat.viewData}
-                    </button>
-                    {canShareConversationKey ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (hasConversationKey) {
-                            openCopyConversationKeyDialog();
-                          } else {
-                            setConversationKeyError(null);
-                            setConversationKeyDialog('add');
-                          }
-                          setConversationMenuOpen(false);
-                        }}
-                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {hasConversationKey
-                          ? copy.chat.copyPrivateKey
-                          : copy.chat.addPrivateKey}
-                      </button>
-                    ) : null}
-                    {isGroupConversation && hasConversationKey ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGroupInviteError(null);
-                          setGroupInviteOpen(true);
-                          setConversationMenuOpen(false);
-                        }}
-                        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                      >
-                        {copy.chat.invite}
-                      </button>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </header>
+          </>
+        )}
+      </ChatConversationHeader>
 
       {!activeConversation ? (
         <div className="grid flex-1 place-items-center p-6 text-center">
@@ -716,155 +598,32 @@ export function ChatColumn({
         </div>
       ) : (
         <>
-          <div
-            ref={scrollerRef}
+          <ChatMessageTimeline
+            bottomRef={bottomRef}
+            currentIdentityId={session.identity.id}
+            currentIdentityName={session.identity.profile.name}
+            hasConversationKey={hasConversationKey}
+            hasReachedMessageStart={hasReachedMessageStart}
+            identityNames={identityNames}
+            identityPictures={identityPictures}
+            isGroupConversation={isGroupConversation}
+            loadAttachmentPreview={loadAttachmentPreview}
+            messageState={messageState}
+            messages={messages}
+            newMessageCount={newMessageCount}
+            onAttachmentOpen={(attachment) => void openAttachment(attachment)}
+            onAuthorProfileOpen={(message, target) =>
+              openMessageAuthorProfile(message, profileAnchorFromTarget(target))
+            }
+            onJumpToLatest={onJumpToLatest}
+            onMessageMenuOpen={onMessageMenuOpen}
+            onReactionToggle={onReactionToggle}
+            onReplyReferenceClick={onReplyReferenceClick}
+            onRetryMessage={onRetryMessage}
             onScroll={onScroll}
-            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
-          >
-            {messageState === 'loading' && messages.length === 0 ? (
-              <MessageListSkeleton />
-            ) : (
-              <>
-                {messageState === 'loading' && (
-                  <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
-                    {copy.chat.loadingEvents}
-                  </div>
-                )}
-                <div>
-                  {hasReachedMessageStart &&
-                    messages.length > 0 &&
-                    messageState !== 'loading' && (
-                      <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                        {copy.chat.noMoreMessages}
-                      </div>
-                    )}
-                  {messages.map((message, index) => {
-                    const previousMessage = messages[index - 1];
-                    const replyMessage = message.replyToMessageId
-                      ? messages.find(
-                          (item) => item.id === message.replyToMessageId,
-                        )
-                      : undefined;
-                    const startsNewDay =
-                      !previousMessage ||
-                      !isSameDay(previousMessage.timestamp, message.timestamp);
-                    const startsNewAuthorRun =
-                      !previousMessage ||
-                      previousMessage.authorIdentityId !==
-                        message.authorIdentityId;
-
-                    return (
-                      <Fragment key={message.id}>
-                        {startsNewDay && (
-                          <DateSeparator
-                            label={formatDateSeparator(message.timestamp)}
-                          />
-                        )}
-                        <div
-                          className={
-                            startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'
-                          }
-                        >
-                          <MessageBubble
-                            message={message}
-                            currentIdentityId={session.identity.id}
-                            authorName={
-                              message.mine
-                                ? session.identity.profile.name
-                                : identityDisplayName(
-                                    message.authorIdentityId,
-                                    identityNames,
-                                  )
-                            }
-                            authorPicture={
-                              message.mine
-                                ? identityPictures[session.identity.id]
-                                : identityPictures[message.authorIdentityId]
-                            }
-                            onAttachmentOpen={(attachmentIndex) =>
-                              void openAttachment(
-                                message.attachments[attachmentIndex],
-                              )
-                            }
-                            onAttachmentPreview={loadAttachmentPreview}
-                            onAvatarClick={(event) =>
-                              openMessageAuthorProfile(
-                                message,
-                                profileAnchorFromTarget(event.currentTarget),
-                              )
-                            }
-                            onMessageMenuOpen={onMessageMenuOpen}
-                            onReactionToggle={onReactionToggle}
-                            onReplyReferenceClick={onReplyReferenceClick}
-                            onRetryMessage={onRetryMessage}
-                            reactionAuthorNames={reactionAuthorNames}
-                            replyImage={
-                              replyMessage?.attachments.find((attachment) =>
-                                isBrowserPreviewImage(attachment.contentType),
-                              ) ?? message.replyPreview?.image
-                            }
-                            replyAuthorName={
-                              replyMessage
-                                ? identityDisplayName(
-                                    replyMessage.authorIdentityId,
-                                    identityNames,
-                                  )
-                                : message.replyPreview
-                                  ? identityDisplayName(
-                                      message.replyPreview.authorIdentityId,
-                                      identityNames,
-                                    )
-                                  : undefined
-                            }
-                            replyPreview={
-                              replyMessage?.content ??
-                              message.replyPreview?.content
-                            }
-                            reserveAvatarSpace={false}
-                            showAvatar={
-                              isGroupConversation && startsNewAuthorRun
-                            }
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                  {messages.length === 0 &&
-                    messageState !== 'loading' &&
-                    (hasConversationKey ? (
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                        {copy.chat.emptyMessages}
-                      </div>
-                    ) : (
-                      <div className="grid min-h-[42vh] place-items-center">
-                        <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                          <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                            <LockIcon locked={false} />
-                          </div>
-                          <div className="font-black">
-                            {copy.chat.e2eMissing}
-                          </div>
-                          <div className="mt-2 text-rose-100/65">
-                            {copy.messages.missingConversationKey}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  <div ref={bottomRef} />
-                </div>
-              </>
-            )}
-            {newMessageCount > 0 && (
-              <button
-                type="button"
-                onClick={onJumpToLatest}
-                className="sticky bottom-3 left-1/2 z-20 mt-3 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-              >
-                {copy.workspace.newMessages}
-                {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
-              </button>
-            )}
-          </div>
+            reactionAuthorNames={reactionAuthorNames}
+            scrollerRef={scrollerRef}
+          />
 
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
@@ -930,7 +689,7 @@ export function ChatColumn({
               </button>
             </div>
             <input
-              autoFocus
+              autoFocus={canAutoFocusInput}
               value={groupInviteInput}
               onChange={(event) => setGroupInviteInput(event.target.value)}
               className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"

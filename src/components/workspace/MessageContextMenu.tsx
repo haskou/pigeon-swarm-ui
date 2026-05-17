@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
+
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage } from '../../domain/types';
 
@@ -12,6 +14,7 @@ import {
   loadRecentReactionEmojis,
   saveRecentReactionEmoji,
 } from '../../utils/recentReactionEmojis';
+import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -40,8 +43,14 @@ export function MessageContextMenu({
   onReply?: () => void;
   onViewRaw: () => void;
 }) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [emojiSearchOpen, setEmojiSearchOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState('');
+  const [position, setPosition] = useState(() => ({
+    left: menu.x,
+    top: menu.y,
+  }));
+  const canAutoFocusInput = useDesktopInputFocus();
   const [recentEmojis, setRecentEmojis] = useState(() =>
     loadRecentReactionEmojis(currentIdentityId),
   );
@@ -67,6 +76,41 @@ export function MessageContextMenu({
     onReactionToggle?.(menu.message, emoji, reacted);
     onClose();
   };
+  const anchorStyle = {
+    anchorName: '--message-menu-anchor',
+    left: menu.x,
+    top: menu.y,
+  } as CSSProperties & { anchorName: string };
+  const menuStyle = {
+    '--message-menu-left': `${position.left}px`,
+    '--message-menu-top': `${position.top}px`,
+    positionAnchor: '--message-menu-anchor',
+  } as CSSProperties & {
+    '--message-menu-left': string;
+    '--message-menu-top': string;
+    positionAnchor: string;
+  };
+
+  useLayoutEffect(() => {
+    const element = menuRef.current;
+
+    if (!element) return;
+
+    const gap = 8;
+    const rect = element.getBoundingClientRect();
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const preferredTop = coarsePointer ? menu.y - rect.height / 2 : menu.y;
+    const nextLeft = Math.min(
+      Math.max(gap, menu.x),
+      Math.max(gap, window.innerWidth - rect.width - gap),
+    );
+    const nextTop = Math.min(
+      Math.max(gap, preferredTop),
+      Math.max(gap, window.innerHeight - rect.height - gap),
+    );
+
+    setPosition({ left: nextLeft, top: nextTop });
+  }, [emojiSearchOpen, menu.x, menu.y]);
 
   return (
     <>
@@ -76,9 +120,15 @@ export function MessageContextMenu({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none fixed h-px w-px"
+        style={anchorStyle}
+      />
       <div
-        className="fixed z-[90] min-w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
-        style={{ left: menu.x, top: menu.y }}
+        ref={menuRef}
+        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        style={menuStyle}
       >
         {onReactionToggle && currentIdentityId ? (
           <div className="border-b border-white/10 p-1">
@@ -110,7 +160,7 @@ export function MessageContextMenu({
             {emojiSearchOpen && (
               <div className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-2">
                 <input
-                  autoFocus
+                  autoFocus={canAutoFocusInput}
                   value={emojiQuery}
                   onChange={(event) => setEmojiQuery(event.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35"
