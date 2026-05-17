@@ -2,11 +2,11 @@ import { FormEvent, useState } from 'react';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { API_SERVER_URL } from '../../config';
+import { Field } from '../../contexts/identities/presentation/auth/Field';
+import { HeroMetric } from '../../contexts/identities/presentation/auth/HeroMetric';
 import { NetworkInviteCode } from '../../domain/networks/NetworkInviteCode';
 import { copy } from '../../i18n/en';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
-import { HeroMetric } from '../auth/HeroMetric';
 import { SegmentedControl } from '../common/SegmentedControl';
 
 type NetworkSetupMode = 'create' | 'join';

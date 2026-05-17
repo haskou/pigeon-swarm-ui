@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react';
 
-import { AuthScreen } from './components/auth/AuthScreen';
 import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
 import { ServerConnectionScreen } from './components/system/ServerConnectionScreen';
 import { GlassWorkspace } from './components/workspace/GlassWorkspace';
+import { AuthScreen } from './contexts/identities/presentation/auth/AuthScreen';
 import { copy } from './i18n/en';
 import { AppFrame, AppLoadingScreen } from './presentation/app/AppFrame';
 import { useAppBootstrap } from './presentation/app/useAppBootstrap';

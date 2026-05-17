@@ -8,6 +8,7 @@ import type {
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { Field } from '../../contexts/identities/presentation/auth/Field';
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
 import {
@@ -15,7 +16,6 @@ import {
   profilePictureDataUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { Field } from '../auth/Field';
 import { GlassSelect } from '../common/GlassSelect';
 
 type LoadState = 'idle' | 'loading' | 'error';

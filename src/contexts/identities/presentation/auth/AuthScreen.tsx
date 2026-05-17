@@ -1,32 +1,33 @@
 import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
-import type { ConversationResource, Session } from '../../domain/types';
+import type { ConversationResource, Session } from '../../../../domain/types';
 
-import { pigeonApplication } from '../../application/applicationContainer';
-import { API_SERVER_URL } from '../../config';
-import { ProfileHandle } from '../../domain/identities/profile/ProfileHandle';
-import { ProfileName } from '../../domain/identities/profile/ProfileName';
-import { copy } from '../../i18n/en';
+import { pigeonApplication } from '../../../../application/applicationContainer';
+import { SegmentedControl } from '../../../../components/common/SegmentedControl';
+import { API_SERVER_URL } from '../../../../config';
+import { copy } from '../../../../i18n/en';
 import {
   clearSavedCredentials,
   loadSavedCredentials,
   saveCredentials,
-} from '../../presentation/auth/savedCredentials';
-import { useNodeNetworks } from '../../presentation/hooks/useNodeNetworks';
-import { cx } from '../../utils/classNameHelper';
+} from '../../../../presentation/auth/savedCredentials';
+import { useNodeNetworks } from '../../../../presentation/hooks/useNodeNetworks';
 import {
-  isValidHandle,
-  isValidPassword,
   normalizeHandleInput,
   passwordValidationChecks,
-} from '../../utils/credentialsValidation';
-import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { GlassSelect } from '../common/GlassSelect';
-import { SegmentedControl } from '../common/SegmentedControl';
+} from '../../../../utils/credentialsValidation';
+import { toUserErrorMessage } from '../../../../utils/toUserErrorMessage';
+import { AuthFormFields } from './AuthFormFields';
+import {
+  type AuthMode,
+  canSubmitAuthForm,
+  normalizeIdentityLogin,
+  registrationNetworks,
+} from './authFormRules';
 import { Field } from './Field';
 import { HeroMetric } from './HeroMetric';
+import { PasswordChecklist } from './PasswordChecklist';
 
-type AuthMode = 'login' | 'create';
 type LoadState = 'idle' | 'loading' | 'error';
 
 interface AuthScreenProps {
@@ -270,200 +271,4 @@ export function AuthScreen({
       </div>
     </section>
   );
-}
-
-function AuthFormFields(props: {
-  availableNetworks: Array<{ id: string; name: string }>;
-  handle: string;
-  identityId: string;
-  mode: AuthMode;
-  name: string;
-  networks: string;
-  selectedNetwork: string;
-  onHandleChange: (value: string) => void;
-  onIdentityIdChange: (value: string) => void;
-  onNameChange: (value: string) => void;
-  onNetworksChange: (value: string) => void;
-  onSelectedNetworkChange: (value: string) => void;
-}): ReactElement {
-  if (props.mode === 'login') {
-    return (
-      <Field label={copy.auth.identityIdLabel}>
-        <input
-          value={props.identityId}
-          onChange={(event) => props.onIdentityIdChange(event.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="@ada or MCowBQYDK2VwAyEA..."
-          autoComplete="username"
-        />
-      </Field>
-    );
-  }
-
-  return (
-    <>
-      <Field label={copy.auth.profileNameLabel}>
-        <input
-          value={props.name}
-          onChange={(event) => props.onNameChange(event.target.value)}
-          maxLength={ProfileName.MAX_LENGTH}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="Ada"
-          autoComplete="name"
-        />
-      </Field>
-      <Field label={copy.auth.handleLabel}>
-        <input
-          value={props.handle}
-          onChange={(event) =>
-            props.onHandleChange(normalizeHandleInput(event.target.value))
-          }
-          maxLength={ProfileHandle.MAX_LENGTH}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="@ada"
-          autoComplete="username"
-        />
-      </Field>
-      <NetworkField {...props} />
-    </>
-  );
-}
-
-function NetworkField(props: {
-  availableNetworks: Array<{ id: string; name: string }>;
-  networks: string;
-  selectedNetwork: string;
-  onNetworksChange: (value: string) => void;
-  onSelectedNetworkChange: (value: string) => void;
-}): ReactElement {
-  if (props.availableNetworks.length > 0) {
-    return (
-      <Field label={copy.auth.networkLabel}>
-        <GlassSelect
-          ariaLabel={copy.auth.networkLabel}
-          value={props.selectedNetwork}
-          onChange={props.onSelectedNetworkChange}
-          options={props.availableNetworks.map((network) => ({
-            label: network.name,
-            value: network.id,
-          }))}
-        />
-      </Field>
-    );
-  }
-
-  return (
-    <Field label={copy.auth.fallbackNetworksLabel}>
-      <input
-        value={props.networks}
-        onChange={(event) => props.onNetworksChange(event.target.value)}
-        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-        placeholder="uuid-public, uuid-private"
-      />
-    </Field>
-  );
-}
-
-function PasswordChecklist({
-  checks,
-  variant = 'profile',
-}: {
-  checks: {
-    lowercase: boolean;
-    match: boolean;
-    maxLength: boolean;
-    minLength: boolean;
-    number: boolean;
-    symbol: boolean;
-    uppercase: boolean;
-  };
-  variant?: 'auth' | 'profile';
-}): ReactElement {
-  const requirements =
-    variant === 'auth'
-      ? copy.auth.passwordRequirementItems
-      : copy.profile.passwordRequirements;
-  const items = [
-    [requirements.minLength, checks.minLength],
-    [requirements.maxLength, checks.maxLength],
-    [requirements.uppercase, checks.uppercase],
-    [requirements.lowercase, checks.lowercase],
-    [requirements.number, checks.number],
-    [requirements.symbol, checks.symbol],
-    [requirements.match, checks.match],
-  ] as const;
-
-  return (
-    <div className="grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
-      {items.map(([label, complete]) => (
-        <div
-          key={label}
-          className={cx(
-            'flex items-center gap-2 rounded-2xl px-3 py-2',
-            complete
-              ? 'bg-emerald-400/10 text-emerald-200'
-              : 'bg-white/5 text-white/45',
-          )}
-        >
-          <span aria-hidden="true">{complete ? '✓' : '×'}</span>
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function normalizeIdentityLogin(value: string): string {
-  const trimmed = value.trim();
-
-  return trimmed.startsWith('@') ? normalizeHandleInput(trimmed) : trimmed;
-}
-
-function canSubmitAuthForm(input: {
-  availableNetworkCount: number;
-  handle: string;
-  identityId: string;
-  mode: AuthMode;
-  name: string;
-  password: string;
-  passwordConfirmation: string;
-  selectedNetwork: string;
-}): boolean {
-  if (input.mode === 'login') {
-    return input.identityId.trim().length > 0 && input.password.length > 0;
-  }
-
-  return canSubmitCreateIdentity(input);
-}
-
-function canSubmitCreateIdentity(input: {
-  availableNetworkCount: number;
-  handle: string;
-  name: string;
-  password: string;
-  passwordConfirmation: string;
-  selectedNetwork: string;
-}): boolean {
-  return (
-    input.name.trim().length > 0 &&
-    (!input.handle.trim() || isValidHandle(input.handle)) &&
-    isValidPassword(input.password) &&
-    input.password === input.passwordConfirmation &&
-    (input.availableNetworkCount === 0 || input.selectedNetwork !== '')
-  );
-}
-
-function registrationNetworks(input: {
-  availableNetworkCount: number;
-  fallbackNetworks: string;
-  selectedNetwork: string;
-}): string[] {
-  if (input.selectedNetwork) return [input.selectedNetwork];
-
-  if (input.availableNetworkCount > 0) return [];
-
-  return input.fallbackNetworks
-    .split(',')
-    .map((network) => network.trim())
-    .filter(Boolean);
 }
