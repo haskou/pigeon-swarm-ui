@@ -4,7 +4,6 @@
     "node": true,
     "jest": true
   },
-  "ignorePatterns": ["src/utils/discordEmojiShortcodes.generated.ts"],
   "parser": "@typescript-eslint/parser",
   "plugins": [
     "@typescript-eslint",
@@ -20,7 +19,10 @@
     "plugin:prettier/recommended"
   ],
   "parserOptions": {
-    "project": ["./tsconfig.json", "./tsconfig.jest.json"],
+    "project": [
+      "./tsconfig.json",
+      "./tsconfig.jest.json"
+    ],
     "sourceType": "module"
   },
   "rules": {
@@ -36,12 +38,21 @@
       {
         "blankLine": "always",
         "prev": "import",
-        "next": ["class", "export", "const", "let", "var"]
+        "next": [
+          "class",
+          "export",
+          "const",
+          "let",
+          "var"
+        ]
       },
       {
         "blankLine": "always",
         "prev": "*",
-        "next": ["return", "if"]
+        "next": [
+          "return",
+          "if"
+        ]
       }
     ],
     "no-extra-boolean-cast": "error",
@@ -49,13 +60,22 @@
     "@typescript-eslint/naming-convention": [
       "error",
       {
-        "selector": ["variable", "function"],
-        "format": ["camelCase", "PascalCase", "UPPER_CASE"],
+        "selector": [
+          "variable",
+          "function"
+        ],
+        "format": [
+          "camelCase",
+          "PascalCase",
+          "UPPER_CASE"
+        ],
         "leadingUnderscore": "allow"
       },
       {
         "selector": "interface",
-        "format": ["PascalCase"],
+        "format": [
+          "PascalCase"
+        ],
         "custom": {
           "regex": "^[A-Z]",
           "match": true
@@ -73,7 +93,7 @@
         "argsIgnorePattern": "^_"
       }
     ],
-    "@typescript-eslint/no-use-before-define": "off",
+    "@typescript-eslint/no-use-before-define": "warn",
     "@typescript-eslint/no-inferrable-types": "off",
     "@typescript-eslint/no-this-alias": "warn",
     "@typescript-eslint/no-require-imports": "error",
@@ -87,7 +107,10 @@
     "@typescript-eslint/no-unsafe-return": "error",
     "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-unsafe-argument": "warn",
-    "max-classes-per-file": ["error", 1],
+    "max-classes-per-file": [
+      "error",
+      1
+    ],
     "no-multiple-empty-lines": [
       1,
       {
@@ -107,7 +130,9 @@
     "@typescript-eslint/explicit-member-accessibility": [
       "error",
       {
-        "ignoredMethodNames": ["constructor"],
+        "ignoredMethodNames": [
+          "constructor"
+        ],
         "accessibility": "explicit"
       }
     ],
@@ -115,7 +140,7 @@
     "no-bitwise": "error",
     "no-caller": "error",
     "no-cond-assign": "error",
-    "no-console": "off",
+    "no-console": "warn",
     "no-debugger": "error",
     "no-empty": "error",
     "no-eval": "error",
@@ -134,12 +159,18 @@
     ],
     "no-unused-labels": "error",
     "object-shorthand": "error",
-    "one-var": ["error", "never"],
+    "one-var": [
+      "error",
+      "never"
+    ],
     "radix": "error",
     "spaced-comment": "error",
     "use-isnan": "error",
     "valid-typeof": "off",
-    "complexity": ["error", 10],
+    "complexity": [
+      "error",
+      8
+    ],
     "@typescript-eslint/member-ordering": [
       "error",
       {
@@ -158,15 +189,30 @@
         ]
       }
     ],
-    "max-params": ["warn", 7],
-    "max-nested-callbacks": "off",
-    "max-depth": ["warn", 3],
+    "max-params": [
+      "warn",
+      7
+    ],
+    "max-nested-callbacks": [
+      "warn",
+      2
+    ],
+    "max-depth": [
+      "warn",
+      3
+    ],
     "sonarjs/prefer-single-boolean-return": "error",
     "sonarjs/no-collapsible-if": "error",
     "sonarjs/no-duplicated-branches": "error",
     "sonarjs/no-identical-expressions": "warn",
     "sonarjs/no-nested-switch": "warn",
-    "perfectionist/sort-objects": "off",
+    "perfectionist/sort-objects": [
+      "warn",
+      {
+        "type": "natural",
+        "order": "asc"
+      }
+    ],
     "perfectionist/sort-imports": [
       "error",
       {
@@ -174,14 +220,24 @@
         "order": "asc"
       }
     ],
-    "sonarjs/cognitive-complexity": ["error", 10],
+    "sonarjs/cognitive-complexity": [
+      "error",
+      10
+    ],
     "@typescript-eslint/explicit-module-boundary-types": [
       "error",
       {
-        "allowedNames": ["toPrimitives"]
+        "allowedNames": [
+          "toPrimitives"
+        ]
       }
     ],
-    "no-param-reassign": "off",
+    "no-param-reassign": [
+      "warn",
+      {
+        "props": true
+      }
+    ],
     "no-restricted-imports": [
       "error",
       {
@@ -196,32 +252,40 @@
   },
   "overrides": [
     {
-      "files": ["*.tsx"],
+      "files": [
+        "*.spec.ts"
+      ],
       "rules": {
-        "@typescript-eslint/explicit-module-boundary-types": "off",
-        "complexity": "off",
-        "sonarjs/cognitive-complexity": "off"
+        "no-unsafe-argument": "off",
+        "max-statements": "off",
+        "max-lines-per-function": "off",
+        "max-nested-callbacks": [
+          "warn",
+          4
+        ]
       }
     },
     {
-      "files": ["*.d.ts"],
+      "files": [
+        "*.d.ts"
+      ],
       "rules": {
         "spaced-comment": "off"
       }
     },
     {
-      "files": ["*.spec.ts"],
+      "files": [
+        "*.tsx"
+      ],
       "rules": {
-        "no-unsafe-argument": "off",
-        "max-statements": "off",
-        "max-lines-per-function": "off",
-        "max-nested-callbacks": ["warn", 4]
+        "@typescript-eslint/explicit-module-boundary-types": "off"
       }
     },
     {
-      "files": ["src/test/**/*.ts"],
+      "files": [
+        "src/test/HaskouValueObjectsMock.ts"
+      ],
       "rules": {
-        "@typescript-eslint/require-await": "off",
         "max-classes-per-file": "off"
       }
     }
