@@ -757,6 +757,15 @@ export function GlassWorkspace({
         playEndedCallSound();
       }
 
+      if (
+        details.kind === 'one-to-one' &&
+        incomingCall?.call.id === call.id &&
+        currentParticipant?.status !== 'ringing'
+      ) {
+        setIncomingCall(null);
+        stopIncomingCallSound();
+      }
+
       if (call.scope.type === 'community_channel') {
         const communityId = call.scope.communityId;
         const channelId = call.scope.channelId;
@@ -852,6 +861,19 @@ export function GlassWorkspace({
           caller,
           participants: details.participants,
           title: details.title,
+        });
+
+        return;
+      }
+
+      if (
+        details.kind === 'one-to-one' &&
+        currentParticipant?.status === 'joined' &&
+        activeCall?.id !== call.id
+      ) {
+        logCallDebug('workspace:call:joined-on-another-device', {
+          callId: call.id,
+          identityId: session.identity.id,
         });
 
         return;
@@ -1242,49 +1264,80 @@ export function GlassWorkspace({
 
     const pendingCall = incomingCall.call;
 
-    setIncomingCall(null);
-    stopIncomingCallSound();
     let localStream: MediaStream | null = null;
 
     callActionInProgressRef.current = true;
-    const localAudioRequest = requestLocalAudio();
 
-    void localAudioRequest
-      .then(async (stream) => {
-        localStream = stream;
-        await leaveCurrentCallForSwitch();
-        await cleanupJoinedCalls(pendingCall.id);
+    void (async () => {
+      const latestCall = await pigeonApplication
+        .getCall(sessionRef.current, pendingCall.id)
+        .catch(() => pendingCall);
+      const currentParticipant = latestCall.participants.find(
+        (participant) =>
+          participant.identityId === sessionRef.current.identity.id,
+      );
 
-        logCallDebug('workspace:incoming-call:join-request', {
-          callId: pendingCall.id,
+      if (currentParticipant?.status !== 'ringing') {
+        logCallDebug('workspace:incoming-call:accept-ignored-not-ringing', {
+          callId: latestCall.id,
+          participantStatus: currentParticipant?.status,
         });
+        setIncomingCall(null);
+        stopIncomingCallSound();
 
-        return await pigeonApplication.joinCall(
-          sessionRef.current,
-          pendingCall.id,
-        );
-      })
-      .then(async (call) => {
-        logCallDebug('workspace:incoming-call:joined', {
+        return;
+      }
+
+      setIncomingCall(null);
+      stopIncomingCallSound();
+      localStream = await requestLocalAudio();
+
+      await leaveCurrentCallForSwitch();
+      await cleanupJoinedCalls(pendingCall.id);
+
+      logCallDebug('workspace:incoming-call:join-request', {
+        callId: pendingCall.id,
+      });
+
+      const call = await pigeonApplication.joinCall(
+        sessionRef.current,
+        pendingCall.id,
+      );
+      const joinedParticipant = call.participants.find(
+        (participant) =>
+          participant.identityId === sessionRef.current.identity.id,
+      );
+
+      if (joinedParticipant?.status !== 'joined') {
+        logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
-          participantStatuses: call.participants.map((participant) => ({
-            identityId: participant.identityId,
-            status: participant.status,
-          })),
+          participantStatus: joinedParticipant?.status,
         });
-        const details = callDetailsForResource(call);
-        const iceConfig = await loadCallIceConfig();
+        stopLocalAudio(localStream);
 
-        await startCall({
-          ...details,
-          call,
-          currentIdentityId: sessionRef.current.identity.id,
-          iceConfig,
-          id: call.id,
-          localStream,
-          onSignal: callSignalSender(call.id),
-        });
-      })
+        return;
+      }
+
+      logCallDebug('workspace:incoming-call:joined', {
+        callId: call.id,
+        participantStatuses: call.participants.map((participant) => ({
+          identityId: participant.identityId,
+          status: participant.status,
+        })),
+      });
+      const details = callDetailsForResource(call);
+      const iceConfig = await loadCallIceConfig();
+
+      await startCall({
+        ...details,
+        call,
+        currentIdentityId: sessionRef.current.identity.id,
+        iceConfig,
+        id: call.id,
+        localStream,
+        onSignal: callSignalSender(call.id),
+      });
+    })()
       .catch((caught) => {
         stopLocalAudio(localStream);
         setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
