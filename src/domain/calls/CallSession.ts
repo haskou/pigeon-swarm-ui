@@ -57,6 +57,7 @@ export type CallIceServerConfig = {
 export type CallParticipant = {
   audioLevel?: number;
   connectionState?: RTCPeerConnectionState;
+  deafened?: boolean;
   identity?: IdentityResource;
   identityId: string;
   latencyMs?: number;

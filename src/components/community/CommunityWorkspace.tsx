@@ -60,6 +60,7 @@ import {
 import { identityBanner, identityName } from '../../utils/identityDisplay';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
@@ -572,6 +573,7 @@ export function CommunityWorkspace({
       return {
         identity,
         identityId,
+        deafened: false,
         muted: false,
         name: identity
           ? (identityName(identity) ?? shortId(identityId))
@@ -2080,6 +2082,7 @@ function VoiceChannelButton({
   onJoin: () => void;
   onParticipantClick: (
     participant: {
+      deafened?: boolean;
       identityId: string;
       muted: boolean;
       name: string;
@@ -2089,6 +2092,7 @@ function VoiceChannelButton({
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
   participants: Array<{
+    deafened?: boolean;
     identityId: string;
     muted: boolean;
     name: string;
@@ -2150,19 +2154,34 @@ function VoiceChannelButton({
                 )}
               </div>
               <span className="min-w-0 flex-1 truncate">
-                {participant.name}
+                {voiceParticipantName(participant.name)}
               </span>
-              {participant.muted && (
-                <span className="text-xs text-fuchsia-200">
-                  {copy.calls.muted}
-                </span>
-              )}
+              <VoiceParticipantStatusIcons participant={participant} />
             </button>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+function VoiceParticipantStatusIcons({
+  participant,
+}: {
+  participant: { deafened?: boolean; muted: boolean };
+}) {
+  if (!participant.muted && !participant.deafened) return null;
+
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-fuchsia-200 [&_svg]:h-4 [&_svg]:w-4">
+      {participant.muted && <MicrophoneIcon muted />}
+      {participant.deafened && <HeadphonesIcon deafened />}
+    </span>
+  );
+}
+
+function voiceParticipantName(name: string): string {
+  return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;
 }
 
 function MemberRow({

@@ -360,7 +360,9 @@ export function useCallSession(): {
         ...current,
         muted,
         participants: current.participants.map((participant, index) =>
-          index === 0 ? { ...participant, muted } : participant,
+          index === 0
+            ? { ...participant, muted, speaking: false }
+            : participant,
         ),
       };
     });
@@ -382,7 +384,15 @@ export function useCallSession(): {
       });
       peerManager.setDeafened(deafened);
 
-      return { ...current, deafened };
+      return {
+        ...current,
+        deafened,
+        participants: current.participants.map((participant) =>
+          participant.identityId === current.currentIdentityId
+            ? { ...participant, deafened }
+            : participant,
+        ),
+      };
     });
   };
 
@@ -618,6 +628,7 @@ function localParticipantWithMediaState(
   return {
     ...participant,
     audioLevel,
+    deafened: call.deafened,
     mediaStream: call.localPreviewStream,
     muted: call.muted,
     screenSharing: call.screenSharing,
