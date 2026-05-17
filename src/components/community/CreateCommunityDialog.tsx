@@ -1,6 +1,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  type ReactElement,
   useEffect,
   useMemo,
   useRef,
@@ -17,6 +18,7 @@ import { GlassSelect } from '../common/GlassSelect';
 import { ImageCropEditor } from '../common/ImageCropEditor';
 
 interface CreateCommunityDialogProps {
+  headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
   onCreated: (input: { community: Community; session: Session }) => void;
@@ -29,6 +31,7 @@ type InitialChannelDraft = {
 };
 
 export function CreateCommunityDialog({
+  headerControl,
   nodeNetworks,
   onClose,
   onCreated,
@@ -201,6 +204,7 @@ export function CreateCommunityDialog({
             ×
           </button>
         </div>
+        {headerControl}
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">

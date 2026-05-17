@@ -179,7 +179,6 @@ export function GlassWorkspace({
   const [messageState, setMessageState] = useState<LoadState>('idle');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
-  const [isDiscoverCommunityOpen, setIsDiscoverCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<
@@ -2830,7 +2829,6 @@ export function GlassWorkspace({
             setSidebarOpen(false);
           }}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-          onDiscoverCommunitiesClick={() => setIsDiscoverCommunityOpen(true)}
           onMessagesClick={() => {
             setWorkspaceMode('messages');
             setSidebarOpen(false);
@@ -2863,9 +2861,6 @@ export function GlassWorkspace({
                     setSidebarOpen(false);
                   }}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onDiscoverCommunitiesClick={() =>
-                    setIsDiscoverCommunityOpen(true)
-                  }
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');
                     setSidebarOpen(false);
@@ -3005,9 +3000,6 @@ export function GlassWorkspace({
                   setSidebarOpen(false);
                 }}
                 onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                onDiscoverCommunitiesClick={() =>
-                  setIsDiscoverCommunityOpen(true)
-                }
                 onMessagesClick={() => {
                   setWorkspaceMode('messages');
                   setSidebarOpen(false);
@@ -3097,7 +3089,6 @@ export function GlassWorkspace({
         inspectorOpen={inspectorOpen}
         isCreateCommunityOpen={isCreateCommunityOpen}
         isCreateOpen={isCreateOpen}
-        isDiscoverCommunityOpen={isDiscoverCommunityOpen}
         membershipRequestAction={membershipRequestAction}
         membershipRequestError={membershipRequestError}
         membershipRequests={membershipRequests}
@@ -3121,7 +3112,6 @@ export function GlassWorkspace({
         }
         onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
         onCloseCreateConversation={() => setIsCreateOpen(false)}
-        onCloseDiscoverCommunity={() => setIsDiscoverCommunityOpen(false)}
         onCloseInspector={() => setInspectorOpen(false)}
         onCloseMessageContextMenu={() => setMessageContextMenu(null)}
         onCloseNodeSettings={() => setNodeSettingsOpen(false)}
@@ -3140,7 +3130,7 @@ export function GlassWorkspace({
             request,
             ...current.filter((item) => item.id !== request.id),
           ]);
-          setIsDiscoverCommunityOpen(false);
+          setIsCreateCommunityOpen(false);
         }}
         onConversationCreated={handleConversationCreated}
         onAcceptMembershipRequest={(requestId) =>

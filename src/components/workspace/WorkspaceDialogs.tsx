@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
@@ -21,6 +21,7 @@ import { copy } from '../../i18n/en';
 import { IncomingCallDialog } from '../calls/IncomingCallDialog';
 import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
 import { CommunityDiscoveryDialog } from '../community/CommunityDiscoveryDialog';
+import { SegmentedControl } from '../common/SegmentedControl';
 import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { Inspector } from './Inspector';
 import {
@@ -51,7 +52,6 @@ interface WorkspaceDialogsProps {
   inspectorOpen: boolean;
   isCreateCommunityOpen: boolean;
   isCreateOpen: boolean;
-  isDiscoverCommunityOpen: boolean;
   membershipRequestAction: 'accept' | 'decline' | 'refresh' | null;
   membershipRequestError: string | null;
   membershipRequests: CommunityMembershipRequest[];
@@ -73,7 +73,6 @@ interface WorkspaceDialogsProps {
   onAcceptNotification: (notification: NotificationResource) => void;
   onCloseCreateCommunity: () => void;
   onCloseCreateConversation: () => void;
-  onCloseDiscoverCommunity: () => void;
   onCloseInspector: () => void;
   onCloseMessageContextMenu: () => void;
   onCloseNodeSettings: () => void;
@@ -105,17 +104,49 @@ interface WorkspaceDialogsProps {
 }
 
 export function WorkspaceDialogs(props: WorkspaceDialogsProps): ReactElement {
+  const [communityEntryMode, setCommunityEntryMode] =
+    useState<CommunityEntryMode>('discover');
+
+  useEffect(() => {
+    if (props.isCreateCommunityOpen) setCommunityEntryMode('discover');
+  }, [props.isCreateCommunityOpen]);
+
   return (
     <>
       <MobileInspectorDialog {...props} />
       <MessageActionDialogs {...props} />
-      <CreateDialogs {...props} />
-      <DiscoverCommunityDialog {...props} />
+      <CreateDialogs
+        {...props}
+        communityEntryMode={communityEntryMode}
+        onCommunityEntryModeChange={setCommunityEntryMode}
+      />
       <WorkspaceNotificationDialog {...props} />
       <NodeSettingsOverlay {...props} />
       <RealtimeEventsOverlay {...props} />
       <IncomingCallOverlay {...props} />
     </>
+  );
+}
+
+type CommunityEntryMode = 'create' | 'discover';
+
+function CommunityEntryModeControl({
+  mode,
+  onChange,
+}: {
+  mode: CommunityEntryMode;
+  onChange: (mode: CommunityEntryMode) => void;
+}): ReactElement {
+  return (
+    <SegmentedControl
+      className="mt-5"
+      onChange={onChange}
+      value={mode}
+      options={[
+        { label: copy.communities.discover, value: 'discover' },
+        { label: copy.communities.create, value: 'create' },
+      ]}
+    />
   );
 }
 
@@ -188,7 +219,12 @@ function MessageActionDialogs(
   );
 }
 
-function CreateDialogs(props: WorkspaceDialogsProps): ReactElement | null {
+function CreateDialogs(
+  props: WorkspaceDialogsProps & {
+    communityEntryMode: CommunityEntryMode;
+    onCommunityEntryModeChange: (mode: CommunityEntryMode) => void;
+  },
+): ReactElement | null {
   if (props.isCreateOpen) {
     return (
       <CreateConversationDialog
@@ -202,25 +238,30 @@ function CreateDialogs(props: WorkspaceDialogsProps): ReactElement | null {
 
   if (!props.isCreateCommunityOpen) return null;
 
-  return (
-    <CreateCommunityDialog
-      nodeNetworks={props.nodeNetworks}
-      session={props.session}
-      onClose={props.onCloseCreateCommunity}
-      onCreated={props.onCommunityCreated}
+  const modeControl = (
+    <CommunityEntryModeControl
+      mode={props.communityEntryMode}
+      onChange={props.onCommunityEntryModeChange}
     />
   );
-}
 
-function DiscoverCommunityDialog(
-  props: WorkspaceDialogsProps,
-): ReactElement | null {
-  if (!props.isDiscoverCommunityOpen) return null;
+  if (props.communityEntryMode === 'create') {
+    return (
+      <CreateCommunityDialog
+        headerControl={modeControl}
+        nodeNetworks={props.nodeNetworks}
+        session={props.session}
+        onClose={props.onCloseCreateCommunity}
+        onCreated={props.onCommunityCreated}
+      />
+    );
+  }
 
   return (
     <CommunityDiscoveryDialog
+      headerControl={modeControl}
       nodeNetworks={props.nodeNetworks}
-      onClose={props.onCloseDiscoverCommunity}
+      onClose={props.onCloseCreateCommunity}
       onJoinRequested={props.onCommunityJoinRequested}
       session={props.session}
     />

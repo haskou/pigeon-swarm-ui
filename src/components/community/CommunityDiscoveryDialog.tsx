@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
@@ -15,6 +15,7 @@ import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 
 type CommunityDiscoveryDialogProps = {
+  headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
   onJoinRequested: (request: CommunityMembershipRequest) => void;
@@ -22,6 +23,7 @@ type CommunityDiscoveryDialogProps = {
 };
 
 export function CommunityDiscoveryDialog({
+  headerControl,
   nodeNetworks,
   onClose,
   onJoinRequested,
@@ -143,6 +145,7 @@ export function CommunityDiscoveryDialog({
             x
           </button>
         </div>
+        {headerControl}
 
         <form
           onSubmit={submitSearch}

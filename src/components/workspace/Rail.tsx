@@ -17,7 +17,6 @@ interface RailProps {
   notificationCount?: number;
   onCommunityClick?: (communityId: string) => void;
   onCreateCommunityClick?: () => void;
-  onDiscoverCommunitiesClick?: () => void;
   onInspectorClick?: () => void;
   onMessagesClick?: () => void;
   onNotificationsClick?: () => void;
@@ -36,7 +35,6 @@ export function Rail({
   notificationCount = 0,
   onCommunityClick,
   onCreateCommunityClick,
-  onDiscoverCommunitiesClick,
   onInspectorClick,
   onMessagesClick,
   onNotificationsClick,
@@ -68,7 +66,7 @@ export function Rail({
         <RailBadge count={messageNotificationCount} />
       </div>
       <div className="h-px w-10 bg-white/10" />
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible">
         {communities.map((community) => (
           <div
             key={community.id}
@@ -94,49 +92,16 @@ export function Rail({
             <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
           </div>
         ))}
-      </div>
-      <button
-        type="button"
-        onClick={onCreateCommunityClick}
-        className="group relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-dashed border-white/25 bg-white/5 text-2xl font-black text-white/60 transition hover:bg-white/12 hover:text-white"
-        aria-label={copy.communities.createTooltip}
-        title={copy.communities.createTooltip}
-      >
-        +<span className="sr-only">{copy.communities.createTooltip}</span>
-        <span className="pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-20 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-white/10 bg-[#15172d] px-3 py-2 text-xs font-black text-white/80 shadow-xl shadow-black/35 group-hover:block">
-          {copy.communities.createTooltip}
-        </span>
-      </button>
-      {onDiscoverCommunitiesClick && (
         <button
           type="button"
-          onClick={onDiscoverCommunitiesClick}
-          className="group relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white"
-          aria-label={copy.communities.discover}
-          title={copy.communities.discover}
+          onClick={onCreateCommunityClick}
+          className="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-dashed border-white/25 bg-white/5 text-2xl font-black text-white/60 transition hover:bg-white/12 hover:text-white"
+          aria-label={copy.communities.createTooltip}
+          title={copy.communities.createTooltip}
         >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-5 w-5"
-          >
-            <path
-              d="m10.5 13.5-2 2 2-6 6-2-2 6-4 0Z"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            />
-          </svg>
-          <span className="sr-only">{copy.communities.discover}</span>
+          +<span className="sr-only">{copy.communities.createTooltip}</span>
         </button>
-      )}
+      </div>
       <button
         type="button"
         onClick={onNotificationsClick}
