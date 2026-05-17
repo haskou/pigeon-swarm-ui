@@ -109,12 +109,14 @@ function CompactCallBar({
       }}
       className="mb-2 cursor-pointer rounded-2xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl transition hover:bg-[#191b29]/95"
     >
-      <div className="flex items-center gap-2.5">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
-          <SpeakerIcon />
+      <div className="flex flex-col gap-2.5">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+            <SpeakerIcon />
+          </div>
+          <CompactCallTitle call={call} subtitle={subtitle} />
         </div>
-        <CompactCallTitle call={call} subtitle={subtitle} />
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           <CompactMediaControls
             call={call}
             onToggleCamera={onToggleCamera}

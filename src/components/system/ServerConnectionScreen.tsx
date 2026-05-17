@@ -11,7 +11,7 @@ export function ServerConnectionScreen({
   onRetry,
 }: ServerConnectionScreenProps) {
   return (
-    <section className="relative z-10 mx-auto flex w-full max-w-3xl items-center justify-center px-4 py-6 sm:py-8">
+    <section className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-3xl items-center justify-center px-4 py-10">
       <div className="glass-panel-strong flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl p-6 text-center sm:p-8">
         <img
           src="/connectionLost.png"
