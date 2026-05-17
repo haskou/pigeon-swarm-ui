@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+
+import { useCallback, useEffect, useState } from 'react';
 
 import type { ConversationResource, Session } from '../../domain/types';
 
@@ -65,7 +66,9 @@ export function useAppBootstrap(): {
 
   useEffect(() => {
     if (nodeNetworks.loading || nodeNetworks.error || session) return;
+
     if (nodeNetworks.networks.length === 0) return;
+
     if (restoreState !== 'loading') return;
 
     const savedCredentials = loadSavedCredentials();

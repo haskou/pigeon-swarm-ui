@@ -7,15 +7,15 @@ import type {
   CallSignalType,
   CallSession,
 } from '../../domain/calls/CallSession';
-
-import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
-import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+
 import {
   logCallDebug,
   logCallError,
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
+import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
+import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 
 type SignalSender = (
   recipientIdentityId: string,
@@ -147,17 +147,17 @@ export function useCallSession(): {
       communityId: input.communityId,
       conversationId: input.conversationId,
       currentIdentityId: input.currentIdentityId,
-      id: input.id,
-      kind: input.kind,
-      participants: input.participants,
-      subtitle: input.subtitle,
-      title: input.title,
       deafened: false,
       hasMicrophone: input.localStream !== null,
+      id: input.id,
+      kind: input.kind,
       muted: input.localStream === null,
+      participants: input.participants,
       participantVolumes: {},
       startedAt: Date.now(),
       status: 'connecting',
+      subtitle: input.subtitle,
+      title: input.title,
     };
 
     setActiveCall(nextCall);
@@ -222,6 +222,7 @@ export function useCallSession(): {
       mediaManager.stop();
       peerManager.reset();
       pendingSignalsRef.current.delete(nextCall.id);
+
       if (startingCallIdRef.current === nextCall.id) {
         startingCallIdRef.current = null;
       }
@@ -230,8 +231,8 @@ export function useCallSession(): {
           ? {
               ...current,
               hasMicrophone: false,
-              status: 'permission-denied',
               muted: true,
+              status: 'permission-denied',
             }
           : current,
       );
@@ -317,6 +318,7 @@ export function useCallSession(): {
         activeCallId,
         callId: input.callId,
       });
+
       return;
     }
 
@@ -343,13 +345,16 @@ export function useCallSession(): {
     setActiveCall((current) => {
       if (!current) {
         logCallWarning('session:toggle-mute:ignored-no-active-call');
+
         return current;
       }
+
       if (!current.hasMicrophone) {
         logCallWarning('session:toggle-mute:ignored-no-microphone', {
           callId: current.id,
           status: current.status,
         });
+
         return current;
       }
 
@@ -375,6 +380,7 @@ export function useCallSession(): {
     setActiveCall((current) => {
       if (!current) {
         logCallWarning('session:toggle-deafen:ignored-no-active-call');
+
         return current;
       }
 
@@ -390,10 +396,7 @@ export function useCallSession(): {
     });
   };
 
-  const setParticipantVolume = (
-    identityId: string,
-    volumePercent: number,
-  ) => {
+  const setParticipantVolume = (identityId: string, volumePercent: number) => {
     peerManager.setPeerVolume(identityId, volumePercent);
     setActiveCall((current) => {
       if (!current) return current;

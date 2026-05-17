@@ -10,7 +10,6 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
-import { normalizeIdentityId } from '../../utils/identityId';
 import {
   identityName,
   identityPicture,
@@ -18,6 +17,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
+import { normalizeIdentityId } from '../../utils/identityId';
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
@@ -114,6 +114,7 @@ export function useIdentityDirectory({
           ids.add(notification.payload.inviterIdentityId);
         }
       }
+
       if (isResolvableIdentityId(notification.payload.recipientIdentityId)) {
         ids.add(notification.payload.recipientIdentityId);
       }
@@ -127,7 +128,8 @@ export function useIdentityDirectory({
 
     return [...ids].filter(
       (identityId) =>
-        !identityNames[identityId] && !resolvingIdentityIds.includes(identityId),
+        !identityNames[identityId] &&
+        !resolvingIdentityIds.includes(identityId),
     );
   }, [
     conversations,
@@ -227,7 +229,6 @@ async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
     return [identityId, identityId, null, null] as const;
   }
 }
-
 
 async function loadIdentityPicture(
   identity: IdentityResource,

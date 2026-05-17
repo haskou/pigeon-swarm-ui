@@ -52,6 +52,20 @@ export function conversationNotificationPreview(
     };
   }
 
+  return oneToOneConversationNotificationPreview(
+    conversation,
+    session,
+    identityNames,
+    identityProfiles,
+  );
+}
+
+function oneToOneConversationNotificationPreview(
+  conversation: ConversationResource,
+  session: Session,
+  identityNames: Record<string, string>,
+  identityProfiles: Record<string, IdentityResource>,
+): { body: string; title: string } {
   const peerIdentityId = conversationPeerIdentityId(
     conversation,
     session.identity.id,

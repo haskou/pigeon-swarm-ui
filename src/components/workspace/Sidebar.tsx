@@ -46,10 +46,10 @@ import {
   normalizeHandle,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
 import { ImageCropEditor } from '../common/ImageCropEditor';
 import { SectionTitle } from '../common/SectionTitle';
-import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { loadPublicImage } from '../community/communityImages';
 
 interface SidebarProps {
@@ -76,19 +76,19 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  activeCall,
   activeConversationId,
   conversations,
   identityNames,
   identityPictures,
   identityProfiles,
   nodeNetworks,
-  onClose,
-  onCreate,
-  activeCall,
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
+  onClose,
+  onCreate,
   onLogout,
   onSelect,
   onSessionUpdated,
@@ -367,17 +367,17 @@ function useIdentityBannerUrls(
 }
 
 export function UserProfileDropdown({
+  activeCall,
   identityNames = {},
   identityPictures = {},
   nodeNetworks,
-  onLogout,
-  onSessionUpdated,
-  session,
-  activeCall,
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
+  onLogout,
+  onSessionUpdated,
+  session,
 }: {
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;

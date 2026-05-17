@@ -14,7 +14,8 @@ type MarkdownBlock =
   | { items: InlineToken[][]; ordered: boolean; type: 'list' };
 
 const autoLinkPattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
-const markdownLinkPattern = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+|www\.[^)\s]+)\)/;
+const markdownLinkPattern =
+  /^\[([^\]]+)\]\((https?:\/\/[^)\s]+|www\.[^)\s]+)\)/;
 
 export function MarkdownMessage({
   content,
@@ -37,10 +38,12 @@ export function MarkdownMessage({
 }
 
 function hasMarkdownSyntax(content: string): boolean {
-  return /(^|\n)(#{1,3}\s|>\s|[-*]\s|\d+\.\s|```)/.test(content) ||
+  return (
+    /(^|\n)(#{1,3}\s|>\s|[-*]\s|\d+\.\s|```)/.test(content) ||
     /(\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\((https?:\/\/|www\.))/i.test(
       content,
-    );
+    )
+  );
 }
 
 function parseMarkdownBlocks(content: string): MarkdownBlock[] {
@@ -223,7 +226,10 @@ function parseInlineSegment(
     const innerText = text.slice(innerStart, closeIndex);
 
     if (!innerText.trim()) {
-      pushTextWithAutoLinks(tokens, text.slice(delimiter.index, closeIndex + delimiter.close.length));
+      pushTextWithAutoLinks(
+        tokens,
+        text.slice(delimiter.index, closeIndex + delimiter.close.length),
+      );
       cursor = closeIndex + delimiter.close.length;
       continue;
     }
@@ -330,7 +336,9 @@ function renderBlock(block: MarkdownBlock, mine: boolean, index: number) {
           )}
         >
           {block.items.map((item, itemIndex) => (
-            <li key={itemIndex}>{renderInline(item, mine, `${index}-${itemIndex}`)}</li>
+            <li key={itemIndex}>
+              {renderInline(item, mine, `${index}-${itemIndex}`)}
+            </li>
           ))}
         </ListTag>
       );
@@ -354,14 +362,19 @@ function renderInline(
 
     switch (token.type) {
       case 'bold':
-        return <strong key={key}>{renderInline(token.children, mine, key)}</strong>;
+        return (
+          <strong key={key}>{renderInline(token.children, mine, key)}</strong>
+        );
       case 'italic':
         return <em key={key}>{renderInline(token.children, mine, key)}</em>;
       case 'strike':
         return <s key={key}>{renderInline(token.children, mine, key)}</s>;
       case 'code':
         return (
-          <code key={key} className="rounded-md bg-black/25 px-1 py-0.5 text-[0.92em]">
+          <code
+            key={key}
+            className="rounded-md bg-black/25 px-1 py-0.5 text-[0.92em]"
+          >
             {token.text}
           </code>
         );

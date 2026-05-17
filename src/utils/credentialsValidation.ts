@@ -18,10 +18,15 @@ export function passwordValidationError(value: string): string | null {
   const checks = passwordValidationChecks(value);
 
   if (!checks.minLength) return 'too-short';
+
   if (!checks.maxLength) return 'too-long';
+
   if (!checks.uppercase) return 'missing-uppercase';
+
   if (!checks.lowercase) return 'missing-lowercase';
+
   if (!checks.number) return 'missing-number';
+
   if (!checks.symbol) return 'missing-symbol';
 
   return null;

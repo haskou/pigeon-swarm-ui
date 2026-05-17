@@ -18,8 +18,9 @@ describe('emoji shortcode helpers', () => {
   });
 
   it('returns sob for :s suggestions', () => {
-    expect(searchEmojiSuggestions('s').map((suggestion) => suggestion.shortcode))
-      .toContain('sob');
+    expect(
+      searchEmojiSuggestions('s').map((suggestion) => suggestion.shortcode),
+    ).toContain('sob');
   });
 
   it('replaces the trigger and keeps the caret after the emoji', () => {

@@ -18,7 +18,10 @@ import {
 } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type {
+  CallParticipant,
+  CallSession,
+} from '../../domain/calls/CallSession';
 import type {
   Community,
   CommunityChannel,
@@ -33,21 +36,18 @@ import type {
   MessageResource,
   Session,
 } from '../../domain/types';
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../domain/calls/CallSession';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import {
-  communityTextChannels,
-  communityVoiceChannels,
-} from '../../domain/communities/communityChannels';
-import {
   decryptCommunityChannelPayload,
   encryptCommunityChannelPayload,
 } from '../../domain/communities/communityChannelPayloadCipher';
+import {
+  communityTextChannels,
+  communityVoiceChannels,
+} from '../../domain/communities/communityChannels';
 import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -57,14 +57,14 @@ import {
   isSameDay,
   shortId,
 } from '../../utils/formatting';
-import { normalizeIdentityId } from '../../utils/identityId';
 import { identityBanner, identityName } from '../../utils/identityDisplay';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
-import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { MessageBubble } from '../chat/MessageBubble';
+import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
 import { ConversationKeyDialog } from '../workspace/ConversationKeyDialog';
@@ -78,10 +78,7 @@ import { UserProfileDropdown } from '../workspace/Sidebar';
 import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
-import {
-  memberDisplayName,
-  memberPrimaryName,
-} from './communityMemberNames';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { ManageCommunityDialog } from './ManageCommunityDialog';
 
 interface CommunityWorkspaceProps {
@@ -183,23 +180,23 @@ export function CommunityWorkspace({
   channelUnreadCounts = {},
   community,
   mobileMembersOpen,
-  mobileSidebarOpen,
   mobileRail,
+  mobileSidebarOpen,
   nodeNetworks,
-  onChannelSelected,
-  onChannelViewed,
-  onCommunityLeft,
-  onCommunityUpdated,
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleDeafen,
   onCallToggleMute,
+  onChannelSelected,
+  onChannelViewed,
+  onCommunityLeft,
+  onCommunityUpdated,
+  onJoinVoiceChannel,
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
-  onOpenMobileSidebar,
-  onJoinVoiceChannel,
   onOpenConversationWithIdentity,
+  onOpenMobileSidebar,
   onRealtimeEventsOpen,
   onSessionUpdated,
   realtimeEvent,
@@ -229,8 +226,7 @@ export function CommunityWorkspace({
   >('idle');
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
-  const [attachmentProgress, setAttachmentProgress] =
-    useState<AttachmentProgress | null>(null);
+  const [attachmentProgress] = useState<AttachmentProgress | null>(null);
   const [memberIdentities, setMemberIdentities] = useState<
     Record<string, IdentityResource>
   >({});
@@ -426,7 +422,9 @@ export function CommunityWorkspace({
         new StringValueObject(
           parsed.conversationId,
           Number.MAX_SAFE_INTEGER,
-        ).isNotEqual(new StringValueObject(community.id, Number.MAX_SAFE_INTEGER)) ||
+        ).isNotEqual(
+          new StringValueObject(community.id, Number.MAX_SAFE_INTEGER),
+        ) ||
         !parsed.privateKey
       ) {
         throw new Error(copy.chat.addPrivateKeyError);
@@ -467,6 +465,7 @@ export function CommunityWorkspace({
   };
   const leaveCommunity = async () => {
     if (communityLeaving) return;
+
     if (!window.confirm(copy.communities.leaveConfirm)) return;
 
     setCommunityLeaving(true);
@@ -642,6 +641,7 @@ export function CommunityWorkspace({
       null;
 
     setSelectedChannelId(nextSelectedChannel);
+
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
   }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
 
@@ -672,6 +672,7 @@ export function CommunityWorkspace({
 
       for (const [identityId, identity, pictureUrl] of entries) {
         if (identity) nextIdentities[identityId] = identity;
+
         if (pictureUrl) nextPictures[identityId] = pictureUrl;
       }
 
@@ -688,6 +689,7 @@ export function CommunityWorkspace({
     const avatar = community.avatar?.trim();
 
     setAvatarUrl(null);
+
     if (!avatar) return undefined;
 
     let cancelled = false;
@@ -706,6 +708,7 @@ export function CommunityWorkspace({
 
     setBannerUrl(null);
     setBannerViewerOpen(false);
+
     if (!banner) return undefined;
 
     let cancelled = false;
@@ -718,12 +721,6 @@ export function CommunityWorkspace({
       cancelled = true;
     };
   }, [community.banner]);
-
-  const refreshCommunity = async () => {
-    onCommunityUpdated(
-      await pigeonApplication.getCommunity(session, community.id),
-    );
-  };
 
   const resolveMemberIdentities = useCallback(async () => {
     const cachedIdentities = memberIdentitiesRef.current;
@@ -739,7 +736,9 @@ export function CommunityWorkspace({
         try {
           return [
             identityId,
-            await pigeonApplication.getIdentity(normalizeIdentityId(identityId)),
+            await pigeonApplication.getIdentity(
+              normalizeIdentityId(identityId),
+            ),
           ] as const;
         } catch {
           return [identityId, undefined] as const;
@@ -885,10 +884,12 @@ export function CommunityWorkspace({
 
     if (nearBottom) {
       setNewChannelMessageCount(0);
+
       if (selectedChannelId) onChannelViewed?.(selectedChannelId);
     }
 
     if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
+
     if (messageStateRef.current === 'loading' || !selectedChannelId) return;
 
     const previousHeight = scroller.scrollHeight;
@@ -986,8 +987,8 @@ export function CommunityWorkspace({
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
           channelId: payload.channelId,
-          communityKey: session.keychain.conversations[community.id],
           communityId: community.id,
+          communityKey: session.keychain.conversations[community.id],
           content: payload.content,
           recipients: Object.values(identities),
           replyPreview: replyPreviewFromMessage(payload.replyTarget),
@@ -1062,6 +1063,7 @@ export function CommunityWorkspace({
   const handleReplyReferenceClick = (messageId: string) => {
     if (messages.some((message) => message.id === messageId)) {
       scrollToChannelMessage(messageId);
+
       return;
     }
 
@@ -1070,6 +1072,7 @@ export function CommunityWorkspace({
 
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
     if (!selectedChannelId || !message.mine) return;
+
     if (!window.confirm(copy.messages.deleteConfirm)) return;
 
     setMessageContextMenu(null);
@@ -1246,11 +1249,13 @@ export function CommunityWorkspace({
       setMessages((current) =>
         current.filter((message) => message.id !== targetMessageId),
       );
+
       return;
     }
 
     if (
-      realtimeEvent.type === 'communities.v1.channel.message.reaction.was_added' ||
+      realtimeEvent.type ===
+        'communities.v1.channel.message.reaction.was_added' ||
       realtimeEvent.type ===
         'communities.v1.channel.message.reaction.was_removed'
     ) {
@@ -1279,6 +1284,7 @@ export function CommunityWorkspace({
             : message,
         ),
       );
+
       return;
     }
 
@@ -1780,7 +1786,11 @@ export function CommunityWorkspace({
                                   y,
                                 })
                               }
-                              onReactionToggle={(targetMessage, emoji, reacted) =>
+                              onReactionToggle={(
+                                targetMessage,
+                                emoji,
+                                reacted,
+                              ) =>
                                 void handleToggleChannelMessageReaction(
                                   targetMessage,
                                   emoji,
@@ -1792,9 +1802,7 @@ export function CommunityWorkspace({
                               reactionAuthorNames={reactionAuthorNames}
                               replyImage={
                                 replyMessage?.attachments.find((attachment) =>
-                                  isBrowserPreviewImage(
-                                    attachment.contentType,
-                                  ),
+                                  isBrowserPreviewImage(attachment.contentType),
                                 ) ?? message.replyPreview?.image
                               }
                               replyAuthorName={
@@ -1839,6 +1847,7 @@ export function CommunityWorkspace({
                   onClick={() => {
                     setNewChannelMessageCount(0);
                     setIsAwayFromBottom(false);
+
                     if (selectedChannelId) onChannelViewed?.(selectedChannelId);
                     bottomRef.current?.scrollIntoView({ block: 'end' });
                   }}

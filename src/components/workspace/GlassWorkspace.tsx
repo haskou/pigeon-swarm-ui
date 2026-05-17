@@ -1,3 +1,4 @@
+import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
   type SetStateAction,
@@ -8,20 +9,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { UUID } from '@haskou/value-objects';
 
-import type {
-  ChatMessage,
-  AttachmentProgress,
-  Community,
-  CommunityChannel,
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-  MessageResource,
-  MessageReplyPreview,
-  Session,
-} from '../../domain/types';
+import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { Peer } from '../../application/peers/ListPeers';
 import type {
   CallParticipant,
   CallParticipantStatus,
@@ -29,26 +19,43 @@ import type {
   CallSignalType,
   CallSession,
 } from '../../domain/calls/CallSession';
-import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { Peer } from '../../application/peers/ListPeers';
+import type {
+  ChatMessage,
+  AttachmentProgress,
+  Community,
+  ConversationKeyEntry,
+  ConversationResource,
+  IdentityResource,
+  MessageResource,
+  Session,
+} from '../../domain/types';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
+import type { MessageContextMenuState } from './MessageContextMenu';
 
 import { pigeonApplication } from '../../application/applicationContainer';
+import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
+import {
+  communityChannels,
+  communityTextChannels,
+} from '../../domain/communities/communityChannels';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import {
   bumpConversationActivity,
   sortConversationsByLatestMessage,
 } from '../../domain/conversations/conversationOrdering';
 import { conversationPeerIdentityId } from '../../domain/conversations/conversationPeer';
-import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { mergeMessages } from '../../domain/messages/mergeMessages';
 import { replyPreviewFromMessage } from '../../domain/messages/messageReplyPreview';
 import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
-import {
-  communityChannels,
-  communityTextChannels,
-} from '../../domain/communities/communityChannels';
 import { selectSharedNetworkId } from '../../domain/networks/selectSharedNetworkId';
 import { copy } from '../../i18n/en';
+import {
+  logCallDebug,
+  logCallError,
+  logCallWarning,
+} from '../../infrastructure/media/callDebugLogger';
+import { useCallSession } from '../../presentation/hooks/useCallSession';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
 import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
@@ -57,7 +64,6 @@ import {
   requestPwaNotificationPermission,
   showPwaNotification,
 } from '../../presentation/notifications/PwaNotifications';
-import { useCallSession } from '../../presentation/hooks/useCallSession';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
@@ -66,12 +72,6 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../../presentation/workspace/useWorkspacePreferences';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
-import {
-  logCallDebug,
-  logCallError,
-  logCallWarning,
-} from '../../infrastructure/media/callDebugLogger';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import {
@@ -82,13 +82,11 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
-import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { loadPublicImage } from '../community/communityImages';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { Rail } from './Rail';
-import type { MessageContextMenuState } from './MessageContextMenu';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -98,7 +96,6 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
-import type { CommunityUnreadCounts } from './workspacePersistence';
 import { WorkspaceDialogs } from './WorkspaceDialogs';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -127,16 +124,16 @@ interface GlassWorkspaceProps {
 }
 
 export function GlassWorkspace({
-  conversations,
   communities,
+  conversations,
   node,
   nodeNetworks,
   onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
-  pendingCommunityInvite,
   peers,
+  pendingCommunityInvite,
   session,
   setCommunities,
   setConversations,
@@ -393,16 +390,20 @@ export function GlassWorkspace({
       session: Session;
     }) => {
       setSession(next.session);
+
       if (next.conversations) {
         setConversations(next.conversations);
       }
+
       if (next.communities) {
         setCommunities(next.communities);
       }
+
       if (next.conversationId) {
         setActiveConversationId(next.conversationId);
         setWorkspaceMode('messages');
       }
+
       if (next.communityId) {
         setActiveCommunityId(next.communityId);
         setWorkspaceMode('community');
@@ -531,6 +532,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     if (!pendingCommunityInvite) return;
+
     if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
       return;
     }
@@ -785,6 +787,7 @@ export function GlassWorkspace({
 
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
+
         if (activeCall?.id === call.id) {
           logCallWarning('workspace:call:ended-by-resource-status', {
             callId: call.id,
@@ -793,11 +796,13 @@ export function GlassWorkspace({
           playEndedCallSound();
           endCall();
         }
+
         return;
       }
 
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
+
         if (activeCall?.id === call.id) {
           logCallWarning('workspace:call:ended-unsupported-group-call', {
             callId: call.id,
@@ -805,6 +810,7 @@ export function GlassWorkspace({
           playEndedCallSound();
           endCall();
         }
+
         return;
       }
 
@@ -828,6 +834,7 @@ export function GlassWorkspace({
         });
         playEndedCallSound();
         endCall();
+
         return;
       }
 
@@ -844,6 +851,7 @@ export function GlassWorkspace({
           participants: details.participants,
           title: details.title,
         });
+
         return;
       }
 
@@ -937,6 +945,7 @@ export function GlassWorkspace({
 
       if (details.kind === 'one-to-one') {
         await pigeonApplication.endCall(sessionRef.current, call.id);
+
         return;
       }
 
@@ -995,6 +1004,7 @@ export function GlassWorkspace({
       title: string;
     }) => {
       if (input.kind === 'group') return;
+
       if (callActionInProgressRef.current) {
         logCallWarning(
           'workspace:conversation-call:ignored-action-in-progress',
@@ -1002,8 +1012,10 @@ export function GlassWorkspace({
             conversationId: input.conversationId,
           },
         );
+
         return;
       }
+
       if (
         activeCall?.kind === input.kind &&
         activeCall.conversationId === input.conversationId
@@ -1012,6 +1024,7 @@ export function GlassWorkspace({
           callId: activeCall.id,
           conversationId: input.conversationId,
         });
+
         return;
       }
 
@@ -1029,6 +1042,7 @@ export function GlassWorkspace({
           logCallDebug('workspace:conversation-call:create-request', {
             conversationId: input.conversationId,
           });
+
           return await pigeonApplication.startConversationCall(
             sessionRef.current,
             input.conversationId,
@@ -1096,6 +1110,7 @@ export function GlassWorkspace({
         communityId: activeCommunity?.id,
         connectedIdentityCount: channel.connectedIdentityIds?.length ?? 0,
       });
+
       if (!activeCommunity) {
         logCallWarning(
           'workspace:community-voice:ignored-no-active-community',
@@ -1103,8 +1118,10 @@ export function GlassWorkspace({
             channelId: channel.id,
           },
         );
+
         return;
       }
+
       if (
         activeCall?.kind === 'community-voice' &&
         activeCall.communityId === activeCommunity.id &&
@@ -1115,6 +1132,7 @@ export function GlassWorkspace({
           channelId: channel.id,
           communityId: activeCommunity.id,
         });
+
         return;
       }
 
@@ -1208,6 +1226,7 @@ export function GlassWorkspace({
 
   const acceptIncomingCall = useCallback(() => {
     if (!incomingCall) return;
+
     if (callActionInProgressRef.current) {
       logCallWarning(
         'workspace:incoming-call:accept-ignored-action-in-progress',
@@ -1215,6 +1234,7 @@ export function GlassWorkspace({
           callId: incomingCall.call.id,
         },
       );
+
       return;
     }
 
@@ -1236,6 +1256,7 @@ export function GlassWorkspace({
         logCallDebug('workspace:incoming-call:join-request', {
           callId: pendingCall.id,
         });
+
         return await pigeonApplication.joinCall(
           sessionRef.current,
           pendingCall.id,
@@ -1300,6 +1321,7 @@ export function GlassWorkspace({
     endCall();
     removeCurrentIdentityFromVoicePresence();
     playEndedCallSound();
+
     if (!callId) return;
 
     const request = shouldEndForEveryone
@@ -1362,6 +1384,7 @@ export function GlassWorkspace({
           );
           removeCurrentIdentityFromVoicePresence();
           await onCommunitiesReload().catch(() => undefined);
+
           return;
         }
 
@@ -1377,6 +1400,7 @@ export function GlassWorkspace({
   useEffect(() => {
     if (!activeConversationId && conversations[0])
       setActiveConversationId(conversations[0].id);
+
     if (
       activeConversationId &&
       conversations.length > 0 &&
@@ -1548,6 +1572,7 @@ export function GlassWorkspace({
         scrollMessagesToBottom('auto', true);
       } catch (caught) {
         if (messageRequestRef.current !== requestId) return;
+
         if (controller.signal.aborted) return;
 
         setMessages([]);
@@ -1558,6 +1583,7 @@ export function GlassWorkspace({
 
         return;
       }
+
       if (messageRequestRef.current !== requestId) return;
 
       if (messageAbortRef.current === controller) {
@@ -1574,6 +1600,7 @@ export function GlassWorkspace({
 
   useEffect(() => {
     if (workspaceMode !== 'messages') return;
+
     if (!activeConversation?.id) return;
     setReplyTarget(null);
     setNewMessageCount(0);
@@ -1586,6 +1613,7 @@ export function GlassWorkspace({
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;
       setMessageLoadState('idle');
+
       return;
     }
 
@@ -1621,6 +1649,7 @@ export function GlassWorkspace({
         activeConversation.id,
         messageCursorRef.current,
       );
+
       if (messageRequestRef.current !== requestId) return;
 
       setMessages((current) => [...result.messages, ...current]);
@@ -1637,6 +1666,7 @@ export function GlassWorkspace({
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     }
+
     if (messageRequestRef.current !== requestId) return;
 
     setMessageLoadState('idle');
@@ -1649,7 +1679,9 @@ export function GlassWorkspace({
     const isScrollingUp = scrollTop < lastScrollTopRef.current;
 
     lastScrollTopRef.current = scrollTop;
+
     if (Date.now() < suppressMessageLoadsUntilRef.current) return;
+
     if (isScrolledNearBottom()) setNewMessageCount(0);
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
@@ -1807,6 +1839,7 @@ export function GlassWorkspace({
   const handleReplyReferenceClick = async (messageId: string) => {
     if (messages.some((message) => message.id === messageId)) {
       scrollToMessage(messageId);
+
       return;
     }
 
@@ -1826,6 +1859,7 @@ export function GlassWorkspace({
 
       if (result.messages.some((message) => message.id === messageId)) {
         scrollToMessage(messageId);
+
         return;
       }
 
@@ -1974,6 +2008,7 @@ export function GlassWorkspace({
       };
 
       setSession(nextSession);
+
       if (identity) rememberIdentity(identity);
       setConversations((current) =>
         sortConversationsByLatestMessage([
@@ -2031,6 +2066,7 @@ export function GlassWorkspace({
         if (!message) return;
 
         setMessages((current) => mergeMessages(current, [message]));
+
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
           scrollMessagesToBottom('smooth', true);
@@ -2101,6 +2137,7 @@ export function GlassWorkspace({
               signalType,
             }).catch(() => undefined);
           }
+
           return;
         }
 
@@ -2132,11 +2169,13 @@ export function GlassWorkspace({
               },
             );
           });
+
         return;
       }
 
       if (event.type.startsWith('nodes.')) {
         void onPeersReload().catch(() => undefined);
+
         return;
       }
 
@@ -2148,11 +2187,13 @@ export function GlassWorkspace({
           title: copy.notifications.title,
         });
         void refreshNotifications();
+
         return;
       }
 
       if (event.type.startsWith('keychains.')) {
         void refreshSession().catch(() => undefined);
+
         return;
       }
 
@@ -2163,6 +2204,7 @@ export function GlassWorkspace({
             .then((identity) => setSession({ ...session, identity }))
             .catch(() => undefined);
         }
+
         return;
       }
 
@@ -2200,6 +2242,7 @@ export function GlassWorkspace({
         }
 
         setCommunityRealtimeEvent(event);
+
         return;
       }
 
@@ -2210,6 +2253,7 @@ export function GlassWorkspace({
         event.type === 'communities.v1.call.event.was_recorded'
       ) {
         setCommunityRealtimeEvent(event);
+
         return;
       }
 
@@ -2355,11 +2399,13 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('communities.')) {
         void onCommunitiesReload().catch(() => undefined);
+
         return;
       }
 
       if (event.type.startsWith('conversations.v1.conversation.')) {
         void refreshConversations().catch(() => undefined);
+
         return;
       }
 
@@ -2409,6 +2455,7 @@ export function GlassWorkspace({
             tag: `conversation-${conversationId}`,
             title: preview.title,
           });
+
           if (unreadMessageId)
             markUnreadMessage(conversationId, unreadMessageId);
         }
@@ -2458,6 +2505,7 @@ export function GlassWorkspace({
                   : message,
               ),
             );
+
             return;
           }
 
@@ -2480,7 +2528,9 @@ export function GlassWorkspace({
             };
 
             setMessages((current) => mergeMessages(current, [message]));
+
             if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+
             return;
           }
 

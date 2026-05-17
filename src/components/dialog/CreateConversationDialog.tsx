@@ -225,7 +225,9 @@ export function CreateConversationDialog({
           {
             name: groupName.trim(),
             networkId: groupNetworkId,
-            participantIds: groupParticipants.map(({ identity }) => identity.id),
+            participantIds: groupParticipants.map(
+              ({ identity }) => identity.id,
+            ),
           },
         );
         onCreated(
@@ -246,6 +248,7 @@ export function CreateConversationDialog({
       }
 
       setState('idle');
+
       return;
     }
 
@@ -286,7 +289,7 @@ export function CreateConversationDialog({
     setState('idle');
   };
 
-  const addGroupParticipant = async () => {
+  const addGroupParticipant = () => {
     const identity = groupIdentityPreview?.identity;
 
     if (!identity) return;

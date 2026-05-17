@@ -10,13 +10,13 @@ export type WorkspacePreference = {
 };
 export type CommunityUnreadCounts = Record<string, Record<string, number>>;
 
-export const lastConversationStorageKey = (identityId: string) =>
+export const lastConversationStorageKey = (identityId: string): string =>
   `pigeon:lastConversation:${identityId}`;
-export const draftsStorageKey = (identityId: string) =>
+export const draftsStorageKey = (identityId: string): string =>
   `pigeon:conversationDrafts:${identityId}`;
-export const workspaceStorageKey = (identityId: string) =>
+export const workspaceStorageKey = (identityId: string): string =>
   `pigeon:workspace:${identityId}`;
-export const communityUnreadStorageKey = (identityId: string) =>
+export const communityUnreadStorageKey = (identityId: string): string =>
   `pigeon:communityUnread:${identityId}`;
 
 export function initialConversationId(

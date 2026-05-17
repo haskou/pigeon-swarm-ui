@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+
+import { useEffect, useState } from 'react';
 
 import type { ConversationResource } from '../../domain/types';
 
@@ -33,8 +34,8 @@ export function useWorkspacePreferences(input: {
   workspaceMode: WorkspaceMode;
 }): void {
   const {
-    activeConversationId,
     activeCommunityId,
+    activeConversationId,
     communityChannelById,
     communityUnreadCountsById,
     drafts,

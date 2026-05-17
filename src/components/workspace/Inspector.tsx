@@ -1,13 +1,14 @@
+import type { ReactNode } from 'react';
+
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+
+import type { Peer } from '../../application/peers/ListPeers';
 import type {
   ChatMessage,
   ConversationResource,
   Session,
 } from '../../domain/types';
-import type { Peer } from '../../application/peers/ListPeers';
-import type { ReactNode } from 'react';
-
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -155,11 +156,7 @@ function MetricCard({
     );
   }
 
-  return (
-    <div className="rounded-2xl bg-white/8 p-4">
-      {content}
-    </div>
-  );
+  return <div className="rounded-2xl bg-white/8 p-4">{content}</div>;
 }
 
 function PeersDialog({

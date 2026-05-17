@@ -39,13 +39,17 @@ function httpErrorMessage(error: HttpJsonError, fallback: string): string {
   }
 
   if (error.status === 401) return copy.errors.unauthorized;
+
   if (error.status === 403) return copy.errors.forbidden;
+
   if (error.status === 404) return copy.errors.notFound;
 
   return fallback;
 }
 
-function normalizeBackendCode(code: number | string | undefined): string | null {
+function normalizeBackendCode(
+  code: number | string | undefined,
+): string | null {
   if (code === undefined) return null;
 
   return String(code);

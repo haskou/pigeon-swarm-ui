@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+
 import './index.css';
 import App from './App';
 
@@ -13,8 +14,7 @@ const serviceWorkerPath = '/sw.js';
 
 function isJavaScriptMimeType(contentType: string): boolean {
   return (
-    contentType.includes('javascript') ||
-    contentType.includes('ecmascript')
+    contentType.includes('javascript') || contentType.includes('ecmascript')
   );
 }
 
@@ -24,7 +24,9 @@ async function registerServiceWorker(): Promise<void> {
   if (import.meta.env.DEV) {
     const registrations = await navigator.serviceWorker.getRegistrations();
 
-    await Promise.all(registrations.map((registration) => registration.unregister()));
+    await Promise.all(
+      registrations.map((registration) => registration.unregister()),
+    );
 
     return;
   }
@@ -36,11 +38,15 @@ async function registerServiceWorker(): Promise<void> {
   const contentType = response.headers.get('content-type') ?? '';
 
   if (!response.ok || !isJavaScriptMimeType(contentType)) {
-    console.warn('Service worker registration skipped: invalid script response', {
-      contentType,
-      status: response.status,
-      url: serviceWorkerPath,
-    });
+    console.warn(
+      'Service worker registration skipped: invalid script response',
+      {
+        contentType,
+        status: response.status,
+        url: serviceWorkerPath,
+      },
+    );
+
     return;
   }
 

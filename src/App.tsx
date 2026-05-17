@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react';
+
 import { AuthScreen } from './components/auth/AuthScreen';
 import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
 import { ServerConnectionScreen } from './components/system/ServerConnectionScreen';
@@ -6,7 +8,64 @@ import { copy } from './i18n/en';
 import { AppFrame, AppLoadingScreen } from './presentation/app/AppFrame';
 import { useAppBootstrap } from './presentation/app/useAppBootstrap';
 
-function App() {
+type AppScreen =
+  | 'auth'
+  | 'loading'
+  | 'network-creation'
+  | 'server-connection'
+  | 'workspace';
+
+function screenFrom(input: {
+  hasNetworkError: boolean;
+  isLoadingNetworks: boolean;
+  isRestoringSession: boolean;
+  networkCount: number;
+  sessionPresent: boolean;
+}): AppScreen {
+  if (isServerConnectionScreen(input)) {
+    return 'server-connection';
+  }
+
+  if (isLoadingScreen(input)) {
+    return 'loading';
+  }
+
+  if (isNetworkCreationScreen(input)) {
+    return 'network-creation';
+  }
+
+  return input.sessionPresent ? 'workspace' : 'auth';
+}
+
+function isServerConnectionScreen(input: {
+  hasNetworkError: boolean;
+  sessionPresent: boolean;
+}): boolean {
+  return input.hasNetworkError && !input.sessionPresent;
+}
+
+function isLoadingScreen(input: {
+  isLoadingNetworks: boolean;
+  isRestoringSession: boolean;
+  sessionPresent: boolean;
+}): boolean {
+  return (
+    (!input.sessionPresent && input.isLoadingNetworks) ||
+    input.isRestoringSession
+  );
+}
+
+function isNetworkCreationScreen(input: {
+  hasNetworkError: boolean;
+  networkCount: number;
+  sessionPresent: boolean;
+}): boolean {
+  return (
+    !input.sessionPresent && input.networkCount === 0 && !input.hasNetworkError
+  );
+}
+
+function App(): ReactElement {
   const bootstrap = useAppBootstrap();
   const {
     clearSession,
@@ -25,7 +84,15 @@ function App() {
     setSession,
   } = bootstrap;
 
-  if (nodeNetworks.error && !session) {
+  const screen = screenFrom({
+    hasNetworkError: !!nodeNetworks.error,
+    isLoadingNetworks: nodeNetworks.loading,
+    isRestoringSession,
+    networkCount: nodeNetworks.networks.length,
+    sessionPresent: !!session,
+  });
+
+  if (screen === 'server-connection' && nodeNetworks.error) {
     return (
       <AppFrame compact>
         <ServerConnectionScreen
@@ -36,11 +103,11 @@ function App() {
     );
   }
 
-  if ((!session && nodeNetworks.loading) || isRestoringSession) {
+  if (screen === 'loading') {
     return <AppLoadingScreen label={copy.app.loading} />;
   }
 
-  if (!session && nodeNetworks.networks.length === 0 && !nodeNetworks.error) {
+  if (screen === 'network-creation') {
     return (
       <AppFrame>
         <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
@@ -50,7 +117,7 @@ function App() {
 
   return (
     <AppFrame>
-      {!session ? (
+      {screen === 'auth' || !session ? (
         <AuthScreen
           onAuthenticated={handleAuthenticated}
           peerCount={peers.peers.length}

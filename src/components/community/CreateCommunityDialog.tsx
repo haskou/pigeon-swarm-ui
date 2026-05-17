@@ -140,6 +140,7 @@ export function CreateCommunityDialog({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+
     if (!canSubmit) return;
 
     setState('loading');
@@ -336,10 +337,8 @@ export function CreateCommunityDialog({
                       className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70 transition hover:bg-rose-500/15 hover:text-rose-100"
                       title={copy.messages.delete}
                     >
-                      {channel.type === 'voice' ? 'Voice' : 'Text'} #{
-                        channel.name
-                      }{' '}
-                      ×
+                      {channel.type === 'voice' ? 'Voice' : 'Text'} #
+                      {channel.name} ×
                     </button>
                   ))}
                 </div>

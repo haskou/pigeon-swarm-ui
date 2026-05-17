@@ -384,6 +384,7 @@ function ParticipantTile({
   const toggleParticipantMute = () => {
     if (isCurrentIdentity) {
       onToggleMute();
+
       return;
     }
 
@@ -468,7 +469,9 @@ function callParticipantStatus(
   call: CallSession,
 ): string {
   if (participant.identityId === call.currentIdentityId) return call.status;
+
   if (participant.connectionState) return participant.connectionState;
+
   if (participant.status) return participant.status;
 
   return call.status;

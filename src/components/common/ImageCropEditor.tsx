@@ -118,9 +118,13 @@ export function ImageCropEditor({
           outputWidth: outputSize.width,
           zoom,
         });
-    const croppedFile = new File([blob], outputFilename(file.name, shape, blob), {
-      type: blob.type,
-    });
+    const croppedFile = new File(
+      [blob],
+      outputFilename(file.name, shape, blob),
+      {
+        type: blob.type,
+      },
+    );
     const previewUrl = URL.createObjectURL(blob);
 
     onApply(croppedFile, previewUrl);
@@ -307,7 +311,13 @@ function drawCroppedImage(
     zoom: number;
   },
 ): void {
-  drawCroppedSource(canvas, image, image.naturalWidth, image.naturalHeight, options);
+  drawCroppedSource(
+    canvas,
+    image,
+    image.naturalWidth,
+    image.naturalHeight,
+    options,
+  );
 }
 
 function drawCroppedSource(

@@ -1,8 +1,10 @@
-import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, MouseEvent } from 'react';
 
+import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
+import type { CallParticipant } from '../../domain/calls/CallSession';
 import type {
   AttachmentProgress,
   ChatMessage,
@@ -12,7 +14,6 @@ import type {
   MessageAttachment,
   Session,
 } from '../../domain/types';
-import type { CallParticipant } from '../../domain/calls/CallSession';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -30,8 +31,8 @@ import {
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
-import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { MessageBubble } from '../chat/MessageBubble';
+import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from './ConversationDataDialog';
 import { ConversationKeyDialog } from './ConversationKeyDialog';
@@ -419,6 +420,7 @@ export function ChatColumn({
 
     if (isGroupConversation) {
       setGroupProfileOpen(true);
+
       return;
     }
 
@@ -729,119 +731,125 @@ export function ChatColumn({
                   </div>
                 )}
                 <div>
-              {hasReachedMessageStart &&
-                messages.length > 0 &&
-                messageState !== 'loading' && (
-                  <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                    {copy.chat.noMoreMessages}
-                  </div>
-                )}
-              {messages.map((message, index) => {
-                const previousMessage = messages[index - 1];
-                const replyMessage = message.replyToMessageId
-                  ? messages.find(
-                      (item) => item.id === message.replyToMessageId,
-                    )
-                  : undefined;
-                const startsNewDay =
-                  !previousMessage ||
-                  !isSameDay(previousMessage.timestamp, message.timestamp);
-                const startsNewAuthorRun =
-                  !previousMessage ||
-                  previousMessage.authorIdentityId !== message.authorIdentityId;
-
-                return (
-                  <Fragment key={message.id}>
-                    {startsNewDay && (
-                      <DateSeparator
-                        label={formatDateSeparator(message.timestamp)}
-                      />
+                  {hasReachedMessageStart &&
+                    messages.length > 0 &&
+                    messageState !== 'loading' && (
+                      <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                        {copy.chat.noMoreMessages}
+                      </div>
                     )}
-                    <div
-                      className={
-                        startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'
-                      }
-                    >
-                      <MessageBubble
-                        message={message}
-                        currentIdentityId={session.identity.id}
-                        authorName={
-                          message.mine
-                            ? session.identity.profile.name
-                            : identityDisplayName(
-                                message.authorIdentityId,
-                                identityNames,
+                  {messages.map((message, index) => {
+                    const previousMessage = messages[index - 1];
+                    const replyMessage = message.replyToMessageId
+                      ? messages.find(
+                          (item) => item.id === message.replyToMessageId,
+                        )
+                      : undefined;
+                    const startsNewDay =
+                      !previousMessage ||
+                      !isSameDay(previousMessage.timestamp, message.timestamp);
+                    const startsNewAuthorRun =
+                      !previousMessage ||
+                      previousMessage.authorIdentityId !==
+                        message.authorIdentityId;
+
+                    return (
+                      <Fragment key={message.id}>
+                        {startsNewDay && (
+                          <DateSeparator
+                            label={formatDateSeparator(message.timestamp)}
+                          />
+                        )}
+                        <div
+                          className={
+                            startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'
+                          }
+                        >
+                          <MessageBubble
+                            message={message}
+                            currentIdentityId={session.identity.id}
+                            authorName={
+                              message.mine
+                                ? session.identity.profile.name
+                                : identityDisplayName(
+                                    message.authorIdentityId,
+                                    identityNames,
+                                  )
+                            }
+                            authorPicture={
+                              message.mine
+                                ? identityPictures[session.identity.id]
+                                : identityPictures[message.authorIdentityId]
+                            }
+                            onAttachmentOpen={(attachmentIndex) =>
+                              void openAttachment(
+                                message.attachments[attachmentIndex],
                               )
-                        }
-                        authorPicture={
-                          message.mine
-                            ? identityPictures[session.identity.id]
-                            : identityPictures[message.authorIdentityId]
-                        }
-                        onAttachmentOpen={(attachmentIndex) =>
-                          void openAttachment(
-                            message.attachments[attachmentIndex],
-                          )
-                        }
-                        onAttachmentPreview={loadAttachmentPreview}
-                        onAvatarClick={(event) =>
-                          openMessageAuthorProfile(
-                            message,
-                            profileAnchorFromTarget(event.currentTarget),
-                          )
-                        }
-                        onMessageMenuOpen={onMessageMenuOpen}
-                        onReactionToggle={onReactionToggle}
-                        onReplyReferenceClick={onReplyReferenceClick}
-                        onRetryMessage={onRetryMessage}
-                        reactionAuthorNames={reactionAuthorNames}
-                        replyImage={
-                          replyMessage?.attachments.find((attachment) =>
-                            isBrowserPreviewImage(attachment.contentType),
-                          ) ?? message.replyPreview?.image
-                        }
-                        replyAuthorName={
-                          replyMessage
-                            ? identityDisplayName(
-                                replyMessage.authorIdentityId,
-                                identityNames,
+                            }
+                            onAttachmentPreview={loadAttachmentPreview}
+                            onAvatarClick={(event) =>
+                              openMessageAuthorProfile(
+                                message,
+                                profileAnchorFromTarget(event.currentTarget),
                               )
-                            : message.replyPreview
-                              ? identityDisplayName(
-                                  message.replyPreview.authorIdentityId,
-                                  identityNames,
-                                )
-                              : undefined
-                        }
-                        replyPreview={
-                          replyMessage?.content ?? message.replyPreview?.content
-                        }
-                        reserveAvatarSpace={false}
-                        showAvatar={isGroupConversation && startsNewAuthorRun}
-                      />
-                    </div>
-                  </Fragment>
-                );
-              })}
-              {messages.length === 0 &&
-                messageState !== 'loading' &&
-                (hasConversationKey ? (
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                    {copy.chat.emptyMessages}
-                  </div>
-                ) : (
-                  <div className="grid min-h-[42vh] place-items-center">
-                    <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                        <LockIcon locked={false} />
+                            }
+                            onMessageMenuOpen={onMessageMenuOpen}
+                            onReactionToggle={onReactionToggle}
+                            onReplyReferenceClick={onReplyReferenceClick}
+                            onRetryMessage={onRetryMessage}
+                            reactionAuthorNames={reactionAuthorNames}
+                            replyImage={
+                              replyMessage?.attachments.find((attachment) =>
+                                isBrowserPreviewImage(attachment.contentType),
+                              ) ?? message.replyPreview?.image
+                            }
+                            replyAuthorName={
+                              replyMessage
+                                ? identityDisplayName(
+                                    replyMessage.authorIdentityId,
+                                    identityNames,
+                                  )
+                                : message.replyPreview
+                                  ? identityDisplayName(
+                                      message.replyPreview.authorIdentityId,
+                                      identityNames,
+                                    )
+                                  : undefined
+                            }
+                            replyPreview={
+                              replyMessage?.content ??
+                              message.replyPreview?.content
+                            }
+                            reserveAvatarSpace={false}
+                            showAvatar={
+                              isGroupConversation && startsNewAuthorRun
+                            }
+                          />
+                        </div>
+                      </Fragment>
+                    );
+                  })}
+                  {messages.length === 0 &&
+                    messageState !== 'loading' &&
+                    (hasConversationKey ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+                        {copy.chat.emptyMessages}
                       </div>
-                      <div className="font-black">{copy.chat.e2eMissing}</div>
-                      <div className="mt-2 text-rose-100/65">
-                        {copy.messages.missingConversationKey}
+                    ) : (
+                      <div className="grid min-h-[42vh] place-items-center">
+                        <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                          <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                            <LockIcon locked={false} />
+                          </div>
+                          <div className="font-black">
+                            {copy.chat.e2eMissing}
+                          </div>
+                          <div className="mt-2 text-rose-100/65">
+                            {copy.messages.missingConversationKey}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
                   <div ref={bottomRef} />
                 </div>
               </>
@@ -999,19 +1007,6 @@ export function ChatColumn({
         />
       )}
     </section>
-  );
-}
-
-function CallIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-      <path
-        d="M7.2 4.8 9 7.9a1.6 1.6 0 0 1-.3 1.9l-1 1a12.2 12.2 0 0 0 5.5 5.5l1-1a1.6 1.6 0 0 1 1.9-.3l3.1 1.8a1.6 1.6 0 0 1 .8 1.7l-.4 2a1.8 1.8 0 0 1-1.8 1.4A15.8 15.8 0 0 1 2.1 6.2a1.8 1.8 0 0 1 1.4-1.8l2-.4a1.6 1.6 0 0 1 1.7.8Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
   );
 }
 

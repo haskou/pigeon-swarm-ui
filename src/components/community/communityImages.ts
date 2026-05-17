@@ -1,7 +1,10 @@
 import type { IdentityResource } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
-import { identityPicture, profilePictureDataUrl } from '../../utils/identityDisplay';
+import {
+  identityPicture,
+  profilePictureDataUrl,
+} from '../../utils/identityDisplay';
 
 export async function loadIdentityPicture(
   identity: IdentityResource,
