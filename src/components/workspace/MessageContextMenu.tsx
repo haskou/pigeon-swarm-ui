@@ -44,8 +44,10 @@ export function MessageContextMenu({
   onViewRaw: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const emojiSearchRef = useRef<HTMLDivElement | null>(null);
   const [emojiSearchOpen, setEmojiSearchOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState('');
+  const [emojiListMaxHeight, setEmojiListMaxHeight] = useState(256);
   const [position, setPosition] = useState(() => ({
     left: menu.x,
     top: menu.y,
@@ -110,6 +112,18 @@ export function MessageContextMenu({
     );
 
     setPosition({ left: nextLeft, top: nextTop });
+
+    const emojiSearch = emojiSearchRef.current;
+
+    if (!emojiSearch) return;
+
+    const availableBelow =
+      window.innerHeight - (nextTop + emojiSearch.offsetTop) - gap;
+    const reservedMenuActionsHeight = 96;
+
+    setEmojiListMaxHeight(
+      Math.max(96, Math.min(256, availableBelow - reservedMenuActionsHeight)),
+    );
   }, [emojiSearchOpen, menu.x, menu.y]);
 
   return (
@@ -158,7 +172,10 @@ export function MessageContextMenu({
               </button>
             </div>
             {emojiSearchOpen && (
-              <div className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-2">
+              <div
+                ref={emojiSearchRef}
+                className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-2"
+              >
                 <input
                   autoFocus={canAutoFocusInput}
                   value={emojiQuery}
@@ -166,7 +183,10 @@ export function MessageContextMenu({
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35"
                   placeholder={copy.messages.searchReaction}
                 />
-                <div className="mt-2 max-h-64 overflow-y-auto">
+                <div
+                  className="mt-2 overflow-y-auto"
+                  style={{ maxHeight: emojiListMaxHeight }}
+                >
                   {emojiSuggestions.map((suggestion) => (
                     <EmojiSearchOption
                       key={suggestion.shortcode}
