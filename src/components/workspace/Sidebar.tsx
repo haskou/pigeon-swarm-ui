@@ -512,21 +512,11 @@ export function UserProfileDropdown({
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
-        {ownBanner ? (
-          <img
-            src={ownBanner}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-45"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/25 via-fuchsia-400/20 to-slate-950/10" />
-        )}
-        <div className="absolute inset-0 bg-black/35" />
         <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
-        <div className="relative min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           <div className="truncate font-black">{ownProfileName}</div>
           <div className="truncate text-xs text-white/50">
             {ownProfileHandle}
@@ -537,7 +527,7 @@ export function UserProfileDropdown({
           viewBox="0 0 20 20"
           fill="none"
           className={cx(
-            'relative h-5 w-5 shrink-0 text-white/60 transition-transform',
+            'h-5 w-5 shrink-0 text-white/45 transition-transform',
             profileOpen && 'rotate-180',
           )}
         >
