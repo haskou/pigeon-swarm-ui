@@ -116,7 +116,7 @@ function CompactCallBar({
           </div>
           <CompactCallTitle call={call} subtitle={subtitle} />
         </div>
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           <CompactMediaControls
             call={call}
             onToggleCamera={onToggleCamera}

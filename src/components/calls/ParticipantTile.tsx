@@ -46,7 +46,7 @@ export function ParticipantTile({
   return (
     <article
       className={cx(
-        'flex h-[260px] w-full max-w-[260px] flex-col items-center overflow-hidden rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:h-[280px] sm:max-w-[280px]',
+        'flex h-[310px] w-full max-w-[260px] flex-col items-center overflow-hidden rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:h-[330px] sm:max-w-[280px]',
         participant.speaking
           ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
           : 'border-white/10',
@@ -148,7 +148,7 @@ function ParticipantVolume({
   value: number;
 }) {
   return (
-    <label className="mt-auto w-full text-left text-[0.65rem] font-black text-white/55">
+    <label className="mt-3 w-full text-left text-[0.65rem] font-black text-white/55">
       <span className="flex items-center justify-between gap-2">
         <span>Volume</span>
         <span className="text-white/85">{value}%</span>
@@ -182,7 +182,7 @@ function ParticipantMetrics({
       : String(participant.packetsLost);
 
   return (
-    <dl className="mt-2 grid w-full grid-cols-2 gap-1.5 text-left text-[0.6rem]">
+    <dl className="mt-auto grid w-full grid-cols-2 gap-1.5 text-left text-[0.6rem]">
       <Metric label="Status" value={callParticipantStatus(participant, call)} />
       <Metric label="Latency" value={latencyLabel} />
       <Metric label="Lost" value={packetLossLabel} />

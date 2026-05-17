@@ -172,7 +172,7 @@ function CallStageBody({
         ))}
       </div>
       {dataOpen && (
-        <div className="min-h-0 w-full shrink-0 lg:w-[360px]">
+        <div className="min-h-0 w-full shrink-0 lg:h-full lg:w-[360px]">
           <CallDataPanel call={call} />
         </div>
       )}
