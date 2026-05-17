@@ -220,8 +220,10 @@ export function GlassWorkspace({
     reconcileCall,
     setParticipantVolume,
     startCall,
+    toggleCamera,
     toggleDeafen,
     toggleMute,
+    toggleScreenShare,
   } = useCallSession();
 
   useEffect(() => {
@@ -2691,8 +2693,10 @@ export function GlassWorkspace({
                   onClose={() => setSidebarOpen(false)}
                   onCallEnd={leaveActiveCall}
                   onCallParticipantVolumeChange={setParticipantVolume}
+                  onCallToggleCamera={toggleCamera}
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
+                  onCallToggleScreenShare={toggleScreenShare}
                   onLogout={() => setSession(null)}
                   onSessionUpdated={(nextSession) => {
                     setSession(nextSession);
@@ -2817,8 +2821,10 @@ export function GlassWorkspace({
             activeCall={activeCall}
             onCallEnd={leaveActiveCall}
             onCallParticipantVolumeChange={setParticipantVolume}
+            onCallToggleCamera={toggleCamera}
             onCallToggleDeafen={toggleDeafen}
             onCallToggleMute={toggleMute}
+            onCallToggleScreenShare={toggleScreenShare}
             realtimeEvent={communityRealtimeEvent}
             onChannelSelected={(channelId) =>
               setCommunityChannelById((current) =>

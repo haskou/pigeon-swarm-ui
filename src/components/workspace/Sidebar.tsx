@@ -71,8 +71,10 @@ interface SidebarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleScreenShare?: () => void;
 }
 
 export function Sidebar({
@@ -85,8 +87,10 @@ export function Sidebar({
   nodeNetworks,
   onCallEnd,
   onCallParticipantVolumeChange,
+  onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleScreenShare,
   onClose,
   onCreate,
   onLogout,
@@ -287,8 +291,10 @@ export function Sidebar({
         activeCall={activeCall}
         onCallEnd={onCallEnd}
         onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
+        onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>
   );
@@ -373,8 +379,10 @@ export function UserProfileDropdown({
   nodeNetworks,
   onCallEnd,
   onCallParticipantVolumeChange,
+  onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleScreenShare,
   onLogout,
   onSessionUpdated,
   session,
@@ -391,8 +399,10 @@ export function UserProfileDropdown({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleScreenShare?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
@@ -448,15 +458,19 @@ export function UserProfileDropdown({
       {activeCall &&
         onCallEnd &&
         onCallParticipantVolumeChange &&
+        onCallToggleCamera &&
         onCallToggleDeafen &&
-        onCallToggleMute && (
+        onCallToggleMute &&
+        onCallToggleScreenShare && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
             <GlobalCallBar
               call={activeCall}
               onEnd={onCallEnd}
               onParticipantVolumeChange={onCallParticipantVolumeChange}
+              onToggleCamera={onCallToggleCamera}
               onToggleDeafen={onCallToggleDeafen}
               onToggleMute={onCallToggleMute}
+              onToggleScreenShare={onCallToggleScreenShare}
             />
           </div>
         )}

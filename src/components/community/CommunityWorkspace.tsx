@@ -99,8 +99,10 @@ interface CommunityWorkspaceProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleScreenShare?: () => void;
   onLogout: () => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
@@ -185,8 +187,10 @@ export function CommunityWorkspace({
   nodeNetworks,
   onCallEnd,
   onCallParticipantVolumeChange,
+  onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleScreenShare,
   onChannelSelected,
   onChannelViewed,
   onCommunityLeft,
@@ -1493,8 +1497,10 @@ export function CommunityWorkspace({
               nodeNetworks={nodeNetworks}
               onCallEnd={onCallEnd}
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+              onCallToggleCamera={onCallToggleCamera}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
+              onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}
               session={session}

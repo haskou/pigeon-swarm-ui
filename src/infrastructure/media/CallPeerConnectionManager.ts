@@ -63,6 +63,8 @@ export class CallPeerConnectionManager {
 
   private readonly remoteAudioVolumes = new Map<string, number>();
 
+  private readonly remoteStreams = new Map<string, MediaStream>();
+
   private localStream: MediaStream | null = null;
 
   private rtcConfiguration: RTCConfiguration | null = null;
@@ -90,6 +92,11 @@ export class CallPeerConnectionManager {
           readyState: track.readyState,
         })) ?? [],
     });
+    this.syncLocalTracks();
+  }
+
+  public remoteMediaStreams(): Record<string, MediaStream> {
+    return Object.fromEntries(this.remoteStreams.entries());
   }
 
   public setDeafened(deafened: boolean): void {
@@ -242,6 +249,7 @@ export class CallPeerConnectionManager {
     this.remoteAudioContexts.clear();
     this.remoteAudioGains.clear();
     this.remoteAudioVolumes.clear();
+    this.remoteStreams.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
     this.deafened = false;
@@ -289,16 +297,7 @@ export class CallPeerConnectionManager {
     });
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        logCallDebug('peer-manager:create-peer:add-local-track', {
-          enabled: track.enabled,
-          kind: track.kind,
-          peerIdentityId,
-          readyState: track.readyState,
-        });
-
-        if (this.localStream) peer.addTrack(track, this.localStream);
-      });
+      this.addLocalTracks(peer, peerIdentityId);
     } else {
       logCallWarning('peer-manager:create-peer:recvonly-no-local-stream', {
         peerIdentityId,
@@ -340,6 +339,9 @@ export class CallPeerConnectionManager {
         ...event.candidate.toJSON(),
       });
     });
+    peer.addEventListener('negotiationneeded', () => {
+      void this.sendRenegotiationOffer(peerIdentityId, peer, sendSignal);
+    });
     peer.addEventListener('track', (event) => {
       const [stream] = event.streams;
 
@@ -352,11 +354,70 @@ export class CallPeerConnectionManager {
         ),
       });
 
-      if (stream) this.playRemoteStream(peerIdentityId, stream);
+      if (stream) {
+        this.remoteStreams.set(peerIdentityId, stream);
+        this.playRemoteStream(peerIdentityId, stream);
+      }
     });
     this.peers.set(peerIdentityId, peer);
 
     return peer;
+  }
+
+  private addLocalTracks(
+    peer: RTCPeerConnection,
+    peerIdentityId: string,
+  ): void {
+    this.localStream?.getTracks().forEach((track) => {
+      logCallDebug('peer-manager:create-peer:add-local-track', {
+        enabled: track.enabled,
+        kind: track.kind,
+        peerIdentityId,
+        readyState: track.readyState,
+      });
+
+      if (this.localStream) peer.addTrack(track, this.localStream);
+    });
+  }
+
+  private syncLocalTracks(): void {
+    for (const [peerIdentityId, peer] of this.peers.entries()) {
+      const activeTracks = new Set(this.localStream?.getTracks() ?? []);
+
+      for (const sender of peer.getSenders()) {
+        const track = sender.track;
+
+        if (track && !activeTracks.has(track)) {
+          void sender.replaceTrack(null).catch((error: unknown) => {
+            logCallError('peer-manager:replace-track:remove-failed', error, {
+              peerIdentityId,
+            });
+          });
+        }
+      }
+
+      this.localStream?.getTracks().forEach((track) => {
+        const existing = peer
+          .getSenders()
+          .some((sender) => sender.track?.id === track.id);
+
+        if (!existing && this.localStream)
+          peer.addTrack(track, this.localStream);
+      });
+    }
+  }
+
+  private async sendRenegotiationOffer(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    if (peer.signalingState !== 'stable') return;
+
+    const offer = await peer.createOffer();
+
+    await peer.setLocalDescription(offer);
+    await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
   }
 
   private playRemoteStream(peerIdentityId: string, stream: MediaStream): void {
