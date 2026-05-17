@@ -560,12 +560,13 @@ export function UserProfileDropdown({
                 />
               )}
             </div>
-            <div className="relative px-3 pb-3">
+            <div className="relative px-5 pb-5">
               <div className="-mt-10 flex items-end gap-3">
                 <ProfileAvatar
                   label={ownDisplayName}
                   picture={ownPicture}
                   size="lg"
+                  className="border-4 border-[#1f1f27] shadow-xl shadow-black/35"
                 />
                 <div className="min-w-0 pb-1">
                   <div className="truncate font-black">{ownProfileName}</div>
@@ -665,10 +666,12 @@ function conversationParticipants(
 }
 
 function ProfileAvatar({
+  className,
   label,
   picture,
   size = 'md',
 }: {
+  className?: string;
   label: string;
   picture?: string | null;
   size?: 'lg' | 'md' | 'xl';
@@ -682,6 +685,7 @@ function ProfileAvatar({
           : size === 'lg'
             ? 'h-12 w-12 text-lg'
             : 'h-11 w-11 text-base',
+        className,
       )}
     >
       {picture ? (
