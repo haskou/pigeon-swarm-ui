@@ -423,6 +423,41 @@ export function UserProfileDropdown({
     : shortId(session.identity.id);
   const ownPicture =
     identityPictures[session.identity.id] ?? identityPicture(session.identity);
+  const [ownBanner, setOwnBanner] = useState<string | null>(() =>
+    identityBanner(session.identity),
+  );
+
+  useEffect(() => {
+    const directBanner = identityBanner(session.identity);
+
+    if (directBanner) {
+      setOwnBanner(directBanner);
+
+      return;
+    }
+
+    const bannerCid = session.identity.profile.banner?.trim();
+
+    if (!bannerCid) {
+      setOwnBanner(null);
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadPublicImage(bannerCid)
+      .then((url) => {
+        if (!cancelled) setOwnBanner(url);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnBanner(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.identity]);
 
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
@@ -477,11 +512,21 @@ export function UserProfileDropdown({
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
+        {ownBanner ? (
+          <img
+            src={ownBanner}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-45"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/25 via-fuchsia-400/20 to-slate-950/10" />
+        )}
+        <div className="absolute inset-0 bg-black/35" />
         <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
-        <div className="min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1">
           <div className="truncate font-black">{ownProfileName}</div>
           <div className="truncate text-xs text-white/50">
             {ownProfileHandle}
@@ -492,7 +537,7 @@ export function UserProfileDropdown({
           viewBox="0 0 20 20"
           fill="none"
           className={cx(
-            'h-5 w-5 shrink-0 text-white/45 transition-transform',
+            'relative h-5 w-5 shrink-0 text-white/60 transition-transform',
             profileOpen && 'rotate-180',
           )}
         >
@@ -515,12 +560,24 @@ export function UserProfileDropdown({
               : 'bottom-[calc(100%+.5rem)]',
           )}
         >
-          <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-            <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
-            <div className="min-w-0">
-              <div className="truncate font-black">{ownProfileName}</div>
-              <div className="truncate text-xs text-white/45">
-                {ownProfileHandle}
+          <div className="relative -m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10 p-3">
+            {ownBanner ? (
+              <img
+                src={ownBanner}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover opacity-45"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/25 via-fuchsia-400/20 to-slate-950/10" />
+            )}
+            <div className="absolute inset-0 bg-black/45" />
+            <div className="relative flex items-center gap-3">
+              <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
+              <div className="min-w-0">
+                <div className="truncate font-black">{ownProfileName}</div>
+                <div className="truncate text-xs text-white/45">
+                  {ownProfileHandle}
+                </div>
               </div>
             </div>
           </div>

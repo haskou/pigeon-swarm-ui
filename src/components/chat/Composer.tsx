@@ -23,6 +23,7 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
 const COMPOSER_MAX_ROWS = 4;
@@ -93,6 +94,7 @@ export function Composer({
     : null;
   const emojiPanelOpen =
     emojiSuggestions.length > 0 && emojiTriggerKey !== dismissedEmojiTrigger;
+  const canAutoFocusInput = useDesktopInputFocus();
 
   useEffect(() => {
     setSelectedEmojiIndex(0);
@@ -112,16 +114,16 @@ export function Composer({
   );
 
   useEffect(() => {
-    if (!replyTo || disabled) return;
+    if (!replyTo || disabled || !canAutoFocusInput) return;
 
     textInputRef.current?.focus();
-  }, [disabled, replyTo]);
+  }, [canAutoFocusInput, disabled, replyTo]);
 
   useEffect(() => {
-    if (!focusKey || disabled) return;
+    if (!focusKey || disabled || !canAutoFocusInput) return;
 
     requestAnimationFrame(() => textInputRef.current?.focus());
-  }, [disabled, focusKey]);
+  }, [canAutoFocusInput, disabled, focusKey]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     setAttachmentError(null);
@@ -258,7 +260,9 @@ export function Composer({
     setAttachmentError(null);
 
     if (fileInputRef.current) fileInputRef.current.value = '';
-    window.setTimeout(() => textInputRef.current?.focus(), 0);
+    if (canAutoFocusInput) {
+      window.setTimeout(() => textInputRef.current?.focus(), 0);
+    }
   };
 
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
@@ -365,7 +369,7 @@ export function Composer({
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="border-t border-white/10 p-4 sm:p-5"
+        className="shrink-0 touch-pan-x border-t border-white/10 p-4 sm:p-5"
       >
         {(error || attachmentError) && (
           <div className="mb-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -500,7 +504,7 @@ export function Composer({
             disabled={disabled}
             maxLength={MESSAGE_MAX_LENGTH}
             rows={1}
-            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
+            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:whitespace-nowrap placeholder:text-white/35 disabled:cursor-not-allowed"
             placeholder={placeholder}
           />
           <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">

@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 
 import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import { decompressFrames, parseGIF } from 'gifuct-js';
@@ -65,12 +65,27 @@ export function ImageCropEditor({
   const [zoom, setZoom] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
+  const [applying, setApplying] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragStateRef = useRef<DragState | null>(null);
   const preset = cropPresets[shape];
   const outputSize = useMemo(
     () => ({ height: preset.height, width: preset.width }),
     [preset.height, preset.width],
+  );
+  const animatedGif = isGifFile(file);
+  const gifPreviewStyle = useMemo(
+    () =>
+      image
+        ? gifPreviewImageStyle(image, {
+            offsetX,
+            offsetY,
+            outputHeight: outputSize.height,
+            outputWidth: outputSize.width,
+            zoom,
+          })
+        : undefined,
+    [image, offsetX, offsetY, outputSize.height, outputSize.width, zoom],
   );
 
   useEffect(() => {
@@ -101,34 +116,34 @@ export function ImageCropEditor({
   }, [image, offsetX, offsetY, outputSize.height, outputSize.width, zoom]);
 
   const applyCrop = async () => {
-    if (!image) return;
+    if (!image || applying) return;
 
-    const blob = isGifFile(file)
-      ? await cropAnimatedGif(file, {
-          offsetX,
-          offsetY,
-          outputHeight: outputSize.height,
-          outputWidth: outputSize.width,
-          zoom,
-        })
-      : await cropStaticImage(image, {
-          offsetX,
-          offsetY,
-          outputHeight: outputSize.height,
-          outputWidth: outputSize.width,
-          zoom,
-        });
-    const croppedFile = new File(
-      [blob],
-      outputFilename(file.name, shape, blob),
-      {
-        type: blob.type,
-      },
-    );
-    const previewUrl = URL.createObjectURL(blob);
+    setApplying(true);
+    try {
+      const cropOptions = {
+        offsetX,
+        offsetY,
+        outputHeight: outputSize.height,
+        outputWidth: outputSize.width,
+        zoom,
+      };
+      const blob = animatedGif
+        ? await cropAnimatedGif(file, cropOptions)
+        : await cropStaticImage(image, cropOptions);
+      const croppedFile = new File(
+        [blob],
+        outputFilename(file.name, shape, blob),
+        {
+          type: blob.type,
+        },
+      );
+      const previewUrl = URL.createObjectURL(blob);
 
-    onApply(croppedFile, previewUrl);
-    onClose();
+      onApply(croppedFile, previewUrl);
+      onClose();
+    } finally {
+      setApplying(false);
+    }
   };
   const startDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (!image) return;
@@ -202,7 +217,7 @@ export function ImageCropEditor({
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-2xl">
             <div
-              className={`${preset.aspectClass} touch-none overflow-hidden rounded-2xl border border-white/10 bg-black/40 ${
+              className={`relative ${preset.aspectClass} touch-none overflow-hidden rounded-2xl border border-white/10 bg-black/40 ${
                 dragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
               onPointerDown={startDrag}
@@ -211,7 +226,16 @@ export function ImageCropEditor({
               onPointerUp={stopDrag}
               onWheel={zoomWithWheel}
             >
-              <canvas ref={canvasRef} className="h-full w-full" />
+              {animatedGif && imageUrl && image && gifPreviewStyle ? (
+                <img
+                  src={imageUrl}
+                  alt=""
+                  className="pointer-events-none absolute max-w-none select-none"
+                  style={gifPreviewStyle}
+                />
+              ) : (
+                <canvas ref={canvasRef} className="h-full w-full" />
+              )}
               {!image && imageUrl && (
                 <div className="grid h-full w-full place-items-center text-sm text-white/50">
                   {copy.app.loading}
@@ -256,11 +280,11 @@ export function ImageCropEditor({
           </button>
           <button
             type="button"
-            disabled={!image}
+            disabled={!image || applying}
             onClick={() => void applyCrop()}
             className="rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/25 transition hover:bg-fuchsia-400 disabled:cursor-wait disabled:opacity-60"
           >
-            {copy.imageEditor.apply}
+            {applying ? copy.app.loading : copy.imageEditor.apply}
           </button>
         </footer>
       </section>
@@ -361,6 +385,40 @@ function drawCroppedSource(
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+}
+
+function gifPreviewImageStyle(
+  image: HTMLImageElement,
+  options: {
+    offsetX: number;
+    offsetY: number;
+    outputHeight: number;
+    outputWidth: number;
+    zoom: number;
+  },
+): CSSProperties {
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  const baseScale = Math.max(
+    options.outputWidth / sourceWidth,
+    options.outputHeight / sourceHeight,
+  );
+  const scale = baseScale * options.zoom;
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  const maxOffsetX = Math.max(0, (drawWidth - options.outputWidth) / 2);
+  const maxOffsetY = Math.max(0, (drawHeight - options.outputHeight) / 2);
+  const offsetXPixels = (options.offsetX / 100) * maxOffsetX;
+  const offsetYPixels = (options.offsetY / 100) * maxOffsetY;
+  const drawX = (options.outputWidth - drawWidth) / 2 + offsetXPixels;
+  const drawY = (options.outputHeight - drawHeight) / 2 + offsetYPixels;
+
+  return {
+    height: `${(drawHeight / options.outputHeight) * 100}%`,
+    left: `${(drawX / options.outputWidth) * 100}%`,
+    top: `${(drawY / options.outputHeight) * 100}%`,
+    width: `${(drawWidth / options.outputWidth) * 100}%`,
+  };
 }
 
 async function cropStaticImage(
