@@ -550,23 +550,28 @@ export function UserProfileDropdown({
               : 'bottom-[calc(100%+.5rem)]',
           )}
         >
-          <div className="relative -m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10 p-3">
-            {ownBanner ? (
-              <img
-                src={ownBanner}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-45"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/25 via-fuchsia-400/20 to-slate-950/10" />
-            )}
-            <div className="absolute inset-0 bg-black/45" />
-            <div className="relative flex items-center gap-3">
-              <ProfileAvatar label={ownDisplayName} picture={ownPicture} />
-              <div className="min-w-0">
-                <div className="truncate font-black">{ownProfileName}</div>
-                <div className="truncate text-xs text-white/45">
-                  {ownProfileHandle}
+          <div className="-m-3 mb-3 overflow-hidden rounded-t-2xl border-b border-white/10">
+            <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
+              {ownBanner && (
+                <img
+                  src={ownBanner}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+            <div className="relative px-3 pb-3">
+              <div className="-mt-10 flex items-end gap-3">
+                <ProfileAvatar
+                  label={ownDisplayName}
+                  picture={ownPicture}
+                  size="lg"
+                />
+                <div className="min-w-0 pb-1">
+                  <div className="truncate font-black">{ownProfileName}</div>
+                  <div className="truncate text-xs text-white/45">
+                    {ownProfileHandle}
+                  </div>
                 </div>
               </div>
             </div>
