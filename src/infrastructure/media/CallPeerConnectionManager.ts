@@ -38,6 +38,12 @@ type SignalSender = (
   payload: Record<string, unknown>,
 ) => Promise<void>;
 
+type PeerNegotiationState = {
+  ignoreOffer: boolean;
+  makingOffer: boolean;
+  polite: boolean;
+};
+
 function descriptionPayload(
   description: RTCSessionDescriptionInit,
 ): Record<string, unknown> {
@@ -47,8 +53,39 @@ function descriptionPayload(
   };
 }
 
+function isScreenShareTrack(track: MediaStreamTrack): boolean {
+  return track.kind === 'video' && track.contentHint === 'detail';
+}
+
+function isRemoteScreenShareTrack(
+  track: MediaStreamTrack,
+  stream: MediaStream,
+  remoteStreams: Map<string, MediaStream>,
+): boolean {
+  if (track.kind !== 'video') return false;
+
+  if (isScreenShareTrack(track)) return true;
+
+  if (/screen|display|window|tab|monitor/i.test(track.label)) return true;
+
+  return (
+    stream.getAudioTracks().length === 0 &&
+    stream.getVideoTracks().length === 1 &&
+    [...remoteStreams.values()].some((remoteStream) =>
+      remoteStream
+        .getVideoTracks()
+        .some((videoTrack) => videoTrack.readyState === 'live'),
+    )
+  );
+}
+
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
+
+  private readonly peerNegotiationStates = new Map<
+    string,
+    PeerNegotiationState
+  >();
 
   private readonly pendingIceCandidates = new Map<
     string,
@@ -64,6 +101,8 @@ export class CallPeerConnectionManager {
   private readonly remoteAudioVolumes = new Map<string, number>();
 
   private readonly remoteStreams = new Map<string, MediaStream>();
+
+  private readonly remoteScreenStreams = new Map<string, MediaStream>();
 
   private localStream: MediaStream | null = null;
 
@@ -97,6 +136,10 @@ export class CallPeerConnectionManager {
 
   public remoteMediaStreams(): Record<string, MediaStream> {
     return Object.fromEntries(this.remoteStreams.entries());
+  }
+
+  public remoteScreenMediaStreams(): Record<string, MediaStream> {
+    return Object.fromEntries(this.remoteScreenStreams.entries());
   }
 
   public setDeafened(deafened: boolean): void {
@@ -150,6 +193,7 @@ export class CallPeerConnectionManager {
       peerIdentityId,
       shouldOffer,
     });
+    this.configureNegotiationState(peerIdentityId, !shouldOffer);
     const peer = this.getOrCreatePeer(peerIdentityId, sendSignal);
 
     if (!shouldOffer || peer.localDescription) {
@@ -162,13 +206,20 @@ export class CallPeerConnectionManager {
       return;
     }
 
-    const offer = await peer.createOffer();
+    const state = this.peerNegotiationState(peerIdentityId);
 
-    await peer.setLocalDescription(offer);
-    logCallDebug('peer-manager:ensure-peer:send-offer', {
-      peerIdentityId,
-    });
-    await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+    try {
+      state.makingOffer = true;
+      const offer = await peer.createOffer();
+
+      await peer.setLocalDescription(offer);
+      logCallDebug('peer-manager:ensure-peer:send-offer', {
+        peerIdentityId,
+      });
+      await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+    } finally {
+      state.makingOffer = false;
+    }
   }
 
   public async handleSignal(
@@ -176,56 +227,40 @@ export class CallPeerConnectionManager {
     signalType: CallSignalType,
     payload: Record<string, unknown>,
     sendSignal: SignalSender,
+    currentIdentityId?: string,
   ): Promise<void> {
     logCallDebug('peer-manager:handle-signal', {
       senderIdentityId,
       signalType,
     });
+
+    if (currentIdentityId) {
+      this.configureNegotiationState(
+        senderIdentityId,
+        currentIdentityId > senderIdentityId,
+      );
+    }
     const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
+    const state = this.peerNegotiationState(senderIdentityId);
 
     if (signalType === 'ice_candidate') {
-      if (!peer.remoteDescription) {
-        logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
-          senderIdentityId,
-        });
-        this.queueIceCandidate(
-          senderIdentityId,
-          payload as RTCIceCandidateInit,
-        );
-
-        return;
-      }
-
-      await peer.addIceCandidate(
-        new RTCIceCandidate(payload as RTCIceCandidateInit),
-      );
-      logCallDebug('peer-manager:handle-signal:added-ice-candidate', {
+      await this.handleIceCandidateSignal(
         senderIdentityId,
-      });
+        peer,
+        payload as RTCIceCandidateInit,
+        state,
+      );
 
       return;
     }
 
-    const description = new RTCSessionDescription(
+    await this.handleDescriptionSignal(
+      senderIdentityId,
+      peer,
       payload as unknown as RTCSessionDescriptionInit,
+      state,
+      sendSignal,
     );
-
-    await peer.setRemoteDescription(description);
-    logCallDebug('peer-manager:handle-signal:remote-description-set', {
-      senderIdentityId,
-      signalType,
-    });
-    await this.flushIceCandidates(senderIdentityId, peer);
-
-    if (signalType !== 'offer') return;
-
-    const answer = await peer.createAnswer();
-
-    await peer.setLocalDescription(answer);
-    logCallDebug('peer-manager:handle-signal:send-answer', {
-      senderIdentityId,
-    });
-    await sendSignal(senderIdentityId, 'answer', descriptionPayload(answer));
   }
 
   public reset(): void {
@@ -236,6 +271,7 @@ export class CallPeerConnectionManager {
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
     this.pendingIceCandidates.clear();
+    this.peerNegotiationStates.clear();
 
     for (const audio of this.remoteAudio.values()) {
       audio.pause();
@@ -250,6 +286,7 @@ export class CallPeerConnectionManager {
     this.remoteAudioGains.clear();
     this.remoteAudioVolumes.clear();
     this.remoteStreams.clear();
+    this.remoteScreenStreams.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
     this.deafened = false;
@@ -271,6 +308,112 @@ export class CallPeerConnectionManager {
     }
 
     return stats;
+  }
+
+  private async handleIceCandidateSignal(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    candidate: RTCIceCandidateInit,
+    state: PeerNegotiationState,
+  ): Promise<void> {
+    if (!peer.remoteDescription) {
+      logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
+        senderIdentityId,
+      });
+      this.queueIceCandidate(senderIdentityId, candidate);
+
+      return;
+    }
+
+    try {
+      await peer.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (error) {
+      if (state.ignoreOffer) return;
+
+      throw error;
+    }
+    logCallDebug('peer-manager:handle-signal:added-ice-candidate', {
+      senderIdentityId,
+    });
+  }
+
+  private async handleDescriptionSignal(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    payload: RTCSessionDescriptionInit,
+    state: PeerNegotiationState,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const description = new RTCSessionDescription(payload);
+
+    if (
+      !(await this.acceptRemoteDescription(
+        senderIdentityId,
+        peer,
+        state,
+        description,
+      ))
+    ) {
+      return;
+    }
+
+    await peer.setRemoteDescription(description);
+    logCallDebug('peer-manager:handle-signal:remote-description-set', {
+      senderIdentityId,
+      signalType: description.type,
+    });
+    await this.flushIceCandidates(senderIdentityId, peer);
+
+    if (description.type !== 'offer') return;
+
+    const answer = await peer.createAnswer();
+
+    await peer.setLocalDescription(answer);
+    logCallDebug('peer-manager:handle-signal:send-answer', {
+      senderIdentityId,
+    });
+    await sendSignal(senderIdentityId, 'answer', descriptionPayload(answer));
+  }
+
+  private async acceptRemoteDescription(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    state: PeerNegotiationState,
+    description: RTCSessionDescription,
+  ): Promise<boolean> {
+    const negotiationState = state;
+
+    if (description.type !== 'offer') {
+      negotiationState.ignoreOffer = false;
+
+      return true;
+    }
+
+    const offerCollision =
+      negotiationState.makingOffer || peer.signalingState !== 'stable';
+
+    negotiationState.ignoreOffer = !negotiationState.polite && offerCollision;
+
+    if (negotiationState.ignoreOffer) {
+      logCallWarning('peer-manager:handle-signal:ignored-glare-offer', {
+        senderIdentityId,
+        signalingState: peer.signalingState,
+      });
+
+      return false;
+    }
+
+    negotiationState.ignoreOffer = false;
+
+    if (offerCollision) {
+      logCallDebug('peer-manager:handle-signal:rollback-glare-offer', {
+        senderIdentityId,
+        signalingState: peer.signalingState,
+      });
+      await peer.setLocalDescription({ type: 'rollback' });
+    }
+
+    return true;
   }
 
   private getOrCreatePeer(
@@ -354,10 +497,7 @@ export class CallPeerConnectionManager {
         ),
       });
 
-      if (stream) {
-        this.remoteStreams.set(peerIdentityId, stream);
-        this.playRemoteStream(peerIdentityId, stream);
-      }
+      this.handleRemoteTrack(peerIdentityId, event);
     });
     this.peers.set(peerIdentityId, peer);
 
@@ -376,8 +516,67 @@ export class CallPeerConnectionManager {
         readyState: track.readyState,
       });
 
-      if (this.localStream) peer.addTrack(track, this.localStream);
+      peer.addTrack(track, this.localTrackStream(track));
     });
+  }
+
+  private localTrackStream(track: MediaStreamTrack): MediaStream {
+    if (isScreenShareTrack(track)) return new MediaStream([track]);
+
+    return this.localStream ?? new MediaStream([track]);
+  }
+
+  private configureNegotiationState(
+    peerIdentityId: string,
+    polite: boolean,
+  ): void {
+    const current = this.peerNegotiationState(peerIdentityId);
+
+    current.polite = polite;
+  }
+
+  private peerNegotiationState(peerIdentityId: string): PeerNegotiationState {
+    const current = this.peerNegotiationStates.get(peerIdentityId);
+
+    if (current) return current;
+
+    const state = {
+      ignoreOffer: false,
+      makingOffer: false,
+      polite: true,
+    };
+
+    this.peerNegotiationStates.set(peerIdentityId, state);
+
+    return state;
+  }
+
+  private handleRemoteTrack(
+    peerIdentityId: string,
+    event: RTCTrackEvent,
+  ): void {
+    const [receivedStream] = event.streams;
+    const stream = receivedStream ?? new MediaStream([event.track]);
+
+    if (isRemoteScreenShareTrack(event.track, stream, this.remoteStreams)) {
+      const screenStream = new MediaStream([event.track]);
+
+      this.remoteScreenStreams.set(peerIdentityId, screenStream);
+      event.track.addEventListener('ended', () => {
+        if (this.remoteScreenStreams.get(peerIdentityId) === screenStream) {
+          this.remoteScreenStreams.delete(peerIdentityId);
+        }
+      });
+      logCallDebug('peer-manager:screen-track-received', {
+        peerIdentityId,
+        trackId: event.track.id,
+      });
+
+      return;
+    }
+
+    this.remoteStreams.set(peerIdentityId, stream);
+    this.playRemoteStream(peerIdentityId, stream);
   }
 
   private syncLocalTracks(): void {
@@ -402,7 +601,7 @@ export class CallPeerConnectionManager {
           .some((sender) => sender.track?.id === track.id);
 
         if (!existing && this.localStream)
-          peer.addTrack(track, this.localStream);
+          peer.addTrack(track, this.localTrackStream(track));
       });
     }
   }
@@ -414,10 +613,17 @@ export class CallPeerConnectionManager {
   ): Promise<void> {
     if (peer.signalingState !== 'stable') return;
 
-    const offer = await peer.createOffer();
+    const state = this.peerNegotiationState(peerIdentityId);
 
-    await peer.setLocalDescription(offer);
-    await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+    try {
+      state.makingOffer = true;
+      const offer = await peer.createOffer();
+
+      await peer.setLocalDescription(offer);
+      await sendSignal(peerIdentityId, 'offer', descriptionPayload(offer));
+    } finally {
+      state.makingOffer = false;
+    }
   }
 
   private playRemoteStream(peerIdentityId: string, stream: MediaStream): void {

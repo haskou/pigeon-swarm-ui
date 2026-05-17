@@ -190,6 +190,9 @@ export class LocalMediaManager {
   ): void {
     const current = kind === 'camera' ? this.cameraTrack : this.screenTrack;
 
+    Object.assign(track, {
+      contentHint: kind === 'camera' ? 'motion' : 'detail',
+    });
     current?.stop();
     this.removeTrack(current);
     this.currentStream().addTrack(track);
