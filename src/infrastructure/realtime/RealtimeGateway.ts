@@ -139,7 +139,9 @@ export class RealtimeGateway {
 
   private startHeartbeat(socket: WebSocket, url: URL): () => void {
     this.ackHeartbeat(socket);
-    const activity = this.trackActivity();
+    const activity = this.trackActivity(() => {
+      this.sendIdentityHeartbeat(socket, true);
+    });
 
     const timer = globalThis.setInterval(() => {
       if (Date.now() - this.lastHeartbeatAckAt(socket) >= heartbeatTimeoutMs) {
@@ -152,15 +154,7 @@ export class RealtimeGateway {
         return;
       }
 
-      if (socket.readyState !== 1) return;
-
-      socket.send(
-        JSON.stringify({
-          active: activity.isActive(),
-          type: 'identity_heartbeat',
-        }),
-      );
-      this.debug('heartbeat', 'sent');
+      this.sendIdentityHeartbeat(socket, activity.isActive());
     }, heartbeatIntervalMs);
 
     return () => {
@@ -169,14 +163,21 @@ export class RealtimeGateway {
     };
   }
 
-  private trackActivity(): ActivityTracker {
+  private trackActivity(onActiveAgain: () => void): ActivityTracker {
     let lastActivityAt = Date.now();
     const markActive = () => {
+      const wasInactive =
+        Date.now() - lastActivityAt > recentActivityWindowMs ||
+        globalThis.document?.visibilityState === 'hidden';
+
       lastActivityAt = Date.now();
+
+      if (wasInactive) onActiveAgain();
     };
     const activityEvents = [
       'focus',
       'keydown',
+      'mousedown',
       'mousemove',
       'pointerdown',
       'pointermove',
@@ -201,6 +202,18 @@ export class RealtimeGateway {
         }
       },
     };
+  }
+
+  private sendIdentityHeartbeat(socket: WebSocket, active: boolean): void {
+    if (socket.readyState !== 1) return;
+
+    socket.send(
+      JSON.stringify({
+        active,
+        type: 'identity_heartbeat',
+      }),
+    );
+    this.debug('heartbeat', 'sent');
   }
 
   private ackHeartbeat(socket: WebSocket): void {

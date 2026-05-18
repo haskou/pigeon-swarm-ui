@@ -783,7 +783,11 @@ export function GlassWorkspace({
           (presence) => presence.identityId === session.identity.id,
         );
 
-        if (ownPresence && ownPresence.status !== 'disconnected') {
+        if (
+          ownPresence &&
+          ownPresence.status !== 'away' &&
+          ownPresence.status !== 'disconnected'
+        ) {
           return;
         }
 

@@ -264,6 +264,73 @@ describe(RealtimeGateway.name, () => {
     );
   });
 
+  it('sends an active heartbeat when the user returns from idle', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(1778536870557);
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const activityListeners: EventListener[] = [];
+    const globalEvents = globalThis as unknown as {
+      addEventListener?: (
+        type: string,
+        listener: EventListener,
+        options?: AddEventListenerOptions,
+      ) => void;
+      removeEventListener?: (type: string, listener: EventListener) => void;
+    };
+    const originalAddEventListener = globalEvents.addEventListener;
+    const originalRemoveEventListener = globalEvents.removeEventListener;
+
+    globalEvents.addEventListener = (type, listener) => {
+      if (type === 'mousemove') activityListeners.push(listener);
+    };
+    globalEvents.removeEventListener = (type, listener) => {
+      if (type !== 'mousemove') return;
+
+      const index = activityListeners.indexOf(listener);
+
+      if (index >= 0) activityListeners.splice(index, 1);
+    };
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    await gateway.connect(session, jest.fn());
+    WebSocketMock.instances[0]?.emitMessage(
+      JSON.stringify({
+        identityId: 'identity-1',
+        type: 'connection_ack',
+      }),
+    );
+
+    for (let heartbeat = 0; heartbeat < 31; heartbeat += 1) {
+      jest.advanceTimersByTime(10000);
+      WebSocketMock.instances[0]?.emitMessage(
+        JSON.stringify({
+          identityId: 'identity-1',
+          timestamp: Date.now(),
+          type: 'heartbeat_ack',
+        }),
+      );
+    }
+
+    activityListeners.forEach((listener) => listener(new Event('mousemove')));
+
+    expect(WebSocketMock.instances[0]?.send).toHaveBeenLastCalledWith(
+      JSON.stringify({ active: true, type: 'identity_heartbeat' }),
+    );
+    globalEvents.addEventListener = originalAddEventListener;
+    globalEvents.removeEventListener = originalRemoveEventListener;
+  });
+
   it('closes the socket when heartbeat acknowledgements stop', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
