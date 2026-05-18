@@ -87,14 +87,16 @@ export class PigeonFilesApi {
   }
 
   public async uploadPublicFile(
-    _session: Session,
+    session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
     const path = '/ipfs/public';
+    const bytes = await file.arrayBuffer();
 
     return await this.http.request<PublicFileUpload>(path, {
       body: file,
       headers: {
+        ...(await this.signer.headers(session, 'POST', path, bytes)),
         'Content-Type': file.type || 'application/octet-stream',
         'X-Filename': file.name || 'upload',
       },

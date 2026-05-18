@@ -1008,7 +1008,8 @@ describe(PigeonApiGateway.name, () => {
     expect(signedPassword).toBe(session.password);
   });
 
-  it('uploads public profile files as unsigned binary bodies', async () => {
+  it('uploads public profile files as signed binary bodies', async () => {
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
     const upload = {
       cid: 'bafy-avatar',
       contentType: 'image/png',
@@ -1026,6 +1027,7 @@ describe(PigeonApiGateway.name, () => {
       password: 'secret',
     } as unknown as Session;
     const file = {
+      arrayBuffer: jest.fn().mockResolvedValue(bytes),
       name: 'avatar.png',
       type: 'image/png',
     } as unknown as File;
@@ -1033,12 +1035,18 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(gateway.uploadPublicFile(session, file)).resolves.toBe(upload);
 
-    expect(signer.headers).not.toHaveBeenCalled();
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/ipfs/public',
+      bytes,
+    );
     expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
       body: file,
       headers: {
         'Content-Type': 'image/png',
         'X-Filename': 'avatar.png',
+        'X-Signature': 'http-signature',
       },
       method: 'POST',
     });
