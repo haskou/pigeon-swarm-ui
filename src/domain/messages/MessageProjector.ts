@@ -41,6 +41,11 @@ type MessageReactionRecord = {
 };
 
 export class MessageProjector {
+  private readonly privateKeys = new Map<
+    string,
+    ReturnType<typeof PrivateKey.fromPEM>
+  >();
+
   public constructor(private readonly copy: MessageProjectionCopy) {}
 
   public list(value: unknown): {
@@ -90,7 +95,7 @@ export class MessageProjector {
       base,
       message,
       encryptedPayload,
-      key.privateKey,
+      this.privateKey(key.privateKey),
       session.identity.id,
     );
   }
@@ -138,15 +143,29 @@ export class MessageProjector {
     );
   }
 
+  private privateKey(
+    privateKey: string,
+  ): ReturnType<typeof PrivateKey.fromPEM> {
+    const cachedPrivateKey = this.privateKeys.get(privateKey);
+
+    if (cachedPrivateKey) return cachedPrivateKey;
+
+    const nextPrivateKey = PrivateKey.fromPEM(privateKey);
+
+    this.privateKeys.set(privateKey, nextPrivateKey);
+
+    return nextPrivateKey;
+  }
+
   private async decryptMessage(
     base: Omit<ChatMessage, 'content' | 'encrypted'>,
     message: MessageResource,
     encryptedPayload: string,
-    privateKey: string,
+    privateKey: ReturnType<typeof PrivateKey.fromPEM>,
     currentIdentityId: string,
   ): Promise<ChatMessage> {
     try {
-      const decrypted = await PrivateKey.fromPEM(privateKey).decrypt(
+      const decrypted = await privateKey.decrypt(
         new EncryptedPayload(encryptedPayload),
       );
       const decryptedText = new TextDecoder().decode(decrypted);

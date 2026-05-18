@@ -1,6 +1,9 @@
 import {
   ChangeEvent,
   FormEvent,
+  lazy,
+  type ReactNode,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -12,7 +15,9 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallSession } from '../../domain/calls/CallSession';
 import type {
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
 
@@ -48,9 +53,15 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
-import { ImageCropEditor } from '../common/ImageCropEditor';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { SectionTitle } from '../common/SectionTitle';
 import { loadPublicImage } from '../community/communityImages';
+
+const ImageCropEditor = lazy(() =>
+  import('../common/ImageCropEditor').then((module) => ({
+    default: module.ImageCropEditor,
+  })),
+);
 
 interface SidebarProps {
   session: Session;
@@ -59,12 +70,14 @@ interface SidebarProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
-  onClose: () => void;
   onCreate: () => void;
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
@@ -84,6 +97,7 @@ export function Sidebar({
   identityNames,
   identityPictures,
   identityProfiles,
+  presenceByIdentityId = {},
   nodeNetworks,
   onCallEnd,
   onCallParticipantVolumeChange,
@@ -91,11 +105,12 @@ export function Sidebar({
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleScreenShare,
-  onClose,
   onCreate,
   onLogout,
   onSelect,
   onSessionUpdated,
+  onPresenceChange,
+  onPresenceStatusSelected,
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
@@ -181,17 +196,6 @@ export function Sidebar({
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
-      <div className="mb-4 flex items-center justify-end lg:hidden">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={copy.workspace.closeSidebar}
-          className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
-        >
-          ×
-        </button>
-      </div>
-
       <button
         onClick={onCreate}
         className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
@@ -240,19 +244,29 @@ export function Sidebar({
               <div className="relative flex items-center gap-3">
                 <div
                   className={cx(
-                    'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+                    'relative grid h-11 w-11 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
                     activeConversationId === conversation.id &&
                       'ring-2 ring-slate-950/20',
                   )}
                 >
-                  {conversationPicture(conversation) ? (
-                    <img
-                      src={conversationPicture(conversation)}
-                      alt=""
-                      className="h-full w-full object-cover"
+                  <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+                    {conversationPicture(conversation) ? (
+                      <img
+                        src={conversationPicture(conversation)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      conversationName(conversation).slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  {conversationPeerId(conversation) && (
+                    <PresenceStatusDot
+                      presence={
+                        presenceByIdentityId[conversationPeerId(conversation)!]
+                      }
+                      className="-bottom-1 -right-1"
                     />
-                  ) : (
-                    conversationName(conversation).slice(0, 1).toUpperCase()
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -286,7 +300,10 @@ export function Sidebar({
         identityPictures={identityPictures}
         nodeNetworks={nodeNetworks}
         onLogout={onLogout}
+        onPresenceChange={onPresenceChange}
+        onPresenceStatusSelected={onPresenceStatusSelected}
         onSessionUpdated={onSessionUpdated}
+        presence={presenceByIdentityId[session.identity.id]}
         session={session}
         activeCall={activeCall}
         onCallEnd={onCallEnd}
@@ -384,14 +401,20 @@ export function UserProfileDropdown({
   onCallToggleMute,
   onCallToggleScreenShare,
   onLogout,
+  onPresenceChange,
+  onPresenceStatusSelected,
   onSessionUpdated,
+  presence,
   session,
 }: {
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;
   nodeNetworks: NodeNetwork[];
   onLogout: () => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   onSessionUpdated: (session: Session) => void;
+  presence?: IdentityPresence;
   session: Session;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
@@ -408,6 +431,10 @@ export function UserProfileDropdown({
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  const [presenceStatus, setPresenceStatus] =
+    useState<SelectablePresenceStatus>(selectablePresenceStatus(presence));
+  const [presenceError, setPresenceError] = useState<string | null>(null);
+  const [presenceSaving, setPresenceSaving] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const ownDisplayName = identityDisplayName(
     session.identity.id,
@@ -435,6 +462,32 @@ export function UserProfileDropdown({
 
   const changeLanguage = (nextLanguage: string) => {
     setLanguage(saveLanguage(nextLanguage));
+  };
+
+  useEffect(() => {
+    if (!presence) return;
+
+    setPresenceStatus(selectablePresenceStatus(presence));
+  }, [presence]);
+
+  const updatePresenceStatus = async (nextStatus: string) => {
+    const status = nextStatus as SelectablePresenceStatus;
+
+    setPresenceStatus(status);
+    setPresenceSaving(true);
+    setPresenceError(null);
+    try {
+      const nextPresence = await pigeonApplication.updatePresence(session, {
+        status,
+      });
+
+      onPresenceStatusSelected?.(status);
+      onPresenceChange?.(nextPresence);
+    } catch {
+      setPresenceError(copy.presence.error);
+    } finally {
+      setPresenceSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -480,7 +533,12 @@ export function UserProfileDropdown({
         className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
-        <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
+        <ProfileAvatar
+          label={ownDisplayName}
+          picture={ownPicture}
+          presence={presence}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <div className="truncate font-black">{ownProfileName}</div>
           <div className="truncate text-xs text-white/50">
@@ -516,6 +574,25 @@ export function UserProfileDropdown({
           )}
         >
           <div className="space-y-3 text-xs">
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.presence.status}
+              </div>
+              <GlassSelect
+                ariaLabel={copy.presence.selectStatus}
+                disabled={presenceSaving}
+                onChange={(value) => void updatePresenceStatus(value)}
+                options={presenceStatusOptions()}
+                value={presenceStatus}
+              />
+            </div>
+
+            {presenceError && (
+              <p className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-2 text-rose-100">
+                {presenceError}
+              </p>
+            )}
+
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.identityId}
@@ -600,17 +677,19 @@ function ProfileAvatar({
   className,
   label,
   picture,
+  presence,
   size = 'md',
 }: {
   className?: string;
   label: string;
   picture?: string | null;
+  presence?: IdentityPresence;
   size?: 'lg' | 'md' | 'xl';
 }) {
   return (
     <div
       className={cx(
-        'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        'relative grid shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
         size === 'xl'
           ? 'h-16 w-16 text-2xl'
           : size === 'lg'
@@ -619,13 +698,57 @@ function ProfileAvatar({
         className,
       )}
     >
-      {picture ? (
-        <img src={picture} alt="" className="h-full w-full object-cover" />
-      ) : (
-        label.slice(0, 1).toUpperCase() || 'P'
-      )}
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+        {picture ? (
+          <img src={picture} alt="" className="h-full w-full object-cover" />
+        ) : (
+          label.slice(0, 1).toUpperCase() || 'P'
+        )}
+      </span>
+      <PresenceStatusDot
+        presence={presence}
+        size={size === 'xl' ? 'lg' : 'md'}
+        className="-bottom-1 -right-1"
+      />
     </div>
   );
+}
+
+function presenceStatusOptions(): Array<{
+  indicatorClassName: string;
+  label: string;
+  value: SelectablePresenceStatus;
+}> {
+  return [
+    {
+      indicatorClassName: 'bg-emerald-400',
+      label: copy.presence.statuses.available,
+      value: 'available',
+    },
+    {
+      indicatorClassName: 'bg-amber-400',
+      label: copy.presence.statuses.away,
+      value: 'away',
+    },
+    {
+      indicatorClassName: 'bg-rose-500',
+      label: copy.presence.statuses.busy,
+      value: 'busy',
+    },
+    {
+      indicatorClassName: 'bg-zinc-500',
+      label: copy.presence.statuses.invisible,
+      value: 'invisible',
+    },
+  ];
+}
+
+function selectablePresenceStatus(
+  presence?: IdentityPresence,
+): SelectablePresenceStatus {
+  if (!presence || presence.status === 'disconnected') return 'available';
+
+  return presence.status;
 }
 
 function ProfileEditor({
@@ -805,7 +928,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6 lg:p-8"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -819,7 +942,7 @@ function ProfileEditor({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
+        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-start xl:gap-6">
           <div className="overflow-hidden rounded-2xl bg-black/25">
             <button
               type="button"
@@ -859,30 +982,36 @@ function ProfileEditor({
                 </span>
               </button>
               <div className="mt-4 grid gap-3">
-                <input
-                  aria-label={copy.profile.name}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={ProfileName.MAX_LENGTH}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-                <input
-                  aria-label={copy.profile.handle}
-                  value={handle}
-                  onChange={(event) =>
-                    setHandle(normalizeHandle(event.target.value))
-                  }
-                  maxLength={ProfileHandle.MAX_LENGTH}
-                  placeholder="@ada"
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-                <textarea
-                  aria-label={copy.profile.biography}
-                  value={biography}
-                  onChange={(event) => setBiography(event.target.value)}
-                  maxLength={ProfileBiography.MAX_LENGTH}
-                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
+                <ProfileEditorField label={copy.profile.name}>
+                  <input
+                    aria-label={copy.profile.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={ProfileName.MAX_LENGTH}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
+                <ProfileEditorField label={copy.profile.handle}>
+                  <input
+                    aria-label={copy.profile.handle}
+                    value={handle}
+                    onChange={(event) =>
+                      setHandle(normalizeHandle(event.target.value))
+                    }
+                    maxLength={ProfileHandle.MAX_LENGTH}
+                    placeholder="@ada"
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
+                <ProfileEditorField label={copy.profile.biography}>
+                  <textarea
+                    aria-label={copy.profile.biography}
+                    value={biography}
+                    onChange={(event) => setBiography(event.target.value)}
+                    maxLength={ProfileBiography.MAX_LENGTH}
+                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
               </div>
             </div>
             <input
@@ -900,7 +1029,7 @@ function ProfileEditor({
               className="sr-only"
             />
           </div>
-          <div className="grid gap-4">
+          <div className="grid min-w-0 gap-4">
             <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
@@ -922,10 +1051,10 @@ function ProfileEditor({
                   </span>
                 )}
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto]">
                 <GlassSelect
                   ariaLabel={copy.profile.availableNetwork}
-                  className="min-w-0 flex-1"
+                  className="min-w-0"
                   disabled={nodeNetworkOptions.length === 0}
                   onChange={setNetworkToAdd}
                   options={
@@ -945,7 +1074,7 @@ function ProfileEditor({
                   type="button"
                   onClick={addNetwork}
                   disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                  className="shrink-0 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {copy.profile.addNetwork}
                 </button>
@@ -1016,20 +1145,22 @@ function ProfileEditor({
         </button>
       </form>
       {imageEditor && (
-        <ImageCropEditor
-          file={imageEditor.file}
-          shape={imageEditor.shape}
-          onClose={() => setImageEditor(null)}
-          onApply={(file, previewUrl) => {
-            if (imageEditor.shape === 'avatar') {
-              setPictureFile(file);
-              setPicturePreview(previewUrl);
-            } else {
-              setBannerFile(file);
-              setBannerPreview(previewUrl);
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <ImageCropEditor
+            file={imageEditor.file}
+            shape={imageEditor.shape}
+            onClose={() => setImageEditor(null)}
+            onApply={(file, previewUrl) => {
+              if (imageEditor.shape === 'avatar') {
+                setPictureFile(file);
+                setPicturePreview(previewUrl);
+              } else {
+                setBannerFile(file);
+                setBannerPreview(previewUrl);
+              }
+            }}
+          />
+        </Suspense>
       )}
     </div>,
     document.body,
@@ -1059,6 +1190,21 @@ function ProfileInput({
         type={type}
         className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
       />
+    </label>
+  );
+}
+
+function ProfileEditorField({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/40">
+      {label}
+      {children}
     </label>
   );
 }

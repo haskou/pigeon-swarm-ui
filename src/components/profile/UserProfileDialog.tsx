@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type { IdentityResource } from '../../domain/types';
+import type { IdentityPresence, IdentityResource } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -14,6 +14,7 @@ import {
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { ImageLightbox, type LightboxImage } from '../chat/ImageLightbox';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 
 type ProfilePopoverAnchor = {
   bottom: number;
@@ -33,6 +34,7 @@ interface UserProfileDialogProps {
   onClose: () => void;
   onOpenConversation?: () => Promise<void> | void;
   picture?: string | null;
+  presence?: IdentityPresence;
 }
 
 export function UserProfileDialog({
@@ -44,6 +46,7 @@ export function UserProfileDialog({
   onClose,
   onOpenConversation,
   picture,
+  presence,
 }: UserProfileDialogProps) {
   const [copied, setCopied] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(
@@ -203,18 +206,25 @@ export function UserProfileDialog({
               ]);
             }}
             disabled={!displayPicture}
-            className="-mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
+            className="relative -mt-10 grid h-20 w-20 place-items-center overflow-visible rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
             aria-label={copy.profile.openPicture}
           >
-            {displayPicture ? (
-              <img
-                src={displayPicture}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              displayName.slice(0, 1).toUpperCase()
-            )}
+            <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-xl">
+              {displayPicture ? (
+                <img
+                  src={displayPicture}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                displayName.slice(0, 1).toUpperCase()
+              )}
+            </span>
+            <PresenceStatusDot
+              presence={presence}
+              size="lg"
+              className="-bottom-1 -right-1"
+            />
           </button>
 
           <div className="mt-3 flex min-w-0 items-start gap-3">

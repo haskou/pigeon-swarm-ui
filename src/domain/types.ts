@@ -23,6 +23,24 @@ export type IdentityResource = {
 
 export type IdentityProfile = IdentityResource['profile'];
 
+export type PresenceStatus =
+  | 'available'
+  | 'away'
+  | 'busy'
+  | 'disconnected'
+  | 'invisible';
+
+export type SelectablePresenceStatus = Exclude<PresenceStatus, 'disconnected'>;
+
+export type IdentityPresence = {
+  identityId: string;
+  status: PresenceStatus;
+  updatedAt: number;
+  lastActivityAt?: number;
+  lastHeartbeatAt?: number;
+  networkIds?: string[];
+};
+
 export type KeychainResource = {
   encryptedPayload: string;
   keychainExternalIdentifier: string;
@@ -259,6 +277,33 @@ export type CommunityDiscoveryResource = {
   membershipStatus: 'invited' | 'member' | 'none' | 'requested';
   membershipRequest?: CommunityMembershipRequest;
   visibility: 'private';
+};
+
+export type IpfsReplicationNetworkStatus = {
+  networkId: string;
+  activeNodeCount: number;
+  desiredReplicas: number;
+  knownReplicas: number;
+  knownReplicaNodeIds: string[];
+  localResponsible: boolean;
+  releaseLocalReplica: boolean;
+  responsibleNodeIds: string[];
+};
+
+export type IpfsReplicationContentStatus = {
+  cid: string;
+  context: string;
+  sizeBytes: number;
+  priority: string;
+  ownerIdentityId: string;
+  createdAt: number;
+  updatedAt: number;
+  networks: IpfsReplicationNetworkStatus[];
+};
+
+export type IpfsReplicationStatus = {
+  localNodeId: string;
+  contents: IpfsReplicationContentStatus[];
 };
 
 export type MessageResource = {

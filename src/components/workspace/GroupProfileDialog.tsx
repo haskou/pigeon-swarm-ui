@@ -5,11 +5,13 @@ import { createPortal } from 'react-dom';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
+import { MemberRow } from '../community/MemberRow';
 
 type GroupParticipant = {
   identity?: IdentityResource;
@@ -28,6 +30,7 @@ interface GroupProfileDialogProps {
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
   participants: GroupParticipant[];
+  presenceByIdentityId?: Record<string, IdentityPresence>;
 }
 
 export function GroupProfileDialog({
@@ -37,6 +40,7 @@ export function GroupProfileDialog({
   onClose,
   onIdentityClick,
   participants,
+  presenceByIdentityId = {},
 }: GroupProfileDialogProps) {
   const groupName = conversation.name ?? conversation.title ?? conversation.id;
   const networkName = networkId
@@ -92,32 +96,15 @@ export function GroupProfileDialog({
           </div>
           <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
             {participants.map((participant) => (
-              <button
+              <MemberRow
                 key={participant.identityId}
-                type="button"
+                identity={participant.identity}
+                identityId={participant.identityId}
+                name={participant.name}
                 onClick={(event) => onIdentityClick(participant, event)}
-                className="flex w-full items-center gap-3 rounded-2xl bg-white/5 p-3 text-left transition hover:bg-white/10"
-              >
-                <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-                  {participant.picture ? (
-                    <img
-                      src={participant.picture}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    participant.name.slice(0, 1).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-black">{participant.name}</div>
-                  <div className="truncate text-xs text-white/45">
-                    {participant.identity?.profile.handle
-                      ? `@${participant.identity.profile.handle}`
-                      : shortId(participant.identityId)}
-                  </div>
-                </div>
-              </button>
+                pictureUrl={participant.picture ?? null}
+                presence={presenceByIdentityId[participant.identityId]}
+              />
             ))}
           </div>
         </div>

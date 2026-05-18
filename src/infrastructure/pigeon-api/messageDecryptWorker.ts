@@ -9,6 +9,7 @@ import type {
 } from '../../domain/types';
 
 type MessageDecryptRequest = {
+  conversationId: string;
   copy: {
     decryptFailed: string;
     missingKey: string;
@@ -52,6 +53,9 @@ type PlainMessage = {
 };
 
 const cancelledRequestIds = new Set<number>();
+const projectedMessageCache = new Map<string, ChatMessage>();
+const projectedMessageCacheLimit = 500;
+const messageDecryptBatchSize = 8;
 
 function isCancelRequest(
   request: MessageDecryptCancelRequest | MessageDecryptRequest,
@@ -71,9 +75,7 @@ self.onmessage = async (
   }
 
   try {
-    const messages = await Promise.all(
-      request.messages.map((message) => projectMessage(request, message)),
-    );
+    const messages = await projectMessages(request);
 
     if (cancelledRequestIds.delete(request.requestId)) return;
 
@@ -94,33 +96,75 @@ self.onmessage = async (
   }
 };
 
+async function projectMessages(
+  request: MessageDecryptRequest,
+): Promise<ChatMessage[]> {
+  const projectedMessages = new Array<ChatMessage>(request.messages.length);
+  const privateKey = request.privateKey
+    ? PrivateKey.fromPEM(request.privateKey)
+    : undefined;
+
+  for (
+    let endIndex = request.messages.length;
+    endIndex > 0;
+    endIndex -= messageDecryptBatchSize
+  ) {
+    if (cancelledRequestIds.has(request.requestId)) break;
+
+    const startIndex = Math.max(0, endIndex - messageDecryptBatchSize);
+    const indexes = Array.from(
+      { length: endIndex - startIndex },
+      (_, offset) => startIndex + offset,
+    );
+    const batch = await Promise.all(
+      indexes.map((index) =>
+        projectMessage(request, request.messages[index], privateKey),
+      ),
+    );
+
+    for (let index = 0; index < indexes.length; index += 1) {
+      projectedMessages[indexes[index]] = batch[index];
+    }
+  }
+
+  return projectedMessages;
+}
+
 async function projectMessage(
   request: MessageDecryptRequest,
   message: MessageResource,
+  privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
+  const cachedMessage = cachedProjectedMessage(request, message);
+
+  if (cachedMessage) return cachedMessage;
+
   const base = baseMessage(request.currentIdentityId, message);
+  let projectedMessage: ChatMessage;
 
   if (message.type === 'call_event') {
-    return callEventMessage(base, message);
+    projectedMessage = callEventMessage(base, message);
+  } else {
+    const encryptedPayload = message.encryptedPayload ?? message.payload;
+
+    if (!encryptedPayload) {
+      projectedMessage = plainMessage(base, message);
+    } else if (!privateKey) {
+      projectedMessage = encryptedError(base, message, request.copy.missingKey);
+    } else {
+      projectedMessage = await decryptMessage(
+        request,
+        base,
+        message,
+        encryptedPayload,
+        privateKey,
+      );
+    }
   }
 
-  const encryptedPayload = message.encryptedPayload ?? message.payload;
+  rememberProjectedMessage(request, message, projectedMessage);
 
-  if (!encryptedPayload) {
-    return plainMessage(base, message);
-  }
-
-  if (!request.privateKey) {
-    return encryptedError(base, message, request.copy.missingKey);
-  }
-
-  return await decryptMessage(
-    request,
-    base,
-    message,
-    encryptedPayload,
-    request.privateKey,
-  );
+  return projectedMessage;
 }
 
 async function decryptMessage(
@@ -128,10 +172,10 @@ async function decryptMessage(
   base: Omit<ChatMessage, 'content' | 'encrypted'>,
   message: MessageResource,
   encryptedPayload: string,
-  privateKey: string,
+  privateKey: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
   try {
-    const decrypted = await PrivateKey.fromPEM(privateKey).decrypt(
+    const decrypted = await privateKey.decrypt(
       new EncryptedPayload(encryptedPayload),
     );
     const decryptedText = new TextDecoder().decode(decrypted);
@@ -153,6 +197,64 @@ async function decryptMessage(
   } catch {
     return encryptedError(base, message, request.copy.decryptFailed);
   }
+}
+
+function cachedProjectedMessage(
+  request: MessageDecryptRequest,
+  message: MessageResource,
+): ChatMessage | undefined {
+  const cachedMessage = projectedMessageCache.get(
+    projectedMessageCacheKey(request, message),
+  );
+
+  return cachedMessage ? cloneChatMessage(cachedMessage) : undefined;
+}
+
+function rememberProjectedMessage(
+  request: MessageDecryptRequest,
+  message: MessageResource,
+  projectedMessage: ChatMessage,
+): void {
+  projectedMessageCache.set(
+    projectedMessageCacheKey(request, message),
+    cloneChatMessage(projectedMessage),
+  );
+
+  if (projectedMessageCache.size <= projectedMessageCacheLimit) return;
+
+  const oldestKey = projectedMessageCache.keys().next().value;
+
+  if (oldestKey) projectedMessageCache.delete(oldestKey);
+}
+
+function projectedMessageCacheKey(
+  request: MessageDecryptRequest,
+  message: MessageResource,
+): string {
+  return [
+    request.currentIdentityId,
+    request.conversationId,
+    firstCachePart(message.id, message.messageId),
+    firstCachePart(message.encryptedPayload, message.payload, message.content),
+    firstCachePart(message.timestamp, message.createdAt),
+    firstCachePart(message.replyToMessageId),
+    JSON.stringify(message.reactions ?? []),
+  ].join('\u0000');
+}
+
+function firstCachePart(...values: unknown[]): string {
+  const value = values.find((entry) => entry !== undefined && entry !== null);
+
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function cloneChatMessage(message: ChatMessage): ChatMessage {
+  return {
+    ...message,
+    attachments: [...message.attachments],
+    raw: { ...message.raw },
+    reactions: [...message.reactions],
+  };
 }
 
 function baseMessage(

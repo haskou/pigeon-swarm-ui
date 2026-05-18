@@ -20,6 +20,8 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
+  IdentityPresence,
+  IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
   MessageAttachment,
@@ -29,12 +31,15 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
+  SelectablePresenceStatus,
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
 import {
   RealtimeGateway,
+  type RealtimeHeartbeatActivityMode,
   type RealtimeMessage,
+  type RealtimeTypingInput,
 } from '../infrastructure/realtime/RealtimeGateway';
 import { CreateConversation } from './conversations/CreateConversation';
 import {
@@ -169,6 +174,33 @@ export class PigeonApplication {
     return await this.gateway.getCallIceServers(session);
   }
 
+  public async getIpfsReplicationStatus(
+    session: Session,
+  ): Promise<IpfsReplicationStatus> {
+    return await this.gateway.getIpfsReplicationStatus(session);
+  }
+
+  public async getPresence(
+    session: Session,
+    identityId: string,
+  ): Promise<IdentityPresence> {
+    return await this.gateway.getPresence(session, identityId);
+  }
+
+  public async getPresences(
+    session: Session,
+    identityIds: string[],
+  ): Promise<IdentityPresence[]> {
+    return await this.gateway.getPresences(session, identityIds);
+  }
+
+  public async updatePresence(
+    session: Session,
+    input: { status: SelectablePresenceStatus },
+  ): Promise<IdentityPresence> {
+    return await this.gateway.updatePresence(session, input);
+  }
+
   public async startConversationCall(
     session: Session,
     conversationId: string,
@@ -223,6 +255,47 @@ export class PigeonApplication {
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
     return await this.realtime.connect(session, onMessage);
+  }
+
+  public setRealtimeHeartbeatActivityMode(
+    session: Session,
+    mode: RealtimeHeartbeatActivityMode,
+  ): void {
+    this.realtime.setHeartbeatActivityMode(session, mode);
+  }
+
+  public sendRealtimeTyping(
+    socket: WebSocket,
+    input: RealtimeTypingInput,
+  ): void {
+    this.realtime.sendTyping(socket, input);
+  }
+
+  public async getPushVapidPublicKey(): Promise<{
+    enabled: boolean;
+    publicKey?: string;
+  }> {
+    return await this.gateway.getPushVapidPublicKey();
+  }
+
+  public async registerPushSubscription(
+    session: Session,
+    subscription: PushSubscriptionJSON,
+  ): Promise<void> {
+    await this.gateway.registerPushSubscription(
+      session,
+      pushSubscriptionPayload(subscription),
+    );
+  }
+
+  public async deletePushSubscription(
+    session: Session,
+    subscription: PushSubscriptionJSON,
+  ): Promise<void> {
+    await this.gateway.deletePushSubscription(
+      session,
+      pushSubscriptionPayload(subscription),
+    );
   }
 
   public async createConversation(
@@ -915,4 +988,27 @@ export class PigeonApplication {
 
     return { textChannels, voiceChannels };
   }
+}
+
+function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: { auth: string; p256dh: string };
+} {
+  if (
+    !subscription.endpoint ||
+    !subscription.keys?.auth ||
+    !subscription.keys.p256dh
+  ) {
+    throw new Error('Invalid push subscription.');
+  }
+
+  return {
+    endpoint: subscription.endpoint,
+    expirationTime: subscription.expirationTime,
+    keys: {
+      auth: subscription.keys.auth,
+      p256dh: subscription.keys.p256dh,
+    },
+  };
 }

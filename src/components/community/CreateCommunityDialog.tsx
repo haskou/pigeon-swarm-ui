@@ -1,6 +1,8 @@
 import {
   ChangeEvent,
   FormEvent,
+  lazy,
+  Suspense,
   type ReactElement,
   useEffect,
   useMemo,
@@ -13,9 +15,15 @@ import type { Community, Session } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
+import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
-import { ImageCropEditor } from '../common/ImageCropEditor';
+
+const ImageCropEditor = lazy(() =>
+  import('../common/ImageCropEditor').then((module) => ({
+    default: module.ImageCropEditor,
+  })),
+);
 
 interface CreateCommunityDialogProps {
   headerControl?: ReactElement;
@@ -184,7 +192,7 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
+        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -372,7 +380,12 @@ export function CreateCommunityDialog({
           </button>
           <button
             disabled={!canSubmit}
-            className="glass-button rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+            className={cx(
+              'rounded-2xl px-5 py-3 text-sm font-black transition',
+              canSubmit
+                ? 'glass-button bg-fuchsia-500 text-white hover:bg-fuchsia-400'
+                : 'cursor-not-allowed bg-white/10 text-white/35',
+            )}
           >
             {state === 'loading'
               ? copy.communities.creating
@@ -380,20 +393,22 @@ export function CreateCommunityDialog({
           </button>
         </div>
         {imageEditor && (
-          <ImageCropEditor
-            file={imageEditor.file}
-            shape={imageEditor.shape}
-            onClose={() => setImageEditor(null)}
-            onApply={(file, previewUrl) => {
-              if (imageEditor.shape === 'avatar') {
-                setAvatar(file);
-                setAvatarPreview(previewUrl);
-              } else {
-                setBanner(file);
-                setBannerPreview(previewUrl);
-              }
-            }}
-          />
+          <Suspense fallback={null}>
+            <ImageCropEditor
+              file={imageEditor.file}
+              shape={imageEditor.shape}
+              onClose={() => setImageEditor(null)}
+              onApply={(file, previewUrl) => {
+                if (imageEditor.shape === 'avatar') {
+                  setAvatar(file);
+                  setAvatarPreview(previewUrl);
+                } else {
+                  setBanner(file);
+                  setBannerPreview(previewUrl);
+                }
+              }}
+            />
+          </Suspense>
         )}
       </form>
     </div>
