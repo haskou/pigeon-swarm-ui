@@ -124,11 +124,15 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
-import { WorkspaceDialogs } from './WorkspaceDialogs';
 
 const CommunityWorkspace = lazy(() =>
   import('../community/CommunityWorkspace').then((module) => ({
     default: module.CommunityWorkspace,
+  })),
+);
+const WorkspaceDialogs = lazy(() =>
+  import('./WorkspaceDialogs').then((module) => ({
+    default: module.WorkspaceDialogs,
   })),
 );
 
@@ -3071,6 +3075,16 @@ export function GlassWorkspace({
     },
     [activeCommunity?.id, sendTyping],
   );
+  const hasWorkspaceDialogOpen =
+    inspectorOpen ||
+    isCreateCommunityOpen ||
+    isCreateOpen ||
+    !!incomingCall ||
+    !!messageContextMenu ||
+    nodeSettingsOpen ||
+    notificationsOpen ||
+    !!rawMessage ||
+    realtimeEventsOpen;
 
   return (
     <section
@@ -3355,89 +3369,93 @@ export function GlassWorkspace({
         )}
       </div>
 
-      <WorkspaceDialogs
-        activeConversation={activeConversation}
-        archiveNotification={archiveNotification}
-        communities={communities}
-        communityAvatarUrls={notificationCommunityAvatarUrls}
-        communityPreviews={notificationCommunityPreviews}
-        conversations={conversations}
-        identityNames={identityNames}
-        identityPictures={identityPictures}
-        identityProfiles={identityProfiles}
-        incomingCall={incomingCall}
-        inspectorOpen={inspectorOpen}
-        isCreateCommunityOpen={isCreateCommunityOpen}
-        isCreateOpen={isCreateOpen}
-        membershipRequestAction={membershipRequestAction}
-        membershipRequestError={membershipRequestError}
-        membershipRequests={membershipRequests}
-        messageContextMenu={messageContextMenu}
-        messages={messages}
-        node={node}
-        nodeNetworks={nodeNetworks}
-        nodeSettingsOpen={nodeSettingsOpen}
-        notificationAction={notificationAction}
-        notificationError={notificationError}
-        notificationsOpen={notificationsOpen}
-        peers={peers}
-        rawMessage={rawMessage}
-        realtimeEventLog={realtimeEventLog}
-        realtimeEventsOpen={realtimeEventsOpen}
-        session={session}
-        visibleNotifications={visibleNotifications}
-        onAcceptIncomingCall={acceptIncomingCall}
-        onAcceptNotification={(notification) =>
-          void acceptNotification(notification)
-        }
-        onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
-        onCloseCreateConversation={() => setIsCreateOpen(false)}
-        onCloseInspector={() => setInspectorOpen(false)}
-        onCloseMessageContextMenu={() => setMessageContextMenu(null)}
-        onCloseNodeSettings={() => setNodeSettingsOpen(false)}
-        onCloseNotifications={closeNotificationsPanel}
-        onCloseRawMessage={() => setRawMessage(null)}
-        onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
-        onCommunityCreated={({ community, session: nextSession }) => {
-          setSession(nextSession);
-          setCommunities((current) => [community, ...current]);
-          setActiveCommunityId(community.id);
-          setWorkspaceMode('community');
-          setIsCreateCommunityOpen(false);
-        }}
-        onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
-          setMembershipRequests((current) => [
-            request,
-            ...current.filter((item) => item.id !== request.id),
-          ]);
-          setIsCreateCommunityOpen(false);
-        }}
-        onConversationCreated={handleConversationCreated}
-        onAcceptMembershipRequest={(requestId) =>
-          void acceptMembershipRequest(requestId)
-        }
-        onDeclineIncomingCall={declineIncomingCall}
-        onDeclineMembershipRequest={(requestId) =>
-          void declineMembershipRequest(requestId)
-        }
-        onDeclineNotification={(notificationId) =>
-          void declineNotification(notificationId)
-        }
-        onDeleteMessage={(message) => void handleDeleteMessage(message)}
-        onCopyMessage={copyMessageContent}
-        onNetworksUpdated={onNodeNetworksReload}
-        onReplyToMessage={(message) => {
-          setReplyTarget(message);
-          setMessageContextMenu(null);
-        }}
-        onToggleReaction={(message, emoji, reacted) =>
-          void handleToggleMessageReaction(message, emoji, reacted)
-        }
-        onViewRawMessage={(message) => {
-          setRawMessage(message);
-          setMessageContextMenu(null);
-        }}
-      />
+      {hasWorkspaceDialogOpen ? (
+        <Suspense fallback={null}>
+          <WorkspaceDialogs
+            activeConversation={activeConversation}
+            archiveNotification={archiveNotification}
+            communities={communities}
+            communityAvatarUrls={notificationCommunityAvatarUrls}
+            communityPreviews={notificationCommunityPreviews}
+            conversations={conversations}
+            identityNames={identityNames}
+            identityPictures={identityPictures}
+            identityProfiles={identityProfiles}
+            incomingCall={incomingCall}
+            inspectorOpen={inspectorOpen}
+            isCreateCommunityOpen={isCreateCommunityOpen}
+            isCreateOpen={isCreateOpen}
+            membershipRequestAction={membershipRequestAction}
+            membershipRequestError={membershipRequestError}
+            membershipRequests={membershipRequests}
+            messageContextMenu={messageContextMenu}
+            messages={messages}
+            node={node}
+            nodeNetworks={nodeNetworks}
+            nodeSettingsOpen={nodeSettingsOpen}
+            notificationAction={notificationAction}
+            notificationError={notificationError}
+            notificationsOpen={notificationsOpen}
+            peers={peers}
+            rawMessage={rawMessage}
+            realtimeEventLog={realtimeEventLog}
+            realtimeEventsOpen={realtimeEventsOpen}
+            session={session}
+            visibleNotifications={visibleNotifications}
+            onAcceptIncomingCall={acceptIncomingCall}
+            onAcceptNotification={(notification) =>
+              void acceptNotification(notification)
+            }
+            onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
+            onCloseCreateConversation={() => setIsCreateOpen(false)}
+            onCloseInspector={() => setInspectorOpen(false)}
+            onCloseMessageContextMenu={() => setMessageContextMenu(null)}
+            onCloseNodeSettings={() => setNodeSettingsOpen(false)}
+            onCloseNotifications={closeNotificationsPanel}
+            onCloseRawMessage={() => setRawMessage(null)}
+            onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
+            onCommunityCreated={({ community, session: nextSession }) => {
+              setSession(nextSession);
+              setCommunities((current) => [community, ...current]);
+              setActiveCommunityId(community.id);
+              setWorkspaceMode('community');
+              setIsCreateCommunityOpen(false);
+            }}
+            onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
+              setMembershipRequests((current) => [
+                request,
+                ...current.filter((item) => item.id !== request.id),
+              ]);
+              setIsCreateCommunityOpen(false);
+            }}
+            onConversationCreated={handleConversationCreated}
+            onAcceptMembershipRequest={(requestId) =>
+              void acceptMembershipRequest(requestId)
+            }
+            onDeclineIncomingCall={declineIncomingCall}
+            onDeclineMembershipRequest={(requestId) =>
+              void declineMembershipRequest(requestId)
+            }
+            onDeclineNotification={(notificationId) =>
+              void declineNotification(notificationId)
+            }
+            onDeleteMessage={(message) => void handleDeleteMessage(message)}
+            onCopyMessage={copyMessageContent}
+            onNetworksUpdated={onNodeNetworksReload}
+            onReplyToMessage={(message) => {
+              setReplyTarget(message);
+              setMessageContextMenu(null);
+            }}
+            onToggleReaction={(message, emoji, reacted) =>
+              void handleToggleMessageReaction(message, emoji, reacted)
+            }
+            onViewRawMessage={(message) => {
+              setRawMessage(message);
+              setMessageContextMenu(null);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </section>
   );
 }
