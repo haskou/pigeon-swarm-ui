@@ -95,19 +95,36 @@ export function useCallSession(): {
       setActiveCall((current) => {
         if (!current) return current;
 
+        const nextParticipants = participantsWithMediaState(
+          current,
+          stats,
+          remoteStreams,
+          remoteScreenStreams,
+          localAudioLevel,
+          screenStream,
+        );
+        const nextCameraEnabled = mediaManager.hasCamera();
+        const nextLocalPreviewStream = mediaManager.previewStream();
+        const nextScreenSharing = mediaManager.hasScreenShare();
+
+        if (
+          current.cameraEnabled === nextCameraEnabled &&
+          current.localPreviewStream === nextLocalPreviewStream &&
+          current.screenSharing === nextScreenSharing &&
+          callParticipantsMediaStateEqual(
+            current.participants,
+            nextParticipants,
+          )
+        ) {
+          return current;
+        }
+
         return {
           ...current,
-          cameraEnabled: mediaManager.hasCamera(),
-          localPreviewStream: mediaManager.previewStream(),
-          participants: participantsWithMediaState(
-            current,
-            stats,
-            remoteStreams,
-            remoteScreenStreams,
-            localAudioLevel,
-            screenStream,
-          ),
-          screenSharing: mediaManager.hasScreenShare(),
+          cameraEnabled: nextCameraEnabled,
+          localPreviewStream: nextLocalPreviewStream,
+          participants: nextParticipants,
+          screenSharing: nextScreenSharing,
         };
       });
     };
@@ -711,4 +728,29 @@ function hasVideoTrack(stream?: MediaStream): boolean {
   return Boolean(
     stream?.getVideoTracks().some((track) => track.readyState === 'live'),
   );
+}
+
+function callParticipantsMediaStateEqual(
+  currentParticipants: CallParticipant[],
+  nextParticipants: CallParticipant[],
+): boolean {
+  if (currentParticipants.length !== nextParticipants.length) return false;
+
+  return currentParticipants.every((currentParticipant, index) => {
+    const nextParticipant = nextParticipants[index];
+
+    return (
+      currentParticipant.identityId === nextParticipant.identityId &&
+      currentParticipant.connectionState === nextParticipant.connectionState &&
+      currentParticipant.deafened === nextParticipant.deafened &&
+      currentParticipant.latencyMs === nextParticipant.latencyMs &&
+      currentParticipant.mediaStream === nextParticipant.mediaStream &&
+      currentParticipant.muted === nextParticipant.muted &&
+      currentParticipant.packetsLost === nextParticipant.packetsLost &&
+      currentParticipant.screenSharing === nextParticipant.screenSharing &&
+      currentParticipant.screenStream === nextParticipant.screenStream &&
+      currentParticipant.speaking === nextParticipant.speaking &&
+      currentParticipant.videoEnabled === nextParticipant.videoEnabled
+    );
+  });
 }
