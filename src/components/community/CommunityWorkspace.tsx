@@ -7,9 +7,11 @@ import {
 } from '@haskou/value-objects';
 import {
   Fragment,
+  lazy,
   memo,
   type MouseEvent,
   type ReactNode,
+  Suspense,
   startTransition,
   useCallback,
   useEffect,
@@ -66,25 +68,56 @@ import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
 import { Composer } from '../chat/Composer';
 import { DateSeparator } from '../chat/DateSeparator';
-import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
-import { UserProfileDialog } from '../profile/UserProfileDialog';
-import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
-import { ConversationKeyDialog } from '../workspace/ConversationKeyDialog';
 import { LockIcon } from '../workspace/LockIcon';
-import {
-  MessageContextMenu,
-  type MessageContextMenuState,
-} from '../workspace/MessageContextMenu';
-import { RawMessageDialog } from '../workspace/RawMessageDialog';
+import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
-import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { MemberRow } from './MemberRow';
 import { memberDisplayName } from './communityMemberNames';
-import { ManageCommunityDialog } from './ManageCommunityDialog';
+
+const AddCommunityMemberDialog = lazy(() =>
+  import('./AddCommunityMemberDialog').then((module) => ({
+    default: module.AddCommunityMemberDialog,
+  })),
+);
+const ConversationDataDialog = lazy(() =>
+  import('../workspace/ConversationDataDialog').then((module) => ({
+    default: module.ConversationDataDialog,
+  })),
+);
+const ConversationKeyDialog = lazy(() =>
+  import('../workspace/ConversationKeyDialog').then((module) => ({
+    default: module.ConversationKeyDialog,
+  })),
+);
+const ImageLightbox = lazy(() =>
+  import('../chat/ImageLightbox').then((module) => ({
+    default: module.ImageLightbox,
+  })),
+);
+const ManageCommunityDialog = lazy(() =>
+  import('./ManageCommunityDialog').then((module) => ({
+    default: module.ManageCommunityDialog,
+  })),
+);
+const MessageContextMenu = lazy(() =>
+  import('../workspace/MessageContextMenu').then((module) => ({
+    default: module.MessageContextMenu,
+  })),
+);
+const RawMessageDialog = lazy(() =>
+  import('../workspace/RawMessageDialog').then((module) => ({
+    default: module.RawMessageDialog,
+  })),
+);
+const UserProfileDialog = lazy(() =>
+  import('../profile/UserProfileDialog').then((module) => ({
+    default: module.UserProfileDialog,
+  })),
+);
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -2053,110 +2086,112 @@ export function CommunityWorkspace({
         </>
       )}
 
-      {bannerViewerOpen && bannerUrl && (
-        <ImageLightbox
-          images={[
-            {
-              alt: community.name,
-              filename: community.banner ?? community.name,
-              url: bannerUrl,
-            },
-          ]}
-          initialIndex={0}
-          onClose={() => setBannerViewerOpen(false)}
-        />
-      )}
-      {manageOpen && (
-        <ManageCommunityDialog
-          community={community}
-          onClose={() => setManageOpen(false)}
-          onCommunityUpdated={onCommunityUpdated}
-          session={session}
-        />
-      )}
-      {memberOpen && (
-        <AddCommunityMemberDialog
-          communityId={community.id}
-          onClose={() => setMemberOpen(false)}
-          onSessionUpdated={onSessionUpdated}
-          session={session}
-        />
-      )}
-      {profileViewer && (
-        <UserProfileDialog
-          anchor={profileViewer.anchor}
-          identity={profileViewer.identity}
-          identityId={profileViewer.identityId}
-          name={memberDisplayName(
-            profileViewer.identity,
-            profileViewer.identityId,
-          )}
-          nodeNetworks={nodeNetworks}
-          onClose={() => setProfileViewer(null)}
-          onOpenConversation={
-            profileViewer.identityId === session.identity.id ||
-            !onOpenConversationWithIdentity
-              ? undefined
-              : () =>
-                  onOpenConversationWithIdentity(
-                    profileViewer.identityId,
-                    profileViewer.identity,
-                  )
-          }
-          picture={profileViewer.pictureUrl}
-          presence={presenceByIdentityId[profileViewer.identityId]}
-        />
-      )}
-      {messageContextMenu && (
-        <MessageContextMenu
-          currentIdentityId={session.identity.id}
-          menu={messageContextMenu}
-          onClose={() => setMessageContextMenu(null)}
-          onDelete={
-            messageContextMenu.message.mine
-              ? () =>
-                  void handleDeleteChannelMessage(messageContextMenu.message)
-              : undefined
-          }
-          onReply={() => {
-            setReplyTarget(messageContextMenu.message);
-            setMessageContextMenu(null);
-          }}
-          onReactionToggle={(message, emoji, reacted) =>
-            void handleToggleChannelMessageReaction(message, emoji, reacted)
-          }
-          onViewRaw={() => {
-            setRawMessage(messageContextMenu.message);
-            setMessageContextMenu(null);
-          }}
-        />
-      )}
-      {rawMessage && (
-        <RawMessageDialog
-          message={rawMessage}
-          onClose={() => setRawMessage(null)}
-        />
-      )}
-      {communityDataOpen && (
-        <ConversationDataDialog
-          data={communityData}
-          onClose={() => setCommunityDataOpen(false)}
-          title={copy.communities.communityDataTitle}
-        />
-      )}
-      {communityKeyDialog && (
-        <ConversationKeyDialog
-          encryptedConversationKey={communityKeyEncrypted}
-          error={communityKeyError}
-          input={communityKeyInput}
-          mode={communityKeyDialog}
-          onClose={closeCommunityKeyDialog}
-          onCopy={() => void copyCommunityKey()}
-          onImport={() => void importCommunityKey()}
-          onInputChange={setCommunityKeyInput}
-          saving={communityKeySaving}
-        />
-      )}
+      <Suspense fallback={null}>
+        {bannerViewerOpen && bannerUrl && (
+          <ImageLightbox
+            images={[
+              {
+                alt: community.name,
+                filename: community.banner ?? community.name,
+                url: bannerUrl,
+              },
+            ]}
+            initialIndex={0}
+            onClose={() => setBannerViewerOpen(false)}
+          />
+        )}
+        {manageOpen && (
+          <ManageCommunityDialog
+            community={community}
+            onClose={() => setManageOpen(false)}
+            onCommunityUpdated={onCommunityUpdated}
+            session={session}
+          />
+        )}
+        {memberOpen && (
+          <AddCommunityMemberDialog
+            communityId={community.id}
+            onClose={() => setMemberOpen(false)}
+            onSessionUpdated={onSessionUpdated}
+            session={session}
+          />
+        )}
+        {profileViewer && (
+          <UserProfileDialog
+            anchor={profileViewer.anchor}
+            identity={profileViewer.identity}
+            identityId={profileViewer.identityId}
+            name={memberDisplayName(
+              profileViewer.identity,
+              profileViewer.identityId,
+            )}
+            nodeNetworks={nodeNetworks}
+            onClose={() => setProfileViewer(null)}
+            onOpenConversation={
+              profileViewer.identityId === session.identity.id ||
+              !onOpenConversationWithIdentity
+                ? undefined
+                : () =>
+                    onOpenConversationWithIdentity(
+                      profileViewer.identityId,
+                      profileViewer.identity,
+                    )
+            }
+            picture={profileViewer.pictureUrl}
+            presence={presenceByIdentityId[profileViewer.identityId]}
+          />
+        )}
+        {messageContextMenu && (
+          <MessageContextMenu
+            currentIdentityId={session.identity.id}
+            menu={messageContextMenu}
+            onClose={() => setMessageContextMenu(null)}
+            onDelete={
+              messageContextMenu.message.mine
+                ? () =>
+                    void handleDeleteChannelMessage(messageContextMenu.message)
+                : undefined
+            }
+            onReply={() => {
+              setReplyTarget(messageContextMenu.message);
+              setMessageContextMenu(null);
+            }}
+            onReactionToggle={(message, emoji, reacted) =>
+              void handleToggleChannelMessageReaction(message, emoji, reacted)
+            }
+            onViewRaw={() => {
+              setRawMessage(messageContextMenu.message);
+              setMessageContextMenu(null);
+            }}
+          />
+        )}
+        {rawMessage && (
+          <RawMessageDialog
+            message={rawMessage}
+            onClose={() => setRawMessage(null)}
+          />
+        )}
+        {communityDataOpen && (
+          <ConversationDataDialog
+            data={communityData}
+            onClose={() => setCommunityDataOpen(false)}
+            title={copy.communities.communityDataTitle}
+          />
+        )}
+        {communityKeyDialog && (
+          <ConversationKeyDialog
+            encryptedConversationKey={communityKeyEncrypted}
+            error={communityKeyError}
+            input={communityKeyInput}
+            mode={communityKeyDialog}
+            onClose={closeCommunityKeyDialog}
+            onCopy={() => void copyCommunityKey()}
+            onImport={() => void importCommunityKey()}
+            onInputChange={setCommunityKeyInput}
+            saving={communityKeySaving}
+          />
+        )}
+      </Suspense>
     </>
   );
 }
