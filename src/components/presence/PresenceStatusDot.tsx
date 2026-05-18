@@ -76,7 +76,6 @@ function statusClassName(status: PresenceStatus): string {
     case 'away':
       return 'bg-amber-400';
     case 'busy':
-    case 'custom':
       return 'bg-rose-500';
     case 'disconnected':
     case 'invisible':

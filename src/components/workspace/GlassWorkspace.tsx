@@ -141,7 +141,6 @@ function isPresenceStatus(value: unknown): value is PresenceStatus {
     value === 'available' ||
     value === 'away' ||
     value === 'busy' ||
-    value === 'custom' ||
     value === 'disconnected' ||
     value === 'invisible'
   );
@@ -775,13 +774,26 @@ export function GlassWorkspace({
             presences.map((presence) => [presence.identityId, presence]),
           ),
         }));
+
+        if (
+          presences.some(
+            (presence) => presence.identityId === session.identity.id,
+          )
+        ) {
+          return;
+        }
+
+        void pigeonApplication
+          .updatePresence(session, { status: 'available' })
+          .then(mergePresence)
+          .catch(() => undefined);
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, [presenceIdentityIds, session]);
+  }, [mergePresence, presenceIdentityIds, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,

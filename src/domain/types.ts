@@ -27,7 +27,6 @@ export type PresenceStatus =
   | 'available'
   | 'away'
   | 'busy'
-  | 'custom'
   | 'disconnected'
   | 'invisible';
 

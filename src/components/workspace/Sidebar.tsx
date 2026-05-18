@@ -53,10 +53,7 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
-import {
-  PresenceCustomStatus,
-  PresenceStatusDot,
-} from '../presence/PresenceStatusDot';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { SectionTitle } from '../common/SectionTitle';
 import { loadPublicImage } from '../community/communityImages';
 
@@ -503,11 +500,10 @@ export function UserProfileDropdown({
     try {
       const nextPresence = await pigeonApplication.updatePresence(session, {
         ...(message ? { customMessage: message } : {}),
-        status: message ? 'custom' : presenceStatus,
+        status: presenceStatus,
       });
 
       onPresenceChange?.(nextPresence);
-      if (message) setPresenceStatus('custom');
     } catch {
       setPresenceError(copy.presence.error);
     } finally {
@@ -521,15 +517,11 @@ export function UserProfileDropdown({
     try {
       await pigeonApplication.deletePresenceCustomMessage(session);
       const nextPresence = await pigeonApplication.updatePresence(session, {
-        status: presenceStatus === 'custom' ? 'available' : presenceStatus,
+        status: presenceStatus,
       });
 
       setCustomMessage('');
-      setPresenceStatus(
-        nextPresence.status === 'custom'
-          ? 'available'
-          : selectablePresenceStatus(nextPresence),
-      );
+      setPresenceStatus(selectablePresenceStatus(nextPresence));
       onPresenceChange?.(nextPresence);
     } catch {
       setPresenceError(copy.presence.error);
@@ -592,7 +584,6 @@ export function UserProfileDropdown({
           <div className="truncate text-xs text-white/50">
             {ownProfileHandle}
           </div>
-          <PresenceCustomStatus presence={presence} />
         </div>
         <svg
           aria-hidden="true"
@@ -803,7 +794,6 @@ function presenceStatusOptions(): Array<{
     { label: copy.presence.statuses.available, value: 'available' },
     { label: copy.presence.statuses.away, value: 'away' },
     { label: copy.presence.statuses.busy, value: 'busy' },
-    { label: copy.presence.statuses.custom, value: 'custom' },
     { label: copy.presence.statuses.invisible, value: 'invisible' },
   ];
 }

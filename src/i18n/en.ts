@@ -529,7 +529,6 @@ export const copy = {
       available: 'Online',
       away: 'Idle',
       busy: 'Do not disturb',
-      custom: 'Custom',
       disconnected: 'Offline',
       invisible: 'Invisible',
     },
