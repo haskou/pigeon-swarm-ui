@@ -71,7 +71,7 @@ const defaultKeychain: LocalKeychain = {
   version: 0,
 };
 
-const messageDecryptBatchSize = 5;
+const messageDecryptBatchSize = 8;
 
 type MessageLoadOptions = {
   limit?: number;
@@ -81,6 +81,7 @@ type MessageLoadOptions = {
 type MessageDecryptWorker = {
   decrypt(
     request: {
+      conversationId: string;
       copy: {
         decryptFailed: string;
         missingKey: string;
@@ -1658,6 +1659,7 @@ export class PigeonApiGateway {
 
       return await worker.decrypt(
         {
+          conversationId,
           copy: copy.messages,
           currentIdentityId: session.identity.id,
           messages: pendingMessages,
@@ -1667,31 +1669,35 @@ export class PigeonApiGateway {
       );
     }
 
-    const decrypted: ChatMessage[] = [];
+    const decrypted = new Array<ChatMessage>(pendingMessages.length);
 
     for (
-      let index = 0;
-      index < pendingMessages.length;
-      index += messageDecryptBatchSize
+      let endIndex = pendingMessages.length;
+      endIndex > 0;
+      endIndex -= messageDecryptBatchSize
     ) {
       throwIfMessageLoadAborted(signal);
 
-      const batch = pendingMessages.slice(
-        index,
-        index + messageDecryptBatchSize,
+      const startIndex = Math.max(0, endIndex - messageDecryptBatchSize);
+      const indexes = Array.from(
+        { length: endIndex - startIndex },
+        (_, offset) => startIndex + offset,
+      );
+      const batch = pendingMessages.slice(startIndex, endIndex);
+
+      const decryptedBatch = await Promise.all(
+        batch.map((message) =>
+          this.decryptMessage(session, conversationId, message),
+        ),
       );
 
-      decrypted.push(
-        ...(await Promise.all(
-          batch.map((message) =>
-            this.decryptMessage(session, conversationId, message),
-          ),
-        )),
-      );
+      for (let index = 0; index < indexes.length; index += 1) {
+        decrypted[indexes[index]] = decryptedBatch[index];
+      }
 
       throwIfMessageLoadAborted(signal);
 
-      if (index + messageDecryptBatchSize < pendingMessages.length) {
+      if (startIndex > 0) {
         await yieldAfterMessageDecryptBatch();
       }
     }
