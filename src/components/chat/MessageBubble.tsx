@@ -185,157 +185,169 @@ export function MessageBubble({
             authorName={authorName}
             authorPicture={authorPicture}
             onAvatarClick={onAvatarClick}
-            onReactionToggle={(emoji, reacted) => {
-              onReactionToggle?.(message, emoji, reacted);
-            }}
-            reactionGroups={reactionGroups}
             reserveAvatarSpace={reserveAvatarSpace}
-            showAvatar={showAvatar || reactionGroups.length > 0}
+            showAvatar={showAvatar}
           />
         )}
         <div
-          onContextMenu={handleContextMenu}
-          style={{
-            WebkitTouchCallout: 'none',
-            WebkitUserSelect: 'none',
-            userSelect: 'none',
-          }}
-          onPointerCancel={clearLongPressTimer}
-          onPointerDown={handlePointerDown}
-          onPointerLeave={clearLongPressTimer}
-          onPointerMove={clearLongPressTimer}
-          onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[96%] select-none rounded-2xl p-3 text-sm leading-6 sm:max-w-[72%]',
-            mine
-              ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
-              : 'border border-white/10 bg-black/25 text-white',
+            'flex max-w-[96%] flex-col sm:max-w-[72%]',
+            mine ? 'items-end' : 'items-start',
           )}
         >
-          {hasReply && replyMessageId && (
-            <button
-              type="button"
-              onClick={() => onReplyReferenceClick(replyMessageId)}
-              className={cx(
-                'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
-                mine
-                  ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                  : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
-              )}
-            >
-              <span className="flex items-center gap-2">
-                {replyImageUrl && (
-                  <img
-                    src={replyImageUrl}
-                    alt=""
-                    className="h-10 w-10 shrink-0 rounded-xl object-cover"
-                  />
-                )}
-                <span className="min-w-0">
-                  <span className="block font-black text-white/75">
-                    {copy.messages.replyTo}{' '}
-                    {replyAuthorName ?? copy.messages.originalMessage}
-                  </span>
-                  {replyPreview && (
-                    <span className="block truncate text-white/55">
-                      {replyPreview}
-                    </span>
-                  )}
-                </span>
-              </span>
-            </button>
-          )}
-          {message.attachments.length > 0 && (
-            <div className="grid gap-2">
-              {imageAttachments.length > 0 && (
-                <ImageAttachmentAlbum
-                  items={imageAttachments}
-                  mine={mine}
-                  onOpen={(images, index) => setLightbox({ images, index })}
-                  onPreview={onAttachmentPreview}
-                />
-              )}
-              {otherAttachments.map(({ attachment, index }) => (
-                <AttachmentCard
-                  attachment={attachment}
-                  key={`${message.id}-${attachment.cid}`}
-                  mine={mine}
-                  onPreview={onAttachmentPreview}
-                  pending={message.deliveryStatus === 'pending'}
-                  onClick={() => onAttachmentOpen(index)}
-                />
-              ))}
-            </div>
-          )}
-          {message.attachmentProgress && (
-            <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
-              <div className="flex items-center justify-between gap-3">
-                <span className="truncate">
-                  {message.attachmentProgress.phase === 'encrypt'
-                    ? copy.composer.encryptingAttachment
-                    : message.attachmentProgress.phase === 'upload'
-                      ? copy.composer.uploadingAttachment
-                      : copy.composer.decryptingAttachment}{' '}
-                  {message.attachmentProgress.filename}
-                </span>
-                <span className="shrink-0">
-                  {message.attachmentProgress.percent}%
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-fuchsia-400"
-                  style={{ width: `${message.attachmentProgress.percent}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {message.content && (
-            <div
-              className={cx(
-                'whitespace-pre-wrap break-words',
-                (hasReply || message.attachments.length > 0) && 'mt-3',
-                message.encrypted && 'text-white/55',
-              )}
-            >
-              <MarkdownMessage content={message.content} mine={mine} />
-            </div>
-          )}
-          {linkPreview && (
-            <LinkPreviewCard
-              description={linkPreview.description}
-              displayUrl={linkPreview.displayUrl}
-              faviconUrl={linkPreview.faviconUrl}
-              hostname={linkPreview.hostname}
+          {reactionGroups.length > 0 && (
+            <MessageReactions
+              groups={reactionGroups}
               mine={mine}
-              title={linkPreview.title}
-              url={linkPreview.url}
+              onToggle={(emoji, reacted) => {
+                onReactionToggle?.(message, emoji, reacted);
+              }}
             />
           )}
-          {(message.deliveryStatus === 'pending' ||
-            message.deliveryStatus === 'failed') && (
-            <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
-              {message.deliveryStatus === 'pending' && (
-                <span>{copy.messages.sending}</span>
-              )}
-              {message.deliveryStatus === 'failed' && (
-                <>
-                  <span className="text-rose-100">
-                    {copy.messages.sendFailed}
-                  </span>
-                  {onRetryMessage && (
-                    <button
-                      type="button"
-                      onClick={() => onRetryMessage(message)}
-                      className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
-                    >
-                      {copy.messages.retrySend}
-                    </button>
+          <div
+            onContextMenu={handleContextMenu}
+            style={{
+              WebkitTouchCallout: 'none',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+            }}
+            onPointerCancel={clearLongPressTimer}
+            onPointerDown={handlePointerDown}
+            onPointerLeave={clearLongPressTimer}
+            onPointerMove={clearLongPressTimer}
+            onPointerUp={clearLongPressTimer}
+            className={cx(
+              'w-fit max-w-full select-none rounded-2xl p-3 text-sm leading-6',
+              mine
+                ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                : 'border border-white/10 bg-black/25 text-white',
+            )}
+          >
+            {hasReply && replyMessageId && (
+              <button
+                type="button"
+                onClick={() => onReplyReferenceClick(replyMessageId)}
+                className={cx(
+                  'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                  mine
+                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                    : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  {replyImageUrl && (
+                    <img
+                      src={replyImageUrl}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                    />
                   )}
-                </>
-              )}
-            </div>
-          )}
+                  <span className="min-w-0">
+                    <span className="block font-black text-white/75">
+                      {copy.messages.replyTo}{' '}
+                      {replyAuthorName ?? copy.messages.originalMessage}
+                    </span>
+                    {replyPreview && (
+                      <span className="block truncate text-white/55">
+                        {replyPreview}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            )}
+            {message.attachments.length > 0 && (
+              <div className="grid gap-2">
+                {imageAttachments.length > 0 && (
+                  <ImageAttachmentAlbum
+                    items={imageAttachments}
+                    mine={mine}
+                    onOpen={(images, index) => setLightbox({ images, index })}
+                    onPreview={onAttachmentPreview}
+                  />
+                )}
+                {otherAttachments.map(({ attachment, index }) => (
+                  <AttachmentCard
+                    attachment={attachment}
+                    key={`${message.id}-${attachment.cid}`}
+                    mine={mine}
+                    onPreview={onAttachmentPreview}
+                    pending={message.deliveryStatus === 'pending'}
+                    onClick={() => onAttachmentOpen(index)}
+                  />
+                ))}
+              </div>
+            )}
+            {message.attachmentProgress && (
+              <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate">
+                    {message.attachmentProgress.phase === 'encrypt'
+                      ? copy.composer.encryptingAttachment
+                      : message.attachmentProgress.phase === 'upload'
+                        ? copy.composer.uploadingAttachment
+                        : copy.composer.decryptingAttachment}{' '}
+                    {message.attachmentProgress.filename}
+                  </span>
+                  <span className="shrink-0">
+                    {message.attachmentProgress.percent}%
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-fuchsia-400"
+                    style={{ width: `${message.attachmentProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {message.content && (
+              <div
+                className={cx(
+                  'whitespace-pre-wrap break-words',
+                  (hasReply || message.attachments.length > 0) && 'mt-3',
+                  message.encrypted && 'text-white/55',
+                )}
+              >
+                <MarkdownMessage content={message.content} mine={mine} />
+              </div>
+            )}
+            {linkPreview && (
+              <LinkPreviewCard
+                description={linkPreview.description}
+                displayUrl={linkPreview.displayUrl}
+                faviconUrl={linkPreview.faviconUrl}
+                hostname={linkPreview.hostname}
+                mine={mine}
+                title={linkPreview.title}
+                url={linkPreview.url}
+              />
+            )}
+            {(message.deliveryStatus === 'pending' ||
+              message.deliveryStatus === 'failed') && (
+              <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
+                {message.deliveryStatus === 'pending' && (
+                  <span>{copy.messages.sending}</span>
+                )}
+                {message.deliveryStatus === 'failed' && (
+                  <>
+                    <span className="text-rose-100">
+                      {copy.messages.sendFailed}
+                    </span>
+                    {onRetryMessage && (
+                      <button
+                        type="button"
+                        onClick={() => onRetryMessage(message)}
+                        className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
+                      >
+                        {copy.messages.retrySend}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {mine && (
           <MessageAvatarColumn
@@ -343,10 +355,6 @@ export function MessageBubble({
             authorPicture={authorPicture}
             mine
             onAvatarClick={onAvatarClick}
-            onReactionToggle={(emoji, reacted) => {
-              onReactionToggle?.(message, emoji, reacted);
-            }}
-            reactionGroups={reactionGroups}
             reserveAvatarSpace
             showAvatar
           />
@@ -368,8 +376,6 @@ function MessageAvatarColumn({
   authorPicture,
   mine,
   onAvatarClick,
-  onReactionToggle,
-  reactionGroups,
   reserveAvatarSpace,
   showAvatar,
 }: {
@@ -377,8 +383,6 @@ function MessageAvatarColumn({
   authorPicture?: string | null;
   mine?: boolean;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
-  onReactionToggle: (emoji: string, reacted: boolean) => void;
-  reactionGroups: ReactionGroup[];
   reserveAvatarSpace: boolean;
   showAvatar: boolean;
 }) {
@@ -391,20 +395,6 @@ function MessageAvatarColumn({
         mine ? 'justify-end' : 'justify-start',
       )}
     >
-      {reactionGroups.length > 0 && (
-        <div
-          className={cx(
-            'absolute bottom-full mb-1 flex w-max max-w-[min(16rem,60vw)]',
-            mine ? 'right-0 justify-end' : 'left-0 justify-start',
-          )}
-        >
-          <MessageReactions
-            groups={reactionGroups}
-            mine={mine}
-            onToggle={onReactionToggle}
-          />
-        </div>
-      )}
       {showAvatar ? (
         <Avatar
           label={authorName}
@@ -439,7 +429,7 @@ function MessageReactions({
   return (
     <div
       className={cx(
-        'flex max-w-full flex-nowrap items-center gap-1 overflow-hidden',
+        'mb-1 flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden',
         mine ? 'justify-end' : 'justify-start',
       )}
     >
