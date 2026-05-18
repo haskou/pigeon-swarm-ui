@@ -1812,9 +1812,6 @@ export function CommunityWorkspace({
                                   ? memberPictures[session.identity.id]
                                   : memberPictures[message.authorIdentityId]
                               }
-                              authorPresence={
-                                presenceByIdentityId[message.authorIdentityId]
-                              }
                               onAttachmentOpen={(attachmentIndex) =>
                                 void openAttachment(
                                   message.attachments[attachmentIndex],

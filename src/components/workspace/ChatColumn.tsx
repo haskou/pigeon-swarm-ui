@@ -612,7 +612,6 @@ export function ChatColumn({
             hasReachedMessageStart={hasReachedMessageStart}
             identityNames={identityNames}
             identityPictures={identityPictures}
-            presenceByIdentityId={presenceByIdentityId}
             isGroupConversation={isGroupConversation}
             loadAttachmentPreview={loadAttachmentPreview}
             messageState={messageState}

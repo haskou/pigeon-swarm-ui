@@ -6,7 +6,6 @@ import { Fragment } from 'react';
 import type {
   AttachmentProgress,
   ChatMessage,
-  IdentityPresence,
   MessageAttachment,
 } from '../../domain/types';
 import type {
@@ -33,7 +32,6 @@ interface ChatMessageTimelineProps {
   hasReachedMessageStart: boolean;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
-  presenceByIdentityId?: Record<string, IdentityPresence>;
   isGroupConversation: boolean;
   loadAttachmentPreview: (
     attachment: MessageAttachment,
@@ -69,7 +67,6 @@ export function ChatMessageTimeline({
   hasReachedMessageStart,
   identityNames,
   identityPictures,
-  presenceByIdentityId = {},
   isGroupConversation,
   loadAttachmentPreview,
   messages,
@@ -108,7 +105,6 @@ export function ChatMessageTimeline({
           hasReachedMessageStart={hasReachedMessageStart}
           identityNames={identityNames}
           identityPictures={identityPictures}
-          presenceByIdentityId={presenceByIdentityId}
           isGroupConversation={isGroupConversation}
           loadAttachmentPreview={loadAttachmentPreview}
           messageState={messageState}
@@ -144,7 +140,6 @@ function MessageTimelineContent({
   hasReachedMessageStart,
   identityNames,
   identityPictures,
-  presenceByIdentityId = {},
   isGroupConversation,
   loadAttachmentPreview,
   messages,
@@ -174,7 +169,6 @@ function MessageTimelineContent({
             currentIdentityName={currentIdentityName}
             identityNames={identityNames}
             identityPictures={identityPictures}
-            presenceByIdentityId={presenceByIdentityId}
             isGroupConversation={isGroupConversation}
             loadAttachmentPreview={loadAttachmentPreview}
             message={message}
@@ -203,7 +197,6 @@ function MessageTimelineItem({
   currentIdentityName,
   identityNames,
   identityPictures,
-  presenceByIdentityId,
   isGroupConversation,
   loadAttachmentPreview,
   message,
@@ -221,7 +214,6 @@ function MessageTimelineItem({
   currentIdentityName: string;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
-  presenceByIdentityId: Record<string, IdentityPresence>;
   isGroupConversation: boolean;
   loadAttachmentPreview: ChatMessageTimelineProps['loadAttachmentPreview'];
   message: ChatMessage;
@@ -258,7 +250,6 @@ function MessageTimelineItem({
             currentIdentityId,
             identityPictures,
           )}
-          authorPresence={presenceByIdentityId[message.authorIdentityId]}
           onAttachmentOpen={(attachmentIndex) =>
             onAttachmentOpen(message.attachments[attachmentIndex])
           }
