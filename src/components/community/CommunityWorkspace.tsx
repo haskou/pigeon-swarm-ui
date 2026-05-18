@@ -2196,6 +2196,15 @@ export function CommunityWorkspace({
   );
 }
 
+type VoiceParticipantView = {
+  deafened?: boolean;
+  identityId: string;
+  muted: boolean;
+  name: string;
+  picture?: null | string;
+  speaking?: boolean;
+};
+
 const VoiceChannelButton = memo(function VoiceChannelButton({
   active,
   channel,
@@ -2207,24 +2216,10 @@ const VoiceChannelButton = memo(function VoiceChannelButton({
   channel: CommunityVoiceChannel;
   onJoin: (channel: CommunityVoiceChannel) => void;
   onParticipantClick: (
-    participant: {
-      deafened?: boolean;
-      identityId: string;
-      muted: boolean;
-      name: string;
-      picture?: null | string;
-      speaking?: boolean;
-    },
+    participant: VoiceParticipantView,
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
-  participants: Array<{
-    deafened?: boolean;
-    identityId: string;
-    muted: boolean;
-    name: string;
-    picture?: null | string;
-    speaking?: boolean;
-  }>;
+  participants: VoiceParticipantView[];
 }) {
   return (
     <div
@@ -2289,7 +2284,47 @@ const VoiceChannelButton = memo(function VoiceChannelButton({
       )}
     </div>
   );
-});
+}, areVoiceChannelButtonPropsEqual);
+
+function areVoiceChannelButtonPropsEqual(
+  previous: {
+    active: boolean;
+    channel: CommunityVoiceChannel;
+    participants: VoiceParticipantView[];
+  },
+  next: {
+    active: boolean;
+    channel: CommunityVoiceChannel;
+    participants: VoiceParticipantView[];
+  },
+): boolean {
+  return (
+    previous.active === next.active &&
+    previous.channel.id === next.channel.id &&
+    previous.channel.name === next.channel.name &&
+    areVoiceParticipantsEqual(previous.participants, next.participants)
+  );
+}
+
+function areVoiceParticipantsEqual(
+  previous: VoiceParticipantView[],
+  next: VoiceParticipantView[],
+): boolean {
+  if (previous.length !== next.length) return false;
+
+  return previous.every((participant, index) => {
+    const nextParticipant = next[index];
+
+    return (
+      participant.identityId === nextParticipant.identityId &&
+      participant.name === nextParticipant.name &&
+      participant.picture === nextParticipant.picture &&
+      participant.muted === nextParticipant.muted &&
+      participant.deafened === nextParticipant.deafened &&
+      participant.speaking === nextParticipant.speaking
+    );
+  });
+}
 
 const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
   participant,
