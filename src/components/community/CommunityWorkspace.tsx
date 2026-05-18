@@ -32,6 +32,7 @@ import type {
   CommunityVoiceChannel,
   ConversationKeyEntry,
   AttachmentProgress,
+  AttachmentUploadOptions,
   ChatMessage,
   IdentityPresence,
   IdentityResource,
@@ -179,6 +180,7 @@ type ProfilePopoverAnchor = {
 };
 
 type CommunityPendingSend = {
+  attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
   channelId: string;
   content: string;
@@ -1081,11 +1083,13 @@ export function CommunityWorkspace({
   const handleSendChannelMessage = (
     content: string,
     attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
   ): Promise<void> => {
     if (!selectedChannelId) return Promise.resolve();
 
     onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
+      attachmentUpload,
       attachments,
       channelId: selectedChannelId,
       content,
@@ -1166,6 +1170,7 @@ export function CommunityWorkspace({
                 );
               });
             },
+            payload.attachmentUpload,
           );
         const encryptedPayload = await encryptCommunityChannelPayload({
           attachments: messageAttachments,

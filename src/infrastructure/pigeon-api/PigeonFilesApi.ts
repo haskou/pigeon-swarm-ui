@@ -3,6 +3,7 @@ import { Buffer } from 'buffer';
 
 import type {
   AttachmentProgress,
+  AttachmentUploadOptions,
   MessageAttachment,
   PendingMessageAttachment,
   PrivateFileContent,
@@ -90,18 +91,14 @@ export class PigeonFilesApi {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    const path = '/ipfs/public';
     const bytes = await file.arrayBuffer();
 
-    return await this.http.request<PublicFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': file.type || 'application/octet-stream',
-        'X-Filename': file.name || 'upload',
-      },
-      method: 'POST',
-    });
+    return await this.uploadPublicBytes(
+      session,
+      bytes,
+      file.name || 'upload',
+      file.type || 'application/octet-stream',
+    );
   }
 
   public async uploadPrivateFile(
@@ -124,29 +121,44 @@ export class PigeonFilesApi {
 
     if (cached) return await cached;
 
-    const request = this.decryptAttachment(attachment, onProgress).catch(
-      (caught: unknown) => {
-        this.attachmentBlobCache.delete(cacheKey);
+    const request = this.attachmentIsEncrypted(attachment)
+      ? this.decryptAttachment(attachment, onProgress)
+      : this.downloadPublicAttachment(attachment);
 
-        throw caught;
-      },
-    );
+    const cachedRequest = request.catch((caught: unknown) => {
+      this.attachmentBlobCache.delete(cacheKey);
 
-    this.attachmentBlobCache.set(cacheKey, request);
+      throw caught;
+    });
 
-    return await request;
+    this.attachmentBlobCache.set(cacheKey, cachedRequest);
+
+    return await cachedRequest;
   }
 
   public async publishMessageAttachments(
     session: Session,
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,
+    options: AttachmentUploadOptions = {},
   ): Promise<MessageAttachment[]> {
     if (attachments.length === 0) return [];
 
     const uploadedAttachments: MessageAttachment[] = [];
 
     for (const file of attachments) {
+      const shouldEncrypt =
+        file.size <= ipfsPrivateUploadLimitBytes ||
+        options.encryptLargeAttachments === true;
+
+      if (!shouldEncrypt) {
+        uploadedAttachments.push(
+          await this.uploadPublicChunkedAttachment(session, file, onProgress),
+        );
+
+        continue;
+      }
+
       const pending = await this.attachmentCipher.encrypt(file, onProgress);
       const upload = await this.uploadPendingAttachment(
         session,
@@ -157,6 +169,7 @@ export class PigeonFilesApi {
       uploadedAttachments.push({
         ...pending.metadata,
         cid: upload.cid,
+        encrypted: true,
         ...(upload.chunks ? { chunks: upload.chunks } : {}),
         encryptedSize: upload.size,
         ...(upload.type ? { type: upload.type } : {}),
@@ -220,16 +233,102 @@ export class PigeonFilesApi {
   private attachmentBlobCacheKey(attachment: MessageAttachment): string {
     return [
       attachment.cid,
+      attachment.encrypted === false ? 'public' : 'encrypted',
       attachment.encryptedSize,
       attachment.size,
       attachment.contentType,
-      attachment.encryption.algorithm,
-      attachment.encryption.key,
-      attachment.encryption.iv,
-      attachment.encryption.chunks
+      attachment.encryption?.algorithm ?? '',
+      attachment.encryption?.key ?? '',
+      attachment.encryption?.iv ?? '',
+      attachment.encryption?.chunks
         ?.map((chunk) => `${chunk.iv}:${chunk.size}`)
         .join(',') ?? '',
     ].join('|');
+  }
+
+  private attachmentIsEncrypted(attachment: MessageAttachment): boolean {
+    return attachment.encrypted !== false && !!attachment.encryption;
+  }
+
+  private async downloadPublicAttachment(
+    attachment: MessageAttachment,
+  ): Promise<Blob> {
+    if (!attachment.chunks?.length) {
+      return (await this.getPublicFile(attachment.cid)).blob;
+    }
+
+    const blobs = await Promise.all(
+      [...attachment.chunks]
+        .sort((left, right) => left.index - right.index)
+        .map(async (chunk) => (await this.getPublicFile(chunk.cid)).blob),
+    );
+
+    return new Blob(blobs, { type: attachment.contentType });
+  }
+
+  private async uploadPublicChunkedAttachment(
+    session: Session,
+    file: File,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<MessageAttachment> {
+    const chunks: NonNullable<MessageAttachment['chunks']> = [];
+    const totalChunks = Math.ceil(file.size / ipfsPrivateChunkBytes) || 1;
+    const filename = file.name || 'attachment';
+
+    for (let index = 0; index < totalChunks; index += 1) {
+      const offset = index * ipfsPrivateChunkBytes;
+      const chunk = await file
+        .slice(offset, Math.min(offset + ipfsPrivateChunkBytes, file.size))
+        .arrayBuffer();
+      const upload = await this.uploadPublicBytes(
+        session,
+        chunk,
+        `${filename}.part-${String(index).padStart(4, '0')}`,
+      );
+
+      chunks.push({
+        cid: upload.cid,
+        index,
+        sha256: this.sha256Hex(chunk),
+        size: upload.size,
+      });
+      onProgress?.({
+        filename,
+        percent: Math.min(100, Math.round(((index + 1) * 100) / totalChunks)),
+        phase: 'upload',
+      });
+      await this.yieldToBrowser(ipfsPrivateChunkUploadPauseMs);
+    }
+
+    return {
+      chunks,
+      cid: chunks[0]?.cid ?? '',
+      contentType: file.type || 'application/octet-stream',
+      encrypted: false,
+      filename,
+      size: file.size,
+      storage: 'public',
+      type: 'chunked_file',
+    };
+  }
+
+  private async uploadPublicBytes(
+    session: Session,
+    bytes: ArrayBuffer,
+    filename: string,
+    contentType = 'application/octet-stream',
+  ): Promise<PublicFileUpload> {
+    const path = '/ipfs/public';
+
+    return await this.http.request<PublicFileUpload>(path, {
+      body: bytes,
+      headers: {
+        ...(await this.signer.headers(session, 'POST', path, bytes)),
+        'Content-Type': contentType,
+        'X-Filename': filename,
+      },
+      method: 'POST',
+    });
   }
 
   private async uploadPendingAttachment(

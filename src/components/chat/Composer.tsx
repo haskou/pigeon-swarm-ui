@@ -11,7 +11,11 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { AttachmentProgress, ChatMessage } from '../../domain/types';
+import type {
+  AttachmentProgress,
+  AttachmentUploadOptions,
+  ChatMessage,
+} from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -27,12 +31,17 @@ import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
 const COMPOSER_MAX_ROWS = 4;
+const LARGE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 interface ComposerProps {
   disabled: boolean;
   error: string | null;
   draft: string;
-  onSend: (content: string, attachments: File[]) => Promise<void>;
+  onSend: (
+    content: string,
+    attachments: File[],
+    options: AttachmentUploadOptions,
+  ) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
   focusKey?: string | null;
@@ -60,6 +69,8 @@ export function Composer({
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
   >([]);
+  const [encryptLargeAttachments, setEncryptLargeAttachments] =
+    useState(false);
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -94,6 +105,9 @@ export function Composer({
   const emojiPanelOpen =
     emojiSuggestions.length > 0 && emojiTriggerKey !== dismissedEmojiTrigger;
   const canAutoFocusInput = useDesktopInputFocus();
+  const hasLargeAttachments = attachments.some(
+    (attachment) => attachment.file.size > LARGE_ATTACHMENT_BYTES,
+  );
 
   useEffect(() => {
     setSelectedEmojiIndex(0);
@@ -268,6 +282,7 @@ export function Composer({
     void onSend(
       trimmed,
       attachments.map((attachment) => attachment.file),
+      { encryptLargeAttachments },
     );
     onDraftChange('');
     attachments.forEach((attachment) =>
@@ -417,45 +432,53 @@ export function Composer({
           </div>
         )}
         {attachments.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {imageAttachments.length > 0 && (
-              <ComposerImageAlbum
-                attachments={imageAttachments}
-                disabled={disabled}
-                lightboxImages={lightboxImages}
-                onOpen={(index) =>
-                  setLightbox({ images: lightboxImages, index })
-                }
-                onRemove={removeAttachment}
-              />
-            )}
-            {otherAttachments.map((attachment) => (
-              <div
-                key={`${attachment.file.name}-${attachment.file.size}-${attachment.index}`}
-                className="max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 text-xs text-white/70"
-              >
-                <AttachmentPreview
-                  file={attachment.file}
-                  url={attachment.previewUrl}
+          <>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {imageAttachments.length > 0 && (
+                <ComposerImageAlbum
+                  attachments={imageAttachments}
+                  disabled={disabled}
+                  lightboxImages={lightboxImages}
+                  onOpen={(index) =>
+                    setLightbox({ images: lightboxImages, index })
+                  }
+                  onRemove={removeAttachment}
                 />
-                <div className="flex max-w-56 items-center gap-2 px-3 py-2">
-                  <span className="truncate">{attachment.file.name}</span>
-                  <span className="shrink-0 text-white/35">
-                    {formatFileSize(attachment.file.size)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(attachment.index)}
-                    disabled={disabled}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
-                    aria-label={copy.composer.removeAttachment}
-                  >
-                    ×
-                  </button>
+              )}
+              {otherAttachments.map((attachment) => (
+                <div
+                  key={`${attachment.file.name}-${attachment.file.size}-${attachment.index}`}
+                  className="max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 text-xs text-white/70"
+                >
+                  <AttachmentPreview
+                    file={attachment.file}
+                    url={attachment.previewUrl}
+                  />
+                  <div className="flex max-w-56 items-center gap-2 px-3 py-2">
+                    <span className="truncate">{attachment.file.name}</span>
+                    <span className="shrink-0 text-white/35">
+                      {formatFileSize(attachment.file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(attachment.index)}
+                      disabled={disabled}
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
+                      aria-label={copy.composer.removeAttachment}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <AttachmentEncryptionControl
+              disabled={disabled || !hasLargeAttachments}
+              enabled={!hasLargeAttachments || encryptLargeAttachments}
+              largeAttachments={hasLargeAttachments}
+              onChange={setEncryptLargeAttachments}
+            />
+          </>
         )}
         {progress && (
           <div className="mb-3 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs text-white/70">
@@ -640,6 +663,61 @@ function ComposerImageAlbum({
         ))}
       </div>
     </div>
+  );
+}
+
+function AttachmentEncryptionControl({
+  disabled,
+  enabled,
+  largeAttachments,
+  onChange,
+}: {
+  disabled: boolean;
+  enabled: boolean;
+  largeAttachments: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <fieldset className="mb-3 flex flex-wrap gap-2 text-xs font-black text-white/70">
+      <label
+        className={cx(
+          'flex min-h-9 items-center gap-2 rounded-2xl border px-3 py-2 transition',
+          enabled
+            ? 'border-emerald-300/35 bg-emerald-400/15 text-emerald-50'
+            : 'border-white/10 bg-white/8 hover:bg-white/12',
+          disabled && 'cursor-not-allowed opacity-70',
+        )}
+      >
+        <input
+          type="radio"
+          checked={enabled}
+          disabled={disabled}
+          onChange={() => onChange(true)}
+          className="h-4 w-4 accent-emerald-300"
+        />
+        {copy.composer.encryptAttachments}
+      </label>
+      {largeAttachments && (
+        <label
+          className={cx(
+            'flex min-h-9 items-center gap-2 rounded-2xl border px-3 py-2 transition',
+            !enabled
+              ? 'border-cyan-300/35 bg-cyan-400/15 text-cyan-50'
+              : 'border-white/10 bg-white/8 hover:bg-white/12',
+            disabled && 'cursor-not-allowed opacity-70',
+          )}
+        >
+          <input
+            type="radio"
+            checked={!enabled}
+            disabled={disabled}
+            onChange={() => onChange(false)}
+            className="h-4 w-4 accent-cyan-300"
+          />
+          {copy.composer.publicLargeAttachments}
+        </label>
+      )}
+    </fieldset>
   );
 }
 

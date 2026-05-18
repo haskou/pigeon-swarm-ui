@@ -7,6 +7,7 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallParticipant } from '../../domain/calls/CallSession';
 import type {
   AttachmentProgress,
+  AttachmentUploadOptions,
   ChatMessage,
   ConversationKeyEntry,
   ConversationResource,
@@ -71,7 +72,11 @@ interface ChatColumnProps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   newMessageCount: number;
   onScroll: () => void;
-  onSend: (content: string, attachments: File[]) => Promise<void>;
+  onSend: (
+    content: string,
+    attachments: File[],
+    options: AttachmentUploadOptions,
+  ) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape: () => void;
@@ -210,9 +215,13 @@ export function ChatColumn({
     onDraftChange(value);
     onTypingActive?.(value.trim().length > 0);
   };
-  const handleSend = async (content: string, attachments: File[]) => {
+  const handleSend = async (
+    content: string,
+    attachments: File[],
+    options: AttachmentUploadOptions,
+  ) => {
     onTypingActive?.(false);
-    await onSend(content, attachments);
+    await onSend(content, attachments, options);
   };
 
   useEffect(
