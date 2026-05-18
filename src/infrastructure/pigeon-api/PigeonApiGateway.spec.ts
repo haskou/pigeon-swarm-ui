@@ -1042,7 +1042,7 @@ describe(PigeonApiGateway.name, () => {
       bytes,
     );
     expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
-      body: file,
+      body: bytes,
       headers: {
         'Content-Type': 'image/png',
         'X-Filename': 'avatar.png',
@@ -1468,6 +1468,39 @@ describe(PigeonApiGateway.name, () => {
     );
 
     expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+  });
+
+  it('loads legacy public IPFS JSON content as a blob', async () => {
+    const http = {
+      requestBlob: jest.fn().mockResolvedValue(
+        new Blob(
+          [
+            JSON.stringify({
+              cid: 'bafy-avatar',
+              contentType: 'image/png',
+              data: 'AQID',
+              filename: 'avatar.png',
+              size: 3,
+            }),
+          ],
+          { type: 'application/json' },
+        ),
+      ),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    const content = await gateway.getPublicFile('bafy-avatar');
+
+    expect(content).toMatchObject({
+      cid: 'bafy-avatar',
+      contentType: 'image/png',
+      filename: 'avatar.png',
+      size: 3,
+    });
+    await expect(content.blob.arrayBuffer()).resolves.toEqual(
+      new Uint8Array([1, 2, 3]).buffer,
+    );
+    expect(content.blob.type).toBe('image/png');
   });
 
   it('downloads encrypted private attachment content', async () => {
