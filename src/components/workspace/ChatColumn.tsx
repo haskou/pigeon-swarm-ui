@@ -771,6 +771,7 @@ export function ChatColumn({
             });
           }}
           participants={groupParticipants}
+          presenceByIdentityId={presenceByIdentityId}
         />
       )}
     </section>
