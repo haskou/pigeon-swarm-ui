@@ -369,6 +369,7 @@ async function projectedMessageCacheDatabase(): Promise<IDBDatabase | null> {
   return await projectedMessageCacheDatabasePromise;
 }
 
+// eslint-disable-next-line max-len
 async function openProjectedMessageCacheDatabase(): Promise<IDBDatabase | null> {
   return await new Promise<IDBDatabase | null>((resolve) => {
     const request = indexedDB.open(

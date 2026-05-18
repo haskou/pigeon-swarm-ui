@@ -185,6 +185,8 @@ type CommunityPendingSend = {
   replyTarget: ChatMessage | null;
 };
 
+const communityMessageProjectionBatchSize = 8;
+
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
 ): MessageReplyPreview | undefined {
@@ -200,6 +202,12 @@ function replyPreviewFromMessage(
     ...(image ? { image } : {}),
     messageId: message.id,
   };
+}
+
+async function yieldAfterCommunityMessageProjectionBatch(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
 }
 
 function profileAnchorFromTarget(
@@ -947,11 +955,31 @@ export function CommunityWorkspace({
           { beforeMessageId },
         ),
       ]);
-      const loadedMessages = await Promise.all(
-        result.messages.map((message) =>
-          projectChannelMessage(message, identities),
-        ),
-      );
+      const loadedMessages = new Array<ChatMessage>(result.messages.length);
+
+      for (
+        let endIndex = result.messages.length;
+        endIndex > 0;
+        endIndex -= communityMessageProjectionBatchSize
+      ) {
+        const startIndex = Math.max(
+          0,
+          endIndex - communityMessageProjectionBatchSize,
+        );
+        const projectedBatch = await Promise.all(
+          result.messages
+            .slice(startIndex, endIndex)
+            .map((message) => projectChannelMessage(message, identities)),
+        );
+
+        for (let index = 0; index < projectedBatch.length; index += 1) {
+          loadedMessages[startIndex + index] = projectedBatch[index];
+        }
+
+        if (startIndex > 0) {
+          await yieldAfterCommunityMessageProjectionBatch();
+        }
+      }
 
       return {
         cursor: result.nextBeforeMessageId ?? null,
