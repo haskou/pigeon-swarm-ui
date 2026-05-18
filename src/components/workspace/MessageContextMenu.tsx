@@ -166,7 +166,7 @@ export function MessageContextMenu({
                   key={emoji}
                   onClick={() => toggleReaction(emoji)}
                   className={cx(
-                    'grid h-8 w-8 place-items-center rounded-2xl text-base transition hover:bg-white/10',
+                    'grid h-8 w-8 place-items-center rounded-2xl text-base transition hover:bg-white/10 active:bg-white/20 active:brightness-125',
                     hasReacted(menu.message, currentIdentityId, emoji) &&
                       'bg-sky-500/35',
                   )}
@@ -178,7 +178,7 @@ export function MessageContextMenu({
               <button
                 type="button"
                 onClick={() => setEmojiSearchOpen((isOpen) => !isOpen)}
-                className="grid h-8 w-8 place-items-center rounded-2xl bg-white/8 text-sm font-black text-white/75 transition hover:bg-white/12"
+                className="grid h-8 w-8 place-items-center rounded-2xl bg-white/8 text-sm font-black text-white/75 transition hover:bg-white/12 active:bg-white/20 active:text-white"
                 aria-label={copy.messages.searchReaction}
               >
                 +
@@ -216,7 +216,7 @@ export function MessageContextMenu({
           <button
             type="button"
             onClick={onReply}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
           >
             {copy.messages.reply}
           </button>
@@ -225,7 +225,7 @@ export function MessageContextMenu({
           <button
             type="button"
             onClick={onCopy}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
           >
             {copy.messages.copy}
           </button>
@@ -233,7 +233,7 @@ export function MessageContextMenu({
         <button
           type="button"
           onClick={onViewRaw}
-          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
         >
           {copy.messages.viewRaw}
         </button>
@@ -241,7 +241,7 @@ export function MessageContextMenu({
           <button
             type="button"
             onClick={onDelete}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15"
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15 active:bg-rose-400/25 active:text-white"
           >
             {copy.messages.delete}
           </button>
@@ -264,7 +264,7 @@ function EmojiSearchOption({
     <button
       type="button"
       onClick={() => onSelect(suggestion.emoji)}
-      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition hover:bg-white/8"
+      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition hover:bg-white/8 active:bg-white/20"
       title={`:${suggestion.shortcode}:`}
     >
       <span className="grid h-7 w-7 shrink-0 place-items-center text-xl leading-none">
