@@ -447,7 +447,6 @@ export const copy = {
     owner: 'Owner',
     ownerOnly:
       'Only the node owner can manage networks and share network codes.',
-    removeUnavailable: 'Remove network unavailable in API',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',
     replicationBody:
@@ -468,6 +467,7 @@ export const copy = {
     replicationResponsibleNodes: 'Responsible nodes',
     replicationStandby: 'Standby',
     replicationTotalSize: 'Total size',
+    removeUnavailable: 'Remove network unavailable in API',
     saving: 'Saving...',
     server: 'Server',
     shareLabel: 'Share selected network',
