@@ -112,8 +112,6 @@ import {
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { loadPublicImage } from '../community/communityImages';
-import { ChatColumn } from './ChatColumn';
-import { Inspector } from './Inspector';
 import { Rail } from './Rail';
 import {
   callSignalTypeAttribute,
@@ -123,11 +121,24 @@ import {
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
-import { Sidebar } from './Sidebar';
-
+const ChatColumn = lazy(() =>
+  import('./ChatColumn').then((module) => ({
+    default: module.ChatColumn,
+  })),
+);
 const CommunityWorkspace = lazy(() =>
   import('../community/CommunityWorkspace').then((module) => ({
     default: module.CommunityWorkspace,
+  })),
+);
+const Inspector = lazy(() =>
+  import('./Inspector').then((module) => ({
+    default: module.Inspector,
+  })),
+);
+const Sidebar = lazy(() =>
+  import('./Sidebar').then((module) => ({
+    default: module.Sidebar,
   })),
 );
 const WorkspaceDialogs = lazy(() =>
@@ -3153,37 +3164,39 @@ export function GlassWorkspace({
                   peerCount={peers.length}
                   settingsAttention={nodeUnclaimed}
                 />
-                <Sidebar
-                  activeCall={activeCall}
-                  session={session}
-                  conversations={conversationsWithUnread}
-                  identityNames={identityNames}
-                  identityPictures={identityPictures}
-                  identityProfiles={identityProfiles}
-                  presenceByIdentityId={presenceByIdentityId}
-                  nodeNetworks={nodeNetworks}
-                  activeConversationId={activeConversation?.id ?? null}
-                  onSelect={(id) => {
-                    clearUnreadMessages(id);
-                    setNewMessageCount(0);
-                    setActiveConversationId(id);
-                    setSidebarOpen(false);
-                  }}
-                  onCreate={() => setIsCreateOpen(true)}
-                  onCallEnd={leaveActiveCall}
-                  onCallParticipantVolumeChange={setParticipantVolume}
-                  onCallToggleCamera={toggleCamera}
-                  onCallToggleDeafen={toggleDeafen}
-                  onCallToggleMute={toggleMute}
-                  onCallToggleScreenShare={toggleScreenShare}
-                  onLogout={logout}
-                  onSessionUpdated={(nextSession) => {
-                    setSession(nextSession);
-                    rememberIdentity(nextSession.identity);
-                  }}
-                  onPresenceChange={mergePresence}
-                  onPresenceStatusSelected={rememberPresencePreference}
-                />
+                <Suspense fallback={null}>
+                  <Sidebar
+                    activeCall={activeCall}
+                    session={session}
+                    conversations={conversationsWithUnread}
+                    identityNames={identityNames}
+                    identityPictures={identityPictures}
+                    identityProfiles={identityProfiles}
+                    presenceByIdentityId={presenceByIdentityId}
+                    nodeNetworks={nodeNetworks}
+                    activeConversationId={activeConversation?.id ?? null}
+                    onSelect={(id) => {
+                      clearUnreadMessages(id);
+                      setNewMessageCount(0);
+                      setActiveConversationId(id);
+                      setSidebarOpen(false);
+                    }}
+                    onCreate={() => setIsCreateOpen(true)}
+                    onCallEnd={leaveActiveCall}
+                    onCallParticipantVolumeChange={setParticipantVolume}
+                    onCallToggleCamera={toggleCamera}
+                    onCallToggleDeafen={toggleDeafen}
+                    onCallToggleMute={toggleMute}
+                    onCallToggleScreenShare={toggleScreenShare}
+                    onLogout={logout}
+                    onSessionUpdated={(nextSession) => {
+                      setSession(nextSession);
+                      rememberIdentity(nextSession.identity);
+                    }}
+                    onPresenceChange={mergePresence}
+                    onPresenceStatusSelected={rememberPresencePreference}
+                  />
+                </Suspense>
               </div>
             </div>
 
@@ -3195,75 +3208,79 @@ export function GlassWorkspace({
               />
             )}
 
-            <ChatColumn
-              session={session}
-              activeConversation={activeConversation}
-              conversationKey={activeConversationKey}
-              draft={activeConversationDraft}
-              hasConversationKey={!!activeConversationKey}
-              hasReachedMessageStart={!messageCursor}
-              peerIdentityId={activeConversationPeerIdentityId}
-              peerIdentity={
-                activeConversationPeerIdentityId
-                  ? identityProfiles[activeConversationPeerIdentityId]
-                  : undefined
-              }
-              peerPicture={
-                activeConversationPeerIdentityId
-                  ? identityPictures[activeConversationPeerIdentityId]
-                  : undefined
-              }
-              identityNames={identityNames}
-              identityPictures={identityPictures}
-              identityProfiles={identityProfiles}
-              presenceByIdentityId={presenceByIdentityId}
-              messages={messages}
-              messageState={messageState}
-              newMessageCount={newMessageCount}
-              nodeNetworks={nodeNetworks}
-              sendError={sendError}
-              scrollerRef={scrollerRef}
-              bottomRef={bottomRef}
-              onScroll={handleScroll}
-              onSend={handleSend}
-              onConversationKeyImported={handleConversationKeyImported}
-              onDraftChange={updateActiveConversationDraft}
-              onEscape={closeTransientUi}
-              onJumpToLatest={jumpToLatestMessages}
-              onMessageMenuOpen={handleMessageMenuOpen}
-              onReactionToggle={(message, emoji, reacted) =>
-                void handleToggleMessageReaction(message, emoji, reacted)
-              }
-              onReplyReferenceClick={(messageId) =>
-                void handleReplyReferenceClick(messageId)
-              }
-              onOpenSidebar={() => setSidebarOpen(true)}
-              onCreate={() => setIsCreateOpen(true)}
-              onOpenConversationWithIdentity={(identityId, identity) =>
-                openOrCreateConversationWithIdentity(
-                  identityId,
-                  identity,
-                  activeConversation?.networkId,
-                )
-              }
-              progress={attachmentProgress}
-              realtimeStatus={realtimeStatus}
-              onRealtimeEventsOpen={openRealtimeEvents}
-              replyToMessage={replyTarget}
-              onCancelReply={() => setReplyTarget(null)}
-              onRetryMessage={retryMessage}
-              onStartCall={startConversationCall}
-              onTypingActive={sendConversationTyping}
-              typingIdentityIds={conversationTypingIdentityIds}
-            />
+            <Suspense fallback={null}>
+              <ChatColumn
+                session={session}
+                activeConversation={activeConversation}
+                conversationKey={activeConversationKey}
+                draft={activeConversationDraft}
+                hasConversationKey={!!activeConversationKey}
+                hasReachedMessageStart={!messageCursor}
+                peerIdentityId={activeConversationPeerIdentityId}
+                peerIdentity={
+                  activeConversationPeerIdentityId
+                    ? identityProfiles[activeConversationPeerIdentityId]
+                    : undefined
+                }
+                peerPicture={
+                  activeConversationPeerIdentityId
+                    ? identityPictures[activeConversationPeerIdentityId]
+                    : undefined
+                }
+                identityNames={identityNames}
+                identityPictures={identityPictures}
+                identityProfiles={identityProfiles}
+                presenceByIdentityId={presenceByIdentityId}
+                messages={messages}
+                messageState={messageState}
+                newMessageCount={newMessageCount}
+                nodeNetworks={nodeNetworks}
+                sendError={sendError}
+                scrollerRef={scrollerRef}
+                bottomRef={bottomRef}
+                onScroll={handleScroll}
+                onSend={handleSend}
+                onConversationKeyImported={handleConversationKeyImported}
+                onDraftChange={updateActiveConversationDraft}
+                onEscape={closeTransientUi}
+                onJumpToLatest={jumpToLatestMessages}
+                onMessageMenuOpen={handleMessageMenuOpen}
+                onReactionToggle={(message, emoji, reacted) =>
+                  void handleToggleMessageReaction(message, emoji, reacted)
+                }
+                onReplyReferenceClick={(messageId) =>
+                  void handleReplyReferenceClick(messageId)
+                }
+                onOpenSidebar={() => setSidebarOpen(true)}
+                onCreate={() => setIsCreateOpen(true)}
+                onOpenConversationWithIdentity={(identityId, identity) =>
+                  openOrCreateConversationWithIdentity(
+                    identityId,
+                    identity,
+                    activeConversation?.networkId,
+                  )
+                }
+                progress={attachmentProgress}
+                realtimeStatus={realtimeStatus}
+                onRealtimeEventsOpen={openRealtimeEvents}
+                replyToMessage={replyTarget}
+                onCancelReply={() => setReplyTarget(null)}
+                onRetryMessage={retryMessage}
+                onStartCall={startConversationCall}
+                onTypingActive={sendConversationTyping}
+                typingIdentityIds={conversationTypingIdentityIds}
+              />
+            </Suspense>
 
-            <Inspector
-              className="hidden xl:block"
-              session={session}
-              activeConversation={activeConversation}
-              messages={messages}
-              peers={peers}
-            />
+            <Suspense fallback={null}>
+              <Inspector
+                className="hidden xl:block"
+                session={session}
+                activeConversation={activeConversation}
+                messages={messages}
+                peers={peers}
+              />
+            </Suspense>
           </>
         ) : activeCommunity ? (
           <Suspense fallback={null}>
