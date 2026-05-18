@@ -69,7 +69,6 @@ interface SidebarProps {
   identityProfiles: Record<string, IdentityResource>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
-  onClose: () => void;
   onCreate: () => void;
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
@@ -99,7 +98,6 @@ export function Sidebar({
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleScreenShare,
-  onClose,
   onCreate,
   onLogout,
   onSelect,
@@ -189,17 +187,6 @@ export function Sidebar({
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
-      <div className="mb-4 flex items-center justify-end lg:hidden">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={copy.workspace.closeSidebar}
-          className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
-        >
-          ×
-        </button>
-      </div>
-
       <button
         onClick={onCreate}
         className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
