@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type { MouseEvent, ReactNode } from 'react';
 
-import type { ConversationResource } from '../../domain/types';
+import type {
+  ConversationResource,
+  IdentityPresence,
+} from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { LockIcon } from './LockIcon';
 
 interface ChatConversationHeaderProps {
@@ -22,6 +26,7 @@ interface ChatConversationHeaderProps {
   onOpenSidebar: () => void;
   onRealtimeEventsOpen?: () => void;
   peerPicture?: string;
+  peerPresence?: IdentityPresence;
   menuOpen: boolean;
   realtimeStatus: 'connected' | 'reconnecting';
 }
@@ -42,6 +47,7 @@ export function ChatConversationHeader({
   onOpenSidebar,
   onRealtimeEventsOpen,
   peerPicture,
+  peerPresence,
   realtimeStatus,
 }: ChatConversationHeaderProps) {
   const e2eTooltip = hasConversationKey
@@ -67,14 +73,23 @@ export function ChatConversationHeader({
           type="button"
           onClick={onConversationOpen}
           disabled={!canOpenConversation}
-          className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
+          className="relative grid h-12 w-12 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
           aria-label={activeConversationName ?? copy.chat.noConversation}
         >
-          <ConversationAvatar
-            activeConversation={activeConversation}
-            activeConversationName={activeConversationName}
-            peerPicture={peerPicture}
-          />
+          <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+            <ConversationAvatar
+              activeConversation={activeConversation}
+              activeConversationName={activeConversationName}
+              peerPicture={peerPicture}
+            />
+          </span>
+          {!isGroupConversation && activeConversation && (
+            <PresenceStatusDot
+              presence={peerPresence}
+              size="lg"
+              className="-bottom-1 -right-1"
+            />
+          )}
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">

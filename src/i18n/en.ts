@@ -11,15 +11,18 @@ export const copy = {
   },
   auth: {
     apiLabel: 'API',
-    createIdentityShort: 'Create',
     createIdentity: 'Create identity',
+    createIdentityShort: 'Create',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
-    identityIdLabel: 'Identity ID or username',
     identityIdHelp: 'Use your @username or full identity ID.',
+    identityIdLabel: 'Identity ID or username',
+    installApp: 'Install app',
+    installAppHelp:
+      'Use your browser menu to add Pigeon Swarm to your Home Screen.',
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
@@ -221,7 +224,7 @@ export const copy = {
     emojiMatches: 'Emojis matching',
     encryptingAttachment: 'Encrypting',
     insertEmoji: 'Insert emoji',
-    placeholder: 'write a message',
+    placeholder: 'Write a message',
     removeAttachment: 'Remove attachment',
     send: 'Send',
     sending: 'Sending',
@@ -375,6 +378,7 @@ export const copy = {
   messages: {
     addReaction: 'Add reaction',
     cancelReply: 'Cancel reply',
+    copy: 'Copy',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
     deleteConfirm: 'Delete this message?',
@@ -516,6 +520,18 @@ export const copy = {
     refresh: 'Refresh',
     title: 'Active peers',
     unclaimed: 'Unclaimed',
+  },
+  presence: {
+    error: 'Presence could not be updated.',
+    selectStatus: 'Select status',
+    status: 'Status',
+    statuses: {
+      available: 'Online',
+      away: 'Idle',
+      busy: 'Do not disturb',
+      disconnected: 'Offline',
+      invisible: 'Invisible',
+    },
   },
   profile: {
     addNetwork: 'Add network',

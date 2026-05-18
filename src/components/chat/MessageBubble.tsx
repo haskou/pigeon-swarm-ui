@@ -196,13 +196,18 @@ export function MessageBubble({
           ) : null)}
         <div
           onContextMenu={handleContextMenu}
+          style={{
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+          }}
           onPointerCancel={clearLongPressTimer}
           onPointerDown={handlePointerDown}
           onPointerLeave={clearLongPressTimer}
           onPointerMove={clearLongPressTimer}
           onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[96%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
+            'max-w-[96%] select-none rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
               message.attachments.length === 0 &&
               reactionGroups.length === 0 &&
@@ -892,7 +897,11 @@ function AttachmentCard({
       )}
     >
       {previewUrl && attachment.contentType.startsWith('video/') && (
-        <video src={previewUrl} className="max-h-44 w-full sm:max-h-72" controls />
+        <video
+          src={previewUrl}
+          className="max-h-44 w-full sm:max-h-72"
+          controls
+        />
       )}
       {previewUrl && attachment.contentType.startsWith('audio/') && (
         <audio src={previewUrl} className="w-full p-1 sm:p-2" controls />

@@ -23,6 +23,24 @@ export type IdentityResource = {
 
 export type IdentityProfile = IdentityResource['profile'];
 
+export type PresenceStatus =
+  | 'available'
+  | 'away'
+  | 'busy'
+  | 'disconnected'
+  | 'invisible';
+
+export type SelectablePresenceStatus = Exclude<PresenceStatus, 'disconnected'>;
+
+export type IdentityPresence = {
+  identityId: string;
+  status: PresenceStatus;
+  updatedAt: number;
+  lastActivityAt?: number;
+  lastHeartbeatAt?: number;
+  networkIds?: string[];
+};
+
 export type KeychainResource = {
   encryptedPayload: string;
   keychainExternalIdentifier: string;

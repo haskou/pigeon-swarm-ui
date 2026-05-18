@@ -31,6 +31,11 @@ import { PasswordChecklist } from './PasswordChecklist';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
 interface AuthScreenProps {
   onAuthenticated: (
     session: Session,
@@ -53,6 +58,10 @@ export function AuthScreen({
   const [rememberMe, setRememberMe] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [canInstallApp, setCanInstallApp] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { networks: availableNetworks } = useNodeNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const modeOptions = [
@@ -74,6 +83,38 @@ export function AuthScreen({
       setPassword(savedCredentials.password);
       setRememberMe(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    if (standalone) return;
+
+    setCanInstallApp(true);
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setShowInstallHelp(false);
+    };
+    const handleAppInstalled = () => {
+      setCanInstallApp(false);
+      setInstallPrompt(null);
+      setShowInstallHelp(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
   const canSubmit = canSubmitAuthForm({
@@ -134,8 +175,22 @@ export function AuthScreen({
     setState('idle');
   };
 
+  const handleInstallApp = async () => {
+    if (!installPrompt) {
+      setShowInstallHelp(true);
+
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+
+    setInstallPrompt(null);
+    setCanInstallApp(choice.outcome !== 'accepted');
+  };
+
   return (
-    <section className="app-screen relative z-10 grid min-h-[100dvh] items-start justify-center px-4 py-7 sm:py-10 lg:place-items-center">
+    <section className="app-screen relative z-10 grid h-[100dvh] min-h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain px-4 py-7 sm:py-10 lg:place-items-center">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
           <div className="glass-panel-strong rounded-2xl p-8">
@@ -175,11 +230,9 @@ export function AuthScreen({
               className="h-12 w-12 rounded-2xl shadow-lg shadow-indigo-950/30"
             />
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-black">
-                {copy.auth.title}
-              </h1>
+              <h1 className="truncate text-lg font-black">{copy.auth.title}</h1>
               <p className="line-clamp-2 text-sm leading-snug text-white/55">
-                {copy.auth.mobileIntro}
+                {copy.auth.heroTitle}
               </p>
             </div>
           </div>
@@ -289,6 +342,23 @@ export function AuthScreen({
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}
           </button>
+
+          {canInstallApp && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleInstallApp}
+                className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white/85 transition hover:border-cyan-200/40 hover:bg-white/15"
+              >
+                {copy.auth.installApp}
+              </button>
+              {showInstallHelp && (
+                <p className="mt-2 text-center text-xs leading-snug text-white/45">
+                  {copy.auth.installAppHelp}
+                </p>
+              )}
+            </div>
+          )}
         </form>
       </div>
     </section>

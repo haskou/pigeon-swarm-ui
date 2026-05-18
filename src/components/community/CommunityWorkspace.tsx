@@ -30,10 +30,12 @@ import type {
   ConversationKeyEntry,
   AttachmentProgress,
   ChatMessage,
+  IdentityPresence,
   IdentityResource,
   MessageAttachment,
   MessageReplyPreview,
   MessageResource,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -57,7 +59,7 @@ import {
   isSameDay,
   shortId,
 } from '../../utils/formatting';
-import { identityBanner, identityName } from '../../utils/identityDisplay';
+import { identityName } from '../../utils/identityDisplay';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
@@ -79,7 +81,8 @@ import { UserProfileDropdown } from '../workspace/Sidebar';
 import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
-import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
+import { MemberRow } from './MemberRow';
+import { memberDisplayName } from './communityMemberNames';
 import { ManageCommunityDialog } from './ManageCommunityDialog';
 
 interface CommunityWorkspaceProps {
@@ -91,6 +94,7 @@ interface CommunityWorkspaceProps {
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
   nodeNetworks: NodeNetwork[];
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
@@ -105,6 +109,8 @@ interface CommunityWorkspaceProps {
   onCallToggleMute?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
@@ -115,9 +121,11 @@ interface CommunityWorkspaceProps {
   ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
+  onTypingActive?: (channelId: string, active: boolean) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
+  typingIdentityIds?: string[];
 }
 
 type MemberView = {
@@ -186,6 +194,7 @@ export function CommunityWorkspace({
   mobileRail,
   mobileSidebarOpen,
   nodeNetworks,
+  presenceByIdentityId = {},
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
@@ -198,15 +207,19 @@ export function CommunityWorkspace({
   onCommunityUpdated,
   onJoinVoiceChannel,
   onLogout,
+  onPresenceChange,
+  onPresenceStatusSelected,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenConversationWithIdentity,
   onOpenMobileSidebar,
   onRealtimeEventsOpen,
   onSessionUpdated,
+  onTypingActive,
   realtimeEvent,
   realtimeStatus = 'connected',
   session,
+  typingIdentityIds = [],
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
     () => communityTextChannels(community),
@@ -950,6 +963,7 @@ export function CommunityWorkspace({
   ): Promise<void> => {
     if (!selectedChannelId) return Promise.resolve();
 
+    onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
       attachments,
       channelId: selectedChannelId,
@@ -960,6 +974,20 @@ export function CommunityWorkspace({
 
     return Promise.resolve();
   };
+  const handleDraftChange = (value: string) => {
+    setDraft(value);
+
+    if (selectedChannelId) {
+      onTypingActive?.(selectedChannelId, value.trim().length > 0);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (selectedChannelId) onTypingActive?.(selectedChannelId, false);
+    },
+    [onTypingActive, selectedChannelId],
+  );
 
   const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
     setSendError(null);
@@ -1526,6 +1554,8 @@ export function CommunityWorkspace({
               activeCall={activeCall}
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
+              onPresenceChange={onPresenceChange}
+              onPresenceStatusSelected={onPresenceStatusSelected}
               onCallEnd={onCallEnd}
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleCamera={onCallToggleCamera}
@@ -1534,6 +1564,7 @@ export function CommunityWorkspace({
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}
+              presence={presenceByIdentityId[session.identity.id]}
               session={session}
             />
           </div>
@@ -1898,13 +1929,19 @@ export function CommunityWorkspace({
                 </button>
               )}
             </div>
+            {typingIdentityIds.length > 0 && (
+              <TypingIndicator
+                identityIds={typingIdentityIds}
+                memberIdentities={memberIdentities}
+              />
+            )}
             <Composer
               disabled={messageState === 'loading' || !communityKey}
               draft={draft}
               error={sendError}
               focusKey={selectedChannelId}
               onCancelReply={() => setReplyTarget(null)}
-              onDraftChange={setDraft}
+              onDraftChange={handleDraftChange}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
               progress={attachmentProgress}
@@ -1947,6 +1984,7 @@ export function CommunityWorkspace({
               }
               owner={member.identityId === community.ownerIdentityId}
               pictureUrl={member.pictureUrl}
+              presence={presenceByIdentityId[member.identityId]}
             />
           ))}
         </div>
@@ -1984,6 +2022,7 @@ export function CommunityWorkspace({
                   }
                   owner={member.identityId === community.ownerIdentityId}
                   pictureUrl={member.pictureUrl}
+                  presence={presenceByIdentityId[member.identityId]}
                 />
               ))}
             </div>
@@ -2042,6 +2081,7 @@ export function CommunityWorkspace({
                   )
           }
           picture={profileViewer.pictureUrl}
+          presence={presenceByIdentityId[profileViewer.identityId]}
         />
       )}
       {messageContextMenu && (
@@ -2212,101 +2252,39 @@ function voiceParticipantName(name: string): string {
   return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;
 }
 
-function MemberRow({
-  identity,
-  identityId,
-  onClick,
-  owner,
-  pictureUrl,
+function TypingIndicator({
+  identityIds,
+  memberIdentities,
 }: {
-  identity?: IdentityResource;
-  identityId: string;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  owner: boolean;
-  pictureUrl: null | string;
+  identityIds: string[];
+  memberIdentities: Record<string, IdentityResource>;
 }) {
-  const name = memberPrimaryName(identity, identityId);
-  const handle = identity?.profile.handle?.trim();
-  const bannerUrl = useIdentityBannerUrl(identity);
-
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
-    >
-      {bannerUrl && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${bannerUrl})`,
-            maskImage:
-              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
-            WebkitMaskImage:
-              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
-          }}
-        />
-      )}
-      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-        {pictureUrl ? (
-          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          name.slice(0, 1).toUpperCase()
-        )}
-      </div>
-      <div className="relative min-w-0 flex-1">
-        <div className="truncate text-sm font-black">{name}</div>
-        <div className="truncate text-xs text-white/45">
-          {handle ? `@${handle}` : shortId(identityId)}
-        </div>
-      </div>
-      {owner && (
-        <span
-          className="absolute right-2 top-2 text-sm text-yellow-300"
-          title={copy.communities.owner}
-        >
-          ♛
-        </span>
-      )}
-    </button>
+    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
+      {typingLabel(identityIds, memberIdentities)}
+    </div>
   );
 }
 
-function useIdentityBannerUrl(identity?: IdentityResource): string | null {
-  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+function typingLabel(
+  identityIds: string[],
+  memberIdentities: Record<string, IdentityResource>,
+): string {
+  const [firstIdentityId, secondIdentityId] = identityIds;
+  const firstName = firstIdentityId
+    ? memberDisplayName(memberIdentities[firstIdentityId], firstIdentityId)
+    : '';
 
-  useEffect(() => {
-    if (!identity?.profile.banner) {
-      setBannerUrl(null);
+  if (identityIds.length === 1) return `${firstName} is typing...`;
 
-      return;
-    }
+  if (identityIds.length === 2 && secondIdentityId) {
+    return `${firstName} and ${memberDisplayName(
+      memberIdentities[secondIdentityId],
+      secondIdentityId,
+    )} are typing...`;
+  }
 
-    const directBanner = identityBanner(identity);
-
-    if (directBanner) {
-      setBannerUrl(directBanner);
-
-      return;
-    }
-
-    let cancelled = false;
-    const bannerCid = identity.profile.banner.trim();
-
-    setBannerUrl(null);
-    void loadPublicImage(bannerCid)
-      .then((loadedBanner) => {
-        if (!cancelled) setBannerUrl(loadedBanner);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [identity]);
-
-  return bannerUrl;
+  return `${firstName} and ${identityIds.length - 1} more are typing...`;
 }
 
 function resolveCommunityChannelId(

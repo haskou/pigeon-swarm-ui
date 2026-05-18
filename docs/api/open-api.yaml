@@ -18,7 +18,9 @@ paths:
   /identities/{identityId}:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1{identityId}'
   /ipfs/{cid}:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{cid}'
+    $ref: './ipfs.yaml#/paths/~1ipfs~1{cid}'
+  /ipfs/replication/status:
+    $ref: './ipfs.yaml#/paths/~1ipfs~1replication~1status'
   /keychains/:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'
   /keychains/{identityId}:

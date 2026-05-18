@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   ConversationKeyEntry,
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
   MessageAttachment,
   Session,
@@ -52,6 +53,7 @@ interface ChatColumnProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   conversationKey?: ConversationKeyEntry;
   draft: string;
   hasConversationKey: boolean;
@@ -94,6 +96,8 @@ interface ChatColumnProps {
     participants: CallParticipant[];
     title: string;
   }) => void;
+  onTypingActive?: (active: boolean) => void;
+  typingIdentityIds?: string[];
 }
 
 function profileAnchorFromTarget(
@@ -119,6 +123,41 @@ function normalizeIdentityLookup(value: string): string {
   return trimmed.startsWith('@') ? trimmed.slice(1).trim() : trimmed;
 }
 
+function TypingIndicator({
+  identityIds,
+  identityNames,
+}: {
+  identityIds: string[];
+  identityNames: IdentityNames;
+}) {
+  return (
+    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
+      {typingLabel(identityIds, identityNames)}
+    </div>
+  );
+}
+
+function typingLabel(
+  identityIds: string[],
+  identityNames: IdentityNames,
+): string {
+  const [firstIdentityId, secondIdentityId] = identityIds;
+  const firstName = firstIdentityId
+    ? identityDisplayName(firstIdentityId, identityNames)
+    : '';
+
+  if (identityIds.length === 1) return `${firstName} is typing...`;
+
+  if (identityIds.length === 2 && secondIdentityId) {
+    return `${firstName} and ${identityDisplayName(
+      secondIdentityId,
+      identityNames,
+    )} are typing...`;
+  }
+
+  return `${firstName} and ${identityIds.length - 1} more are typing...`;
+}
+
 export function ChatColumn({
   activeConversation,
   bottomRef,
@@ -129,6 +168,7 @@ export function ChatColumn({
   identityNames,
   identityPictures,
   identityProfiles,
+  presenceByIdentityId = {},
   messages,
   messageState,
   newMessageCount,
@@ -149,6 +189,7 @@ export function ChatColumn({
   onScroll,
   onSend,
   onStartCall,
+  onTypingActive,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -158,6 +199,7 @@ export function ChatColumn({
   scrollerRef,
   sendError,
   session,
+  typingIdentityIds = [],
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     anchor?: ProfilePopoverAnchor;
@@ -194,6 +236,21 @@ export function ChatColumn({
   >(null);
   const [conversationKeySaving, setConversationKeySaving] = useState(false);
   const canAutoFocusInput = useDesktopInputFocus();
+  const handleDraftChange = (value: string) => {
+    onDraftChange(value);
+    onTypingActive?.(value.trim().length > 0);
+  };
+  const handleSend = async (content: string, attachments: File[]) => {
+    onTypingActive?.(false);
+    await onSend(content, attachments);
+  };
+
+  useEffect(
+    () => () => {
+      onTypingActive?.(false);
+    },
+    [activeConversation?.id, onTypingActive],
+  );
   const isGroupConversation = !!(
     activeConversation &&
     (activeConversation.type === 'group' ||
@@ -492,6 +549,9 @@ export function ChatColumn({
         onOpenSidebar={onOpenSidebar}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
         peerPicture={peerPicture}
+        peerPresence={
+          peerIdentityId ? presenceByIdentityId[peerIdentityId] : undefined
+        }
         realtimeStatus={realtimeStatus}
       >
         {conversationMenuOpen && activeConversation && (
@@ -625,14 +685,20 @@ export function ChatColumn({
             scrollerRef={scrollerRef}
           />
 
+          {typingIdentityIds.length > 0 && (
+            <TypingIndicator
+              identityIds={typingIdentityIds}
+              identityNames={identityNames}
+            />
+          )}
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
             draft={draft}
             error={sendError ?? attachmentError}
             focusKey={activeConversation.id}
-            onDraftChange={onDraftChange}
+            onDraftChange={handleDraftChange}
             onEscape={onEscape}
-            onSend={onSend}
+            onSend={handleSend}
             onCancelReply={onCancelReply}
             progress={progress}
             placeholder={
@@ -733,6 +799,7 @@ export function ChatColumn({
           name={profileViewer.name}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          presence={presenceByIdentityId[profileViewer.identityId]}
           onOpenConversation={
             profileViewer.identityId === session.identity.id ||
             !onOpenConversationWithIdentity
@@ -763,6 +830,7 @@ export function ChatColumn({
             });
           }}
           participants={groupParticipants}
+          presenceByIdentityId={presenceByIdentityId}
         />
       )}
     </section>
