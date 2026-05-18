@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { CallSession } from '../../domain/calls/CallSession';
@@ -14,8 +14,13 @@ import {
   ScreenShareIcon,
   SpeakerIcon,
 } from './CallIcons';
-import { CallStageDialog } from './CallStageDialog';
 import { VideoPreview } from './VideoPreview';
+
+const CallStageDialog = lazy(() =>
+  import('./CallStageDialog').then((module) => ({
+    default: module.CallStageDialog,
+  })),
+);
 
 interface GlobalCallBarProps {
   call: CallSession;
@@ -66,19 +71,21 @@ export function GlobalCallBar({
       />
       {stageOpen &&
         createPortal(
-          <CallStageDialog
-            call={call}
-            dataOpen={dataOpen}
-            onClose={() => setStageOpen(false)}
-            onDataToggle={() => setDataOpen((isOpen) => !isOpen)}
-            onEnd={onEnd}
-            onParticipantVolumeChange={onParticipantVolumeChange}
-            onToggleCamera={onToggleCamera}
-            onToggleDeafen={onToggleDeafen}
-            onToggleMute={onToggleMute}
-            onToggleScreenShare={onToggleScreenShare}
-            subtitle={subtitle}
-          />,
+          <Suspense fallback={null}>
+            <CallStageDialog
+              call={call}
+              dataOpen={dataOpen}
+              onClose={() => setStageOpen(false)}
+              onDataToggle={() => setDataOpen((isOpen) => !isOpen)}
+              onEnd={onEnd}
+              onParticipantVolumeChange={onParticipantVolumeChange}
+              onToggleCamera={onToggleCamera}
+              onToggleDeafen={onToggleDeafen}
+              onToggleMute={onToggleMute}
+              onToggleScreenShare={onToggleScreenShare}
+              subtitle={subtitle}
+            />
+          </Suspense>,
           document.body,
         )}
     </>

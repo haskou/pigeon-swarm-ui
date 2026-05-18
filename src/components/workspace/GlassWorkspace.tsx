@@ -3,7 +3,9 @@ import {
   type Dispatch,
   type PointerEvent,
   type SetStateAction,
+  lazy,
   startTransition,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -86,7 +88,6 @@ import {
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { loadPublicImage } from '../community/communityImages';
-import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { Rail } from './Rail';
@@ -100,6 +101,12 @@ import {
 } from './realtimeEventAttributes';
 import { Sidebar } from './Sidebar';
 import { WorkspaceDialogs } from './WorkspaceDialogs';
+
+const CommunityWorkspace = lazy(() =>
+  import('../community/CommunityWorkspace').then((module) => ({
+    default: module.CommunityWorkspace,
+  })),
+);
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PendingSend = {
@@ -2979,95 +2986,97 @@ export function GlassWorkspace({
             />
           </>
         ) : activeCommunity ? (
-          <CommunityWorkspace
-            activeChannelId={activeCommunityChannelId}
-            channelUnreadCounts={
-              communityUnreadCountsById[activeCommunity.id] ?? {}
-            }
-            community={activeCommunity}
-            mobileMembersOpen={communityMembersOpen}
-            mobileSidebarOpen={sidebarOpen}
-            mobileRail={
-              <Rail
-                activeCommunityId={activeCommunity.id}
-                communities={communities}
-                communityUnreadCounts={communityUnreadCounts}
-                messageNotificationCount={unreadMessageCount}
-                notificationCount={inboxNotificationCount}
-                onCommunityClick={(communityId) => {
-                  setActiveCommunityId(communityId);
-                  setWorkspaceMode('community');
-                  setSidebarOpen(false);
-                }}
-                onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                onMessagesClick={() => {
-                  setWorkspaceMode('messages');
-                  setSidebarOpen(false);
-                }}
-                onNotificationsClick={openNotificationsPanel}
-                onSettingsClick={() => setNodeSettingsOpen(true)}
-                onInspectorClick={() => {
-                  setSidebarOpen(false);
-                  setCommunityMembersOpen(true);
-                }}
-                peerCount={peers.length}
-                settingsAttention={nodeUnclaimed}
-              />
-            }
-            nodeNetworks={nodeNetworks}
-            activeCall={activeCall}
-            onCallEnd={leaveActiveCall}
-            onCallParticipantVolumeChange={setParticipantVolume}
-            onCallToggleCamera={toggleCamera}
-            onCallToggleDeafen={toggleDeafen}
-            onCallToggleMute={toggleMute}
-            onCallToggleScreenShare={toggleScreenShare}
-            realtimeEvent={communityRealtimeEvent}
-            onChannelSelected={(channelId) =>
-              setCommunityChannelById((current) =>
-                current[activeCommunity.id] === channelId
-                  ? current
-                  : {
-                      ...current,
-                      [activeCommunity.id]: channelId,
-                    },
-              )
-            }
-            onCommunityUpdated={(community) =>
-              setCommunities((current) =>
-                current.map((item) =>
-                  item.id === community.id ? community : item,
-                ),
-              )
-            }
-            onCommunityLeft={(community) =>
-              setCommunities((current) =>
-                current.filter((item) => item.id !== community.id),
-              )
-            }
-            onChannelViewed={(channelId) =>
-              clearCommunityChannelUnread(activeCommunity.id, channelId)
-            }
-            onLogout={() => setSession(null)}
-            onMobileSidebarClose={() => setSidebarOpen(false)}
-            onMobileMembersClose={() => setCommunityMembersOpen(false)}
-            onOpenMobileSidebar={() => setSidebarOpen(true)}
-            onOpenConversationWithIdentity={(identityId, identity) =>
-              openOrCreateConversationWithIdentity(
-                identityId,
-                identity,
-                activeCommunity.networkId,
-              )
-            }
-            onSessionUpdated={(nextSession) => {
-              setSession(nextSession);
-              rememberIdentity(nextSession.identity);
-            }}
-            realtimeStatus={realtimeStatus}
-            onRealtimeEventsOpen={openRealtimeEvents}
-            session={session}
-            onJoinVoiceChannel={startCommunityVoiceCall}
-          />
+          <Suspense fallback={null}>
+            <CommunityWorkspace
+              activeChannelId={activeCommunityChannelId}
+              channelUnreadCounts={
+                communityUnreadCountsById[activeCommunity.id] ?? {}
+              }
+              community={activeCommunity}
+              mobileMembersOpen={communityMembersOpen}
+              mobileSidebarOpen={sidebarOpen}
+              mobileRail={
+                <Rail
+                  activeCommunityId={activeCommunity.id}
+                  communities={communities}
+                  communityUnreadCounts={communityUnreadCounts}
+                  messageNotificationCount={unreadMessageCount}
+                  notificationCount={inboxNotificationCount}
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
+                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
+                  onNotificationsClick={openNotificationsPanel}
+                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onInspectorClick={() => {
+                    setSidebarOpen(false);
+                    setCommunityMembersOpen(true);
+                  }}
+                  peerCount={peers.length}
+                  settingsAttention={nodeUnclaimed}
+                />
+              }
+              nodeNetworks={nodeNetworks}
+              activeCall={activeCall}
+              onCallEnd={leaveActiveCall}
+              onCallParticipantVolumeChange={setParticipantVolume}
+              onCallToggleCamera={toggleCamera}
+              onCallToggleDeafen={toggleDeafen}
+              onCallToggleMute={toggleMute}
+              onCallToggleScreenShare={toggleScreenShare}
+              realtimeEvent={communityRealtimeEvent}
+              onChannelSelected={(channelId) =>
+                setCommunityChannelById((current) =>
+                  current[activeCommunity.id] === channelId
+                    ? current
+                    : {
+                        ...current,
+                        [activeCommunity.id]: channelId,
+                      },
+                )
+              }
+              onCommunityUpdated={(community) =>
+                setCommunities((current) =>
+                  current.map((item) =>
+                    item.id === community.id ? community : item,
+                  ),
+                )
+              }
+              onCommunityLeft={(community) =>
+                setCommunities((current) =>
+                  current.filter((item) => item.id !== community.id),
+                )
+              }
+              onChannelViewed={(channelId) =>
+                clearCommunityChannelUnread(activeCommunity.id, channelId)
+              }
+              onLogout={() => setSession(null)}
+              onMobileSidebarClose={() => setSidebarOpen(false)}
+              onMobileMembersClose={() => setCommunityMembersOpen(false)}
+              onOpenMobileSidebar={() => setSidebarOpen(true)}
+              onOpenConversationWithIdentity={(identityId, identity) =>
+                openOrCreateConversationWithIdentity(
+                  identityId,
+                  identity,
+                  activeCommunity.networkId,
+                )
+              }
+              onSessionUpdated={(nextSession) => {
+                setSession(nextSession);
+                rememberIdentity(nextSession.identity);
+              }}
+              realtimeStatus={realtimeStatus}
+              onRealtimeEventsOpen={openRealtimeEvents}
+              session={session}
+              onJoinVoiceChannel={startCommunityVoiceCall}
+            />
+          </Suspense>
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
             {copy.communities.empty}
