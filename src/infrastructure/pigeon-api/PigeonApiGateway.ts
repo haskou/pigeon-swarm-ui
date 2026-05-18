@@ -30,6 +30,7 @@ import type {
   ConversationResource,
   AttachmentProgress,
   IdentityResource,
+  IdentityPresence,
   IpfsReplicationStatus,
   KeychainResource,
   LocalKeychain,
@@ -44,6 +45,7 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
+  SelectablePresenceStatus,
 } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
@@ -69,7 +71,7 @@ const defaultKeychain: LocalKeychain = {
   version: 0,
 };
 
-const messageDecryptBatchSize = 5;
+const messageDecryptBatchSize = 8;
 
 type MessageLoadOptions = {
   limit?: number;
@@ -79,6 +81,7 @@ type MessageLoadOptions = {
 type MessageDecryptWorker = {
   decrypt(
     request: {
+      conversationId: string;
       copy: {
         decryptFailed: string;
         missingKey: string;
@@ -115,6 +118,15 @@ function uniqueSorted(values: string[]): string[] {
 type ConversationInvitationType =
   | 'conversation_invitation'
   | 'group_conversation_invitation';
+
+type PushSubscriptionPayload = {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: {
+    auth: string;
+    p256dh: string;
+  };
+};
 
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsApi;
@@ -222,6 +234,95 @@ export class PigeonApiGateway {
     return await this.http.request<IpfsReplicationStatus>(path, {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
+    });
+  }
+
+  public async getPresence(
+    session: Session,
+    identityId: string,
+  ): Promise<IdentityPresence> {
+    const path = `/presence/${encodeURIComponent(identityId)}`;
+    const body = {};
+
+    return await this.http.request<IdentityPresence>(path, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+  }
+
+  public async getPresences(
+    session: Session,
+    identityIds: string[],
+  ): Promise<IdentityPresence[]> {
+    const path = '/presence/';
+    const query = new URLSearchParams();
+    const body = {};
+
+    for (const identityId of uniqueSorted(identityIds)) {
+      query.append('identityIds', identityId);
+    }
+
+    const result = await this.http.request<
+      IdentityPresence[] | { presences: IdentityPresence[] }
+    >(`${path}?${query.toString()}`, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+
+    return Array.isArray(result) ? result : result.presences;
+  }
+
+  public async getPushVapidPublicKey(): Promise<{
+    enabled: boolean;
+    publicKey?: string;
+  }> {
+    return await this.http.request<{
+      enabled: boolean;
+      publicKey?: string;
+    }>('/push/vapid-public-key', {
+      method: 'GET',
+    });
+  }
+
+  public async registerPushSubscription(
+    session: Session,
+    subscription: PushSubscriptionPayload,
+  ): Promise<void> {
+    const path = '/push/subscriptions';
+
+    await this.http.request(path, {
+      body: JSON.stringify(subscription),
+      headers: await this.signer.headers(session, 'PUT', path, subscription),
+      method: 'PUT',
+    });
+  }
+
+  public async deletePushSubscription(
+    session: Session,
+    subscription: PushSubscriptionPayload,
+  ): Promise<void> {
+    const path = '/push/subscriptions';
+
+    await this.http.request(path, {
+      body: JSON.stringify(subscription),
+      headers: await this.signer.headers(session, 'DELETE', path, subscription),
+      method: 'DELETE',
+    });
+  }
+
+  public async updatePresence(
+    session: Session,
+    input: { status: SelectablePresenceStatus },
+  ): Promise<IdentityPresence> {
+    const path = '/presence/me';
+    const body = {
+      status: input.status,
+    };
+
+    return await this.http.request<IdentityPresence>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
     });
   }
 
@@ -866,9 +967,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const recipientIdentity = await this.getIdentity(
-      recipientIdentityId.trim(),
-    );
+    const normalizedRecipientIdentityId = recipientIdentityId.trim();
     const existingKeyEntry = session.keychain.conversations[communityId];
     const keyEntry =
       existingKeyEntry ??
@@ -884,7 +983,7 @@ export class PigeonApiGateway {
             this.withConversationKey(session.keychain, keyEntry),
           );
 
-    await this.createCommunityInvitationNotification(
+    await this.addCommunityMember(
       {
         ...session,
         keychain: published.keychain,
@@ -892,10 +991,9 @@ export class PigeonApiGateway {
           published.keychainExternalIdentifier ||
           session.keychainExternalIdentifier,
       },
-      recipientIdentity,
-      keyEntry,
+      communityId,
+      normalizedRecipientIdentityId,
     );
-    await this.addCommunityMember(session, communityId, recipientIdentity.id);
 
     return published;
   }
@@ -1605,6 +1703,7 @@ export class PigeonApiGateway {
 
       return await worker.decrypt(
         {
+          conversationId,
           copy: copy.messages,
           currentIdentityId: session.identity.id,
           messages: pendingMessages,
@@ -1614,31 +1713,35 @@ export class PigeonApiGateway {
       );
     }
 
-    const decrypted: ChatMessage[] = [];
+    const decrypted = new Array<ChatMessage>(pendingMessages.length);
 
     for (
-      let index = 0;
-      index < pendingMessages.length;
-      index += messageDecryptBatchSize
+      let endIndex = pendingMessages.length;
+      endIndex > 0;
+      endIndex -= messageDecryptBatchSize
     ) {
       throwIfMessageLoadAborted(signal);
 
-      const batch = pendingMessages.slice(
-        index,
-        index + messageDecryptBatchSize,
+      const startIndex = Math.max(0, endIndex - messageDecryptBatchSize);
+      const indexes = Array.from(
+        { length: endIndex - startIndex },
+        (_, offset) => startIndex + offset,
+      );
+      const batch = pendingMessages.slice(startIndex, endIndex);
+
+      const decryptedBatch = await Promise.all(
+        batch.map((message) =>
+          this.decryptMessage(session, conversationId, message),
+        ),
       );
 
-      decrypted.push(
-        ...(await Promise.all(
-          batch.map((message) =>
-            this.decryptMessage(session, conversationId, message),
-          ),
-        )),
-      );
+      for (let index = 0; index < indexes.length; index += 1) {
+        decrypted[indexes[index]] = decryptedBatch[index];
+      }
 
       throwIfMessageLoadAborted(signal);
 
-      if (index + messageDecryptBatchSize < pendingMessages.length) {
+      if (startIndex > 0) {
         await yieldAfterMessageDecryptBatch();
       }
     }
@@ -1697,42 +1800,6 @@ export class PigeonApiGateway {
       inviterSignature: inviterSignature.toString(),
       recipientIdentityId: peerIdentity.id,
       type,
-    };
-
-    await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-  }
-
-  private async createCommunityInvitationNotification(
-    session: Session,
-    recipientIdentity: IdentityResource,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<void> {
-    const path = '/notifications/';
-    const encryptedCommunityKey = PublicKey.fromPEM(
-      recipientIdentity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(JSON.stringify(keyEntry))
-      .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        communityId: keyEntry.conversationId,
-        encryptedCommunityKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: recipientIdentity.id,
-      }),
-      session.password,
-    );
-    const body = {
-      communityId: keyEntry.conversationId,
-      encryptedCommunityKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: recipientIdentity.id,
-      type: 'community_invitation',
     };
 
     await this.http.request<NotificationResource>(path, {

@@ -3,7 +3,9 @@ import {
   type Dispatch,
   type PointerEvent,
   type SetStateAction,
+  lazy,
   startTransition,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -27,11 +29,18 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
   MessageResource,
+  PresenceStatus,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type {
+  RealtimeDomainEvent,
+  RealtimeTypingInput,
+  RealtimeTypingMessage,
+} from '../../infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
 import type { MessageContextMenuState } from './MessageContextMenu';
 
@@ -61,9 +70,14 @@ import { useCallSession } from '../../presentation/hooks/useCallSession';
 import { useCommunityMembershipRequests } from '../../presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
-import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
+import {
+  sendRealtimeTyping,
+  useRealtimeEvents,
+} from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
 import {
+  deletePwaPushSubscription,
+  ensurePwaPushSubscription,
   requestPwaNotificationPermission,
   showPwaNotification,
 } from '../../presentation/notifications/PwaNotifications';
@@ -86,7 +100,6 @@ import {
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { loadPublicImage } from '../community/communityImages';
-import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { ChatColumn } from './ChatColumn';
 import { Inspector } from './Inspector';
 import { Rail } from './Rail';
@@ -101,6 +114,12 @@ import {
 import { Sidebar } from './Sidebar';
 import { WorkspaceDialogs } from './WorkspaceDialogs';
 
+const CommunityWorkspace = lazy(() =>
+  import('../community/CommunityWorkspace').then((module) => ({
+    default: module.CommunityWorkspace,
+  })),
+);
+
 type LoadState = 'idle' | 'loading' | 'error';
 type PendingSend = {
   attachments: File[];
@@ -108,6 +127,51 @@ type PendingSend = {
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
+type TypingEntries = Record<string, Record<string, number>>;
+const presencePreferenceStoragePrefix = 'pigeon:presencePreference:';
+
+function presencePreferenceStorageKey(identityId: string): string {
+  return `${presencePreferenceStoragePrefix}${identityId}`;
+}
+
+function readPresencePreference(
+  identityId: string,
+): SelectablePresenceStatus | null {
+  try {
+    const value = globalThis.localStorage?.getItem(
+      presencePreferenceStorageKey(identityId),
+    );
+
+    return isSelectablePresenceStatus(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePresencePreference(
+  identityId: string,
+  status: SelectablePresenceStatus,
+): void {
+  try {
+    globalThis.localStorage?.setItem(
+      presencePreferenceStorageKey(identityId),
+      status,
+    );
+  } catch {
+    // Local storage is best-effort; the server still receives the explicit status.
+  }
+}
+
+function isSelectablePresenceStatus(
+  value: unknown,
+): value is SelectablePresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'invisible'
+  );
+}
 
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
@@ -125,6 +189,119 @@ function canActOnMembershipRequest(
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
   );
+}
+
+function updateTypingEntries(
+  entries: TypingEntries,
+  scopeId: string,
+  identityId: string,
+  expiresAt: number | null,
+): TypingEntries {
+  const currentScope = entries[scopeId] ?? {};
+  const nextScope = { ...currentScope };
+
+  if (expiresAt === null) {
+    delete nextScope[identityId];
+  } else {
+    nextScope[identityId] = expiresAt;
+  }
+
+  if (Object.keys(nextScope).length === 0) {
+    const { [scopeId]: _removed, ...rest } = entries;
+
+    return rest;
+  }
+
+  return { ...entries, [scopeId]: nextScope };
+}
+
+function expireTypingEntries(entries: TypingEntries): TypingEntries {
+  const now = Date.now();
+  let changed = false;
+  const nextEntries: TypingEntries = {};
+
+  for (const [scopeId, scopeEntries] of Object.entries(entries)) {
+    const activeEntries = Object.fromEntries(
+      Object.entries(scopeEntries).filter(([, expiresAt]) => expiresAt > now),
+    );
+
+    if (
+      Object.keys(activeEntries).length !== Object.keys(scopeEntries).length
+    ) {
+      changed = true;
+    }
+
+    if (Object.keys(activeEntries).length > 0) {
+      nextEntries[scopeId] = activeEntries;
+    }
+  }
+
+  return changed ? nextEntries : entries;
+}
+
+function activeTypingIdentityIds(
+  entries: TypingEntries,
+  scopeId: string | null | undefined,
+): string[] {
+  if (!scopeId) return [];
+
+  const now = Date.now();
+
+  return Object.entries(entries[scopeId] ?? {})
+    .filter(([, expiresAt]) => expiresAt > now)
+    .map(([identityId]) => identityId)
+    .sort();
+}
+
+function communityTypingKey(communityId: string, channelId: string): string {
+  return `${communityId}:${channelId}`;
+}
+
+function typingInputKey(input: RealtimeTypingInput): string {
+  return input.scope === 'conversation'
+    ? `conversation:${input.conversationId}`
+    : communityTypingKey(input.communityId, input.channelId);
+}
+
+function isPresenceStatus(value: unknown): value is PresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'disconnected' ||
+    value === 'invisible'
+  );
+}
+
+function presenceFromRealtimeEvent(
+  event: RealtimeDomainEvent,
+): IdentityPresence | null {
+  if (event.type !== 'presence.v1.identity_presence.was_updated') return null;
+
+  const attributes = event.attributes;
+  const identityId = attributes.identityId;
+  const status = attributes.status;
+
+  if (typeof identityId !== 'string' || !isPresenceStatus(status)) return null;
+
+  return {
+    identityId,
+    status,
+    updatedAt:
+      typeof attributes.updatedAt === 'number'
+        ? attributes.updatedAt
+        : Date.now(),
+    ...(typeof attributes.lastActivityAt === 'number'
+      ? { lastActivityAt: attributes.lastActivityAt }
+      : {}),
+    ...(typeof attributes.lastHeartbeatAt === 'number'
+      ? { lastHeartbeatAt: attributes.lastHeartbeatAt }
+      : {}),
+    ...(Array.isArray(attributes.networkIds) &&
+    attributes.networkIds.every((networkId) => typeof networkId === 'string')
+      ? { networkIds: attributes.networkIds }
+      : {}),
+  };
 }
 
 interface GlassWorkspaceProps {
@@ -188,6 +365,13 @@ export function GlassWorkspace({
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
+  const [conversationTypingEntries, setConversationTypingEntries] =
+    useState<TypingEntries>({});
+  const [communityTypingEntries, setCommunityTypingEntries] =
+    useState<TypingEntries>({});
+  const typingSentRef = useRef(
+    new Map<string, { active: boolean; sentAt: number }>(),
+  );
   const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
     useState<Record<string, Community>>({});
   const [notificationCommunityAvatarUrls, setNotificationCommunityAvatarUrls] =
@@ -212,6 +396,11 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [presenceByIdentityId, setPresenceByIdentityId] = useState<
+    Record<string, IdentityPresence>
+  >({});
+  const notificationsMutedByPresence =
+    presenceByIdentityId[session.identity.id]?.status === 'busy';
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -233,6 +422,9 @@ export function GlassWorkspace({
   >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const pendingCommunityInviteRef = useRef<string | null>(null);
+  const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
+    readPresencePreference(session.identity.id),
+  );
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -258,6 +450,16 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    const preference = readPresencePreference(session.identity.id);
+
+    presencePreferenceRef.current = preference;
+    pigeonApplication.setRealtimeHeartbeatActivityMode(
+      session,
+      !preference || preference === 'available' ? 'auto' : 'inactive',
+    );
   }, [session]);
 
   useEffect(() => {
@@ -477,6 +679,15 @@ export function GlassWorkspace({
     pendingNotificationCount + pendingMembershipRequestCount;
 
   useEffect(() => {
+    void ensurePwaPushSubscription(session).catch(() => undefined);
+  }, [session]);
+
+  const logout = () => {
+    void deletePwaPushSubscription(session).catch(() => undefined);
+    setSession(null);
+  };
+
+  useEffect(() => {
     const communityIds = visibleNotifications
       .filter((notification) => notification.type === 'community_invitation')
       .map((notification) => notification.payload.communityId)
@@ -653,6 +864,50 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
+  const presenceIdentityIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          session.identity.id,
+          ...conversations.flatMap((conversation) => [
+            conversationPeerIdentityId(
+              conversation,
+              session.identity.id,
+              session.keychain,
+            ),
+            ...(conversation.participantIdentityIds ??
+              conversation.participantIds ??
+              conversation.participants ??
+              []),
+          ]),
+          ...communities.flatMap((community) => community.memberIds),
+          ...messages.map((message) => message.authorIdentityId),
+        ]),
+      ).filter((identityId): identityId is string => !!identityId),
+    [communities, conversations, messages, session],
+  );
+  const mergePresence = useCallback((presence: IdentityPresence) => {
+    setPresenceByIdentityId((current) => ({
+      ...current,
+      [presence.identityId]: presence,
+    }));
+  }, []);
+  const rememberPresencePreference = useCallback(
+    (status: SelectablePresenceStatus) => {
+      presencePreferenceRef.current = status;
+      writePresencePreference(sessionRef.current.identity.id, status);
+      pigeonApplication.setRealtimeHeartbeatActivityMode(
+        sessionRef.current,
+        status === 'available' ? 'auto' : 'inactive',
+      );
+    },
+    [],
+  );
+  const playNotificationSoundIfAllowed = useCallback(() => {
+    if (notificationsMutedByPresence) return;
+
+    playNotificationSound();
+  }, [notificationsMutedByPresence]);
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
       const identity =
@@ -673,6 +928,59 @@ export function GlassWorkspace({
     },
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
+
+  useEffect(() => {
+    if (presenceIdentityIds.length === 0) return;
+
+    let cancelled = false;
+
+    void pigeonApplication
+      .getPresences(session, presenceIdentityIds)
+      .then((presences) => {
+        if (cancelled) return;
+
+        setPresenceByIdentityId((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            presences.map((presence) => [presence.identityId, presence]),
+          ),
+        }));
+
+        const ownPresence = presences.find(
+          (presence) => presence.identityId === session.identity.id,
+        );
+        const preferredStatus = presencePreferenceRef.current;
+
+        if (preferredStatus && preferredStatus !== 'available') {
+          if (ownPresence?.status === preferredStatus) return;
+
+          void pigeonApplication
+            .updatePresence(session, { status: preferredStatus })
+            .then(mergePresence)
+            .catch(() => undefined);
+
+          return;
+        }
+
+        if (
+          ownPresence &&
+          ownPresence.status !== 'away' &&
+          ownPresence.status !== 'disconnected'
+        ) {
+          return;
+        }
+
+        void pigeonApplication
+          .updatePresence(session, { status: 'available' })
+          .then(mergePresence)
+          .catch(() => undefined);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mergePresence, presenceIdentityIds, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,
@@ -1963,6 +2271,13 @@ export function GlassWorkspace({
       y,
     });
   };
+  const copyMessageContent = (message: ChatMessage) => {
+    if (navigator.clipboard && message.content) {
+      void navigator.clipboard.writeText(message.content);
+    }
+
+    setMessageContextMenu(null);
+  };
 
   const scrollToMessage = (messageId: string) => {
     requestAnimationFrame(() => {
@@ -2248,6 +2563,14 @@ export function GlassWorkspace({
         });
       }
 
+      const presence = presenceFromRealtimeEvent(event);
+
+      if (presence) {
+        mergePresence(presence);
+
+        return;
+      }
+
       if (event.type.startsWith('calls.')) {
         const eventCallId =
           eventAggregateId(event) ?? stringAttribute(event, 'callId');
@@ -2325,7 +2648,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('notifications.')) {
-        playNotificationSound();
+        playNotificationSoundIfAllowed();
         void showPwaNotification({
           body: copy.notifications.open,
           tag: `notification-${event.event_id}`,
@@ -2387,7 +2710,7 @@ export function GlassWorkspace({
             identityNames,
           );
 
-          playNotificationSound();
+          playNotificationSoundIfAllowed();
           void showPwaNotification({
             body: preview.body,
             tag: `community-${communityId}-${channelId}`,
@@ -2604,7 +2927,7 @@ export function GlassWorkspace({
             identityProfiles,
           );
 
-          playNotificationSound();
+          playNotificationSoundIfAllowed();
           void showPwaNotification({
             body: preview.body,
             tag: `conversation-${conversationId}`,
@@ -2739,9 +3062,11 @@ export function GlassWorkspace({
       isScrolledNearBottom,
       markCommunityChannelUnread,
       markUnreadMessage,
+      mergePresence,
       messages,
       onCommunitiesReload,
       onPeersReload,
+      playNotificationSoundIfAllowed,
       refreshConversations,
       refreshMembershipRequests,
       refreshNotifications,
@@ -2758,6 +3083,63 @@ export function GlassWorkspace({
     ],
   );
 
+  const handleRealtimeTyping = useCallback(
+    (message: RealtimeTypingMessage) => {
+      if (message.identityId === session.identity.id) return;
+
+      const expiresAt = Date.now() + 5000;
+
+      if (message.scope === 'conversation') {
+        setConversationTypingEntries((current) =>
+          updateTypingEntries(
+            current,
+            message.conversationId,
+            message.identityId,
+            message.active ? expiresAt : null,
+          ),
+        );
+
+        return;
+      }
+
+      setCommunityTypingEntries((current) =>
+        updateTypingEntries(
+          current,
+          communityTypingKey(message.communityId, message.channelId),
+          message.identityId,
+          message.active ? expiresAt : null,
+        ),
+      );
+    },
+    [session.identity.id],
+  );
+  const sendTyping = useCallback(
+    (input: RealtimeTypingInput) => {
+      const key = typingInputKey(input);
+      const current = typingSentRef.current.get(key);
+      const now = Date.now();
+
+      if (input.active && current?.active && now - current.sentAt < 2500) {
+        return;
+      }
+
+      if (!input.active && current && !current.active) return;
+
+      typingSentRef.current.set(key, { active: input.active, sentAt: now });
+      sendRealtimeTyping(session, input);
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setConversationTypingEntries(expireTypingEntries);
+      setCommunityTypingEntries(expireTypingEntries);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   useRealtimeEvents(session, {
     onConnected: () => {
       setRealtimeStatus('connected');
@@ -2765,10 +3147,9 @@ export function GlassWorkspace({
     onDisconnected: () => setRealtimeStatus('reconnecting'),
     onDomainEvent: handleRealtimeEvent,
     onReconnecting: () => setRealtimeStatus('reconnecting'),
+    onTyping: handleRealtimeTyping,
   });
-  const handleWorkspacePointerDown = (
-    event: PointerEvent<HTMLElement>,
-  ) => {
+  const handleWorkspacePointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'touch' || sidebarOpen) return;
 
     if (event.clientX > 28) return;
@@ -2779,9 +3160,7 @@ export function GlassWorkspace({
       startY: event.clientY,
     };
   };
-  const handleWorkspacePointerMove = (
-    event: PointerEvent<HTMLElement>,
-  ) => {
+  const handleWorkspacePointerMove = (event: PointerEvent<HTMLElement>) => {
     const gesture = sidebarGestureRef.current;
 
     if (!gesture || gesture.pointerId !== event.pointerId) return;
@@ -2803,6 +3182,41 @@ export function GlassWorkspace({
       sidebarGestureRef.current = null;
     }
   };
+  const conversationTypingIdentityIds = activeTypingIdentityIds(
+    conversationTypingEntries,
+    activeConversation?.id,
+  );
+  const communityTypingIdentityIds = activeTypingIdentityIds(
+    communityTypingEntries,
+    activeCommunity && activeCommunityChannelId
+      ? communityTypingKey(activeCommunity.id, activeCommunityChannelId)
+      : null,
+  );
+  const sendConversationTyping = useCallback(
+    (active: boolean) => {
+      if (!activeConversation?.id) return;
+
+      sendTyping({
+        active,
+        conversationId: activeConversation.id,
+        scope: 'conversation',
+      });
+    },
+    [activeConversation?.id, sendTyping],
+  );
+  const sendCommunityTyping = useCallback(
+    (channelId: string, active: boolean) => {
+      if (!activeCommunity?.id) return;
+
+      sendTyping({
+        active,
+        channelId,
+        communityId: activeCommunity.id,
+        scope: 'community_channel',
+      });
+    },
+    [activeCommunity?.id, sendTyping],
+  );
 
   return (
     <section
@@ -2842,7 +3256,7 @@ export function GlassWorkspace({
           <>
             <div
               className={cx(
-                'fixed inset-y-0 left-0 z-40 w-[calc(86vw+82px)] max-w-[442px] p-3 transition lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+                'fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
                 sidebarOpen ? 'block' : 'hidden lg:block',
               )}
             >
@@ -2878,6 +3292,7 @@ export function GlassWorkspace({
                   identityNames={identityNames}
                   identityPictures={identityPictures}
                   identityProfiles={identityProfiles}
+                  presenceByIdentityId={presenceByIdentityId}
                   nodeNetworks={nodeNetworks}
                   activeConversationId={activeConversation?.id ?? null}
                   onSelect={(id) => {
@@ -2887,18 +3302,19 @@ export function GlassWorkspace({
                     setSidebarOpen(false);
                   }}
                   onCreate={() => setIsCreateOpen(true)}
-                  onClose={() => setSidebarOpen(false)}
                   onCallEnd={leaveActiveCall}
                   onCallParticipantVolumeChange={setParticipantVolume}
                   onCallToggleCamera={toggleCamera}
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
                   onCallToggleScreenShare={toggleScreenShare}
-                  onLogout={() => setSession(null)}
+                  onLogout={logout}
                   onSessionUpdated={(nextSession) => {
                     setSession(nextSession);
                     rememberIdentity(nextSession.identity);
                   }}
+                  onPresenceChange={mergePresence}
+                  onPresenceStatusSelected={rememberPresencePreference}
                 />
               </div>
             </div>
@@ -2932,6 +3348,7 @@ export function GlassWorkspace({
               identityNames={identityNames}
               identityPictures={identityPictures}
               identityProfiles={identityProfiles}
+              presenceByIdentityId={presenceByIdentityId}
               messages={messages}
               messageState={messageState}
               newMessageCount={newMessageCount}
@@ -2968,6 +3385,8 @@ export function GlassWorkspace({
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}
               onStartCall={startConversationCall}
+              onTypingActive={sendConversationTyping}
+              typingIdentityIds={conversationTypingIdentityIds}
             />
 
             <Inspector
@@ -2979,95 +3398,102 @@ export function GlassWorkspace({
             />
           </>
         ) : activeCommunity ? (
-          <CommunityWorkspace
-            activeChannelId={activeCommunityChannelId}
-            channelUnreadCounts={
-              communityUnreadCountsById[activeCommunity.id] ?? {}
-            }
-            community={activeCommunity}
-            mobileMembersOpen={communityMembersOpen}
-            mobileSidebarOpen={sidebarOpen}
-            mobileRail={
-              <Rail
-                activeCommunityId={activeCommunity.id}
-                communities={communities}
-                communityUnreadCounts={communityUnreadCounts}
-                messageNotificationCount={unreadMessageCount}
-                notificationCount={inboxNotificationCount}
-                onCommunityClick={(communityId) => {
-                  setActiveCommunityId(communityId);
-                  setWorkspaceMode('community');
-                  setSidebarOpen(false);
-                }}
-                onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                onMessagesClick={() => {
-                  setWorkspaceMode('messages');
-                  setSidebarOpen(false);
-                }}
-                onNotificationsClick={openNotificationsPanel}
-                onSettingsClick={() => setNodeSettingsOpen(true)}
-                onInspectorClick={() => {
-                  setSidebarOpen(false);
-                  setCommunityMembersOpen(true);
-                }}
-                peerCount={peers.length}
-                settingsAttention={nodeUnclaimed}
-              />
-            }
-            nodeNetworks={nodeNetworks}
-            activeCall={activeCall}
-            onCallEnd={leaveActiveCall}
-            onCallParticipantVolumeChange={setParticipantVolume}
-            onCallToggleCamera={toggleCamera}
-            onCallToggleDeafen={toggleDeafen}
-            onCallToggleMute={toggleMute}
-            onCallToggleScreenShare={toggleScreenShare}
-            realtimeEvent={communityRealtimeEvent}
-            onChannelSelected={(channelId) =>
-              setCommunityChannelById((current) =>
-                current[activeCommunity.id] === channelId
-                  ? current
-                  : {
-                      ...current,
-                      [activeCommunity.id]: channelId,
-                    },
-              )
-            }
-            onCommunityUpdated={(community) =>
-              setCommunities((current) =>
-                current.map((item) =>
-                  item.id === community.id ? community : item,
-                ),
-              )
-            }
-            onCommunityLeft={(community) =>
-              setCommunities((current) =>
-                current.filter((item) => item.id !== community.id),
-              )
-            }
-            onChannelViewed={(channelId) =>
-              clearCommunityChannelUnread(activeCommunity.id, channelId)
-            }
-            onLogout={() => setSession(null)}
-            onMobileSidebarClose={() => setSidebarOpen(false)}
-            onMobileMembersClose={() => setCommunityMembersOpen(false)}
-            onOpenMobileSidebar={() => setSidebarOpen(true)}
-            onOpenConversationWithIdentity={(identityId, identity) =>
-              openOrCreateConversationWithIdentity(
-                identityId,
-                identity,
-                activeCommunity.networkId,
-              )
-            }
-            onSessionUpdated={(nextSession) => {
-              setSession(nextSession);
-              rememberIdentity(nextSession.identity);
-            }}
-            realtimeStatus={realtimeStatus}
-            onRealtimeEventsOpen={openRealtimeEvents}
-            session={session}
-            onJoinVoiceChannel={startCommunityVoiceCall}
-          />
+          <Suspense fallback={null}>
+            <CommunityWorkspace
+              activeChannelId={activeCommunityChannelId}
+              channelUnreadCounts={
+                communityUnreadCountsById[activeCommunity.id] ?? {}
+              }
+              community={activeCommunity}
+              mobileMembersOpen={communityMembersOpen}
+              mobileSidebarOpen={sidebarOpen}
+              mobileRail={
+                <Rail
+                  activeCommunityId={activeCommunity.id}
+                  communities={communities}
+                  communityUnreadCounts={communityUnreadCounts}
+                  messageNotificationCount={unreadMessageCount}
+                  notificationCount={inboxNotificationCount}
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
+                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
+                  onNotificationsClick={openNotificationsPanel}
+                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onInspectorClick={() => {
+                    setSidebarOpen(false);
+                    setCommunityMembersOpen(true);
+                  }}
+                  peerCount={peers.length}
+                  settingsAttention={nodeUnclaimed}
+                />
+              }
+              nodeNetworks={nodeNetworks}
+              activeCall={activeCall}
+              onCallEnd={leaveActiveCall}
+              onCallParticipantVolumeChange={setParticipantVolume}
+              onCallToggleCamera={toggleCamera}
+              onCallToggleDeafen={toggleDeafen}
+              onCallToggleMute={toggleMute}
+              onCallToggleScreenShare={toggleScreenShare}
+              realtimeEvent={communityRealtimeEvent}
+              presenceByIdentityId={presenceByIdentityId}
+              onChannelSelected={(channelId) =>
+                setCommunityChannelById((current) =>
+                  current[activeCommunity.id] === channelId
+                    ? current
+                    : {
+                        ...current,
+                        [activeCommunity.id]: channelId,
+                      },
+                )
+              }
+              onCommunityUpdated={(community) =>
+                setCommunities((current) =>
+                  current.map((item) =>
+                    item.id === community.id ? community : item,
+                  ),
+                )
+              }
+              onCommunityLeft={(community) =>
+                setCommunities((current) =>
+                  current.filter((item) => item.id !== community.id),
+                )
+              }
+              onChannelViewed={(channelId) =>
+                clearCommunityChannelUnread(activeCommunity.id, channelId)
+              }
+              onLogout={logout}
+              onMobileSidebarClose={() => setSidebarOpen(false)}
+              onMobileMembersClose={() => setCommunityMembersOpen(false)}
+              onOpenMobileSidebar={() => setSidebarOpen(true)}
+              onOpenConversationWithIdentity={(identityId, identity) =>
+                openOrCreateConversationWithIdentity(
+                  identityId,
+                  identity,
+                  activeCommunity.networkId,
+                )
+              }
+              onSessionUpdated={(nextSession) => {
+                setSession(nextSession);
+                rememberIdentity(nextSession.identity);
+              }}
+              onPresenceChange={mergePresence}
+              onPresenceStatusSelected={rememberPresencePreference}
+              onTypingActive={sendCommunityTyping}
+              realtimeStatus={realtimeStatus}
+              onRealtimeEventsOpen={openRealtimeEvents}
+              session={session}
+              typingIdentityIds={communityTypingIdentityIds}
+              onJoinVoiceChannel={startCommunityVoiceCall}
+            />
+          </Suspense>
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
             {copy.communities.empty}
@@ -3144,6 +3570,7 @@ export function GlassWorkspace({
           void declineNotification(notificationId)
         }
         onDeleteMessage={(message) => void handleDeleteMessage(message)}
+        onCopyMessage={copyMessageContent}
         onNetworksUpdated={onNodeNetworksReload}
         onReplyToMessage={(message) => {
           setReplyTarget(message);

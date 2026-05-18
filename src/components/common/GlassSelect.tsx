@@ -6,6 +6,7 @@ import { cx } from '../../utils/classNameHelper';
 
 export type GlassSelectOption = {
   disabled?: boolean;
+  indicatorClassName?: string;
   label: string;
   value: string;
 };
@@ -108,8 +109,19 @@ export function GlassSelect({
         onKeyDown={handleKeyDown}
         className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left text-sm font-bold text-white outline-none transition hover:border-white/20 focus:border-cyan-300/60 focus:bg-black/35 disabled:cursor-not-allowed disabled:opacity-45"
       >
-        <span className="min-w-0 truncate">
-          {selectedOption?.label ?? ariaLabel}
+        <span className="flex min-w-0 items-center gap-2">
+          {selectedOption?.indicatorClassName && (
+            <span
+              aria-hidden="true"
+              className={cx(
+                'h-2.5 w-2.5 shrink-0 rounded-full',
+                selectedOption.indicatorClassName,
+              )}
+            />
+          )}
+          <span className="min-w-0 truncate">
+            {selectedOption?.label ?? ariaLabel}
+          </span>
         </span>
         <svg
           aria-hidden="true"
@@ -155,7 +167,18 @@ export function GlassSelect({
                     : 'text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white',
               )}
             >
-              <span className="truncate">{option.label}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {option.indicatorClassName && (
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      'h-2.5 w-2.5 shrink-0 rounded-full',
+                      option.indicatorClassName,
+                    )}
+                  />
+                )}
+                <span className="truncate">{option.label}</span>
+              </span>
               {option.value === value && (
                 <svg
                   aria-hidden="true"

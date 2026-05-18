@@ -35,19 +35,19 @@ export function PasswordChecklist({
   ] as const;
 
   return (
-    <div className="grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-1.5 text-[0.68rem] font-black sm:gap-2 sm:text-xs">
       {items.map(([label, complete]) => (
         <div
           key={label}
           className={cx(
-            'flex items-center gap-2 rounded-2xl px-3 py-2',
+            'flex min-w-0 items-center gap-1.5 rounded-2xl px-2.5 py-1.5 sm:gap-2 sm:px-3 sm:py-2',
             complete
               ? 'bg-emerald-400/10 text-emerald-200'
               : 'bg-white/5 text-white/45',
           )}
         >
           <span aria-hidden="true">{complete ? '✓' : '×'}</span>
-          <span>{label}</span>
+          <span className="min-w-0 truncate">{label}</span>
         </div>
       ))}
     </div>

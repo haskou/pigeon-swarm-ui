@@ -1,6 +1,7 @@
 import type { ChatMessage, MessageResource } from '../../domain/types';
 
 type MessageDecryptWorkerRequest = {
+  conversationId: string;
   copy: {
     decryptFailed: string;
     missingKey: string;

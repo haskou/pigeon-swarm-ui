@@ -1,5 +1,5 @@
 import { UUID } from '@haskou/value-objects';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { Community, CommunityChannel, Session } from '../../domain/types';
@@ -12,13 +12,18 @@ import {
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { ImageCropEditor } from '../common/ImageCropEditor';
 import {
   DialogHeader,
   TrashIcon,
   VoiceIcon,
 } from './communityDialogPrimitives';
 import { loadPublicImage } from './communityImages';
+
+const ImageCropEditor = lazy(() =>
+  import('../common/ImageCropEditor').then((module) => ({
+    default: module.ImageCropEditor,
+  })),
+);
 
 type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
 
@@ -508,20 +513,22 @@ export function ManageCommunityDialog({
           {copy.profile.save}
         </button>
         {imageEditor && (
-          <ImageCropEditor
-            file={imageEditor.file}
-            shape={imageEditor.shape}
-            onClose={() => setImageEditor(null)}
-            onApply={(file, previewUrl) => {
-              if (imageEditor.shape === 'avatar') {
-                setAvatar(file);
-                setAvatarPreview(previewUrl);
-              } else {
-                setBanner(file);
-                setBannerPreview(previewUrl);
-              }
-            }}
-          />
+          <Suspense fallback={null}>
+            <ImageCropEditor
+              file={imageEditor.file}
+              shape={imageEditor.shape}
+              onClose={() => setImageEditor(null)}
+              onApply={(file, previewUrl) => {
+                if (imageEditor.shape === 'avatar') {
+                  setAvatar(file);
+                  setAvatarPreview(previewUrl);
+                } else {
+                  setBanner(file);
+                  setBannerPreview(previewUrl);
+                }
+              }}
+            />
+          </Suspense>
         )}
       </section>
     </div>,

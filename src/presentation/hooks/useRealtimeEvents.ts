@@ -3,7 +3,11 @@ import type { RefObject } from 'react';
 import { useEffect, useRef } from 'react';
 
 import type { Session } from '../../domain/types';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type {
+  RealtimeDomainEvent,
+  RealtimeTypingInput,
+  RealtimeTypingMessage,
+} from '../../infrastructure/realtime/RealtimeGateway';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 
@@ -12,6 +16,7 @@ type RealtimeHandlers = {
   onDisconnected?: () => void;
   onDomainEvent: (event: RealtimeDomainEvent) => void;
   onReconnecting?: () => void;
+  onTyping?: (message: RealtimeTypingMessage) => void;
 };
 
 type RealtimeSubscription = {
@@ -143,6 +148,14 @@ async function connectRealtime(
 
         if (message.type === 'heartbeat_ack') return;
 
+        if (message.type === 'typing') {
+          notifySubscribers(connection, (handlers) =>
+            handlers.onTyping?.(message),
+          );
+
+          return;
+        }
+
         notifySubscribers(connection, (handlers) =>
           handlers.onDomainEvent(message.event),
         );
@@ -199,4 +212,17 @@ function notifySubscribers(
 
 function realtimeConnectionKey(session: Session): string {
   return session.identity.id;
+}
+
+export function sendRealtimeTyping(
+  session: Session,
+  input: RealtimeTypingInput,
+): void {
+  const socket = realtimeConnections.get(
+    realtimeConnectionKey(session),
+  )?.socket;
+
+  if (!socket) return;
+
+  pigeonApplication.sendRealtimeTyping(socket, input);
 }

@@ -4,6 +4,28 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 
+function preventMobileZoom(): void {
+  const preventDefault = (event: Event) => event.preventDefault();
+  const preventMultiTouch = (event: TouchEvent) => {
+    if (event.touches.length > 1) event.preventDefault();
+  };
+
+  document.addEventListener('gesturestart', preventDefault, {
+    passive: false,
+  });
+  document.addEventListener('gesturechange', preventDefault, {
+    passive: false,
+  });
+  document.addEventListener('gestureend', preventDefault, {
+    passive: false,
+  });
+  document.addEventListener('touchmove', preventMultiTouch, {
+    passive: false,
+  });
+}
+
+preventMobileZoom();
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

@@ -60,6 +60,7 @@ export function ImageCropEditor({
   shape,
 }: ImageCropEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cropFrameRef = useRef<HTMLDivElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -114,6 +115,24 @@ export function ImageCropEditor({
       zoom,
     });
   }, [image, offsetX, offsetY, outputSize.height, outputSize.width, zoom]);
+
+  useEffect(() => {
+    const cropFrame = cropFrameRef.current;
+
+    if (!cropFrame || !image) return;
+
+    const zoomWithWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const direction = event.deltaY > 0 ? -1 : 1;
+      const nextZoomStep = direction * 0.12;
+
+      setZoom((current) => clampZoom(current + nextZoomStep));
+    };
+
+    cropFrame.addEventListener('wheel', zoomWithWheel, { passive: false });
+
+    return () => cropFrame.removeEventListener('wheel', zoomWithWheel);
+  }, [image]);
 
   const applyCrop = async () => {
     if (!image || applying) return;
@@ -180,16 +199,6 @@ export function ImageCropEditor({
       setDragging(false);
     }
   };
-  const zoomWithWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (!image) return;
-
-    event.preventDefault();
-    const direction = event.deltaY > 0 ? -1 : 1;
-    const nextZoomStep = direction * 0.12;
-
-    setZoom((current) => clampZoom(current + nextZoomStep));
-  };
-
   return createPortal(
     <div className="fixed inset-0 z-[130] grid place-items-stretch bg-black/70 p-0 text-white backdrop-blur-xl sm:place-items-center sm:p-4">
       <button
@@ -217,6 +226,7 @@ export function ImageCropEditor({
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-2xl">
             <div
+              ref={cropFrameRef}
               className={`relative ${preset.aspectClass} touch-none overflow-hidden rounded-2xl border border-white/10 bg-black/40 ${
                 dragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
@@ -224,7 +234,6 @@ export function ImageCropEditor({
               onPointerMove={moveDrag}
               onPointerCancel={stopDrag}
               onPointerUp={stopDrag}
-              onWheel={zoomWithWheel}
             >
               {animatedGif && imageUrl && image && gifPreviewStyle ? (
                 <img
