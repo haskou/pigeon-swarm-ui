@@ -1008,8 +1008,7 @@ describe(PigeonApiGateway.name, () => {
     expect(signedPassword).toBe(session.password);
   });
 
-  it('uploads public profile files as signed raw bytes', async () => {
-    const bytes = new Uint8Array([1, 2, 3]).buffer;
+  it('uploads public profile files as unsigned binary bodies', async () => {
     const upload = {
       cid: 'bafy-avatar',
       contentType: 'image/png',
@@ -1027,7 +1026,6 @@ describe(PigeonApiGateway.name, () => {
       password: 'secret',
     } as unknown as Session;
     const file = {
-      arrayBuffer: jest.fn().mockResolvedValue(bytes),
       name: 'avatar.png',
       type: 'image/png',
     } as unknown as File;
@@ -1035,18 +1033,12 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(gateway.uploadPublicFile(session, file)).resolves.toBe(upload);
 
-    expect(signer.headers).toHaveBeenCalledWith(
-      session,
-      'POST',
-      '/ipfs/public',
-      bytes,
-    );
+    expect(signer.headers).not.toHaveBeenCalled();
     expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
-      body: bytes,
+      body: file,
       headers: {
         'Content-Type': 'image/png',
         'X-Filename': 'avatar.png',
-        'X-Signature': 'http-signature',
       },
       method: 'POST',
     });
@@ -1450,21 +1442,24 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('loads public IPFS content by encoded cid', async () => {
+    const blob = new Blob(['abc'], { type: 'image/png' });
     const content = {
+      blob,
       cid: 'bafy/avatar',
       contentType: 'image/png',
-      data: 'abc',
-      filename: 'avatar.png',
+      filename: 'bafy/avatar',
       size: 3,
     };
     const http = {
-      request: jest.fn().mockResolvedValue(content),
+      requestBlob: jest.fn().mockResolvedValue(blob),
     } as unknown as HttpJsonClient;
     const gateway = new PigeonApiGateway(http);
 
-    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toBe(content);
+    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toEqual(
+      content,
+    );
 
-    expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
   });
 
   it('downloads encrypted private attachment content', async () => {

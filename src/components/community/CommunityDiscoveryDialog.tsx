@@ -16,7 +16,7 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { profilePictureDataUrl } from '../../utils/identityDisplay';
+import { publicFileObjectUrl } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
 
@@ -225,7 +225,7 @@ function CommunityDiscoveryRow({
 
     void pigeonApplication
       .getPublicFile(avatar)
-      .then((content) => profilePictureDataUrl(content))
+      .then((content) => publicFileObjectUrl(content))
       .then((url) => {
         if (!cancelled) setAvatarUrl(url);
       })

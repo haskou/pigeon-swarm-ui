@@ -13,7 +13,7 @@ import { conversationPeerIdentityId } from '../../domain/conversations/conversat
 import {
   identityName,
   identityPicture,
-  profilePictureDataUrl,
+  publicFileObjectUrl,
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
@@ -243,5 +243,5 @@ async function loadIdentityPicture(
 
   const content = await pigeonApplication.getPublicFile(pictureCid);
 
-  return profilePictureDataUrl(content);
+  return publicFileObjectUrl(content);
 }

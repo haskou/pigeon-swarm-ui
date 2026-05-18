@@ -68,3 +68,17 @@ export function profilePictureDataUrl(input: {
 }): string {
   return `data:${input.contentType};base64,${input.data}`;
 }
+
+const publicFileObjectUrls = new WeakMap<Blob, string>();
+
+export function publicFileObjectUrl(input: { blob: Blob }): string {
+  const cached = publicFileObjectUrls.get(input.blob);
+
+  if (cached) return cached;
+
+  const url = URL.createObjectURL(input.blob);
+
+  publicFileObjectUrls.set(input.blob, url);
+
+  return url;
+}

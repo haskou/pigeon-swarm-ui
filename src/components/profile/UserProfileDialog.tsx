@@ -10,7 +10,7 @@ import { shortId } from '../../utils/formatting';
 import {
   identityBanner,
   identityPicture,
-  profilePictureDataUrl,
+  publicFileObjectUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { ImageLightbox, type LightboxImage } from '../chat/ImageLightbox';
@@ -97,7 +97,7 @@ export function UserProfileDialog({
     void pigeonApplication
       .getPublicFile(bannerCid)
       .then((content) => {
-        if (active) setBannerUrl(profilePictureDataUrl(content));
+        if (active) setBannerUrl(publicFileObjectUrl(content));
       })
       .catch(() => {
         if (active) setBannerUrl(null);

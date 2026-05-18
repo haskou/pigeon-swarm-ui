@@ -3,7 +3,7 @@ import type { IdentityResource } from '../../domain/types';
 import { pigeonApplication } from '../../application/applicationContainer';
 import {
   identityPicture,
-  profilePictureDataUrl,
+  publicFileObjectUrl,
 } from '../../utils/identityDisplay';
 
 export async function loadIdentityPicture(
@@ -29,7 +29,7 @@ export async function loadPublicImage(cid: string): Promise<string | null> {
     try {
       const content = await pigeonApplication.getPublicFile(cid);
 
-      return profilePictureDataUrl(content);
+      return publicFileObjectUrl(content);
     } catch {
       await new Promise((resolve) =>
         window.setTimeout(resolve, 250 * (attempt + 1)),

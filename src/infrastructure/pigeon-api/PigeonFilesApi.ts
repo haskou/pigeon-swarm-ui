@@ -49,7 +49,14 @@ export class PigeonFilesApi {
     if (cached) return await cached;
 
     const request = this.http
-      .request<PublicFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
+      .requestBlob(`/ipfs/${encodeURIComponent(cid)}`)
+      .then((blob) => ({
+        blob,
+        cid,
+        contentType: blob.type || 'application/octet-stream',
+        filename: cid,
+        size: blob.size,
+      }))
       .catch((caught: unknown) => {
         this.publicFileCache.delete(cid);
 
@@ -80,16 +87,14 @@ export class PigeonFilesApi {
   }
 
   public async uploadPublicFile(
-    session: Session,
+    _session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
     const path = '/ipfs/public';
-    const bytes = await file.arrayBuffer();
 
     return await this.http.request<PublicFileUpload>(path, {
-      body: bytes,
+      body: file,
       headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
         'Content-Type': file.type || 'application/octet-stream',
         'X-Filename': file.name || 'upload',
       },

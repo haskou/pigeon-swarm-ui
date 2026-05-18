@@ -5,7 +5,7 @@ import type { Community } from '../../domain/types';
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { profilePictureDataUrl } from '../../utils/identityDisplay';
+import { publicFileObjectUrl } from '../../utils/identityDisplay';
 
 interface RailProps {
   activeMessages?: boolean;
@@ -251,7 +251,7 @@ async function loadRailAvatar(cid: string): Promise<null | string> {
     try {
       const content = await pigeonApplication.getPublicFile(cid);
 
-      return profilePictureDataUrl(content);
+      return publicFileObjectUrl(content);
     } catch {
       await new Promise((resolve) =>
         window.setTimeout(resolve, 250 * (attempt + 1)),

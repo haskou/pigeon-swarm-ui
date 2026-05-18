@@ -128,7 +128,7 @@ export type PublicFileUpload = {
 };
 
 export type PublicFileContent = PublicFileUpload & {
-  data: string;
+  blob: Blob;
   uploadedAt?: string;
   uploadedByIdentityId?: string;
 };

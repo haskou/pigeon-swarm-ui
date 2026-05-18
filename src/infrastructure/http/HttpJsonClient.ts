@@ -8,7 +8,7 @@ export class HttpJsonClient {
     const response = await fetch(this.urls.build(path), {
       ...init,
       cache: init.cache ?? 'no-store',
-      headers: this.headers(init),
+      headers: this.headers(init, 'application/json'),
     });
 
     if (!response.ok) {
@@ -22,18 +22,35 @@ export class HttpJsonClient {
     return (await response.json()) as T;
   }
 
+  public async requestBlob(
+    path: string,
+    init: RequestInit = {},
+  ): Promise<Blob> {
+    const response = await fetch(this.urls.build(path), {
+      ...init,
+      cache: init.cache ?? 'no-store',
+      headers: this.headers(init, '*/*'),
+    });
+
+    if (!response.ok) {
+      throw await this.error(response);
+    }
+
+    return await response.blob();
+  }
+
   private async error(response: Response): Promise<HttpJsonError> {
     const text = await response.text().catch(() => '');
 
     return new HttpJsonError(response.status, response.statusText, text);
   }
 
-  private headers(init: RequestInit): HeadersInit {
+  private headers(init: RequestInit, accept: string): HeadersInit {
     const headers = init.headers ?? {};
     const headerRecord = this.headerRecord(headers);
 
     return {
-      Accept: 'application/json',
+      Accept: accept,
       ...(init.body &&
       typeof init.body === 'string' &&
       !this.hasHeader(headers, 'Content-Type')

@@ -28,8 +28,8 @@ import { shortId } from '../../utils/formatting';
 import {
   isValidHandle,
   normalizeHandle,
-  profilePictureDataUrl,
   profilePictureUrl,
+  publicFileObjectUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
@@ -138,7 +138,7 @@ export function ProfileEditor({
     void pigeonApplication
       .getPublicFile(banner)
       .then((content) => {
-        if (active) setBannerPreview(profilePictureDataUrl(content));
+        if (active) setBannerPreview(publicFileObjectUrl(content));
       })
       .catch(() => {
         if (active) setBannerPreview(null);

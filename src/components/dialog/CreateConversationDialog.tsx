@@ -13,7 +13,7 @@ import { copy } from '../../i18n/en';
 import { shortId } from '../../utils/formatting';
 import {
   identityPicture,
-  profilePictureDataUrl,
+  publicFileObjectUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
@@ -645,7 +645,7 @@ async function loadDialogIdentityPicture(
   try {
     const content = await pigeonApplication.getPublicFile(pictureCid);
 
-    return profilePictureDataUrl(content);
+    return publicFileObjectUrl(content);
   } catch {
     return null;
   }
