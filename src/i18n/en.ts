@@ -20,6 +20,9 @@ export const copy = {
     heroTitle: 'P2P messaging for everyone.',
     identityIdLabel: 'Identity ID or username',
     identityIdHelp: 'Use your @username or full identity ID.',
+    installApp: 'Install app',
+    installAppHelp:
+      'Use your browser menu to add Pigeon Swarm to your Home Screen.',
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
