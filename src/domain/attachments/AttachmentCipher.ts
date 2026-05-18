@@ -13,6 +13,7 @@ const gcmTagBytes = 16;
 const largeAttachmentBytes = 5 * 1024 * 1024;
 
 type AttachmentProgressHandler = (progress: AttachmentProgress) => void;
+type AttachmentWorkerFactory = () => Worker;
 
 type WorkerRequest =
   | {
@@ -65,6 +66,10 @@ export class AttachmentCipher {
   >();
 
   private worker?: Worker;
+
+  public constructor(
+    private readonly workerFactory?: AttachmentWorkerFactory,
+  ) {}
 
   public async encrypt(
     file: File,
@@ -323,10 +328,11 @@ export class AttachmentCipher {
   private attachmentWorker(): Worker {
     if (this.worker) return this.worker;
 
-    this.worker = new Worker(
-      new URL('./attachmentCipherWorker.ts', import.meta.url),
-      { type: 'module' },
-    );
+    if (!this.workerFactory) {
+      throw new Error('Attachment workers are not available');
+    }
+
+    this.worker = this.workerFactory();
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       this.handleWorkerMessage(event.data);
     };
