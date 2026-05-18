@@ -339,6 +339,14 @@ export function MessageBubble({
               </div>
             )}
           </div>
+          <span
+            className={cx(
+              'mt-1 px-1 text-[0.68rem] font-bold leading-none text-white/30',
+              mine ? 'text-right' : 'text-left',
+            )}
+          >
+            {formatTime(message.timestamp)}
+          </span>
           {reactionGroups.length > 0 && (
             <MessageReactions
               groups={reactionGroups}
@@ -349,16 +357,6 @@ export function MessageBubble({
             />
           )}
         </div>
-        {mine && (
-          <MessageAvatarColumn
-            authorName={authorName}
-            authorPicture={authorPicture}
-            mine
-            onAvatarClick={onAvatarClick}
-            reserveAvatarSpace
-            showAvatar
-          />
-        )}
       </div>
       {lightbox && (
         <ImageLightbox
