@@ -1925,6 +1925,12 @@ export function CommunityWorkspace({
                 </button>
               )}
             </div>
+            {typingIdentityIds.length > 0 && (
+              <TypingIndicator
+                identityIds={typingIdentityIds}
+                memberIdentities={memberIdentities}
+              />
+            )}
             <Composer
               disabled={messageState === 'loading' || !communityKey}
               draft={draft}
@@ -1945,12 +1951,6 @@ export function CommunityWorkspace({
                   : undefined
               }
             />
-            {typingIdentityIds.length > 0 && (
-              <TypingIndicator
-                identityIds={typingIdentityIds}
-                memberIdentities={memberIdentities}
-              />
-            )}
           </>
         )}
       </section>

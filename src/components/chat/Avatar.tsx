@@ -37,10 +37,12 @@ export function Avatar({
         <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
           {content}
         </span>
-        <PresenceStatusDot
-          presence={presence}
-          className="-bottom-1 -right-1 border-[#111226]"
-        />
+        {presence ? (
+          <PresenceStatusDot
+            presence={presence}
+            className="-bottom-1 -right-1 border-[#111226]"
+          />
+        ) : null}
       </button>
     );
   }
@@ -50,10 +52,12 @@ export function Avatar({
       <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
         {content}
       </span>
-      <PresenceStatusDot
-        presence={presence}
-        className="-bottom-1 -right-1 border-[#111226]"
-      />
+      {presence ? (
+        <PresenceStatusDot
+          presence={presence}
+          className="-bottom-1 -right-1 border-[#111226]"
+        />
+      ) : null}
     </div>
   );
 }

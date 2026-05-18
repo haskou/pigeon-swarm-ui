@@ -685,6 +685,12 @@ export function ChatColumn({
             scrollerRef={scrollerRef}
           />
 
+          {typingIdentityIds.length > 0 && (
+            <TypingIndicator
+              identityIds={typingIdentityIds}
+              identityNames={identityNames}
+            />
+          )}
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
             draft={draft}
@@ -710,12 +716,6 @@ export function ChatColumn({
                 : undefined
             }
           />
-          {typingIdentityIds.length > 0 && (
-            <TypingIndicator
-              identityIds={typingIdentityIds}
-              identityNames={identityNames}
-            />
-          )}
         </>
       )}
       {conversationDataOpen && (
