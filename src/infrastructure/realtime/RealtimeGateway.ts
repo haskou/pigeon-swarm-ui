@@ -65,6 +65,8 @@ export type RealtimeTypingInput =
       scope: 'community_channel';
     };
 
+export type RealtimeHeartbeatActivityMode = 'auto' | 'inactive';
+
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
 const heartbeatIntervalMs = 10000;
 const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
@@ -79,10 +81,22 @@ type ActivityTracker = {
 export class RealtimeGateway {
   private readonly heartbeatAcks = new WeakMap<WebSocket, number>();
 
+  private readonly heartbeatActivityModes = new Map<
+    string,
+    RealtimeHeartbeatActivityMode
+  >();
+
   public constructor(
     private readonly urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
     private readonly signer: RequestSigner = new RequestSigner(),
   ) {}
+
+  public setHeartbeatActivityMode(
+    session: Session,
+    mode: RealtimeHeartbeatActivityMode,
+  ): void {
+    this.heartbeatActivityModes.set(session.identity.id, mode);
+  }
 
   public async connect(
     session: Session,
@@ -122,7 +136,7 @@ export class RealtimeGateway {
       const message = this.parseMessage(event.data);
 
       if (message?.type === 'connection_ack') {
-        stopHeartbeat ??= this.startHeartbeat(socket, url);
+        stopHeartbeat ??= this.startHeartbeat(socket, url, session);
       }
 
       if (message?.type === 'heartbeat_ack') {
@@ -182,10 +196,17 @@ export class RealtimeGateway {
     return this.url(path).pathname;
   }
 
-  private startHeartbeat(socket: WebSocket, url: URL): () => void {
+  private startHeartbeat(
+    socket: WebSocket,
+    url: URL,
+    session: Session,
+  ): () => void {
     this.ackHeartbeat(socket);
     const activity = this.trackActivity(() => {
-      this.sendIdentityHeartbeat(socket, true);
+      this.sendIdentityHeartbeat(
+        socket,
+        this.heartbeatActive(session.identity.id, activity),
+      );
     });
 
     const timer = globalThis.setInterval(() => {
@@ -199,13 +220,26 @@ export class RealtimeGateway {
         return;
       }
 
-      this.sendIdentityHeartbeat(socket, activity.isActive());
+      this.sendIdentityHeartbeat(
+        socket,
+        this.heartbeatActive(session.identity.id, activity),
+      );
     }, heartbeatIntervalMs);
 
     return () => {
       activity.stop();
       globalThis.clearInterval(timer);
     };
+  }
+
+  private heartbeatActive(
+    identityId: string,
+    activity: ActivityTracker,
+  ): boolean {
+    return (
+      (this.heartbeatActivityModes.get(identityId) ?? 'auto') === 'auto' &&
+      activity.isActive()
+    );
   }
 
   private trackActivity(onActiveAgain: () => void): ActivityTracker {

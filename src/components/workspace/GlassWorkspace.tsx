@@ -33,6 +33,7 @@ import type {
   IdentityResource,
   MessageResource,
   PresenceStatus,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
 import type {
@@ -127,6 +128,50 @@ type PendingSend = {
 };
 type FailedSends = Record<string, PendingSend>;
 type TypingEntries = Record<string, Record<string, number>>;
+const presencePreferenceStoragePrefix = 'pigeon:presencePreference:';
+
+function presencePreferenceStorageKey(identityId: string): string {
+  return `${presencePreferenceStoragePrefix}${identityId}`;
+}
+
+function readPresencePreference(
+  identityId: string,
+): SelectablePresenceStatus | null {
+  try {
+    const value = globalThis.localStorage?.getItem(
+      presencePreferenceStorageKey(identityId),
+    );
+
+    return isSelectablePresenceStatus(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePresencePreference(
+  identityId: string,
+  status: SelectablePresenceStatus,
+): void {
+  try {
+    globalThis.localStorage?.setItem(
+      presencePreferenceStorageKey(identityId),
+      status,
+    );
+  } catch {
+    // Local storage is best-effort; the server still receives the explicit status.
+  }
+}
+
+function isSelectablePresenceStatus(
+  value: unknown,
+): value is SelectablePresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'invisible'
+  );
+}
 
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
@@ -377,6 +422,9 @@ export function GlassWorkspace({
   >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const pendingCommunityInviteRef = useRef<string | null>(null);
+  const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
+    readPresencePreference(session.identity.id),
+  );
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -402,6 +450,16 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    const preference = readPresencePreference(session.identity.id);
+
+    presencePreferenceRef.current = preference;
+    pigeonApplication.setRealtimeHeartbeatActivityMode(
+      session,
+      !preference || preference === 'available' ? 'auto' : 'inactive',
+    );
   }, [session]);
 
   useEffect(() => {
@@ -834,6 +892,17 @@ export function GlassWorkspace({
       [presence.identityId]: presence,
     }));
   }, []);
+  const rememberPresencePreference = useCallback(
+    (status: SelectablePresenceStatus) => {
+      presencePreferenceRef.current = status;
+      writePresencePreference(sessionRef.current.identity.id, status);
+      pigeonApplication.setRealtimeHeartbeatActivityMode(
+        sessionRef.current,
+        status === 'available' ? 'auto' : 'inactive',
+      );
+    },
+    [],
+  );
   const playNotificationSoundIfAllowed = useCallback(() => {
     if (notificationsMutedByPresence) return;
 
@@ -880,6 +949,18 @@ export function GlassWorkspace({
         const ownPresence = presences.find(
           (presence) => presence.identityId === session.identity.id,
         );
+        const preferredStatus = presencePreferenceRef.current;
+
+        if (preferredStatus && preferredStatus !== 'available') {
+          if (ownPresence?.status === preferredStatus) return;
+
+          void pigeonApplication
+            .updatePresence(session, { status: preferredStatus })
+            .then(mergePresence)
+            .catch(() => undefined);
+
+          return;
+        }
 
         if (
           ownPresence &&
@@ -3233,6 +3314,7 @@ export function GlassWorkspace({
                     rememberIdentity(nextSession.identity);
                   }}
                   onPresenceChange={mergePresence}
+                  onPresenceStatusSelected={rememberPresencePreference}
                 />
               </div>
             </div>
@@ -3403,6 +3485,7 @@ export function GlassWorkspace({
                 rememberIdentity(nextSession.identity);
               }}
               onPresenceChange={mergePresence}
+              onPresenceStatusSelected={rememberPresencePreference}
               onTypingActive={sendCommunityTyping}
               realtimeStatus={realtimeStatus}
               onRealtimeEventsOpen={openRealtimeEvents}

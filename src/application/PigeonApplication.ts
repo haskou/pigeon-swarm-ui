@@ -37,6 +37,7 @@ import type {
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
 import {
   RealtimeGateway,
+  type RealtimeHeartbeatActivityMode,
   type RealtimeMessage,
   type RealtimeTypingInput,
 } from '../infrastructure/realtime/RealtimeGateway';
@@ -254,6 +255,13 @@ export class PigeonApplication {
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
     return await this.realtime.connect(session, onMessage);
+  }
+
+  public setRealtimeHeartbeatActivityMode(
+    session: Session,
+    mode: RealtimeHeartbeatActivityMode,
+  ): void {
+    this.realtime.setHeartbeatActivityMode(session, mode);
   }
 
   public sendRealtimeTyping(

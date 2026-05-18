@@ -404,6 +404,37 @@ describe(RealtimeGateway.name, () => {
     globalEvents.removeEventListener = originalRemoveEventListener;
   });
 
+  it('keeps identity heartbeats inactive when presence activity is disabled', async () => {
+    jest.useFakeTimers();
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    gateway.setHeartbeatActivityMode(session, 'inactive');
+    await gateway.connect(session, jest.fn());
+    WebSocketMock.instances[0]?.emitMessage(
+      JSON.stringify({
+        identityId: 'identity-1',
+        type: 'connection_ack',
+      }),
+    );
+    jest.advanceTimersByTime(10000);
+
+    expect(WebSocketMock.instances[0]?.send).toHaveBeenLastCalledWith(
+      JSON.stringify({ active: false, type: 'identity_heartbeat' }),
+    );
+  });
+
   it('closes the socket when heartbeat acknowledgements stop', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;

@@ -35,6 +35,7 @@ import type {
   MessageAttachment,
   MessageReplyPreview,
   MessageResource,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -109,6 +110,7 @@ interface CommunityWorkspaceProps {
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
@@ -206,6 +208,7 @@ export function CommunityWorkspace({
   onJoinVoiceChannel,
   onLogout,
   onPresenceChange,
+  onPresenceStatusSelected,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenConversationWithIdentity,
@@ -1552,6 +1555,7 @@ export function CommunityWorkspace({
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
               onPresenceChange={onPresenceChange}
+              onPresenceStatusSelected={onPresenceStatusSelected}
               onCallEnd={onCallEnd}
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleCamera={onCallToggleCamera}

@@ -77,6 +77,7 @@ interface SidebarProps {
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
@@ -109,6 +110,7 @@ export function Sidebar({
   onSelect,
   onSessionUpdated,
   onPresenceChange,
+  onPresenceStatusSelected,
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
@@ -299,6 +301,7 @@ export function Sidebar({
         nodeNetworks={nodeNetworks}
         onLogout={onLogout}
         onPresenceChange={onPresenceChange}
+        onPresenceStatusSelected={onPresenceStatusSelected}
         onSessionUpdated={onSessionUpdated}
         presence={presenceByIdentityId[session.identity.id]}
         session={session}
@@ -399,6 +402,7 @@ export function UserProfileDropdown({
   onCallToggleScreenShare,
   onLogout,
   onPresenceChange,
+  onPresenceStatusSelected,
   onSessionUpdated,
   presence,
   session,
@@ -408,6 +412,7 @@ export function UserProfileDropdown({
   nodeNetworks: NodeNetwork[];
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   onSessionUpdated: (session: Session) => void;
   presence?: IdentityPresence;
   session: Session;
@@ -476,6 +481,7 @@ export function UserProfileDropdown({
         status,
       });
 
+      onPresenceStatusSelected?.(status);
       onPresenceChange?.(nextPresence);
     } catch {
       setPresenceError(copy.presence.error);
