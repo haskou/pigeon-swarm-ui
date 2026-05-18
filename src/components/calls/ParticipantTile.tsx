@@ -134,6 +134,7 @@ function ParticipantMedia({
         />
       ) : videoVisible && mediaStream ? (
         <VideoPreview
+          fit="contain"
           label={name}
           muted={isCurrentIdentity}
           stream={mediaStream}

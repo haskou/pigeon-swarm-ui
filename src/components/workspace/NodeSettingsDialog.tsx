@@ -387,7 +387,6 @@ export function NodeSettingsDialog({
         <ReplicationStatusPanel
           error={replicationError}
           loading={replicationLoading}
-          onRefresh={() => void loadReplicationStatus()}
           status={replicationStatus}
         />
       </section>
@@ -412,19 +411,17 @@ function ServerField({ label, value }: { label: string; value: string }) {
 function ReplicationStatusPanel({
   error,
   loading,
-  onRefresh,
   status,
 }: {
   error: string | null;
   loading: boolean;
-  onRefresh: () => void;
   status: IpfsReplicationStatus | null;
 }) {
   const totals = replicationTotals(status);
 
   return (
     <section className="border-t border-white/10 p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4">
         <div>
           <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
             {copy.nodeSettings.replication}
@@ -433,16 +430,6 @@ function ReplicationStatusPanel({
             {copy.nodeSettings.replicationBody}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {loading
-            ? copy.nodeSettings.replicationLoading
-            : copy.nodeSettings.replicationRefresh}
-        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">

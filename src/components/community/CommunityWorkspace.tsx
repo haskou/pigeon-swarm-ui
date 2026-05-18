@@ -76,7 +76,7 @@ import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { MemberRow } from './MemberRow';
-import { memberDisplayName } from './communityMemberNames';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -2172,7 +2172,7 @@ export function CommunityWorkspace({
             anchor={profileViewer.anchor}
             identity={profileViewer.identity}
             identityId={profileViewer.identityId}
-            name={memberDisplayName(
+            name={memberPrimaryName(
               profileViewer.identity,
               profileViewer.identityId,
             )}

@@ -726,7 +726,9 @@ function localMediaSession(
 
 function hasVideoTrack(stream?: MediaStream): boolean {
   return Boolean(
-    stream?.getVideoTracks().some((track) => track.readyState === 'live'),
+    stream
+      ?.getVideoTracks()
+      .some((track) => track.readyState === 'live' && !track.muted),
   );
 }
 

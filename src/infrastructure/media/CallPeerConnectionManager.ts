@@ -66,12 +66,17 @@ function isScreenShareTrack(track: MediaStreamTrack): boolean {
 function isRemoteScreenShareTrack(
   track: MediaStreamTrack,
   remoteScreenTrackIds: Set<string>,
+  hasRemoteScreenStream: boolean,
 ): boolean {
   if (track.kind !== 'video') return false;
 
   if (remoteScreenTrackIds.has(track.id)) return true;
 
   if (isScreenShareTrack(track)) return true;
+
+  if (remoteScreenTrackIds.size > 0 && !hasRemoteScreenStream) {
+    return true;
+  }
 
   return /screen|display|window|tab|monitor/i.test(track.label);
 }
@@ -169,6 +174,10 @@ export class CallPeerConnectionManager {
         volume,
         this.remoteAudioContexts.get(peerIdentityId)?.currentTime ?? 0,
       );
+    void this.remoteAudioContexts
+      .get(peerIdentityId)
+      ?.resume()
+      .catch(() => undefined);
 
     const audio = this.remoteAudio.get(peerIdentityId);
 
@@ -599,6 +608,7 @@ export class CallPeerConnectionManager {
       isRemoteScreenShareTrack(
         event.track,
         this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
+        this.remoteScreenStreams.has(peerIdentityId),
       )
     ) {
       const screenStream = new MediaStream([event.track]);
@@ -622,18 +632,14 @@ export class CallPeerConnectionManager {
   }
 
   private syncLocalTracks(): void {
-    for (const [peerIdentityId, peer] of this.peers.entries()) {
+    for (const peer of this.peers.values()) {
       const activeTracks = new Set(this.localStream?.getTracks() ?? []);
 
       for (const sender of peer.getSenders()) {
         const track = sender.track;
 
         if (track && !activeTracks.has(track)) {
-          void sender.replaceTrack(null).catch((error: unknown) => {
-            logCallError('peer-manager:replace-track:remove-failed', error, {
-              peerIdentityId,
-            });
-          });
+          peer.removeTrack(sender);
         }
       }
 

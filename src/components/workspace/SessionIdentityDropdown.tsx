@@ -297,16 +297,18 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       )}
 
       {profileEditorOpen && (
-        <ProfileEditor
-          currentPicture={ownPicture}
-          nodeNetworks={nodeNetworks}
-          session={session}
-          onClose={() => setProfileEditorOpen(false)}
-          onUpdated={(nextSession) => {
-            onSessionUpdated(nextSession);
-            setProfileEditorOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ProfileEditor
+            currentPicture={ownPicture}
+            nodeNetworks={nodeNetworks}
+            session={session}
+            onClose={() => setProfileEditorOpen(false)}
+            onUpdated={(nextSession) => {
+              onSessionUpdated(nextSession);
+              setProfileEditorOpen(false);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );
