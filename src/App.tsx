@@ -1,12 +1,31 @@
-import type { ReactElement } from 'react';
+import { lazy, Suspense, type ReactElement, type ReactNode } from 'react';
 
-import { NetworkCreationScreen } from './components/network/NetworkCreationScreen';
-import { ServerConnectionScreen } from './components/system/ServerConnectionScreen';
-import { GlassWorkspace } from './components/workspace/GlassWorkspace';
-import { AuthScreen } from './contexts/identities/presentation/auth/AuthScreen';
 import { copy } from './i18n/en';
 import { AppFrame, AppLoadingScreen } from './presentation/app/AppFrame';
 import { useAppBootstrap } from './presentation/app/useAppBootstrap';
+
+const AuthScreen = lazy(() =>
+  import('./contexts/identities/presentation/auth/AuthScreen').then(
+    (module) => ({
+      default: module.AuthScreen,
+    }),
+  ),
+);
+const GlassWorkspace = lazy(() =>
+  import('./components/workspace/GlassWorkspace').then((module) => ({
+    default: module.GlassWorkspace,
+  })),
+);
+const NetworkCreationScreen = lazy(() =>
+  import('./components/network/NetworkCreationScreen').then((module) => ({
+    default: module.NetworkCreationScreen,
+  })),
+);
+const ServerConnectionScreen = lazy(() =>
+  import('./components/system/ServerConnectionScreen').then((module) => ({
+    default: module.ServerConnectionScreen,
+  })),
+);
 
 type AppScreen =
   | 'auth'
@@ -65,6 +84,24 @@ function isNetworkCreationScreen(input: {
   );
 }
 
+function AppScreenSuspense({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
+  return (
+    <Suspense
+      fallback={
+        <div className="grid min-h-dvh place-items-center">
+          <div className="text-xl">{copy.app.loading}</div>
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
+
 function App(): ReactElement {
   const bootstrap = useAppBootstrap();
   const {
@@ -95,10 +132,12 @@ function App(): ReactElement {
   if (screen === 'server-connection' && nodeNetworks.error) {
     return (
       <AppFrame compact>
-        <ServerConnectionScreen
-          error={nodeNetworks.error}
-          onRetry={nodeNetworks.reload}
-        />
+        <AppScreenSuspense>
+          <ServerConnectionScreen
+            error={nodeNetworks.error}
+            onRetry={nodeNetworks.reload}
+          />
+        </AppScreenSuspense>
       </AppFrame>
     );
   }
@@ -110,44 +149,48 @@ function App(): ReactElement {
   if (screen === 'network-creation') {
     return (
       <AppFrame>
-        <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
+        <AppScreenSuspense>
+          <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
+        </AppScreenSuspense>
       </AppFrame>
     );
   }
 
   return (
     <AppFrame>
-      {screen === 'auth' || !session ? (
-        <AuthScreen
-          onAuthenticated={handleAuthenticated}
-          peerCount={peers.peers.length}
-        />
-      ) : (
-        <GlassWorkspace
-          session={session}
-          node={nodeNetworks.node}
-          nodeNetworks={nodeNetworks.networks}
-          onNodeNetworksReload={nodeNetworks.reload}
-          onPeersReload={peers.reload}
-          peers={peers.peers}
-          setSession={(nextSession) => {
-            if (!nextSession) {
-              clearSession();
+      <AppScreenSuspense>
+        {screen === 'auth' || !session ? (
+          <AuthScreen
+            onAuthenticated={handleAuthenticated}
+            peerCount={peers.peers.length}
+          />
+        ) : (
+          <GlassWorkspace
+            session={session}
+            node={nodeNetworks.node}
+            nodeNetworks={nodeNetworks.networks}
+            onNodeNetworksReload={nodeNetworks.reload}
+            onPeersReload={peers.reload}
+            peers={peers.peers}
+            setSession={(nextSession) => {
+              if (!nextSession) {
+                clearSession();
 
-              return;
-            }
+                return;
+              }
 
-            setSession(nextSession);
-          }}
-          conversations={conversations}
-          communities={communities.communities}
-          onCommunitiesReload={communities.reload}
-          setCommunities={setCommunities}
-          setConversations={setConversations}
-          pendingCommunityInvite={pendingCommunityInvite}
-          onPendingCommunityInviteHandled={setPendingCommunityInviteHandled}
-        />
-      )}
+              setSession(nextSession);
+            }}
+            conversations={conversations}
+            communities={communities.communities}
+            onCommunitiesReload={communities.reload}
+            setCommunities={setCommunities}
+            setConversations={setConversations}
+            pendingCommunityInvite={pendingCommunityInvite}
+            onPendingCommunityInviteHandled={setPendingCommunityInviteHandled}
+          />
+        )}
+      </AppScreenSuspense>
     </AppFrame>
   );
 }

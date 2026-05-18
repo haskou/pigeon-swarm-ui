@@ -476,15 +476,18 @@ export function UserProfileDropdown({
     setPresenceStatus(status);
     setPresenceSaving(true);
     setPresenceError(null);
+    onPresenceStatusSelected?.(status);
     try {
       const nextPresence = await pigeonApplication.updatePresence(session, {
         status,
       });
 
-      onPresenceStatusSelected?.(status);
       onPresenceChange?.(nextPresence);
     } catch {
       setPresenceError(copy.presence.error);
+      setPresenceStatus(selectablePresenceStatus(presence));
+      if (presence)
+        onPresenceStatusSelected?.(selectablePresenceStatus(presence));
     } finally {
       setPresenceSaving(false);
     }

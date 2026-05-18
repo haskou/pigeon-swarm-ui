@@ -17,9 +17,11 @@ describe('emoji shortcode helpers', () => {
     expect(findEmojiTrigger('hello:test', 10)).toBeNull();
   });
 
-  it('returns sob for :s suggestions', () => {
+  it('returns sob for :s suggestions', async () => {
     expect(
-      searchEmojiSuggestions('s').map((suggestion) => suggestion.shortcode),
+      (await searchEmojiSuggestions('s')).map(
+        (suggestion) => suggestion.shortcode,
+      ),
     ).toContain('sob');
   });
 

@@ -1,5 +1,3 @@
-import { DISCORD_EMOJI_SHORTCODES } from './discordEmojiShortcodes.generated';
-
 export type EmojiSuggestion = {
   emoji: string;
   label: string;
@@ -12,13 +10,7 @@ export type EmojiTrigger = {
   start: number;
 };
 
-const EMOJI_SUGGESTIONS: EmojiSuggestion[] = DISCORD_EMOJI_SHORTCODES.map(
-  ({ emoji, shortcode }) => ({
-    emoji,
-    label: shortcode.replace(/[_-]/g, ' '),
-    shortcode,
-  }),
-);
+let emojiSuggestionsPromise: Promise<EmojiSuggestion[]> | null = null;
 
 export function findEmojiTrigger(
   value: string,
@@ -39,15 +31,16 @@ export function findEmojiTrigger(
   };
 }
 
-export function searchEmojiSuggestions(
+export async function searchEmojiSuggestions(
   query: string,
   limit = 50,
-): EmojiSuggestion[] {
+): Promise<EmojiSuggestion[]> {
+  const emojiSuggestions = await loadEmojiSuggestions();
   const normalizedQuery = query.toLowerCase();
 
-  if (!normalizedQuery) return EMOJI_SUGGESTIONS.slice(0, limit);
+  if (!normalizedQuery) return emojiSuggestions.slice(0, limit);
 
-  const matches = EMOJI_SUGGESTIONS.filter(
+  const matches = emojiSuggestions.filter(
     (suggestion) =>
       suggestion.shortcode.startsWith(normalizedQuery) ||
       suggestion.label.includes(normalizedQuery),
@@ -86,4 +79,17 @@ export function replaceEmojiTrigger(
     nextCaretIndex: trigger.start + replacement.length,
     value: nextValue,
   };
+}
+
+function loadEmojiSuggestions(): Promise<EmojiSuggestion[]> {
+  emojiSuggestionsPromise ??= import('./discordEmojiShortcodes.generated').then(
+    ({ DISCORD_EMOJI_SHORTCODES }) =>
+      DISCORD_EMOJI_SHORTCODES.map(({ emoji, shortcode }) => ({
+        emoji,
+        label: shortcode.replace(/[_-]/g, ' '),
+        shortcode,
+      })),
+  );
+
+  return emojiSuggestionsPromise;
 }
