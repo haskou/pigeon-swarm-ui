@@ -13,6 +13,7 @@ const gcmTagBytes = 16;
 const largeAttachmentBytes = 5 * 1024 * 1024;
 
 type AttachmentProgressHandler = (progress: AttachmentProgress) => void;
+type AttachmentWorkerFactory = () => Worker;
 
 type WorkerRequest =
   | {
@@ -53,6 +54,23 @@ type WorkerResponse =
     };
 
 export class AttachmentCipher {
+  private nextWorkerRequestId = 0;
+
+  private readonly workerRequests = new Map<
+    string,
+    {
+      onProgress?: AttachmentProgressHandler;
+      reject: (reason?: unknown) => void;
+      resolve: (response: WorkerResponse) => void;
+    }
+  >();
+
+  private worker?: Worker;
+
+  public constructor(
+    private readonly workerFactory?: AttachmentWorkerFactory,
+  ) {}
+
   public async encrypt(
     file: File,
     onProgress?: AttachmentProgressHandler,
@@ -101,6 +119,21 @@ export class AttachmentCipher {
     );
 
     return new Blob([result.bytes], { type: attachment.contentType });
+  }
+
+  public async encryptWithoutWorker(
+    file: File,
+    onProgress?: AttachmentProgressHandler,
+  ): Promise<Extract<WorkerResponse, { type: 'encrypt-result' }>> {
+    return await this.encryptInCurrentThread(file, onProgress);
+  }
+
+  public decryptWithoutWorker(
+    attachment: MessageAttachment,
+    encryptedBytes: ArrayBuffer,
+    onProgress?: AttachmentProgressHandler,
+  ): Extract<WorkerResponse, { type: 'decrypt-result' }> {
+    return this.decryptInCurrentThread(attachment, encryptedBytes, onProgress);
   }
 
   public base64ToBytes(value: string): Uint8Array {
@@ -267,10 +300,77 @@ export class AttachmentCipher {
     request: WorkerRequest,
     onProgress?: AttachmentProgressHandler,
   ): Promise<T> {
-    void request;
-    void onProgress;
+    if (typeof Worker === 'undefined') {
+      return Promise.reject(new Error('Attachment workers are not available'));
+    }
 
-    return Promise.reject(new Error('Attachment workers are not available'));
+    const worker = this.attachmentWorker();
+    const id = `${this.nextWorkerRequestId + 1}`;
+
+    this.nextWorkerRequestId += 1;
+
+    return new Promise<T>((resolve, reject) => {
+      this.workerRequests.set(id, {
+        onProgress,
+        reject,
+        resolve: (response) => resolve(response as T),
+      });
+
+      try {
+        worker.postMessage({ ...request, id });
+      } catch (caught) {
+        this.workerRequests.delete(id);
+        reject(caught);
+      }
+    });
+  }
+
+  private attachmentWorker(): Worker {
+    if (this.worker) return this.worker;
+
+    if (!this.workerFactory) {
+      throw new Error('Attachment workers are not available');
+    }
+
+    this.worker = this.workerFactory();
+    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      this.handleWorkerMessage(event.data);
+    };
+    this.worker.onerror = (event) => {
+      const error = new Error(event.message);
+
+      for (const pending of this.workerRequests.values()) {
+        pending.reject(error);
+      }
+
+      this.workerRequests.clear();
+      this.worker?.terminate();
+      this.worker = undefined;
+    };
+
+    return this.worker;
+  }
+
+  private handleWorkerMessage(response: WorkerResponse): void {
+    const pending = this.workerRequests.get(response.id);
+
+    if (!pending) return;
+
+    if (response.type === 'progress') {
+      pending.onProgress?.(response.progress);
+
+      return;
+    }
+
+    this.workerRequests.delete(response.id);
+
+    if (response.type === 'error') {
+      pending.reject(new Error(response.error));
+
+      return;
+    }
+
+    pending.resolve(response);
   }
 
   private concatArrayBuffers(buffers: ArrayBuffer[]): ArrayBuffer {

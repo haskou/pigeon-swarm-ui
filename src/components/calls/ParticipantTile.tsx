@@ -3,6 +3,7 @@ import type { CallSession } from '../../domain/calls/CallSession';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
+import { identityPicture } from '../../utils/identityDisplay';
 import { MicrophoneIcon } from './CallIcons';
 import { VideoPreview } from './VideoPreview';
 
@@ -108,6 +109,8 @@ function ParticipantMedia({
   participant: CallSession['participants'][number];
 }) {
   const mediaStream = participant.mediaStream;
+  const picture =
+    participant.picture ?? participantIdentityPicture(participant);
   const videoVisible = Boolean(participant.videoEnabled && mediaStream);
   const canExpandScreen = Boolean(
     participant.screenSharing && participant.screenStream,
@@ -135,12 +138,8 @@ function ParticipantMedia({
           muted={isCurrentIdentity}
           stream={mediaStream}
         />
-      ) : participant.picture ? (
-        <img
-          src={participant.picture}
-          alt=""
-          className="h-full w-full object-cover"
-        />
+      ) : picture ? (
+        <img src={picture} alt="" className="h-full w-full object-cover" />
       ) : (
         name.slice(0, 1).toUpperCase()
       )}
@@ -164,6 +163,12 @@ function ParticipantMedia({
       {media}
     </button>
   );
+}
+
+function participantIdentityPicture(
+  participant: CallSession['participants'][number],
+): string | null {
+  return participant.identity ? identityPicture(participant.identity) : null;
 }
 
 function ParticipantVolume({

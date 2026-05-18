@@ -712,6 +712,8 @@ function ImageAttachmentAlbum({
 }) {
   const [previewUrls, setPreviewUrls] = useState<(null | string)[]>([]);
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
+  const albumRef = useRef<HTMLDivElement | null>(null);
+  const [shouldLoadPreviews, setShouldLoadPreviews] = useState(false);
   const visibleItems = items.length > 4 ? items.slice(0, 4) : items;
   const extraCount = items.length > 4 ? items.length - 3 : 0;
   const lightboxImages = items.flatMap(({ attachment }, index) => {
@@ -729,11 +731,44 @@ function ImageAttachmentAlbum({
   });
 
   useEffect(() => {
+    const album = albumRef.current;
+
+    if (!album || shouldLoadPreviews) return undefined;
+
+    if (!('IntersectionObserver' in window)) {
+      setShouldLoadPreviews(true);
+
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+
+        setShouldLoadPreviews(true);
+        observer.disconnect();
+      },
+      { rootMargin: '360px 0px' },
+    );
+
+    observer.observe(album);
+
+    return () => observer.disconnect();
+  }, [shouldLoadPreviews]);
+
+  useEffect(() => {
     let cancelled = false;
     const loadedUrls: string[] = [];
 
     setPreviewUrls(Array(items.length).fill(null));
     setProgress(null);
+
+    if (!shouldLoadPreviews) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void Promise.all(
       items.map(({ attachment }, index) =>
         onPreview(attachment, setProgress)
@@ -763,10 +798,11 @@ function ImageAttachmentAlbum({
       cancelled = true;
       loadedUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [items, onPreview]);
+  }, [items, onPreview, shouldLoadPreviews]);
 
   return (
     <div
+      ref={albumRef}
       className={cx(
         'overflow-hidden rounded-2xl border',
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',

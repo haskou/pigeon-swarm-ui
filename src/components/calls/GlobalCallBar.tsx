@@ -1,4 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type { CallSession } from '../../domain/calls/CallSession';
@@ -92,17 +100,7 @@ export function GlobalCallBar({
   );
 }
 
-function CompactCallBar({
-  call,
-  onEnd,
-  onOpenStage,
-  onToggleCamera,
-  onToggleDeafen,
-  onToggleMute,
-  onToggleScreenShare,
-  screenParticipant,
-  subtitle,
-}: {
+type CompactCallBarProps = {
   call: CallSession;
   onEnd: () => void;
   onOpenStage: () => void;
@@ -112,7 +110,19 @@ function CompactCallBar({
   onToggleScreenShare: () => void;
   screenParticipant?: CallSession['participants'][number];
   subtitle: string;
-}) {
+};
+
+const CompactCallBar = memo(function CompactCallBar({
+  call,
+  onEnd,
+  onOpenStage,
+  onToggleCamera,
+  onToggleDeafen,
+  onToggleMute,
+  onToggleScreenShare,
+  screenParticipant,
+  subtitle,
+}: CompactCallBarProps) {
   return (
     <aside
       role="button"
@@ -121,7 +131,7 @@ function CompactCallBar({
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onOpenStage();
       }}
-      className="mb-2 cursor-pointer rounded-2xl border border-white/10 bg-[#151722]/95 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl transition hover:bg-[#191b29]/95"
+      className="mb-2 cursor-pointer rounded-2xl border border-white/10 bg-[#151722] p-2.5 shadow-xl shadow-black/35 transition hover:bg-[#191b29]"
     >
       <div className="flex flex-col gap-2.5">
         {screenParticipant?.screenStream && (
@@ -156,6 +166,27 @@ function CompactCallBar({
         </div>
       </div>
     </aside>
+  );
+}, areCompactCallBarPropsEqual);
+
+function areCompactCallBarPropsEqual(
+  previous: CompactCallBarProps,
+  next: CompactCallBarProps,
+): boolean {
+  return (
+    previous.call.cameraEnabled === next.call.cameraEnabled &&
+    previous.call.deafened === next.call.deafened &&
+    previous.call.hasMicrophone === next.call.hasMicrophone &&
+    previous.call.id === next.call.id &&
+    previous.call.muted === next.call.muted &&
+    previous.call.screenSharing === next.call.screenSharing &&
+    previous.call.status === next.call.status &&
+    previous.call.title === next.call.title &&
+    previous.screenParticipant?.identityId ===
+      next.screenParticipant?.identityId &&
+    previous.screenParticipant?.screenStream ===
+      next.screenParticipant?.screenStream &&
+    previous.subtitle === next.subtitle
   );
 }
 

@@ -72,6 +72,7 @@ const heartbeatIntervalMs = 10000;
 const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
 const heartbeatTimeoutCloseCode = 4000;
 const recentActivityWindowMs = 5 * 60 * 1000;
+const activeActivityRefreshMs = 1000;
 
 type ActivityTracker = {
   isActive: () => boolean;
@@ -245,24 +246,29 @@ export class RealtimeGateway {
   private trackActivity(onActiveAgain: () => void): ActivityTracker {
     let lastActivityAt = Date.now();
     const markActive = () => {
+      const now = Date.now();
       const wasInactive =
-        Date.now() - lastActivityAt > recentActivityWindowMs ||
+        now - lastActivityAt > recentActivityWindowMs ||
         globalThis.document?.visibilityState === 'hidden';
 
-      lastActivityAt = Date.now();
+      if (!wasInactive && now - lastActivityAt < activeActivityRefreshMs) {
+        return;
+      }
+
+      lastActivityAt = now;
 
       if (wasInactive) onActiveAgain();
     };
+    const movementEvent =
+      'PointerEvent' in globalThis ? 'pointermove' : 'mousemove';
     const activityEvents = [
       'focus',
       'keydown',
       'mousedown',
-      'mousemove',
       'pointerdown',
-      'pointermove',
       'scroll',
       'touchstart',
-      'touchmove',
+      movementEvent,
     ];
 
     for (const eventName of activityEvents) {
