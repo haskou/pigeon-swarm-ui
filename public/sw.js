@@ -37,6 +37,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
 
   if (request.method !== 'GET') return;
+  if (request.headers.has('range')) return;
 
   const url = new URL(request.url);
 
@@ -55,9 +56,14 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
+          if (!canCacheResponse(response)) return response;
+
           const copy = response.clone();
 
-          caches.open(cacheVersion).then((cache) => cache.put('/', copy));
+          caches
+            .open(cacheVersion)
+            .then((cache) => cache.put('/', copy))
+            .catch(() => undefined);
 
           return response;
         })
@@ -72,17 +78,24 @@ self.addEventListener('fetch', (event) => {
       (cached) =>
         cached ??
         fetch(request).then((response) => {
-          if (!response.ok) return response;
+          if (!canCacheResponse(response)) return response;
 
           const copy = response.clone();
 
-          caches.open(cacheVersion).then((cache) => cache.put(request, copy));
+          caches
+            .open(cacheVersion)
+            .then((cache) => cache.put(request, copy))
+            .catch(() => undefined);
 
           return response;
         }).catch(() => cached ?? Response.error()),
     ),
   );
 });
+
+function canCacheResponse(response) {
+  return response.ok && response.status === 200 && response.type === 'basic';
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
