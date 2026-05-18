@@ -2092,6 +2092,13 @@ export function GlassWorkspace({
       y,
     });
   };
+  const copyMessageContent = (message: ChatMessage) => {
+    if (navigator.clipboard && message.content) {
+      void navigator.clipboard.writeText(message.content);
+    }
+
+    setMessageContextMenu(null);
+  };
 
   const scrollToMessage = (messageId: string) => {
     requestAnimationFrame(() => {
@@ -3285,6 +3292,7 @@ export function GlassWorkspace({
           void declineNotification(notificationId)
         }
         onDeleteMessage={(message) => void handleDeleteMessage(message)}
+        onCopyMessage={copyMessageContent}
         onNetworksUpdated={onNodeNetworksReload}
         onReplyToMessage={(message) => {
           setReplyTarget(message);

@@ -378,6 +378,7 @@ export const copy = {
   messages: {
     addReaction: 'Add reaction',
     cancelReply: 'Cancel reply',
+    copy: 'Copy',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
     deleteConfirm: 'Delete this message?',

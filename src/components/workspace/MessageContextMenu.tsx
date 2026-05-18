@@ -26,6 +26,7 @@ export function MessageContextMenu({
   currentIdentityId,
   menu,
   onClose,
+  onCopy,
   onDelete,
   onReactionToggle,
   onReply,
@@ -34,6 +35,7 @@ export function MessageContextMenu({
   currentIdentityId?: string;
   menu: MessageContextMenuState;
   onClose: () => void;
+  onCopy?: () => void;
   onDelete?: () => void;
   onReactionToggle?: (
     message: ChatMessage,
@@ -132,6 +134,7 @@ export function MessageContextMenu({
         type="button"
         className="fixed inset-0 z-[80] cursor-default"
         onClick={onClose}
+        onContextMenu={(event) => event.preventDefault()}
         aria-label={copy.dialog.close}
       />
       <span
@@ -143,6 +146,7 @@ export function MessageContextMenu({
         ref={menuRef}
         className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
         style={menuStyle}
+        onContextMenu={(event) => event.preventDefault()}
       >
         {onReactionToggle && currentIdentityId ? (
           <div className="border-b border-white/10 p-1">
@@ -206,6 +210,15 @@ export function MessageContextMenu({
             className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
           >
             {copy.messages.reply}
+          </button>
+        ) : null}
+        {onCopy ? (
+          <button
+            type="button"
+            onClick={onCopy}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {copy.messages.copy}
           </button>
         ) : null}
         <button

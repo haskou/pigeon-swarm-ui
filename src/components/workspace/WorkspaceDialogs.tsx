@@ -1,10 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useState,
-  type ReactElement,
-} from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
@@ -133,6 +127,7 @@ interface WorkspaceDialogsProps {
   onDeclineNotification: (notificationId: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
+  onCopyMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
   onToggleReaction: (
     message: ChatMessage,
@@ -237,6 +232,11 @@ function MessageActionDialogs(
         currentIdentityId={props.session.identity.id}
         menu={props.messageContextMenu}
         onClose={props.onCloseMessageContextMenu}
+        onCopy={
+          contextMenuMessage?.content
+            ? () => props.onCopyMessage(contextMenuMessage)
+            : undefined
+        }
         onDelete={
           contextMenuMessage?.authorIdentityId === props.session.identity.id
             ? () => props.onDeleteMessage(contextMenuMessage)

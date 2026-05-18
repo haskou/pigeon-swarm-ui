@@ -200,6 +200,7 @@ export function MessageBubble({
           ) : null)}
         <div
           onContextMenu={handleContextMenu}
+          style={{ WebkitTouchCallout: 'none' }}
           onPointerCancel={clearLongPressTimer}
           onPointerDown={handlePointerDown}
           onPointerLeave={clearLongPressTimer}
