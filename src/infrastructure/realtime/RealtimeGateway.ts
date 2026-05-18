@@ -36,7 +36,7 @@ const debugRealtimeStorageKey = 'pigeon:debugRealtime';
 const heartbeatIntervalMs = 10000;
 const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
 const heartbeatTimeoutCloseCode = 4000;
-const recentActivityWindowMs = 60000;
+const recentActivityWindowMs = 5 * 60 * 1000;
 
 type ActivityTracker = {
   isActive: () => boolean;
@@ -177,9 +177,12 @@ export class RealtimeGateway {
     const activityEvents = [
       'focus',
       'keydown',
+      'mousemove',
       'pointerdown',
+      'pointermove',
       'scroll',
       'touchstart',
+      'touchmove',
     ];
 
     for (const eventName of activityEvents) {
