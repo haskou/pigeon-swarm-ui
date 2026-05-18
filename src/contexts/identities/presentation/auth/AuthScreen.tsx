@@ -190,7 +190,7 @@ export function AuthScreen({
   };
 
   return (
-    <section className="app-screen relative z-10 grid min-h-[100dvh] items-start justify-center px-4 py-7 sm:py-10 lg:place-items-center">
+    <section className="app-screen relative z-10 grid h-[100dvh] min-h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain px-4 py-7 sm:py-10 lg:place-items-center">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
           <div className="glass-panel-strong rounded-2xl p-8">
