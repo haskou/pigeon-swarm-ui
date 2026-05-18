@@ -195,15 +195,6 @@ export function MessageBubble({
             mine ? 'items-end' : 'items-start',
           )}
         >
-          {reactionGroups.length > 0 && (
-            <MessageReactions
-              groups={reactionGroups}
-              mine={mine}
-              onToggle={(emoji, reacted) => {
-                onReactionToggle?.(message, emoji, reacted);
-              }}
-            />
-          )}
           <div
             onContextMenu={handleContextMenu}
             style={{
@@ -348,6 +339,15 @@ export function MessageBubble({
               </div>
             )}
           </div>
+          {reactionGroups.length > 0 && (
+            <MessageReactions
+              groups={reactionGroups}
+              mine={mine}
+              onToggle={(emoji, reacted) => {
+                onReactionToggle?.(message, emoji, reacted);
+              }}
+            />
+          )}
         </div>
         {mine && (
           <MessageAvatarColumn
@@ -429,7 +429,7 @@ function MessageReactions({
   return (
     <div
       className={cx(
-        'mb-1 flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden',
+        'mt-1 flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden',
         mine ? 'justify-end' : 'justify-start',
       )}
     >
