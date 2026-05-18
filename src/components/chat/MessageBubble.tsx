@@ -200,14 +200,18 @@ export function MessageBubble({
           ) : null)}
         <div
           onContextMenu={handleContextMenu}
-          style={{ WebkitTouchCallout: 'none' }}
+          style={{
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+          }}
           onPointerCancel={clearLongPressTimer}
           onPointerDown={handlePointerDown}
           onPointerLeave={clearLongPressTimer}
           onPointerMove={clearLongPressTimer}
           onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[96%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
+            'max-w-[96%] select-none rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
               message.attachments.length === 0 &&
               reactionGroups.length === 0 &&

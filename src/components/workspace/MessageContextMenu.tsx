@@ -89,6 +89,10 @@ export function MessageContextMenu({
     '--message-menu-left': `${position.left}px`,
     '--message-menu-top': `${position.top}px`,
     positionAnchor: '--message-menu-anchor',
+    touchAction: 'manipulation',
+    userSelect: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitUserSelect: 'none',
   } as CSSProperties & {
     '--message-menu-left': string;
     '--message-menu-top': string;
@@ -132,9 +136,14 @@ export function MessageContextMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[80] cursor-default"
+        className="fixed inset-0 z-[80] cursor-default select-none"
         onClick={onClose}
         onContextMenu={(event) => event.preventDefault()}
+        style={{
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
         aria-label={copy.dialog.close}
       />
       <span
@@ -144,7 +153,7 @@ export function MessageContextMenu({
       />
       <div
         ref={menuRef}
-        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
       >
