@@ -678,6 +678,28 @@ export function CommunityWorkspace({
     },
     [memberIdentities, memberPictures, session.identity],
   );
+  const voiceParticipantViewForIdentity = useCallback(
+    (
+      identityId: string,
+      activeParticipant?: CallParticipant,
+    ): CallParticipant => {
+      const fallbackParticipant = callParticipantForIdentity(identityId);
+
+      if (!activeParticipant) return fallbackParticipant;
+
+      return {
+        ...activeParticipant,
+        identity: activeParticipant.identity ?? fallbackParticipant.identity,
+        name:
+          activeParticipant.name?.trim() &&
+          activeParticipant.name !== shortId(identityId)
+            ? activeParticipant.name
+            : fallbackParticipant.name,
+        picture: activeParticipant.picture ?? fallbackParticipant.picture,
+      };
+    },
+    [callParticipantForIdentity],
+  );
   const voiceParticipantsForChannel = useCallback(
     (channel: CommunityChannel): CallParticipant[] => {
       if (channel.type !== 'voice') return [];
@@ -699,16 +721,17 @@ export function CommunityWorkspace({
         ]),
       );
 
-      return identityIds.map(
-        (identityId) =>
-          activeByIdentityId.get(identityId) ??
-          callParticipantForIdentity(identityId),
+      return identityIds.map((identityId) =>
+        voiceParticipantViewForIdentity(
+          identityId,
+          activeByIdentityId.get(identityId),
+        ),
       );
     },
     [
       activeCall?.participants,
       activeVoiceChannelId,
-      callParticipantForIdentity,
+      voiceParticipantViewForIdentity,
     ],
   );
   const voiceParticipantsByChannelId = useMemo(
