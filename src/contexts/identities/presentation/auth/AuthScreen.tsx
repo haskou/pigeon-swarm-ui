@@ -232,7 +232,7 @@ export function AuthScreen({
             <div className="min-w-0">
               <h1 className="truncate text-lg font-black">{copy.auth.title}</h1>
               <p className="line-clamp-2 text-sm leading-snug text-white/55">
-                {copy.auth.mobileIntro}
+                {copy.auth.heroTitle}
               </p>
             </div>
           </div>
