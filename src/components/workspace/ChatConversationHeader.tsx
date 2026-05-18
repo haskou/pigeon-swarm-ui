@@ -8,6 +8,7 @@ import type {
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
+import { FallbackImage } from '../common/FallbackImage';
 import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { LockIcon } from './LockIcon';
 
@@ -154,17 +155,20 @@ function ConversationAvatar({
   activeConversationName?: string;
   peerPicture?: string;
 }) {
-  if (peerPicture) {
-    return (
-      <img src={peerPicture} alt="" className="h-full w-full object-cover" />
-    );
-  }
-
   if (!activeConversation) return '∅';
 
-  return (activeConversationName ?? activeConversation.id)
+  const fallback = (activeConversationName ?? activeConversation.id)
     .slice(0, 1)
     .toUpperCase();
+
+  return (
+    <FallbackImage
+      src={peerPicture}
+      alt=""
+      className="h-full w-full object-cover"
+      fallback={fallback}
+    />
+  );
 }
 
 function ConversationLockState({

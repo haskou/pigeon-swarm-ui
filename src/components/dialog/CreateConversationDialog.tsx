@@ -16,6 +16,7 @@ import {
   publicFileObjectUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { FallbackImage } from '../common/FallbackImage';
 import { GlassSelect } from '../common/GlassSelect';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -616,11 +617,12 @@ function Avatar({
 }) {
   return (
     <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-      {pictureUrl ? (
-        <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        name.slice(0, 1).toUpperCase()
-      )}
+      <FallbackImage
+        src={pictureUrl}
+        alt=""
+        className="h-full w-full object-cover"
+        fallback={name.slice(0, 1).toUpperCase()}
+      />
     </div>
   );
 }

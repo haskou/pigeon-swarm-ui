@@ -9,6 +9,7 @@ import { copy } from '../../i18n/en';
 import { createCommunityInviteUrl } from '../../utils/communityInviteLink';
 import { shortId } from '../../utils/formatting';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { FallbackImage } from '../common/FallbackImage';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture } from './communityImages';
@@ -281,11 +282,12 @@ function IdentityPreviewCard({
   return (
     <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
       <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-        {pictureUrl ? (
-          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          name.slice(0, 1).toUpperCase()
-        )}
+        <FallbackImage
+          src={pictureUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          fallback={name.slice(0, 1).toUpperCase()}
+        />
       </div>
       <div className="min-w-0">
         <p className="truncate font-black">{name}</p>

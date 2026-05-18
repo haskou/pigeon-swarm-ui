@@ -25,6 +25,7 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ChatEmptyState } from './ChatEmptyState';
@@ -279,7 +280,7 @@ export function ChatColumn({
         return {
           identity,
           identityId,
-          name: identityDisplayName(identityId, identityNames),
+          name: memberPrimaryName(identity, identityId),
           picture: identityPictures[identityId],
         };
       }),

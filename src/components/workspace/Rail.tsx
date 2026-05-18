@@ -6,6 +6,7 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { publicFileObjectUrl } from '../../utils/identityDisplay';
+import { FallbackImage } from '../common/FallbackImage';
 
 interface RailProps {
   activeMessages?: boolean;
@@ -239,10 +240,13 @@ function CommunityRailAvatar({ community }: { community: Community }) {
     };
   }, [community.avatar]);
 
-  return avatarUrl ? (
-    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-  ) : (
-    community.name.slice(0, 1).toUpperCase()
+  return (
+    <FallbackImage
+      src={avatarUrl}
+      alt=""
+      className="h-full w-full object-cover"
+      fallback={community.name.slice(0, 1).toUpperCase()}
+    />
   );
 }
 
