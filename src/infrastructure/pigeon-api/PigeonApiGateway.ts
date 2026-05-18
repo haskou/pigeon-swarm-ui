@@ -920,9 +920,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const recipientIdentity = await this.getIdentity(
-      recipientIdentityId.trim(),
-    );
+    const normalizedRecipientIdentityId = recipientIdentityId.trim();
     const existingKeyEntry = session.keychain.conversations[communityId];
     const keyEntry =
       existingKeyEntry ??
@@ -938,7 +936,7 @@ export class PigeonApiGateway {
             this.withConversationKey(session.keychain, keyEntry),
           );
 
-    await this.createCommunityInvitationNotification(
+    await this.addCommunityMember(
       {
         ...session,
         keychain: published.keychain,
@@ -946,10 +944,9 @@ export class PigeonApiGateway {
           published.keychainExternalIdentifier ||
           session.keychainExternalIdentifier,
       },
-      recipientIdentity,
-      keyEntry,
+      communityId,
+      normalizedRecipientIdentityId,
     );
-    await this.addCommunityMember(session, communityId, recipientIdentity.id);
 
     return published;
   }
@@ -1756,42 +1753,6 @@ export class PigeonApiGateway {
       inviterSignature: inviterSignature.toString(),
       recipientIdentityId: peerIdentity.id,
       type,
-    };
-
-    await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-  }
-
-  private async createCommunityInvitationNotification(
-    session: Session,
-    recipientIdentity: IdentityResource,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<void> {
-    const path = '/notifications/';
-    const encryptedCommunityKey = PublicKey.fromPEM(
-      recipientIdentity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(JSON.stringify(keyEntry))
-      .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        communityId: keyEntry.conversationId,
-        encryptedCommunityKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: recipientIdentity.id,
-      }),
-      session.password,
-    );
-    const body = {
-      communityId: keyEntry.conversationId,
-      encryptedCommunityKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: recipientIdentity.id,
-      type: 'community_invitation',
     };
 
     await this.http.request<NotificationResource>(path, {
