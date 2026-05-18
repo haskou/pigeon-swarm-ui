@@ -772,11 +772,11 @@ export function GlassWorkspace({
           ),
         }));
 
-        if (
-          presences.some(
-            (presence) => presence.identityId === session.identity.id,
-          )
-        ) {
+        const ownPresence = presences.find(
+          (presence) => presence.identityId === session.identity.id,
+        );
+
+        if (ownPresence && ownPresence.status !== 'disconnected') {
           return;
         }
 

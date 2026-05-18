@@ -709,14 +709,31 @@ function ProfileAvatar({
 }
 
 function presenceStatusOptions(): Array<{
+  indicatorClassName: string;
   label: string;
   value: SelectablePresenceStatus;
 }> {
   return [
-    { label: copy.presence.statuses.available, value: 'available' },
-    { label: copy.presence.statuses.away, value: 'away' },
-    { label: copy.presence.statuses.busy, value: 'busy' },
-    { label: copy.presence.statuses.invisible, value: 'invisible' },
+    {
+      indicatorClassName: 'bg-emerald-400',
+      label: copy.presence.statuses.available,
+      value: 'available',
+    },
+    {
+      indicatorClassName: 'bg-amber-400',
+      label: copy.presence.statuses.away,
+      value: 'away',
+    },
+    {
+      indicatorClassName: 'bg-rose-500',
+      label: copy.presence.statuses.busy,
+      value: 'busy',
+    },
+    {
+      indicatorClassName: 'bg-zinc-500',
+      label: copy.presence.statuses.invisible,
+      value: 'invisible',
+    },
   ];
 }
 
