@@ -48,10 +48,14 @@ import {
   profilePictureUrl,
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
 import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 
+const GlobalCallBar = lazy(() =>
+  import('../calls/GlobalCallBar').then((module) => ({
+    default: module.GlobalCallBar,
+  })),
+);
 const ImageCropEditor = lazy(() =>
   import('../common/ImageCropEditor').then((module) => ({
     default: module.ImageCropEditor,
@@ -188,15 +192,17 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallToggleMute &&
         onCallToggleScreenShare && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
-            <GlobalCallBar
-              call={activeCall}
-              onEnd={onCallEnd}
-              onParticipantVolumeChange={onCallParticipantVolumeChange}
-              onToggleCamera={onCallToggleCamera}
-              onToggleDeafen={onCallToggleDeafen}
-              onToggleMute={onCallToggleMute}
-              onToggleScreenShare={onCallToggleScreenShare}
-            />
+            <Suspense fallback={null}>
+              <GlobalCallBar
+                call={activeCall}
+                onEnd={onCallEnd}
+                onParticipantVolumeChange={onCallParticipantVolumeChange}
+                onToggleCamera={onCallToggleCamera}
+                onToggleDeafen={onCallToggleDeafen}
+                onToggleMute={onCallToggleMute}
+                onToggleScreenShare={onCallToggleScreenShare}
+              />
+            </Suspense>
           </div>
         )}
       <button
