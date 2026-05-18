@@ -32,7 +32,6 @@ import type {
   IdentityPresence,
   IdentityResource,
   MessageResource,
-  PresenceStatus,
   SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
@@ -86,6 +85,19 @@ import {
   conversationNotificationPreview,
 } from '../../presentation/workspace/notificationPreviews';
 import {
+  readPresencePreference,
+  writePresencePreference,
+} from '../../presentation/workspace/presencePreferenceStorage';
+import { presenceFromRealtimeEvent } from '../../presentation/workspace/presenceRealtimeEvents';
+import {
+  activeTypingIdentityIds,
+  communityTypingKey,
+  expireTypingEntries,
+  type TypingEntries,
+  typingInputKey,
+  updateTypingEntries,
+} from '../../presentation/workspace/typingEntries';
+import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../../presentation/workspace/useWorkspacePreferences';
@@ -127,51 +139,6 @@ type PendingSend = {
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
-type TypingEntries = Record<string, Record<string, number>>;
-const presencePreferenceStoragePrefix = 'pigeon:presencePreference:';
-
-function presencePreferenceStorageKey(identityId: string): string {
-  return `${presencePreferenceStoragePrefix}${identityId}`;
-}
-
-function readPresencePreference(
-  identityId: string,
-): SelectablePresenceStatus | null {
-  try {
-    const value = globalThis.localStorage?.getItem(
-      presencePreferenceStorageKey(identityId),
-    );
-
-    return isSelectablePresenceStatus(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function writePresencePreference(
-  identityId: string,
-  status: SelectablePresenceStatus,
-): void {
-  try {
-    globalThis.localStorage?.setItem(
-      presencePreferenceStorageKey(identityId),
-      status,
-    );
-  } catch {
-    // Local storage is best-effort; the server still receives the explicit status.
-  }
-}
-
-function isSelectablePresenceStatus(
-  value: unknown,
-): value is SelectablePresenceStatus {
-  return (
-    value === 'available' ||
-    value === 'away' ||
-    value === 'busy' ||
-    value === 'invisible'
-  );
-}
 
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
@@ -189,119 +156,6 @@ function canActOnMembershipRequest(
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
   );
-}
-
-function updateTypingEntries(
-  entries: TypingEntries,
-  scopeId: string,
-  identityId: string,
-  expiresAt: number | null,
-): TypingEntries {
-  const currentScope = entries[scopeId] ?? {};
-  const nextScope = { ...currentScope };
-
-  if (expiresAt === null) {
-    delete nextScope[identityId];
-  } else {
-    nextScope[identityId] = expiresAt;
-  }
-
-  if (Object.keys(nextScope).length === 0) {
-    const { [scopeId]: _removed, ...rest } = entries;
-
-    return rest;
-  }
-
-  return { ...entries, [scopeId]: nextScope };
-}
-
-function expireTypingEntries(entries: TypingEntries): TypingEntries {
-  const now = Date.now();
-  let changed = false;
-  const nextEntries: TypingEntries = {};
-
-  for (const [scopeId, scopeEntries] of Object.entries(entries)) {
-    const activeEntries = Object.fromEntries(
-      Object.entries(scopeEntries).filter(([, expiresAt]) => expiresAt > now),
-    );
-
-    if (
-      Object.keys(activeEntries).length !== Object.keys(scopeEntries).length
-    ) {
-      changed = true;
-    }
-
-    if (Object.keys(activeEntries).length > 0) {
-      nextEntries[scopeId] = activeEntries;
-    }
-  }
-
-  return changed ? nextEntries : entries;
-}
-
-function activeTypingIdentityIds(
-  entries: TypingEntries,
-  scopeId: string | null | undefined,
-): string[] {
-  if (!scopeId) return [];
-
-  const now = Date.now();
-
-  return Object.entries(entries[scopeId] ?? {})
-    .filter(([, expiresAt]) => expiresAt > now)
-    .map(([identityId]) => identityId)
-    .sort();
-}
-
-function communityTypingKey(communityId: string, channelId: string): string {
-  return `${communityId}:${channelId}`;
-}
-
-function typingInputKey(input: RealtimeTypingInput): string {
-  return input.scope === 'conversation'
-    ? `conversation:${input.conversationId}`
-    : communityTypingKey(input.communityId, input.channelId);
-}
-
-function isPresenceStatus(value: unknown): value is PresenceStatus {
-  return (
-    value === 'available' ||
-    value === 'away' ||
-    value === 'busy' ||
-    value === 'disconnected' ||
-    value === 'invisible'
-  );
-}
-
-function presenceFromRealtimeEvent(
-  event: RealtimeDomainEvent,
-): IdentityPresence | null {
-  if (event.type !== 'presence.v1.identity_presence.was_updated') return null;
-
-  const attributes = event.attributes;
-  const identityId = attributes.identityId;
-  const status = attributes.status;
-
-  if (typeof identityId !== 'string' || !isPresenceStatus(status)) return null;
-
-  return {
-    identityId,
-    status,
-    updatedAt:
-      typeof attributes.updatedAt === 'number'
-        ? attributes.updatedAt
-        : Date.now(),
-    ...(typeof attributes.lastActivityAt === 'number'
-      ? { lastActivityAt: attributes.lastActivityAt }
-      : {}),
-    ...(typeof attributes.lastHeartbeatAt === 'number'
-      ? { lastHeartbeatAt: attributes.lastHeartbeatAt }
-      : {}),
-    ...(Array.isArray(attributes.networkIds) &&
-    attributes.networkIds.every((networkId) => typeof networkId === 'string')
-      ? { networkIds: attributes.networkIds }
-      : {}),
-  };
 }
 
 interface GlassWorkspaceProps {
