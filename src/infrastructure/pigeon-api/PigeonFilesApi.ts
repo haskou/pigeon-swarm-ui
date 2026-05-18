@@ -33,6 +33,8 @@ export class PigeonFilesApi {
     Promise<PublicFileContent>
   >();
 
+  private readonly attachmentBlobCache = new Map<string, Promise<Blob>>();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
@@ -110,19 +112,22 @@ export class PigeonFilesApi {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    const encryptedBytes = attachment.chunks?.length
-      ? await this.downloadAttachmentChunks(attachment)
-      : this.attachmentCipher.bytesToArrayBuffer(
-          this.attachmentCipher.base64ToBytes(
-            (await this.getPrivateFile(attachment.cid)).encryptedData,
-          ),
-        );
+    const cacheKey = this.attachmentBlobCacheKey(attachment);
+    const cached = this.attachmentBlobCache.get(cacheKey);
 
-    return await this.attachmentCipher.decrypt(
-      attachment,
-      encryptedBytes,
-      onProgress,
+    if (cached) return await cached;
+
+    const request = this.decryptAttachment(attachment, onProgress).catch(
+      (caught: unknown) => {
+        this.attachmentBlobCache.delete(cacheKey);
+
+        throw caught;
+      },
     );
+
+    this.attachmentBlobCache.set(cacheKey, request);
+
+    return await request;
   }
 
   public async publishMessageAttachments(
@@ -152,6 +157,40 @@ export class PigeonFilesApi {
     }
 
     return uploadedAttachments;
+  }
+
+  private async decryptAttachment(
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<Blob> {
+    const encryptedBytes = attachment.chunks?.length
+      ? await this.downloadAttachmentChunks(attachment)
+      : this.attachmentCipher.bytesToArrayBuffer(
+          this.attachmentCipher.base64ToBytes(
+            (await this.getPrivateFile(attachment.cid)).encryptedData,
+          ),
+        );
+
+    return await this.attachmentCipher.decrypt(
+      attachment,
+      encryptedBytes,
+      onProgress,
+    );
+  }
+
+  private attachmentBlobCacheKey(attachment: MessageAttachment): string {
+    return [
+      attachment.cid,
+      attachment.encryptedSize,
+      attachment.size,
+      attachment.contentType,
+      attachment.encryption.algorithm,
+      attachment.encryption.key,
+      attachment.encryption.iv,
+      attachment.encryption.chunks
+        ?.map((chunk) => `${chunk.iv}:${chunk.size}`)
+        .join(',') ?? '',
+    ].join('|');
   }
 
   private async uploadPendingAttachment(
