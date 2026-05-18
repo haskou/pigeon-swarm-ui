@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage } from '../../domain/types';
 
@@ -49,6 +49,9 @@ export function MessageContextMenu({
   const emojiSearchRef = useRef<HTMLDivElement | null>(null);
   const [emojiSearchOpen, setEmojiSearchOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState('');
+  const [emojiSuggestions, setEmojiSuggestions] = useState<EmojiSuggestion[]>(
+    [],
+  );
   const [emojiListMaxHeight, setEmojiListMaxHeight] = useState(256);
   const [position, setPosition] = useState(() => ({
     left: menu.x,
@@ -61,10 +64,6 @@ export function MessageContextMenu({
   const quickReactions = useMemo(
     () => quickReactionOptions(menu.message, recentEmojis),
     [menu.message, recentEmojis],
-  );
-  const emojiSuggestions = useMemo(
-    () => searchEmojiSuggestions(emojiQuery, 24),
-    [emojiQuery],
   );
   const toggleReaction = (emoji: string) => {
     const reacted = Boolean(
@@ -99,7 +98,7 @@ export function MessageContextMenu({
     positionAnchor: string;
   };
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const element = menuRef.current;
 
     if (!element) return;
@@ -131,6 +130,24 @@ export function MessageContextMenu({
       Math.max(96, Math.min(256, availableBelow - reservedMenuActionsHeight)),
     );
   }, [emojiSearchOpen, menu.x, menu.y]);
+
+  useLayoutEffect(() => {
+    if (!emojiSearchOpen) {
+      setEmojiSuggestions([]);
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void searchEmojiSuggestions(emojiQuery, 24).then((suggestions) => {
+      if (!cancelled) setEmojiSuggestions(suggestions);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emojiQuery, emojiSearchOpen]);
 
   return (
     <>

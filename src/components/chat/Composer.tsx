@@ -17,7 +17,7 @@ import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import {
-  EmojiSuggestion,
+  type EmojiSuggestion,
   findEmojiTrigger,
   replaceEmojiTrigger,
   searchEmojiSuggestions,
@@ -70,6 +70,9 @@ export function Composer({
   const [dismissedEmojiTrigger, setDismissedEmojiTrigger] = useState<
     null | string
   >(null);
+  const [emojiSuggestions, setEmojiSuggestions] = useState<EmojiSuggestion[]>(
+    [],
+  );
   const [selectedEmojiIndex, setSelectedEmojiIndex] = useState(0);
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
@@ -85,10 +88,6 @@ export function Composer({
     () => findEmojiTrigger(draft, caretIndex),
     [caretIndex, draft],
   );
-  const emojiSuggestions = useMemo(
-    () => (emojiTrigger ? searchEmojiSuggestions(emojiTrigger.query) : []),
-    [emojiTrigger],
-  );
   const emojiTriggerKey = emojiTrigger
     ? `${emojiTrigger.start}:${emojiTrigger.end}:${emojiTrigger.query}`
     : null;
@@ -99,6 +98,24 @@ export function Composer({
   useEffect(() => {
     setSelectedEmojiIndex(0);
   }, [emojiTriggerKey]);
+
+  useEffect(() => {
+    if (!emojiTrigger) {
+      setEmojiSuggestions([]);
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void searchEmojiSuggestions(emojiTrigger.query).then((suggestions) => {
+      if (!cancelled) setEmojiSuggestions(suggestions);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emojiTrigger]);
 
   useEffect(() => {
     attachmentsRef.current = attachments;
