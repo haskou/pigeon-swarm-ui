@@ -2245,40 +2245,12 @@ const VoiceChannelButton = memo(function VoiceChannelButton({
       {participants.length > 0 && (
         <div className="space-y-1 px-3 pb-3">
           {participants.map((participant) => (
-            <button
+            <VoiceParticipantButton
+              active={active}
               key={participant.identityId}
-              type="button"
-              onClick={(event) => onParticipantClick(participant, event)}
-              className={cx(
-                'flex w-full items-center gap-2 rounded-2xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
-                active && participant.speaking
-                  ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
-                  : 'border-transparent text-white/55',
-              )}
-            >
-              <div
-                className={cx(
-                  'grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950',
-                  active &&
-                    participant.speaking &&
-                    'ring-2 ring-emerald-200/60',
-                )}
-              >
-                {participant.picture ? (
-                  <img
-                    src={participant.picture}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  participant.name.slice(0, 1).toUpperCase()
-                )}
-              </div>
-              <span className="min-w-0 flex-1 truncate">
-                {voiceParticipantName(participant.name)}
-              </span>
-              <VoiceParticipantStatusIcons participant={participant} />
-            </button>
+              participant={participant}
+              onClick={onParticipantClick}
+            />
           ))}
         </div>
       )}
@@ -2326,17 +2298,92 @@ function areVoiceParticipantsEqual(
   });
 }
 
-const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
+const VoiceParticipantButton = memo(function VoiceParticipantButton({
+  active,
+  onClick,
   participant,
 }: {
-  participant: { deafened?: boolean; muted: boolean };
+  active: boolean;
+  onClick: (
+    participant: VoiceParticipantView,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => void;
+  participant: VoiceParticipantView;
 }) {
-  if (!participant.muted && !participant.deafened) return null;
+  const speaking = active && participant.speaking;
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => onClick(participant, event)}
+      className={cx(
+        'flex w-full items-center gap-2 rounded-2xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
+        speaking
+          ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
+          : 'border-transparent text-white/55',
+      )}
+    >
+      <div
+        className={cx(
+          'grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950',
+          speaking && 'ring-2 ring-emerald-200/60',
+        )}
+      >
+        {participant.picture ? (
+          <img
+            src={participant.picture}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          participant.name.slice(0, 1).toUpperCase()
+        )}
+      </div>
+      <span className="min-w-0 flex-1 truncate">
+        {voiceParticipantName(participant.name)}
+      </span>
+      <VoiceParticipantStatusIcons
+        deafened={participant.deafened}
+        muted={participant.muted}
+      />
+    </button>
+  );
+}, areVoiceParticipantButtonPropsEqual);
+
+function areVoiceParticipantButtonPropsEqual(
+  previous: {
+    active: boolean;
+    participant: VoiceParticipantView;
+  },
+  next: {
+    active: boolean;
+    participant: VoiceParticipantView;
+  },
+): boolean {
+  return (
+    previous.active === next.active &&
+    previous.participant.identityId === next.participant.identityId &&
+    previous.participant.name === next.participant.name &&
+    previous.participant.picture === next.participant.picture &&
+    previous.participant.muted === next.participant.muted &&
+    previous.participant.deafened === next.participant.deafened &&
+    previous.participant.speaking === next.participant.speaking
+  );
+}
+
+const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
+  deafened,
+  muted,
+}: {
+  deafened?: boolean;
+  muted: boolean;
+}) {
+  if (!muted && !deafened) return null;
 
   return (
     <span className="flex shrink-0 items-center gap-1 text-fuchsia-200 [&_svg]:h-4 [&_svg]:w-4">
-      {participant.muted && <MicrophoneIcon muted />}
-      {participant.deafened && <HeadphonesIcon deafened />}
+      {muted && <MicrophoneIcon muted />}
+      {deafened && <HeadphonesIcon deafened />}
     </span>
   );
 });
