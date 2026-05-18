@@ -74,10 +74,6 @@ export function MessageBubble({
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
   const hasReply = Boolean(replyMessageId);
-  const compactTimestamp =
-    !hasReply &&
-    message.content.length <= 36 &&
-    !message.content.includes('\n');
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -182,173 +178,181 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex gap-3', mine && 'justify-end')}
+        className={cx('flex items-center gap-3', mine && 'justify-end')}
       >
-        {!mine &&
-          (showAvatar ? (
-            <Avatar
-              label={authorName}
-              onClick={onAvatarClick}
-              picture={authorPicture}
-            />
-          ) : reserveAvatarSpace ? (
-            <div className="w-11 shrink-0" />
-          ) : null)}
+        {!mine && (
+          <MessageAvatarColumn
+            authorName={authorName}
+            authorPicture={authorPicture}
+            onAvatarClick={onAvatarClick}
+            reserveAvatarSpace={reserveAvatarSpace}
+            showAvatar={showAvatar}
+          />
+        )}
         <div
-          onContextMenu={handleContextMenu}
-          style={{
-            WebkitTouchCallout: 'none',
-            WebkitUserSelect: 'none',
-            userSelect: 'none',
-          }}
-          onPointerCancel={clearLongPressTimer}
-          onPointerDown={handlePointerDown}
-          onPointerLeave={clearLongPressTimer}
-          onPointerMove={clearLongPressTimer}
-          onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[96%] select-none rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
-            compactTimestamp &&
-              message.attachments.length === 0 &&
-              reactionGroups.length === 0 &&
-              'flex items-end gap-2',
-            mine
-              ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
-              : 'border border-white/10 bg-black/25 text-white',
+            'flex max-w-[96%] flex-col sm:max-w-[72%]',
+            mine ? 'items-end' : 'items-start',
           )}
         >
-          {hasReply && replyMessageId && (
-            <button
-              type="button"
-              onClick={() => onReplyReferenceClick(replyMessageId)}
-              className={cx(
-                'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
-                mine
-                  ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                  : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
-              )}
-            >
-              <span className="flex items-center gap-2">
-                {replyImageUrl && (
-                  <img
-                    src={replyImageUrl}
-                    alt=""
-                    className="h-10 w-10 shrink-0 rounded-xl object-cover"
-                  />
-                )}
-                <span className="min-w-0">
-                  <span className="block font-black text-white/75">
-                    {copy.messages.replyTo}{' '}
-                    {replyAuthorName ?? copy.messages.originalMessage}
-                  </span>
-                  {replyPreview && (
-                    <span className="block truncate text-white/55">
-                      {replyPreview}
-                    </span>
-                  )}
-                </span>
-              </span>
-            </button>
-          )}
-          {message.attachments.length > 0 && (
-            <div className="grid gap-2">
-              {imageAttachments.length > 0 && (
-                <ImageAttachmentAlbum
-                  items={imageAttachments}
-                  mine={mine}
-                  onOpen={(images, index) => setLightbox({ images, index })}
-                  onPreview={onAttachmentPreview}
-                />
-              )}
-              {otherAttachments.map(({ attachment, index }) => (
-                <AttachmentCard
-                  attachment={attachment}
-                  key={`${message.id}-${attachment.cid}`}
-                  mine={mine}
-                  onPreview={onAttachmentPreview}
-                  pending={message.deliveryStatus === 'pending'}
-                  onClick={() => onAttachmentOpen(index)}
-                />
-              ))}
-            </div>
-          )}
-          {message.attachmentProgress && (
-            <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
-              <div className="flex items-center justify-between gap-3">
-                <span className="truncate">
-                  {message.attachmentProgress.phase === 'encrypt'
-                    ? copy.composer.encryptingAttachment
-                    : message.attachmentProgress.phase === 'upload'
-                      ? copy.composer.uploadingAttachment
-                      : copy.composer.decryptingAttachment}{' '}
-                  {message.attachmentProgress.filename}
-                </span>
-                <span className="shrink-0">
-                  {message.attachmentProgress.percent}%
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-fuchsia-400"
-                  style={{ width: `${message.attachmentProgress.percent}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {message.content && (
-            <div
-              className={cx(
-                'whitespace-pre-wrap break-words',
-                (hasReply || message.attachments.length > 0) && 'mt-3',
-                message.encrypted && 'text-white/55',
-              )}
-            >
-              <MarkdownMessage content={message.content} mine={mine} />
-            </div>
-          )}
-          {linkPreview && (
-            <LinkPreviewCard
-              description={linkPreview.description}
-              displayUrl={linkPreview.displayUrl}
-              faviconUrl={linkPreview.faviconUrl}
-              hostname={linkPreview.hostname}
-              mine={mine}
-              title={linkPreview.title}
-              url={linkPreview.url}
-            />
-          )}
           <div
             className={cx(
-              'flex items-center justify-end gap-2 text-xs font-black opacity-65',
-              compactTimestamp && message.attachments.length === 0
-                ? 'shrink-0'
-                : 'mt-1',
+              'flex max-w-full items-end gap-2',
+              mine && 'flex-row-reverse',
             )}
           >
-            {message.deliveryStatus === 'pending' && (
-              <span>{copy.messages.sending}</span>
-            )}
-            {message.deliveryStatus === 'failed' && (
-              <>
-                <span className="text-rose-100">
-                  {copy.messages.sendFailed}
-                </span>
-                {onRetryMessage && (
-                  <button
-                    type="button"
-                    onClick={() => onRetryMessage(message)}
-                    className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
-                  >
-                    {copy.messages.retrySend}
-                  </button>
+            <div
+              onContextMenu={handleContextMenu}
+              style={{
+                WebkitTouchCallout: 'none',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
+              }}
+              onPointerCancel={clearLongPressTimer}
+              onPointerDown={handlePointerDown}
+              onPointerLeave={clearLongPressTimer}
+              onPointerMove={clearLongPressTimer}
+              onPointerUp={clearLongPressTimer}
+              className={cx(
+                'min-w-0 max-w-full select-none rounded-2xl p-3 text-sm leading-6',
+                mine
+                  ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                  : 'border border-white/10 bg-black/25 text-white',
+              )}
+            >
+            {hasReply && replyMessageId && (
+              <button
+                type="button"
+                onClick={() => onReplyReferenceClick(replyMessageId)}
+                className={cx(
+                  'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                  mine
+                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                    : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
                 )}
-              </>
+              >
+                <span className="flex items-center gap-2">
+                  {replyImageUrl && (
+                    <img
+                      src={replyImageUrl}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                    />
+                  )}
+                  <span className="min-w-0">
+                    <span className="block font-black text-white/75">
+                      {copy.messages.replyTo}{' '}
+                      {replyAuthorName ?? copy.messages.originalMessage}
+                    </span>
+                    {replyPreview && (
+                      <span className="block truncate text-white/55">
+                        {replyPreview}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
             )}
-            <span>{formatTime(message.timestamp)}</span>
+            {message.attachments.length > 0 && (
+              <div className="grid gap-2">
+                {imageAttachments.length > 0 && (
+                  <ImageAttachmentAlbum
+                    items={imageAttachments}
+                    mine={mine}
+                    onOpen={(images, index) => setLightbox({ images, index })}
+                    onPreview={onAttachmentPreview}
+                  />
+                )}
+                {otherAttachments.map(({ attachment, index }) => (
+                  <AttachmentCard
+                    attachment={attachment}
+                    key={`${message.id}-${attachment.cid}`}
+                    mine={mine}
+                    onPreview={onAttachmentPreview}
+                    pending={message.deliveryStatus === 'pending'}
+                    onClick={() => onAttachmentOpen(index)}
+                  />
+                ))}
+              </div>
+            )}
+            {message.attachmentProgress && (
+              <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate">
+                    {message.attachmentProgress.phase === 'encrypt'
+                      ? copy.composer.encryptingAttachment
+                      : message.attachmentProgress.phase === 'upload'
+                        ? copy.composer.uploadingAttachment
+                        : copy.composer.decryptingAttachment}{' '}
+                    {message.attachmentProgress.filename}
+                  </span>
+                  <span className="shrink-0">
+                    {message.attachmentProgress.percent}%
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-fuchsia-400"
+                    style={{ width: `${message.attachmentProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {message.content && (
+              <div
+                className={cx(
+                  'whitespace-pre-wrap break-words',
+                  (hasReply || message.attachments.length > 0) && 'mt-3',
+                  message.encrypted && 'text-white/55',
+                )}
+              >
+                <MarkdownMessage content={message.content} mine={mine} />
+              </div>
+            )}
+            {linkPreview && (
+              <LinkPreviewCard
+                description={linkPreview.description}
+                displayUrl={linkPreview.displayUrl}
+                faviconUrl={linkPreview.faviconUrl}
+                hostname={linkPreview.hostname}
+                mine={mine}
+                title={linkPreview.title}
+                url={linkPreview.url}
+              />
+            )}
+            {(message.deliveryStatus === 'pending' ||
+              message.deliveryStatus === 'failed') && (
+              <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
+                {message.deliveryStatus === 'pending' && (
+                  <span>{copy.messages.sending}</span>
+                )}
+                {message.deliveryStatus === 'failed' && (
+                  <>
+                    <span className="text-rose-100">
+                      {copy.messages.sendFailed}
+                    </span>
+                    {onRetryMessage && (
+                      <button
+                        type="button"
+                        onClick={() => onRetryMessage(message)}
+                        className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
+                      >
+                        {copy.messages.retrySend}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            </div>
+            <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
+              {formatTime(message.timestamp)}
+            </span>
           </div>
           {reactionGroups.length > 0 && (
             <MessageReactions
               groups={reactionGroups}
+              mine={mine}
               onToggle={(emoji, reacted) => {
                 onReactionToggle?.(message, emoji, reacted);
               }}
@@ -367,6 +371,44 @@ export function MessageBubble({
   );
 }
 
+function MessageAvatarColumn({
+  authorName,
+  authorPicture,
+  mine,
+  onAvatarClick,
+  reserveAvatarSpace,
+  showAvatar,
+}: {
+  authorName: string;
+  authorPicture?: string | null;
+  mine?: boolean;
+  onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
+  reserveAvatarSpace: boolean;
+  showAvatar: boolean;
+}) {
+  if (!showAvatar && !reserveAvatarSpace) return null;
+
+  return (
+    <div
+      className={cx(
+        'relative flex h-11 w-11 shrink-0 items-center',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
+      {showAvatar ? (
+        <Avatar
+          label={authorName}
+          mine={mine}
+          onClick={onAvatarClick}
+          picture={authorPicture}
+        />
+      ) : (
+        <div className="w-11 shrink-0" />
+      )}
+    </div>
+  );
+}
+
 type ReactionGroup = {
   authors: string[];
   count: number;
@@ -377,29 +419,36 @@ type ReactionGroup = {
 
 function MessageReactions({
   groups,
+  mine,
   onToggle,
 }: {
   groups: ReactionGroup[];
+  mine?: boolean;
   onToggle: (emoji: string, reacted: boolean) => void;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <div
+      className={cx(
+        'mt-1 flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
       {groups.map((group) => (
         <button
           type="button"
           key={group.emoji}
           onClick={() => onToggle(group.emoji, group.reacted)}
           className={cx(
-            'rounded-full border px-2 py-0.5 text-xs font-black transition hover:brightness-110',
+            'inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
             group.reacted
-              ? 'border-sky-300/40 bg-sky-500/35 text-sky-50'
-              : 'border-white/10 bg-black/15 text-white/75 hover:bg-white/10',
+              ? 'border-sky-200/45 bg-sky-400/35 text-sky-50 shadow-sky-950/20'
+              : 'border-white/12 bg-black/25 text-white/78 shadow-black/15 hover:bg-white/10',
           )}
           aria-label={`${group.emoji} ${group.count}`}
           title={group.authors.join(', ')}
         >
-          <span>{group.emoji}</span>
-          <span className="ml-1">{group.count}</span>
+          <span className="text-[0.82rem] leading-none">{group.emoji}</span>
+          <span className="tabular-nums leading-none">{group.count}</span>
         </button>
       ))}
     </div>
