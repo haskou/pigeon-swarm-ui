@@ -7,6 +7,7 @@ import {
 } from '@haskou/value-objects';
 import {
   Fragment,
+  memo,
   type MouseEvent,
   type ReactNode,
   startTransition,
@@ -77,7 +78,7 @@ import {
   type MessageContextMenuState,
 } from '../workspace/MessageContextMenu';
 import { RawMessageDialog } from '../workspace/RawMessageDialog';
-import { UserProfileDropdown } from '../workspace/Sidebar';
+import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
@@ -376,10 +377,36 @@ export function CommunityWorkspace({
       ),
     [communityMemberIds, voiceConnectedIdentityIds],
   );
-  const openMemberProfile = (
-    member: MemberView,
-    anchor?: ProfilePopoverAnchor,
-  ) => setProfileViewer({ ...member, anchor });
+  const openMemberProfile = useCallback(
+    (member: MemberView, anchor?: ProfilePopoverAnchor) =>
+      setProfileViewer({ ...member, anchor }),
+    [],
+  );
+  const joinVoiceChannel = useCallback(
+    (channel: CommunityVoiceChannel) => onJoinVoiceChannel?.(channel),
+    [onJoinVoiceChannel],
+  );
+  const openVoiceParticipantProfile = useCallback(
+    (
+      participant: {
+        identityId: string;
+        picture?: null | string;
+      },
+      event: MouseEvent<HTMLButtonElement>,
+    ) =>
+      openMemberProfile(
+        {
+          identity:
+            participant.identityId === session.identity.id
+              ? session.identity
+              : memberIdentities[participant.identityId],
+          identityId: participant.identityId,
+          pictureUrl: participant.picture ?? null,
+        },
+        profileAnchorFromTarget(event.currentTarget),
+      ),
+    [memberIdentities, openMemberProfile, session.identity],
+  );
   const openMessageAuthorProfile = (
     message: ChatMessage,
     anchor?: ProfilePopoverAnchor,
@@ -642,6 +669,16 @@ export function CommunityWorkspace({
       activeVoiceChannelId,
       callParticipantForIdentity,
     ],
+  );
+  const voiceParticipantsByChannelId = useMemo(
+    () =>
+      new Map(
+        visibleVoiceChannels.map((channel) => [
+          channel.id,
+          voiceParticipantsForChannel(channel),
+        ]),
+      ),
+    [visibleVoiceChannels, voiceParticipantsForChannel],
   );
   const communityData = useMemo(
     () => ({
@@ -1521,26 +1558,12 @@ export function CommunityWorkspace({
                               key={channel.id}
                               active={activeVoiceChannelId === channel.id}
                               channel={channel}
-                              onJoin={() => onJoinVoiceChannel?.(channel)}
-                              onParticipantClick={(participant, event) =>
-                                openMemberProfile(
-                                  {
-                                    identity:
-                                      participant.identityId ===
-                                      session.identity.id
-                                        ? session.identity
-                                        : memberIdentities[
-                                            participant.identityId
-                                          ],
-                                    identityId: participant.identityId,
-                                    pictureUrl: participant.picture ?? null,
-                                  },
-                                  profileAnchorFromTarget(event.currentTarget),
-                                )
+                              onJoin={joinVoiceChannel}
+                              onParticipantClick={openVoiceParticipantProfile}
+                              participants={
+                                voiceParticipantsByChannelId.get(channel.id) ??
+                                []
                               }
-                              participants={voiceParticipantsForChannel(
-                                channel,
-                              )}
                             />
                           ))}
                         </div>
@@ -2138,7 +2161,7 @@ export function CommunityWorkspace({
   );
 }
 
-function VoiceChannelButton({
+const VoiceChannelButton = memo(function VoiceChannelButton({
   active,
   channel,
   onJoin,
@@ -2146,8 +2169,8 @@ function VoiceChannelButton({
   participants,
 }: {
   active: boolean;
-  channel: { id: string; name: string };
-  onJoin: () => void;
+  channel: CommunityVoiceChannel;
+  onJoin: (channel: CommunityVoiceChannel) => void;
   onParticipantClick: (
     participant: {
       deafened?: boolean;
@@ -2177,7 +2200,7 @@ function VoiceChannelButton({
     >
       <button
         type="button"
-        onClick={onJoin}
+        onClick={() => onJoin(channel)}
         className={cx(
           'flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-black transition',
           active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/8',
@@ -2231,9 +2254,9 @@ function VoiceChannelButton({
       )}
     </div>
   );
-}
+});
 
-function VoiceParticipantStatusIcons({
+const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
   participant,
 }: {
   participant: { deafened?: boolean; muted: boolean };
@@ -2246,7 +2269,7 @@ function VoiceParticipantStatusIcons({
       {participant.deafened && <HeadphonesIcon deafened />}
     </span>
   );
-}
+});
 
 function voiceParticipantName(name: string): string {
   return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;

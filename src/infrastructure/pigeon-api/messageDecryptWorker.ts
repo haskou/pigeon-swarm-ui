@@ -55,7 +55,13 @@ type PlainMessage = {
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();
 const projectedMessageCacheLimit = 500;
+const persistentProjectedMessageCacheLimit = 2000;
+const projectedMessageCacheDatabaseName = 'pigeon-message-projection-cache';
+const projectedMessageCacheDatabaseVersion = 1;
+const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
+let projectedMessageCacheDatabasePromise: Promise<IDBDatabase | null> | null =
+  null;
 
 function isCancelRequest(
   request: MessageDecryptCancelRequest | MessageDecryptRequest,
@@ -135,7 +141,8 @@ async function projectMessage(
   message: MessageResource,
   privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
-  const cachedMessage = cachedProjectedMessage(request, message);
+  const cacheKey = projectedMessageCacheKey(request, message);
+  const cachedMessage = await cachedProjectedMessage(cacheKey);
 
   if (cachedMessage) return cachedMessage;
 
@@ -162,7 +169,7 @@ async function projectMessage(
     }
   }
 
-  rememberProjectedMessage(request, message, projectedMessage);
+  rememberProjectedMessage(cacheKey, projectedMessage);
 
   return projectedMessage;
 }
@@ -199,32 +206,47 @@ async function decryptMessage(
   }
 }
 
-function cachedProjectedMessage(
-  request: MessageDecryptRequest,
-  message: MessageResource,
-): ChatMessage | undefined {
-  const cachedMessage = projectedMessageCache.get(
-    projectedMessageCacheKey(request, message),
-  );
+async function cachedProjectedMessage(
+  cacheKey: string,
+): Promise<ChatMessage | undefined> {
+  const cachedMessage = projectedMessageCache.get(cacheKey);
 
-  return cachedMessage ? cloneChatMessage(cachedMessage) : undefined;
+  if (cachedMessage) return cloneChatMessage(cachedMessage);
+
+  const persistentMessage = await readPersistentProjectedMessage(cacheKey);
+
+  if (!persistentMessage) return undefined;
+
+  rememberProjectedMessageInMemory(cacheKey, persistentMessage);
+
+  return cloneChatMessage(persistentMessage);
 }
 
 function rememberProjectedMessage(
-  request: MessageDecryptRequest,
-  message: MessageResource,
+  cacheKey: string,
   projectedMessage: ChatMessage,
 ): void {
-  projectedMessageCache.set(
-    projectedMessageCacheKey(request, message),
-    cloneChatMessage(projectedMessage),
-  );
+  if (!shouldCacheProjectedMessage(projectedMessage)) return;
+
+  rememberProjectedMessageInMemory(cacheKey, projectedMessage);
+  void writePersistentProjectedMessage(cacheKey, projectedMessage);
+}
+
+function rememberProjectedMessageInMemory(
+  cacheKey: string,
+  projectedMessage: ChatMessage,
+): void {
+  projectedMessageCache.set(cacheKey, cloneChatMessage(projectedMessage));
 
   if (projectedMessageCache.size <= projectedMessageCacheLimit) return;
 
   const oldestKey = projectedMessageCache.keys().next().value;
 
   if (oldestKey) projectedMessageCache.delete(oldestKey);
+}
+
+function shouldCacheProjectedMessage(message: ChatMessage): boolean {
+  return !message.encrypted;
 }
 
 function projectedMessageCacheKey(
@@ -234,6 +256,7 @@ function projectedMessageCacheKey(
   return [
     request.currentIdentityId,
     request.conversationId,
+    request.privateKey ? 'keyed' : 'no-key',
     firstCachePart(message.id, message.messageId),
     firstCachePart(message.encryptedPayload, message.payload, message.content),
     firstCachePart(message.timestamp, message.createdAt),
@@ -246,6 +269,131 @@ function firstCachePart(...values: unknown[]): string {
   const value = values.find((entry) => entry !== undefined && entry !== null);
 
   return value === undefined || value === null ? '' : String(value);
+}
+
+async function readPersistentProjectedMessage(
+  cacheKey: string,
+): Promise<ChatMessage | undefined> {
+  const database = await projectedMessageCacheDatabase();
+
+  if (!database) return undefined;
+
+  return await new Promise<ChatMessage | undefined>((resolve) => {
+    const transaction = database.transaction(
+      projectedMessageCacheStoreName,
+      'readonly',
+    );
+    const request = transaction
+      .objectStore(projectedMessageCacheStoreName)
+      .get(cacheKey);
+
+    request.onsuccess = () => {
+      const record = request.result as { message?: ChatMessage } | undefined;
+
+      resolve(record?.message ? cloneChatMessage(record.message) : undefined);
+    };
+    request.onerror = () => resolve(undefined);
+  });
+}
+
+async function writePersistentProjectedMessage(
+  cacheKey: string,
+  message: ChatMessage,
+): Promise<void> {
+  const database = await projectedMessageCacheDatabase();
+
+  if (!database) return;
+
+  await new Promise<void>((resolve) => {
+    const transaction = database.transaction(
+      projectedMessageCacheStoreName,
+      'readwrite',
+    );
+    const store = transaction.objectStore(projectedMessageCacheStoreName);
+
+    store.put({
+      cacheKey,
+      lastAccessedAt: Date.now(),
+      message: cloneChatMessage(message),
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+    transaction.onabort = () => resolve();
+  });
+
+  void prunePersistentProjectedMessages(database);
+}
+
+async function prunePersistentProjectedMessages(
+  database: IDBDatabase,
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const transaction = database.transaction(
+      projectedMessageCacheStoreName,
+      'readwrite',
+    );
+    const store = transaction.objectStore(projectedMessageCacheStoreName);
+    const countRequest = store.count();
+
+    countRequest.onsuccess = () => {
+      const extraCount =
+        countRequest.result - persistentProjectedMessageCacheLimit;
+
+      if (extraCount <= 0) return;
+
+      const index = store.index('lastAccessedAt');
+      const cursorRequest = index.openCursor();
+      let deletedCount = 0;
+
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+
+        if (!cursor || deletedCount >= extraCount) return;
+
+        cursor.delete();
+        deletedCount += 1;
+        cursor.continue();
+      };
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+    transaction.onabort = () => resolve();
+  });
+}
+
+async function projectedMessageCacheDatabase(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === 'undefined') return null;
+
+  projectedMessageCacheDatabasePromise ??= openProjectedMessageCacheDatabase();
+
+  return await projectedMessageCacheDatabasePromise;
+}
+
+async function openProjectedMessageCacheDatabase(): Promise<IDBDatabase | null> {
+  return await new Promise<IDBDatabase | null>((resolve) => {
+    const request = indexedDB.open(
+      projectedMessageCacheDatabaseName,
+      projectedMessageCacheDatabaseVersion,
+    );
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      const store = database.objectStoreNames.contains(
+        projectedMessageCacheStoreName,
+      )
+        ? request.transaction?.objectStore(projectedMessageCacheStoreName)
+        : database.createObjectStore(projectedMessageCacheStoreName, {
+            keyPath: 'cacheKey',
+          });
+
+      if (store && !store.indexNames.contains('lastAccessedAt')) {
+        store.createIndex('lastAccessedAt', 'lastAccessedAt');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
 }
 
 function cloneChatMessage(message: ChatMessage): ChatMessage {
