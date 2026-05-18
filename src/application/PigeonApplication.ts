@@ -20,6 +20,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
+  IdentityPresence,
   IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
@@ -30,6 +31,7 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
+  SelectablePresenceStatus,
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
@@ -174,6 +176,31 @@ export class PigeonApplication {
     session: Session,
   ): Promise<IpfsReplicationStatus> {
     return await this.gateway.getIpfsReplicationStatus(session);
+  }
+
+  public async getPresence(
+    session: Session,
+    identityId: string,
+  ): Promise<IdentityPresence> {
+    return await this.gateway.getPresence(session, identityId);
+  }
+
+  public async getPresences(
+    session: Session,
+    identityIds: string[],
+  ): Promise<IdentityPresence[]> {
+    return await this.gateway.getPresences(session, identityIds);
+  }
+
+  public async updatePresence(
+    session: Session,
+    input: { customMessage?: string; status: SelectablePresenceStatus },
+  ): Promise<IdentityPresence> {
+    return await this.gateway.updatePresence(session, input);
+  }
+
+  public async deletePresenceCustomMessage(session: Session): Promise<void> {
+    await this.gateway.deletePresenceCustomMessage(session);
   }
 
   public async startConversationCall(

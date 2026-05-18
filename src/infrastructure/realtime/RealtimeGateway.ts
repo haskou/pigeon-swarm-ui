@@ -33,9 +33,15 @@ export type RealtimeMessage =
     };
 
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
-const heartbeatIntervalMs = 30000;
-const heartbeatTimeoutMs = heartbeatIntervalMs * 2;
+const heartbeatIntervalMs = 10000;
+const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
 const heartbeatTimeoutCloseCode = 4000;
+const recentActivityWindowMs = 60000;
+
+type ActivityTracker = {
+  isActive: () => boolean;
+  stop: () => void;
+};
 
 export class RealtimeGateway {
   private readonly heartbeatAcks = new WeakMap<WebSocket, number>();
@@ -133,6 +139,7 @@ export class RealtimeGateway {
 
   private startHeartbeat(socket: WebSocket, url: URL): () => void {
     this.ackHeartbeat(socket);
+    const activity = this.trackActivity();
 
     const timer = globalThis.setInterval(() => {
       if (Date.now() - this.lastHeartbeatAckAt(socket) >= heartbeatTimeoutMs) {
@@ -147,11 +154,50 @@ export class RealtimeGateway {
 
       if (socket.readyState !== 1) return;
 
-      socket.send(JSON.stringify({ type: 'identity_heartbeat' }));
+      socket.send(
+        JSON.stringify({
+          active: activity.isActive(),
+          type: 'identity_heartbeat',
+        }),
+      );
       this.debug('heartbeat', 'sent');
     }, heartbeatIntervalMs);
 
-    return () => globalThis.clearInterval(timer);
+    return () => {
+      activity.stop();
+      globalThis.clearInterval(timer);
+    };
+  }
+
+  private trackActivity(): ActivityTracker {
+    let lastActivityAt = Date.now();
+    const markActive = () => {
+      lastActivityAt = Date.now();
+    };
+    const activityEvents = [
+      'focus',
+      'keydown',
+      'pointerdown',
+      'scroll',
+      'touchstart',
+    ];
+
+    for (const eventName of activityEvents) {
+      globalThis.addEventListener?.(eventName, markActive, {
+        passive: true,
+      });
+    }
+
+    return {
+      isActive: () =>
+        globalThis.document?.visibilityState !== 'hidden' &&
+        Date.now() - lastActivityAt <= recentActivityWindowMs,
+      stop: () => {
+        for (const eventName of activityEvents) {
+          globalThis.removeEventListener?.(eventName, markActive);
+        }
+      },
+    };
   }
 
   private ackHeartbeat(socket: WebSocket): void {

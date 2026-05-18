@@ -30,6 +30,7 @@ import type {
   ConversationKeyEntry,
   AttachmentProgress,
   ChatMessage,
+  IdentityPresence,
   IdentityResource,
   MessageAttachment,
   MessageReplyPreview,
@@ -91,6 +92,7 @@ interface CommunityWorkspaceProps {
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
   nodeNetworks: NodeNetwork[];
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
@@ -105,6 +107,7 @@ interface CommunityWorkspaceProps {
   onCallToggleMute?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
@@ -186,6 +189,7 @@ export function CommunityWorkspace({
   mobileRail,
   mobileSidebarOpen,
   nodeNetworks,
+  presenceByIdentityId = {},
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
@@ -198,6 +202,7 @@ export function CommunityWorkspace({
   onCommunityUpdated,
   onJoinVoiceChannel,
   onLogout,
+  onPresenceChange,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenConversationWithIdentity,
@@ -1526,6 +1531,7 @@ export function CommunityWorkspace({
               activeCall={activeCall}
               identityPictures={ownIdentityPictures}
               nodeNetworks={nodeNetworks}
+              onPresenceChange={onPresenceChange}
               onCallEnd={onCallEnd}
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleCamera={onCallToggleCamera}
@@ -1534,6 +1540,7 @@ export function CommunityWorkspace({
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}
+              presence={presenceByIdentityId[session.identity.id]}
               session={session}
             />
           </div>
@@ -1804,6 +1811,9 @@ export function CommunityWorkspace({
                                   ? memberPictures[session.identity.id]
                                   : memberPictures[message.authorIdentityId]
                               }
+                              authorPresence={
+                                presenceByIdentityId[message.authorIdentityId]
+                              }
                               onAttachmentOpen={(attachmentIndex) =>
                                 void openAttachment(
                                   message.attachments[attachmentIndex],
@@ -2042,6 +2052,7 @@ export function CommunityWorkspace({
                   )
           }
           picture={profileViewer.pictureUrl}
+          presence={presenceByIdentityId[profileViewer.identityId]}
         />
       )}
       {messageContextMenu && (

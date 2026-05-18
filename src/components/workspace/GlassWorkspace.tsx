@@ -29,8 +29,10 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
   MessageResource,
+  PresenceStatus,
   Session,
 } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
@@ -134,6 +136,51 @@ function canActOnMembershipRequest(
   );
 }
 
+function isPresenceStatus(value: unknown): value is PresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'custom' ||
+    value === 'disconnected' ||
+    value === 'invisible'
+  );
+}
+
+function presenceFromRealtimeEvent(
+  event: RealtimeDomainEvent,
+): IdentityPresence | null {
+  if (event.type !== 'presence.v1.identity_presence.was_updated') return null;
+
+  const attributes = event.attributes;
+  const identityId = attributes.identityId;
+  const status = attributes.status;
+
+  if (typeof identityId !== 'string' || !isPresenceStatus(status)) return null;
+
+  return {
+    identityId,
+    status,
+    updatedAt:
+      typeof attributes.updatedAt === 'number'
+        ? attributes.updatedAt
+        : Date.now(),
+    ...(typeof attributes.customMessage === 'string'
+      ? { customMessage: attributes.customMessage }
+      : {}),
+    ...(typeof attributes.lastActivityAt === 'number'
+      ? { lastActivityAt: attributes.lastActivityAt }
+      : {}),
+    ...(typeof attributes.lastHeartbeatAt === 'number'
+      ? { lastHeartbeatAt: attributes.lastHeartbeatAt }
+      : {}),
+    ...(Array.isArray(attributes.networkIds) &&
+    attributes.networkIds.every((networkId) => typeof networkId === 'string')
+      ? { networkIds: attributes.networkIds }
+      : {}),
+  };
+}
+
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -219,6 +266,9 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [presenceByIdentityId, setPresenceByIdentityId] = useState<
+    Record<string, IdentityPresence>
+  >({});
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -660,6 +710,34 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
+  const presenceIdentityIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          session.identity.id,
+          ...conversations.flatMap((conversation) => [
+            conversationPeerIdentityId(
+              conversation,
+              session.identity.id,
+              session.keychain,
+            ),
+            ...(conversation.participantIdentityIds ??
+              conversation.participantIds ??
+              conversation.participants ??
+              []),
+          ]),
+          ...communities.flatMap((community) => community.memberIds),
+          ...messages.map((message) => message.authorIdentityId),
+        ]),
+      ).filter((identityId): identityId is string => !!identityId),
+    [communities, conversations, messages, session],
+  );
+  const mergePresence = useCallback((presence: IdentityPresence) => {
+    setPresenceByIdentityId((current) => ({
+      ...current,
+      [presence.identityId]: presence,
+    }));
+  }, []);
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
       const identity =
@@ -680,6 +758,30 @@ export function GlassWorkspace({
     },
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
+
+  useEffect(() => {
+    if (presenceIdentityIds.length === 0) return;
+
+    let cancelled = false;
+
+    void pigeonApplication
+      .getPresences(session, presenceIdentityIds)
+      .then((presences) => {
+        if (cancelled) return;
+
+        setPresenceByIdentityId((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            presences.map((presence) => [presence.identityId, presence]),
+          ),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [presenceIdentityIds, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,
@@ -2255,6 +2357,14 @@ export function GlassWorkspace({
         });
       }
 
+      const presence = presenceFromRealtimeEvent(event);
+
+      if (presence) {
+        mergePresence(presence);
+
+        return;
+      }
+
       if (event.type.startsWith('calls.')) {
         const eventCallId =
           eventAggregateId(event) ?? stringAttribute(event, 'callId');
@@ -2746,6 +2856,7 @@ export function GlassWorkspace({
       isScrolledNearBottom,
       markCommunityChannelUnread,
       markUnreadMessage,
+      mergePresence,
       messages,
       onCommunitiesReload,
       onPeersReload,
@@ -2773,9 +2884,7 @@ export function GlassWorkspace({
     onDomainEvent: handleRealtimeEvent,
     onReconnecting: () => setRealtimeStatus('reconnecting'),
   });
-  const handleWorkspacePointerDown = (
-    event: PointerEvent<HTMLElement>,
-  ) => {
+  const handleWorkspacePointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'touch' || sidebarOpen) return;
 
     if (event.clientX > 28) return;
@@ -2786,9 +2895,7 @@ export function GlassWorkspace({
       startY: event.clientY,
     };
   };
-  const handleWorkspacePointerMove = (
-    event: PointerEvent<HTMLElement>,
-  ) => {
+  const handleWorkspacePointerMove = (event: PointerEvent<HTMLElement>) => {
     const gesture = sidebarGestureRef.current;
 
     if (!gesture || gesture.pointerId !== event.pointerId) return;
@@ -2885,6 +2992,7 @@ export function GlassWorkspace({
                   identityNames={identityNames}
                   identityPictures={identityPictures}
                   identityProfiles={identityProfiles}
+                  presenceByIdentityId={presenceByIdentityId}
                   nodeNetworks={nodeNetworks}
                   activeConversationId={activeConversation?.id ?? null}
                   onSelect={(id) => {
@@ -2905,6 +3013,7 @@ export function GlassWorkspace({
                     setSession(nextSession);
                     rememberIdentity(nextSession.identity);
                   }}
+                  onPresenceChange={mergePresence}
                 />
               </div>
             </div>
@@ -2938,6 +3047,7 @@ export function GlassWorkspace({
               identityNames={identityNames}
               identityPictures={identityPictures}
               identityProfiles={identityProfiles}
+              presenceByIdentityId={presenceByIdentityId}
               messages={messages}
               messageState={messageState}
               newMessageCount={newMessageCount}
@@ -3030,6 +3140,7 @@ export function GlassWorkspace({
               onCallToggleMute={toggleMute}
               onCallToggleScreenShare={toggleScreenShare}
               realtimeEvent={communityRealtimeEvent}
+              presenceByIdentityId={presenceByIdentityId}
               onChannelSelected={(channelId) =>
                 setCommunityChannelById((current) =>
                   current[activeCommunity.id] === channelId
@@ -3070,6 +3181,7 @@ export function GlassWorkspace({
                 setSession(nextSession);
                 rememberIdentity(nextSession.identity);
               }}
+              onPresenceChange={mergePresence}
               realtimeStatus={realtimeStatus}
               onRealtimeEventsOpen={openRealtimeEvents}
               session={session}

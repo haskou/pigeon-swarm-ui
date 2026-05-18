@@ -214,12 +214,12 @@ describe(RealtimeGateway.name, () => {
       }),
     );
 
-    jest.advanceTimersByTime(29999);
+    jest.advanceTimersByTime(9999);
     expect(WebSocketMock.instances[0]?.send).not.toHaveBeenCalled();
 
     jest.advanceTimersByTime(1);
     expect(WebSocketMock.instances[0]?.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: 'identity_heartbeat' }),
+      JSON.stringify({ active: true, type: 'identity_heartbeat' }),
     );
   });
 
@@ -248,7 +248,7 @@ describe(RealtimeGateway.name, () => {
       }),
     );
 
-    jest.advanceTimersByTime(60000);
+    jest.advanceTimersByTime(30000);
 
     expect(WebSocketMock.instances[0]?.close).toHaveBeenCalledWith(
       4000,
@@ -279,7 +279,7 @@ describe(RealtimeGateway.name, () => {
         type: 'connection_ack',
       }),
     );
-    jest.advanceTimersByTime(30000);
+    jest.advanceTimersByTime(10000);
     WebSocketMock.instances[0]?.emitMessage(
       JSON.stringify({
         identityId: 'identity-1',
@@ -287,7 +287,7 @@ describe(RealtimeGateway.name, () => {
         type: 'heartbeat_ack',
       }),
     );
-    jest.advanceTimersByTime(30000);
+    jest.advanceTimersByTime(10000);
 
     expect(WebSocketMock.instances[0]?.close).not.toHaveBeenCalled();
   });

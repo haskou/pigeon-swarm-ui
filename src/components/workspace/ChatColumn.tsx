@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   ConversationKeyEntry,
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
   MessageAttachment,
   Session,
@@ -52,6 +53,7 @@ interface ChatColumnProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   conversationKey?: ConversationKeyEntry;
   draft: string;
   hasConversationKey: boolean;
@@ -129,6 +131,7 @@ export function ChatColumn({
   identityNames,
   identityPictures,
   identityProfiles,
+  presenceByIdentityId = {},
   messages,
   messageState,
   newMessageCount,
@@ -492,6 +495,9 @@ export function ChatColumn({
         onOpenSidebar={onOpenSidebar}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
         peerPicture={peerPicture}
+        peerPresence={
+          peerIdentityId ? presenceByIdentityId[peerIdentityId] : undefined
+        }
         realtimeStatus={realtimeStatus}
       >
         {conversationMenuOpen && activeConversation && (
@@ -606,6 +612,7 @@ export function ChatColumn({
             hasReachedMessageStart={hasReachedMessageStart}
             identityNames={identityNames}
             identityPictures={identityPictures}
+            presenceByIdentityId={presenceByIdentityId}
             isGroupConversation={isGroupConversation}
             loadAttachmentPreview={loadAttachmentPreview}
             messageState={messageState}
@@ -733,6 +740,7 @@ export function ChatColumn({
           name={profileViewer.name}
           nodeNetworks={nodeNetworks}
           onClose={() => setProfileViewer(null)}
+          presence={presenceByIdentityId[profileViewer.identityId]}
           onOpenConversation={
             profileViewer.identityId === session.identity.id ||
             !onOpenConversationWithIdentity

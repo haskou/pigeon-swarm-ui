@@ -30,6 +30,7 @@ import type {
   ConversationResource,
   AttachmentProgress,
   IdentityResource,
+  IdentityPresence,
   IpfsReplicationStatus,
   KeychainResource,
   LocalKeychain,
@@ -44,6 +45,7 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
+  SelectablePresenceStatus,
 } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
@@ -222,6 +224,70 @@ export class PigeonApiGateway {
     return await this.http.request<IpfsReplicationStatus>(path, {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
+    });
+  }
+
+  public async getPresence(
+    session: Session,
+    identityId: string,
+  ): Promise<IdentityPresence> {
+    const path = `/presence/${encodeURIComponent(identityId)}`;
+    const body = {};
+
+    return await this.http.request<IdentityPresence>(path, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+  }
+
+  public async getPresences(
+    session: Session,
+    identityIds: string[],
+  ): Promise<IdentityPresence[]> {
+    const path = '/presence/';
+    const query = new URLSearchParams();
+    const body = {};
+
+    for (const identityId of uniqueSorted(identityIds)) {
+      query.append('identityIds', identityId);
+    }
+
+    const result = await this.http.request<
+      IdentityPresence[] | { presences: IdentityPresence[] }
+    >(`${path}?${query.toString()}`, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+
+    return Array.isArray(result) ? result : result.presences;
+  }
+
+  public async updatePresence(
+    session: Session,
+    input: { customMessage?: string; status: SelectablePresenceStatus },
+  ): Promise<IdentityPresence> {
+    const path = '/presence/me';
+    const body = {
+      status: input.status,
+      ...(input.customMessage !== undefined
+        ? { customMessage: input.customMessage }
+        : {}),
+    };
+
+    return await this.http.request<IdentityPresence>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+  }
+
+  public async deletePresenceCustomMessage(session: Session): Promise<void> {
+    const path = '/presence/me/custom-message';
+    const body = {};
+
+    await this.http.request<void>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
     });
   }
 

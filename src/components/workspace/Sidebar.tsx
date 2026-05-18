@@ -15,7 +15,9 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallSession } from '../../domain/calls/CallSession';
 import type {
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
+  SelectablePresenceStatus,
   Session,
 } from '../../domain/types';
 
@@ -51,6 +53,10 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
+import {
+  PresenceCustomStatus,
+  PresenceStatusDot,
+} from '../presence/PresenceStatusDot';
 import { SectionTitle } from '../common/SectionTitle';
 import { loadPublicImage } from '../community/communityImages';
 
@@ -67,11 +73,13 @@ interface SidebarProps {
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
+  presenceByIdentityId?: Record<string, IdentityPresence>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
@@ -91,6 +99,7 @@ export function Sidebar({
   identityNames,
   identityPictures,
   identityProfiles,
+  presenceByIdentityId = {},
   nodeNetworks,
   onCallEnd,
   onCallParticipantVolumeChange,
@@ -102,6 +111,7 @@ export function Sidebar({
   onLogout,
   onSelect,
   onSessionUpdated,
+  onPresenceChange,
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
@@ -235,7 +245,7 @@ export function Sidebar({
               <div className="relative flex items-center gap-3">
                 <div
                   className={cx(
-                    'grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+                    'relative grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
                     activeConversationId === conversation.id &&
                       'ring-2 ring-slate-950/20',
                   )}
@@ -248,6 +258,14 @@ export function Sidebar({
                     />
                   ) : (
                     conversationName(conversation).slice(0, 1).toUpperCase()
+                  )}
+                  {conversationPeerId(conversation) && (
+                    <PresenceStatusDot
+                      presence={
+                        presenceByIdentityId[conversationPeerId(conversation)!]
+                      }
+                      className="bottom-0 right-0"
+                    />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -281,7 +299,9 @@ export function Sidebar({
         identityPictures={identityPictures}
         nodeNetworks={nodeNetworks}
         onLogout={onLogout}
+        onPresenceChange={onPresenceChange}
         onSessionUpdated={onSessionUpdated}
+        presence={presenceByIdentityId[session.identity.id]}
         session={session}
         activeCall={activeCall}
         onCallEnd={onCallEnd}
@@ -379,14 +399,18 @@ export function UserProfileDropdown({
   onCallToggleMute,
   onCallToggleScreenShare,
   onLogout,
+  onPresenceChange,
   onSessionUpdated,
+  presence,
   session,
 }: {
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;
   nodeNetworks: NodeNetwork[];
   onLogout: () => void;
+  onPresenceChange?: (presence: IdentityPresence) => void;
   onSessionUpdated: (session: Session) => void;
+  presence?: IdentityPresence;
   session: Session;
   activeCall?: CallSession | null;
   onCallEnd?: () => void;
@@ -403,6 +427,13 @@ export function UserProfileDropdown({
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  const [presenceStatus, setPresenceStatus] =
+    useState<SelectablePresenceStatus>(selectablePresenceStatus(presence));
+  const [customMessage, setCustomMessage] = useState(
+    presence?.customMessage ?? '',
+  );
+  const [presenceError, setPresenceError] = useState<string | null>(null);
+  const [presenceSaving, setPresenceSaving] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const ownDisplayName = identityDisplayName(
     session.identity.id,
@@ -430,6 +461,79 @@ export function UserProfileDropdown({
 
   const changeLanguage = (nextLanguage: string) => {
     setLanguage(saveLanguage(nextLanguage));
+  };
+
+  useEffect(() => {
+    if (!presence) return;
+
+    setPresenceStatus(selectablePresenceStatus(presence));
+    setCustomMessage(presence.customMessage ?? '');
+  }, [presence]);
+
+  const updatePresenceStatus = async (nextStatus: string) => {
+    const status = nextStatus as SelectablePresenceStatus;
+
+    setPresenceStatus(status);
+    setPresenceSaving(true);
+    setPresenceError(null);
+    try {
+      const nextPresence = await pigeonApplication.updatePresence(session, {
+        ...(customMessage.trim()
+          ? { customMessage: customMessage.trim().slice(0, 50) }
+          : {}),
+        status,
+      });
+
+      onPresenceChange?.(nextPresence);
+    } catch {
+      setPresenceError(copy.presence.error);
+    } finally {
+      setPresenceSaving(false);
+    }
+  };
+
+  const saveCustomPresence = async () => {
+    const message = customMessage.trim().slice(0, 50);
+
+    setCustomMessage(message);
+    setPresenceSaving(true);
+    setPresenceError(null);
+    try {
+      const nextPresence = await pigeonApplication.updatePresence(session, {
+        ...(message ? { customMessage: message } : {}),
+        status: message ? 'custom' : presenceStatus,
+      });
+
+      onPresenceChange?.(nextPresence);
+      if (message) setPresenceStatus('custom');
+    } catch {
+      setPresenceError(copy.presence.error);
+    } finally {
+      setPresenceSaving(false);
+    }
+  };
+
+  const clearCustomPresence = async () => {
+    setPresenceSaving(true);
+    setPresenceError(null);
+    try {
+      await pigeonApplication.deletePresenceCustomMessage(session);
+      const nextPresence = await pigeonApplication.updatePresence(session, {
+        status: presenceStatus === 'custom' ? 'available' : presenceStatus,
+      });
+
+      setCustomMessage('');
+      setPresenceStatus(
+        nextPresence.status === 'custom'
+          ? 'available'
+          : selectablePresenceStatus(nextPresence),
+      );
+      onPresenceChange?.(nextPresence);
+    } catch {
+      setPresenceError(copy.presence.error);
+    } finally {
+      setPresenceSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -475,12 +579,18 @@ export function UserProfileDropdown({
         className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
       >
-        <ProfileAvatar label={ownDisplayName} picture={ownPicture} size="lg" />
+        <ProfileAvatar
+          label={ownDisplayName}
+          picture={ownPicture}
+          presence={presence}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <div className="truncate font-black">{ownProfileName}</div>
           <div className="truncate text-xs text-white/50">
             {ownProfileHandle}
           </div>
+          <PresenceCustomStatus presence={presence} />
         </div>
         <svg
           aria-hidden="true"
@@ -511,6 +621,57 @@ export function UserProfileDropdown({
           )}
         >
           <div className="space-y-3 text-xs">
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.presence.status}
+              </div>
+              <GlassSelect
+                ariaLabel={copy.presence.selectStatus}
+                disabled={presenceSaving}
+                onChange={(value) => void updatePresenceStatus(value)}
+                options={presenceStatusOptions()}
+                value={presenceStatus}
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.presence.customMessage}
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
+                <input
+                  value={customMessage}
+                  maxLength={50}
+                  onChange={(event) => setCustomMessage(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-white/80 outline-none placeholder:text-white/30"
+                  placeholder={copy.presence.customMessagePlaceholder}
+                />
+                <button
+                  type="button"
+                  onClick={() => void saveCustomPresence()}
+                  disabled={presenceSaving}
+                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950 disabled:opacity-50"
+                >
+                  {copy.presence.saveCustomMessage}
+                </button>
+              </div>
+              {customMessage && (
+                <button
+                  type="button"
+                  onClick={() => void clearCustomPresence()}
+                  disabled={presenceSaving}
+                  className="mt-2 text-xs font-black text-white/45 transition hover:text-white/75 disabled:opacity-50"
+                >
+                  {copy.presence.clearCustomMessage}
+                </button>
+              )}
+              {presenceError && (
+                <p className="mt-2 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-2 text-rose-100">
+                  {presenceError}
+                </p>
+              )}
+            </div>
+
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.identityId}
@@ -595,17 +756,19 @@ function ProfileAvatar({
   className,
   label,
   picture,
+  presence,
   size = 'md',
 }: {
   className?: string;
   label: string;
   picture?: string | null;
+  presence?: IdentityPresence;
   size?: 'lg' | 'md' | 'xl';
 }) {
   return (
     <div
       className={cx(
-        'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        'relative grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
         size === 'xl'
           ? 'h-16 w-16 text-2xl'
           : size === 'lg'
@@ -619,8 +782,34 @@ function ProfileAvatar({
       ) : (
         label.slice(0, 1).toUpperCase() || 'P'
       )}
+      <PresenceStatusDot
+        presence={presence}
+        size={size === 'xl' ? 'lg' : 'md'}
+        className="bottom-0 right-0"
+      />
     </div>
   );
+}
+
+function presenceStatusOptions(): Array<{
+  label: string;
+  value: SelectablePresenceStatus;
+}> {
+  return [
+    { label: copy.presence.statuses.available, value: 'available' },
+    { label: copy.presence.statuses.away, value: 'away' },
+    { label: copy.presence.statuses.busy, value: 'busy' },
+    { label: copy.presence.statuses.custom, value: 'custom' },
+    { label: copy.presence.statuses.invisible, value: 'invisible' },
+  ];
+}
+
+function selectablePresenceStatus(
+  presence?: IdentityPresence,
+): SelectablePresenceStatus {
+  if (!presence || presence.status === 'disconnected') return 'available';
+
+  return presence.status;
 }
 
 function ProfileEditor({

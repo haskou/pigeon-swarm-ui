@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AttachmentProgress,
   ChatMessage,
+  IdentityPresence,
   MessageAttachment,
   MessageResource,
 } from '../../domain/types';
@@ -22,6 +23,7 @@ interface MessageBubbleProps {
   currentIdentityId: string;
   authorName: string;
   authorPicture?: string | null;
+  authorPresence?: IdentityPresence;
   onAttachmentPreview: (
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
@@ -52,6 +54,7 @@ type IndexedAttachment = {
 export function MessageBubble({
   authorName,
   authorPicture,
+  authorPresence,
   currentIdentityId,
   message,
   onAttachmentOpen,
@@ -190,6 +193,7 @@ export function MessageBubble({
               label={authorName}
               onClick={onAvatarClick}
               picture={authorPicture}
+              presence={authorPresence}
             />
           ) : reserveAvatarSpace ? (
             <div className="w-11 shrink-0" />
@@ -892,7 +896,11 @@ function AttachmentCard({
       )}
     >
       {previewUrl && attachment.contentType.startsWith('video/') && (
-        <video src={previewUrl} className="max-h-44 w-full sm:max-h-72" controls />
+        <video
+          src={previewUrl}
+          className="max-h-44 w-full sm:max-h-72"
+          controls
+        />
       )}
       {previewUrl && attachment.contentType.startsWith('audio/') && (
         <audio src={previewUrl} className="w-full p-1 sm:p-2" controls />
