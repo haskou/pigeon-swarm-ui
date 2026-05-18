@@ -733,7 +733,7 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
-  const presenceIdentityIds = useMemo(
+  const presenceIdentityIdsKey = useMemo(
     () =>
       Array.from(
         new Set([
@@ -752,8 +752,17 @@ export function GlassWorkspace({
           ...communities.flatMap((community) => community.memberIds),
           ...messages.map((message) => message.authorIdentityId),
         ]),
-      ).filter((identityId): identityId is string => !!identityId),
+      )
+        .filter((identityId): identityId is string => !!identityId)
+        .join('\u0000'),
     [communities, conversations, messages, session],
+  );
+  const presenceIdentityIds = useMemo(
+    () =>
+      presenceIdentityIdsKey.length > 0
+        ? presenceIdentityIdsKey.split('\u0000')
+        : [],
+    [presenceIdentityIdsKey],
   );
   const mergePresence = useCallback((presence: IdentityPresence) => {
     setPresenceByIdentityId((current) => ({
@@ -849,7 +858,7 @@ export function GlassWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [mergePresence, presenceIdentityIds, session]);
+  }, [mergePresence, presenceIdentityIds, presenceIdentityIdsKey, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,

@@ -224,7 +224,12 @@ export class PigeonApiGateway {
     session: Session,
     identityIds: string[],
   ): Promise<IdentityPresence[]> {
-    return await this.presence.getMany(session, identityIds);
+    const uniqueIdentityIds = [...new Set(identityIds.filter(Boolean))].sort();
+
+    return await this.cachedRequest(
+      `GET /presence/ ${session.identity.id} ${uniqueIdentityIds.join('\u0000')}`,
+      () => this.presence.getMany(session, uniqueIdentityIds),
+    );
   }
 
   public async getPushVapidPublicKey(): Promise<{
@@ -341,10 +346,14 @@ export class PigeonApiGateway {
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}`;
 
-    return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    return await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () =>
+        await this.http.request<Community>(path, {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        }),
+    );
   }
 
   public async discoverCommunities(
