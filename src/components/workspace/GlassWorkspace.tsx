@@ -265,6 +265,8 @@ export function GlassWorkspace({
   const [presenceByIdentityId, setPresenceByIdentityId] = useState<
     Record<string, IdentityPresence>
   >({});
+  const notificationsMutedByPresence =
+    presenceByIdentityId[session.identity.id]?.status === 'busy';
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -734,6 +736,11 @@ export function GlassWorkspace({
       [presence.identityId]: presence,
     }));
   }, []);
+  const playNotificationSoundIfAllowed = useCallback(() => {
+    if (notificationsMutedByPresence) return;
+
+    playNotificationSound();
+  }, [notificationsMutedByPresence]);
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
       const identity =
@@ -2451,7 +2458,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('notifications.')) {
-        playNotificationSound();
+        playNotificationSoundIfAllowed();
         void showPwaNotification({
           body: copy.notifications.open,
           tag: `notification-${event.event_id}`,
@@ -2513,7 +2520,7 @@ export function GlassWorkspace({
             identityNames,
           );
 
-          playNotificationSound();
+          playNotificationSoundIfAllowed();
           void showPwaNotification({
             body: preview.body,
             tag: `community-${communityId}-${channelId}`,
@@ -2730,7 +2737,7 @@ export function GlassWorkspace({
             identityProfiles,
           );
 
-          playNotificationSound();
+          playNotificationSoundIfAllowed();
           void showPwaNotification({
             body: preview.body,
             tag: `conversation-${conversationId}`,
@@ -2869,6 +2876,7 @@ export function GlassWorkspace({
       messages,
       onCommunitiesReload,
       onPeersReload,
+      playNotificationSoundIfAllowed,
       refreshConversations,
       refreshMembershipRequests,
       refreshNotifications,
