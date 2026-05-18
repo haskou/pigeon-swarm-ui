@@ -64,6 +64,9 @@ import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
 import { PigeonCallsApi } from './PigeonCallsApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
+import { PigeonNodeApi } from './PigeonNodeApi';
+import { PigeonPresenceApi } from './PigeonPresenceApi';
+import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
@@ -119,15 +122,6 @@ type ConversationInvitationType =
   | 'conversation_invitation'
   | 'group_conversation_invitation';
 
-type PushSubscriptionPayload = {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: {
-    auth: string;
-    p256dh: string;
-  };
-};
-
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsApi;
 
@@ -148,6 +142,12 @@ export class PigeonApiGateway {
   private messageDecryptWorker: MessageDecryptWorker | null = null;
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
+
+  private readonly node: PigeonNodeApi;
+
+  private readonly presence: PigeonPresenceApi;
+
+  private readonly push: PigeonPushApi;
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
@@ -173,6 +173,9 @@ export class PigeonApiGateway {
     this.keychains = keychains;
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
+    this.node = new PigeonNodeApi(http, signer);
+    this.presence = new PigeonPresenceApi(http, signer);
+    this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
   }
 
@@ -181,48 +184,21 @@ export class PigeonApiGateway {
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.cachedRequest('GET /node/', () =>
-      this.http.request<{ id: string; owner: string | null }>('/node/'),
-    );
+    return await this.node.getInfo();
   }
 
   public async claimNode(session: Session): Promise<void> {
-    const path = '/node/owner';
-    const body = { identityId: session.identity.id };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
+    await this.node.claim(session);
   }
 
   public async getNodeNetworks(
     session?: Session,
   ): Promise<{ id: string; key?: null | string; name: string }[]> {
-    const path = '/node/networks/';
-    const result = await this.cachedRequest(
-      `GET ${path} ${session?.identity.id ?? 'anonymous'}`,
-      async () =>
-        await this.http.request<{
-          networks: { id: string; key?: null | string; name: string }[];
-        }>(path, {
-          headers: session
-            ? await this.signer.headers(session, 'GET', path)
-            : undefined,
-          method: 'GET',
-        }),
-    );
-
-    return result.networks;
+    return await this.node.getNetworks(session);
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.cachedRequest('GET /peers/', () =>
-      this.http.request<{ peers: Peer[] }>('/peers/'),
-    );
-
-    return result.peers;
+    return await this.node.getPeers();
   }
 
   public async getIpfsReplicationStatus(
@@ -241,89 +217,42 @@ export class PigeonApiGateway {
     session: Session,
     identityId: string,
   ): Promise<IdentityPresence> {
-    const path = `/presence/${encodeURIComponent(identityId)}`;
-    const body = {};
-
-    return await this.http.request<IdentityPresence>(path, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
-    });
+    return await this.presence.get(session, identityId);
   }
 
   public async getPresences(
     session: Session,
     identityIds: string[],
   ): Promise<IdentityPresence[]> {
-    const path = '/presence/';
-    const query = new URLSearchParams();
-    const body = {};
-
-    for (const identityId of uniqueSorted(identityIds)) {
-      query.append('identityIds', identityId);
-    }
-
-    const result = await this.http.request<
-      IdentityPresence[] | { presences: IdentityPresence[] }
-    >(`${path}?${query.toString()}`, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
-    });
-
-    return Array.isArray(result) ? result : result.presences;
+    return await this.presence.getMany(session, identityIds);
   }
 
   public async getPushVapidPublicKey(): Promise<{
     enabled: boolean;
     publicKey?: string;
   }> {
-    return await this.http.request<{
-      enabled: boolean;
-      publicKey?: string;
-    }>('/push/vapid-public-key', {
-      method: 'GET',
-    });
+    return await this.push.getVapidPublicKey();
   }
 
   public async registerPushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    const path = '/push/subscriptions';
-
-    await this.http.request(path, {
-      body: JSON.stringify(subscription),
-      headers: await this.signer.headers(session, 'PUT', path, subscription),
-      method: 'PUT',
-    });
+    await this.push.registerSubscription(session, subscription);
   }
 
   public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    const path = '/push/subscriptions';
-
-    await this.http.request(path, {
-      body: JSON.stringify(subscription),
-      headers: await this.signer.headers(session, 'DELETE', path, subscription),
-      method: 'DELETE',
-    });
+    await this.push.deleteSubscription(session, subscription);
   }
 
   public async updatePresence(
     session: Session,
     input: { status: SelectablePresenceStatus },
   ): Promise<IdentityPresence> {
-    const path = '/presence/me';
-    const body = {
-      status: input.status,
-    };
-
-    return await this.http.request<IdentityPresence>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
+    return await this.presence.update(session, input);
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
