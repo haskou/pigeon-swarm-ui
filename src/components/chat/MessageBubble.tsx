@@ -74,10 +74,6 @@ export function MessageBubble({
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
   const hasReply = Boolean(replyMessageId);
-  const compactTimestamp =
-    !hasReply &&
-    message.content.length <= 36 &&
-    !message.content.includes('\n');
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -182,18 +178,21 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex gap-3', mine && 'justify-end')}
+        className={cx('flex items-end gap-3', mine && 'justify-end')}
       >
-        {!mine &&
-          (showAvatar ? (
-            <Avatar
-              label={authorName}
-              onClick={onAvatarClick}
-              picture={authorPicture}
-            />
-          ) : reserveAvatarSpace ? (
-            <div className="w-11 shrink-0" />
-          ) : null)}
+        {!mine && (
+          <MessageAvatarColumn
+            authorName={authorName}
+            authorPicture={authorPicture}
+            onAvatarClick={onAvatarClick}
+            onReactionToggle={(emoji, reacted) => {
+              onReactionToggle?.(message, emoji, reacted);
+            }}
+            reactionGroups={reactionGroups}
+            reserveAvatarSpace={reserveAvatarSpace}
+            showAvatar={showAvatar || reactionGroups.length > 0}
+          />
+        )}
         <div
           onContextMenu={handleContextMenu}
           style={{
@@ -208,10 +207,6 @@ export function MessageBubble({
           onPointerUp={clearLongPressTimer}
           className={cx(
             'max-w-[96%] select-none rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
-            compactTimestamp &&
-              message.attachments.length === 0 &&
-              reactionGroups.length === 0 &&
-              'flex items-end gap-2',
             mine
               ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
               : 'border border-white/10 bg-black/25 text-white',
@@ -317,44 +312,45 @@ export function MessageBubble({
               url={linkPreview.url}
             />
           )}
-          <div
-            className={cx(
-              'flex items-center justify-end gap-2 text-xs font-black opacity-65',
-              compactTimestamp && message.attachments.length === 0
-                ? 'shrink-0'
-                : 'mt-1',
-            )}
-          >
-            {message.deliveryStatus === 'pending' && (
-              <span>{copy.messages.sending}</span>
-            )}
-            {message.deliveryStatus === 'failed' && (
-              <>
-                <span className="text-rose-100">
-                  {copy.messages.sendFailed}
-                </span>
-                {onRetryMessage && (
-                  <button
-                    type="button"
-                    onClick={() => onRetryMessage(message)}
-                    className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
-                  >
-                    {copy.messages.retrySend}
-                  </button>
-                )}
-              </>
-            )}
-            <span>{formatTime(message.timestamp)}</span>
-          </div>
-          {reactionGroups.length > 0 && (
-            <MessageReactions
-              groups={reactionGroups}
-              onToggle={(emoji, reacted) => {
-                onReactionToggle?.(message, emoji, reacted);
-              }}
-            />
+          {(message.deliveryStatus === 'pending' ||
+            message.deliveryStatus === 'failed') && (
+            <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
+              {message.deliveryStatus === 'pending' && (
+                <span>{copy.messages.sending}</span>
+              )}
+              {message.deliveryStatus === 'failed' && (
+                <>
+                  <span className="text-rose-100">
+                    {copy.messages.sendFailed}
+                  </span>
+                  {onRetryMessage && (
+                    <button
+                      type="button"
+                      onClick={() => onRetryMessage(message)}
+                      className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
+                    >
+                      {copy.messages.retrySend}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
+        {mine && (
+          <MessageAvatarColumn
+            authorName={authorName}
+            authorPicture={authorPicture}
+            mine
+            onAvatarClick={onAvatarClick}
+            onReactionToggle={(emoji, reacted) => {
+              onReactionToggle?.(message, emoji, reacted);
+            }}
+            reactionGroups={reactionGroups}
+            reserveAvatarSpace
+            showAvatar
+          />
+        )}
       </div>
       {lightbox && (
         <ImageLightbox
@@ -364,6 +360,46 @@ export function MessageBubble({
         />
       )}
     </>
+  );
+}
+
+function MessageAvatarColumn({
+  authorName,
+  authorPicture,
+  mine,
+  onAvatarClick,
+  onReactionToggle,
+  reactionGroups,
+  reserveAvatarSpace,
+  showAvatar,
+}: {
+  authorName: string;
+  authorPicture?: string | null;
+  mine?: boolean;
+  onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
+  onReactionToggle: (emoji: string, reacted: boolean) => void;
+  reactionGroups: ReactionGroup[];
+  reserveAvatarSpace: boolean;
+  showAvatar: boolean;
+}) {
+  if (!showAvatar && !reserveAvatarSpace) return null;
+
+  return (
+    <div className="flex w-11 shrink-0 flex-col items-center gap-1">
+      {reactionGroups.length > 0 && (
+        <MessageReactions groups={reactionGroups} onToggle={onReactionToggle} />
+      )}
+      {showAvatar ? (
+        <Avatar
+          label={authorName}
+          mine={mine}
+          onClick={onAvatarClick}
+          picture={authorPicture}
+        />
+      ) : (
+        <div className="w-11 shrink-0" />
+      )}
+    </div>
   );
 }
 
@@ -383,7 +419,7 @@ function MessageReactions({
   onToggle: (emoji: string, reacted: boolean) => void;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <div className="flex max-w-24 flex-wrap items-center justify-center gap-1">
       {groups.map((group) => (
         <button
           type="button"
