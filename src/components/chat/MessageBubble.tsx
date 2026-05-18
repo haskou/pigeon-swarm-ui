@@ -196,24 +196,30 @@ export function MessageBubble({
           )}
         >
           <div
-            onContextMenu={handleContextMenu}
-            style={{
-              WebkitTouchCallout: 'none',
-              WebkitUserSelect: 'none',
-              userSelect: 'none',
-            }}
-            onPointerCancel={clearLongPressTimer}
-            onPointerDown={handlePointerDown}
-            onPointerLeave={clearLongPressTimer}
-            onPointerMove={clearLongPressTimer}
-            onPointerUp={clearLongPressTimer}
             className={cx(
-              'w-fit max-w-full select-none rounded-2xl p-3 text-sm leading-6',
-              mine
-                ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
-                : 'border border-white/10 bg-black/25 text-white',
+              'flex max-w-full items-end gap-2',
+              mine && 'flex-row-reverse',
             )}
           >
+            <div
+              onContextMenu={handleContextMenu}
+              style={{
+                WebkitTouchCallout: 'none',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
+              }}
+              onPointerCancel={clearLongPressTimer}
+              onPointerDown={handlePointerDown}
+              onPointerLeave={clearLongPressTimer}
+              onPointerMove={clearLongPressTimer}
+              onPointerUp={clearLongPressTimer}
+              className={cx(
+                'min-w-0 max-w-full select-none rounded-2xl p-3 text-sm leading-6',
+                mine
+                  ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                  : 'border border-white/10 bg-black/25 text-white',
+              )}
+            >
             {hasReply && replyMessageId && (
               <button
                 type="button"
@@ -338,15 +344,11 @@ export function MessageBubble({
                 )}
               </div>
             )}
+            </div>
+            <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
+              {formatTime(message.timestamp)}
+            </span>
           </div>
-          <span
-            className={cx(
-              'mt-1 px-1 text-[0.68rem] font-bold leading-none text-white/30',
-              mine ? 'text-right' : 'text-left',
-            )}
-          >
-            {formatTime(message.timestamp)}
-          </span>
           {reactionGroups.length > 0 && (
             <MessageReactions
               groups={reactionGroups}
