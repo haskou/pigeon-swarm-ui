@@ -27,11 +27,15 @@ import {
 import { Composer } from '../chat/Composer';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
+import { ChatEmptyState } from './ChatEmptyState';
 import { ChatConversationHeader } from './ChatConversationHeader';
 import { ChatMessageTimeline } from './ChatMessageTimeline';
+import { ChatTypingIndicator } from './ChatTypingIndicator';
 import { ConversationDataDialog } from './ConversationDataDialog';
+import { ConversationActionsMenu } from './ConversationActionsMenu';
 import { ConversationKeyDialog } from './ConversationKeyDialog';
 import { GroupProfileDialog } from './GroupProfileDialog';
+import { GroupInvitationDialog } from './GroupInvitationDialog';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -121,41 +125,6 @@ function normalizeIdentityLookup(value: string): string {
   const trimmed = value.trim();
 
   return trimmed.startsWith('@') ? trimmed.slice(1).trim() : trimmed;
-}
-
-function TypingIndicator({
-  identityIds,
-  identityNames,
-}: {
-  identityIds: string[];
-  identityNames: IdentityNames;
-}) {
-  return (
-    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
-      {typingLabel(identityIds, identityNames)}
-    </div>
-  );
-}
-
-function typingLabel(
-  identityIds: string[],
-  identityNames: IdentityNames,
-): string {
-  const [firstIdentityId, secondIdentityId] = identityIds;
-  const firstName = firstIdentityId
-    ? identityDisplayName(firstIdentityId, identityNames)
-    : '';
-
-  if (identityIds.length === 1) return `${firstName} is typing...`;
-
-  if (identityIds.length === 2 && secondIdentityId) {
-    return `${firstName} and ${identityDisplayName(
-      secondIdentityId,
-      identityNames,
-    )} are typing...`;
-  }
-
-  return `${firstName} and ${identityIds.length - 1} more are typing...`;
 }
 
 export function ChatColumn({
@@ -315,6 +284,17 @@ export function ChatColumn({
         };
       }),
     [activeConversation, identityNames, identityPictures, identityProfiles],
+  );
+  const callParticipants = useMemo(
+    () =>
+      groupParticipants.map((participant) => ({
+        identity: participant.identity,
+        identityId: participant.identityId,
+        muted: false,
+        name: participant.name,
+        picture: participant.picture,
+      })),
+    [groupParticipants],
   );
   const canShareConversationKey = !isGroupConversation;
   const closeConversationKeyDialog = () => {
@@ -555,107 +535,35 @@ export function ChatColumn({
         realtimeStatus={realtimeStatus}
       >
         {conversationMenuOpen && activeConversation && (
-          <>
-            <button
-              type="button"
-              className="fixed inset-0 z-30 cursor-default"
-              onClick={() => setConversationMenuOpen(false)}
-              aria-label={copy.dialog.close}
-            />
-            <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-              {onStartCall && !isGroupConversation ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStartCall({
-                      conversationId: activeConversation.id,
-                      kind: 'one-to-one',
-                      participants: groupParticipants.map((participant) => ({
-                        identity: participant.identity,
-                        identityId: participant.identityId,
-                        muted: false,
-                        name: participant.name,
-                        picture: participant.picture,
-                      })),
-                      title:
-                        activeConversationTitle ??
-                        activeConversationName ??
-                        activeConversation.id,
-                    });
-                    setConversationMenuOpen(false);
-                  }}
-                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                >
-                  {copy.calls.startCall}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setConversationDataOpen(true);
-                  setConversationMenuOpen(false);
-                }}
-                className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-              >
-                {copy.chat.viewData}
-              </button>
-              {canShareConversationKey ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (hasConversationKey) {
-                      openCopyConversationKeyDialog();
-                    } else {
-                      setConversationKeyError(null);
-                      setConversationKeyDialog('add');
-                    }
-                    setConversationMenuOpen(false);
-                  }}
-                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                >
-                  {hasConversationKey
-                    ? copy.chat.copyPrivateKey
-                    : copy.chat.addPrivateKey}
-                </button>
-              ) : null}
-              {isGroupConversation && hasConversationKey ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGroupInviteError(null);
-                    setGroupInviteOpen(true);
-                    setConversationMenuOpen(false);
-                  }}
-                  className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                >
-                  {copy.chat.invite}
-                </button>
-              ) : null}
-            </div>
-          </>
+          <ConversationActionsMenu
+            activeConversation={activeConversation}
+            activeConversationName={activeConversationName}
+            activeConversationTitle={activeConversationTitle}
+            callParticipants={callParticipants}
+            canShareConversationKey={canShareConversationKey}
+            hasConversationKey={hasConversationKey}
+            isGroupConversation={isGroupConversation}
+            onClose={() => setConversationMenuOpen(false)}
+            onConversationDataOpen={() => setConversationDataOpen(true)}
+            onConversationKeyOpen={() => {
+              if (hasConversationKey) {
+                openCopyConversationKeyDialog();
+              } else {
+                setConversationKeyError(null);
+                setConversationKeyDialog('add');
+              }
+            }}
+            onGroupInviteOpen={() => {
+              setGroupInviteError(null);
+              setGroupInviteOpen(true);
+            }}
+            onStartCall={onStartCall}
+          />
         )}
       </ChatConversationHeader>
 
       {!activeConversation ? (
-        <div className="grid flex-1 place-items-center p-6 text-center">
-          <div className="max-w-md">
-            <img
-              src="/noConversations.png"
-              alt="Pigeon Swarm"
-              className="mx-auto"
-            />
-            <h2 className="mt-6 text-3xl font-black tracking-tight">
-              {copy.chat.emptyTitle}
-            </h2>
-            <p className="mt-3 text-white/55">{copy.chat.emptyBody}</p>
-            <button
-              onClick={onCreate}
-              className="mt-6 rounded-2xl bg-fuchsia-500 px-5 py-3 font-black"
-            >
-              {copy.chat.createConversation}
-            </button>
-          </div>
-        </div>
+        <ChatEmptyState onCreate={onCreate} />
       ) : (
         <>
           <ChatMessageTimeline
@@ -686,7 +594,7 @@ export function ChatColumn({
           />
 
           {typingIdentityIds.length > 0 && (
-            <TypingIndicator
+            <ChatTypingIndicator
               identityIds={typingIdentityIds}
               identityNames={identityNames}
             />
@@ -725,56 +633,15 @@ export function ChatColumn({
         />
       )}
       {groupInviteOpen && activeConversation && (
-        <div className="fixed inset-0 z-[80] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
-          <button
-            type="button"
-            className="absolute inset-0"
-            onClick={() => setGroupInviteOpen(false)}
-            aria-label={copy.dialog.close}
-          />
-          <form
-            onSubmit={(event) => void sendGroupInvitation(event)}
-            className="glass-panel-strong relative z-10 w-full rounded-none p-5 shadow-2xl shadow-black/40 sm:max-w-md sm:rounded-2xl"
-          >
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-black tracking-tight">
-                  {copy.chat.invite}
-                </h2>
-                <p className="mt-1 text-sm text-white/50">
-                  {copy.chat.inviteGroupBody}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setGroupInviteOpen(false)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-                aria-label={copy.dialog.close}
-              >
-                ×
-              </button>
-            </div>
-            <input
-              autoFocus={canAutoFocusInput}
-              value={groupInviteInput}
-              onChange={(event) => setGroupInviteInput(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-              placeholder={copy.communities.memberIdentity}
-            />
-            {groupInviteError && (
-              <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-                {groupInviteError}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={!groupInviteInput.trim() || groupInviteLoading}
-              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {copy.chat.sendInvite}
-            </button>
-          </form>
-        </div>
+        <GroupInvitationDialog
+          autoFocus={canAutoFocusInput}
+          error={groupInviteError}
+          input={groupInviteInput}
+          loading={groupInviteLoading}
+          onClose={() => setGroupInviteOpen(false)}
+          onInputChange={setGroupInviteInput}
+          onSubmit={(event) => void sendGroupInvitation(event)}
+        />
       )}
       {conversationKeyDialog && (
         <ConversationKeyDialog
