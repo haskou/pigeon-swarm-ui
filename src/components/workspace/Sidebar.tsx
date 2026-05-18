@@ -428,9 +428,6 @@ export function UserProfileDropdown({
   const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
   const [presenceStatus, setPresenceStatus] =
     useState<SelectablePresenceStatus>(selectablePresenceStatus(presence));
-  const [customMessage, setCustomMessage] = useState(
-    presence?.customMessage ?? '',
-  );
   const [presenceError, setPresenceError] = useState<string | null>(null);
   const [presenceSaving, setPresenceSaving] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -466,7 +463,6 @@ export function UserProfileDropdown({
     if (!presence) return;
 
     setPresenceStatus(selectablePresenceStatus(presence));
-    setCustomMessage(presence.customMessage ?? '');
   }, [presence]);
 
   const updatePresenceStatus = async (nextStatus: string) => {
@@ -477,51 +473,9 @@ export function UserProfileDropdown({
     setPresenceError(null);
     try {
       const nextPresence = await pigeonApplication.updatePresence(session, {
-        ...(customMessage.trim()
-          ? { customMessage: customMessage.trim().slice(0, 50) }
-          : {}),
         status,
       });
 
-      onPresenceChange?.(nextPresence);
-    } catch {
-      setPresenceError(copy.presence.error);
-    } finally {
-      setPresenceSaving(false);
-    }
-  };
-
-  const saveCustomPresence = async () => {
-    const message = customMessage.trim().slice(0, 50);
-
-    setCustomMessage(message);
-    setPresenceSaving(true);
-    setPresenceError(null);
-    try {
-      const nextPresence = await pigeonApplication.updatePresence(session, {
-        ...(message ? { customMessage: message } : {}),
-        status: presenceStatus,
-      });
-
-      onPresenceChange?.(nextPresence);
-    } catch {
-      setPresenceError(copy.presence.error);
-    } finally {
-      setPresenceSaving(false);
-    }
-  };
-
-  const clearCustomPresence = async () => {
-    setPresenceSaving(true);
-    setPresenceError(null);
-    try {
-      await pigeonApplication.deletePresenceCustomMessage(session);
-      const nextPresence = await pigeonApplication.updatePresence(session, {
-        status: presenceStatus,
-      });
-
-      setCustomMessage('');
-      setPresenceStatus(selectablePresenceStatus(nextPresence));
       onPresenceChange?.(nextPresence);
     } catch {
       setPresenceError(copy.presence.error);
@@ -627,43 +581,11 @@ export function UserProfileDropdown({
               />
             </div>
 
-            <div>
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.presence.customMessage}
-              </div>
-              <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
-                <input
-                  value={customMessage}
-                  maxLength={50}
-                  onChange={(event) => setCustomMessage(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-white/80 outline-none placeholder:text-white/30"
-                  placeholder={copy.presence.customMessagePlaceholder}
-                />
-                <button
-                  type="button"
-                  onClick={() => void saveCustomPresence()}
-                  disabled={presenceSaving}
-                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950 disabled:opacity-50"
-                >
-                  {copy.presence.saveCustomMessage}
-                </button>
-              </div>
-              {customMessage && (
-                <button
-                  type="button"
-                  onClick={() => void clearCustomPresence()}
-                  disabled={presenceSaving}
-                  className="mt-2 text-xs font-black text-white/45 transition hover:text-white/75 disabled:opacity-50"
-                >
-                  {copy.presence.clearCustomMessage}
-                </button>
-              )}
-              {presenceError && (
-                <p className="mt-2 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-2 text-rose-100">
-                  {presenceError}
-                </p>
-              )}
-            </div>
+            {presenceError && (
+              <p className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-2 text-rose-100">
+                {presenceError}
+              </p>
+            )}
 
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">

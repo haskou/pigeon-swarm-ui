@@ -14,10 +14,7 @@ import {
 } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { ImageLightbox, type LightboxImage } from '../chat/ImageLightbox';
-import {
-  PresenceCustomStatus,
-  PresenceStatusDot,
-} from '../presence/PresenceStatusDot';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 
 type ProfilePopoverAnchor = {
   bottom: number;
@@ -234,7 +231,6 @@ export function UserProfileDialog({
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-2xl font-black">{displayName}</h2>
               <p className="truncate text-sm text-white/45">{displayHandle}</p>
-              <PresenceCustomStatus presence={presence} />
             </div>
             {onOpenConversation && (
               <button

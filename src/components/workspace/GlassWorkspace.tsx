@@ -164,9 +164,6 @@ function presenceFromRealtimeEvent(
       typeof attributes.updatedAt === 'number'
         ? attributes.updatedAt
         : Date.now(),
-    ...(typeof attributes.customMessage === 'string'
-      ? { customMessage: attributes.customMessage }
-      : {}),
     ...(typeof attributes.lastActivityAt === 'number'
       ? { lastActivityAt: attributes.lastActivityAt }
       : {}),

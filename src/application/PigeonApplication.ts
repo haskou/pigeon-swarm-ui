@@ -194,13 +194,9 @@ export class PigeonApplication {
 
   public async updatePresence(
     session: Session,
-    input: { customMessage?: string; status: SelectablePresenceStatus },
+    input: { status: SelectablePresenceStatus },
   ): Promise<IdentityPresence> {
     return await this.gateway.updatePresence(session, input);
-  }
-
-  public async deletePresenceCustomMessage(session: Session): Promise<void> {
-    await this.gateway.deletePresenceCustomMessage(session);
   }
 
   public async startConversationCall(

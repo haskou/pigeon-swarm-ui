@@ -32,41 +32,10 @@ export function PresenceStatusDot({
   );
 }
 
-export function PresenceCustomStatus({
-  className,
-  presence,
-}: {
-  className?: string;
-  presence?: IdentityPresence;
-}) {
-  const customMessage = presence?.customMessage?.trim();
-
-  if (!customMessage) return null;
-
-  return (
-    <div
-      className={cx(
-        'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-semibold text-white/65',
-        className,
-      )}
-    >
-      <PresenceStatusDot
-        inline
-        presence={presence}
-        size="sm"
-        className="shrink-0 border-white/10"
-      />
-      <span className="truncate">{customMessage}</span>
-    </div>
-  );
-}
-
 export function presenceLabel(presence?: IdentityPresence): string {
   const status = presence?.status ?? 'disconnected';
-  const statusLabel = copy.presence.statuses[status];
-  const customMessage = presence?.customMessage?.trim();
 
-  return customMessage ? `${statusLabel}: ${customMessage}` : statusLabel;
+  return copy.presence.statuses[status];
 }
 
 function statusClassName(status: PresenceStatus): string {

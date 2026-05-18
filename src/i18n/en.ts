@@ -518,11 +518,7 @@ export const copy = {
     unclaimed: 'Unclaimed',
   },
   presence: {
-    clearCustomMessage: 'Clear custom status',
-    customMessage: 'Custom status',
-    customMessagePlaceholder: 'What are you up to?',
     error: 'Presence could not be updated.',
-    saveCustomMessage: 'Save custom status',
     selectStatus: 'Select status',
     status: 'Status',
     statuses: {

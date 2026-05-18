@@ -36,7 +36,6 @@ export type IdentityPresence = {
   identityId: string;
   status: PresenceStatus;
   updatedAt: number;
-  customMessage?: string;
   lastActivityAt?: number;
   lastHeartbeatAt?: number;
   networkIds?: string[];

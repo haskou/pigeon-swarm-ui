@@ -264,30 +264,17 @@ export class PigeonApiGateway {
 
   public async updatePresence(
     session: Session,
-    input: { customMessage?: string; status: SelectablePresenceStatus },
+    input: { status: SelectablePresenceStatus },
   ): Promise<IdentityPresence> {
     const path = '/presence/me';
     const body = {
       status: input.status,
-      ...(input.customMessage !== undefined
-        ? { customMessage: input.customMessage }
-        : {}),
     };
 
     return await this.http.request<IdentityPresence>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
-    });
-  }
-
-  public async deletePresenceCustomMessage(session: Session): Promise<void> {
-    const path = '/presence/me/custom-message';
-    const body = {};
-
-    await this.http.request<void>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
     });
   }
 
