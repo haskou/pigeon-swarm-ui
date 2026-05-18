@@ -2,6 +2,7 @@ import {
   ChangeEvent,
   FormEvent,
   lazy,
+  type ReactNode,
   Suspense,
   useEffect,
   useMemo,
@@ -866,30 +867,36 @@ function ProfileEditor({
                 </span>
               </button>
               <div className="mt-4 grid gap-3">
-                <input
-                  aria-label={copy.profile.name}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={ProfileName.MAX_LENGTH}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-                <input
-                  aria-label={copy.profile.handle}
-                  value={handle}
-                  onChange={(event) =>
-                    setHandle(normalizeHandle(event.target.value))
-                  }
-                  maxLength={ProfileHandle.MAX_LENGTH}
-                  placeholder="@ada"
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
-                <textarea
-                  aria-label={copy.profile.biography}
-                  value={biography}
-                  onChange={(event) => setBiography(event.target.value)}
-                  maxLength={ProfileBiography.MAX_LENGTH}
-                  className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                />
+                <ProfileEditorField label={copy.profile.name}>
+                  <input
+                    aria-label={copy.profile.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={ProfileName.MAX_LENGTH}
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
+                <ProfileEditorField label={copy.profile.handle}>
+                  <input
+                    aria-label={copy.profile.handle}
+                    value={handle}
+                    onChange={(event) =>
+                      setHandle(normalizeHandle(event.target.value))
+                    }
+                    maxLength={ProfileHandle.MAX_LENGTH}
+                    placeholder="@ada"
+                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
+                <ProfileEditorField label={copy.profile.biography}>
+                  <textarea
+                    aria-label={copy.profile.biography}
+                    value={biography}
+                    onChange={(event) => setBiography(event.target.value)}
+                    maxLength={ProfileBiography.MAX_LENGTH}
+                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  />
+                </ProfileEditorField>
               </div>
             </div>
             <input
@@ -1068,6 +1075,21 @@ function ProfileInput({
         type={type}
         className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
       />
+    </label>
+  );
+}
+
+function ProfileEditorField({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/40">
+      {label}
+      {children}
     </label>
   );
 }

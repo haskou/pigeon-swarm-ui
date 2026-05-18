@@ -16,6 +16,7 @@ import {
   normalizeHandleInput,
   passwordValidationChecks,
 } from '../../../../utils/credentialsValidation';
+import { cx } from '../../../../utils/classNameHelper';
 import { toUserErrorMessage } from '../../../../utils/toUserErrorMessage';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -56,7 +57,7 @@ export function AuthScreen({
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const modeOptions = [
     { label: copy.auth.login, value: 'login' },
-    { label: copy.auth.createIdentity, value: 'create' },
+    { label: copy.auth.createIdentityShort, value: 'create' },
   ] satisfies Array<{ label: string; value: AuthMode }>;
 
   useEffect(() => {
@@ -134,7 +135,7 @@ export function AuthScreen({
   };
 
   return (
-    <section className="app-screen relative z-10 grid min-h-[100dvh] place-items-center px-4 py-6 sm:py-8">
+    <section className="app-screen relative z-10 grid min-h-[100dvh] items-start justify-center px-4 py-7 sm:py-10 lg:place-items-center">
       <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
         <div className="hidden lg:block">
           <div className="glass-panel-strong rounded-2xl p-8">
@@ -167,6 +168,22 @@ export function AuthScreen({
           onSubmit={handleSubmit}
           className="glass-panel-strong min-h-0 rounded-2xl p-5 sm:p-7"
         >
+          <div className="mb-5 flex items-center gap-3 lg:hidden">
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-12 w-12 rounded-2xl shadow-lg shadow-indigo-950/30"
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-black">
+                {copy.auth.title}
+              </h1>
+              <p className="line-clamp-2 text-sm leading-snug text-white/55">
+                {copy.auth.mobileIntro}
+              </p>
+            </div>
+          </div>
+
           <SegmentedControl
             value={mode}
             onChange={setMode}
@@ -259,7 +276,12 @@ export function AuthScreen({
 
           <button
             disabled={!canSubmit || state === 'loading'}
-            className="glass-button mt-6 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
+            className={cx(
+              'mt-6 w-full rounded-2xl px-5 py-4 text-sm font-black transition',
+              canSubmit && state !== 'loading'
+                ? 'glass-button bg-gradient-to-r from-cyan-300 to-fuchsia-500 text-white shadow-xl shadow-fuchsia-950/30 hover:scale-[1.01]'
+                : 'cursor-not-allowed bg-white/10 text-white/35',
+            )}
           >
             {state === 'loading'
               ? copy.auth.loadingSubmit

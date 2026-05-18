@@ -82,7 +82,7 @@ export function ChatConversationHeader({
               type="button"
               onClick={onConversationOpen}
               disabled={!canOpenConversation}
-              className="min-w-0 truncate text-left text-2xl font-black tracking-tight disabled:cursor-default"
+              className="min-w-0 truncate text-left text-xl font-black tracking-tight disabled:cursor-default sm:text-2xl"
             >
               {activeConversation
                 ? (activeConversationTitle ?? activeConversation.id)
@@ -188,10 +188,20 @@ function ConversationMetadata({
     : copy.chat.directMessage;
 
   return (
-    <div className="mt-1 flex min-w-0 items-center gap-2 text-sm text-white/50">
-      <span className="shrink-0">{modeLabel}</span>
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-white/50 sm:text-sm">
+      <span className="shrink-0">
+        <span className="sm:hidden">
+          {isGroupConversation
+            ? copy.dialog.groupConversation
+            : copy.dialog.directConversation}
+        </span>
+        <span className="hidden sm:inline">{modeLabel}</span>
+      </span>
       <span className="text-white/25">·</span>
-      <span className="min-w-0 truncate" title={conversationNetworkTooltip}>
+      <span
+        className="min-w-0 max-w-full truncate"
+        title={conversationNetworkTooltip}
+      >
         {conversationNetworkName}
       </span>
     </div>

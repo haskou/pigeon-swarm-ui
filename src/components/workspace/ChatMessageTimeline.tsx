@@ -90,7 +90,7 @@ export function ChatMessageTimeline({
     <div
       ref={scrollerRef}
       onScroll={onScroll}
-      className="min-h-0 flex-1 overscroll-contain overflow-y-auto p-4 sm:p-6"
+      className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-2 py-3 sm:p-6"
     >
       {loadingInitialMessages ? (
         <div className="grid min-h-full place-items-center">

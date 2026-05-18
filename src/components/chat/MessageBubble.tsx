@@ -202,7 +202,7 @@ export function MessageBubble({
           onPointerMove={clearLongPressTimer}
           onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[86%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
+            'max-w-[96%] rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
             compactTimestamp &&
               message.attachments.length === 0 &&
               reactionGroups.length === 0 &&
@@ -892,10 +892,10 @@ function AttachmentCard({
       )}
     >
       {previewUrl && attachment.contentType.startsWith('video/') && (
-        <video src={previewUrl} className="max-h-72 w-full" controls />
+        <video src={previewUrl} className="max-h-44 w-full sm:max-h-72" controls />
       )}
       {previewUrl && attachment.contentType.startsWith('audio/') && (
-        <audio src={previewUrl} className="w-full p-2" controls />
+        <audio src={previewUrl} className="w-full p-1 sm:p-2" controls />
       )}
       {progress && (
         <div className="px-3 pt-3 text-xs font-black opacity-75">
@@ -909,8 +909,8 @@ function AttachmentCard({
         </div>
       )}
       {!hasPreview && (
-        <div className="grid min-h-32 place-items-center bg-black/20 p-4">
-          <div className="relative h-16 w-12 rounded-lg border border-white/20 bg-white/10">
+        <div className="grid min-h-20 place-items-center bg-black/20 p-3 sm:min-h-32 sm:p-4">
+          <div className="relative h-12 w-9 rounded-lg border border-white/20 bg-white/10 sm:h-16 sm:w-12">
             <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
             <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
             <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
@@ -931,7 +931,7 @@ function AttachmentCard({
           ↓
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-black">
+          <span className="line-clamp-2 break-words font-black leading-tight">
             {attachment.filename}
           </span>
           <span className="block text-xs opacity-65">
