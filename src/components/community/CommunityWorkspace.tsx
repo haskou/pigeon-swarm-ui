@@ -67,6 +67,7 @@ import { DateSeparator } from '../chat/DateSeparator';
 import { ImageLightbox } from '../chat/ImageLightbox';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ConversationDataDialog } from '../workspace/ConversationDataDialog';
 import { ConversationKeyDialog } from '../workspace/ConversationKeyDialog';
@@ -1957,6 +1958,7 @@ export function CommunityWorkspace({
               }
               owner={member.identityId === community.ownerIdentityId}
               pictureUrl={member.pictureUrl}
+              presence={presenceByIdentityId[member.identityId]}
             />
           ))}
         </div>
@@ -1994,6 +1996,7 @@ export function CommunityWorkspace({
                   }
                   owner={member.identityId === community.ownerIdentityId}
                   pictureUrl={member.pictureUrl}
+                  presence={presenceByIdentityId[member.identityId]}
                 />
               ))}
             </div>
@@ -2229,12 +2232,14 @@ function MemberRow({
   onClick,
   owner,
   pictureUrl,
+  presence,
 }: {
   identity?: IdentityResource;
   identityId: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   owner: boolean;
   pictureUrl: null | string;
+  presence?: IdentityPresence;
 }) {
   const name = memberPrimaryName(identity, identityId);
   const handle = identity?.profile.handle?.trim();
@@ -2259,12 +2264,19 @@ function MemberRow({
           }}
         />
       )}
-      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-        {pictureUrl ? (
-          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          name.slice(0, 1).toUpperCase()
-        )}
+      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+        <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+          {pictureUrl ? (
+            <img
+              src={pictureUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            name.slice(0, 1).toUpperCase()
+          )}
+        </span>
+        <PresenceStatusDot presence={presence} className="-bottom-1 -right-1" />
       </div>
       <div className="relative min-w-0 flex-1">
         <div className="truncate text-sm font-black">{name}</div>

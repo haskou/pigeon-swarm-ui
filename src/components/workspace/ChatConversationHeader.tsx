@@ -73,19 +73,21 @@ export function ChatConversationHeader({
           type="button"
           onClick={onConversationOpen}
           disabled={!canOpenConversation}
-          className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
+          className="relative grid h-12 w-12 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
           aria-label={activeConversationName ?? copy.chat.noConversation}
         >
-          <ConversationAvatar
-            activeConversation={activeConversation}
-            activeConversationName={activeConversationName}
-            peerPicture={peerPicture}
-          />
+          <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+            <ConversationAvatar
+              activeConversation={activeConversation}
+              activeConversationName={activeConversationName}
+              peerPicture={peerPicture}
+            />
+          </span>
           {!isGroupConversation && activeConversation && (
             <PresenceStatusDot
               presence={peerPresence}
               size="lg"
-              className="bottom-0 right-0"
+              className="-bottom-1 -right-1"
             />
           )}
         </button>

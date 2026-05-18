@@ -245,26 +245,28 @@ export function Sidebar({
               <div className="relative flex items-center gap-3">
                 <div
                   className={cx(
-                    'relative grid h-11 w-11 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+                    'relative grid h-11 w-11 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
                     activeConversationId === conversation.id &&
                       'ring-2 ring-slate-950/20',
                   )}
                 >
-                  {conversationPicture(conversation) ? (
-                    <img
-                      src={conversationPicture(conversation)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    conversationName(conversation).slice(0, 1).toUpperCase()
-                  )}
+                  <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+                    {conversationPicture(conversation) ? (
+                      <img
+                        src={conversationPicture(conversation)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      conversationName(conversation).slice(0, 1).toUpperCase()
+                    )}
+                  </span>
                   {conversationPeerId(conversation) && (
                     <PresenceStatusDot
                       presence={
                         presenceByIdentityId[conversationPeerId(conversation)!]
                       }
-                      className="bottom-0 right-0"
+                      className="-bottom-1 -right-1"
                     />
                   )}
                 </div>
@@ -768,7 +770,7 @@ function ProfileAvatar({
   return (
     <div
       className={cx(
-        'relative grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        'relative grid shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
         size === 'xl'
           ? 'h-16 w-16 text-2xl'
           : size === 'lg'
@@ -777,15 +779,17 @@ function ProfileAvatar({
         className,
       )}
     >
-      {picture ? (
-        <img src={picture} alt="" className="h-full w-full object-cover" />
-      ) : (
-        label.slice(0, 1).toUpperCase() || 'P'
-      )}
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+        {picture ? (
+          <img src={picture} alt="" className="h-full w-full object-cover" />
+        ) : (
+          label.slice(0, 1).toUpperCase() || 'P'
+        )}
+      </span>
       <PresenceStatusDot
         presence={presence}
         size={size === 'xl' ? 'lg' : 'md'}
-        className="bottom-0 right-0"
+        className="-bottom-1 -right-1"
       />
     </div>
   );

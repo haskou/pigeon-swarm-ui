@@ -209,22 +209,24 @@ export function UserProfileDialog({
               ]);
             }}
             disabled={!displayPicture}
-            className="relative -mt-10 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
+            className="relative -mt-10 grid h-20 w-20 place-items-center overflow-visible rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
             aria-label={copy.profile.openPicture}
           >
-            {displayPicture ? (
-              <img
-                src={displayPicture}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              displayName.slice(0, 1).toUpperCase()
-            )}
+            <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-xl">
+              {displayPicture ? (
+                <img
+                  src={displayPicture}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                displayName.slice(0, 1).toUpperCase()
+              )}
+            </span>
             <PresenceStatusDot
               presence={presence}
               size="lg"
-              className="bottom-1 right-1"
+              className="-bottom-1 -right-1"
             />
           </button>
 
