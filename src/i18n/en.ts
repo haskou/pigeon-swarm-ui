@@ -11,15 +11,15 @@ export const copy = {
   },
   auth: {
     apiLabel: 'API',
-    createIdentityShort: 'Create',
     createIdentity: 'Create identity',
+    createIdentityShort: 'Create',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:
       'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
     heroTitle: 'P2P messaging for everyone.',
-    identityIdLabel: 'Identity ID or username',
     identityIdHelp: 'Use your @username or full identity ID.',
+    identityIdLabel: 'Identity ID or username',
     installApp: 'Install app',
     installAppHelp:
       'Use your browser menu to add Pigeon Swarm to your Home Screen.',
@@ -224,7 +224,7 @@ export const copy = {
     emojiMatches: 'Emojis matching',
     encryptingAttachment: 'Encrypting',
     insertEmoji: 'Insert emoji',
-    placeholder: 'write a message',
+    placeholder: 'Write a message',
     removeAttachment: 'Remove attachment',
     send: 'Send',
     sending: 'Sending',
@@ -447,6 +447,7 @@ export const copy = {
     owner: 'Owner',
     ownerOnly:
       'Only the node owner can manage networks and share network codes.',
+    removeUnavailable: 'Remove network unavailable in API',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',
     replicationBody:
@@ -467,7 +468,6 @@ export const copy = {
     replicationResponsibleNodes: 'Responsible nodes',
     replicationStandby: 'Standby',
     replicationTotalSize: 'Total size',
-    removeUnavailable: 'Remove network unavailable in API',
     saving: 'Saving...',
     server: 'Server',
     shareLabel: 'Share selected network',
