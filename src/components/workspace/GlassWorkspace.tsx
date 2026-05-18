@@ -35,7 +35,11 @@ import type {
   PresenceStatus,
   Session,
 } from '../../domain/types';
-import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type {
+  RealtimeDomainEvent,
+  RealtimeTypingInput,
+  RealtimeTypingMessage,
+} from '../../infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../utils/communityInviteLink';
 import type { MessageContextMenuState } from './MessageContextMenu';
 
@@ -65,9 +69,14 @@ import { useCallSession } from '../../presentation/hooks/useCallSession';
 import { useCommunityMembershipRequests } from '../../presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
 import { useNotifications } from '../../presentation/hooks/useNotifications';
-import { useRealtimeEvents } from '../../presentation/hooks/useRealtimeEvents';
+import {
+  sendRealtimeTyping,
+  useRealtimeEvents,
+} from '../../presentation/hooks/useRealtimeEvents';
 import { useUnreadMessages } from '../../presentation/hooks/useUnreadMessages';
 import {
+  deletePwaPushSubscription,
+  ensurePwaPushSubscription,
   requestPwaNotificationPermission,
   showPwaNotification,
 } from '../../presentation/notifications/PwaNotifications';
@@ -117,6 +126,7 @@ type PendingSend = {
   replyTarget: ChatMessage | null;
 };
 type FailedSends = Record<string, PendingSend>;
+type TypingEntries = Record<string, Record<string, number>>;
 
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
@@ -134,6 +144,78 @@ function canActOnMembershipRequest(
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
   );
+}
+
+function updateTypingEntries(
+  entries: TypingEntries,
+  scopeId: string,
+  identityId: string,
+  expiresAt: number | null,
+): TypingEntries {
+  const currentScope = entries[scopeId] ?? {};
+  const nextScope = { ...currentScope };
+
+  if (expiresAt === null) {
+    delete nextScope[identityId];
+  } else {
+    nextScope[identityId] = expiresAt;
+  }
+
+  if (Object.keys(nextScope).length === 0) {
+    const { [scopeId]: _removed, ...rest } = entries;
+
+    return rest;
+  }
+
+  return { ...entries, [scopeId]: nextScope };
+}
+
+function expireTypingEntries(entries: TypingEntries): TypingEntries {
+  const now = Date.now();
+  let changed = false;
+  const nextEntries: TypingEntries = {};
+
+  for (const [scopeId, scopeEntries] of Object.entries(entries)) {
+    const activeEntries = Object.fromEntries(
+      Object.entries(scopeEntries).filter(([, expiresAt]) => expiresAt > now),
+    );
+
+    if (
+      Object.keys(activeEntries).length !== Object.keys(scopeEntries).length
+    ) {
+      changed = true;
+    }
+
+    if (Object.keys(activeEntries).length > 0) {
+      nextEntries[scopeId] = activeEntries;
+    }
+  }
+
+  return changed ? nextEntries : entries;
+}
+
+function activeTypingIdentityIds(
+  entries: TypingEntries,
+  scopeId: string | null | undefined,
+): string[] {
+  if (!scopeId) return [];
+
+  const now = Date.now();
+
+  return Object.entries(entries[scopeId] ?? {})
+    .filter(([, expiresAt]) => expiresAt > now)
+    .map(([identityId]) => identityId)
+    .sort();
+}
+
+function communityTypingKey(communityId: string, channelId: string): string {
+  return `${communityId}:${channelId}`;
+}
+
+function typingInputKey(input: RealtimeTypingInput): string {
+  return input.scope === 'conversation'
+    ? `conversation:${input.conversationId}`
+    : communityTypingKey(input.communityId, input.channelId);
 }
 
 function isPresenceStatus(value: unknown): value is PresenceStatus {
@@ -238,6 +320,13 @@ export function GlassWorkspace({
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
+  const [conversationTypingEntries, setConversationTypingEntries] =
+    useState<TypingEntries>({});
+  const [communityTypingEntries, setCommunityTypingEntries] =
+    useState<TypingEntries>({});
+  const typingSentRef = useRef(
+    new Map<string, { active: boolean; sentAt: number }>(),
+  );
   const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
     useState<Record<string, Community>>({});
   const [notificationCommunityAvatarUrls, setNotificationCommunityAvatarUrls] =
@@ -530,6 +619,15 @@ export function GlassWorkspace({
   );
   const inboxNotificationCount =
     pendingNotificationCount + pendingMembershipRequestCount;
+
+  useEffect(() => {
+    void ensurePwaPushSubscription(session).catch(() => undefined);
+  }, [session]);
+
+  const logout = () => {
+    void deletePwaPushSubscription(session).catch(() => undefined);
+    setSession(null);
+  };
 
   useEffect(() => {
     const communityIds = visibleNotifications
@@ -2904,6 +3002,63 @@ export function GlassWorkspace({
     ],
   );
 
+  const handleRealtimeTyping = useCallback(
+    (message: RealtimeTypingMessage) => {
+      if (message.identityId === session.identity.id) return;
+
+      const expiresAt = Date.now() + 5000;
+
+      if (message.scope === 'conversation') {
+        setConversationTypingEntries((current) =>
+          updateTypingEntries(
+            current,
+            message.conversationId,
+            message.identityId,
+            message.active ? expiresAt : null,
+          ),
+        );
+
+        return;
+      }
+
+      setCommunityTypingEntries((current) =>
+        updateTypingEntries(
+          current,
+          communityTypingKey(message.communityId, message.channelId),
+          message.identityId,
+          message.active ? expiresAt : null,
+        ),
+      );
+    },
+    [session.identity.id],
+  );
+  const sendTyping = useCallback(
+    (input: RealtimeTypingInput) => {
+      const key = typingInputKey(input);
+      const current = typingSentRef.current.get(key);
+      const now = Date.now();
+
+      if (input.active && current?.active && now - current.sentAt < 2500) {
+        return;
+      }
+
+      if (!input.active && current && !current.active) return;
+
+      typingSentRef.current.set(key, { active: input.active, sentAt: now });
+      sendRealtimeTyping(session, input);
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setConversationTypingEntries(expireTypingEntries);
+      setCommunityTypingEntries(expireTypingEntries);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   useRealtimeEvents(session, {
     onConnected: () => {
       setRealtimeStatus('connected');
@@ -2911,6 +3066,7 @@ export function GlassWorkspace({
     onDisconnected: () => setRealtimeStatus('reconnecting'),
     onDomainEvent: handleRealtimeEvent,
     onReconnecting: () => setRealtimeStatus('reconnecting'),
+    onTyping: handleRealtimeTyping,
   });
   const handleWorkspacePointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'touch' || sidebarOpen) return;
@@ -2945,6 +3101,41 @@ export function GlassWorkspace({
       sidebarGestureRef.current = null;
     }
   };
+  const conversationTypingIdentityIds = activeTypingIdentityIds(
+    conversationTypingEntries,
+    activeConversation?.id,
+  );
+  const communityTypingIdentityIds = activeTypingIdentityIds(
+    communityTypingEntries,
+    activeCommunity && activeCommunityChannelId
+      ? communityTypingKey(activeCommunity.id, activeCommunityChannelId)
+      : null,
+  );
+  const sendConversationTyping = useCallback(
+    (active: boolean) => {
+      if (!activeConversation?.id) return;
+
+      sendTyping({
+        active,
+        conversationId: activeConversation.id,
+        scope: 'conversation',
+      });
+    },
+    [activeConversation?.id, sendTyping],
+  );
+  const sendCommunityTyping = useCallback(
+    (channelId: string, active: boolean) => {
+      if (!activeCommunity?.id) return;
+
+      sendTyping({
+        active,
+        channelId,
+        communityId: activeCommunity.id,
+        scope: 'community_channel',
+      });
+    },
+    [activeCommunity?.id, sendTyping],
+  );
 
   return (
     <section
@@ -3036,7 +3227,7 @@ export function GlassWorkspace({
                   onCallToggleDeafen={toggleDeafen}
                   onCallToggleMute={toggleMute}
                   onCallToggleScreenShare={toggleScreenShare}
-                  onLogout={() => setSession(null)}
+                  onLogout={logout}
                   onSessionUpdated={(nextSession) => {
                     setSession(nextSession);
                     rememberIdentity(nextSession.identity);
@@ -3112,6 +3303,8 @@ export function GlassWorkspace({
               onCancelReply={() => setReplyTarget(null)}
               onRetryMessage={retryMessage}
               onStartCall={startConversationCall}
+              onTypingActive={sendConversationTyping}
+              typingIdentityIds={conversationTypingIdentityIds}
             />
 
             <Inspector
@@ -3194,7 +3387,7 @@ export function GlassWorkspace({
               onChannelViewed={(channelId) =>
                 clearCommunityChannelUnread(activeCommunity.id, channelId)
               }
-              onLogout={() => setSession(null)}
+              onLogout={logout}
               onMobileSidebarClose={() => setSidebarOpen(false)}
               onMobileMembersClose={() => setCommunityMembersOpen(false)}
               onOpenMobileSidebar={() => setSidebarOpen(true)}
@@ -3210,9 +3403,11 @@ export function GlassWorkspace({
                 rememberIdentity(nextSession.identity);
               }}
               onPresenceChange={mergePresence}
+              onTypingActive={sendCommunityTyping}
               realtimeStatus={realtimeStatus}
               onRealtimeEventsOpen={openRealtimeEvents}
               session={session}
+              typingIdentityIds={communityTypingIdentityIds}
               onJoinVoiceChannel={startCommunityVoiceCall}
             />
           </Suspense>

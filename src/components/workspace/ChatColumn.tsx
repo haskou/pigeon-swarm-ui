@@ -96,6 +96,8 @@ interface ChatColumnProps {
     participants: CallParticipant[];
     title: string;
   }) => void;
+  onTypingActive?: (active: boolean) => void;
+  typingIdentityIds?: string[];
 }
 
 function profileAnchorFromTarget(
@@ -119,6 +121,41 @@ function normalizeIdentityLookup(value: string): string {
   const trimmed = value.trim();
 
   return trimmed.startsWith('@') ? trimmed.slice(1).trim() : trimmed;
+}
+
+function TypingIndicator({
+  identityIds,
+  identityNames,
+}: {
+  identityIds: string[];
+  identityNames: IdentityNames;
+}) {
+  return (
+    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
+      {typingLabel(identityIds, identityNames)}
+    </div>
+  );
+}
+
+function typingLabel(
+  identityIds: string[],
+  identityNames: IdentityNames,
+): string {
+  const [firstIdentityId, secondIdentityId] = identityIds;
+  const firstName = firstIdentityId
+    ? identityDisplayName(firstIdentityId, identityNames)
+    : '';
+
+  if (identityIds.length === 1) return `${firstName} is typing...`;
+
+  if (identityIds.length === 2 && secondIdentityId) {
+    return `${firstName} and ${identityDisplayName(
+      secondIdentityId,
+      identityNames,
+    )} are typing...`;
+  }
+
+  return `${firstName} and ${identityIds.length - 1} more are typing...`;
 }
 
 export function ChatColumn({
@@ -152,6 +189,7 @@ export function ChatColumn({
   onScroll,
   onSend,
   onStartCall,
+  onTypingActive,
   peerIdentity,
   peerIdentityId,
   peerPicture,
@@ -161,6 +199,7 @@ export function ChatColumn({
   scrollerRef,
   sendError,
   session,
+  typingIdentityIds = [],
 }: ChatColumnProps) {
   const [profileViewer, setProfileViewer] = useState<{
     anchor?: ProfilePopoverAnchor;
@@ -197,6 +236,21 @@ export function ChatColumn({
   >(null);
   const [conversationKeySaving, setConversationKeySaving] = useState(false);
   const canAutoFocusInput = useDesktopInputFocus();
+  const handleDraftChange = (value: string) => {
+    onDraftChange(value);
+    onTypingActive?.(value.trim().length > 0);
+  };
+  const handleSend = async (content: string, attachments: File[]) => {
+    onTypingActive?.(false);
+    await onSend(content, attachments);
+  };
+
+  useEffect(
+    () => () => {
+      onTypingActive?.(false);
+    },
+    [activeConversation?.id, onTypingActive],
+  );
   const isGroupConversation = !!(
     activeConversation &&
     (activeConversation.type === 'group' ||
@@ -636,9 +690,9 @@ export function ChatColumn({
             draft={draft}
             error={sendError ?? attachmentError}
             focusKey={activeConversation.id}
-            onDraftChange={onDraftChange}
+            onDraftChange={handleDraftChange}
             onEscape={onEscape}
-            onSend={onSend}
+            onSend={handleSend}
             onCancelReply={onCancelReply}
             progress={progress}
             placeholder={
@@ -656,6 +710,12 @@ export function ChatColumn({
                 : undefined
             }
           />
+          {typingIdentityIds.length > 0 && (
+            <TypingIndicator
+              identityIds={typingIdentityIds}
+              identityNames={identityNames}
+            />
+          )}
         </>
       )}
       {conversationDataOpen && (

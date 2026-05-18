@@ -119,9 +119,11 @@ interface CommunityWorkspaceProps {
   ) => Promise<void>;
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
+  onTypingActive?: (channelId: string, active: boolean) => void;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
+  typingIdentityIds?: string[];
 }
 
 type MemberView = {
@@ -210,9 +212,11 @@ export function CommunityWorkspace({
   onOpenMobileSidebar,
   onRealtimeEventsOpen,
   onSessionUpdated,
+  onTypingActive,
   realtimeEvent,
   realtimeStatus = 'connected',
   session,
+  typingIdentityIds = [],
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
     () => communityTextChannels(community),
@@ -956,6 +960,7 @@ export function CommunityWorkspace({
   ): Promise<void> => {
     if (!selectedChannelId) return Promise.resolve();
 
+    onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
       attachments,
       channelId: selectedChannelId,
@@ -966,6 +971,20 @@ export function CommunityWorkspace({
 
     return Promise.resolve();
   };
+  const handleDraftChange = (value: string) => {
+    setDraft(value);
+
+    if (selectedChannelId) {
+      onTypingActive?.(selectedChannelId, value.trim().length > 0);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (selectedChannelId) onTypingActive?.(selectedChannelId, false);
+    },
+    [onTypingActive, selectedChannelId],
+  );
 
   const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
     setSendError(null);
@@ -1912,7 +1931,7 @@ export function CommunityWorkspace({
               error={sendError}
               focusKey={selectedChannelId}
               onCancelReply={() => setReplyTarget(null)}
-              onDraftChange={setDraft}
+              onDraftChange={handleDraftChange}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
               progress={attachmentProgress}
@@ -1926,6 +1945,12 @@ export function CommunityWorkspace({
                   : undefined
               }
             />
+            {typingIdentityIds.length > 0 && (
+              <TypingIndicator
+                identityIds={typingIdentityIds}
+                memberIdentities={memberIdentities}
+              />
+            )}
           </>
         )}
       </section>
@@ -2221,6 +2246,41 @@ function VoiceParticipantStatusIcons({
 
 function voiceParticipantName(name: string): string {
   return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;
+}
+
+function TypingIndicator({
+  identityIds,
+  memberIdentities,
+}: {
+  identityIds: string[];
+  memberIdentities: Record<string, IdentityResource>;
+}) {
+  return (
+    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
+      {typingLabel(identityIds, memberIdentities)}
+    </div>
+  );
+}
+
+function typingLabel(
+  identityIds: string[],
+  memberIdentities: Record<string, IdentityResource>,
+): string {
+  const [firstIdentityId, secondIdentityId] = identityIds;
+  const firstName = firstIdentityId
+    ? memberDisplayName(memberIdentities[firstIdentityId], firstIdentityId)
+    : '';
+
+  if (identityIds.length === 1) return `${firstName} is typing...`;
+
+  if (identityIds.length === 2 && secondIdentityId) {
+    return `${firstName} and ${memberDisplayName(
+      memberIdentities[secondIdentityId],
+      secondIdentityId,
+    )} are typing...`;
+  }
+
+  return `${firstName} and ${identityIds.length - 1} more are typing...`;
 }
 
 function resolveCommunityChannelId(

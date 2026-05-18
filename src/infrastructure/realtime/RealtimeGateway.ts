@@ -30,6 +30,39 @@ export type RealtimeMessage =
   | {
       event: RealtimeDomainEvent;
       type: 'domain_event';
+    }
+  | RealtimeTypingMessage;
+
+export type RealtimeTypingMessage =
+  | {
+      active: boolean;
+      conversationId: string;
+      identityId: string;
+      scope: 'conversation';
+      timestamp: number;
+      type: 'typing';
+    }
+  | {
+      active: boolean;
+      channelId: string;
+      communityId: string;
+      identityId: string;
+      scope: 'community_channel';
+      timestamp: number;
+      type: 'typing';
+    };
+
+export type RealtimeTypingInput =
+  | {
+      active: boolean;
+      conversationId: string;
+      scope: 'conversation';
+    }
+  | {
+      active: boolean;
+      channelId: string;
+      communityId: string;
+      scope: 'community_channel';
     };
 
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
@@ -119,6 +152,18 @@ export class RealtimeGateway {
     });
 
     return socket;
+  }
+
+  public sendTyping(socket: WebSocket, input: RealtimeTypingInput): void {
+    if (socket.readyState !== 1) return;
+
+    socket.send(
+      JSON.stringify({
+        ...input,
+        type: 'typing',
+      }),
+    );
+    this.debug('typing', input);
   }
 
   private parseMessage(data: unknown): RealtimeMessage | null {

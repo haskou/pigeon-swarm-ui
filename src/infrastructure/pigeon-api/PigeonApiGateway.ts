@@ -119,6 +119,15 @@ type ConversationInvitationType =
   | 'conversation_invitation'
   | 'group_conversation_invitation';
 
+type PushSubscriptionPayload = {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: {
+    auth: string;
+    p256dh: string;
+  };
+};
+
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsApi;
 
@@ -261,6 +270,44 @@ export class PigeonApiGateway {
     });
 
     return Array.isArray(result) ? result : result.presences;
+  }
+
+  public async getPushVapidPublicKey(): Promise<{
+    enabled: boolean;
+    publicKey?: string;
+  }> {
+    return await this.http.request<{
+      enabled: boolean;
+      publicKey?: string;
+    }>('/push/vapid-public-key', {
+      method: 'GET',
+    });
+  }
+
+  public async registerPushSubscription(
+    session: Session,
+    subscription: PushSubscriptionPayload,
+  ): Promise<void> {
+    const path = '/push/subscriptions';
+
+    await this.http.request(path, {
+      body: JSON.stringify(subscription),
+      headers: await this.signer.headers(session, 'PUT', path, subscription),
+      method: 'PUT',
+    });
+  }
+
+  public async deletePushSubscription(
+    session: Session,
+    subscription: PushSubscriptionPayload,
+  ): Promise<void> {
+    const path = '/push/subscriptions';
+
+    await this.http.request(path, {
+      body: JSON.stringify(subscription),
+      headers: await this.signer.headers(session, 'DELETE', path, subscription),
+      method: 'DELETE',
+    });
   }
 
   public async updatePresence(

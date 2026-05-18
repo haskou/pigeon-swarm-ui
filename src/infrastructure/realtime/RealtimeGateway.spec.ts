@@ -190,6 +190,79 @@ describe(RealtimeGateway.name, () => {
     });
   });
 
+  it('parses typing messages from the socket', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const onMessage = jest.fn();
+
+    await gateway.connect(session, onMessage);
+    WebSocketMock.instances[0]?.emitMessage(
+      JSON.stringify({
+        active: true,
+        conversationId: 'conversation-1',
+        identityId: 'identity-2',
+        scope: 'conversation',
+        timestamp: 1770000000000,
+        type: 'typing',
+      }),
+    );
+
+    expect(onMessage).toHaveBeenCalledWith({
+      active: true,
+      conversationId: 'conversation-1',
+      identityId: 'identity-2',
+      scope: 'conversation',
+      timestamp: 1770000000000,
+      type: 'typing',
+    });
+  });
+
+  it('sends typing messages through an open socket', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/'),
+      new RequestSigner(),
+    );
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+
+    const socket = await gateway.connect(session, jest.fn());
+
+    gateway.sendTyping(socket, {
+      active: true,
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      scope: 'community_channel',
+    });
+
+    expect(WebSocketMock.instances[0]?.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        active: true,
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        scope: 'community_channel',
+        type: 'typing',
+      }),
+    );
+  });
+
   it('starts identity heartbeats after the connection acknowledgement', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;

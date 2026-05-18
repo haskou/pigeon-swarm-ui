@@ -77,18 +77,20 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then(
       (cached) =>
         cached ??
-        fetch(request).then((response) => {
-          if (!canCacheResponse(response)) return response;
+        fetch(request)
+          .then((response) => {
+            if (!canCacheResponse(response)) return response;
 
-          const copy = response.clone();
+            const copy = response.clone();
 
-          caches
-            .open(cacheVersion)
-            .then((cache) => cache.put(request, copy))
-            .catch(() => undefined);
+            caches
+              .open(cacheVersion)
+              .then((cache) => cache.put(request, copy))
+              .catch(() => undefined);
 
-          return response;
-        }).catch(() => cached ?? Response.error()),
+            return response;
+          })
+          .catch(() => cached ?? Response.error()),
     ),
   );
 });
@@ -115,3 +117,46 @@ self.addEventListener('notificationclick', (event) => {
       }),
   );
 });
+
+self.addEventListener('push', (event) => {
+  const payload = pushPayload(event.data);
+
+  if (!payload) return;
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      badge: payload.badge || '/favicon/favicon-32x32.png',
+      body: payload.body,
+      data: {
+        url: payload.url || '/',
+      },
+      icon: payload.icon || '/favicon/android-chrome-192x192.png',
+      tag: payload.tag,
+    }),
+  );
+});
+
+function pushPayload(data) {
+  if (!data) return null;
+
+  try {
+    const payload = data.json();
+
+    if (!payload || typeof payload !== 'object') return null;
+
+    return {
+      badge: typeof payload.badge === 'string' ? payload.badge : undefined,
+      body: typeof payload.body === 'string' ? payload.body : '',
+      icon: typeof payload.icon === 'string' ? payload.icon : undefined,
+      tag: typeof payload.tag === 'string' ? payload.tag : undefined,
+      title: typeof payload.title === 'string' ? payload.title : 'Pigeon Swarm',
+      url: typeof payload.url === 'string' ? payload.url : '/',
+    };
+  } catch {
+    return {
+      body: data.text(),
+      title: 'Pigeon Swarm',
+      url: '/',
+    };
+  }
+}
