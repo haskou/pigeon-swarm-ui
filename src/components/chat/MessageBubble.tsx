@@ -178,7 +178,7 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex items-end gap-3', mine && 'justify-end')}
+        className={cx('flex items-center gap-3', mine && 'justify-end')}
       >
         {!mine && (
           <MessageAvatarColumn
@@ -206,7 +206,7 @@ export function MessageBubble({
           onPointerMove={clearLongPressTimer}
           onPointerUp={clearLongPressTimer}
           className={cx(
-            'max-w-[96%] select-none rounded-3xl p-3 text-sm leading-relaxed sm:max-w-[72%]',
+            'max-w-[96%] select-none rounded-2xl p-3 text-sm leading-6 sm:max-w-[72%]',
             mine
               ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
               : 'border border-white/10 bg-black/25 text-white',
@@ -385,9 +385,25 @@ function MessageAvatarColumn({
   if (!showAvatar && !reserveAvatarSpace) return null;
 
   return (
-    <div className="flex w-11 shrink-0 flex-col items-center gap-1">
+    <div
+      className={cx(
+        'relative flex h-11 w-11 shrink-0 items-center',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
       {reactionGroups.length > 0 && (
-        <MessageReactions groups={reactionGroups} onToggle={onReactionToggle} />
+        <div
+          className={cx(
+            'absolute bottom-full mb-1 flex w-max max-w-[min(16rem,60vw)]',
+            mine ? 'right-0 justify-end' : 'left-0 justify-start',
+          )}
+        >
+          <MessageReactions
+            groups={reactionGroups}
+            mine={mine}
+            onToggle={onReactionToggle}
+          />
+        </div>
       )}
       {showAvatar ? (
         <Avatar
@@ -413,20 +429,27 @@ type ReactionGroup = {
 
 function MessageReactions({
   groups,
+  mine,
   onToggle,
 }: {
   groups: ReactionGroup[];
+  mine?: boolean;
   onToggle: (emoji: string, reacted: boolean) => void;
 }) {
   return (
-    <div className="flex max-w-28 flex-wrap items-center justify-center gap-1">
+    <div
+      className={cx(
+        'flex max-w-full flex-nowrap items-center gap-1 overflow-hidden',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
       {groups.map((group) => (
         <button
           type="button"
           key={group.emoji}
           onClick={() => onToggle(group.emoji, group.reacted)}
           className={cx(
-            'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
+            'inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
             group.reacted
               ? 'border-sky-200/45 bg-sky-400/35 text-sky-50 shadow-sky-950/20'
               : 'border-white/12 bg-black/25 text-white/78 shadow-black/15 hover:bg-white/10',
