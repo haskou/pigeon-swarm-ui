@@ -20,6 +20,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
+  IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
   MessageAttachment,
@@ -167,6 +168,12 @@ export class PigeonApplication {
     session: Session,
   ): Promise<CallIceServerConfig> {
     return await this.gateway.getCallIceServers(session);
+  }
+
+  public async getIpfsReplicationStatus(
+    session: Session,
+  ): Promise<IpfsReplicationStatus> {
+    return await this.gateway.getIpfsReplicationStatus(session);
   }
 
   public async startConversationCall(

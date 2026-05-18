@@ -274,6 +274,57 @@ describe(PigeonApiGateway.name, () => {
     );
   });
 
+  it('loads IPFS replication status with signed identity headers', async () => {
+    const response = {
+      contents: [
+        {
+          cid: 'bafy-content',
+          context: 'ipfs_private_upload',
+          createdAt: 1,
+          networks: [
+            {
+              activeNodeCount: 8,
+              desiredReplicas: 5,
+              knownReplicaNodeIds: ['node-1'],
+              knownReplicas: 1,
+              localResponsible: true,
+              networkId: 'network-1',
+              releaseLocalReplica: false,
+              responsibleNodeIds: ['node-1', 'node-2'],
+            },
+          ],
+          ownerIdentityId: 'identity-1',
+          priority: 'normal',
+          sizeBytes: 215040,
+          updatedAt: 2,
+        },
+      ],
+      localNodeId: 'node-1',
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/ipfs/replication/status';
+
+    await expect(gateway.getIpfsReplicationStatus(session)).resolves.toBe(
+      response,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'GET', path, {});
+    expect(http.request).toHaveBeenCalledWith(path, {
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'GET',
+    });
+  });
+
   it('leaves communities with a signed member request', async () => {
     const community = {
       createdAt: 1,

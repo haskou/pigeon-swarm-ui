@@ -261,6 +261,33 @@ export type CommunityDiscoveryResource = {
   visibility: 'private';
 };
 
+export type IpfsReplicationNetworkStatus = {
+  networkId: string;
+  activeNodeCount: number;
+  desiredReplicas: number;
+  knownReplicas: number;
+  knownReplicaNodeIds: string[];
+  localResponsible: boolean;
+  releaseLocalReplica: boolean;
+  responsibleNodeIds: string[];
+};
+
+export type IpfsReplicationContentStatus = {
+  cid: string;
+  context: string;
+  sizeBytes: number;
+  priority: string;
+  ownerIdentityId: string;
+  createdAt: number;
+  updatedAt: number;
+  networks: IpfsReplicationNetworkStatus[];
+};
+
+export type IpfsReplicationStatus = {
+  localNodeId: string;
+  contents: IpfsReplicationContentStatus[];
+};
+
 export type MessageResource = {
   attachmentExternalIdentifiers?: string[];
   id?: string;

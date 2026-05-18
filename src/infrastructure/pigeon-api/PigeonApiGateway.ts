@@ -30,6 +30,7 @@ import type {
   ConversationResource,
   AttachmentProgress,
   IdentityResource,
+  IpfsReplicationStatus,
   KeychainResource,
   LocalKeychain,
   LoginResult,
@@ -210,6 +211,18 @@ export class PigeonApiGateway {
     );
 
     return result.peers;
+  }
+
+  public async getIpfsReplicationStatus(
+    session: Session,
+  ): Promise<IpfsReplicationStatus> {
+    const path = '/ipfs/replication/status';
+    const body = {};
+
+    return await this.http.request<IpfsReplicationStatus>(path, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
