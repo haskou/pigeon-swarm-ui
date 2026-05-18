@@ -419,23 +419,23 @@ function MessageReactions({
   onToggle: (emoji: string, reacted: boolean) => void;
 }) {
   return (
-    <div className="flex max-w-24 flex-wrap items-center justify-center gap-1">
+    <div className="flex max-w-28 flex-wrap items-center justify-center gap-1">
       {groups.map((group) => (
         <button
           type="button"
           key={group.emoji}
           onClick={() => onToggle(group.emoji, group.reacted)}
           className={cx(
-            'rounded-full border px-2 py-0.5 text-xs font-black transition hover:brightness-110',
+            'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
             group.reacted
-              ? 'border-sky-300/40 bg-sky-500/35 text-sky-50'
-              : 'border-white/10 bg-black/15 text-white/75 hover:bg-white/10',
+              ? 'border-sky-200/45 bg-sky-400/35 text-sky-50 shadow-sky-950/20'
+              : 'border-white/12 bg-black/25 text-white/78 shadow-black/15 hover:bg-white/10',
           )}
           aria-label={`${group.emoji} ${group.count}`}
           title={group.authors.join(', ')}
         >
-          <span>{group.emoji}</span>
-          <span className="ml-1">{group.count}</span>
+          <span className="text-[0.82rem] leading-none">{group.emoji}</span>
+          <span className="tabular-nums leading-none">{group.count}</span>
         </button>
       ))}
     </div>
