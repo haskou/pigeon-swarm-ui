@@ -922,7 +922,7 @@ function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6"
+        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6 lg:p-8"
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
@@ -936,7 +936,7 @@ function ProfileEditor({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
+        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-start xl:gap-6">
           <div className="overflow-hidden rounded-2xl bg-black/25">
             <button
               type="button"
@@ -1023,7 +1023,7 @@ function ProfileEditor({
               className="sr-only"
             />
           </div>
-          <div className="grid gap-4">
+          <div className="grid min-w-0 gap-4">
             <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
@@ -1045,10 +1045,10 @@ function ProfileEditor({
                   </span>
                 )}
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto]">
                 <GlassSelect
                   ariaLabel={copy.profile.availableNetwork}
-                  className="min-w-0 flex-1"
+                  className="min-w-0"
                   disabled={nodeNetworkOptions.length === 0}
                   onChange={setNetworkToAdd}
                   options={
@@ -1068,7 +1068,7 @@ function ProfileEditor({
                   type="button"
                   onClick={addNetwork}
                   disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                  className="shrink-0 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {copy.profile.addNetwork}
                 </button>
