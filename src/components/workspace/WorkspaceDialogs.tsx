@@ -83,7 +83,6 @@ interface WorkspaceDialogsProps {
     community: Community;
     session: Session;
   }) => void;
-  onCommunityOpen: (communityId: string) => void;
   onCommunityJoinRequested: (request: CommunityMembershipRequest) => void;
   onConversationCreated: (
     nextSession: Session,
@@ -263,7 +262,6 @@ function CreateDialogs(
       headerControl={modeControl}
       nodeNetworks={props.nodeNetworks}
       onClose={props.onCloseCreateCommunity}
-      onCommunityOpen={props.onCommunityOpen}
       onJoinRequested={props.onCommunityJoinRequested}
       session={props.session}
     />
