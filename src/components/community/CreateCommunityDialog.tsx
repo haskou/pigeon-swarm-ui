@@ -1,6 +1,8 @@
 import {
   ChangeEvent,
   FormEvent,
+  lazy,
+  Suspense,
   type ReactElement,
   useEffect,
   useMemo,
@@ -15,7 +17,12 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlassSelect } from '../common/GlassSelect';
-import { ImageCropEditor } from '../common/ImageCropEditor';
+
+const ImageCropEditor = lazy(() =>
+  import('../common/ImageCropEditor').then((module) => ({
+    default: module.ImageCropEditor,
+  })),
+);
 
 interface CreateCommunityDialogProps {
   headerControl?: ReactElement;
@@ -380,20 +387,22 @@ export function CreateCommunityDialog({
           </button>
         </div>
         {imageEditor && (
-          <ImageCropEditor
-            file={imageEditor.file}
-            shape={imageEditor.shape}
-            onClose={() => setImageEditor(null)}
-            onApply={(file, previewUrl) => {
-              if (imageEditor.shape === 'avatar') {
-                setAvatar(file);
-                setAvatarPreview(previewUrl);
-              } else {
-                setBanner(file);
-                setBannerPreview(previewUrl);
-              }
-            }}
-          />
+          <Suspense fallback={null}>
+            <ImageCropEditor
+              file={imageEditor.file}
+              shape={imageEditor.shape}
+              onClose={() => setImageEditor(null)}
+              onApply={(file, previewUrl) => {
+                if (imageEditor.shape === 'avatar') {
+                  setAvatar(file);
+                  setAvatarPreview(previewUrl);
+                } else {
+                  setBanner(file);
+                  setBannerPreview(previewUrl);
+                }
+              }}
+            />
+          </Suspense>
         )}
       </form>
     </div>

@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type ReactElement,
+} from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { Peer } from '../../application/peers/ListPeers';
@@ -18,20 +24,53 @@ import type {
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 
 import { copy } from '../../i18n/en';
-import { IncomingCallDialog } from '../calls/IncomingCallDialog';
-import { CreateCommunityDialog } from '../community/CreateCommunityDialog';
-import { CommunityDiscoveryDialog } from '../community/CommunityDiscoveryDialog';
 import { SegmentedControl } from '../common/SegmentedControl';
-import { CreateConversationDialog } from '../dialog/CreateConversationDialog';
 import { Inspector } from './Inspector';
 import {
   MessageContextMenu,
   type MessageContextMenuState,
 } from './MessageContextMenu';
-import { NodeSettingsDialog } from './NodeSettingsDialog';
-import { NotificationsPanel } from './NotificationsPanel';
-import { RawMessageDialog } from './RawMessageDialog';
-import { RealtimeEventsDialog } from './RealtimeEventsDialog';
+
+const CommunityDiscoveryDialog = lazy(() =>
+  import('../community/CommunityDiscoveryDialog').then((module) => ({
+    default: module.CommunityDiscoveryDialog,
+  })),
+);
+const CreateCommunityDialog = lazy(() =>
+  import('../community/CreateCommunityDialog').then((module) => ({
+    default: module.CreateCommunityDialog,
+  })),
+);
+const CreateConversationDialog = lazy(() =>
+  import('../dialog/CreateConversationDialog').then((module) => ({
+    default: module.CreateConversationDialog,
+  })),
+);
+const IncomingCallDialog = lazy(() =>
+  import('../calls/IncomingCallDialog').then((module) => ({
+    default: module.IncomingCallDialog,
+  })),
+);
+const NodeSettingsDialog = lazy(() =>
+  import('./NodeSettingsDialog').then((module) => ({
+    default: module.NodeSettingsDialog,
+  })),
+);
+const NotificationsPanel = lazy(() =>
+  import('./NotificationsPanel').then((module) => ({
+    default: module.NotificationsPanel,
+  })),
+);
+const RawMessageDialog = lazy(() =>
+  import('./RawMessageDialog').then((module) => ({
+    default: module.RawMessageDialog,
+  })),
+);
+const RealtimeEventsDialog = lazy(() =>
+  import('./RealtimeEventsDialog').then((module) => ({
+    default: module.RealtimeEventsDialog,
+  })),
+);
 
 interface WorkspaceDialogsProps {
   activeConversation?: ConversationResource;
@@ -183,10 +222,12 @@ function MessageActionDialogs(
 
   if (!props.messageContextMenu) {
     return props.rawMessage ? (
-      <RawMessageDialog
-        message={props.rawMessage}
-        onClose={props.onCloseRawMessage}
-      />
+      <Suspense fallback={null}>
+        <RawMessageDialog
+          message={props.rawMessage}
+          onClose={props.onCloseRawMessage}
+        />
+      </Suspense>
     ) : null;
   }
 
@@ -210,10 +251,12 @@ function MessageActionDialogs(
         }}
       />
       {props.rawMessage && (
-        <RawMessageDialog
-          message={props.rawMessage}
-          onClose={props.onCloseRawMessage}
-        />
+        <Suspense fallback={null}>
+          <RawMessageDialog
+            message={props.rawMessage}
+            onClose={props.onCloseRawMessage}
+          />
+        </Suspense>
       )}
     </>
   );
@@ -227,12 +270,14 @@ function CreateDialogs(
 ): ReactElement | null {
   if (props.isCreateOpen) {
     return (
-      <CreateConversationDialog
-        nodeNetworks={props.nodeNetworks}
-        session={props.session}
-        onClose={props.onCloseCreateConversation}
-        onCreated={props.onConversationCreated}
-      />
+      <Suspense fallback={null}>
+        <CreateConversationDialog
+          nodeNetworks={props.nodeNetworks}
+          session={props.session}
+          onClose={props.onCloseCreateConversation}
+          onCreated={props.onConversationCreated}
+        />
+      </Suspense>
     );
   }
 
@@ -247,24 +292,28 @@ function CreateDialogs(
 
   if (props.communityEntryMode === 'create') {
     return (
-      <CreateCommunityDialog
-        headerControl={modeControl}
-        nodeNetworks={props.nodeNetworks}
-        session={props.session}
-        onClose={props.onCloseCreateCommunity}
-        onCreated={props.onCommunityCreated}
-      />
+      <Suspense fallback={null}>
+        <CreateCommunityDialog
+          headerControl={modeControl}
+          nodeNetworks={props.nodeNetworks}
+          session={props.session}
+          onClose={props.onCloseCreateCommunity}
+          onCreated={props.onCommunityCreated}
+        />
+      </Suspense>
     );
   }
 
   return (
-    <CommunityDiscoveryDialog
-      headerControl={modeControl}
-      nodeNetworks={props.nodeNetworks}
-      onClose={props.onCloseCreateCommunity}
-      onJoinRequested={props.onCommunityJoinRequested}
-      session={props.session}
-    />
+    <Suspense fallback={null}>
+      <CommunityDiscoveryDialog
+        headerControl={modeControl}
+        nodeNetworks={props.nodeNetworks}
+        onClose={props.onCloseCreateCommunity}
+        onJoinRequested={props.onCommunityJoinRequested}
+        session={props.session}
+      />
+    </Suspense>
   );
 }
 
@@ -274,28 +323,30 @@ function WorkspaceNotificationDialog(
   if (!props.notificationsOpen) return null;
 
   return (
-    <NotificationsPanel
-      action={props.notificationAction}
-      communities={props.communities}
-      communityAvatarUrls={props.communityAvatarUrls}
-      communityPreviews={props.communityPreviews}
-      conversations={props.conversations}
-      currentIdentityId={props.session.identity.id}
-      error={props.notificationError}
-      identityNames={props.identityNames}
-      identityPictures={props.identityPictures}
-      identityProfiles={props.identityProfiles}
-      membershipAction={props.membershipRequestAction}
-      membershipError={props.membershipRequestError}
-      membershipRequests={props.membershipRequests}
-      notifications={props.visibleNotifications}
-      onAcceptMembershipRequest={props.onAcceptMembershipRequest}
-      onAccept={props.onAcceptNotification}
-      onArchive={props.archiveNotification}
-      onClose={props.onCloseNotifications}
-      onDeclineMembershipRequest={props.onDeclineMembershipRequest}
-      onDecline={props.onDeclineNotification}
-    />
+    <Suspense fallback={null}>
+      <NotificationsPanel
+        action={props.notificationAction}
+        communities={props.communities}
+        communityAvatarUrls={props.communityAvatarUrls}
+        communityPreviews={props.communityPreviews}
+        conversations={props.conversations}
+        currentIdentityId={props.session.identity.id}
+        error={props.notificationError}
+        identityNames={props.identityNames}
+        identityPictures={props.identityPictures}
+        identityProfiles={props.identityProfiles}
+        membershipAction={props.membershipRequestAction}
+        membershipError={props.membershipRequestError}
+        membershipRequests={props.membershipRequests}
+        notifications={props.visibleNotifications}
+        onAcceptMembershipRequest={props.onAcceptMembershipRequest}
+        onAccept={props.onAcceptNotification}
+        onArchive={props.archiveNotification}
+        onClose={props.onCloseNotifications}
+        onDeclineMembershipRequest={props.onDeclineMembershipRequest}
+        onDecline={props.onDeclineNotification}
+      />
+    </Suspense>
   );
 }
 
@@ -305,13 +356,15 @@ function NodeSettingsOverlay(
   if (!props.nodeSettingsOpen) return null;
 
   return (
-    <NodeSettingsDialog
-      networks={props.nodeNetworks}
-      node={props.node}
-      onClose={props.onCloseNodeSettings}
-      onNetworksUpdated={props.onNetworksUpdated}
-      session={props.session}
-    />
+    <Suspense fallback={null}>
+      <NodeSettingsDialog
+        networks={props.nodeNetworks}
+        node={props.node}
+        onClose={props.onCloseNodeSettings}
+        onNetworksUpdated={props.onNetworksUpdated}
+        session={props.session}
+      />
+    </Suspense>
   );
 }
 
@@ -321,10 +374,12 @@ function RealtimeEventsOverlay(
   if (!props.realtimeEventsOpen) return null;
 
   return (
-    <RealtimeEventsDialog
-      events={props.realtimeEventLog}
-      onClose={props.onCloseRealtimeEvents}
-    />
+    <Suspense fallback={null}>
+      <RealtimeEventsDialog
+        events={props.realtimeEventLog}
+        onClose={props.onCloseRealtimeEvents}
+      />
+    </Suspense>
   );
 }
 
@@ -334,11 +389,13 @@ function IncomingCallOverlay(
   if (!props.incomingCall) return null;
 
   return (
-    <IncomingCallDialog
-      caller={props.incomingCall.caller}
-      onAccept={props.onAcceptIncomingCall}
-      onDecline={props.onDeclineIncomingCall}
-      title={props.incomingCall.title}
-    />
+    <Suspense fallback={null}>
+      <IncomingCallDialog
+        caller={props.incomingCall.caller}
+        onAccept={props.onAcceptIncomingCall}
+        onDecline={props.onDeclineIncomingCall}
+        title={props.incomingCall.title}
+      />
+    </Suspense>
   );
 }

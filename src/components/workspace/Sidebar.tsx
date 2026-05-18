@@ -1,6 +1,8 @@
 import {
   ChangeEvent,
   FormEvent,
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -48,9 +50,14 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { GlobalCallBar } from '../calls/GlobalCallBar';
 import { GlassSelect } from '../common/GlassSelect';
-import { ImageCropEditor } from '../common/ImageCropEditor';
 import { SectionTitle } from '../common/SectionTitle';
 import { loadPublicImage } from '../community/communityImages';
+
+const ImageCropEditor = lazy(() =>
+  import('../common/ImageCropEditor').then((module) => ({
+    default: module.ImageCropEditor,
+  })),
+);
 
 interface SidebarProps {
   session: Session;
@@ -1016,20 +1023,22 @@ function ProfileEditor({
         </button>
       </form>
       {imageEditor && (
-        <ImageCropEditor
-          file={imageEditor.file}
-          shape={imageEditor.shape}
-          onClose={() => setImageEditor(null)}
-          onApply={(file, previewUrl) => {
-            if (imageEditor.shape === 'avatar') {
-              setPictureFile(file);
-              setPicturePreview(previewUrl);
-            } else {
-              setBannerFile(file);
-              setBannerPreview(previewUrl);
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <ImageCropEditor
+            file={imageEditor.file}
+            shape={imageEditor.shape}
+            onClose={() => setImageEditor(null)}
+            onApply={(file, previewUrl) => {
+              if (imageEditor.shape === 'avatar') {
+                setPictureFile(file);
+                setPicturePreview(previewUrl);
+              } else {
+                setBannerFile(file);
+                setBannerPreview(previewUrl);
+              }
+            }}
+          />
+        </Suspense>
       )}
     </div>,
     document.body,
