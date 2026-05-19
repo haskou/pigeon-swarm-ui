@@ -145,7 +145,6 @@ export type StickerResource = {
   contentType: string;
   dimensions?: StickerDimensions;
   id: string;
-  name: string;
   sizeBytes?: number;
   type: StickerType;
   createdAt?: number;
@@ -169,7 +168,6 @@ export type StickerInput = {
   assetCid: string;
   contentType: string;
   dimensions: StickerDimensions;
-  name: string;
   sizeBytes: number;
   type: StickerType;
 };

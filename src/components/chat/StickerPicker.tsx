@@ -499,7 +499,7 @@ export function StickerPackPreviewDialog({
                   <img
                     key={packSticker.id}
                     src={stickerAssetUrl(packSticker.assetCid)}
-                    alt={packSticker.name}
+                    alt="Sticker"
                     className="aspect-square rounded-xl bg-black/20 object-contain p-1"
                   />
                 ))}
@@ -603,12 +603,12 @@ function StickerGrid({
             <button
               type="button"
               onClick={() => void onSend(packId, sticker)}
-              title={sticker.name}
+              title="Sticker"
               className="grid aspect-square w-full place-items-center rounded-xl bg-white/5 p-1 transition hover:bg-white/10"
             >
               <img
                 src={stickerAssetUrl(sticker.assetCid)}
-                alt={sticker.name}
+                alt="Sticker"
                 className="max-h-full max-w-full object-contain"
               />
             </button>
@@ -916,14 +916,14 @@ function ManagePackStickers({
           <div key={sticker.id} className="group relative">
             <img
               src={stickerAssetUrl(sticker.assetCid)}
-              alt={sticker.name}
+              alt="Sticker"
               className="aspect-square w-full rounded-xl bg-black/20 object-contain p-1"
             />
             <button
               type="button"
               onClick={() => void onStickerDelete(pack.id, sticker.id)}
               className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/75 text-xs font-black text-white/70 opacity-0 transition hover:text-white group-hover:opacity-100"
-              aria-label={`Delete ${sticker.name}`}
+              aria-label="Delete sticker"
             >
               ×
             </button>
@@ -983,7 +983,6 @@ function StickerUploadForm({
   session: Session;
 }) {
   const [packId, setPackId] = useState('');
-  const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -994,7 +993,7 @@ function StickerUploadForm({
 
   const submitSticker = async (event: FormEvent) => {
     event.preventDefault();
-    if (!file || !packId || !name.trim()) return;
+    if (!file || !packId) return;
 
     setSaving(true);
     setError(null);
@@ -1008,11 +1007,9 @@ function StickerUploadForm({
         assetCid: upload.cid,
         contentType: upload.contentType,
         dimensions,
-        name: name.trim(),
         sizeBytes: upload.size,
         type: stickerTypeFromUpload(upload),
       });
-      setName('');
       setFile(null);
       await onCreated();
     } catch (caught) {
@@ -1025,7 +1022,7 @@ function StickerUploadForm({
   return (
     <form
       onSubmit={submitSticker}
-      className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[1fr_1fr_auto]"
+      className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[1fr_auto]"
     >
       <select
         value={packId}
@@ -1038,12 +1035,6 @@ function StickerUploadForm({
           </option>
         ))}
       </select>
-      <input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-        placeholder="Sticker name"
-      />
       <label className="rounded-xl bg-white/10 px-3 py-2 text-center text-sm font-black text-white/70 transition hover:bg-white/15">
         File
         <input
@@ -1058,8 +1049,8 @@ function StickerUploadForm({
       {error && <div className="text-sm text-rose-100 md:col-span-4">{error}</div>}
       <button
         type="submit"
-        disabled={saving || !file || !packId || !name.trim()}
-        className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-black text-white disabled:opacity-45 md:col-span-4"
+        disabled={saving || !file || !packId}
+        className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-black text-white disabled:opacity-45 md:col-span-2"
       >
         {saving ? 'Uploading...' : 'Add sticker'}
       </button>

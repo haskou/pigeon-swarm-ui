@@ -1114,7 +1114,6 @@ describe(PigeonApiGateway.name, () => {
       createdAt: 2,
       dimensions: { height: 512, width: 512 },
       id: 'sticker-1',
-      name: 'Smile',
       sizeBytes: 215040,
       type: 'static' as const,
       updatedAt: 2,
@@ -1123,7 +1122,6 @@ describe(PigeonApiGateway.name, () => {
       assetCid: sticker.assetCid,
       contentType: sticker.contentType,
       dimensions: sticker.dimensions,
-      name: sticker.name,
       sizeBytes: sticker.sizeBytes,
       type: sticker.type,
     };
@@ -1133,7 +1131,7 @@ describe(PigeonApiGateway.name, () => {
         .mockResolvedValueOnce(pack)
         .mockResolvedValueOnce({ ...pack, name: 'Updated pack' })
         .mockResolvedValueOnce(sticker)
-        .mockResolvedValueOnce({ ...sticker, name: 'Smile updated' })
+        .mockResolvedValueOnce({ ...sticker, sizeBytes: 215041 })
         .mockResolvedValueOnce(undefined),
     } as unknown as HttpJsonClient;
     const signer = {
@@ -1161,9 +1159,9 @@ describe(PigeonApiGateway.name, () => {
     await expect(
       gateway.updateSticker(session, pack.id, sticker.id, {
         ...stickerInput,
-        name: 'Smile updated',
+        sizeBytes: 215041,
       }),
-    ).resolves.toEqual({ ...sticker, name: 'Smile updated' });
+    ).resolves.toEqual({ ...sticker, sizeBytes: 215041 });
     await expect(
       gateway.deleteSticker(session, pack.id, sticker.id),
     ).resolves.toBeUndefined();
@@ -1213,13 +1211,13 @@ describe(PigeonApiGateway.name, () => {
       session,
       'PATCH',
       '/stickers/packs/pack-1/stickers/sticker-1',
-      { ...stickerInput, name: 'Smile updated' },
+      { ...stickerInput, sizeBytes: 215041 },
     );
     expect(http.request).toHaveBeenNthCalledWith(
       4,
       '/stickers/packs/pack-1/stickers/sticker-1',
       {
-        body: JSON.stringify({ ...stickerInput, name: 'Smile updated' }),
+        body: JSON.stringify({ ...stickerInput, sizeBytes: 215041 }),
         headers: { 'X-Signature': 'http-signature' },
         method: 'PATCH',
       },
