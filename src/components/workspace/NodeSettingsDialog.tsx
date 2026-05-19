@@ -4,8 +4,6 @@ import { createPortal } from 'react-dom';
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type {
   IdentityResource,
-  IpfsReplicationContentStatus,
-  IpfsReplicationNetworkStatus,
   IpfsReplicationStatus,
   Session,
 } from '../../domain/types';
@@ -417,7 +415,7 @@ function ReplicationStatusPanel({
   loading: boolean;
   status: IpfsReplicationStatus | null;
 }) {
-  const totals = replicationTotals(status);
+  const summary = status?.summary;
 
   return (
     <section className="border-t border-white/10 p-5">
@@ -435,27 +433,21 @@ function ReplicationStatusPanel({
       <div className="grid gap-3 sm:grid-cols-4">
         <ReplicationMetric
           label={copy.nodeSettings.replicationContents}
-          value={String(totals.contentCount)}
+          value={String(summary?.contentCount ?? 0)}
         />
         <ReplicationMetric
           label={copy.nodeSettings.replicationTotalSize}
-          value={formatBytes(totals.totalBytes)}
+          value={formatBytes(summary?.totalSizeBytes ?? 0)}
         />
         <ReplicationMetric
           label={copy.nodeSettings.replicationResponsible}
-          value={String(totals.localResponsibleCount)}
+          value={String(summary?.localResponsibleCount ?? 0)}
         />
         <ReplicationMetric
           label={copy.nodeSettings.replicationReleasable}
-          value={String(totals.releasableCount)}
+          value={String(summary?.releasableCount ?? 0)}
         />
       </div>
-
-      {status && (
-        <div className="mt-3 truncate rounded-2xl bg-black/20 px-3 py-2 text-xs text-white/50">
-          {copy.nodeSettings.replicationLocalNode}: {status.localNodeId}
-        </div>
-      )}
 
       {error && (
         <div className="mt-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -463,17 +455,9 @@ function ReplicationStatusPanel({
         </div>
       )}
 
-      {!error && !loading && status?.contents.length === 0 && (
+      {!error && !loading && status?.summary.contentCount === 0 && (
         <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
           {copy.nodeSettings.replicationEmpty}
-        </div>
-      )}
-
-      {status && status.contents.length > 0 && (
-        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-          {status.contents.map((content) => (
-            <ReplicationContentRow content={content} key={content.cid} />
-          ))}
         </div>
       )}
     </section>
@@ -497,156 +481,27 @@ function ReplicationMetric({
   );
 }
 
-function ReplicationContentRow({
-  content,
-}: {
-  content: IpfsReplicationContentStatus;
-}) {
-  return (
-    <article className="rounded-2xl border border-white/10 bg-black/20 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-black text-white">
-            {content.cid}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-xs text-white/45">
-            <span>{content.context}</span>
-            <span>{content.priority}</span>
-            <span>{formatBytes(content.sizeBytes)}</span>
-          </div>
-        </div>
-        <div className="text-right text-xs text-white/45">
-          {formatTimestamp(content.updatedAt)}
-        </div>
-      </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {content.networks.map((network) => (
-          <ReplicationNetworkRow
-            key={`${content.cid}-${network.networkId}`}
-            network={network}
-          />
-        ))}
-      </div>
-    </article>
-  );
-}
-
-function ReplicationNetworkRow({
-  network,
-}: {
-  network: IpfsReplicationNetworkStatus;
-}) {
-  const badgeCopy = network.localResponsible
-    ? copy.nodeSettings.replicationKeepLocal
-    : network.releaseLocalReplica
-      ? copy.nodeSettings.replicationReleaseLocal
-      : copy.nodeSettings.replicationStandby;
-
-  return (
-    <div className="rounded-2xl bg-black/25 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 truncate text-xs font-black text-white">
-          {network.networkId}
-        </div>
-        <span
-          className={cx(
-            'shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-black',
-            network.localResponsible
-              ? 'bg-emerald-400/15 text-emerald-100'
-              : network.releaseLocalReplica
-                ? 'bg-amber-400/15 text-amber-100'
-                : 'bg-white/10 text-white/60',
-          )}
-        >
-          {badgeCopy}
-        </span>
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-        <MiniMetric
-          label={copy.nodeSettings.replicationActiveNodes}
-          value={network.activeNodeCount}
-        />
-        <MiniMetric
-          label={copy.nodeSettings.replicationDesired}
-          value={network.desiredReplicas}
-        />
-        <MiniMetric
-          label={copy.nodeSettings.replicationKnown}
-          value={network.knownReplicas}
-        />
-      </div>
-      <div className="mt-2 truncate text-xs text-white/40">
-        {copy.nodeSettings.replicationResponsibleNodes}:{' '}
-        {network.responsibleNodeIds.join(', ') || '--'}
-      </div>
-      <div className="mt-1 truncate text-xs text-white/40">
-        {copy.nodeSettings.replicationKnownNodes}:{' '}
-        {network.knownReplicaNodeIds.join(', ') || '--'}
-      </div>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/30">
-        {label}
-      </div>
-      <div className="text-sm font-black text-white/75">{value}</div>
-    </div>
-  );
-}
-
-function replicationTotals(status: IpfsReplicationStatus | null): {
-  contentCount: number;
-  localResponsibleCount: number;
-  releasableCount: number;
-  totalBytes: number;
-} {
-  if (!status) {
-    return {
-      contentCount: 0,
-      localResponsibleCount: 0,
-      releasableCount: 0,
-      totalBytes: 0,
-    };
-  }
-
-  return status.contents.reduce(
-    (totals, content) => ({
-      contentCount: totals.contentCount + 1,
-      localResponsibleCount:
-        totals.localResponsibleCount +
-        content.networks.filter((network) => network.localResponsible).length,
-      releasableCount:
-        totals.releasableCount +
-        content.networks.filter((network) => network.releaseLocalReplica)
-          .length,
-      totalBytes: totals.totalBytes + content.sizeBytes,
-    }),
-    {
-      contentCount: 0,
-      localResponsibleCount: 0,
-      releasableCount: 0,
-      totalBytes: 0,
-    },
-  );
-}
-
 function formatBytes(bytes: number): string {
   return new Intl.NumberFormat('en', {
-    maximumFractionDigits: 1,
-    notation: bytes >= 1_000_000 ? 'compact' : 'standard',
+    maximumFractionDigits: bytes >= 1024 * 1024 ? 1 : 0,
     style: 'unit',
-    unit: 'byte',
-    unitDisplay: 'narrow',
-  }).format(bytes);
+    unit: byteUnit(bytes),
+    unitDisplay: 'short',
+  }).format(bytes / byteUnitDivisor(bytes));
 }
 
-function formatTimestamp(timestamp: number): string {
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(timestamp));
+function byteUnit(bytes: number): 'byte' | 'gigabyte' | 'kilobyte' | 'megabyte' {
+  if (bytes >= 1024 * 1024 * 1024) return 'gigabyte';
+  if (bytes >= 1024 * 1024) return 'megabyte';
+  if (bytes >= 1024) return 'kilobyte';
+
+  return 'byte';
+}
+
+function byteUnitDivisor(bytes: number): number {
+  if (bytes >= 1024 * 1024 * 1024) return 1024 * 1024 * 1024;
+  if (bytes >= 1024 * 1024) return 1024 * 1024;
+  if (bytes >= 1024) return 1024;
+
+  return 1;
 }
