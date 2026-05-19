@@ -14,6 +14,7 @@ import type {
   IdentityPresence,
   IdentityResource,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
@@ -25,6 +26,7 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { StickerPackPreviewDialog } from '../chat/StickerPicker';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
@@ -72,6 +74,7 @@ interface ChatColumnProps {
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape: () => void;
@@ -141,6 +144,7 @@ export function ChatColumn({
   onRetryMessage,
   onScroll,
   onSend,
+  onStickerSend,
   onStartCall,
   onTypingActive,
   peerIdentity,
@@ -162,6 +166,8 @@ export function ChatColumn({
     picture?: string | null;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [stickerPackPreview, setStickerPackPreview] =
+    useState<StickerMessageReference | null>(null);
   const [downloadProgress, setDownloadProgress] =
     useState<AttachmentProgress | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
@@ -202,6 +208,9 @@ export function ChatColumn({
   ) => {
     onTypingActive?.(false);
     await onSend(content, attachments, options);
+  };
+  const handleStickerClick = (sticker: StickerMessageReference) => {
+    setStickerPackPreview(sticker);
   };
 
   useEffect(
@@ -543,6 +552,7 @@ export function ChatColumn({
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
+            onStickerClick={handleStickerClick}
             onScroll={onScroll}
             reactionAuthorNames={reactionAuthorNames}
             scrollerRef={scrollerRef}
@@ -562,6 +572,7 @@ export function ChatColumn({
             onDraftChange={handleDraftChange}
             onEscape={onEscape}
             onSend={handleSend}
+            onStickerSend={onStickerSend}
             onCancelReply={onCancelReply}
             progress={downloadProgress ?? progress}
             placeholder={
@@ -578,7 +589,16 @@ export function ChatColumn({
                   )
                 : undefined
             }
+            session={session}
           />
+          {stickerPackPreview && (
+            <StickerPackPreviewDialog
+              onClose={() => setStickerPackPreview(null)}
+              onStickerSend={onStickerSend}
+              session={session}
+              sticker={stickerPackPreview}
+            />
+          )}
         </>
       )}
       {conversationDataOpen && (

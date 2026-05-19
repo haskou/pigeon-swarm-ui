@@ -6,6 +6,7 @@ import type {
   IdentityResource,
   MessageAttachment,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -17,11 +18,12 @@ import {
   endsAuthorRun,
   findReplyMessage,
   messageReplyImage,
+  messageReplySticker,
   startsAuthorRun,
   startsMessageDay,
 } from '../chat/messageTimelineHelpers';
 import { LockIcon } from '../workspace/LockIcon';
-import { memberDisplayName } from './communityMemberNames';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 type LoadState = 'error' | 'idle' | 'loading';
 
@@ -50,6 +52,7 @@ interface CommunityMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -75,6 +78,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   onScroll,
   reactionAuthorNames,
   scrollerRef,
@@ -174,16 +178,18 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
+                      onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
                       replyImage={messageReplyImage(message, replyMessage)}
+                      replySticker={messageReplySticker(message, replyMessage)}
                       replyAuthorName={
                         replyMessage
-                          ? memberDisplayName(
+                          ? memberPrimaryName(
                               memberIdentities[replyMessage.authorIdentityId],
                               replyMessage.authorIdentityId,
                             )
                           : message.replyPreview
-                            ? memberDisplayName(
+                            ? memberPrimaryName(
                                 memberIdentities[
                                   message.replyPreview.authorIdentityId
                                 ],

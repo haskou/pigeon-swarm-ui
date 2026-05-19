@@ -15,6 +15,8 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
   ChatMessage,
+  Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -27,6 +29,8 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { StickerPicker } from './StickerPicker';
+import { stickerAssetUrl } from './StickerPressPreview';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -42,6 +46,7 @@ interface ComposerProps {
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onStickerSend?: (sticker: StickerMessageReference) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
   focusKey?: string | null;
@@ -49,6 +54,7 @@ interface ComposerProps {
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
   replyToAuthorName?: string;
+  session: Session;
   onCancelReply?: () => void;
 }
 
@@ -61,10 +67,12 @@ export function Composer({
   onDraftChange,
   onEscape,
   onSend,
+  onStickerSend,
   placeholder = copy.composer.placeholder,
   progress,
   replyTo,
   replyToAuthorName,
+  session,
 }: ComposerProps) {
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
@@ -210,6 +218,27 @@ export function Composer({
       });
     },
     [draft, emojiTrigger, onDraftChange],
+  );
+  const insertLooseEmoji = useCallback(
+    (emoji: string) => {
+      const start = textInputRef.current?.selectionStart ?? caretIndex;
+      const end = textInputRef.current?.selectionEnd ?? caretIndex;
+      const nextValue = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+      const nextCaretIndex = start + emoji.length;
+
+      if (nextValue.length > MESSAGE_MAX_LENGTH) return;
+
+      onDraftChange(nextValue);
+      setCaretIndex(nextCaretIndex);
+      requestAnimationFrame(() => {
+        textInputRef.current?.focus();
+        textInputRef.current?.setSelectionRange(
+          nextCaretIndex,
+          nextCaretIndex,
+        );
+      });
+    },
+    [caretIndex, draft, onDraftChange],
   );
 
   useEffect(() => {
@@ -410,16 +439,27 @@ export function Composer({
         )}
         {replyTo && (
           <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              {replyTo.sticker && (
+                <img
+                  src={stickerAssetUrl(replyTo.sticker.assetCid)}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                />
+              )}
+              <div className="min-w-0">
               <div className="text-xs font-black uppercase text-fuchsia-100/70">
                 {copy.messages.replyingTo}{' '}
                 {replyToAuthorName ?? replyTo.authorIdentityId}
               </div>
-              {replyTo.content && (
+              {replyTo.content ? (
                 <div className="mt-1 truncate text-white/80">
                   {replyTo.content}
                 </div>
-              )}
+              ) : replyTo.sticker ? (
+                <div className="mt-1 truncate text-white/80">Sticker</div>
+              ) : null}
+              </div>
             </div>
             <button
               type="button"
@@ -518,14 +558,33 @@ export function Composer({
               suggestions={emojiSuggestions}
             />
           )}
+          {onStickerSend && (
+            <StickerPicker
+              disabled={disabled}
+              onEmojiInsert={insertLooseEmoji}
+              onStickerSend={onStickerSend}
+              session={session}
+            />
+          )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 disabled:cursor-not-allowed"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
             aria-label={copy.composer.attach}
           >
-            +
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" />
+            </svg>
           </button>
           <input
             ref={fileInputRef}

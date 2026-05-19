@@ -7,6 +7,7 @@ import type {
   ChatMessage,
   MessageAttachment,
   MessageResource,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -16,6 +17,10 @@ import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 import { MarkdownMessage } from './MarkdownMessage';
+import {
+  stickerAssetUrl,
+  useStickerPressPreview,
+} from './StickerPressPreview';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,10 +41,12 @@ interface MessageBubbleProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
+  replySticker?: StickerMessageReference;
   reserveAvatarSpace?: boolean;
   showAvatar: boolean;
 }
@@ -61,10 +68,12 @@ export function MessageBubble({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   reactionAuthorNames = {},
   replyAuthorName,
   replyImage,
   replyPreview,
+  replySticker,
   reserveAvatarSpace = true,
   showAvatar,
 }: MessageBubbleProps) {
@@ -103,6 +112,8 @@ export function MessageBubble({
     () => firstLinkPreview(message.content),
     [message.content],
   );
+  const sticker = message.sticker;
+  const stickerPreview = useStickerPressPreview(sticker?.assetCid ?? '');
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -205,8 +216,6 @@ export function MessageBubble({
               onContextMenu={handleContextMenu}
               style={{
                 WebkitTouchCallout: 'none',
-                WebkitUserSelect: 'none',
-                userSelect: 'none',
               }}
               onPointerCancel={clearLongPressTimer}
               onPointerDown={handlePointerDown}
@@ -214,45 +223,59 @@ export function MessageBubble({
               onPointerMove={clearLongPressTimer}
               onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-full select-none rounded-2xl p-3 text-sm leading-6',
-                mine
-                  ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
-                  : 'border border-white/10 bg-black/25 text-white',
+                'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                sticker
+                  ? 'rounded-2xl bg-transparent p-0'
+                  : cx(
+                      'rounded-2xl px-3 py-1.5',
+                      mine
+                        ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                        : 'border border-white/10 bg-black/25 text-white',
+                    ),
               )}
             >
-            {hasReply && replyMessageId && (
-              <button
-                type="button"
-                onClick={() => onReplyReferenceClick(replyMessageId)}
-                className={cx(
-                  'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
-                  mine
-                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                    : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  {replyImageUrl && (
-                    <img
-                      src={replyImageUrl}
-                      alt=""
-                      className="h-10 w-10 shrink-0 rounded-xl object-cover"
-                    />
+              {hasReply && replyMessageId && (
+                <button
+                  type="button"
+                  onClick={() => onReplyReferenceClick(replyMessageId)}
+                  className={cx(
+                    'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                    mine
+                      ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                      : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
                   )}
-                  <span className="min-w-0">
-                    <span className="block font-black text-white/75">
-                      {copy.messages.replyTo}{' '}
-                      {replyAuthorName ?? copy.messages.originalMessage}
-                    </span>
-                    {replyPreview && (
-                      <span className="block truncate text-white/55">
-                        {replyPreview}
-                      </span>
+                >
+                  <span className="flex items-center gap-2">
+                    {replyImageUrl && (
+                      <img
+                        src={replyImageUrl}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                      />
                     )}
+                    {replySticker && (
+                      <img
+                        src={stickerAssetUrl(replySticker.assetCid)}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block font-black text-white/75">
+                        {copy.messages.replyTo}{' '}
+                        {replyAuthorName ?? copy.messages.originalMessage}
+                      </span>
+                      {replyPreview ? (
+                        <span className="block truncate text-white/55">
+                          {replyPreview}
+                        </span>
+                      ) : replySticker ? (
+                        <span className="block truncate text-white/55">Sticker</span>
+                      ) : null}
+                    </span>
                   </span>
-                </span>
-              </button>
-            )}
+                </button>
+              )}
             {message.attachments.length > 0 && (
               <div className="grid gap-2">
                 {imageAttachments.length > 0 && (
@@ -274,6 +297,29 @@ export function MessageBubble({
                   />
                 ))}
               </div>
+            )}
+            {sticker && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (stickerPreview.consumePreviewClick()) return;
+
+                    onStickerClick?.(sticker);
+                  }}
+                  className="block touch-none select-none rounded-2xl p-1 transition hover:bg-white/10"
+                  title="View sticker pack"
+                  {...stickerPreview.pressPreviewHandlers}
+                >
+                  <img
+                    src={stickerAssetUrl(sticker.assetCid)}
+                    alt="Sticker"
+                    className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
+                    draggable={false}
+                  />
+                </button>
+                {stickerPreview.previewPortal}
+              </>
             )}
             {message.attachmentProgress && (
               <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
@@ -300,7 +346,7 @@ export function MessageBubble({
                 </div>
               </div>
             )}
-            {message.content && (
+            {message.content && !sticker && (
               <div
                 className={cx(
                   'whitespace-pre-wrap break-words',

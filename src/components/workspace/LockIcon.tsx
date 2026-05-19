@@ -1,6 +1,11 @@
 export function LockIcon({ locked }: { locked: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="block h-4 w-4"
+    >
       <path
         d={locked ? 'M7 10V8a5 5 0 0 1 10 0v2' : 'M9 10V8a5 5 0 0 1 8.7-3.4'}
         stroke="currentColor"

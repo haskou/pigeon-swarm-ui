@@ -7,6 +7,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   MessageAttachment,
+  StickerMessageReference,
 } from '../../domain/types';
 import type {
   IdentityNames,
@@ -15,13 +16,17 @@ import type {
 
 import { copy } from '../../i18n/en';
 import { formatDateSeparator } from '../../utils/formatting';
-import { identityDisplayName } from '../../utils/identityDisplay';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../utils/identityDisplay';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import {
   findReplyMessage,
   messageReplyImage,
+  messageReplySticker,
   startsAuthorRun,
   startsMessageDay,
 } from '../chat/messageTimelineHelpers';
@@ -59,6 +64,7 @@ interface ChatMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -84,6 +90,7 @@ export function ChatMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   onScroll,
   reactionAuthorNames,
   scrollerRef,
@@ -120,6 +127,7 @@ export function ChatMessageTimeline({
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
+          onStickerClick={onStickerClick}
           reactionAuthorNames={reactionAuthorNames}
         />
       )}
@@ -155,6 +163,7 @@ function MessageTimelineContent({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   reactionAuthorNames,
 }: Omit<
   ChatMessageTimelineProps,
@@ -184,6 +193,7 @@ function MessageTimelineContent({
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
+            onStickerClick={onStickerClick}
             previousMessage={messages[index - 1]}
             reactionAuthorNames={reactionAuthorNames}
           />
@@ -212,6 +222,7 @@ function MessageTimelineItem({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   previousMessage,
   reactionAuthorNames,
 }: {
@@ -229,6 +240,7 @@ function MessageTimelineItem({
   onReactionToggle: ChatMessageTimelineProps['onReactionToggle'];
   onReplyReferenceClick: ChatMessageTimelineProps['onReplyReferenceClick'];
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];
+  onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
   previousMessage?: ChatMessage;
   reactionAuthorNames: Record<string, string>;
 }) {
@@ -266,8 +278,10 @@ function MessageTimelineItem({
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
+          onStickerClick={onStickerClick}
           reactionAuthorNames={reactionAuthorNames}
           replyImage={messageReplyImage(message, replyMessage)}
+          replySticker={messageReplySticker(message, replyMessage)}
           replyAuthorName={replyAuthorName(
             message,
             replyMessage,
@@ -352,13 +366,14 @@ function replyAuthorName(
   identityNames: IdentityNames,
 ): string | undefined {
   if (replyMessage) {
-    return identityDisplayName(replyMessage.authorIdentityId, identityNames);
+    return identityPrimaryDisplayName(
+      identityDisplayName(replyMessage.authorIdentityId, identityNames),
+    );
   }
 
   if (!message.replyPreview) return undefined;
 
-  return identityDisplayName(
-    message.replyPreview.authorIdentityId,
-    identityNames,
+  return identityPrimaryDisplayName(
+    identityDisplayName(message.replyPreview.authorIdentityId, identityNames),
   );
 }

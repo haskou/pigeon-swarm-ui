@@ -7,6 +7,7 @@ import type {
   MessageResource,
   MessageReplyPreview,
   Session,
+  StickerMessageReference,
 } from '../types';
 
 import { conversationKeyEntry } from '../conversations/conversationKey';
@@ -25,7 +26,9 @@ type PlainMessage = {
   authorIdentityId?: string;
   content?: string;
   reply?: MessageReplyPreview;
+  sticker?: StickerMessageReference;
   timestamp?: number;
+  type?: string;
 };
 
 export type MessageProjectionCopy = {
@@ -240,6 +243,7 @@ export class MessageProjector {
       raw: message,
       replyPreview: parsed.reply,
       replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
+      sticker: parsed.sticker,
       timestamp: parsed.timestamp ?? base.timestamp,
     };
   }

@@ -7,6 +7,7 @@ import type {
   MessageAttachment,
   MessageReplyPreview,
   Session,
+  StickerMessageReference,
 } from '../types';
 
 import { normalizeIdentityId } from '../../utils/identityId';
@@ -19,6 +20,7 @@ export type CommunityChannelPlainPayload = {
   content?: string;
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
+  sticker?: StickerMessageReference;
   timestamp?: number;
   type?: string;
 };
@@ -40,6 +42,7 @@ type EncryptCommunityChannelPayloadInput = {
   recipients: IdentityResource[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
+  sticker?: StickerMessageReference;
   timestamp: number;
 };
 
@@ -122,8 +125,11 @@ export function encryptCommunityChannelPayload(
       ...(input.replyToMessageId
         ? { replyToMessageId: input.replyToMessageId }
         : {}),
+      ...(input.sticker ? { sticker: input.sticker } : {}),
       timestamp: input.timestamp,
-      type: 'CommunityChannelMessageSent',
+      type: input.sticker
+        ? 'CommunityChannelStickerMessageSent'
+        : 'CommunityChannelMessageSent',
     }),
   );
   const encrypted = CryptoAdapter.encryptAes256Gcm(key, iv, plaintext);

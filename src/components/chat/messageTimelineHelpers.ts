@@ -1,4 +1,8 @@
-import type { ChatMessage, MessageAttachment } from '../../domain/types';
+import type {
+  ChatMessage,
+  MessageAttachment,
+  StickerMessageReference,
+} from '../../domain/types';
 
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { isSameDay } from '../../utils/formatting';
@@ -63,4 +67,11 @@ function isReplyPreviewImageAttachment(
     typeof value.contentType === 'string' &&
     isBrowserPreviewImage(value.contentType)
   );
+}
+
+export function messageReplySticker(
+  message: ChatMessage,
+  replyMessage?: ChatMessage,
+): StickerMessageReference | undefined {
+  return replyMessage?.sticker ?? message.replyPreview?.sticker;
 }

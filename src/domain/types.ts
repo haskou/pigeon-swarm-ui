@@ -133,6 +133,65 @@ export type PublicFileContent = PublicFileUpload & {
   uploadedByIdentityId?: string;
 };
 
+export type StickerType = 'animated' | 'static' | 'video';
+
+export type StickerDimensions = {
+  height: number;
+  width: number;
+};
+
+export type StickerResource = {
+  assetCid: string;
+  contentType: string;
+  dimensions?: StickerDimensions;
+  id: string;
+  sizeBytes?: number;
+  type: StickerType;
+  createdAt?: number;
+  updatedAt?: number;
+};
+
+export type StickerPackResource = {
+  createdAt?: number;
+  id: string;
+  name: string;
+  ownerIdentityId: string;
+  stickers: StickerResource[];
+  updatedAt?: number;
+};
+
+export type StickerPackInput = {
+  name: string;
+};
+
+export type StickerInput = {
+  assetCid: string;
+  contentType: string;
+  dimensions: StickerDimensions;
+  sizeBytes: number;
+  type: StickerType;
+};
+
+export type StickerMessageReference = {
+  assetCid: string;
+  packId: string;
+  stickerId: string;
+};
+
+export type StickerUsageResource = {
+  favoritedAt?: number;
+  packId: string;
+  sticker: StickerResource;
+  stickerId: string;
+  usedAt?: number;
+};
+
+export type MyStickersResource = {
+  favoriteStickers: StickerUsageResource[];
+  recentStickers: StickerUsageResource[];
+  savedPacks: StickerPackResource[];
+};
+
 export type PrivateFileUpload = PublicFileUpload & {
   encrypted: true;
 };
@@ -174,6 +233,7 @@ export type MessageReplyPreview = {
   content?: string;
   image?: MessageAttachment;
   messageId: string;
+  sticker?: StickerMessageReference;
 };
 
 export type PendingMessageAttachment = {
@@ -199,6 +259,7 @@ export type SendMessageOptions = {
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
+  sticker?: StickerMessageReference;
 };
 
 export type LocalKeychain = {
@@ -373,6 +434,7 @@ export type ChatMessage = {
   replyToMessageId?: string;
   raw: MessageResource;
   reactions: MessageReaction[];
+  sticker?: StickerMessageReference;
 };
 
 export type Session = {

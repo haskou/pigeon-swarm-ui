@@ -16,5 +16,6 @@ export function replyPreviewFromMessage(
     ...(message.content ? { content: message.content.slice(0, 180) } : {}),
     ...(image ? { image } : {}),
     messageId: message.id,
+    ...(message.sticker ? { sticker: message.sticker } : {}),
   };
 }

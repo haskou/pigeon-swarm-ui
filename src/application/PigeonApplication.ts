@@ -27,12 +27,18 @@ import type {
   LoginResult,
   MessageAttachment,
   MessageResource,
+  MyStickersResource,
   NotificationResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
+  StickerInput,
+  StickerMessageReference,
+  StickerPackInput,
+  StickerPackResource,
+  StickerResource,
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
@@ -813,6 +819,114 @@ export class PigeonApplication {
     file: File,
   ): Promise<PublicFileUpload> {
     return await this.gateway.uploadPublicFile(session, file);
+  }
+
+  public async uploadStickerAsset(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    return await this.gateway.uploadStickerAsset(session, file);
+  }
+
+  public async listStickerPacks(
+    input: {
+      ownerIdentityId?: string;
+    } = {},
+  ): Promise<StickerPackResource[]> {
+    return await this.gateway.listStickerPacks(input);
+  }
+
+  public async getStickerPack(packId: string): Promise<StickerPackResource> {
+    return await this.gateway.getStickerPack(packId);
+  }
+
+  public async getMyStickers(session: Session): Promise<MyStickersResource> {
+    return await this.gateway.getMyStickers(session);
+  }
+
+  public async createStickerPack(
+    session: Session,
+    input: StickerPackInput,
+  ): Promise<StickerPackResource> {
+    return await this.gateway.createStickerPack(session, input);
+  }
+
+  public async updateStickerPack(
+    session: Session,
+    packId: string,
+    input: Partial<StickerPackInput>,
+  ): Promise<StickerPackResource> {
+    return await this.gateway.updateStickerPack(session, packId, input);
+  }
+
+  public async addStickerToPack(
+    session: Session,
+    packId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.gateway.addStickerToPack(session, packId, input);
+  }
+
+  public async updateSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.gateway.updateSticker(session, packId, stickerId, input);
+  }
+
+  public async deleteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.deleteSticker(session, packId, stickerId);
+  }
+
+  public async saveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.gateway.saveStickerPack(session, packId);
+  }
+
+  public async unsaveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.gateway.unsaveStickerPack(session, packId);
+  }
+
+  public async favoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.favoriteSticker(session, packId, stickerId);
+  }
+
+  public async unfavoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.unfavoriteSticker(session, packId, stickerId);
+  }
+
+  public async markStickerUsed(
+    session: Session,
+    sticker: StickerMessageReference,
+  ): Promise<void> {
+    await this.gateway.markStickerUsed(
+      session,
+      sticker.packId,
+      sticker.stickerId,
+    );
+  }
+
+  public stickerAssetUrl(assetCid: string): string {
+    return this.gateway.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
   }
 
   public async listConversations(

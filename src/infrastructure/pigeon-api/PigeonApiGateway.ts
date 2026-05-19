@@ -38,6 +38,7 @@ import type {
   LoginResult,
   MessageAttachment,
   MessageResource,
+  MyStickersResource,
   NotificationResource,
   PendingMessageAttachment,
   PrivateFileContent,
@@ -47,6 +48,10 @@ import type {
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
+  StickerInput,
+  StickerPackInput,
+  StickerPackResource,
+  StickerResource,
 } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
@@ -68,6 +73,7 @@ import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
 import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
+import { PigeonStickersApi } from './PigeonStickersApi';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
@@ -154,6 +160,8 @@ export class PigeonApiGateway {
 
   private readonly signer: RequestSigner;
 
+  private readonly stickers: PigeonStickersApi;
+
   public constructor(
     http: HttpJsonClient = new HttpJsonClient(
       new ApiUrlBuilder(API_SERVER_URL),
@@ -178,6 +186,7 @@ export class PigeonApiGateway {
     this.presence = new PigeonPresenceApi(http, signer);
     this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
+    this.stickers = new PigeonStickersApi(http, signer);
   }
 
   public apiUrl(path: string): string {
@@ -1144,6 +1153,107 @@ export class PigeonApiGateway {
     return await this.files.uploadPublicFile(session, file);
   }
 
+  public async uploadStickerAsset(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    return await this.stickers.uploadAsset(session, file);
+  }
+
+  public async listStickerPacks(
+    input: {
+      ownerIdentityId?: string;
+    } = {},
+  ): Promise<StickerPackResource[]> {
+    return await this.stickers.listPacks(input);
+  }
+
+  public async getStickerPack(packId: string): Promise<StickerPackResource> {
+    return await this.stickers.getPack(packId);
+  }
+
+  public async getMyStickers(session: Session): Promise<MyStickersResource> {
+    return await this.stickers.getMyStickers(session);
+  }
+
+  public async createStickerPack(
+    session: Session,
+    input: StickerPackInput,
+  ): Promise<StickerPackResource> {
+    return await this.stickers.createPack(session, input);
+  }
+
+  public async updateStickerPack(
+    session: Session,
+    packId: string,
+    input: Partial<StickerPackInput>,
+  ): Promise<StickerPackResource> {
+    return await this.stickers.updatePack(session, packId, input);
+  }
+
+  public async addStickerToPack(
+    session: Session,
+    packId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.stickers.addSticker(session, packId, input);
+  }
+
+  public async updateSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.stickers.updateSticker(session, packId, stickerId, input);
+  }
+
+  public async deleteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.deleteSticker(session, packId, stickerId);
+  }
+
+  public async saveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.stickers.savePack(session, packId);
+  }
+
+  public async unsaveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.stickers.unsavePack(session, packId);
+  }
+
+  public async favoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.favoriteSticker(session, packId, stickerId);
+  }
+
+  public async unfavoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.unfavoriteSticker(session, packId, stickerId);
+  }
+
+  public async markStickerUsed(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.markStickerUsed(session, packId, stickerId);
+  }
+
   public async uploadPrivateFile(
     session: Session,
     attachment: PendingMessageAttachment,
@@ -1448,11 +1558,12 @@ export class PigeonApiGateway {
       JSON.stringify({
         attachments: messageAttachments,
         authorIdentityId: session.identity.id,
-        content,
+        content: options.sticker ? '' : content,
         conversationId,
         ...(replyPreview ? { reply: replyPreview } : {}),
+        ...(options.sticker ? { sticker: options.sticker } : {}),
         timestamp,
-        type: 'MessageSent',
+        type: options.sticker ? 'StickerMessageSent' : 'MessageSent',
       }),
     );
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
