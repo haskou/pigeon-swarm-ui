@@ -210,8 +210,6 @@ export function MessageBubble({
               onContextMenu={handleContextMenu}
               style={{
                 WebkitTouchCallout: 'none',
-                WebkitUserSelect: 'none',
-                userSelect: 'none',
               }}
               onPointerCancel={clearLongPressTimer}
               onPointerDown={handlePointerDown}
@@ -219,50 +217,50 @@ export function MessageBubble({
               onPointerMove={clearLongPressTimer}
               onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-full select-none text-sm leading-6',
+                'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                 sticker
                   ? 'rounded-2xl bg-transparent p-0'
                   : cx(
-                      'rounded-2xl p-3',
+                      'rounded-2xl px-3 py-1.5',
                       mine
                         ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
                         : 'border border-white/10 bg-black/25 text-white',
                     ),
               )}
             >
-            {hasReply && replyMessageId && (
-              <button
-                type="button"
-                onClick={() => onReplyReferenceClick(replyMessageId)}
-                className={cx(
-                  'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
-                  mine
-                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                    : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  {replyImageUrl && (
-                    <img
-                      src={replyImageUrl}
-                      alt=""
-                      className="h-10 w-10 shrink-0 rounded-xl object-cover"
-                    />
+              {hasReply && replyMessageId && (
+                <button
+                  type="button"
+                  onClick={() => onReplyReferenceClick(replyMessageId)}
+                  className={cx(
+                    'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                    mine
+                      ? 'border-white/20 bg-white/10 hover:bg-white/15'
+                      : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
                   )}
-                  <span className="min-w-0">
-                    <span className="block font-black text-white/75">
-                      {copy.messages.replyTo}{' '}
-                      {replyAuthorName ?? copy.messages.originalMessage}
-                    </span>
-                    {replyPreview && (
-                      <span className="block truncate text-white/55">
-                        {replyPreview}
-                      </span>
+                >
+                  <span className="flex items-center gap-2">
+                    {replyImageUrl && (
+                      <img
+                        src={replyImageUrl}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                      />
                     )}
+                    <span className="min-w-0">
+                      <span className="block font-black text-white/75">
+                        {copy.messages.replyTo}{' '}
+                        {replyAuthorName ?? copy.messages.originalMessage}
+                      </span>
+                      {replyPreview && (
+                        <span className="block truncate text-white/55">
+                          {replyPreview}
+                        </span>
+                      )}
+                    </span>
                   </span>
-                </span>
-              </button>
-            )}
+                </button>
+              )}
             {message.attachments.length > 0 && (
               <div className="grid gap-2">
                 {imageAttachments.length > 0 && (

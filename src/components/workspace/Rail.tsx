@@ -61,6 +61,7 @@ export function Rail({
           <img
             src="/logo.png"
             alt="Pigeon Swarm"
+            draggable={false}
             className="h-14 w-14 rounded-2xl shadow-xl"
           />
         </button>

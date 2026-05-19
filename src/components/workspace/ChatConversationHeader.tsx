@@ -182,8 +182,8 @@ function ConversationLockState({
     <span
       className={
         hasConversationKey
-          ? 'shrink-0 text-emerald-300'
-          : 'shrink-0 text-rose-300'
+          ? 'inline-grid h-5 w-5 shrink-0 place-items-center text-emerald-300'
+          : 'inline-grid h-5 w-5 shrink-0 place-items-center text-rose-300'
       }
       title={tooltip}
       aria-label={tooltip}
