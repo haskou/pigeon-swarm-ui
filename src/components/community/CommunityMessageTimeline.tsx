@@ -18,6 +18,7 @@ import {
   endsAuthorRun,
   findReplyMessage,
   messageReplyImage,
+  messageReplySticker,
   startsAuthorRun,
   startsMessageDay,
 } from '../chat/messageTimelineHelpers';
@@ -180,6 +181,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
                       replyImage={messageReplyImage(message, replyMessage)}
+                      replySticker={messageReplySticker(message, replyMessage)}
                       replyAuthorName={
                         replyMessage
                           ? memberDisplayName(

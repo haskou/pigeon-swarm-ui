@@ -29,7 +29,7 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
-import { StickerPicker } from './StickerPicker';
+import { StickerPicker, stickerAssetUrl } from './StickerPicker';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -438,16 +438,27 @@ export function Composer({
         )}
         {replyTo && (
           <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              {replyTo.sticker && (
+                <img
+                  src={stickerAssetUrl(replyTo.sticker.assetCid)}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                />
+              )}
+              <div className="min-w-0">
               <div className="text-xs font-black uppercase text-fuchsia-100/70">
                 {copy.messages.replyingTo}{' '}
                 {replyToAuthorName ?? replyTo.authorIdentityId}
               </div>
-              {replyTo.content && (
+              {replyTo.content ? (
                 <div className="mt-1 truncate text-white/80">
                   {replyTo.content}
                 </div>
-              )}
+              ) : replyTo.sticker ? (
+                <div className="mt-1 truncate text-white/80">Sticker</div>
+              ) : null}
+              </div>
             </div>
             <button
               type="button"

@@ -23,6 +23,7 @@ import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import {
   findReplyMessage,
   messageReplyImage,
+  messageReplySticker,
   startsAuthorRun,
   startsMessageDay,
 } from '../chat/messageTimelineHelpers';
@@ -277,6 +278,7 @@ function MessageTimelineItem({
           onStickerClick={onStickerClick}
           reactionAuthorNames={reactionAuthorNames}
           replyImage={messageReplyImage(message, replyMessage)}
+          replySticker={messageReplySticker(message, replyMessage)}
           replyAuthorName={replyAuthorName(
             message,
             replyMessage,

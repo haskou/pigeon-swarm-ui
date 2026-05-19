@@ -43,6 +43,7 @@ interface MessageBubbleProps {
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
+  replySticker?: StickerMessageReference;
   reserveAvatarSpace?: boolean;
   showAvatar: boolean;
 }
@@ -69,6 +70,7 @@ export function MessageBubble({
   replyAuthorName,
   replyImage,
   replyPreview,
+  replySticker,
   reserveAvatarSpace = true,
   showAvatar,
 }: MessageBubbleProps) {
@@ -247,16 +249,25 @@ export function MessageBubble({
                         className="h-10 w-10 shrink-0 rounded-xl object-cover"
                       />
                     )}
+                    {replySticker && (
+                      <img
+                        src={stickerAssetUrl(replySticker.assetCid)}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                      />
+                    )}
                     <span className="min-w-0">
                       <span className="block font-black text-white/75">
                         {copy.messages.replyTo}{' '}
                         {replyAuthorName ?? copy.messages.originalMessage}
                       </span>
-                      {replyPreview && (
+                      {replyPreview ? (
                         <span className="block truncate text-white/55">
                           {replyPreview}
                         </span>
-                      )}
+                      ) : replySticker ? (
+                        <span className="block truncate text-white/55">Sticker</span>
+                      ) : null}
                     </span>
                   </span>
                 </button>

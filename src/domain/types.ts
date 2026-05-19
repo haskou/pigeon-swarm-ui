@@ -233,6 +233,7 @@ export type MessageReplyPreview = {
   content?: string;
   image?: MessageAttachment;
   messageId: string;
+  sticker?: StickerMessageReference;
 };
 
 export type PendingMessageAttachment = {
