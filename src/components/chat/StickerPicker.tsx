@@ -54,6 +54,78 @@ const STICKER_SIZE_LIMITS: Record<StickerType, number> = {
   static: 512 * 1024,
   video: 256 * 1024,
 };
+const STICKER_CACHE_TTL_MS = 30_000;
+
+type StickerCacheEntry<T> = {
+  expiresAt: number;
+  value: T;
+};
+
+let stickerPacksCache: StickerCacheEntry<StickerPackResource[]> | null = null;
+const myStickersCache = new Map<string, StickerCacheEntry<MyStickersResource>>();
+const stickerPackCache = new Map<string, StickerCacheEntry<StickerPackResource>>();
+const preloadedStickerAssetCids = new Set<string>();
+
+async function cachedListStickerPacks(): Promise<StickerPackResource[]> {
+  const now = Date.now();
+  if (stickerPacksCache && stickerPacksCache.expiresAt > now) {
+    return stickerPacksCache.value;
+  }
+
+  const packs = await pigeonApplication.listStickerPacks();
+  stickerPacksCache = {
+    expiresAt: now + STICKER_CACHE_TTL_MS,
+    value: packs,
+  };
+
+  return packs;
+}
+
+async function cachedGetMyStickers(
+  session: Session,
+): Promise<MyStickersResource> {
+  const now = Date.now();
+  const cached = myStickersCache.get(session.identity.id);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const library = await pigeonApplication.getMyStickers(session);
+  myStickersCache.set(session.identity.id, {
+    expiresAt: now + STICKER_CACHE_TTL_MS,
+    value: library,
+  });
+
+  return library;
+}
+
+async function cachedGetStickerPack(
+  packId: string,
+): Promise<StickerPackResource> {
+  const now = Date.now();
+  const cached = stickerPackCache.get(packId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const pack = await pigeonApplication.getStickerPack(packId);
+  stickerPackCache.set(packId, {
+    expiresAt: now + STICKER_CACHE_TTL_MS,
+    value: pack,
+  });
+
+  return pack;
+}
+
+function invalidateStickerCaches(): void {
+  stickerPacksCache = null;
+  myStickersCache.clear();
+  stickerPackCache.clear();
+}
+
+function preloadStickerAsset(assetCid: string): void {
+  if (preloadedStickerAssetCids.has(assetCid)) return;
+
+  preloadedStickerAssetCids.add(assetCid);
+  const image = new Image();
+  image.src = stickerAssetUrl(assetCid);
+}
 
 export function StickerPicker({
   disabled,
@@ -71,7 +143,9 @@ export function StickerPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [activeShortcutId, setActiveShortcutId] = useState('favorites');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const stickerScrollerRef = useRef<HTMLDivElement>(null);
   const stickerSectionRefs = useRef(new Map<string, HTMLDivElement>());
   const savedPackIds = useMemo(
     () => new Set(library?.savedPacks.map((pack) => pack.id) ?? []),
@@ -87,14 +161,14 @@ export function StickerPicker({
     [library],
   );
 
-  const loadLibrary = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setLibrary(await pigeonApplication.getMyStickers(session));
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Stickers could not be loaded.'));
-    } finally {
+	  const loadLibrary = async () => {
+	    setLoading(true);
+	    setError(null);
+	    try {
+	      setLibrary(await cachedGetMyStickers(session));
+	    } catch (caught) {
+	      setError(toUserErrorMessage(caught, 'Stickers could not be loaded.'));
+	    } finally {
       setLoading(false);
     }
   };
@@ -142,12 +216,12 @@ export function StickerPicker({
     };
   }, [emojiQuery, open, tab]);
 
-  const searchPacks = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const packs = await pigeonApplication.listStickerPacks();
-      const normalizedQuery = query.trim().toLowerCase();
+	  const searchPacks = async () => {
+	    setLoading(true);
+	    setError(null);
+	    try {
+	      const packs = await cachedListStickerPacks();
+	      const normalizedQuery = query.trim().toLowerCase();
 
       setPublicPacks(
         normalizedQuery
@@ -173,19 +247,21 @@ export function StickerPicker({
     void loadLibrary();
   };
 
-  const savePack = async (packId: string, saved: boolean) => {
-    if (saved) {
-      await pigeonApplication.unsaveStickerPack(session, packId);
-    } else {
-      await pigeonApplication.saveStickerPack(session, packId);
-    }
-    await loadLibrary();
-  };
+	  const savePack = async (packId: string, saved: boolean) => {
+	    if (saved) {
+	      await pigeonApplication.unsaveStickerPack(session, packId);
+	    } else {
+	      await pigeonApplication.saveStickerPack(session, packId);
+	    }
+	    invalidateStickerCaches();
+	    await loadLibrary();
+	  };
 
-  const deleteSticker = async (packId: string, stickerId: string) => {
-    await pigeonApplication.deleteSticker(session, packId, stickerId);
-    await loadLibrary();
-  };
+	  const deleteSticker = async (packId: string, stickerId: string) => {
+	    await pigeonApplication.deleteSticker(session, packId, stickerId);
+	    invalidateStickerCaches();
+	    await loadLibrary();
+	  };
 
   const toggleFavorite = async (
     packId: string,
@@ -194,11 +270,12 @@ export function StickerPicker({
   ) => {
     if (favorite) {
       await pigeonApplication.unfavoriteSticker(session, packId, stickerId);
-    } else {
-      await pigeonApplication.favoriteSticker(session, packId, stickerId);
-    }
-    await loadLibrary();
-  };
+	    } else {
+	      await pigeonApplication.favoriteSticker(session, packId, stickerId);
+	    }
+	    invalidateStickerCaches();
+	    await loadLibrary();
+	  };
 
   const recentItems = usageItems(library?.recentStickers ?? []);
   const favoriteItems = usageItems(library?.favoriteStickers ?? []);
@@ -224,12 +301,48 @@ export function StickerPicker({
 
       stickerSectionRefs.current.delete(sectionId);
     };
-  const scrollToStickerSection = (sectionId: string) => {
-    stickerSectionRefs.current.get(sectionId)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  };
+	  const scrollToStickerSection = (sectionId: string) => {
+	    setActiveShortcutId(sectionId);
+	    stickerSectionRefs.current.get(sectionId)?.scrollIntoView({
+	      behavior: 'smooth',
+	      block: 'start',
+	    });
+	  };
+	  const updateActiveStickerShortcut = () => {
+	    const scroller = stickerScrollerRef.current;
+	    if (!scroller) return;
+
+	    const scrollerTop = scroller.getBoundingClientRect().top;
+	    let nextActiveShortcutId = activeShortcutId;
+	    let closestDistance = Number.POSITIVE_INFINITY;
+
+	    stickerSectionRefs.current.forEach((node, sectionId) => {
+	      const distance = Math.abs(node.getBoundingClientRect().top - scrollerTop);
+	      if (distance < closestDistance) {
+	        closestDistance = distance;
+	        nextActiveShortcutId = sectionId;
+	      }
+	    });
+
+	    if (nextActiveShortcutId !== activeShortcutId) {
+	      setActiveShortcutId(nextActiveShortcutId);
+	    }
+	  };
+
+	  useEffect(() => {
+	    const assetCids = [
+	      ...favoriteItems.map(({ sticker }) => sticker.assetCid),
+	      ...recentItems.map(({ sticker }) => sticker.assetCid),
+	      ...savedPacks.flatMap((pack) =>
+	        pack.stickers.map((sticker) => sticker.assetCid),
+	      ),
+	      ...publicPacks.flatMap((pack) =>
+	        pack.stickers.map((sticker) => sticker.assetCid),
+	      ),
+	    ];
+
+	    assetCids.slice(0, 80).forEach(preloadStickerAsset);
+	  }, [favoriteItems, publicPacks, recentItems, savedPacks]);
 
   return (
     <div className="relative" ref={pickerRef}>
@@ -266,8 +379,13 @@ export function StickerPicker({
             )}
           </div>
           {tab === 'stickers' ? (
-            <div className="max-h-[24rem] overflow-y-auto p-3">
+            <div
+              className="max-h-[24rem] overflow-y-auto p-3"
+              onScroll={updateActiveStickerShortcut}
+              ref={stickerScrollerRef}
+            >
               <StickerShortcutBar
+                activeShortcutId={activeShortcutId}
                 onSelect={scrollToStickerSection}
                 shortcuts={stickerShortcuts}
               />
@@ -308,6 +426,7 @@ export function StickerPicker({
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
                 sectionRef={setStickerSectionRef('favorites')}
+                emptyText="No favorite stickers yet."
               />
               <StickerSection
                 favoriteIds={favoriteIds}
@@ -316,6 +435,7 @@ export function StickerPicker({
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
                 sectionRef={setStickerSectionRef('recent')}
+                emptyText="Recently used stickers will appear here."
               />
               {savedPacks.map((pack) => (
                 <StickerSection
@@ -329,8 +449,14 @@ export function StickerPicker({
                   onFavoriteToggle={toggleFavorite}
                   onSend={sendSticker}
                   sectionRef={setStickerSectionRef(`pack:${pack.id}`)}
+                  emptyText="This pack has no stickers yet."
                 />
               ))}
+              {!loading && savedPacks.length === 0 && publicPacks.length === 0 && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/45">
+                  No sticker packs yet. Open Manage to create or save one.
+                </div>
+              )}
               {publicPacks.length > 0 && (
                 <div className="mt-4 grid gap-2">
                   <div className="text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -409,10 +535,14 @@ export function StickerPicker({
             onClose={() => setManageOpen(false)}
             onCreatePack={async (input) => {
               await pigeonApplication.createStickerPack(session, input);
+              invalidateStickerCaches();
               await loadLibrary();
             }}
             onFavoriteToggle={toggleFavorite}
-            onRefresh={loadLibrary}
+            onRefresh={async () => {
+              invalidateStickerCaches();
+              await loadLibrary();
+            }}
             onSavePack={savePack}
             onStickerDelete={deleteSticker}
             onStickerCreated={loadLibrary}
@@ -454,8 +584,8 @@ export function StickerPackPreviewDialog({
     setError(null);
     try {
       const [nextPack, library] = await Promise.all([
-        pigeonApplication.getStickerPack(sticker.packId),
-        pigeonApplication.getMyStickers(session),
+        cachedGetStickerPack(sticker.packId),
+        cachedGetMyStickers(session),
       ]);
 
       setPack(nextPack);
@@ -482,6 +612,7 @@ export function StickerPackPreviewDialog({
       } else {
         await pigeonApplication.saveStickerPack(session, sticker.packId);
       }
+      invalidateStickerCaches();
 
       setSavedPackIds((current) => {
         const next = new Set(current);
@@ -619,21 +750,28 @@ function PickerTab({
 }
 
 function StickerShortcutBar({
+  activeShortcutId,
   onSelect,
   shortcuts,
 }: {
+  activeShortcutId: string;
   onSelect: (sectionId: string) => void;
   shortcuts: StickerShortcut[];
 }) {
   return (
-    <div className="-mx-3 -mt-3 mb-3 border-b border-white/10 bg-white/[0.03] px-3 py-2">
+    <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 border-b border-white/10 bg-[#17171d]/95 px-3 py-2 backdrop-blur">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {shortcuts.map((shortcut) => (
           <button
             key={shortcut.id}
             type="button"
             onClick={() => onSelect(shortcut.id)}
-            className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/5 text-lg text-white/70 transition hover:bg-white/10 hover:text-white"
+            className={cx(
+              'grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl text-lg transition',
+              activeShortcutId === shortcut.id
+                ? 'bg-white text-slate-950 shadow shadow-white/10'
+                : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white',
+            )}
             aria-label={`Go to ${shortcut.label}`}
             title={shortcut.label}
           >
@@ -656,6 +794,7 @@ function StickerShortcutBar({
 }
 
 function StickerSection({
+  emptyText,
   favoriteIds,
   items,
   label,
@@ -663,6 +802,7 @@ function StickerSection({
   onSend,
   sectionRef,
 }: {
+  emptyText?: string;
   favoriteIds: Set<string>;
   items: StickerGridItem[];
   label: string;
@@ -674,19 +814,25 @@ function StickerSection({
   onSend: (packId: string, sticker: StickerResource) => Promise<void>;
   sectionRef?: (node: HTMLDivElement | null) => void;
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 && !emptyText) return null;
 
   return (
     <div className="mt-3 scroll-mt-3" ref={sectionRef}>
       <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {label}
       </div>
-      <StickerGrid
-        favoriteIds={favoriteIds}
-        items={items}
-        onFavoriteToggle={onFavoriteToggle}
-        onSend={onSend}
-      />
+      {items.length > 0 ? (
+        <StickerGrid
+          favoriteIds={favoriteIds}
+          items={items}
+          onFavoriteToggle={onFavoriteToggle}
+          onSend={onSend}
+        />
+      ) : (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center text-sm text-white/45">
+          {emptyText}
+        </div>
+      )}
     </div>
   );
 }
@@ -798,8 +944,7 @@ function StickerManagerDialog({
     const timeoutId = window.setTimeout(() => {
       setSearchingPacks(true);
       setError(null);
-      void pigeonApplication
-        .listStickerPacks()
+      void cachedListStickerPacks()
         .then((packs) => {
           if (cancelled) return;
 
@@ -1082,6 +1227,7 @@ function ManagePackStickers({
         sizeBytes: upload.size,
         type: stickerTypeFromUpload(upload),
       });
+      invalidateStickerCaches();
       await onStickerCreated();
     } catch (caught) {
       setError(toUserErrorMessage(caught, 'Sticker could not be uploaded.'));
