@@ -335,6 +335,14 @@ export function CommunityWorkspace({
     [],
   );
 
+  useEffect(
+    () => () => {
+      communityMessageDecryptWorkerRef.current?.terminate();
+      communityMessageDecryptWorkerRef.current = null;
+    },
+    [],
+  );
+
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
   }, [memberIdentities]);

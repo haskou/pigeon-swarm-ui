@@ -95,6 +95,11 @@ export class CommunityMessageDecryptWorkerClient {
     }
   }
 
+  public terminate(): void {
+    this.rejectAll(abortError());
+    this.worker.terminate();
+  }
+
   private handleMessage(response: CommunityMessageDecryptWorkerResponse): void {
     const pendingRequest = this.pending.get(response.requestId);
 
