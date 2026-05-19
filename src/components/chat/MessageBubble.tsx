@@ -7,6 +7,7 @@ import type {
   ChatMessage,
   MessageAttachment,
   MessageResource,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -16,6 +17,7 @@ import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 import { MarkdownMessage } from './MarkdownMessage';
+import { stickerAssetUrl } from './StickerPicker';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,6 +38,7 @@ interface MessageBubbleProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
@@ -61,6 +64,7 @@ export function MessageBubble({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   reactionAuthorNames = {},
   replyAuthorName,
   replyImage,
@@ -103,6 +107,7 @@ export function MessageBubble({
     () => firstLinkPreview(message.content),
     [message.content],
   );
+  const sticker = message.sticker;
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -214,10 +219,15 @@ export function MessageBubble({
               onPointerMove={clearLongPressTimer}
               onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-full select-none rounded-2xl p-3 text-sm leading-6',
-                mine
-                  ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
-                  : 'border border-white/10 bg-black/25 text-white',
+                'min-w-0 max-w-full select-none text-sm leading-6',
+                sticker
+                  ? 'rounded-2xl bg-transparent p-0'
+                  : cx(
+                      'rounded-2xl p-3',
+                      mine
+                        ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                        : 'border border-white/10 bg-black/25 text-white',
+                    ),
               )}
             >
             {hasReply && replyMessageId && (
@@ -275,6 +285,20 @@ export function MessageBubble({
                 ))}
               </div>
             )}
+            {sticker && (
+              <button
+                type="button"
+                onClick={() => onStickerClick?.(sticker)}
+                className="block rounded-2xl p-1 transition hover:bg-white/10"
+                title="Add sticker to favorites"
+              >
+                <img
+                  src={stickerAssetUrl(sticker.assetCid)}
+                  alt="Sticker"
+                  className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
+                />
+              </button>
+            )}
             {message.attachmentProgress && (
               <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
                 <div className="flex items-center justify-between gap-3">
@@ -300,7 +324,7 @@ export function MessageBubble({
                 </div>
               </div>
             )}
-            {message.content && (
+            {message.content && !sticker && (
               <div
                 className={cx(
                   'whitespace-pre-wrap break-words',

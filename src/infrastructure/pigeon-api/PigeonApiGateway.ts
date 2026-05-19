@@ -38,6 +38,7 @@ import type {
   LoginResult,
   MessageAttachment,
   MessageResource,
+  MyStickersResource,
   NotificationResource,
   PendingMessageAttachment,
   PrivateFileContent,
@@ -1167,6 +1168,14 @@ export class PigeonApiGateway {
     return await this.stickers.listPacks(input);
   }
 
+  public async getStickerPack(packId: string): Promise<StickerPackResource> {
+    return await this.stickers.getPack(packId);
+  }
+
+  public async getMyStickers(session: Session): Promise<MyStickersResource> {
+    return await this.stickers.getMyStickers(session);
+  }
+
   public async createStickerPack(
     session: Session,
     input: StickerPackInput,
@@ -1205,6 +1214,44 @@ export class PigeonApiGateway {
     stickerId: string,
   ): Promise<void> {
     await this.stickers.deleteSticker(session, packId, stickerId);
+  }
+
+  public async saveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.stickers.savePack(session, packId);
+  }
+
+  public async unsaveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.stickers.unsavePack(session, packId);
+  }
+
+  public async favoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.favoriteSticker(session, packId, stickerId);
+  }
+
+  public async unfavoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.unfavoriteSticker(session, packId, stickerId);
+  }
+
+  public async markStickerUsed(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.markStickerUsed(session, packId, stickerId);
   }
 
   public async uploadPrivateFile(
@@ -1511,11 +1558,12 @@ export class PigeonApiGateway {
       JSON.stringify({
         attachments: messageAttachments,
         authorIdentityId: session.identity.id,
-        content,
+        content: options.sticker ? '' : content,
         conversationId,
         ...(replyPreview ? { reply: replyPreview } : {}),
+        ...(options.sticker ? { sticker: options.sticker } : {}),
         timestamp,
-        type: 'MessageSent',
+        type: options.sticker ? 'StickerMessageSent' : 'MessageSent',
       }),
     );
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;

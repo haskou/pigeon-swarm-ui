@@ -34,6 +34,7 @@ import type {
   MessageResource,
   SelectablePresenceStatus,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 import type {
   RealtimeDomainEvent,
@@ -154,6 +155,7 @@ type PendingSend = {
   attachments: File[];
   content: string;
   replyTarget: ChatMessage | null;
+  sticker?: StickerMessageReference;
 };
 type FailedSends = Record<string, PendingSend>;
 
@@ -1944,9 +1946,10 @@ export function GlassWorkspace({
       {
         attachments: pendingFileAttachments(payload.attachments, optimisticId),
         authorIdentityId: session.identity.id,
-        content:
-          payload.content ||
-          payload.attachments.map((attachment) => attachment.name).join(', '),
+        content: payload.sticker
+          ? ''
+          : payload.content ||
+            payload.attachments.map((attachment) => attachment.name).join(', '),
         deliveryStatus: 'pending',
         encrypted: false,
         id: optimisticId,
@@ -1955,6 +1958,7 @@ export function GlassWorkspace({
         reactions: [],
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
+        sticker: payload.sticker,
         timestamp: optimisticTimestamp,
       },
     ]);
@@ -1986,8 +1990,13 @@ export function GlassWorkspace({
             previousMessageIds: lastMessageId ? [lastMessageId] : [],
             replyPreview: replyPreviewFromMessage(payload.replyTarget),
             replyToMessageId: payload.replyTarget?.id,
+            sticker: payload.sticker,
           },
         );
+
+        if (payload.sticker) {
+          void pigeonApplication.markStickerUsed(session, payload.sticker);
+        }
 
         setMessages((current) =>
           mergeMessages(
@@ -2023,6 +2032,22 @@ export function GlassWorkspace({
     attachmentUpload: AttachmentUploadOptions,
   ): Promise<void> => {
     const payload = { attachmentUpload, attachments, content, replyTarget };
+
+    setReplyTarget(null);
+    sendPendingMessage(payload);
+
+    return Promise.resolve();
+  };
+  const handleSendSticker = (
+    sticker: StickerMessageReference,
+  ): Promise<void> => {
+    const payload = {
+      attachmentUpload: {},
+      attachments: [],
+      content: '',
+      replyTarget,
+      sticker,
+    };
 
     setReplyTarget(null);
     sendPendingMessage(payload);
@@ -3124,6 +3149,7 @@ export function GlassWorkspace({
                 bottomRef={bottomRef}
                 onScroll={handleScroll}
                 onSend={handleSend}
+                onStickerSend={handleSendSticker}
                 onConversationKeyImported={handleConversationKeyImported}
                 onDraftChange={updateActiveConversationDraft}
                 onEscape={closeTransientUi}

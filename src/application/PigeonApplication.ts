@@ -27,6 +27,7 @@ import type {
   LoginResult,
   MessageAttachment,
   MessageResource,
+  MyStickersResource,
   NotificationResource,
   PublicFileContent,
   PublicFileUpload,
@@ -34,6 +35,7 @@ import type {
   Session,
   SelectablePresenceStatus,
   StickerInput,
+  StickerMessageReference,
   StickerPackInput,
   StickerPackResource,
   StickerResource,
@@ -834,6 +836,14 @@ export class PigeonApplication {
     return await this.gateway.listStickerPacks(input);
   }
 
+  public async getStickerPack(packId: string): Promise<StickerPackResource> {
+    return await this.gateway.getStickerPack(packId);
+  }
+
+  public async getMyStickers(session: Session): Promise<MyStickersResource> {
+    return await this.gateway.getMyStickers(session);
+  }
+
   public async createStickerPack(
     session: Session,
     input: StickerPackInput,
@@ -872,6 +882,51 @@ export class PigeonApplication {
     stickerId: string,
   ): Promise<void> {
     await this.gateway.deleteSticker(session, packId, stickerId);
+  }
+
+  public async saveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.gateway.saveStickerPack(session, packId);
+  }
+
+  public async unsaveStickerPack(
+    session: Session,
+    packId: string,
+  ): Promise<void> {
+    await this.gateway.unsaveStickerPack(session, packId);
+  }
+
+  public async favoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.favoriteSticker(session, packId, stickerId);
+  }
+
+  public async unfavoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.unfavoriteSticker(session, packId, stickerId);
+  }
+
+  public async markStickerUsed(
+    session: Session,
+    sticker: StickerMessageReference,
+  ): Promise<void> {
+    await this.gateway.markStickerUsed(
+      session,
+      sticker.packId,
+      sticker.stickerId,
+    );
+  }
+
+  public stickerAssetUrl(assetCid: string): string {
+    return this.gateway.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
   }
 
   public async listConversations(

@@ -7,6 +7,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   MessageAttachment,
+  StickerMessageReference,
 } from '../../domain/types';
 import type {
   IdentityNames,
@@ -59,6 +60,7 @@ interface ChatMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -84,6 +86,7 @@ export function ChatMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   onScroll,
   reactionAuthorNames,
   scrollerRef,
@@ -120,6 +123,7 @@ export function ChatMessageTimeline({
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
+          onStickerClick={onStickerClick}
           reactionAuthorNames={reactionAuthorNames}
         />
       )}
@@ -155,6 +159,7 @@ function MessageTimelineContent({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   reactionAuthorNames,
 }: Omit<
   ChatMessageTimelineProps,
@@ -184,6 +189,7 @@ function MessageTimelineContent({
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
+            onStickerClick={onStickerClick}
             previousMessage={messages[index - 1]}
             reactionAuthorNames={reactionAuthorNames}
           />
@@ -212,6 +218,7 @@ function MessageTimelineItem({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   previousMessage,
   reactionAuthorNames,
 }: {
@@ -229,6 +236,7 @@ function MessageTimelineItem({
   onReactionToggle: ChatMessageTimelineProps['onReactionToggle'];
   onReplyReferenceClick: ChatMessageTimelineProps['onReplyReferenceClick'];
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];
+  onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
   previousMessage?: ChatMessage;
   reactionAuthorNames: Record<string, string>;
 }) {
@@ -266,6 +274,7 @@ function MessageTimelineItem({
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
+          onStickerClick={onStickerClick}
           reactionAuthorNames={reactionAuthorNames}
           replyImage={messageReplyImage(message, replyMessage)}
           replyAuthorName={replyAuthorName(

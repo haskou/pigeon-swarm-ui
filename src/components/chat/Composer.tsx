@@ -15,6 +15,8 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
   ChatMessage,
+  Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -27,6 +29,7 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { StickerPicker } from './StickerPicker';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -42,6 +45,7 @@ interface ComposerProps {
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onStickerSend?: (sticker: StickerMessageReference) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
   focusKey?: string | null;
@@ -49,6 +53,7 @@ interface ComposerProps {
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
   replyToAuthorName?: string;
+  session: Session;
   onCancelReply?: () => void;
 }
 
@@ -61,10 +66,12 @@ export function Composer({
   onDraftChange,
   onEscape,
   onSend,
+  onStickerSend,
   placeholder = copy.composer.placeholder,
   progress,
   replyTo,
   replyToAuthorName,
+  session,
 }: ComposerProps) {
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
@@ -210,6 +217,27 @@ export function Composer({
       });
     },
     [draft, emojiTrigger, onDraftChange],
+  );
+  const insertLooseEmoji = useCallback(
+    (emoji: string) => {
+      const start = textInputRef.current?.selectionStart ?? caretIndex;
+      const end = textInputRef.current?.selectionEnd ?? caretIndex;
+      const nextValue = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
+      const nextCaretIndex = start + emoji.length;
+
+      if (nextValue.length > MESSAGE_MAX_LENGTH) return;
+
+      onDraftChange(nextValue);
+      setCaretIndex(nextCaretIndex);
+      requestAnimationFrame(() => {
+        textInputRef.current?.focus();
+        textInputRef.current?.setSelectionRange(
+          nextCaretIndex,
+          nextCaretIndex,
+        );
+      });
+    },
+    [caretIndex, draft, onDraftChange],
   );
 
   useEffect(() => {
@@ -516,6 +544,14 @@ export function Composer({
               selectedIndex={selectedEmojiIndex}
               setSelectedIndex={setSelectedEmojiIndex}
               suggestions={emojiSuggestions}
+            />
+          )}
+          {onStickerSend && (
+            <StickerPicker
+              disabled={disabled}
+              onEmojiInsert={insertLooseEmoji}
+              onStickerSend={onStickerSend}
+              session={session}
             />
           )}
           <button

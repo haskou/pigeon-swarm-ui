@@ -14,6 +14,7 @@ import type {
   IdentityPresence,
   IdentityResource,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { pigeonApplication } from '../../application/applicationContainer';
@@ -24,6 +25,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
+import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
@@ -72,6 +74,7 @@ interface ChatColumnProps {
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape: () => void;
@@ -141,6 +144,7 @@ export function ChatColumn({
   onRetryMessage,
   onScroll,
   onSend,
+  onStickerSend,
   onStartCall,
   onTypingActive,
   peerIdentity,
@@ -202,6 +206,15 @@ export function ChatColumn({
   ) => {
     onTypingActive?.(false);
     await onSend(content, attachments, options);
+  };
+  const handleStickerClick = (sticker: StickerMessageReference) => {
+    void pigeonApplication
+      .favoriteSticker(session, sticker.packId, sticker.stickerId)
+      .catch((caught) =>
+        setAttachmentError(
+          toUserErrorMessage(caught, copy.messages.reactionError),
+        ),
+      );
   };
 
   useEffect(
@@ -543,6 +556,7 @@ export function ChatColumn({
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
+            onStickerClick={handleStickerClick}
             onScroll={onScroll}
             reactionAuthorNames={reactionAuthorNames}
             scrollerRef={scrollerRef}
@@ -562,6 +576,7 @@ export function ChatColumn({
             onDraftChange={handleDraftChange}
             onEscape={onEscape}
             onSend={handleSend}
+            onStickerSend={onStickerSend}
             onCancelReply={onCancelReply}
             progress={downloadProgress ?? progress}
             placeholder={
@@ -578,6 +593,7 @@ export function ChatColumn({
                   )
                 : undefined
             }
+            session={session}
           />
         </>
       )}

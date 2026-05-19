@@ -1,4 +1,5 @@
 import type {
+  MyStickersResource,
   PublicFileUpload,
   Session,
   StickerInput,
@@ -53,6 +54,24 @@ export class PigeonStickersApi {
     });
 
     return response.results;
+  }
+
+  public async getPack(packId: string): Promise<StickerPackResource> {
+    return await this.http.request<StickerPackResource>(
+      `/stickers/packs/${encodeURIComponent(packId)}`,
+      {
+        method: 'GET',
+      },
+    );
+  }
+
+  public async getMyStickers(session: Session): Promise<MyStickersResource> {
+    const path = '/stickers/me';
+
+    return await this.http.request<MyStickersResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
   }
 
   public async createPack(
@@ -121,6 +140,63 @@ export class PigeonStickersApi {
     await this.http.request(path, {
       headers: await this.signer.headers(session, 'DELETE', path),
       method: 'DELETE',
+    });
+  }
+
+  public async savePack(session: Session, packId: string): Promise<void> {
+    const path = `/stickers/packs/${encodeURIComponent(packId)}/saved`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'PUT', path),
+      method: 'PUT',
+    });
+  }
+
+  public async unsavePack(session: Session, packId: string): Promise<void> {
+    const path = `/stickers/packs/${encodeURIComponent(packId)}/saved`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async favoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    const path = `${this.stickerPath(packId, stickerId)}/favorite`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'PUT', path),
+      method: 'PUT',
+    });
+  }
+
+  public async unfavoriteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    const path = `${this.stickerPath(packId, stickerId)}/favorite`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async markStickerUsed(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    const path = `${this.stickerPath(packId, stickerId)}/used`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'POST', path),
+      method: 'POST',
     });
   }
 

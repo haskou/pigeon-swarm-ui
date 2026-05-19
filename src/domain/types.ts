@@ -143,11 +143,11 @@ export type StickerDimensions = {
 export type StickerResource = {
   assetCid: string;
   contentType: string;
-  dimensions: StickerDimensions;
+  dimensions?: StickerDimensions;
   emojis: string[];
   id: string;
   name: string;
-  sizeBytes: number;
+  sizeBytes?: number;
   type: StickerType;
   createdAt?: number;
   updatedAt?: number;
@@ -176,6 +176,26 @@ export type StickerInput = {
   name: string;
   sizeBytes: number;
   type: StickerType;
+};
+
+export type StickerMessageReference = {
+  assetCid: string;
+  packId: string;
+  stickerId: string;
+};
+
+export type StickerUsageResource = {
+  favoritedAt?: number;
+  packId: string;
+  sticker: StickerResource;
+  stickerId: string;
+  usedAt?: number;
+};
+
+export type MyStickersResource = {
+  favoriteStickers: StickerUsageResource[];
+  recentStickers: StickerUsageResource[];
+  savedPacks: StickerPackResource[];
 };
 
 export type PrivateFileUpload = PublicFileUpload & {
@@ -244,6 +264,7 @@ export type SendMessageOptions = {
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
+  sticker?: StickerMessageReference;
 };
 
 export type LocalKeychain = {
@@ -418,6 +439,7 @@ export type ChatMessage = {
   replyToMessageId?: string;
   raw: MessageResource;
   reactions: MessageReaction[];
+  sticker?: StickerMessageReference;
 };
 
 export type Session = {

@@ -6,6 +6,7 @@ import type {
   IdentityResource,
   MessageAttachment,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
@@ -50,6 +51,7 @@ interface CommunityMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -75,6 +77,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onStickerClick,
   onScroll,
   reactionAuthorNames,
   scrollerRef,
@@ -174,6 +177,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
+                      onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
                       replyImage={messageReplyImage(message, replyMessage)}
                       replyAuthorName={

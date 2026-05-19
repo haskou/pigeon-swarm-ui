@@ -40,6 +40,7 @@ import type {
   MessageResource,
   SelectablePresenceStatus,
   Session,
+  StickerMessageReference,
 } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 
@@ -175,6 +176,7 @@ type CommunityPendingSend = {
   channelId: string;
   content: string;
   replyTarget: ChatMessage | null;
+  sticker?: StickerMessageReference;
 };
 
 const communityMessageProjectionBatchSize = 8;
@@ -919,13 +921,14 @@ export function CommunityWorkspace({
           ...base,
           attachments: payload.attachments ?? [],
           authorIdentityId: payload.authorIdentityId ?? base.authorIdentityId,
-          content: payload.content ?? '',
+          content: payload.sticker ? '' : (payload.content ?? ''),
           encrypted: false,
           mine:
             (payload.authorIdentityId ?? base.authorIdentityId) ===
             session.identity.id,
           replyPreview: payload.reply,
           replyToMessageId: payload.replyToMessageId,
+          sticker: payload.sticker,
           timestamp: payload.timestamp ?? base.timestamp,
         };
       } catch {
@@ -1073,6 +1076,31 @@ export function CommunityWorkspace({
 
     return Promise.resolve();
   };
+  const handleSendChannelSticker = (
+    sticker: StickerMessageReference,
+  ): Promise<void> => {
+    if (!selectedChannelId) return Promise.resolve();
+
+    onTypingActive?.(selectedChannelId, false);
+    sendPendingChannelMessage({
+      attachmentUpload: {},
+      attachments: [],
+      channelId: selectedChannelId,
+      content: '',
+      replyTarget,
+      sticker,
+    });
+    setReplyTarget(null);
+
+    return Promise.resolve();
+  };
+  const handleStickerClick = (sticker: StickerMessageReference) => {
+    void pigeonApplication
+      .favoriteSticker(session, sticker.packId, sticker.stickerId)
+      .catch((caught) =>
+        setSendError(toUserErrorMessage(caught, copy.messages.reactionError)),
+      );
+  };
   const handleDraftChange = (value: string) => {
     setDraft(value);
 
@@ -1105,9 +1133,10 @@ export function CommunityWorkspace({
       {
         attachments: pendingFileAttachments(payload.attachments, optimisticId),
         authorIdentityId: session.identity.id,
-        content:
-          payload.content ||
-          payload.attachments.map((attachment) => attachment.name).join(', '),
+        content: payload.sticker
+          ? ''
+          : payload.content ||
+            payload.attachments.map((attachment) => attachment.name).join(', '),
         deliveryStatus: 'pending',
         encrypted: false,
         id: optimisticId,
@@ -1121,6 +1150,7 @@ export function CommunityWorkspace({
         reactions: [],
         replyPreview: replyPreviewFromMessage(payload.replyTarget),
         replyToMessageId: payload.replyTarget?.id,
+        sticker: payload.sticker,
         timestamp,
       },
     ]);
@@ -1156,6 +1186,7 @@ export function CommunityWorkspace({
           recipients: Object.values(identities),
           replyPreview: replyPreviewFromMessage(payload.replyTarget),
           replyToMessageId: payload.replyTarget?.id,
+          sticker: payload.sticker,
           timestamp,
         });
         const created = await pigeonApplication.createCommunityChannelMessage(
@@ -1171,6 +1202,10 @@ export function CommunityWorkspace({
           },
         );
         const projected = await projectChannelMessage(created, identities);
+
+        if (payload.sticker) {
+          void pigeonApplication.markStickerUsed(session, payload.sticker);
+        }
 
         setMessages((current) =>
           mergeChatMessages(
@@ -1833,6 +1868,7 @@ export function CommunityWorkspace({
               onReplyReferenceClick={handleReplyReferenceClick}
               onRetryMessage={retryChannelMessage}
               onScroll={handleMessagesScroll}
+              onStickerClick={handleStickerClick}
               reactionAuthorNames={reactionAuthorNames}
               scrollerRef={scrollerRef}
               session={session}
@@ -1855,6 +1891,7 @@ export function CommunityWorkspace({
               onDraftChange={handleDraftChange}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
+              onStickerSend={handleSendChannelSticker}
               progress={attachmentProgress}
               replyTo={replyTarget}
               replyToAuthorName={
@@ -1865,6 +1902,7 @@ export function CommunityWorkspace({
                     )
                   : undefined
               }
+              session={session}
             />
           </>
         )}

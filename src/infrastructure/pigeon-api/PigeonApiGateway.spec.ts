@@ -1281,6 +1281,94 @@ describe(PigeonApiGateway.name, () => {
     );
   });
 
+  it('loads sticker library and updates saved, favorite and recent stickers', async () => {
+    const library = {
+      favoriteStickers: [],
+      recentStickers: [],
+      savedPacks: [],
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'pack-1', stickers: [] })
+        .mockResolvedValueOnce(library)
+        .mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getStickerPack('pack 1')).resolves.toEqual({
+      id: 'pack-1',
+      stickers: [],
+    });
+    await expect(gateway.getMyStickers(session)).resolves.toBe(library);
+    await expect(
+      gateway.saveStickerPack(session, 'pack-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      gateway.unsaveStickerPack(session, 'pack-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      gateway.favoriteSticker(session, 'pack-1', 'sticker-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      gateway.unfavoriteSticker(session, 'pack-1', 'sticker-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      gateway.markStickerUsed(session, 'pack-1', 'sticker-1'),
+    ).resolves.toBeUndefined();
+
+    expect(http.request).toHaveBeenNthCalledWith(
+      1,
+      '/stickers/packs/pack%201',
+      {
+        method: 'GET',
+      },
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      1,
+      session,
+      'GET',
+      '/stickers/me',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      2,
+      session,
+      'PUT',
+      '/stickers/packs/pack-1/saved',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      3,
+      session,
+      'DELETE',
+      '/stickers/packs/pack-1/saved',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      4,
+      session,
+      'PUT',
+      '/stickers/packs/pack-1/stickers/sticker-1/favorite',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      5,
+      session,
+      'DELETE',
+      '/stickers/packs/pack-1/stickers/sticker-1/favorite',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      6,
+      session,
+      'POST',
+      '/stickers/packs/pack-1/stickers/sticker-1/used',
+    );
+  });
+
   it('uploads private attachments as signed encrypted raw bytes', async () => {
     const bytes = new Uint8Array([9, 8, 7]).buffer;
     const upload = {
@@ -1492,6 +1580,68 @@ describe(PigeonApiGateway.name, () => {
         content: 'original',
         messageId: 'message-0',
       },
+    });
+  });
+
+  it('sends stickers as encrypted message payloads without content', async () => {
+    const sticker = {
+      assetCid: 'bafy-sticker',
+      packId: 'pack-1',
+      stickerId: 'sticker-1',
+    };
+    const http = {
+      request: jest.fn().mockResolvedValueOnce({
+        authorIdentityId: 'identity-1',
+        content: '',
+        id: 'message-1',
+        timestamp: 10,
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'message-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          conversation: {
+            conversationId: 'conversation',
+            createdAt: 1,
+            peerIdentityId: 'identity-2',
+            privateKey: 'private-key',
+            publicKey: 'public-key',
+          },
+        },
+        version: 1,
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.sendMessage(session, 'conversation', '', { sticker }),
+    ).resolves.toMatchObject({
+      content: '',
+    });
+
+    const [, messageRequest] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(messageRequest.body as string) as {
+      attachmentExternalIdentifiers: string[];
+      encryptedPayload: string;
+    };
+
+    expect(body.attachmentExternalIdentifiers).toEqual([]);
+    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+      content: '',
+      sticker,
+      type: 'StickerMessageSent',
     });
   });
 
