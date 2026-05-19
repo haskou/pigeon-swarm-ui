@@ -1,5 +1,4 @@
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
-import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
 
 import type {
   ChatMessage,
@@ -41,14 +40,6 @@ type CommunityMessageDecryptResponse =
       type: 'error';
     };
 
-type CommunityChannelEnvelope = {
-  algorithm: 'community-channel.v1';
-  ciphertext: string;
-  iv: string;
-  wrappedKey?: string;
-  recipients?: Record<string, string>;
-};
-
 type CommunityChannelPlainPayload = {
   attachments?: MessageAttachment[];
   authorIdentityId?: string;
@@ -77,7 +68,6 @@ const projectedMessageCacheDatabaseName =
 const projectedMessageCacheDatabaseVersion = 1;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
-const gcmTagBytes = 16;
 let projectedMessageCacheDatabasePromise: Promise<CacheDatabase> | null = null;
 
 function isCancelRequest(
@@ -223,50 +213,11 @@ async function decryptCommunityChannelPayload(
   encryptedPayload: string,
   communityKey: ConversationKeyEntry,
 ): Promise<CommunityChannelPlainPayload> {
-  const privateKey = PrivateKey.fromPEM(communityKey.privateKey);
-
-  try {
-    const decrypted = await privateKey.decrypt(
-      new EncryptedPayload(encryptedPayload),
-    );
-
-    return JSON.parse(decrypted.toString()) as CommunityChannelPlainPayload;
-  } catch {
-    // Fall through to legacy channel envelopes persisted before direct
-    // community-key encryption.
-  }
-
-  const envelope = JSON.parse(encryptedPayload) as CommunityChannelEnvelope;
-  const wrappedKey =
-    envelope.wrappedKey ?? envelope.recipients?.[communityKey.conversationId];
-
-  if (!wrappedKey) throw new Error('Missing community key');
-
-  const rawCommunityKey = await privateKey.decrypt(
-    new EncryptedPayload(wrappedKey),
+  const decrypted = await PrivateKey.fromPEM(communityKey.privateKey).decrypt(
+    new EncryptedPayload(encryptedPayload),
   );
 
-  return decryptCommunityEnvelope(
-    envelope,
-    base64ToBytes(new TextDecoder().decode(rawCommunityKey)),
-  );
-}
-
-function decryptCommunityEnvelope(
-  envelope: CommunityChannelEnvelope,
-  key: Uint8Array,
-): CommunityChannelPlainPayload {
-  const ciphertext = base64ToBytes(envelope.ciphertext);
-  const decrypted = CryptoAdapter.decryptAes256Gcm(
-    key,
-    base64ToBytes(envelope.iv),
-    ciphertext.subarray(0, -gcmTagBytes),
-    ciphertext.subarray(-gcmTagBytes),
-  );
-
-  return JSON.parse(
-    new TextDecoder().decode(decrypted),
-  ) as CommunityChannelPlainPayload;
+  return JSON.parse(decrypted.toString()) as CommunityChannelPlainPayload;
 }
 
 function baseMessage(
@@ -557,17 +508,6 @@ function cloneChatMessage(message: ChatMessage): ChatMessage {
       : undefined,
     sticker: message.sticker ? { ...message.sticker } : undefined,
   };
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
 }
 
 function postResponse(response: CommunityMessageDecryptResponse): void {
