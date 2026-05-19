@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { pigeonApplication } from '../../application/applicationContainer';
 
 const STICKER_PREVIEW_DELAY_MS = 260;
-const STICKER_PREVIEW_SIZE = 224;
+const STICKER_PREVIEW_SIZE = 336;
 const STICKER_PREVIEW_MARGIN = 16;
 
 type StickerPreviewPosition = {
@@ -93,7 +93,7 @@ function StickerPressPreview({
 }) {
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[120] grid h-56 w-56 place-items-center rounded-3xl border border-white/15 bg-black/70 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      className="pointer-events-none fixed z-[120] grid h-[21rem] w-[21rem] place-items-center rounded-3xl border border-white/15 bg-black/70 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
       style={{ left: preview.position.x, top: preview.position.y }}
       aria-hidden="true"
     >
