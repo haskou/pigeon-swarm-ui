@@ -664,12 +664,25 @@ function StickerManagerDialog({
   session: Session;
 }) {
   const [packName, setPackName] = useState('');
+  const [mode, setMode] = useState<'create' | 'packs'>('packs');
+  const [packSearch, setPackSearch] = useState('');
+  const [packSearchResults, setPackSearchResults] =
+    useState<StickerPackResource[]>(publicPacks);
+  const [searchingPacks, setSearchingPacks] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ownPacks =
     library?.savedPacks.filter(
       (pack) => pack.ownerIdentityId === session.identity.id,
     ) ?? [];
+  const savedPacks =
+    library?.savedPacks.filter(
+      (pack) => pack.ownerIdentityId !== session.identity.id,
+    ) ?? [];
+
+  useEffect(() => {
+    setPackSearchResults(publicPacks);
+  }, [publicPacks]);
 
   const submitPack = async (event: FormEvent) => {
     event.preventDefault();
@@ -682,10 +695,33 @@ function StickerManagerDialog({
         name: packName.trim(),
       });
       setPackName('');
+      setMode('packs');
     } catch (caught) {
       setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const searchPacks = async (event: FormEvent) => {
+    event.preventDefault();
+    setSearchingPacks(true);
+    setError(null);
+    try {
+      const packs = await pigeonApplication.listStickerPacks();
+      const normalizedQuery = packSearch.trim().toLowerCase();
+
+      setPackSearchResults(
+        normalizedQuery
+          ? packs.filter((pack) =>
+              pack.name.toLowerCase().includes(normalizedQuery),
+            )
+          : packs,
+      );
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, 'Sticker packs could not be found.'));
+    } finally {
+      setSearchingPacks(false);
     }
   };
 
@@ -712,86 +748,144 @@ function StickerManagerDialog({
             {error}
           </div>
         )}
-        <form onSubmit={submitPack} className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <input
-            value={packName}
-            onChange={(event) => setPackName(event.target.value)}
-            className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-            placeholder="Pack name"
-          />
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
           <button
-            type="submit"
-            disabled={saving || !packName.trim()}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
+            type="button"
+            onClick={() => setMode('packs')}
+            className={cx(
+              'rounded-xl px-3 py-2 text-sm font-black transition',
+              mode === 'packs'
+                ? 'bg-white text-slate-950'
+                : 'text-white/55 hover:bg-white/10',
+            )}
           >
-            Create
+            My packs
           </button>
-        </form>
-        <StickerUploadForm
-          onCreated={onStickerCreated}
-          ownPacks={ownPacks}
-          session={session}
-        />
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <section>
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              Saved packs
-            </div>
-            <div className="grid gap-2">
-              {library?.savedPacks.map((pack) => (
-                <PackRow
-                  key={pack.id}
-                  pack={pack}
-                  saved={savedPackIds.has(pack.id)}
-                  onSavePack={onSavePack}
-                />
-              ))}
-            </div>
-          </section>
-          <section>
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              Favorites
-            </div>
-            <StickerGrid
-              favoriteIds={favoriteIds}
-              items={usageItems(library?.favoriteStickers ?? [])}
-              onFavoriteToggle={onFavoriteToggle}
-              onSend={async () => undefined}
-            />
-          </section>
+          <button
+            type="button"
+            onClick={() => setMode('create')}
+            className={cx(
+              'rounded-xl px-3 py-2 text-sm font-black transition',
+              mode === 'create'
+                ? 'bg-white text-slate-950'
+                : 'text-white/55 hover:bg-white/10',
+            )}
+          >
+            Create pack
+          </button>
         </div>
-        {ownPacks.length > 0 && (
-          <section className="mt-5">
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              My packs
-            </div>
-            <div className="grid gap-3">
-              {ownPacks.map((pack) => (
-                <ManagePackStickers
-                  key={pack.id}
-                  onStickerDelete={onStickerDelete}
-                  pack={pack}
+
+        {mode === 'create' ? (
+          <form
+            onSubmit={submitPack}
+            className="grid gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 sm:grid-cols-[1fr_auto]"
+          >
+            <input
+              value={packName}
+              onChange={(event) => setPackName(event.target.value)}
+              className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+              placeholder="Pack name"
+            />
+            <button
+              type="submit"
+              disabled={saving || !packName.trim()}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
+            >
+              Create
+            </button>
+          </form>
+        ) : (
+          <>
+            <form
+              onSubmit={searchPacks}
+              className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]"
+            >
+              <input
+                value={packSearch}
+                onChange={(event) => setPackSearch(event.target.value)}
+                className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+                placeholder="Search sticker packs"
+              />
+              <button
+                type="submit"
+                disabled={searchingPacks}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
+              >
+                Search
+              </button>
+            </form>
+            <StickerUploadForm
+              onCreated={onStickerCreated}
+              ownPacks={ownPacks}
+              session={session}
+            />
+            {ownPacks.length > 0 && (
+              <section className="mt-5">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  My packs
+                </div>
+                <div className="grid gap-3">
+                  {ownPacks.map((pack) => (
+                    <ManagePackStickers
+                      key={pack.id}
+                      onStickerDelete={onStickerDelete}
+                      pack={pack}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <section>
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  Saved packs
+                </div>
+                <div className="grid gap-2">
+                  {savedPacks.map((pack) => (
+                    <PackRow
+                      key={pack.id}
+                      pack={pack}
+                      saved={savedPackIds.has(pack.id)}
+                      onSavePack={onSavePack}
+                    />
+                  ))}
+                  {savedPacks.length === 0 && (
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+                      No saved packs yet.
+                    </div>
+                  )}
+                </div>
+              </section>
+              <section>
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  Favorites
+                </div>
+                <StickerGrid
+                  favoriteIds={favoriteIds}
+                  items={usageItems(library?.favoriteStickers ?? [])}
+                  onFavoriteToggle={onFavoriteToggle}
+                  onSend={async () => undefined}
                 />
-              ))}
+              </section>
             </div>
-          </section>
-        )}
-        {publicPacks.length > 0 && (
-          <section className="mt-5">
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              Search results
-            </div>
-            <div className="grid gap-2">
-              {publicPacks.map((pack) => (
-                <PackRow
-                  key={pack.id}
-                  pack={pack}
-                  saved={savedPackIds.has(pack.id)}
-                  onSavePack={onSavePack}
-                />
-              ))}
-            </div>
-          </section>
+            {packSearchResults.length > 0 && (
+              <section className="mt-5">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  Search results
+                </div>
+                <div className="grid gap-2">
+                  {packSearchResults.map((pack) => (
+                    <PackRow
+                      key={pack.id}
+                      pack={pack}
+                      saved={savedPackIds.has(pack.id)}
+                      onSavePack={onSavePack}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
         <button
           type="button"
