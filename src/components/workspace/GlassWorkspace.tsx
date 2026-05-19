@@ -1,7 +1,6 @@
 import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
-  type PointerEvent,
   type SetStateAction,
   lazy,
   startTransition,
@@ -102,6 +101,7 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../../presentation/workspace/useWorkspacePreferences';
+import { useNotificationCommunityPreviews } from '../../presentation/workspace/useNotificationCommunityPreviews';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import {
@@ -112,8 +112,8 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { loadPublicImage } from '../community/communityImages';
 import { Rail } from './Rail';
+import { useSidebarGesture } from './useSidebarGesture';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -243,10 +243,6 @@ export function GlassWorkspace({
   const typingSentRef = useRef(
     new Map<string, { active: boolean; sentAt: number }>(),
   );
-  const [notificationCommunityPreviews, setNotificationCommunityPreviews] =
-    useState<Record<string, Community>>({});
-  const [notificationCommunityAvatarUrls, setNotificationCommunityAvatarUrls] =
-    useState<Record<string, string>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -281,11 +277,6 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
-  const sidebarGestureRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -314,6 +305,11 @@ export function GlassWorkspace({
     toggleMute,
     toggleScreenShare,
   } = useCallSession();
+  const {
+    clearSidebarGesture,
+    handleWorkspacePointerDown,
+    handleWorkspacePointerMove,
+  } = useSidebarGesture(sidebarOpen, setSidebarOpen);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -548,6 +544,14 @@ export function GlassWorkspace({
   );
   const inboxNotificationCount =
     pendingNotificationCount + pendingMembershipRequestCount;
+  const {
+    communityAvatarUrls: notificationCommunityAvatarUrls,
+    communityPreviews: notificationCommunityPreviews,
+  } = useNotificationCommunityPreviews({
+    communities,
+    session,
+    visibleNotifications,
+  });
 
   useEffect(() => {
     void ensurePwaPushSubscription(session).catch(() => undefined);
@@ -557,109 +561,6 @@ export function GlassWorkspace({
     void deletePwaPushSubscription(session).catch(() => undefined);
     setSession(null);
   };
-
-  useEffect(() => {
-    const communityIds = visibleNotifications
-      .filter((notification) => notification.type === 'community_invitation')
-      .map((notification) => notification.payload.communityId)
-      .filter(
-        (communityId) =>
-          !communities.some((community) => community.id === communityId) &&
-          !notificationCommunityPreviews[communityId],
-      );
-
-    if (communityIds.length === 0) return;
-
-    let cancelled = false;
-
-    void Promise.all(
-      [...new Set(communityIds)].map((communityId) =>
-        pigeonApplication
-          .getCommunity(session, communityId)
-          .then((community) => [communityId, community] as const)
-          .catch(() => null),
-      ),
-    ).then((results) => {
-      if (cancelled) return;
-
-      const loaded = results.filter(
-        (result): result is readonly [string, Community] => result !== null,
-      );
-
-      if (loaded.length === 0) return;
-
-      setNotificationCommunityPreviews((current) => ({
-        ...current,
-        ...Object.fromEntries(loaded),
-      }));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    communities,
-    notificationCommunityPreviews,
-    session,
-    visibleNotifications,
-  ]);
-
-  useEffect(() => {
-    const communityIds = [
-      ...new Set(
-        visibleNotifications
-          .filter(
-            (notification) => notification.type === 'community_invitation',
-          )
-          .map((notification) => notification.payload.communityId),
-      ),
-    ];
-    const communitiesById = new Map(
-      [...communities, ...Object.values(notificationCommunityPreviews)].map(
-        (community) => [community.id, community],
-      ),
-    );
-    const avatarEntries = communityIds
-      .map((communityId) => communitiesById.get(communityId))
-      .filter(
-        (community): community is Community =>
-          !!community?.avatar && !notificationCommunityAvatarUrls[community.id],
-      );
-
-    if (avatarEntries.length === 0) return;
-
-    let cancelled = false;
-
-    void Promise.all(
-      avatarEntries.map((community) =>
-        loadPublicImage(community.avatar as string)
-          .then((url) => (url ? ([community.id, url] as const) : null))
-          .catch(() => null),
-      ),
-    ).then((results) => {
-      if (cancelled) return;
-
-      const loaded = results.filter(
-        (result): result is readonly [string, string] => result !== null,
-      );
-
-      if (loaded.length === 0) return;
-
-      setNotificationCommunityAvatarUrls((current) => ({
-        ...current,
-        ...Object.fromEntries(loaded),
-      }));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    communities,
-    notificationCommunityAvatarUrls,
-    notificationCommunityPreviews,
-    visibleNotifications,
-  ]);
 
   useEffect(() => {
     if (!pendingCommunityInvite) return;
@@ -3034,39 +2935,6 @@ export function GlassWorkspace({
     onReconnecting: () => setRealtimeStatus('reconnecting'),
     onTyping: handleRealtimeTyping,
   });
-  const handleWorkspacePointerDown = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== 'touch' || sidebarOpen) return;
-
-    if (event.clientX > 28) return;
-
-    sidebarGestureRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-    };
-  };
-  const handleWorkspacePointerMove = (event: PointerEvent<HTMLElement>) => {
-    const gesture = sidebarGestureRef.current;
-
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
-
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = Math.abs(event.clientY - gesture.startY);
-
-    if (deltaX > 54 && deltaY < 42) {
-      setSidebarOpen(true);
-      sidebarGestureRef.current = null;
-    }
-
-    if (deltaX < -16 || deltaY > 72) {
-      sidebarGestureRef.current = null;
-    }
-  };
-  const clearSidebarGesture = (event: PointerEvent<HTMLElement>) => {
-    if (sidebarGestureRef.current?.pointerId === event.pointerId) {
-      sidebarGestureRef.current = null;
-    }
-  };
   const conversationTypingIdentityIds = activeTypingIdentityIds(
     conversationTypingEntries,
     activeConversation?.id,

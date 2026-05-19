@@ -14,12 +14,17 @@ import type {
 } from '../../utils/identityDisplay';
 
 import { copy } from '../../i18n/en';
-import { isBrowserPreviewImage } from '../../utils/browserPreview';
-import { formatDateSeparator, isSameDay } from '../../utils/formatting';
+import { formatDateSeparator } from '../../utils/formatting';
 import { identityDisplayName } from '../../utils/identityDisplay';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import {
+  findReplyMessage,
+  messageReplyImage,
+  startsAuthorRun,
+  startsMessageDay,
+} from '../chat/messageTimelineHelpers';
 import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -262,7 +267,7 @@ function MessageTimelineItem({
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
           reactionAuthorNames={reactionAuthorNames}
-          replyImage={replyImage(message, replyMessage)}
+          replyImage={messageReplyImage(message, replyMessage)}
           replyAuthorName={replyAuthorName(
             message,
             replyMessage,
@@ -321,34 +326,6 @@ function EmptyTimelineState({
   );
 }
 
-function startsMessageDay(
-  previousMessage: ChatMessage | undefined,
-  message: ChatMessage,
-): boolean {
-  return (
-    !previousMessage || !isSameDay(previousMessage.timestamp, message.timestamp)
-  );
-}
-
-function startsAuthorRun(
-  previousMessage: ChatMessage | undefined,
-  message: ChatMessage,
-): boolean {
-  return (
-    !previousMessage ||
-    previousMessage.authorIdentityId !== message.authorIdentityId
-  );
-}
-
-function findReplyMessage(
-  messages: ChatMessage[],
-  message: ChatMessage,
-): ChatMessage | undefined {
-  if (!message.replyToMessageId) return undefined;
-
-  return messages.find((item) => item.id === message.replyToMessageId);
-}
-
 function messageAuthorName(
   message: ChatMessage,
   currentIdentityName: string,
@@ -367,19 +344,6 @@ function messageAuthorPicture(
   return message.mine
     ? identityPictures[currentIdentityId]
     : identityPictures[message.authorIdentityId];
-}
-
-function replyImage(
-  message: ChatMessage,
-  replyMessage?: ChatMessage,
-): MessageAttachment | undefined {
-  const previewImage = message.replyPreview?.image;
-
-  return (
-    replyMessage?.attachments.find((attachment) =>
-      isBrowserPreviewImage(attachment.contentType),
-    ) ?? (typeof previewImage === 'string' ? undefined : previewImage)
-  );
 }
 
 function replyAuthorName(
