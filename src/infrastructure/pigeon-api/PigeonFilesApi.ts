@@ -16,6 +16,8 @@ import type { HttpJsonClient } from '../http/HttpJsonClient';
 import type { RequestSigner } from './RequestSigner';
 
 import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
+import { attachmentBlobCacheKey } from './AttachmentBlobCacheKey';
+import { PigeonFileRequestCache } from './PigeonFileRequestCache';
 
 const ipfsPrivateUploadLimitBytes = 50 * 1024 * 1024;
 const ipfsPrivateChunkBytes = 8 * 1024 * 1024;
@@ -30,17 +32,13 @@ type LegacyPublicFileContent = PublicFileUpload & {
 export class PigeonFilesApi {
   private readonly attachmentCipher: AttachmentCipher;
 
-  private readonly privateFileCache = new Map<
-    string,
-    Promise<PrivateFileContent>
-  >();
+  private readonly privateFileCache =
+    new PigeonFileRequestCache<PrivateFileContent>();
 
-  private readonly publicFileCache = new Map<
-    string,
-    Promise<PublicFileContent>
-  >();
+  private readonly publicFileCache =
+    new PigeonFileRequestCache<PublicFileContent>();
 
-  private readonly attachmentBlobCache = new Map<string, Promise<Blob>>();
+  private readonly attachmentBlobCache = new PigeonFileRequestCache<Blob>();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -58,37 +56,15 @@ export class PigeonFilesApi {
       return await this.fetchPublicFile(cid, onDownloadProgress);
     }
 
-    const cached = this.publicFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.fetchPublicFile(cid).catch((caught: unknown) => {
-      this.publicFileCache.delete(cid);
-
-      throw caught;
-    });
-
-    this.publicFileCache.set(cid, request);
-
-    return await request;
+    return await this.publicFileCache.getOrCreate(cid, () =>
+      this.fetchPublicFile(cid),
+    );
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    const cached = this.privateFileCache.get(cid);
-
-    if (cached) return await cached;
-
-    const request = this.http
-      .request<PrivateFileContent>(`/ipfs/${encodeURIComponent(cid)}`)
-      .catch((caught: unknown) => {
-        this.privateFileCache.delete(cid);
-
-        throw caught;
-      });
-
-    this.privateFileCache.set(cid, request);
-
-    return await request;
+    return await this.privateFileCache.getOrCreate(cid, () =>
+      this.http.request<PrivateFileContent>(`/ipfs/${encodeURIComponent(cid)}`),
+    );
   }
 
   public async uploadPublicFile(
@@ -120,24 +96,13 @@ export class PigeonFilesApi {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    const cacheKey = this.attachmentBlobCacheKey(attachment);
-    const cached = this.attachmentBlobCache.get(cacheKey);
+    const cacheKey = attachmentBlobCacheKey(attachment);
 
-    if (cached) return await cached;
-
-    const request = this.attachmentIsEncrypted(attachment)
-      ? this.decryptAttachment(attachment, onProgress)
-      : this.downloadPublicAttachment(attachment, onProgress);
-
-    const cachedRequest = request.catch((caught: unknown) => {
-      this.attachmentBlobCache.delete(cacheKey);
-
-      throw caught;
-    });
-
-    this.attachmentBlobCache.set(cacheKey, cachedRequest);
-
-    return await cachedRequest;
+    return await this.attachmentBlobCache.getOrCreate(cacheKey, () =>
+      this.attachmentIsEncrypted(attachment)
+        ? this.decryptAttachment(attachment, onProgress)
+        : this.downloadPublicAttachment(attachment, onProgress),
+    );
   }
 
   public async publishMessageAttachments(
@@ -250,28 +215,6 @@ export class PigeonFilesApi {
       encryptedBytes,
       onProgress,
     );
-  }
-
-  private attachmentBlobCacheKey(attachment: MessageAttachment): string {
-    return [
-      attachment.cid,
-      attachment.encrypted === false ? 'public' : 'encrypted',
-      attachment.encryptedSize,
-      attachment.size,
-      attachment.contentType,
-      attachment.encryption?.algorithm ?? '',
-      attachment.encryption?.key ?? '',
-      attachment.encryption?.iv ?? '',
-      attachment.encryption?.chunks
-        ?.map((chunk) => `${chunk.iv}:${chunk.size}`)
-        .join(',') ?? '',
-      attachment.chunks
-        ?.map(
-          (chunk) =>
-            `${chunk.index}:${chunk.cid}:${chunk.sha256}:${chunk.size}`,
-        )
-        .join(',') ?? '',
-    ].join('|');
   }
 
   private attachmentIsEncrypted(attachment: MessageAttachment): boolean {

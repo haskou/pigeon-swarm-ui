@@ -6,7 +6,6 @@ import {
   UUID,
 } from '@haskou/value-objects';
 import {
-  Fragment,
   lazy,
   memo,
   type MouseEvent,
@@ -58,19 +57,18 @@ import { updateMessageReaction } from '../../domain/messages/updateMessageReacti
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
-import {
-  formatDateSeparator,
-  isSameDay,
-  shortId,
-} from '../../utils/formatting';
+import { shortId } from '../../utils/formatting';
 import { identityName } from '../../utils/identityDisplay';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
 import { Composer } from '../chat/Composer';
-import { DateSeparator } from '../chat/DateSeparator';
-import { MessageBubble } from '../chat/MessageBubble';
-import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { TypingIndicator } from '../chat/TypingIndicator';
+import { useAttachmentDownload } from '../chat/useAttachmentDownload';
+import {
+  profileAnchorFromTarget,
+  type ProfilePopoverAnchor,
+} from '../profile/profilePopoverAnchor';
 import { LockIcon } from '../workspace/LockIcon';
 import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
@@ -78,6 +76,7 @@ import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { MemberRow } from './MemberRow';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
+import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -170,15 +169,6 @@ type MemberView = {
   pictureUrl: null | string;
 };
 
-type ProfilePopoverAnchor = {
-  bottom: number;
-  height: number;
-  left: number;
-  right: number;
-  top: number;
-  width: number;
-};
-
 type CommunityPendingSend = {
   attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
@@ -210,23 +200,6 @@ async function yieldAfterCommunityMessageProjectionBatch(): Promise<void> {
   await new Promise<void>((resolve) => {
     window.setTimeout(resolve, 0);
   });
-}
-
-function profileAnchorFromTarget(
-  target: HTMLElement | null | undefined,
-): ProfilePopoverAnchor | undefined {
-  if (!target) return undefined;
-
-  const rect = target.getBoundingClientRect();
-
-  return {
-    bottom: rect.bottom,
-    height: rect.height,
-    left: rect.left,
-    right: rect.right,
-    top: rect.top,
-    width: rect.width,
-  };
 }
 
 export function CommunityWorkspace({
@@ -1340,39 +1313,11 @@ export function CommunityWorkspace({
     }
   };
 
-  const loadAttachmentPreview = useCallback(
-    async (
-      attachment: MessageAttachment,
-      onProgress?: (progress: AttachmentProgress) => void,
-    ): Promise<string> => {
-      const blob = await pigeonApplication.downloadAttachment(
-        attachment,
-        onProgress,
-      );
-
-      return URL.createObjectURL(blob);
-    },
-    [],
-  );
-
-  const openAttachment = async (attachment?: MessageAttachment) => {
-    if (!attachment) return;
-
-    setAttachmentProgress(null);
-    try {
-      const url = await loadAttachmentPreview(attachment, setAttachmentProgress);
-      const link = document.createElement('a');
-
-      setAttachmentProgress(null);
-      link.href = url;
-      link.download = attachment.filename;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    } catch {
-      setAttachmentProgress(null);
-      setSendError(copy.composer.attachmentDownloadError);
-    }
-  };
+  const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
+    errorMessage: copy.composer.attachmentDownloadError,
+    onErrorChange: setSendError,
+    onProgressChange: setAttachmentProgress,
+  });
 
   useEffect(() => {
     setSelectedChannelId(resolvedChannelId);
@@ -1851,204 +1796,54 @@ export function CommunityWorkspace({
           </div>
         ) : (
           <>
-            <div className="relative min-h-0 flex-1">
-              <div
-                ref={scrollerRef}
-                onScroll={handleMessagesScroll}
-                className="h-full overflow-y-auto p-4 sm:p-6"
-              >
-                {messageState === 'loading' && visibleMessages.length === 0 ? (
-                  <MessageListSkeleton />
-                ) : messageState === 'loading' ? (
-                  <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
-                    {copy.chat.loadingEvents}
-                  </div>
-                ) : null}
-                <div>
-                  {!messageCursor &&
-                    visibleMessages.length > 0 &&
-                    messageState !== 'loading' && (
-                      <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                        {copy.chat.noMoreMessages}
-                      </div>
-                    )}
-                  {missingCommunityKey && (
-                    <div className="grid min-h-[28vh] place-items-center">
-                      <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                        <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                          <LockIcon locked={false} />
-                        </div>
-                        <div className="font-black">{copy.chat.e2eMissing}</div>
-                        <div className="mt-2 text-rose-100/65">
-                          {copy.messages.missingCommunityKey}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCommunityKeyError(null);
-                            setCommunityKeyDialog('add');
-                          }}
-                          className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-                        >
-                          {copy.chat.addPrivateKey}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {!missingCommunityKey &&
-                    visibleMessages.map((message, index) => {
-                      const previousMessage = visibleMessages[index - 1];
-                      const nextMessage = visibleMessages[index + 1];
-                      const replyMessage = message.replyToMessageId
-                        ? visibleMessages.find(
-                            (item) => item.id === message.replyToMessageId,
-                          )
-                        : undefined;
-                      const startsNewDay =
-                        !previousMessage ||
-                        !isSameDay(
-                          previousMessage.timestamp,
-                          message.timestamp,
-                        );
-                      const startsNewAuthorRun =
-                        !previousMessage ||
-                        previousMessage.authorIdentityId !==
-                          message.authorIdentityId;
-                      const showAvatar =
-                        !nextMessage ||
-                        nextMessage.authorIdentityId !==
-                          message.authorIdentityId;
+            <CommunityMessageTimeline
+              bottomRef={bottomRef}
+              isAwayFromBottom={isAwayFromBottom}
+              loadAttachmentPreview={loadAttachmentPreview}
+              memberIdentities={memberIdentities}
+              memberPictures={memberPictures}
+              messageCursor={messageCursor}
+              messageState={messageState}
+              missingCommunityKey={missingCommunityKey}
+              newChannelMessageCount={newChannelMessageCount}
+              onAddCommunityKey={() => {
+                setCommunityKeyError(null);
+                setCommunityKeyDialog('add');
+              }}
+              onAttachmentOpen={(attachment) => void openAttachment(attachment)}
+              onAuthorProfileOpen={(message, target) =>
+                openMessageAuthorProfile(
+                  message,
+                  profileAnchorFromTarget(target),
+                )
+              }
+              onJumpToLatest={() => {
+                setNewChannelMessageCount(0);
+                setIsAwayFromBottom(false);
 
-                      return (
-                        <Fragment key={message.id}>
-                          {startsNewDay && (
-                            <DateSeparator
-                              label={formatDateSeparator(message.timestamp)}
-                            />
-                          )}
-                          <div
-                            className={
-                              startsNewDay || startsNewAuthorRun
-                                ? 'mt-4'
-                                : 'mt-1'
-                            }
-                          >
-                            <MessageBubble
-                              message={message}
-                              currentIdentityId={session.identity.id}
-                              authorName={
-                                message.mine
-                                  ? session.identity.profile.name
-                                  : memberDisplayName(
-                                      memberIdentities[
-                                        message.authorIdentityId
-                                      ],
-                                      message.authorIdentityId,
-                                    )
-                              }
-                              authorPicture={
-                                message.mine
-                                  ? memberPictures[session.identity.id]
-                                  : memberPictures[message.authorIdentityId]
-                              }
-                              onAttachmentOpen={(attachmentIndex) =>
-                                void openAttachment(
-                                  message.attachments[attachmentIndex],
-                                )
-                              }
-                              onAttachmentPreview={loadAttachmentPreview}
-                              onAvatarClick={(event) =>
-                                openMessageAuthorProfile(
-                                  message,
-                                  profileAnchorFromTarget(event.currentTarget),
-                                )
-                              }
-                              onMessageMenuOpen={(targetMessage, x, y) =>
-                                setMessageContextMenu({
-                                  message: targetMessage,
-                                  x,
-                                  y,
-                                })
-                              }
-                              onReactionToggle={(
-                                targetMessage,
-                                emoji,
-                                reacted,
-                              ) =>
-                                void handleToggleChannelMessageReaction(
-                                  targetMessage,
-                                  emoji,
-                                  reacted,
-                                )
-                              }
-                              onReplyReferenceClick={handleReplyReferenceClick}
-                              onRetryMessage={retryChannelMessage}
-                              reactionAuthorNames={reactionAuthorNames}
-                              replyImage={
-                                replyMessage?.attachments.find((attachment) =>
-                                  isBrowserPreviewImage(attachment.contentType),
-                                ) ?? message.replyPreview?.image
-                              }
-                              replyAuthorName={
-                                replyMessage
-                                  ? memberDisplayName(
-                                      memberIdentities[
-                                        replyMessage.authorIdentityId
-                                      ],
-                                      replyMessage.authorIdentityId,
-                                    )
-                                  : message.replyPreview
-                                    ? memberDisplayName(
-                                        memberIdentities[
-                                          message.replyPreview.authorIdentityId
-                                        ],
-                                        message.replyPreview.authorIdentityId,
-                                      )
-                                    : undefined
-                              }
-                              replyPreview={
-                                replyMessage?.content ??
-                                message.replyPreview?.content
-                              }
-                              showAvatar={showAvatar}
-                            />
-                          </div>
-                        </Fragment>
-                      );
-                    })}
-                  {visibleMessages.length === 0 &&
-                    messageState !== 'loading' && (
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
-                        {copy.communities.emptyChannel}
-                      </div>
-                    )}
-                  <div ref={bottomRef} />
-                </div>
-              </div>
-              {(newChannelMessageCount > 0 || isAwayFromBottom) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewChannelMessageCount(0);
-                    setIsAwayFromBottom(false);
-
-                    if (selectedChannelId) onChannelViewed?.(selectedChannelId);
-                    bottomRef.current?.scrollIntoView({ block: 'end' });
-                  }}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-                >
-                  {newChannelMessageCount > 0
-                    ? newChannelMessageCount > 1
-                      ? copy.chat.newMessages
-                      : copy.chat.newMessage
-                    : copy.chat.jumpToLatest}
-                </button>
-              )}
-            </div>
+                if (selectedChannelId) onChannelViewed?.(selectedChannelId);
+                bottomRef.current?.scrollIntoView({ block: 'end' });
+              }}
+              onMessageMenuOpen={(message, x, y) =>
+                setMessageContextMenu({ message, x, y })
+              }
+              onReactionToggle={(message, emoji, reacted) =>
+                void handleToggleChannelMessageReaction(message, emoji, reacted)
+              }
+              onReplyReferenceClick={handleReplyReferenceClick}
+              onRetryMessage={retryChannelMessage}
+              onScroll={handleMessagesScroll}
+              reactionAuthorNames={reactionAuthorNames}
+              scrollerRef={scrollerRef}
+              session={session}
+              visibleMessages={visibleMessages}
+            />
             {typingIdentityIds.length > 0 && (
               <TypingIndicator
+                getIdentityName={(identityId) =>
+                  memberDisplayName(memberIdentities[identityId], identityId)
+                }
                 identityIds={typingIdentityIds}
-                memberIdentities={memberIdentities}
               />
             )}
             <Composer
@@ -2450,41 +2245,6 @@ const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
 
 function voiceParticipantName(name: string): string {
   return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;
-}
-
-function TypingIndicator({
-  identityIds,
-  memberIdentities,
-}: {
-  identityIds: string[];
-  memberIdentities: Record<string, IdentityResource>;
-}) {
-  return (
-    <div className="px-4 pb-2 text-xs font-black text-white/45 sm:px-6">
-      {typingLabel(identityIds, memberIdentities)}
-    </div>
-  );
-}
-
-function typingLabel(
-  identityIds: string[],
-  memberIdentities: Record<string, IdentityResource>,
-): string {
-  const [firstIdentityId, secondIdentityId] = identityIds;
-  const firstName = firstIdentityId
-    ? memberDisplayName(memberIdentities[firstIdentityId], firstIdentityId)
-    : '';
-
-  if (identityIds.length === 1) return `${firstName} is typing...`;
-
-  if (identityIds.length === 2 && secondIdentityId) {
-    return `${firstName} and ${memberDisplayName(
-      memberIdentities[secondIdentityId],
-      secondIdentityId,
-    )} are typing...`;
-  }
-
-  return `${firstName} and ${identityIds.length - 1} more are typing...`;
 }
 
 function resolveCommunityChannelId(

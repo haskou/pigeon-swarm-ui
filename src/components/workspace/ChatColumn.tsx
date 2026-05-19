@@ -1,7 +1,7 @@
 import type { FormEvent, MouseEvent } from 'react';
 
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallParticipant } from '../../domain/calls/CallSession';
@@ -13,7 +13,6 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
-  MessageAttachment,
   Session,
 } from '../../domain/types';
 
@@ -26,8 +25,13 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
+import {
+  profileAnchorFromTarget,
+  type ProfilePopoverAnchor,
+} from '../profile/profilePopoverAnchor';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatConversationHeader } from './ChatConversationHeader';
@@ -40,15 +44,6 @@ import { GroupProfileDialog } from './GroupProfileDialog';
 import { GroupInvitationDialog } from './GroupInvitationDialog';
 
 type LoadState = 'idle' | 'loading' | 'error';
-
-type ProfilePopoverAnchor = {
-  bottom: number;
-  height: number;
-  left: number;
-  right: number;
-  top: number;
-  width: number;
-};
 
 interface ChatColumnProps {
   session: Session;
@@ -108,23 +103,6 @@ interface ChatColumnProps {
   }) => void;
   onTypingActive?: (active: boolean) => void;
   typingIdentityIds?: string[];
-}
-
-function profileAnchorFromTarget(
-  target: HTMLElement | null | undefined,
-): ProfilePopoverAnchor | undefined {
-  if (!target) return undefined;
-
-  const rect = target.getBoundingClientRect();
-
-  return {
-    bottom: rect.bottom,
-    height: rect.height,
-    left: rect.left,
-    right: rect.right,
-    top: rect.top,
-    width: rect.width,
-  };
 }
 
 function normalizeIdentityLookup(value: string): string {
@@ -484,43 +462,11 @@ export function ChatColumn({
       picture: identityPictures[message.authorIdentityId],
     });
   };
-  const loadAttachmentPreview = useCallback(
-    async (
-      attachment: MessageAttachment,
-      onProgress?: (progress: AttachmentProgress) => void,
-    ): Promise<string> => {
-      const blob = await pigeonApplication.downloadAttachment(
-        attachment,
-        onProgress,
-      );
-
-      return URL.createObjectURL(blob);
-    },
-    [],
-  );
-  const openAttachment = async (attachment?: MessageAttachment) => {
-    if (!attachment) return;
-
-    setAttachmentError(null);
-    setDownloadProgress(null);
-    try {
-      const url = await loadAttachmentPreview(
-        attachment,
-        setDownloadProgress,
-      );
-      const link = document.createElement('a');
-
-      setAttachmentError(null);
-      setDownloadProgress(null);
-      link.href = url;
-      link.download = attachment.filename;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    } catch {
-      setDownloadProgress(null);
-      setAttachmentError(copy.composer.attachmentDownloadError);
-    }
-  };
+  const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
+    errorMessage: copy.composer.attachmentDownloadError,
+    onErrorChange: setAttachmentError,
+    onProgressChange: setDownloadProgress,
+  });
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <ChatConversationHeader

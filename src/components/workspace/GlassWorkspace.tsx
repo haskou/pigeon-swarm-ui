@@ -1,7 +1,6 @@
 import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
-  type PointerEvent,
   type SetStateAction,
   lazy,
   startTransition,
@@ -114,6 +113,7 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { loadPublicImage } from '../community/communityImages';
 import { Rail } from './Rail';
+import { useSidebarGesture } from './useSidebarGesture';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -281,11 +281,6 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
-  const sidebarGestureRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -314,6 +309,11 @@ export function GlassWorkspace({
     toggleMute,
     toggleScreenShare,
   } = useCallSession();
+  const {
+    clearSidebarGesture,
+    handleWorkspacePointerDown,
+    handleWorkspacePointerMove,
+  } = useSidebarGesture(sidebarOpen, setSidebarOpen);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -3034,39 +3034,6 @@ export function GlassWorkspace({
     onReconnecting: () => setRealtimeStatus('reconnecting'),
     onTyping: handleRealtimeTyping,
   });
-  const handleWorkspacePointerDown = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== 'touch' || sidebarOpen) return;
-
-    if (event.clientX > 28) return;
-
-    sidebarGestureRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-    };
-  };
-  const handleWorkspacePointerMove = (event: PointerEvent<HTMLElement>) => {
-    const gesture = sidebarGestureRef.current;
-
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
-
-    const deltaX = event.clientX - gesture.startX;
-    const deltaY = Math.abs(event.clientY - gesture.startY);
-
-    if (deltaX > 54 && deltaY < 42) {
-      setSidebarOpen(true);
-      sidebarGestureRef.current = null;
-    }
-
-    if (deltaX < -16 || deltaY > 72) {
-      sidebarGestureRef.current = null;
-    }
-  };
-  const clearSidebarGesture = (event: PointerEvent<HTMLElement>) => {
-    if (sidebarGestureRef.current?.pointerId === event.pointerId) {
-      sidebarGestureRef.current = null;
-    }
-  };
   const conversationTypingIdentityIds = activeTypingIdentityIds(
     conversationTypingEntries,
     activeConversation?.id,
