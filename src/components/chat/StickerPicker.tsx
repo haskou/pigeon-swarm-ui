@@ -28,6 +28,10 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import {
+  stickerAssetUrl,
+  useStickerPressPreview,
+} from './StickerPressPreview';
 
 type StickerPickerProps = {
   disabled: boolean;
@@ -575,10 +579,6 @@ export function StickerPicker({
   );
 }
 
-export function stickerAssetUrl(assetCid: string): string {
-  return pigeonApplication.stickerAssetUrl(assetCid);
-}
-
 export function StickerPackPreviewDialog({
   onClose,
   onStickerSend,
@@ -879,18 +879,10 @@ function StickerGrid({
 
         return (
           <div key={`${packId}:${sticker.id}`} className="group relative">
-            <button
-              type="button"
-              onClick={() => void onSend(packId, sticker)}
-              title="Sticker"
-              className="grid aspect-square w-full place-items-center rounded-xl bg-white/5 p-1 transition hover:bg-white/10"
-            >
-              <img
-                src={stickerAssetUrl(sticker.assetCid)}
-                alt="Sticker"
-                className="max-h-full max-w-full object-contain"
-              />
-            </button>
+            <StickerGridButton
+              onSend={() => onSend(packId, sticker)}
+              sticker={sticker}
+            />
             <button
               type="button"
               onClick={() => void onFavoriteToggle(packId, sticker.id, favorite)}
@@ -908,6 +900,41 @@ function StickerGrid({
         );
       })}
     </div>
+  );
+}
+
+function StickerGridButton({
+  onSend,
+  sticker,
+}: {
+  onSend: () => Promise<void>;
+  sticker: StickerResource;
+}) {
+  const { consumePreviewClick, pressPreviewHandlers, previewPortal } =
+    useStickerPressPreview(sticker.assetCid);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          if (consumePreviewClick()) return;
+
+          void onSend();
+        }}
+        title="Sticker"
+        className="grid aspect-square w-full touch-none select-none place-items-center rounded-xl bg-white/5 p-1 transition hover:bg-white/10"
+        {...pressPreviewHandlers}
+      >
+        <img
+          src={stickerAssetUrl(sticker.assetCid)}
+          alt="Sticker"
+          className="max-h-full max-w-full object-contain"
+          draggable={false}
+        />
+      </button>
+      {previewPortal}
+    </>
   );
 }
 

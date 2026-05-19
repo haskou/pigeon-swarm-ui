@@ -29,7 +29,8 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
-import { StickerPicker, stickerAssetUrl } from './StickerPicker';
+import { StickerPicker } from './StickerPicker';
+import { stickerAssetUrl } from './StickerPressPreview';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;

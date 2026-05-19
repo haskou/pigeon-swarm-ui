@@ -17,7 +17,10 @@ import { formatTime } from '../../utils/formatting';
 import { Avatar } from './Avatar';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 import { MarkdownMessage } from './MarkdownMessage';
-import { stickerAssetUrl } from './StickerPicker';
+import {
+  stickerAssetUrl,
+  useStickerPressPreview,
+} from './StickerPressPreview';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -110,6 +113,7 @@ export function MessageBubble({
     [message.content],
   );
   const sticker = message.sticker;
+  const stickerPreview = useStickerPressPreview(sticker?.assetCid ?? '');
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -295,18 +299,27 @@ export function MessageBubble({
               </div>
             )}
             {sticker && (
-              <button
-                type="button"
-                onClick={() => onStickerClick?.(sticker)}
-                className="block rounded-2xl p-1 transition hover:bg-white/10"
-                title="View sticker pack"
-              >
-                <img
-                  src={stickerAssetUrl(sticker.assetCid)}
-                  alt="Sticker"
-                  className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
-                />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (stickerPreview.consumePreviewClick()) return;
+
+                    onStickerClick?.(sticker);
+                  }}
+                  className="block touch-none select-none rounded-2xl p-1 transition hover:bg-white/10"
+                  title="View sticker pack"
+                  {...stickerPreview.pressPreviewHandlers}
+                >
+                  <img
+                    src={stickerAssetUrl(sticker.assetCid)}
+                    alt="Sticker"
+                    className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
+                    draggable={false}
+                  />
+                </button>
+                {stickerPreview.previewPortal}
+              </>
             )}
             {message.attachmentProgress && (
               <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
