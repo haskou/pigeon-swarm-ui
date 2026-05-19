@@ -757,7 +757,7 @@ function StickerManagerDialog({
   const [mode, setMode] = useState<'create' | 'mine' | 'saved'>('mine');
   const [packSearch, setPackSearch] = useState('');
   const [packSearchResults, setPackSearchResults] =
-    useState<StickerPackResource[]>(publicPacks);
+    useState<StickerPackResource[]>([]);
   const [searchingPacks, setSearchingPacks] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -769,10 +769,13 @@ function StickerManagerDialog({
     library?.savedPacks.filter(
       (pack) => pack.ownerIdentityId !== session.identity.id,
     ) ?? [];
+  const visiblePackSearchResults = packSearchResults.filter(
+    (pack) => !savedPackIds.has(pack.id),
+  );
 
   useEffect(() => {
-    setPackSearchResults(publicPacks);
-  }, [publicPacks]);
+    setPackSearchResults(publicPacks.filter((pack) => !savedPackIds.has(pack.id)).slice(0, 2));
+  }, [publicPacks, savedPackIds]);
 
   const submitPack = async (event: FormEvent) => {
     event.preventDefault();
@@ -803,10 +806,10 @@ function StickerManagerDialog({
 
       setPackSearchResults(
         normalizedQuery
-          ? packs.filter((pack) =>
-              pack.name.toLowerCase().includes(normalizedQuery),
-            )
-          : packs,
+          ? packs
+              .filter((pack) => !savedPackIds.has(pack.id))
+              .filter((pack) => pack.name.toLowerCase().includes(normalizedQuery))
+          : packs.filter((pack) => !savedPackIds.has(pack.id)).slice(0, 2),
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, 'Sticker packs could not be found.'));
@@ -948,6 +951,23 @@ function StickerManagerDialog({
                 Search
               </button>
             </form>
+            {visiblePackSearchResults.length > 0 && (
+              <section className="mb-5">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  {packSearch.trim() ? 'Search results' : 'Suggested packs'}
+                </div>
+                <div className="grid gap-2">
+                  {visiblePackSearchResults.map((pack) => (
+                    <PackRow
+                      key={pack.id}
+                      pack={pack}
+                      saved={savedPackIds.has(pack.id)}
+                      onSavePack={onSavePack}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <section>
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -981,23 +1001,6 @@ function StickerManagerDialog({
                 />
               </section>
             </div>
-            {packSearchResults.length > 0 && (
-              <section className="mt-5">
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                  Search results
-                </div>
-                <div className="grid gap-2">
-                  {packSearchResults.map((pack) => (
-                    <PackRow
-                      key={pack.id}
-                      pack={pack}
-                      saved={savedPackIds.has(pack.id)}
-                      onSavePack={onSavePack}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
           </>
         )}
         <button
