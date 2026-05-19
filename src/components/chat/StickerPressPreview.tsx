@@ -93,7 +93,7 @@ function StickerPressPreview({
 }) {
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[120] grid h-56 w-56 place-items-center rounded-3xl border border-white/15 bg-black/70 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl"
+      className="pointer-events-none fixed z-[120] grid h-56 w-56 place-items-center rounded-3xl border border-white/15 bg-black/70 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
       style={{ left: preview.position.x, top: preview.position.y }}
       aria-hidden="true"
     >
