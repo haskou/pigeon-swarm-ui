@@ -350,10 +350,10 @@ export function StickerPicker({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-lg text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45"
         aria-label="Open stickers"
       >
-        ☺
+        ☺︎
       </button>
       {open && (
         <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40">
