@@ -814,13 +814,8 @@ function StickerManagerDialog({
           </form>
         ) : mode === 'mine' ? (
           <>
-            <StickerUploadForm
-              onCreated={onStickerCreated}
-              ownPacks={ownPacks}
-              session={session}
-            />
             {ownPacks.length > 0 && (
-              <section className="mt-5">
+              <section>
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   My packs
                 </div>
@@ -828,8 +823,10 @@ function StickerManagerDialog({
                   {ownPacks.map((pack) => (
                     <ManagePackStickers
                       key={pack.id}
+                      onStickerCreated={onStickerCreated}
                       onStickerDelete={onStickerDelete}
                       pack={pack}
+                      session={session}
                     />
                   ))}
                 </div>
@@ -926,13 +923,46 @@ function StickerManagerDialog({
 }
 
 function ManagePackStickers({
+  onStickerCreated,
   onStickerDelete,
   pack,
+  session,
 }: {
+  onStickerCreated: () => Promise<void>;
   onStickerDelete: (packId: string, stickerId: string) => Promise<void>;
   pack: StickerPackResource;
+  session: Session;
 }) {
-  if (pack.stickers.length === 0) return null;
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const uploadSticker = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      const [upload, dimensions] = await Promise.all([
+        pigeonApplication.uploadStickerAsset(session, file),
+        readMediaDimensions(file),
+      ]);
+
+      await pigeonApplication.addStickerToPack(session, pack.id, {
+        assetCid: upload.cid,
+        contentType: upload.contentType,
+        dimensions,
+        sizeBytes: upload.size,
+        type: stickerTypeFromUpload(upload),
+      });
+      await onStickerCreated();
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, 'Sticker could not be uploaded.'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -955,7 +985,30 @@ function ManagePackStickers({
             </button>
           </div>
         ))}
+        <label
+          className={cx(
+            'grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-white/15 bg-black/20 text-2xl font-black text-white/45 transition hover:border-white/30 hover:bg-white/10 hover:text-white/80',
+            uploading && 'pointer-events-none opacity-50',
+          )}
+          aria-label="Add sticker"
+        >
+          {uploading ? (
+            <span className="text-xs font-black uppercase tracking-[0.12em]">
+              ...
+            </span>
+          ) : (
+            '+'
+          )}
+          <input
+            type="file"
+            accept="image/*,video/*"
+            onChange={uploadSticker}
+            className="hidden"
+            disabled={uploading}
+          />
+        </label>
       </div>
+      {error && <div className="mt-2 text-sm text-rose-100">{error}</div>}
     </div>
   );
 }
@@ -996,133 +1049,6 @@ function PackRow({
         </div>
       )}
     </div>
-  );
-}
-
-function StickerUploadForm({
-  onCreated,
-  ownPacks,
-  session,
-}: {
-  onCreated: () => Promise<void>;
-  ownPacks: StickerPackResource[];
-  session: Session;
-}) {
-  const [packId, setPackId] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!packId && ownPacks[0]) setPackId(ownPacks[0].id);
-  }, [ownPacks, packId]);
-
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return undefined;
-    }
-
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(nextPreviewUrl);
-
-    return () => {
-      URL.revokeObjectURL(nextPreviewUrl);
-    };
-  }, [file]);
-
-  const submitSticker = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!file || !packId) return;
-
-    setSaving(true);
-    setError(null);
-    try {
-      const [upload, dimensions] = await Promise.all([
-        pigeonApplication.uploadStickerAsset(session, file),
-        readMediaDimensions(file),
-      ]);
-
-      await pigeonApplication.addStickerToPack(session, packId, {
-        assetCid: upload.cid,
-        contentType: upload.contentType,
-        dimensions,
-        sizeBytes: upload.size,
-        type: stickerTypeFromUpload(upload),
-      });
-      setFile(null);
-      await onCreated();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker could not be uploaded.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form
-      onSubmit={submitSticker}
-      className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[12rem_1fr]"
-    >
-      <label className="group relative grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/25 text-center text-sm font-black text-white/55 transition hover:border-white/30 hover:bg-white/10">
-        {previewUrl ? (
-          file?.type.startsWith('video/') ? (
-            <video
-              src={previewUrl}
-              className="h-full w-full object-contain"
-              muted
-              playsInline
-            />
-          ) : (
-            <img
-              src={previewUrl}
-              alt="Sticker preview"
-              className="h-full w-full object-contain"
-            />
-          )
-        ) : (
-          <span className="px-4">Choose sticker</span>
-        )}
-        <span className="absolute inset-x-2 bottom-2 rounded-xl bg-black/70 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100">
-          {file ? 'Change file' : 'Select file'}
-        </span>
-        <input
-          type="file"
-          accept="image/*,video/*"
-          onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            setFile(event.target.files?.[0] ?? null)
-          }
-          className="hidden"
-        />
-      </label>
-      <div className="grid content-start gap-2">
-        <select
-          value={packId}
-          onChange={(event) => setPackId(event.target.value)}
-          className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-        >
-          {ownPacks.map((pack) => (
-            <option key={pack.id} value={pack.id}>
-              {pack.name}
-            </option>
-          ))}
-        </select>
-        {file && (
-          <div className="truncate rounded-xl bg-black/20 px-3 py-2 text-xs text-white/45">
-            {file.name}
-          </div>
-        )}
-        {error && <div className="text-sm text-rose-100">{error}</div>}
-        <button
-          type="submit"
-          disabled={saving || !file || !packId}
-          className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-black text-white disabled:opacity-45"
-        >
-          {saving ? 'Uploading...' : 'Add sticker'}
-        </button>
-      </div>
-    </form>
   );
 }
 
