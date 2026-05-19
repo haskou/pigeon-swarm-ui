@@ -6,6 +6,7 @@ import type {
   MessageReaction,
   MessageReplyPreview,
   MessageResource,
+  StickerMessageReference,
 } from '../../domain/types';
 
 type MessageDecryptRequest = {
@@ -49,7 +50,9 @@ type PlainMessage = {
   authorIdentityId?: string;
   content?: string;
   reply?: MessageReplyPreview;
+  sticker?: StickerMessageReference;
   timestamp?: number;
+  type?: string;
 };
 
 const cancelledRequestIds = new Set<number>();
@@ -57,7 +60,7 @@ const projectedMessageCache = new Map<string, ChatMessage>();
 const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
 const projectedMessageCacheDatabaseName = 'pigeon-message-projection-cache';
-const projectedMessageCacheDatabaseVersion = 1;
+const projectedMessageCacheDatabaseVersion = 2;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
 let projectedMessageCacheDatabasePromise: Promise<IDBDatabase | null> | null =
@@ -199,6 +202,7 @@ async function decryptMessage(
       raw: message,
       replyPreview: parsed.reply,
       replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
+      sticker: parsed.sticker,
       timestamp: parsed.timestamp ?? base.timestamp,
     };
   } catch {
@@ -377,7 +381,7 @@ async function openProjectedMessageCacheDatabase(): Promise<IDBDatabase | null> 
       projectedMessageCacheDatabaseVersion,
     );
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const database = request.result;
       const store = database.objectStoreNames.contains(
         projectedMessageCacheStoreName,
@@ -389,6 +393,10 @@ async function openProjectedMessageCacheDatabase(): Promise<IDBDatabase | null> 
 
       if (store && !store.indexNames.contains('lastAccessedAt')) {
         store.createIndex('lastAccessedAt', 'lastAccessedAt');
+      }
+
+      if (store && event.oldVersion < 2) {
+        store.clear();
       }
     };
     request.onsuccess = () => resolve(request.result);

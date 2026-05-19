@@ -1,4 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -16,30 +23,11 @@ import type {
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { cx } from '../../utils/classNameHelper';
+import {
+  type EmojiSuggestion,
+  searchEmojiSuggestions,
+} from '../../utils/emojiShortcodes';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-
-const commonEmojis = [
-  '😀',
-  '😂',
-  '🥹',
-  '😍',
-  '😎',
-  '😭',
-  '😡',
-  '👍',
-  '👎',
-  '🙏',
-  '🔥',
-  '✨',
-  '🎉',
-  '✅',
-  '❌',
-  '👀',
-  '💀',
-  '💜',
-  '🐦',
-  '🍿',
-];
 
 type StickerPickerProps = {
   disabled: boolean;
@@ -64,9 +52,12 @@ export function StickerPicker({
   const [library, setLibrary] = useState<MyStickersResource | null>(null);
   const [publicPacks, setPublicPacks] = useState<StickerPackResource[]>([]);
   const [query, setQuery] = useState('');
+  const [emojiQuery, setEmojiQuery] = useState('');
+  const [emojis, setEmojis] = useState<EmojiSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const savedPackIds = useMemo(
     () => new Set(library?.savedPacks.map((pack) => pack.id) ?? []),
     [library],
@@ -98,6 +89,43 @@ export function StickerPicker({
 
     void loadLibrary();
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (
+        target instanceof Node &&
+        pickerRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || tab !== 'emoji') return;
+
+    let cancelled = false;
+
+    void searchEmojiSuggestions(emojiQuery, 5000).then((suggestions) => {
+      if (!cancelled) setEmojis(suggestions);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emojiQuery, open, tab]);
 
   const searchPacks = async () => {
     setLoading(true);
@@ -141,6 +169,11 @@ export function StickerPicker({
     await loadLibrary();
   };
 
+  const deleteSticker = async (packId: string, stickerId: string) => {
+    await pigeonApplication.deleteSticker(session, packId, stickerId);
+    await loadLibrary();
+  };
+
   const toggleFavorite = async (
     packId: string,
     stickerId: string,
@@ -156,13 +189,8 @@ export function StickerPicker({
 
   const recentItems = usageItems(library?.recentStickers ?? []);
   const favoriteItems = usageItems(library?.favoriteStickers ?? []);
-  const savedItems =
-    library?.savedPacks.flatMap((pack) =>
-      pack.stickers.map((sticker) => ({ packId: pack.id, sticker })),
-    ) ?? [];
-
   return (
-    <div className="relative">
+    <div className="relative" ref={pickerRef}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -185,13 +213,15 @@ export function StickerPicker({
               label="Emoji"
               onClick={() => setTab('emoji')}
             />
-            <button
-              type="button"
-              onClick={() => setManageOpen(true)}
-              className="ml-auto rounded-xl px-3 py-2 text-xs font-black text-white/60 transition hover:bg-white/10 hover:text-white"
-            >
-              Manage
-            </button>
+            {tab === 'stickers' && (
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="ml-auto rounded-xl px-3 py-2 text-xs font-black text-white/60 transition hover:bg-white/10 hover:text-white"
+              >
+                Manage
+              </button>
+            )}
           </div>
           {tab === 'stickers' ? (
             <div className="max-h-[24rem] overflow-y-auto p-3">
@@ -239,13 +269,19 @@ export function StickerPicker({
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
               />
-              <StickerSection
-                favoriteIds={favoriteIds}
-                items={savedItems}
-                label="Saved packs"
-                onFavoriteToggle={toggleFavorite}
-                onSend={sendSticker}
-              />
+              {(library?.savedPacks ?? []).map((pack) => (
+                <StickerSection
+                  key={pack.id}
+                  favoriteIds={favoriteIds}
+                  items={pack.stickers.map((sticker) => ({
+                    packId: pack.id,
+                    sticker,
+                  }))}
+                  label={pack.name}
+                  onFavoriteToggle={toggleFavorite}
+                  onSend={sendSticker}
+                />
+              ))}
               {publicPacks.length > 0 && (
                 <div className="mt-4 grid gap-2">
                   <div className="text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -292,20 +328,29 @@ export function StickerPicker({
               )}
             </div>
           ) : (
-            <div className="grid max-h-[24rem] grid-cols-6 gap-1 overflow-y-auto p-3">
-              {commonEmojis.map((emoji) => (
-                <button
-                  type="button"
-                  key={emoji}
-                  onClick={() => {
-                    onEmojiInsert(emoji);
-                    setOpen(false);
-                  }}
-                  className="grid aspect-square place-items-center rounded-xl text-2xl transition hover:bg-white/10"
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div className="max-h-[24rem] overflow-y-auto p-3">
+              <input
+                value={emojiQuery}
+                onChange={(event) => setEmojiQuery(event.target.value)}
+                className="mb-3 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none placeholder:text-white/35"
+                placeholder="Search emojis"
+              />
+              <div className="grid grid-cols-7 gap-1">
+                {emojis.map((suggestion) => (
+                  <button
+                    type="button"
+                    key={suggestion.shortcode}
+                    onClick={() => {
+                      onEmojiInsert(suggestion.emoji);
+                      setOpen(false);
+                    }}
+                    className="grid aspect-square place-items-center rounded-xl text-2xl transition hover:bg-white/10"
+                    title={suggestion.shortcode}
+                  >
+                    {suggestion.emoji}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -323,6 +368,7 @@ export function StickerPicker({
             onFavoriteToggle={toggleFavorite}
             onRefresh={loadLibrary}
             onSavePack={savePack}
+            onStickerDelete={deleteSticker}
             onStickerCreated={loadLibrary}
             publicPacks={publicPacks}
             savedPackIds={savedPackIds}
@@ -457,6 +503,7 @@ function StickerManagerDialog({
   onFavoriteToggle,
   onRefresh,
   onSavePack,
+  onStickerDelete,
   onStickerCreated,
   publicPacks,
   savedPackIds,
@@ -473,6 +520,7 @@ function StickerManagerDialog({
   ) => Promise<void>;
   onRefresh: () => Promise<void>;
   onSavePack: (packId: string, saved: boolean) => Promise<void>;
+  onStickerDelete: (packId: string, stickerId: string) => Promise<void>;
   onStickerCreated: () => Promise<void>;
   publicPacks: StickerPackResource[];
   savedPackIds: Set<string>;
@@ -584,6 +632,22 @@ function StickerManagerDialog({
             />
           </section>
         </div>
+        {ownPacks.length > 0 && (
+          <section className="mt-5">
+            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              My packs
+            </div>
+            <div className="grid gap-3">
+              {ownPacks.map((pack) => (
+                <ManagePackStickers
+                  key={pack.id}
+                  onStickerDelete={onStickerDelete}
+                  pack={pack}
+                />
+              ))}
+            </div>
+          </section>
+        )}
         {publicPacks.length > 0 && (
           <section className="mt-5">
             <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -608,6 +672,41 @@ function StickerManagerDialog({
         >
           Refresh
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ManagePackStickers({
+  onStickerDelete,
+  pack,
+}: {
+  onStickerDelete: (packId: string, stickerId: string) => Promise<void>;
+  pack: StickerPackResource;
+}) {
+  if (pack.stickers.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="mb-2 truncate text-sm font-black">{pack.name}</div>
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
+        {pack.stickers.map((sticker) => (
+          <div key={sticker.id} className="group relative">
+            <img
+              src={stickerAssetUrl(sticker.assetCid)}
+              alt={sticker.name}
+              className="aspect-square w-full rounded-xl bg-black/20 object-contain p-1"
+            />
+            <button
+              type="button"
+              onClick={() => void onStickerDelete(pack.id, sticker.id)}
+              className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/75 text-xs font-black text-white/70 opacity-0 transition hover:text-white group-hover:opacity-100"
+              aria-label={`Delete ${sticker.name}`}
+            >
+              ×
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

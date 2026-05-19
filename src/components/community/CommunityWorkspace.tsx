@@ -1482,6 +1482,14 @@ export function CommunityWorkspace({
 
         setMessages((current) => {
           if (current.some((item) => item.id === projected.id)) return current;
+          if (
+            projected.mine &&
+            current.some(
+              (item) => item.mine && item.deliveryStatus === 'pending',
+            )
+          ) {
+            return current;
+          }
 
           return [...current, projected].sort(
             (left, right) => left.timestamp - right.timestamp,

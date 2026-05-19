@@ -2826,7 +2826,8 @@ export function GlassWorkspace({
           if (
             !activeConversationKeyId ||
             !messageId ||
-            messages.some((message) => message.id === messageId)
+            messages.some((message) => message.id === messageId) ||
+            isOwnRealtimeMessageWhileSendPending(event, messagesRef.current)
           ) {
             return;
           }
@@ -3384,5 +3385,26 @@ export function GlassWorkspace({
         </Suspense>
       ) : null}
     </section>
+  );
+}
+
+function isOwnRealtimeMessageWhileSendPending(
+  event: RealtimeDomainEvent,
+  messages: ChatMessage[],
+): boolean {
+  const authorIdentityId = stringAttribute(
+    event,
+    'authorIdentityId',
+    'authorId',
+    'actorIdentityId',
+  );
+
+  if (!authorIdentityId) return false;
+
+  return messages.some(
+    (message) =>
+      message.deliveryStatus === 'pending' &&
+      message.mine &&
+      message.authorIdentityId === authorIdentityId,
   );
 }
