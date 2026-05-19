@@ -18,19 +18,19 @@ import type { RequestSigner } from './RequestSigner';
 import { AttachmentCipher } from '../../domain/attachments/AttachmentCipher';
 import { attachmentBlobCacheKey } from './AttachmentBlobCacheKey';
 import { PigeonFileRequestCache } from './PigeonFileRequestCache';
+import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
+import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
 
 const ipfsPrivateUploadLimitBytes = 50 * 1024 * 1024;
 const ipfsPrivateChunkBytes = 8 * 1024 * 1024;
 const ipfsPrivateChunkUploadPauseMs = 35;
 
-type LegacyPublicFileContent = PublicFileUpload & {
-  data: string;
-  uploadedAt?: string;
-  uploadedByIdentityId?: string;
-};
-
 export class PigeonFilesApi {
   private readonly attachmentCipher: AttachmentCipher;
+
+  private readonly privateFiles: PigeonPrivateFilesClient;
+
+  private readonly publicFiles: PigeonPublicFilesClient;
 
   private readonly privateFileCache =
     new PigeonFileRequestCache<PrivateFileContent>();
@@ -41,11 +41,13 @@ export class PigeonFilesApi {
   private readonly attachmentBlobCache = new PigeonFileRequestCache<Blob>();
 
   public constructor(
-    private readonly http: HttpJsonClient,
-    private readonly signer: RequestSigner,
+    http: HttpJsonClient,
+    signer: RequestSigner,
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
     this.attachmentCipher = attachmentCipher;
+    this.privateFiles = new PigeonPrivateFilesClient(http, signer);
+    this.publicFiles = new PigeonPublicFilesClient(http, signer);
   }
 
   public async getPublicFile(
@@ -53,17 +55,17 @@ export class PigeonFilesApi {
     onDownloadProgress?: (percent: number) => void,
   ): Promise<PublicFileContent> {
     if (onDownloadProgress) {
-      return await this.fetchPublicFile(cid, onDownloadProgress);
+      return await this.publicFiles.fetch(cid, onDownloadProgress);
     }
 
     return await this.publicFileCache.getOrCreate(cid, () =>
-      this.fetchPublicFile(cid),
+      this.publicFiles.fetch(cid),
     );
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
     return await this.privateFileCache.getOrCreate(cid, () =>
-      this.http.request<PrivateFileContent>(`/ipfs/${encodeURIComponent(cid)}`),
+      this.privateFiles.fetch(cid),
     );
   }
 
@@ -73,7 +75,7 @@ export class PigeonFilesApi {
   ): Promise<PublicFileUpload> {
     const bytes = await file.arrayBuffer();
 
-    return await this.uploadPublicBytes(
+    return await this.publicFiles.upload(
       session,
       bytes,
       file.name || 'upload',
@@ -85,7 +87,7 @@ export class PigeonFilesApi {
     session: Session,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
-    return await this.uploadPrivateBytes(
+    return await this.privateFiles.upload(
       session,
       attachment.encryptedBytes,
       attachment.uploadFilename,
@@ -146,60 +148,6 @@ export class PigeonFilesApi {
     }
 
     return uploadedAttachments;
-  }
-
-  private async publicFileContent(
-    cid: string,
-    blob: Blob,
-  ): Promise<PublicFileContent> {
-    if (blob.type.includes('json')) {
-      return this.legacyPublicFileContent(await blob.text());
-    }
-
-    return {
-      blob,
-      cid,
-      contentType: blob.type || 'application/octet-stream',
-      filename: cid,
-      size: blob.size,
-    };
-  }
-
-  private async fetchPublicFile(
-    cid: string,
-    onDownloadProgress?: (percent: number) => void,
-  ): Promise<PublicFileContent> {
-    const blob = await this.http.requestBlob(
-      `/ipfs/${encodeURIComponent(cid)}`,
-      {
-        ...(onDownloadProgress
-          ? {
-              onDownloadProgress: ({ loadedBytes, totalBytes }) => {
-                if (!totalBytes) return;
-
-                onDownloadProgress((loadedBytes * 100) / totalBytes);
-              },
-            }
-          : {}),
-      },
-    );
-
-    return await this.publicFileContent(cid, blob);
-  }
-
-  private legacyPublicFileContent(payload: string): PublicFileContent {
-    const content = JSON.parse(payload) as LegacyPublicFileContent;
-    const bytes = Uint8Array.from(Buffer.from(content.data, 'base64'));
-
-    return {
-      blob: new Blob([bytes], { type: content.contentType }),
-      cid: content.cid,
-      contentType: content.contentType,
-      filename: content.filename,
-      size: content.size,
-      uploadedAt: content.uploadedAt,
-      uploadedByIdentityId: content.uploadedByIdentityId,
-    };
   }
 
   private async decryptAttachment(
@@ -290,7 +238,7 @@ export class PigeonFilesApi {
       const chunk = await file
         .slice(offset, Math.min(offset + ipfsPrivateChunkBytes, file.size))
         .arrayBuffer();
-      const upload = await this.uploadPublicBytes(
+      const upload = await this.publicFiles.upload(
         session,
         chunk,
         `${filename}.part-${String(index).padStart(4, '0')}`,
@@ -320,25 +268,6 @@ export class PigeonFilesApi {
       storage: 'public',
       type: 'chunked_file',
     };
-  }
-
-  private async uploadPublicBytes(
-    session: Session,
-    bytes: ArrayBuffer,
-    filename: string,
-    contentType = 'application/octet-stream',
-  ): Promise<PublicFileUpload> {
-    const path = '/ipfs/public';
-
-    return await this.http.request<PublicFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': contentType,
-        'X-Filename': filename,
-      },
-      method: 'POST',
-    });
   }
 
   private async uploadPendingAttachment(
@@ -382,7 +311,7 @@ export class PigeonFilesApi {
           pending.encryptedBytes.byteLength,
         ),
       );
-      const upload = await this.uploadPrivateBytes(
+      const upload = await this.privateFiles.upload(
         session,
         chunk,
         `${pending.uploadFilename}.part-${String(index).padStart(4, '0')}`,
@@ -408,24 +337,6 @@ export class PigeonFilesApi {
       size: pending.encryptedBytes.byteLength,
       type: 'chunked_file',
     };
-  }
-
-  private async uploadPrivateBytes(
-    session: Session,
-    bytes: ArrayBuffer,
-    filename: string,
-  ): Promise<PrivateFileUpload> {
-    const path = '/ipfs/private';
-
-    return await this.http.request<PrivateFileUpload>(path, {
-      body: bytes,
-      headers: {
-        ...(await this.signer.headers(session, 'POST', path, bytes)),
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': filename,
-      },
-      method: 'POST',
-    });
   }
 
   private async downloadAttachmentChunks(
