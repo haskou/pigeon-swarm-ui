@@ -1083,7 +1083,11 @@ export class PigeonApiGateway {
     conversationId: string,
     message: MessageResource,
   ): Promise<ChatMessage> {
-    return await this.messages.toChatMessage(session, conversationId, message);
+    const [projected] = await this.decryptMessages(session, conversationId, [
+      message,
+    ]);
+
+    return projected;
   }
 
   public deterministicConversationId(
@@ -1785,7 +1789,7 @@ export class PigeonApiGateway {
 
       const decryptedBatch = await Promise.all(
         batch.map((message) =>
-          this.decryptMessage(session, conversationId, message),
+          this.projectMessageDirect(session, conversationId, message),
         ),
       );
 
@@ -1801,6 +1805,14 @@ export class PigeonApiGateway {
     }
 
     return decrypted;
+  }
+
+  private async projectMessageDirect(
+    session: Session,
+    conversationId: string,
+    message: MessageResource,
+  ): Promise<ChatMessage> {
+    return await this.messages.toChatMessage(session, conversationId, message);
   }
 
   private async getMessageDecryptWorker(): Promise<MessageDecryptWorker> {
