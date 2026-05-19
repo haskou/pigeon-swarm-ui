@@ -3,11 +3,13 @@ import { type ReactNode, useEffect, useState } from 'react';
 export function FallbackImage({
   alt = '',
   className,
+  draggable,
   fallback,
   src,
 }: {
   alt?: string;
   className?: string;
+  draggable?: boolean;
   fallback: ReactNode;
   src: null | string | undefined;
 }) {
@@ -24,6 +26,7 @@ export function FallbackImage({
       src={src}
       alt={alt}
       className={className}
+      draggable={draggable}
       onError={() => setFailed(true)}
     />
   );

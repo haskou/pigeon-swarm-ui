@@ -245,6 +245,7 @@ function CommunityRailAvatar({ community }: { community: Community }) {
       src={avatarUrl}
       alt=""
       className="h-full w-full object-cover"
+      draggable={false}
       fallback={community.name.slice(0, 1).toUpperCase()}
     />
   );
