@@ -1467,7 +1467,7 @@ describe(PigeonApiGateway.name, () => {
       content,
     );
 
-    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar', {});
   });
 
   it('loads legacy public IPFS JSON content as a blob', async () => {
@@ -1662,7 +1662,15 @@ describe(PigeonApiGateway.name, () => {
     await expect(blob.text()).resolves.toBe('hello world');
     expect(blob.type).toBe('text/plain');
     expect(attachmentCipher.decrypt).not.toHaveBeenCalled();
-    expect(http.requestBlob).toHaveBeenNthCalledWith(1, '/ipfs/chunk-1');
-    expect(http.requestBlob).toHaveBeenNthCalledWith(2, '/ipfs/chunk-2');
+    expect(http.requestBlob).toHaveBeenNthCalledWith(
+      1,
+      '/ipfs/chunk-1',
+      expect.objectContaining({ onDownloadProgress: expect.any(Function) }),
+    );
+    expect(http.requestBlob).toHaveBeenNthCalledWith(
+      2,
+      '/ipfs/chunk-2',
+      expect.objectContaining({ onDownloadProgress: expect.any(Function) }),
+    );
   });
 });

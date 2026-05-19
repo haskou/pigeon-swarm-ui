@@ -488,7 +488,9 @@ export function Composer({
                   ? copy.composer.encryptingAttachment
                   : progress.phase === 'upload'
                     ? copy.composer.uploadingAttachment
-                    : copy.composer.decryptingAttachment}{' '}
+                    : progress.phase === 'download'
+                      ? copy.composer.downloadingAttachment
+                      : copy.composer.decryptingAttachment}{' '}
                 {progress.filename}
               </span>
               <span className="shrink-0 font-black">{progress.percent}%</span>

@@ -283,7 +283,9 @@ export function MessageBubble({
                       ? copy.composer.encryptingAttachment
                       : message.attachmentProgress.phase === 'upload'
                         ? copy.composer.uploadingAttachment
-                        : copy.composer.decryptingAttachment}{' '}
+                        : message.attachmentProgress.phase === 'download'
+                          ? copy.composer.downloadingAttachment
+                          : copy.composer.decryptingAttachment}{' '}
                     {message.attachmentProgress.filename}
                   </span>
                   <span className="shrink-0">

@@ -220,6 +220,7 @@ export const copy = {
     attachmentDownloadError: 'The attachment could not be decrypted.',
     attachmentTooLarge: 'Attachments must be 50 MiB or smaller.',
     decryptingAttachment: 'Decrypting',
+    downloadingAttachment: 'Downloading',
     dropFiles: 'Drop files to attach',
     emojiMatches: 'Emojis matching',
     encryptAttachments: 'Encrypt attachments',
