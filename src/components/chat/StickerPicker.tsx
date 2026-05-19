@@ -1220,36 +1220,54 @@ function ManagePackStickers({
   pack: StickerPackResource;
   session: Session;
 }) {
-  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const uploading = uploadProgress !== null;
 
   const uploadSticker = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!file) return;
+    if (files.length === 0) return;
 
-    setUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
     setError(null);
+    const failedFiles: string[] = [];
     try {
-      const preparedSticker = await prepareStickerFile(file);
-      const [upload, dimensions] = await Promise.all([
-        pigeonApplication.uploadStickerAsset(session, preparedSticker.file),
-        Promise.resolve(preparedSticker.dimensions),
-      ]);
+      for (const [index, file] of files.entries()) {
+        setUploadProgress({ current: index + 1, total: files.length });
 
-      await pigeonApplication.addStickerToPack(session, pack.id, {
-        assetCid: upload.cid,
-        contentType: upload.contentType,
-        dimensions,
-        sizeBytes: upload.size,
-        type: stickerTypeFromUpload(upload),
-      });
+        try {
+          const preparedSticker = await prepareStickerFile(file);
+          const [upload, dimensions] = await Promise.all([
+            pigeonApplication.uploadStickerAsset(session, preparedSticker.file),
+            Promise.resolve(preparedSticker.dimensions),
+          ]);
+
+          await pigeonApplication.addStickerToPack(session, pack.id, {
+            assetCid: upload.cid,
+            contentType: upload.contentType,
+            dimensions,
+            sizeBytes: upload.size,
+            type: stickerTypeFromUpload(upload),
+          });
+        } catch {
+          failedFiles.push(file.name);
+        }
+      }
+
       invalidateStickerCaches();
       await onStickerCreated();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker could not be uploaded.'));
+
+      if (failedFiles.length > 0) {
+        setError(
+          `${failedFiles.length} sticker${failedFiles.length === 1 ? '' : 's'} could not be uploaded: ${failedFiles.join(', ')}`,
+        );
+      }
     } finally {
-      setUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -1283,7 +1301,7 @@ function ManagePackStickers({
         >
           {uploading ? (
             <span className="text-xs font-black uppercase tracking-[0.12em]">
-              ...
+              {uploadProgress?.current}/{uploadProgress?.total}
             </span>
           ) : (
             '+'
@@ -1291,6 +1309,7 @@ function ManagePackStickers({
           <input
             type="file"
             accept="image/*,video/*"
+            multiple
             onChange={uploadSticker}
             className="hidden"
             disabled={uploading}
