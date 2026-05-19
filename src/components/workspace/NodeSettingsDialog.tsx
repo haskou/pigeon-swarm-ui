@@ -449,12 +449,6 @@ function ReplicationStatusPanel({
         />
       </div>
 
-      {status && (
-        <div className="mt-3 truncate rounded-2xl bg-black/20 px-3 py-2 text-xs text-white/50">
-          {copy.nodeSettings.replicationLocalNode}: {status.localNodeId}
-        </div>
-      )}
-
       {error && (
         <div className="mt-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
           {error}
@@ -466,13 +460,6 @@ function ReplicationStatusPanel({
           {copy.nodeSettings.replicationEmpty}
         </div>
       )}
-
-      {status?.summary.updatedAt ? (
-        <div className="mt-3 rounded-2xl bg-black/20 px-3 py-2 text-xs text-white/50">
-          {copy.nodeSettings.replicationUpdated}: {' '}
-          {formatTimestamp(status.summary.updatedAt)}
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -517,11 +504,4 @@ function byteUnitDivisor(bytes: number): number {
   if (bytes >= 1024) return 1024;
 
   return 1;
-}
-
-function formatTimestamp(timestamp: number): string {
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(timestamp));
 }
