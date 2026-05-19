@@ -41,6 +41,13 @@ type StickerGridItem = {
   sticker: StickerResource;
 };
 
+type StickerShortcut = {
+  id: string;
+  label: string;
+  sticker?: StickerResource;
+  type: 'favorites' | 'pack' | 'recent';
+};
+
 const STICKER_MAX_EDGE = 512;
 const STICKER_SIZE_LIMITS: Record<StickerType, number> = {
   animated: 64 * 1024,
@@ -65,6 +72,7 @@ export function StickerPicker({
   const [error, setError] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const stickerSectionRefs = useRef(new Map<string, HTMLDivElement>());
   const savedPackIds = useMemo(
     () => new Set(library?.savedPacks.map((pack) => pack.id) ?? []),
     [library],
@@ -194,6 +202,35 @@ export function StickerPicker({
 
   const recentItems = usageItems(library?.recentStickers ?? []);
   const favoriteItems = usageItems(library?.favoriteStickers ?? []);
+  const savedPacks = library?.savedPacks ?? [];
+  const stickerShortcuts: StickerShortcut[] = [
+    { id: 'favorites', label: 'Favorites', type: 'favorites' },
+    { id: 'recent', label: 'Recent', type: 'recent' },
+    ...savedPacks
+      .filter((pack) => pack.stickers.length > 0)
+      .map((pack) => ({
+        id: `pack:${pack.id}`,
+        label: pack.name,
+        sticker: pack.stickers[0],
+        type: 'pack' as const,
+      })),
+  ];
+  const setStickerSectionRef =
+    (sectionId: string) => (node: HTMLDivElement | null) => {
+      if (node) {
+        stickerSectionRefs.current.set(sectionId, node);
+        return;
+      }
+
+      stickerSectionRefs.current.delete(sectionId);
+    };
+  const scrollToStickerSection = (sectionId: string) => {
+    stickerSectionRefs.current.get(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
   return (
     <div className="relative" ref={pickerRef}>
       <button
@@ -230,6 +267,10 @@ export function StickerPicker({
           </div>
           {tab === 'stickers' ? (
             <div className="max-h-[24rem] overflow-y-auto p-3">
+              <StickerShortcutBar
+                onSelect={scrollToStickerSection}
+                shortcuts={stickerShortcuts}
+              />
               <form
                 className="mb-3 flex gap-2"
                 onSubmit={(event) => {
@@ -266,6 +307,7 @@ export function StickerPicker({
                 label="Favorites"
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
+                sectionRef={setStickerSectionRef('favorites')}
               />
               <StickerSection
                 favoriteIds={favoriteIds}
@@ -273,8 +315,9 @@ export function StickerPicker({
                 label="Recent"
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
+                sectionRef={setStickerSectionRef('recent')}
               />
-              {(library?.savedPacks ?? []).map((pack) => (
+              {savedPacks.map((pack) => (
                 <StickerSection
                   key={pack.id}
                   favoriteIds={favoriteIds}
@@ -285,6 +328,7 @@ export function StickerPicker({
                   label={pack.name}
                   onFavoriteToggle={toggleFavorite}
                   onSend={sendSticker}
+                  sectionRef={setStickerSectionRef(`pack:${pack.id}`)}
                 />
               ))}
               {publicPacks.length > 0 && (
@@ -551,12 +595,50 @@ function PickerTab({
   );
 }
 
+function StickerShortcutBar({
+  onSelect,
+  shortcuts,
+}: {
+  onSelect: (sectionId: string) => void;
+  shortcuts: StickerShortcut[];
+}) {
+  return (
+    <div className="-mx-3 -mt-3 mb-3 border-b border-white/10 bg-white/[0.03] px-3 py-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {shortcuts.map((shortcut) => (
+          <button
+            key={shortcut.id}
+            type="button"
+            onClick={() => onSelect(shortcut.id)}
+            className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/5 text-lg text-white/70 transition hover:bg-white/10 hover:text-white"
+            aria-label={`Go to ${shortcut.label}`}
+            title={shortcut.label}
+          >
+            {shortcut.sticker ? (
+              <img
+                src={stickerAssetUrl(shortcut.sticker.assetCid)}
+                alt=""
+                className="h-full w-full object-contain p-1"
+              />
+            ) : (
+              <span aria-hidden="true">
+                {shortcut.type === 'favorites' ? '♡' : '◷'}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StickerSection({
   favoriteIds,
   items,
   label,
   onFavoriteToggle,
   onSend,
+  sectionRef,
 }: {
   favoriteIds: Set<string>;
   items: StickerGridItem[];
@@ -567,11 +649,12 @@ function StickerSection({
     favorite: boolean,
   ) => Promise<void>;
   onSend: (packId: string, sticker: StickerResource) => Promise<void>;
+  sectionRef?: (node: HTMLDivElement | null) => void;
 }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="mt-3">
+    <div className="mt-3 scroll-mt-3" ref={sectionRef}>
       <div className="mb-2 text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {label}
       </div>
