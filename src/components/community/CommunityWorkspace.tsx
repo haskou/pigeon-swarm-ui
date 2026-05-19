@@ -46,10 +46,8 @@ import type { RealtimeDomainEvent } from '../../infrastructure/realtime/Realtime
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
-import {
-  decryptCommunityChannelPayload,
-  encryptCommunityChannelPayload,
-} from '../../domain/communities/communityChannelPayloadCipher';
+import { encryptCommunityChannelPayload } from '../../domain/communities/communityChannelPayloadCipher';
+import { CommunityMessageDecryptWorkerClient } from '../../domain/communities/CommunityMessageDecryptWorkerClient';
 import {
   communityTextChannels,
   communityVoiceChannels,
@@ -180,8 +178,6 @@ type CommunityPendingSend = {
   sticker?: StickerMessageReference;
 };
 
-const communityMessageProjectionBatchSize = 8;
-
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
 ): MessageReplyPreview | undefined {
@@ -198,12 +194,6 @@ function replyPreviewFromMessage(
     messageId: message.id,
     ...(message.sticker ? { sticker: message.sticker } : {}),
   };
-}
-
-async function yieldAfterCommunityMessageProjectionBatch(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 0);
-  });
 }
 
 export function CommunityWorkspace({
@@ -312,6 +302,8 @@ export function CommunityWorkspace({
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const sendQueueRef = useRef(Promise.resolve());
+  const communityMessageDecryptWorkerRef =
+    useRef<CommunityMessageDecryptWorkerClient | null>(null);
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
   const owner = community.ownerIdentityId === session.identity.id;
@@ -339,6 +331,14 @@ export function CommunityWorkspace({
     (state: 'error' | 'idle' | 'loading') => {
       messageStateRef.current = state;
       setMessageState(state);
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      communityMessageDecryptWorkerRef.current?.terminate();
+      communityMessageDecryptWorkerRef.current = null;
     },
     [],
   );
@@ -885,114 +885,51 @@ export function CommunityWorkspace({
     return nextIdentities;
   }, [communityMemberIds, session.identity]);
 
-  const projectChannelMessage = useCallback(
-    async (
-      rawMessage: MessageResource,
-      identities: Record<string, IdentityResource>,
-    ): Promise<ChatMessage> => {
-      const authorIdentityId =
-        rawMessage.authorIdentityId ??
-        rawMessage.actorIdentityId ??
-        session.identity.id;
-      const base = {
-        attachments: [],
-        authorIdentityId,
-        id: rawMessage.id ?? `${rawMessage.createdAt ?? Date.now()}`,
-        mine: authorIdentityId === session.identity.id,
-        raw: rawMessage,
-        reactions: rawMessage.reactions ?? [],
-        timestamp: rawMessage.createdAt ?? Date.now(),
-      };
+  const projectChannelMessages = useCallback(
+    async (channelId: string, rawMessages: MessageResource[]) => {
+      communityMessageDecryptWorkerRef.current ??=
+        new CommunityMessageDecryptWorkerClient();
 
-      if (rawMessage.type === 'call_event') {
-        return {
-          ...base,
-          content: '',
-          encrypted: false,
-          kind: 'call-event',
-        };
-      }
-
-      try {
-        const payload = await decryptCommunityChannelPayload(
-          session,
-          rawMessage.encryptedPayload ?? '',
-          copy.messages.missingKey,
-          community.id,
-        );
-
-        return {
-          ...base,
-          attachments: payload.attachments ?? [],
-          authorIdentityId: payload.authorIdentityId ?? base.authorIdentityId,
-          content: payload.sticker ? '' : (payload.content ?? ''),
-          encrypted: false,
-          mine:
-            (payload.authorIdentityId ?? base.authorIdentityId) ===
-            session.identity.id,
-          replyPreview: payload.reply,
-          replyToMessageId: payload.replyToMessageId,
-          sticker: payload.sticker,
-          timestamp: payload.timestamp ?? base.timestamp,
-        };
-      } catch {
-        return {
-          ...base,
-          authorIdentityId:
-            rawMessage.authorIdentityId ??
-            identities[rawMessage.authorIdentityId ?? '']?.id ??
-            'unknown',
-          content: copy.messages.decryptFailed,
-          encrypted: true,
-        };
-      }
+      return await communityMessageDecryptWorkerRef.current.decrypt({
+        channelId,
+        communityId: community.id,
+        communityKey,
+        copy: copy.messages,
+        currentIdentityId: session.identity.id,
+        messages: rawMessages,
+      });
     },
-    [session],
+    [community.id, communityKey, session.identity.id],
+  );
+
+  const projectChannelMessage = useCallback(
+    async (channelId: string, rawMessage: MessageResource): Promise<ChatMessage> => {
+      const [projected] = await projectChannelMessages(channelId, [rawMessage]);
+
+      return projected;
+    },
+    [projectChannelMessages],
   );
 
   const loadChannelMessages = useCallback(
     async (channelId: string, beforeMessageId?: string) => {
-      const [identities, result] = await Promise.all([
-        resolveMemberIdentities(),
-        pigeonApplication.listCommunityChannelMessages(
-          session,
-          community.id,
-          channelId,
-          { beforeMessageId },
-        ),
-      ]);
-      const loadedMessages = new Array<ChatMessage>(result.messages.length);
-
-      for (
-        let endIndex = result.messages.length;
-        endIndex > 0;
-        endIndex -= communityMessageProjectionBatchSize
-      ) {
-        const startIndex = Math.max(
-          0,
-          endIndex - communityMessageProjectionBatchSize,
-        );
-        const projectedBatch = await Promise.all(
-          result.messages
-            .slice(startIndex, endIndex)
-            .map((message) => projectChannelMessage(message, identities)),
-        );
-
-        for (let index = 0; index < projectedBatch.length; index += 1) {
-          loadedMessages[startIndex + index] = projectedBatch[index];
-        }
-
-        if (startIndex > 0) {
-          await yieldAfterCommunityMessageProjectionBatch();
-        }
-      }
+      const result = await pigeonApplication.listCommunityChannelMessages(
+        session,
+        community.id,
+        channelId,
+        { beforeMessageId },
+      );
+      const loadedMessages = await projectChannelMessages(
+        channelId,
+        result.messages,
+      );
 
       return {
         cursor: result.nextBeforeMessageId ?? null,
         loadedMessages,
       };
     },
-    [community.id, projectChannelMessage, resolveMemberIdentities, session],
+    [community.id, projectChannelMessages, session],
   );
   const loadChannelMessagesRef = useRef(loadChannelMessages);
 
@@ -1158,7 +1095,6 @@ export function CommunityWorkspace({
 
     sendQueueRef.current = sendQueueRef.current.then(async () => {
       try {
-        const identities = await resolveMemberIdentities();
         const messageAttachments =
           await pigeonApplication.publishMessageAttachments(
             session,
@@ -1183,7 +1119,6 @@ export function CommunityWorkspace({
           communityId: community.id,
           communityKey: session.keychain.conversations[community.id],
           content: payload.content,
-          recipients: Object.values(identities),
           replyPreview: replyPreviewFromMessage(payload.replyTarget),
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
@@ -1201,7 +1136,7 @@ export function CommunityWorkspace({
             timestamp,
           },
         );
-        const projected = await projectChannelMessage(created, identities);
+        const projected = await projectChannelMessage(payload.channelId, created);
 
         if (payload.sticker) {
           void pigeonApplication.markStickerUsed(session, payload.sticker);
@@ -1475,8 +1410,7 @@ export function CommunityWorkspace({
     const shouldStickToBottom = isScrolledNearBottom();
     let cancelled = false;
 
-    void resolveMemberIdentities()
-      .then((identities) => projectChannelMessage(message, identities))
+    void projectChannelMessage(channelId, message)
       .then((projected) => {
         if (cancelled) return;
 
@@ -1507,7 +1441,6 @@ export function CommunityWorkspace({
     onChannelViewed,
     projectChannelMessage,
     realtimeEvent,
-    resolveMemberIdentities,
     selectedChannelId,
     session.identity.id,
     scrollChannelToBottom,
