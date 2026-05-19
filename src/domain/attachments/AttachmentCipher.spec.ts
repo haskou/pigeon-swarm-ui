@@ -22,6 +22,6 @@ describe(AttachmentCipher.name, () => {
     );
 
     await expect(blob.text()).resolves.toBe('hello');
-    expect(encrypted.metadata.encryption.chunks?.length).toBeGreaterThan(0);
+    expect(encrypted.metadata.encryption?.chunks?.length).toBeGreaterThan(0);
   });
 });

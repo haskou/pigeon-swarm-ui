@@ -7,6 +7,7 @@ import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallParticipant } from '../../domain/calls/CallSession';
 import type {
   AttachmentProgress,
+  AttachmentUploadOptions,
   ChatMessage,
   ConversationKeyEntry,
   ConversationResource,
@@ -25,6 +26,7 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
 import { UserProfileDialog } from '../profile/UserProfileDialog';
 import { ChatEmptyState } from './ChatEmptyState';
@@ -70,7 +72,11 @@ interface ChatColumnProps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   newMessageCount: number;
   onScroll: () => void;
-  onSend: (content: string, attachments: File[]) => Promise<void>;
+  onSend: (
+    content: string,
+    attachments: File[],
+    options: AttachmentUploadOptions,
+  ) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape: () => void;
@@ -209,9 +215,13 @@ export function ChatColumn({
     onDraftChange(value);
     onTypingActive?.(value.trim().length > 0);
   };
-  const handleSend = async (content: string, attachments: File[]) => {
+  const handleSend = async (
+    content: string,
+    attachments: File[],
+    options: AttachmentUploadOptions,
+  ) => {
     onTypingActive?.(false);
-    await onSend(content, attachments);
+    await onSend(content, attachments, options);
   };
 
   useEffect(
@@ -279,7 +289,7 @@ export function ChatColumn({
         return {
           identity,
           identityId,
-          name: identityDisplayName(identityId, identityNames),
+          name: memberPrimaryName(identity, identityId),
           picture: identityPictures[identityId],
         };
       }),

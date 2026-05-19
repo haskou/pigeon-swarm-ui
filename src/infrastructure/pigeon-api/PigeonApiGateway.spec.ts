@@ -1008,7 +1008,7 @@ describe(PigeonApiGateway.name, () => {
     expect(signedPassword).toBe(session.password);
   });
 
-  it('uploads public profile files as signed raw bytes', async () => {
+  it('uploads public profile files as signed binary bodies', async () => {
     const bytes = new Uint8Array([1, 2, 3]).buffer;
     const upload = {
       cid: 'bafy-avatar',
@@ -1450,21 +1450,57 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('loads public IPFS content by encoded cid', async () => {
+    const blob = new Blob(['abc'], { type: 'image/png' });
     const content = {
+      blob,
       cid: 'bafy/avatar',
       contentType: 'image/png',
-      data: 'abc',
-      filename: 'avatar.png',
+      filename: 'bafy/avatar',
       size: 3,
     };
     const http = {
-      request: jest.fn().mockResolvedValue(content),
+      requestBlob: jest.fn().mockResolvedValue(blob),
     } as unknown as HttpJsonClient;
     const gateway = new PigeonApiGateway(http);
 
-    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toBe(content);
+    await expect(gateway.getPublicFile('bafy/avatar')).resolves.toEqual(
+      content,
+    );
 
-    expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+  });
+
+  it('loads legacy public IPFS JSON content as a blob', async () => {
+    const http = {
+      requestBlob: jest.fn().mockResolvedValue(
+        new Blob(
+          [
+            JSON.stringify({
+              cid: 'bafy-avatar',
+              contentType: 'image/png',
+              data: 'AQID',
+              filename: 'avatar.png',
+              size: 3,
+            }),
+          ],
+          { type: 'application/json' },
+        ),
+      ),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    const content = await gateway.getPublicFile('bafy-avatar');
+
+    expect(content).toMatchObject({
+      cid: 'bafy-avatar',
+      contentType: 'image/png',
+      filename: 'avatar.png',
+      size: 3,
+    });
+    await expect(content.blob.arrayBuffer()).resolves.toEqual(
+      new Uint8Array([1, 2, 3]).buffer,
+    );
+    expect(content.blob.type).toBe('image/png');
   });
 
   it('downloads encrypted private attachment content', async () => {
@@ -1513,5 +1549,120 @@ describe(PigeonApiGateway.name, () => {
       encryptedBytes.buffer,
       undefined,
     );
+  });
+
+  it('uploads large unencrypted attachments as public chunks', async () => {
+    const chunkBytes = new Uint8Array([1, 2, 3]).buffer;
+    let uploadIndex = 0;
+    const http = {
+      request: jest.fn().mockImplementation(() => {
+        uploadIndex += 1;
+
+        return Promise.resolve({ cid: `public-chunk-${uploadIndex}`, size: 3 });
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const attachmentCipher = {
+      encrypt: jest.fn(),
+    } as unknown as AttachmentCipher;
+    const largeFile = {
+      name: 'large.mov',
+      size: 51 * 1024 * 1024,
+      slice: jest.fn().mockReturnValue({
+        arrayBuffer: jest.fn().mockResolvedValue(chunkBytes),
+      }),
+      type: 'video/quicktime',
+    } as unknown as File;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      attachmentCipher,
+    );
+
+    const attachments = await gateway.publishMessageAttachments(
+      session,
+      [largeFile],
+      undefined,
+      { encryptLargeAttachments: false },
+    );
+
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toMatchObject({
+      cid: 'public-chunk-1',
+      contentType: 'video/quicktime',
+      encrypted: false,
+      filename: 'large.mov',
+      size: 51 * 1024 * 1024,
+      storage: 'public',
+      type: 'chunked_file',
+    });
+    expect(attachments[0].chunks).toHaveLength(7);
+    expect(attachments[0].chunks?.[0]).toMatchObject({
+      cid: 'public-chunk-1',
+      index: 0,
+      size: 3,
+    });
+    expect(attachmentCipher.encrypt).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledTimes(7);
+    expect(http.request).toHaveBeenNthCalledWith(1, '/ipfs/public', {
+      body: chunkBytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': 'large.mov.part-0000',
+        'X-Signature': 'http-signature',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('downloads public chunked attachments without decrypting', async () => {
+    const http = {
+      requestBlob: jest
+        .fn()
+        .mockResolvedValueOnce(new Blob(['hello ']))
+        .mockResolvedValueOnce(new Blob(['world'])),
+    } as unknown as HttpJsonClient;
+    const attachmentCipher = {
+      decrypt: jest.fn(),
+    } as unknown as AttachmentCipher;
+    const gateway = new PigeonApiGateway(
+      http,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      attachmentCipher,
+    );
+
+    const blob = await gateway.downloadAttachment({
+      chunks: [
+        { cid: 'chunk-2', index: 1, sha256: 'two', size: 5 },
+        { cid: 'chunk-1', index: 0, sha256: 'one', size: 6 },
+      ],
+      cid: 'chunk-1',
+      contentType: 'text/plain',
+      encrypted: false,
+      filename: 'note.txt',
+      size: 11,
+      storage: 'public',
+      type: 'chunked_file',
+    });
+
+    await expect(blob.text()).resolves.toBe('hello world');
+    expect(blob.type).toBe('text/plain');
+    expect(attachmentCipher.decrypt).not.toHaveBeenCalled();
+    expect(http.requestBlob).toHaveBeenNthCalledWith(1, '/ipfs/chunk-1');
+    expect(http.requestBlob).toHaveBeenNthCalledWith(2, '/ipfs/chunk-2');
   });
 });

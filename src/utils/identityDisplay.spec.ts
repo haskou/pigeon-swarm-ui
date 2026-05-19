@@ -6,6 +6,7 @@ import {
   normalizeHandle,
   profilePictureDataUrl,
   profilePictureUrl,
+  publicFileObjectUrl,
   identityName,
 } from './identityDisplay';
 
@@ -57,5 +58,20 @@ describe('identity display helpers', () => {
         data: 'abc',
       }),
     ).toBe('data:image/png;base64,abc');
+  });
+
+  it('reuses object urls for public IPFS blobs', () => {
+    const createObjectUrl = jest.fn().mockReturnValue('blob:avatar');
+    const originalCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = createObjectUrl;
+    const blob = new Blob(['abc'], { type: 'image/png' });
+
+    try {
+      expect(publicFileObjectUrl({ blob })).toBe('blob:avatar');
+      expect(publicFileObjectUrl({ blob })).toBe('blob:avatar');
+      expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+    }
   });
 });

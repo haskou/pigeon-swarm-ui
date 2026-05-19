@@ -7,6 +7,7 @@ export function pendingFileAttachments(
   return files.map((file, index) => ({
     cid: `${messageId}:pending-attachment:${index}`,
     contentType: file.type || 'application/octet-stream',
+    encrypted: true,
     encryptedSize: file.size,
     encryption: {
       algorithm: 'AES-GCM',

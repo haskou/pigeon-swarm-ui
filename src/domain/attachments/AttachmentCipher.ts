@@ -245,6 +245,10 @@ export class AttachmentCipher {
     encryptedBytes: ArrayBuffer,
     onProgress?: AttachmentProgressHandler,
   ): ArrayBuffer {
+    if (!attachment.encryption) {
+      throw new Error('Attachment is not encrypted.');
+    }
+
     const key = this.base64ToBytes(attachment.encryption.key);
     const chunks = attachment.encryption.chunks ?? [
       { iv: attachment.encryption.iv, size: encryptedBytes.byteLength },

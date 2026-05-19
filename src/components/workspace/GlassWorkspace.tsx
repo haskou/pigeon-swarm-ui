@@ -25,6 +25,7 @@ import type {
 import type {
   ChatMessage,
   AttachmentProgress,
+  AttachmentUploadOptions,
   Community,
   CommunityMembershipRequest,
   ConversationKeyEntry,
@@ -149,6 +150,7 @@ const WorkspaceDialogs = lazy(() =>
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PendingSend = {
+  attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
   content: string;
   replyTarget: ChatMessage | null;
@@ -2068,6 +2070,7 @@ export function GlassWorkspace({
           payload.content,
           {
             attachments: payload.attachments,
+            attachmentUpload: payload.attachmentUpload,
             onAttachmentProgress: (progress) => {
               startTransition(() => {
                 setMessages((current) =>
@@ -2113,8 +2116,12 @@ export function GlassWorkspace({
     });
   };
 
-  const handleSend = (content: string, attachments: File[]): Promise<void> => {
-    const payload = { attachments, content, replyTarget };
+  const handleSend = (
+    content: string,
+    attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
+  ): Promise<void> => {
+    const payload = { attachmentUpload, attachments, content, replyTarget };
 
     setReplyTarget(null);
     sendPendingMessage(payload);

@@ -32,6 +32,7 @@ import type {
   CommunityVoiceChannel,
   ConversationKeyEntry,
   AttachmentProgress,
+  AttachmentUploadOptions,
   ChatMessage,
   IdentityPresence,
   IdentityResource,
@@ -76,7 +77,7 @@ import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { MemberRow } from './MemberRow';
-import { memberDisplayName } from './communityMemberNames';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -179,6 +180,7 @@ type ProfilePopoverAnchor = {
 };
 
 type CommunityPendingSend = {
+  attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
   channelId: string;
   content: string;
@@ -1081,11 +1083,13 @@ export function CommunityWorkspace({
   const handleSendChannelMessage = (
     content: string,
     attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
   ): Promise<void> => {
     if (!selectedChannelId) return Promise.resolve();
 
     onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
+      attachmentUpload,
       attachments,
       channelId: selectedChannelId,
       content,
@@ -1166,6 +1170,7 @@ export function CommunityWorkspace({
                 );
               });
             },
+            payload.attachmentUpload,
           );
         const encryptedPayload = await encryptCommunityChannelPayload({
           attachments: messageAttachments,
@@ -2172,7 +2177,7 @@ export function CommunityWorkspace({
             anchor={profileViewer.anchor}
             identity={profileViewer.identity}
             identityId={profileViewer.identityId}
-            name={memberDisplayName(
+            name={memberPrimaryName(
               profileViewer.identity,
               profileViewer.identityId,
             )}

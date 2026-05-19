@@ -24,6 +24,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
+import { FallbackImage } from '../common/FallbackImage';
 import { GlassSelect } from '../common/GlassSelect';
 import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 
@@ -297,16 +298,18 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       )}
 
       {profileEditorOpen && (
-        <ProfileEditor
-          currentPicture={ownPicture}
-          nodeNetworks={nodeNetworks}
-          session={session}
-          onClose={() => setProfileEditorOpen(false)}
-          onUpdated={(nextSession) => {
-            onSessionUpdated(nextSession);
-            setProfileEditorOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ProfileEditor
+            currentPicture={ownPicture}
+            nodeNetworks={nodeNetworks}
+            session={session}
+            onClose={() => setProfileEditorOpen(false)}
+            onUpdated={(nextSession) => {
+              onSessionUpdated(nextSession);
+              setProfileEditorOpen(false);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );
@@ -338,11 +341,12 @@ function ProfileAvatar({
       )}
     >
       <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
-        {picture ? (
-          <img src={picture} alt="" className="h-full w-full object-cover" />
-        ) : (
-          label.slice(0, 1).toUpperCase() || 'P'
-        )}
+        <FallbackImage
+          src={picture}
+          alt=""
+          className="h-full w-full object-cover"
+          fallback={label.slice(0, 1).toUpperCase() || 'P'}
+        />
       </span>
       <PresenceStatusDot
         presence={presence}

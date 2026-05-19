@@ -128,7 +128,7 @@ export type PublicFileUpload = {
 };
 
 export type PublicFileContent = PublicFileUpload & {
-  data: string;
+  blob: Blob;
   uploadedAt?: string;
   uploadedByIdentityId?: string;
 };
@@ -160,10 +160,12 @@ export type MessageAttachment = {
     size: number;
   }>;
   contentType: string;
+  encrypted?: boolean;
   encryptedSize?: number;
-  encryption: MessageAttachmentEncryption;
+  encryption?: MessageAttachmentEncryption;
   filename: string;
   size: number;
+  storage?: 'private' | 'public';
   type?: 'chunked_file';
 };
 
@@ -186,8 +188,13 @@ export type AttachmentProgress = {
   phase: 'decrypt' | 'encrypt' | 'upload';
 };
 
+export type AttachmentUploadOptions = {
+  encryptLargeAttachments?: boolean;
+};
+
 export type SendMessageOptions = {
   attachments?: File[];
+  attachmentUpload?: AttachmentUploadOptions;
   onAttachmentProgress?: (progress: AttachmentProgress) => void;
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;

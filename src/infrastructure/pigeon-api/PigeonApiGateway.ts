@@ -29,6 +29,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   AttachmentProgress,
+  AttachmentUploadOptions,
   IdentityResource,
   IdentityPresence,
   IpfsReplicationStatus,
@@ -1417,6 +1418,7 @@ export class PigeonApiGateway {
   ): Promise<ChatMessage> {
     const {
       attachments = [],
+      attachmentUpload,
       onAttachmentProgress,
       previousMessageIds = [],
       replyPreview,
@@ -1437,6 +1439,7 @@ export class PigeonApiGateway {
       session,
       attachments,
       onAttachmentProgress,
+      attachmentUpload,
     );
     const attachmentExternalIdentifiers = messageAttachments.map(
       (attachment) => attachment.cid,
@@ -1611,11 +1614,13 @@ export class PigeonApiGateway {
     session: Session,
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,
+    options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
     return await this.files.publishMessageAttachments(
       session,
       attachments,
       onProgress,
+      options,
     );
   }
 

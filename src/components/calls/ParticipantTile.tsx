@@ -4,6 +4,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import { identityPicture } from '../../utils/identityDisplay';
+import { FallbackImage } from '../common/FallbackImage';
 import { MicrophoneIcon } from './CallIcons';
 import { VideoPreview } from './VideoPreview';
 
@@ -134,14 +135,18 @@ function ParticipantMedia({
         />
       ) : videoVisible && mediaStream ? (
         <VideoPreview
+          fit="contain"
           label={name}
           muted={isCurrentIdentity}
           stream={mediaStream}
         />
-      ) : picture ? (
-        <img src={picture} alt="" className="h-full w-full object-cover" />
       ) : (
-        name.slice(0, 1).toUpperCase()
+        <FallbackImage
+          src={picture}
+          alt=""
+          className="h-full w-full object-cover"
+          fallback={name.slice(0, 1).toUpperCase()}
+        />
       )}
       {participant.screenSharing && (
         <span className="absolute right-3 top-3 rounded-full bg-emerald-400 px-2 py-0.5 text-[0.6rem] font-black text-slate-950">

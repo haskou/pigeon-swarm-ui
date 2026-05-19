@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import type { IdentityPresence } from '../../domain/types';
 
 import { cx } from '../../utils/classNameHelper';
+import { FallbackImage } from '../common/FallbackImage';
 import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 
 interface AvatarProps {
@@ -25,10 +26,13 @@ export function Avatar({
     mine && 'ring-2 ring-white/40',
   );
 
-  const content = picture ? (
-    <img src={picture} alt="" className="h-full w-full object-cover" />
-  ) : (
-    label.slice(0, 1).toUpperCase()
+  const content = (
+    <FallbackImage
+      src={picture}
+      alt=""
+      className="h-full w-full object-cover"
+      fallback={label.slice(0, 1).toUpperCase()}
+    />
   );
 
   if (onClick) {

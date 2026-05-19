@@ -16,8 +16,9 @@ import type {
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { profilePictureDataUrl } from '../../utils/identityDisplay';
+import { publicFileObjectUrl } from '../../utils/identityDisplay';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { FallbackImage } from '../common/FallbackImage';
 import { GlassSelect } from '../common/GlassSelect';
 
 type CommunityDiscoveryDialogProps = {
@@ -225,7 +226,7 @@ function CommunityDiscoveryRow({
 
     void pigeonApplication
       .getPublicFile(avatar)
-      .then((content) => profilePictureDataUrl(content))
+      .then((content) => publicFileObjectUrl(content))
       .then((url) => {
         if (!cancelled) setAvatarUrl(url);
       })
@@ -242,11 +243,12 @@ function CommunityDiscoveryRow({
     <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
       <div className="flex gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            community.name.slice(0, 1).toUpperCase()
-          )}
+          <FallbackImage
+            src={avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={community.name.slice(0, 1).toUpperCase()}
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

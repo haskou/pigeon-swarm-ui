@@ -7,6 +7,7 @@ import type { IdentityPresence, IdentityResource } from '../../domain/types';
 import { copy } from '../../i18n/en';
 import { identityBanner } from '../../utils/identityDisplay';
 import { shortId } from '../../utils/formatting';
+import { FallbackImage } from '../common/FallbackImage';
 import { PresenceStatusDot } from '../presence/PresenceStatusDot';
 import { loadPublicImage } from './communityImages';
 import { memberPrimaryName } from './communityMemberNames';
@@ -53,15 +54,12 @@ export function MemberRow({
       )}
       <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
         <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
-          {pictureUrl ? (
-            <img
-              src={pictureUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            displayName.slice(0, 1).toUpperCase()
-          )}
+          <FallbackImage
+            src={pictureUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={displayName.slice(0, 1).toUpperCase()}
+          />
         </span>
         <PresenceStatusDot presence={presence} className="-bottom-1 -right-1" />
       </div>

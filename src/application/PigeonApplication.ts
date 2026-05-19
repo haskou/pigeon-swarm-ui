@@ -8,6 +8,7 @@ import type {
 import type { IdentityUpdateProfileInput } from '../domain/identities/IdentitySignaturePayloadFactory';
 import type {
   AttachmentProgress,
+  AttachmentUploadOptions,
   ChatMessage,
   Community,
   CommunityChannel,
@@ -674,11 +675,13 @@ export class PigeonApplication {
     session: Session,
     attachments: File[],
     onProgress?: (progress: AttachmentProgress) => void,
+    options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
     return await this.gateway.publishMessageAttachments(
       session,
       attachments,
       onProgress,
+      options,
     );
   }
 
