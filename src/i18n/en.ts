@@ -471,6 +471,7 @@ export const copy = {
     replicationResponsibleNodes: 'Responsible nodes',
     replicationStandby: 'Standby',
     replicationTotalSize: 'Total size',
+    replicationUpdated: 'Updated',
     removeUnavailable: 'Remove network unavailable in API',
     saving: 'Saving...',
     server: 'Server',
