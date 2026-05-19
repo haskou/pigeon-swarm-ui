@@ -1102,7 +1102,6 @@ describe(PigeonApiGateway.name, () => {
   it('manages sticker packs through signed owner endpoints', async () => {
     const pack = {
       createdAt: 1,
-      description: 'Public sticker pack for chat reactions.',
       id: 'pack-1',
       name: 'Blue archive reactions',
       ownerIdentityId: 'identity-1',
@@ -1114,7 +1113,6 @@ describe(PigeonApiGateway.name, () => {
       contentType: 'image/png',
       createdAt: 2,
       dimensions: { height: 512, width: 512 },
-      emojis: ['😄'],
       id: 'sticker-1',
       name: 'Smile',
       sizeBytes: 215040,
@@ -1125,7 +1123,6 @@ describe(PigeonApiGateway.name, () => {
       assetCid: sticker.assetCid,
       contentType: sticker.contentType,
       dimensions: sticker.dimensions,
-      emojis: sticker.emojis,
       name: sticker.name,
       sizeBytes: sticker.sizeBytes,
       type: sticker.type,
@@ -1148,7 +1145,6 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
     const packInput = {
-      description: pack.description,
       name: pack.name,
     };
     const packUpdate = { name: 'Updated pack' };
@@ -1246,7 +1242,6 @@ describe(PigeonApiGateway.name, () => {
 
   it('lists sticker packs and filters by owner identity', async () => {
     const pack = {
-      description: 'Public sticker pack.',
       id: 'pack-1',
       name: 'Reactions',
       ownerIdentityId: 'identity-1',

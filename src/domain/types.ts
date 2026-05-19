@@ -144,7 +144,6 @@ export type StickerResource = {
   assetCid: string;
   contentType: string;
   dimensions?: StickerDimensions;
-  emojis: string[];
   id: string;
   name: string;
   sizeBytes?: number;
@@ -155,7 +154,6 @@ export type StickerResource = {
 
 export type StickerPackResource = {
   createdAt?: number;
-  description: string;
   id: string;
   name: string;
   ownerIdentityId: string;
@@ -164,7 +162,6 @@ export type StickerPackResource = {
 };
 
 export type StickerPackInput = {
-  description: string;
   name: string;
 };
 
@@ -172,7 +169,6 @@ export type StickerInput = {
   assetCid: string;
   contentType: string;
   dimensions: StickerDimensions;
-  emojis: string[];
   name: string;
   sizeBytes: number;
   type: StickerType;

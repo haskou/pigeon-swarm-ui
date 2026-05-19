@@ -137,9 +137,7 @@ export function StickerPicker({
       setPublicPacks(
         normalizedQuery
           ? packs.filter((pack) =>
-              `${pack.name} ${pack.description}`
-                .toLowerCase()
-                .includes(normalizedQuery),
+              pack.name.toLowerCase().includes(normalizedQuery),
             )
           : packs,
       );
@@ -299,9 +297,6 @@ export function StickerPicker({
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-black">
                               {pack.name}
-                            </div>
-                            <div className="truncate text-xs text-white/45">
-                              {pack.description}
                             </div>
                           </div>
                           <button
@@ -512,7 +507,7 @@ function StickerManagerDialog({
   favoriteIds: Set<string>;
   library: MyStickersResource | null;
   onClose: () => void;
-  onCreatePack: (input: { description: string; name: string }) => Promise<void>;
+  onCreatePack: (input: { name: string }) => Promise<void>;
   onFavoriteToggle: (
     packId: string,
     stickerId: string,
@@ -527,7 +522,6 @@ function StickerManagerDialog({
   session: Session;
 }) {
   const [packName, setPackName] = useState('');
-  const [packDescription, setPackDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ownPacks =
@@ -543,11 +537,9 @@ function StickerManagerDialog({
     setError(null);
     try {
       await onCreatePack({
-        description: packDescription.trim(),
         name: packName.trim(),
       });
       setPackName('');
-      setPackDescription('');
     } catch (caught) {
       setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
     } finally {
@@ -578,18 +570,12 @@ function StickerManagerDialog({
             {error}
           </div>
         )}
-        <form onSubmit={submitPack} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <form onSubmit={submitPack} className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <input
             value={packName}
             onChange={(event) => setPackName(event.target.value)}
             className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
             placeholder="Pack name"
-          />
-          <input
-            value={packDescription}
-            onChange={(event) => setPackDescription(event.target.value)}
-            className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-            placeholder="Description"
           />
           <button
             type="submit"
@@ -726,9 +712,6 @@ function PackRow({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-black">{pack.name}</div>
-          <div className="truncate text-xs text-white/45">
-            {pack.description}
-          </div>
         </div>
         <button
           type="button"
@@ -765,7 +748,6 @@ function StickerUploadForm({
 }) {
   const [packId, setPackId] = useState('');
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('🙂');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -790,7 +772,6 @@ function StickerUploadForm({
         assetCid: upload.cid,
         contentType: upload.contentType,
         dimensions,
-        emojis: [emoji.trim() || '🙂'],
         name: name.trim(),
         sizeBytes: upload.size,
         type: stickerTypeFromUpload(upload),
@@ -808,7 +789,7 @@ function StickerUploadForm({
   return (
     <form
       onSubmit={submitSticker}
-      className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[1fr_1fr_4rem_auto]"
+      className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[1fr_1fr_auto]"
     >
       <select
         value={packId}
@@ -826,12 +807,6 @@ function StickerUploadForm({
         onChange={(event) => setName(event.target.value)}
         className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
         placeholder="Sticker name"
-      />
-      <input
-        value={emoji}
-        onChange={(event) => setEmoji(event.target.value)}
-        className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-        placeholder="😄"
       />
       <label className="rounded-xl bg-white/10 px-3 py-2 text-center text-sm font-black text-white/70 transition hover:bg-white/15">
         File
