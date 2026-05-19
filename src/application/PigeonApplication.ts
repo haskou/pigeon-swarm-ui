@@ -33,6 +33,10 @@ import type {
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
+  StickerInput,
+  StickerPackInput,
+  StickerPackResource,
+  StickerResource,
 } from '../domain/types';
 
 import { PigeonApiGateway } from '../infrastructure/pigeon-api/PigeonApiGateway';
@@ -813,6 +817,61 @@ export class PigeonApplication {
     file: File,
   ): Promise<PublicFileUpload> {
     return await this.gateway.uploadPublicFile(session, file);
+  }
+
+  public async uploadStickerAsset(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    return await this.gateway.uploadStickerAsset(session, file);
+  }
+
+  public async listStickerPacks(
+    input: {
+      ownerIdentityId?: string;
+    } = {},
+  ): Promise<StickerPackResource[]> {
+    return await this.gateway.listStickerPacks(input);
+  }
+
+  public async createStickerPack(
+    session: Session,
+    input: StickerPackInput,
+  ): Promise<StickerPackResource> {
+    return await this.gateway.createStickerPack(session, input);
+  }
+
+  public async updateStickerPack(
+    session: Session,
+    packId: string,
+    input: Partial<StickerPackInput>,
+  ): Promise<StickerPackResource> {
+    return await this.gateway.updateStickerPack(session, packId, input);
+  }
+
+  public async addStickerToPack(
+    session: Session,
+    packId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.gateway.addStickerToPack(session, packId, input);
+  }
+
+  public async updateSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.gateway.updateSticker(session, packId, stickerId, input);
+  }
+
+  public async deleteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.gateway.deleteSticker(session, packId, stickerId);
   }
 
   public async listConversations(

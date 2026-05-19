@@ -133,6 +133,51 @@ export type PublicFileContent = PublicFileUpload & {
   uploadedByIdentityId?: string;
 };
 
+export type StickerType = 'animated' | 'static' | 'video';
+
+export type StickerDimensions = {
+  height: number;
+  width: number;
+};
+
+export type StickerResource = {
+  assetCid: string;
+  contentType: string;
+  dimensions: StickerDimensions;
+  emojis: string[];
+  id: string;
+  name: string;
+  sizeBytes: number;
+  type: StickerType;
+  createdAt?: number;
+  updatedAt?: number;
+};
+
+export type StickerPackResource = {
+  createdAt?: number;
+  description: string;
+  id: string;
+  name: string;
+  ownerIdentityId: string;
+  stickers: StickerResource[];
+  updatedAt?: number;
+};
+
+export type StickerPackInput = {
+  description: string;
+  name: string;
+};
+
+export type StickerInput = {
+  assetCid: string;
+  contentType: string;
+  dimensions: StickerDimensions;
+  emojis: string[];
+  name: string;
+  sizeBytes: number;
+  type: StickerType;
+};
+
 export type PrivateFileUpload = PublicFileUpload & {
   encrypted: true;
 };

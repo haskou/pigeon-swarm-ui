@@ -47,6 +47,10 @@ import type {
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
+  StickerInput,
+  StickerPackInput,
+  StickerPackResource,
+  StickerResource,
 } from '../../domain/types';
 
 import { API_SERVER_URL } from '../../config';
@@ -68,6 +72,7 @@ import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
 import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
+import { PigeonStickersApi } from './PigeonStickersApi';
 import { RequestSigner } from './RequestSigner';
 
 const defaultKeychain: LocalKeychain = {
@@ -154,6 +159,8 @@ export class PigeonApiGateway {
 
   private readonly signer: RequestSigner;
 
+  private readonly stickers: PigeonStickersApi;
+
   public constructor(
     http: HttpJsonClient = new HttpJsonClient(
       new ApiUrlBuilder(API_SERVER_URL),
@@ -178,6 +185,7 @@ export class PigeonApiGateway {
     this.presence = new PigeonPresenceApi(http, signer);
     this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
+    this.stickers = new PigeonStickersApi(http, signer);
   }
 
   public apiUrl(path: string): string {
@@ -1142,6 +1150,61 @@ export class PigeonApiGateway {
     file: File,
   ): Promise<PublicFileUpload> {
     return await this.files.uploadPublicFile(session, file);
+  }
+
+  public async uploadStickerAsset(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    return await this.stickers.uploadAsset(session, file);
+  }
+
+  public async listStickerPacks(
+    input: {
+      ownerIdentityId?: string;
+    } = {},
+  ): Promise<StickerPackResource[]> {
+    return await this.stickers.listPacks(input);
+  }
+
+  public async createStickerPack(
+    session: Session,
+    input: StickerPackInput,
+  ): Promise<StickerPackResource> {
+    return await this.stickers.createPack(session, input);
+  }
+
+  public async updateStickerPack(
+    session: Session,
+    packId: string,
+    input: Partial<StickerPackInput>,
+  ): Promise<StickerPackResource> {
+    return await this.stickers.updatePack(session, packId, input);
+  }
+
+  public async addStickerToPack(
+    session: Session,
+    packId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.stickers.addSticker(session, packId, input);
+  }
+
+  public async updateSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+    input: StickerInput,
+  ): Promise<StickerResource> {
+    return await this.stickers.updateSticker(session, packId, stickerId, input);
+  }
+
+  public async deleteSticker(
+    session: Session,
+    packId: string,
+    stickerId: string,
+  ): Promise<void> {
+    await this.stickers.deleteSticker(session, packId, stickerId);
   }
 
   public async uploadPrivateFile(

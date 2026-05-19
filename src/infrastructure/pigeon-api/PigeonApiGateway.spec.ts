@@ -5,6 +5,7 @@ import type {
   LocalKeychain,
   PendingMessageAttachment,
   Session,
+  StickerInput,
 } from '../../domain/types';
 import type { HttpJsonClient } from '../http/HttpJsonClient';
 import type { RequestSigner } from './RequestSigner';
@@ -1050,6 +1051,234 @@ describe(PigeonApiGateway.name, () => {
       },
       method: 'POST',
     });
+  });
+
+  it('uploads sticker assets as public signed binary bodies', async () => {
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    const upload = {
+      cid: 'bafy-sticker',
+      contentType: 'image/png',
+      filename: 'smile.png',
+      size: 3,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(upload),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const file = {
+      arrayBuffer: jest.fn().mockResolvedValue(bytes),
+      name: 'smile.png',
+      type: 'image/png',
+    } as unknown as File;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.uploadStickerAsset(session, file)).resolves.toBe(
+      upload,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/ipfs/public',
+      bytes,
+    );
+    expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
+      body: bytes,
+      headers: {
+        'Content-Type': 'image/png',
+        'X-Filename': 'smile.png',
+        'X-Signature': 'http-signature',
+      },
+      method: 'POST',
+    });
+  });
+
+  it('manages sticker packs through signed owner endpoints', async () => {
+    const pack = {
+      createdAt: 1,
+      description: 'Public sticker pack for chat reactions.',
+      id: 'pack-1',
+      name: 'Blue archive reactions',
+      ownerIdentityId: 'identity-1',
+      stickers: [],
+      updatedAt: 1,
+    };
+    const sticker = {
+      assetCid: 'bafy-sticker',
+      contentType: 'image/png',
+      createdAt: 2,
+      dimensions: { height: 512, width: 512 },
+      emojis: ['😄'],
+      id: 'sticker-1',
+      name: 'Smile',
+      sizeBytes: 215040,
+      type: 'static' as const,
+      updatedAt: 2,
+    };
+    const stickerInput: StickerInput = {
+      assetCid: sticker.assetCid,
+      contentType: sticker.contentType,
+      dimensions: sticker.dimensions,
+      emojis: sticker.emojis,
+      name: sticker.name,
+      sizeBytes: sticker.sizeBytes,
+      type: sticker.type,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce(pack)
+        .mockResolvedValueOnce({ ...pack, name: 'Updated pack' })
+        .mockResolvedValueOnce(sticker)
+        .mockResolvedValueOnce({ ...sticker, name: 'Smile updated' })
+        .mockResolvedValueOnce(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const packInput = {
+      description: pack.description,
+      name: pack.name,
+    };
+    const packUpdate = { name: 'Updated pack' };
+
+    await expect(gateway.createStickerPack(session, packInput)).resolves.toBe(
+      pack,
+    );
+    await expect(
+      gateway.updateStickerPack(session, pack.id, packUpdate),
+    ).resolves.toEqual({ ...pack, name: 'Updated pack' });
+    await expect(
+      gateway.addStickerToPack(session, pack.id, stickerInput),
+    ).resolves.toBe(sticker);
+    await expect(
+      gateway.updateSticker(session, pack.id, sticker.id, {
+        ...stickerInput,
+        name: 'Smile updated',
+      }),
+    ).resolves.toEqual({ ...sticker, name: 'Smile updated' });
+    await expect(
+      gateway.deleteSticker(session, pack.id, sticker.id),
+    ).resolves.toBeUndefined();
+
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      1,
+      session,
+      'POST',
+      '/stickers/packs',
+      packInput,
+    );
+    expect(http.request).toHaveBeenNthCalledWith(1, '/stickers/packs', {
+      body: JSON.stringify(packInput),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      2,
+      session,
+      'PATCH',
+      '/stickers/packs/pack-1',
+      packUpdate,
+    );
+    expect(http.request).toHaveBeenNthCalledWith(2, '/stickers/packs/pack-1', {
+      body: JSON.stringify(packUpdate),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PATCH',
+    });
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      3,
+      session,
+      'POST',
+      '/stickers/packs/pack-1/stickers',
+      stickerInput,
+    );
+    expect(http.request).toHaveBeenNthCalledWith(
+      3,
+      '/stickers/packs/pack-1/stickers',
+      {
+        body: JSON.stringify(stickerInput),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      4,
+      session,
+      'PATCH',
+      '/stickers/packs/pack-1/stickers/sticker-1',
+      { ...stickerInput, name: 'Smile updated' },
+    );
+    expect(http.request).toHaveBeenNthCalledWith(
+      4,
+      '/stickers/packs/pack-1/stickers/sticker-1',
+      {
+        body: JSON.stringify({ ...stickerInput, name: 'Smile updated' }),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'PATCH',
+      },
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      5,
+      session,
+      'DELETE',
+      '/stickers/packs/pack-1/stickers/sticker-1',
+    );
+    expect(http.request).toHaveBeenNthCalledWith(
+      5,
+      '/stickers/packs/pack-1/stickers/sticker-1',
+      {
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'DELETE',
+      },
+    );
+  });
+
+  it('lists sticker packs and filters by owner identity', async () => {
+    const pack = {
+      description: 'Public sticker pack.',
+      id: 'pack-1',
+      name: 'Reactions',
+      ownerIdentityId: 'identity-1',
+      stickers: [],
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({ results: [pack] })
+        .mockResolvedValueOnce({ results: [pack] }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.listStickerPacks()).resolves.toEqual([pack]);
+    await expect(
+      gateway.listStickerPacks({ ownerIdentityId: 'identity 1' }),
+    ).resolves.toEqual([pack]);
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenNthCalledWith(1, '/stickers/packs', {
+      method: 'GET',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(
+      2,
+      '/stickers/packs?ownerIdentityId=identity+1',
+      {
+        method: 'GET',
+      },
+    );
   });
 
   it('uploads private attachments as signed encrypted raw bytes', async () => {
