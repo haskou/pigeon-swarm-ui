@@ -23,7 +23,7 @@ import {
   startsMessageDay,
 } from '../chat/messageTimelineHelpers';
 import { LockIcon } from '../workspace/LockIcon';
-import { memberDisplayName } from './communityMemberNames';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 type LoadState = 'error' | 'idle' | 'loading';
 
@@ -184,12 +184,12 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       replySticker={messageReplySticker(message, replyMessage)}
                       replyAuthorName={
                         replyMessage
-                          ? memberDisplayName(
+                          ? memberPrimaryName(
                               memberIdentities[replyMessage.authorIdentityId],
                               replyMessage.authorIdentityId,
                             )
                           : message.replyPreview
-                            ? memberDisplayName(
+                            ? memberPrimaryName(
                                 memberIdentities[
                                   message.replyPreview.authorIdentityId
                                 ],

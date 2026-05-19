@@ -16,7 +16,10 @@ import type {
 
 import { copy } from '../../i18n/en';
 import { formatDateSeparator } from '../../utils/formatting';
-import { identityDisplayName } from '../../utils/identityDisplay';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../utils/identityDisplay';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
@@ -363,13 +366,14 @@ function replyAuthorName(
   identityNames: IdentityNames,
 ): string | undefined {
   if (replyMessage) {
-    return identityDisplayName(replyMessage.authorIdentityId, identityNames);
+    return identityPrimaryDisplayName(
+      identityDisplayName(replyMessage.authorIdentityId, identityNames),
+    );
   }
 
   if (!message.replyPreview) return undefined;
 
-  return identityDisplayName(
-    message.replyPreview.authorIdentityId,
-    identityNames,
+  return identityPrimaryDisplayName(
+    identityDisplayName(message.replyPreview.authorIdentityId, identityNames),
   );
 }

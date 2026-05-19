@@ -35,6 +35,10 @@ export function identityName(identity: IdentityResource): string | null {
   return name || `@${handle}`;
 }
 
+export function identityPrimaryDisplayName(displayName: string): string {
+  return displayName.replace(/\s+\(@[^)]+\)$/, '');
+}
+
 export function identityPicture(identity: IdentityResource): string | null {
   const picture = identity.profile.picture?.trim();
 
