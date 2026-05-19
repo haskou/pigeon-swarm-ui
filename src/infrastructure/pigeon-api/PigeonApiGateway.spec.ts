@@ -1467,7 +1467,7 @@ describe(PigeonApiGateway.name, () => {
       content,
     );
 
-    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar');
+    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/bafy%2Favatar', {});
   });
 
   it('loads legacy public IPFS JSON content as a blob', async () => {
@@ -1662,7 +1662,67 @@ describe(PigeonApiGateway.name, () => {
     await expect(blob.text()).resolves.toBe('hello world');
     expect(blob.type).toBe('text/plain');
     expect(attachmentCipher.decrypt).not.toHaveBeenCalled();
-    expect(http.requestBlob).toHaveBeenNthCalledWith(1, '/ipfs/chunk-1');
-    expect(http.requestBlob).toHaveBeenNthCalledWith(2, '/ipfs/chunk-2');
+    expect(http.requestBlob).toHaveBeenNthCalledWith(
+      1,
+      '/ipfs/chunk-1',
+      expect.objectContaining({ onDownloadProgress: expect.any(Function) }),
+    );
+    expect(http.requestBlob).toHaveBeenNthCalledWith(
+      2,
+      '/ipfs/chunk-2',
+      expect.objectContaining({ onDownloadProgress: expect.any(Function) }),
+    );
+  });
+
+  it('does not reuse cached public chunked blobs when later chunks differ', async () => {
+    const http = {
+      requestBlob: jest
+        .fn()
+        .mockResolvedValueOnce(new Blob(['hello ']))
+        .mockResolvedValueOnce(new Blob(['world']))
+        .mockResolvedValueOnce(new Blob(['hello ']))
+        .mockResolvedValueOnce(new Blob(['moon'])),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(
+      http,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+    const baseAttachment = {
+      cid: 'chunk-1',
+      contentType: 'text/plain',
+      encrypted: false,
+      filename: 'note.txt',
+      size: 11,
+      storage: 'public',
+      type: 'chunked_file',
+    } as const;
+
+    const firstBlob = await gateway.downloadAttachment({
+      ...baseAttachment,
+      chunks: [
+        { cid: 'chunk-1', index: 0, sha256: 'one', size: 6 },
+        { cid: 'chunk-2', index: 1, sha256: 'two', size: 5 },
+      ],
+    });
+    const secondBlob = await gateway.downloadAttachment({
+      ...baseAttachment,
+      chunks: [
+        { cid: 'chunk-1', index: 0, sha256: 'one', size: 6 },
+        { cid: 'chunk-3', index: 1, sha256: 'three', size: 5 },
+      ],
+    });
+
+    await expect(firstBlob.text()).resolves.toBe('hello world');
+    await expect(secondBlob.text()).resolves.toBe('hello moon');
+    expect(http.requestBlob).toHaveBeenCalledTimes(4);
+    expect(http.requestBlob).toHaveBeenNthCalledWith(
+      4,
+      '/ipfs/chunk-3',
+      expect.objectContaining({ onDownloadProgress: expect.any(Function) }),
+    );
   });
 });

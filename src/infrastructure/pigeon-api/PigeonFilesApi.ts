@@ -50,19 +50,23 @@ export class PigeonFilesApi {
     this.attachmentCipher = attachmentCipher;
   }
 
-  public async getPublicFile(cid: string): Promise<PublicFileContent> {
+  public async getPublicFile(
+    cid: string,
+    onDownloadProgress?: (percent: number) => void,
+  ): Promise<PublicFileContent> {
+    if (onDownloadProgress) {
+      return await this.fetchPublicFile(cid, onDownloadProgress);
+    }
+
     const cached = this.publicFileCache.get(cid);
 
     if (cached) return await cached;
 
-    const request = this.http
-      .requestBlob(`/ipfs/${encodeURIComponent(cid)}`)
-      .then((blob) => this.publicFileContent(cid, blob))
-      .catch((caught: unknown) => {
-        this.publicFileCache.delete(cid);
+    const request = this.fetchPublicFile(cid).catch((caught: unknown) => {
+      this.publicFileCache.delete(cid);
 
-        throw caught;
-      });
+      throw caught;
+    });
 
     this.publicFileCache.set(cid, request);
 
@@ -123,7 +127,7 @@ export class PigeonFilesApi {
 
     const request = this.attachmentIsEncrypted(attachment)
       ? this.decryptAttachment(attachment, onProgress)
-      : this.downloadPublicAttachment(attachment);
+      : this.downloadPublicAttachment(attachment, onProgress);
 
     const cachedRequest = request.catch((caught: unknown) => {
       this.attachmentBlobCache.delete(cacheKey);
@@ -196,6 +200,28 @@ export class PigeonFilesApi {
     };
   }
 
+  private async fetchPublicFile(
+    cid: string,
+    onDownloadProgress?: (percent: number) => void,
+  ): Promise<PublicFileContent> {
+    const blob = await this.http.requestBlob(
+      `/ipfs/${encodeURIComponent(cid)}`,
+      {
+        ...(onDownloadProgress
+          ? {
+              onDownloadProgress: ({ loadedBytes, totalBytes }) => {
+                if (!totalBytes) return;
+
+                onDownloadProgress((loadedBytes * 100) / totalBytes);
+              },
+            }
+          : {}),
+      },
+    );
+
+    return await this.publicFileContent(cid, blob);
+  }
+
   private legacyPublicFileContent(payload: string): PublicFileContent {
     const content = JSON.parse(payload) as LegacyPublicFileContent;
     const bytes = Uint8Array.from(Buffer.from(content.data, 'base64'));
@@ -216,12 +242,8 @@ export class PigeonFilesApi {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     const encryptedBytes = attachment.chunks?.length
-      ? await this.downloadAttachmentChunks(attachment)
-      : this.attachmentCipher.bytesToArrayBuffer(
-          this.attachmentCipher.base64ToBytes(
-            (await this.getPrivateFile(attachment.cid)).encryptedData,
-          ),
-        );
+      ? await this.downloadAttachmentChunks(attachment, onProgress)
+      : await this.downloadPrivateAttachmentBytes(attachment, onProgress);
 
     return await this.attachmentCipher.decrypt(
       attachment,
@@ -243,6 +265,12 @@ export class PigeonFilesApi {
       attachment.encryption?.chunks
         ?.map((chunk) => `${chunk.iv}:${chunk.size}`)
         .join(',') ?? '',
+      attachment.chunks
+        ?.map(
+          (chunk) =>
+            `${chunk.index}:${chunk.cid}:${chunk.sha256}:${chunk.size}`,
+        )
+        .join(',') ?? '',
     ].join('|');
   }
 
@@ -252,16 +280,55 @@ export class PigeonFilesApi {
 
   private async downloadPublicAttachment(
     attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     if (!attachment.chunks?.length) {
-      return (await this.getPublicFile(attachment.cid)).blob;
+      const content = await this.getPublicFile(attachment.cid, (percent) =>
+        this.reportAttachmentProgress(
+          onProgress,
+          attachment.filename,
+          'download',
+          percent,
+        ),
+      );
+
+      this.reportAttachmentProgress(
+        onProgress,
+        attachment.filename,
+        'download',
+        100,
+      );
+
+      return content.blob;
     }
 
-    const blobs = await Promise.all(
-      [...attachment.chunks]
-        .sort((left, right) => left.index - right.index)
-        .map(async (chunk) => (await this.getPublicFile(chunk.cid)).blob),
+    const sortedChunks = [...attachment.chunks].sort(
+      (left, right) => left.index - right.index,
     );
+    const blobs: Blob[] = [];
+
+    for (let index = 0; index < sortedChunks.length; index += 1) {
+      const chunk = sortedChunks[index];
+      const content = await this.getPublicFile(chunk.cid, (percent) => {
+        const overallPercent =
+          ((index + percent / 100) * 100) / sortedChunks.length;
+
+        this.reportAttachmentProgress(
+          onProgress,
+          attachment.filename,
+          'download',
+          overallPercent,
+        );
+      });
+
+      blobs.push(content.blob);
+      this.reportAttachmentProgress(
+        onProgress,
+        attachment.filename,
+        'download',
+        ((index + 1) * 100) / sortedChunks.length,
+      );
+    }
 
     return new Blob(blobs, { type: attachment.contentType });
   }
@@ -420,18 +487,30 @@ export class PigeonFilesApi {
 
   private async downloadAttachmentChunks(
     attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<ArrayBuffer> {
-    const buffers = await Promise.all(
-      [...(attachment.chunks ?? [])]
-        .sort((left, right) => left.index - right.index)
-        .map(async (chunk) =>
-          this.attachmentCipher.bytesToArrayBuffer(
-            this.attachmentCipher.base64ToBytes(
-              (await this.getPrivateFile(chunk.cid)).encryptedData,
-            ),
-          ),
-        ),
+    const sortedChunks = [...(attachment.chunks ?? [])].sort(
+      (left, right) => left.index - right.index,
     );
+    const buffers: ArrayBuffer[] = [];
+
+    for (let index = 0; index < sortedChunks.length; index += 1) {
+      const chunk = sortedChunks[index];
+      const content = await this.getPrivateFile(chunk.cid);
+
+      buffers.push(
+        this.attachmentCipher.bytesToArrayBuffer(
+          this.attachmentCipher.base64ToBytes(content.encryptedData),
+        ),
+      );
+      this.reportAttachmentProgress(
+        onProgress,
+        attachment.filename,
+        'download',
+        ((index + 1) * 100) / sortedChunks.length,
+      );
+    }
+
     const totalSize = buffers.reduce(
       (total, buffer) => total + buffer.byteLength,
       0,
@@ -445,6 +524,42 @@ export class PigeonFilesApi {
     });
 
     return output.buffer;
+  }
+
+  private async downloadPrivateAttachmentBytes(
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<ArrayBuffer> {
+    this.reportAttachmentProgress(
+      onProgress,
+      attachment.filename,
+      'download',
+      0,
+    );
+    const content = await this.getPrivateFile(attachment.cid);
+    this.reportAttachmentProgress(
+      onProgress,
+      attachment.filename,
+      'download',
+      100,
+    );
+
+    return this.attachmentCipher.bytesToArrayBuffer(
+      this.attachmentCipher.base64ToBytes(content.encryptedData),
+    );
+  }
+
+  private reportAttachmentProgress(
+    onProgress: ((progress: AttachmentProgress) => void) | undefined,
+    filename: string,
+    phase: AttachmentProgress['phase'],
+    percent: number,
+  ): void {
+    onProgress?.({
+      filename,
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      phase,
+    });
   }
 
   private sha256Hex(bytes: ArrayBuffer): string {

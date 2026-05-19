@@ -50,7 +50,7 @@ export function ParticipantTile({
   return (
     <article
       className={cx(
-        'flex min-h-[310px] w-full max-w-[260px] flex-col items-center rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:min-h-[330px] sm:max-w-[280px]',
+        'flex min-h-[340px] w-full max-w-[300px] flex-col items-center rounded-[1.5rem] border bg-black/25 p-3 text-center transition sm:min-h-[360px] sm:max-w-[340px]',
         participant.speaking
           ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
           : 'border-white/10',
@@ -122,7 +122,7 @@ function ParticipantMedia({
       className={cx(
         'relative mt-3 grid shrink-0 place-items-center overflow-hidden rounded-2xl',
         videoVisible
-          ? 'h-28 w-full bg-black sm:h-32'
+          ? 'aspect-video w-full bg-black'
           : 'h-20 w-20 bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24',
       )}
     >

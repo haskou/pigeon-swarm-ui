@@ -288,7 +288,8 @@ export function CommunityWorkspace({
   >('idle');
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
-  const [attachmentProgress] = useState<AttachmentProgress | null>(null);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
   const [memberIdentities, setMemberIdentities] = useState<
     Record<string, IdentityResource>
   >({});
@@ -1357,15 +1358,18 @@ export function CommunityWorkspace({
   const openAttachment = async (attachment?: MessageAttachment) => {
     if (!attachment) return;
 
+    setAttachmentProgress(null);
     try {
-      const url = await loadAttachmentPreview(attachment);
+      const url = await loadAttachmentPreview(attachment, setAttachmentProgress);
       const link = document.createElement('a');
 
+      setAttachmentProgress(null);
       link.href = url;
       link.download = attachment.filename;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch {
+      setAttachmentProgress(null);
       setSendError(copy.composer.attachmentDownloadError);
     }
   };

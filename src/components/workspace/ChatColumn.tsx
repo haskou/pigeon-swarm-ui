@@ -184,6 +184,8 @@ export function ChatColumn({
     picture?: string | null;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] =
+    useState<AttachmentProgress | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
   const [groupInviteOpen, setGroupInviteOpen] = useState(false);
@@ -500,28 +502,25 @@ export function ChatColumn({
     if (!attachment) return;
 
     setAttachmentError(null);
+    setDownloadProgress(null);
     try {
       const url = await loadAttachmentPreview(
         attachment,
-        setAttachmentErrorProgress,
+        setDownloadProgress,
       );
       const link = document.createElement('a');
 
       setAttachmentError(null);
+      setDownloadProgress(null);
       link.href = url;
       link.download = attachment.filename;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch {
+      setDownloadProgress(null);
       setAttachmentError(copy.composer.attachmentDownloadError);
     }
   };
-  const setAttachmentErrorProgress = (nextProgress: AttachmentProgress) => {
-    setAttachmentError(
-      `${copy.composer.decryptingAttachment} ${nextProgress.filename} ${nextProgress.percent}%`,
-    );
-  };
-
   return (
     <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <ChatConversationHeader
@@ -618,7 +617,7 @@ export function ChatColumn({
             onEscape={onEscape}
             onSend={handleSend}
             onCancelReply={onCancelReply}
-            progress={progress}
+            progress={downloadProgress ?? progress}
             placeholder={
               hasConversationKey
                 ? copy.composer.placeholder

@@ -35,8 +35,8 @@ export function VideoPreview({
       playsInline
       className={
         fit === 'contain'
-          ? 'h-full w-full object-contain'
-          : 'h-full w-full object-cover'
+          ? 'block h-full w-full object-contain'
+          : 'block h-full w-full object-cover'
       }
     />
   );

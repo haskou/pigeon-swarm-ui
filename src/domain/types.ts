@@ -185,7 +185,7 @@ export type PendingMessageAttachment = {
 export type AttachmentProgress = {
   filename: string;
   percent: number;
-  phase: 'decrypt' | 'encrypt' | 'upload';
+  phase: 'decrypt' | 'download' | 'encrypt' | 'upload';
 };
 
 export type AttachmentUploadOptions = {

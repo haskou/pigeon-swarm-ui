@@ -488,7 +488,9 @@ export function Composer({
                   ? copy.composer.encryptingAttachment
                   : progress.phase === 'upload'
                     ? copy.composer.uploadingAttachment
-                    : copy.composer.decryptingAttachment}{' '}
+                    : progress.phase === 'download'
+                      ? copy.composer.downloadingAttachment
+                      : copy.composer.decryptingAttachment}{' '}
                 {progress.filename}
               </span>
               <span className="shrink-0 font-black">{progress.percent}%</span>
@@ -677,47 +679,55 @@ function AttachmentEncryptionControl({
   largeAttachments: boolean;
   onChange: (enabled: boolean) => void;
 }) {
+  const effectiveEnabled = !largeAttachments || enabled;
+
   return (
-    <fieldset className="mb-3 flex flex-wrap gap-2 text-xs font-black text-white/70">
+    <div className="mb-3">
       <label
         className={cx(
-          'flex min-h-9 items-center gap-2 rounded-2xl border px-3 py-2 transition',
-          enabled
+          'flex min-h-10 max-w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-xs font-black transition',
+          effectiveEnabled
             ? 'border-emerald-300/35 bg-emerald-400/15 text-emerald-50'
-            : 'border-white/10 bg-white/8 hover:bg-white/12',
+            : 'border-cyan-300/35 bg-cyan-400/15 text-cyan-50',
           disabled && 'cursor-not-allowed opacity-70',
         )}
       >
-        <input
-          type="radio"
-          checked={enabled}
-          disabled={disabled}
-          onChange={() => onChange(true)}
-          className="h-4 w-4 accent-emerald-300"
-        />
-        {copy.composer.encryptAttachments}
-      </label>
-      {largeAttachments && (
-        <label
+        <span className="min-w-0">
+          <span className="block truncate">
+            {copy.composer.encryptAttachments}
+          </span>
+          {largeAttachments && (
+            <span className="block truncate text-[0.65rem] text-white/45">
+              {effectiveEnabled
+                ? copy.composer.largeAttachmentsEncrypted
+                : copy.composer.publicLargeAttachments}
+            </span>
+          )}
+        </span>
+        <span
           className={cx(
-            'flex min-h-9 items-center gap-2 rounded-2xl border px-3 py-2 transition',
-            !enabled
-              ? 'border-cyan-300/35 bg-cyan-400/15 text-cyan-50'
-              : 'border-white/10 bg-white/8 hover:bg-white/12',
-            disabled && 'cursor-not-allowed opacity-70',
+            'relative h-6 w-11 shrink-0 rounded-full border transition',
+            effectiveEnabled
+              ? 'border-emerald-200/60 bg-emerald-300'
+              : 'border-white/15 bg-white/10',
           )}
         >
           <input
-            type="radio"
-            checked={!enabled}
+            type="checkbox"
+            checked={effectiveEnabled}
             disabled={disabled}
-            onChange={() => onChange(false)}
-            className="h-4 w-4 accent-cyan-300"
+            onChange={(event) => onChange(event.target.checked)}
+            className="peer sr-only"
           />
-          {copy.composer.publicLargeAttachments}
-        </label>
-      )}
-    </fieldset>
+          <span
+            className={cx(
+              'absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition',
+              effectiveEnabled ? 'left-6' : 'left-1',
+            )}
+          />
+        </span>
+      </label>
+    </div>
   );
 }
 

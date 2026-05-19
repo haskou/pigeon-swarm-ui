@@ -1,6 +1,13 @@
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 import { HttpJsonError } from './HttpJsonError';
 
+type BlobRequestInit = RequestInit & {
+  onDownloadProgress?: (progress: {
+    loadedBytes: number;
+    totalBytes?: number;
+  }) => void;
+};
+
 export class HttpJsonClient {
   public constructor(private readonly urls: ApiUrlBuilder) {}
 
@@ -24,19 +31,68 @@ export class HttpJsonClient {
 
   public async requestBlob(
     path: string,
-    init: RequestInit = {},
+    init: BlobRequestInit = {},
   ): Promise<Blob> {
+    const { onDownloadProgress, ...requestInit } = init;
     const response = await fetch(this.urls.build(path), {
-      ...init,
-      cache: init.cache ?? 'no-store',
-      headers: this.headers(init, '*/*'),
+      ...requestInit,
+      cache: requestInit.cache ?? 'no-store',
+      headers: this.headers(requestInit, '*/*'),
     });
 
     if (!response.ok) {
       throw await this.error(response);
     }
 
-    return await response.blob();
+    if (!onDownloadProgress || !response.body) {
+      const blob = await response.blob();
+
+      onDownloadProgress?.({
+        loadedBytes: blob.size,
+        totalBytes: blob.size,
+      });
+
+      return blob;
+    }
+
+    return await this.blobWithProgress(response, onDownloadProgress);
+  }
+
+  private async blobWithProgress(
+    response: Response,
+    onDownloadProgress: NonNullable<BlobRequestInit['onDownloadProgress']>,
+  ): Promise<Blob> {
+    const reader = response.body!.getReader();
+    const chunks: ArrayBuffer[] = [];
+    const totalBytes = Number(response.headers.get('Content-Length')) || 0;
+    let done = false;
+    let loadedBytes = 0;
+
+    while (!done) {
+      const result = await reader.read();
+
+      done = result.done;
+
+      if (done || !result.value) continue;
+
+      const value = result.value;
+
+      chunks.push(
+        value.buffer.slice(
+          value.byteOffset,
+          value.byteOffset + value.byteLength,
+        ),
+      );
+      loadedBytes += value.byteLength;
+      onDownloadProgress({
+        loadedBytes,
+        ...(totalBytes ? { totalBytes } : {}),
+      });
+    }
+
+    return new Blob(chunks, {
+      type: response.headers.get('Content-Type') ?? undefined,
+    });
   }
 
   private async error(response: Response): Promise<HttpJsonError> {
