@@ -66,17 +66,12 @@ function isScreenShareTrack(track: MediaStreamTrack): boolean {
 function isRemoteScreenShareTrack(
   track: MediaStreamTrack,
   remoteScreenTrackIds: Set<string>,
-  hasRemoteScreenStream: boolean,
 ): boolean {
   if (track.kind !== 'video') return false;
 
   if (remoteScreenTrackIds.has(track.id)) return true;
 
   if (isScreenShareTrack(track)) return true;
-
-  if (remoteScreenTrackIds.size > 0 && !hasRemoteScreenStream) {
-    return true;
-  }
 
   return /screen|display|window|tab|monitor/i.test(track.label);
 }
@@ -608,7 +603,6 @@ export class CallPeerConnectionManager {
       isRemoteScreenShareTrack(
         event.track,
         this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
-        this.remoteScreenStreams.has(peerIdentityId),
       )
     ) {
       const screenStream = new MediaStream([event.track]);

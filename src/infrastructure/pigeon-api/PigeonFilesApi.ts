@@ -265,6 +265,12 @@ export class PigeonFilesApi {
       attachment.encryption?.chunks
         ?.map((chunk) => `${chunk.iv}:${chunk.size}`)
         .join(',') ?? '',
+      attachment.chunks
+        ?.map(
+          (chunk) =>
+            `${chunk.index}:${chunk.cid}:${chunk.sha256}:${chunk.size}`,
+        )
+        .join(',') ?? '',
     ].join('|');
   }
 
