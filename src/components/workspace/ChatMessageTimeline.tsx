@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type { RefObject } from 'react';
 
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 
 import type {
   AttachmentProgress,
@@ -24,7 +24,6 @@ import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import {
-  findReplyMessage,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
@@ -169,6 +168,11 @@ function MessageTimelineContent({
   ChatMessageTimelineProps,
   'newMessageCount' | 'onJumpToLatest' | 'onScroll' | 'scrollerRef'
 >) {
+  const messagesById = useMemo(
+    () => new Map(messages.map((message) => [message.id, message])),
+    [messages],
+  );
+
   return (
     <>
       {messageState === 'loading' && <LoadingOlderMessages />}
@@ -186,7 +190,6 @@ function MessageTimelineContent({
             isGroupConversation={isGroupConversation}
             loadAttachmentPreview={loadAttachmentPreview}
             message={message}
-            messages={messages}
             onAttachmentOpen={onAttachmentOpen}
             onAuthorProfileOpen={onAuthorProfileOpen}
             onMessageMenuOpen={onMessageMenuOpen}
@@ -196,6 +199,11 @@ function MessageTimelineContent({
             onStickerClick={onStickerClick}
             previousMessage={messages[index - 1]}
             reactionAuthorNames={reactionAuthorNames}
+            replyMessage={
+              message.replyToMessageId
+                ? messagesById.get(message.replyToMessageId)
+                : undefined
+            }
           />
         ))}
         {messages.length === 0 && messageState !== 'loading' && (
@@ -215,7 +223,6 @@ function MessageTimelineItem({
   isGroupConversation,
   loadAttachmentPreview,
   message,
-  messages,
   onAttachmentOpen,
   onAuthorProfileOpen,
   onMessageMenuOpen,
@@ -225,6 +232,7 @@ function MessageTimelineItem({
   onStickerClick,
   previousMessage,
   reactionAuthorNames,
+  replyMessage,
 }: {
   currentIdentityId: string;
   currentIdentityName: string;
@@ -233,7 +241,6 @@ function MessageTimelineItem({
   isGroupConversation: boolean;
   loadAttachmentPreview: ChatMessageTimelineProps['loadAttachmentPreview'];
   message: ChatMessage;
-  messages: ChatMessage[];
   onAttachmentOpen: ChatMessageTimelineProps['onAttachmentOpen'];
   onAuthorProfileOpen: ChatMessageTimelineProps['onAuthorProfileOpen'];
   onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
@@ -243,8 +250,8 @@ function MessageTimelineItem({
   onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
   previousMessage?: ChatMessage;
   reactionAuthorNames: Record<string, string>;
+  replyMessage?: ChatMessage;
 }) {
-  const replyMessage = findReplyMessage(messages, message);
   const startsNewDay = startsMessageDay(previousMessage, message);
   const startsNewAuthorRun = startsAuthorRun(previousMessage, message);
 

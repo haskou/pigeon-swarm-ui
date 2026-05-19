@@ -159,6 +159,10 @@ type PendingSend = {
 };
 type FailedSends = Record<string, PendingSend>;
 
+function stableUniqueKey(values: string[]): string {
+  return [...new Set(values.filter(Boolean))].sort().join('\u0000');
+}
+
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
   communities: Community[],
@@ -627,6 +631,10 @@ export function GlassWorkspace({
         session.keychain,
       )
     : undefined;
+  const messageAuthorIdentityIdsKey = useMemo(
+    () => stableUniqueKey(messages.map((message) => message.authorIdentityId)),
+    [messages],
+  );
   const {
     identityNames,
     identityPictures,
@@ -634,7 +642,7 @@ export function GlassWorkspace({
     rememberIdentity,
   } = useIdentityDirectory({
     conversations,
-    messages,
+    messageAuthorIdentityIdsKey,
     notifications: notificationList,
     session,
   });
@@ -655,12 +663,12 @@ export function GlassWorkspace({
               []),
           ]),
           ...communities.flatMap((community) => community.memberIds),
-          ...messages.map((message) => message.authorIdentityId),
+          ...messageAuthorIdentityIdsKey.split('\u0000'),
         ]),
       )
         .filter((identityId): identityId is string => !!identityId)
         .join('\u0000'),
-    [communities, conversations, messages, session],
+    [communities, conversations, messageAuthorIdentityIdsKey, session],
   );
   const presenceIdentityIds = useMemo(
     () =>
@@ -2826,7 +2834,7 @@ export function GlassWorkspace({
           if (
             !activeConversationKeyId ||
             !messageId ||
-            messages.some((message) => message.id === messageId)
+            messagesRef.current.some((message) => message.id === messageId)
           ) {
             return;
           }
@@ -2874,7 +2882,6 @@ export function GlassWorkspace({
       markCommunityChannelUnread,
       markUnreadMessage,
       mergePresence,
-      messages,
       onCommunitiesReload,
       onPeersReload,
       playNotificationSoundIfAllowed,
@@ -3187,7 +3194,7 @@ export function GlassWorkspace({
                 className="hidden xl:block"
                 session={session}
                 activeConversation={activeConversation}
-                messages={messages}
+                loadedMessageCount={messages.length}
                 peers={peers}
               />
             </Suspense>

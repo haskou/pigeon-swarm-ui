@@ -1,4 +1,4 @@
-import { Fragment, memo, type RefObject } from 'react';
+import { Fragment, memo, type RefObject, useMemo } from 'react';
 
 import type {
   AttachmentProgress,
@@ -16,7 +16,6 @@ import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
 import {
   endsAuthorRun,
-  findReplyMessage,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
@@ -85,6 +84,11 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   session,
   visibleMessages,
 }: CommunityMessageTimelineProps) {
+  const messagesById = useMemo(
+    () => new Map(visibleMessages.map((message) => [message.id, message])),
+    [visibleMessages],
+  );
+
   return (
     <div className="relative min-h-0 flex-1">
       <div
@@ -131,7 +135,9 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             visibleMessages.map((message, index) => {
               const previousMessage = visibleMessages[index - 1];
               const nextMessage = visibleMessages[index + 1];
-              const replyMessage = findReplyMessage(visibleMessages, message);
+              const replyMessage = message.replyToMessageId
+                ? messagesById.get(message.replyToMessageId)
+                : undefined;
               const startsNewDay = startsMessageDay(previousMessage, message);
               const startsNewAuthorRun = startsAuthorRun(
                 previousMessage,

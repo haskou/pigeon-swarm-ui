@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
-  ChatMessage,
   ConversationResource,
   IdentityResource,
   NotificationResource,
@@ -21,7 +20,7 @@ import { normalizeIdentityId } from '../../utils/identityId';
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
-  messages: ChatMessage[];
+  messageAuthorIdentityIdsKey: string;
   notifications: NotificationResource[];
   session: Session;
 };
@@ -35,7 +34,7 @@ type ResolvedIdentity = readonly [
 
 export function useIdentityDirectory({
   conversations,
-  messages,
+  messageAuthorIdentityIdsKey,
   notifications,
   session,
 }: IdentityDirectoryInput): {
@@ -119,11 +118,10 @@ export function useIdentityDirectory({
         ids.add(notification.payload.recipientIdentityId);
       }
     });
-    messages.forEach((message) => {
-      if (isResolvableIdentityId(message.authorIdentityId)) {
-        ids.add(message.authorIdentityId);
-      }
-    });
+    messageAuthorIdentityIdsKey
+      .split('\u0000')
+      .filter(isResolvableIdentityId)
+      .forEach((identityId) => ids.add(identityId));
     ids.delete(session.identity.id);
 
     return [...ids].filter(
@@ -134,7 +132,7 @@ export function useIdentityDirectory({
   }, [
     conversations,
     identityNames,
-    messages,
+    messageAuthorIdentityIdsKey,
     notifications,
     resolvingIdentityIds,
     session.identity.id,

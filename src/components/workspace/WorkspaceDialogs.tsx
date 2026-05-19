@@ -201,7 +201,7 @@ function MobileInspectorDialog(
           className="h-full overflow-y-auto"
           session={props.session}
           activeConversation={props.activeConversation}
-          messages={props.messages}
+          loadedMessageCount={props.messages.length}
           onClose={props.onCloseInspector}
           peers={props.peers}
         />

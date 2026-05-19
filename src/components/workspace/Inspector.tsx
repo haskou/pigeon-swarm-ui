@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { Peer } from '../../application/peers/ListPeers';
-import type {
-  ChatMessage,
-  ConversationResource,
-  Session,
-} from '../../domain/types';
+import type { ConversationResource, Session } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
@@ -20,7 +16,7 @@ interface InspectorProps {
   session: Session;
   activeConversation?: ConversationResource;
   className?: string;
-  messages: ChatMessage[];
+  loadedMessageCount: number;
   onClose?: () => void;
   peers: Peer[];
 }
@@ -28,7 +24,7 @@ interface InspectorProps {
 export function Inspector({
   activeConversation,
   className,
-  messages,
+  loadedMessageCount,
   onClose,
   peers,
   session,
@@ -96,7 +92,7 @@ export function Inspector({
         <MetricCard
           icon={<MessagesIcon />}
           label={copy.inspector.eventsProjectedLocally}
-          value={`${messages.length}`}
+          value={`${loadedMessageCount}`}
         />
         <MetricCard
           icon={<PeersIcon />}
