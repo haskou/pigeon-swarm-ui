@@ -594,6 +594,7 @@ export function ChatColumn({
           {stickerPackPreview && (
             <StickerPackPreviewDialog
               onClose={() => setStickerPackPreview(null)}
+              onStickerSend={onStickerSend}
               session={session}
               sticker={stickerPackPreview}
             />

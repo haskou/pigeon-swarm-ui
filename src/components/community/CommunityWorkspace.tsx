@@ -1915,6 +1915,7 @@ export function CommunityWorkspace({
             {stickerPackPreview && (
               <StickerPackPreviewDialog
                 onClose={() => setStickerPackPreview(null)}
+                onStickerSend={handleSendChannelSticker}
                 session={session}
                 sticker={stickerPackPreview}
               />

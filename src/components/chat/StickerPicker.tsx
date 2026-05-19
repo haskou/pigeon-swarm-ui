@@ -432,10 +432,12 @@ export function stickerAssetUrl(assetCid: string): string {
 
 export function StickerPackPreviewDialog({
   onClose,
+  onStickerSend,
   session,
   sticker,
 }: {
   onClose: () => void;
+  onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   session: Session;
   sticker: StickerMessageReference;
 }) {
@@ -499,6 +501,10 @@ export function StickerPackPreviewDialog({
       setSaving(false);
     }
   };
+  const sendSticker = async (nextSticker: StickerMessageReference) => {
+    await onStickerSend(nextSticker);
+    onClose();
+  };
 
   return createPortal(
     <div
@@ -537,22 +543,40 @@ export function StickerPackPreviewDialog({
           </div>
         ) : (
           <>
-            <div className="mb-4 flex justify-center rounded-2xl bg-white/5 p-4">
+            <button
+              type="button"
+              onClick={() => void sendSticker(sticker)}
+              className="mb-4 flex w-full justify-center rounded-2xl bg-white/5 p-4 transition hover:bg-white/10"
+              title="Send sticker"
+            >
               <img
                 src={stickerAssetUrl(sticker.assetCid)}
-                alt=""
+                alt="Sticker"
                 className="max-h-48 max-w-full object-contain"
               />
-            </div>
+            </button>
             {pack && pack.stickers.length > 0 && (
               <div className="mb-4 grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {pack.stickers.map((packSticker) => (
-                  <img
+                  <button
                     key={packSticker.id}
-                    src={stickerAssetUrl(packSticker.assetCid)}
-                    alt="Sticker"
-                    className="aspect-square rounded-xl bg-black/20 object-contain p-1"
-                  />
+                    type="button"
+                    onClick={() =>
+                      void sendSticker({
+                        assetCid: packSticker.assetCid,
+                        packId: pack.id,
+                        stickerId: packSticker.id,
+                      })
+                    }
+                    className="grid aspect-square place-items-center rounded-xl bg-black/20 p-1 transition hover:bg-white/10"
+                    title="Send sticker"
+                  >
+                    <img
+                      src={stickerAssetUrl(packSticker.assetCid)}
+                      alt="Sticker"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </button>
                 ))}
               </div>
             )}
