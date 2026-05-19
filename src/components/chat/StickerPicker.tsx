@@ -280,6 +280,9 @@ export function StickerPicker({
   const recentItems = usageItems(library?.recentStickers ?? []);
   const favoriteItems = usageItems(library?.favoriteStickers ?? []);
   const savedPacks = library?.savedPacks ?? [];
+  const explorePacks = publicPacks
+    .filter((pack) => !savedPackIds.has(pack.id))
+    .slice(0, 2);
   const stickerShortcuts: StickerShortcut[] = [
     { id: 'favorites', label: 'Favorites', type: 'favorites' },
     { id: 'recent', label: 'Recent', type: 'recent' },
@@ -469,17 +472,17 @@ export function StickerPicker({
                   emptyText="This pack has no stickers yet."
                 />
               ))}
-              {!loading && savedPacks.length === 0 && publicPacks.length === 0 && (
+              {!loading && savedPacks.length === 0 && explorePacks.length === 0 && (
                 <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/45">
                   No sticker packs yet. Open Manage to create or save one.
                 </div>
               )}
-              {publicPacks.length > 0 && (
+              {explorePacks.length > 0 && (
                 <div className="mt-4 grid gap-2">
                   <div className="text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
                     Explore
                   </div>
-                  {publicPacks.map((pack) => {
+                  {explorePacks.map((pack) => {
                     const saved = savedPackIds.has(pack.id);
 
                     return (
