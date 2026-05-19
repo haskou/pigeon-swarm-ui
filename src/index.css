@@ -190,6 +190,12 @@ textarea:disabled,
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
 }
 
+.inspector-panel {
+  border-left-color: transparent;
+  background: rgb(31, 32, 55);
+  backdrop-filter: none;
+}
+
 .glass-panel-strong {
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.15);
