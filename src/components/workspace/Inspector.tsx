@@ -39,7 +39,9 @@ export function Inspector({
     : undefined;
 
   return (
-    <aside className={cx('glass-panel rounded-none p-4', className)}>
+    <aside
+      className={cx('glass-panel inspector-panel rounded-none p-4', className)}
+    >
       <div className="flex items-center justify-between gap-3">
         <SectionTitle title={copy.inspector.identity} />
         {onClose && (
