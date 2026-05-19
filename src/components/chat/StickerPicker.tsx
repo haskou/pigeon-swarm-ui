@@ -403,26 +403,29 @@ export function StickerPicker({
                 onSelect={scrollToStickerSection}
                 shortcuts={stickerShortcuts}
               />
-              <form
+              <div
                 className="mb-3 flex gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void searchPacks();
-                }}
               >
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+
+                    event.preventDefault();
+                    void searchPacks();
+                  }}
                   className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none placeholder:text-white/35"
                   placeholder="Search stickers"
                 />
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => void searchPacks()}
                   className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950"
                 >
                   Search
                 </button>
-              </form>
+              </div>
               {error && (
                 <div className="mb-3 rounded-xl border border-rose-300/25 bg-rose-500/15 p-2 text-xs text-rose-100">
                   {error}
