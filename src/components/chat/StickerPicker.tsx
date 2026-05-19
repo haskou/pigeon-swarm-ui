@@ -353,7 +353,21 @@ export function StickerPicker({
         className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45"
         aria-label="Open stickers"
       >
-        ☺︎
+        <svg
+          aria-hidden="true"
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+          <path d="M9 9h.01" />
+          <path d="M15 9h.01" />
+        </svg>
       </button>
       {open && (
         <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40">
