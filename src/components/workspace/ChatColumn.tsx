@@ -25,8 +25,8 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../utils/identityDisplay';
-import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
+import { StickerPackPreviewDialog } from '../chat/StickerPicker';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
@@ -166,6 +166,8 @@ export function ChatColumn({
     picture?: string | null;
   } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [stickerPackPreview, setStickerPackPreview] =
+    useState<StickerMessageReference | null>(null);
   const [downloadProgress, setDownloadProgress] =
     useState<AttachmentProgress | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
@@ -208,13 +210,7 @@ export function ChatColumn({
     await onSend(content, attachments, options);
   };
   const handleStickerClick = (sticker: StickerMessageReference) => {
-    void pigeonApplication
-      .favoriteSticker(session, sticker.packId, sticker.stickerId)
-      .catch((caught) =>
-        setAttachmentError(
-          toUserErrorMessage(caught, copy.messages.reactionError),
-        ),
-      );
+    setStickerPackPreview(sticker);
   };
 
   useEffect(
@@ -595,6 +591,13 @@ export function ChatColumn({
             }
             session={session}
           />
+          {stickerPackPreview && (
+            <StickerPackPreviewDialog
+              onClose={() => setStickerPackPreview(null)}
+              session={session}
+              sticker={stickerPackPreview}
+            />
+          )}
         </>
       )}
       {conversationDataOpen && (

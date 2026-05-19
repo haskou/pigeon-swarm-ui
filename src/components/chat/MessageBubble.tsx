@@ -288,7 +288,7 @@ export function MessageBubble({
                 type="button"
                 onClick={() => onStickerClick?.(sticker)}
                 className="block rounded-2xl p-1 transition hover:bg-white/10"
-                title="Add sticker to favorites"
+                title="View sticker pack"
               >
                 <img
                   src={stickerAssetUrl(sticker.assetCid)}

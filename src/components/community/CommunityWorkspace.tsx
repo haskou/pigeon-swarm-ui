@@ -64,6 +64,7 @@ import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
 import { Composer } from '../chat/Composer';
+import { StickerPackPreviewDialog } from '../chat/StickerPicker';
 import { TypingIndicator } from '../chat/TypingIndicator';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import {
@@ -263,6 +264,8 @@ export function CommunityWorkspace({
   >('idle');
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [stickerPackPreview, setStickerPackPreview] =
+    useState<StickerMessageReference | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const [memberIdentities, setMemberIdentities] = useState<
@@ -1095,11 +1098,7 @@ export function CommunityWorkspace({
     return Promise.resolve();
   };
   const handleStickerClick = (sticker: StickerMessageReference) => {
-    void pigeonApplication
-      .favoriteSticker(session, sticker.packId, sticker.stickerId)
-      .catch((caught) =>
-        setSendError(toUserErrorMessage(caught, copy.messages.reactionError)),
-      );
+    setStickerPackPreview(sticker);
   };
   const handleDraftChange = (value: string) => {
     setDraft(value);
@@ -1912,6 +1911,13 @@ export function CommunityWorkspace({
               }
               session={session}
             />
+            {stickerPackPreview && (
+              <StickerPackPreviewDialog
+                onClose={() => setStickerPackPreview(null)}
+                session={session}
+                sticker={stickerPackPreview}
+              />
+            )}
           </>
         )}
       </section>
