@@ -9,11 +9,17 @@ import type {
 } from '../../domain/types';
 
 import { copy } from '../../i18n/en';
-import { isBrowserPreviewImage } from '../../utils/browserPreview';
-import { formatDateSeparator, isSameDay } from '../../utils/formatting';
+import { formatDateSeparator } from '../../utils/formatting';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import {
+  endsAuthorRun,
+  findReplyMessage,
+  messageReplyImage,
+  startsAuthorRun,
+  startsMessageDay,
+} from '../chat/messageTimelineHelpers';
 import { LockIcon } from '../workspace/LockIcon';
 import { memberDisplayName } from './communityMemberNames';
 
@@ -121,20 +127,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             visibleMessages.map((message, index) => {
               const previousMessage = visibleMessages[index - 1];
               const nextMessage = visibleMessages[index + 1];
-              const replyMessage = message.replyToMessageId
-                ? visibleMessages.find(
-                    (item) => item.id === message.replyToMessageId,
-                  )
-                : undefined;
-              const startsNewDay =
-                !previousMessage ||
-                !isSameDay(previousMessage.timestamp, message.timestamp);
-              const startsNewAuthorRun =
-                !previousMessage ||
-                previousMessage.authorIdentityId !== message.authorIdentityId;
-              const showAvatar =
-                !nextMessage ||
-                nextMessage.authorIdentityId !== message.authorIdentityId;
+              const replyMessage = findReplyMessage(visibleMessages, message);
+              const startsNewDay = startsMessageDay(previousMessage, message);
+              const startsNewAuthorRun = startsAuthorRun(
+                previousMessage,
+                message,
+              );
+              const showAvatar = endsAuthorRun(nextMessage, message);
 
               return (
                 <Fragment key={message.id}>
@@ -176,11 +175,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
                       reactionAuthorNames={reactionAuthorNames}
-                      replyImage={
-                        replyMessage?.attachments.find((attachment) =>
-                          isBrowserPreviewImage(attachment.contentType),
-                        ) ?? message.replyPreview?.image
-                      }
+                      replyImage={messageReplyImage(message, replyMessage)}
                       replyAuthorName={
                         replyMessage
                           ? memberDisplayName(
