@@ -416,7 +416,6 @@ export function StickerPicker({
             onSavePack={savePack}
             onStickerDelete={deleteSticker}
             onStickerCreated={loadLibrary}
-            publicPacks={publicPacks}
             savedPackIds={savedPackIds}
             session={session}
           />,
@@ -756,7 +755,6 @@ function StickerManagerDialog({
   onSavePack,
   onStickerDelete,
   onStickerCreated,
-  publicPacks,
   savedPackIds,
   session,
 }: {
@@ -773,7 +771,6 @@ function StickerManagerDialog({
   onSavePack: (packId: string, saved: boolean) => Promise<void>;
   onStickerDelete: (packId: string, stickerId: string) => Promise<void>;
   onStickerCreated: () => Promise<void>;
-  publicPacks: StickerPackResource[];
   savedPackIds: Set<string>;
   session: Session;
 }) {
@@ -793,13 +790,46 @@ function StickerManagerDialog({
     library?.savedPacks.filter(
       (pack) => pack.ownerIdentityId !== session.identity.id,
     ) ?? [];
-  const visiblePackSearchResults = packSearchResults.filter(
-    (pack) => !savedPackIds.has(pack.id),
-  );
-
   useEffect(() => {
-    setPackSearchResults(publicPacks.filter((pack) => !savedPackIds.has(pack.id)).slice(0, 2));
-  }, [publicPacks, savedPackIds]);
+    if (mode !== 'saved') return undefined;
+
+    let cancelled = false;
+    const searchDelay = packSearch.trim() ? 180 : 0;
+    const timeoutId = window.setTimeout(() => {
+      setSearchingPacks(true);
+      setError(null);
+      void pigeonApplication
+        .listStickerPacks()
+        .then((packs) => {
+          if (cancelled) return;
+
+          const normalizedQuery = packSearch.trim().toLowerCase();
+          const unsavedPacks = packs.filter((pack) => !savedPackIds.has(pack.id));
+          const matchingPacks = normalizedQuery
+            ? unsavedPacks.filter((pack) =>
+                pack.name.toLowerCase().includes(normalizedQuery),
+              )
+            : unsavedPacks.slice(0, 2);
+
+          setPackSearchResults(matchingPacks);
+        })
+        .catch((caught) => {
+          if (!cancelled) {
+            setError(
+              toUserErrorMessage(caught, 'Sticker packs could not be found.'),
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setSearchingPacks(false);
+        });
+    }, searchDelay);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [mode, packSearch, savedPackIds]);
 
   const submitPack = async (event: FormEvent) => {
     event.preventDefault();
@@ -817,28 +847,6 @@ function StickerManagerDialog({
       setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const searchPacks = async (event: FormEvent) => {
-    event.preventDefault();
-    setSearchingPacks(true);
-    setError(null);
-    try {
-      const packs = await pigeonApplication.listStickerPacks();
-      const normalizedQuery = packSearch.trim().toLowerCase();
-
-      setPackSearchResults(
-        normalizedQuery
-          ? packs
-              .filter((pack) => !savedPackIds.has(pack.id))
-              .filter((pack) => pack.name.toLowerCase().includes(normalizedQuery))
-          : packs.filter((pack) => !savedPackIds.has(pack.id)).slice(0, 2),
-      );
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker packs could not be found.'));
-    } finally {
-      setSearchingPacks(false);
     }
   };
 
@@ -957,31 +965,26 @@ function StickerManagerDialog({
           </>
         ) : (
           <>
-            <form
-              onSubmit={searchPacks}
-              className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]"
-            >
+            <div className="mb-4">
               <input
                 value={packSearch}
                 onChange={(event) => setPackSearch(event.target.value)}
-                className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+                className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
                 placeholder="Search sticker packs"
               />
-              <button
-                type="submit"
-                disabled={searchingPacks}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
-              >
-                Search
-              </button>
-            </form>
-            {visiblePackSearchResults.length > 0 && (
+              {searchingPacks && (
+                <div className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-white/35">
+                  Searching...
+                </div>
+              )}
+            </div>
+            {packSearchResults.length > 0 && (
               <section className="mb-5">
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   {packSearch.trim() ? 'Search results' : 'Suggested packs'}
                 </div>
                 <div className="grid gap-2">
-                  {visiblePackSearchResults.map((pack) => (
+                  {packSearchResults.map((pack) => (
                     <PackRow
                       key={pack.id}
                       pack={pack}
@@ -991,6 +994,11 @@ function StickerManagerDialog({
                   ))}
                 </div>
               </section>
+            )}
+            {packSearch.trim() && !searchingPacks && packSearchResults.length === 0 && (
+              <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+                No packs found.
+              </div>
             )}
             <div className="grid gap-4 md:grid-cols-2">
               <section>
