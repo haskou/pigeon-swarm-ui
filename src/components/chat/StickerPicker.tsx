@@ -664,7 +664,7 @@ function StickerManagerDialog({
   session: Session;
 }) {
   const [packName, setPackName] = useState('');
-  const [mode, setMode] = useState<'create' | 'packs'>('packs');
+  const [mode, setMode] = useState<'create' | 'mine' | 'saved'>('mine');
   const [packSearch, setPackSearch] = useState('');
   const [packSearchResults, setPackSearchResults] =
     useState<StickerPackResource[]>(publicPacks);
@@ -695,7 +695,7 @@ function StickerManagerDialog({
         name: packName.trim(),
       });
       setPackName('');
-      setMode('packs');
+      setMode('mine');
     } catch (caught) {
       setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
     } finally {
@@ -726,8 +726,14 @@ function StickerManagerDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[160] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#17171d] p-5 text-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-[160] grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#17171d] p-5 text-white shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="mb-4 flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-black">Stickers</h2>
@@ -748,13 +754,25 @@ function StickerManagerDialog({
             {error}
           </div>
         )}
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
+        <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl bg-black/20 p-1">
           <button
             type="button"
-            onClick={() => setMode('packs')}
+            onClick={() => setMode('saved')}
             className={cx(
               'rounded-xl px-3 py-2 text-sm font-black transition',
-              mode === 'packs'
+              mode === 'saved'
+                ? 'bg-white text-slate-950'
+                : 'text-white/55 hover:bg-white/10',
+            )}
+          >
+            Saved packs
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('mine')}
+            className={cx(
+              'rounded-xl px-3 py-2 text-sm font-black transition',
+              mode === 'mine'
                 ? 'bg-white text-slate-950'
                 : 'text-white/55 hover:bg-white/10',
             )}
@@ -794,26 +812,8 @@ function StickerManagerDialog({
               Create
             </button>
           </form>
-        ) : (
+        ) : mode === 'mine' ? (
           <>
-            <form
-              onSubmit={searchPacks}
-              className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]"
-            >
-              <input
-                value={packSearch}
-                onChange={(event) => setPackSearch(event.target.value)}
-                className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-                placeholder="Search sticker packs"
-              />
-              <button
-                type="submit"
-                disabled={searchingPacks}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
-              >
-                Search
-              </button>
-            </form>
             <StickerUploadForm
               onCreated={onStickerCreated}
               ownPacks={ownPacks}
@@ -835,7 +835,33 @@ function StickerManagerDialog({
                 </div>
               </section>
             )}
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {ownPacks.length === 0 && (
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+                Create a pack first to upload stickers.
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <form
+              onSubmit={searchPacks}
+              className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]"
+            >
+              <input
+                value={packSearch}
+                onChange={(event) => setPackSearch(event.target.value)}
+                className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+                placeholder="Search sticker packs"
+              />
+              <button
+                type="submit"
+                disabled={searchingPacks}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
+              >
+                Search
+              </button>
+            </form>
+            <div className="grid gap-4 md:grid-cols-2">
               <section>
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   Saved packs
@@ -984,12 +1010,27 @@ function StickerUploadForm({
 }) {
   const [packId, setPackId] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!packId && ownPacks[0]) setPackId(ownPacks[0].id);
   }, [ownPacks, packId]);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return undefined;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(nextPreviewUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextPreviewUrl);
+    };
+  }, [file]);
 
   const submitSticker = async (event: FormEvent) => {
     event.preventDefault();
@@ -1022,21 +1063,30 @@ function StickerUploadForm({
   return (
     <form
       onSubmit={submitSticker}
-      className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[1fr_auto]"
+      className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[12rem_1fr]"
     >
-      <select
-        value={packId}
-        onChange={(event) => setPackId(event.target.value)}
-        className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-      >
-        {ownPacks.map((pack) => (
-          <option key={pack.id} value={pack.id}>
-            {pack.name}
-          </option>
-        ))}
-      </select>
-      <label className="rounded-xl bg-white/10 px-3 py-2 text-center text-sm font-black text-white/70 transition hover:bg-white/15">
-        File
+      <label className="group relative grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/25 text-center text-sm font-black text-white/55 transition hover:border-white/30 hover:bg-white/10">
+        {previewUrl ? (
+          file?.type.startsWith('video/') ? (
+            <video
+              src={previewUrl}
+              className="h-full w-full object-contain"
+              muted
+              playsInline
+            />
+          ) : (
+            <img
+              src={previewUrl}
+              alt="Sticker preview"
+              className="h-full w-full object-contain"
+            />
+          )
+        ) : (
+          <span className="px-4">Choose sticker</span>
+        )}
+        <span className="absolute inset-x-2 bottom-2 rounded-xl bg-black/70 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100">
+          {file ? 'Change file' : 'Select file'}
+        </span>
         <input
           type="file"
           accept="image/*,video/*"
@@ -1046,14 +1096,32 @@ function StickerUploadForm({
           className="hidden"
         />
       </label>
-      {error && <div className="text-sm text-rose-100 md:col-span-4">{error}</div>}
-      <button
-        type="submit"
-        disabled={saving || !file || !packId}
-        className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-black text-white disabled:opacity-45 md:col-span-2"
-      >
-        {saving ? 'Uploading...' : 'Add sticker'}
-      </button>
+      <div className="grid content-start gap-2">
+        <select
+          value={packId}
+          onChange={(event) => setPackId(event.target.value)}
+          className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+        >
+          {ownPacks.map((pack) => (
+            <option key={pack.id} value={pack.id}>
+              {pack.name}
+            </option>
+          ))}
+        </select>
+        {file && (
+          <div className="truncate rounded-xl bg-black/20 px-3 py-2 text-xs text-white/45">
+            {file.name}
+          </div>
+        )}
+        {error && <div className="text-sm text-rose-100">{error}</div>}
+        <button
+          type="submit"
+          disabled={saving || !file || !packId}
+          className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-black text-white disabled:opacity-45"
+        >
+          {saving ? 'Uploading...' : 'Add sticker'}
+        </button>
+      </div>
     </form>
   );
 }
