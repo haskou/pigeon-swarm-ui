@@ -69,6 +69,7 @@ import {
 } from '../profile/profilePopoverAnchor';
 import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
+import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
 import { loadPublicImage } from './communityImages';
 import {
@@ -83,7 +84,6 @@ import {
   realtimeStringAttribute,
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
-import { VoiceChannelButton } from './CommunityVoiceChannelButton';
 import { useCommunityMembers } from './useCommunityMembers';
 
 const AddCommunityMemberDialog = lazy(() =>
@@ -1364,78 +1364,21 @@ export function CommunityWorkspace({
               </div>
             </div>
 
-            <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.channels}
-              </div>
-              <input
-                value={channelSearch}
-                onChange={(event) => setChannelSearch(event.target.value)}
-                className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                placeholder={copy.communities.searchChannels}
-              />
-              <div className="space-y-2">
-                {textChannels.length === 0 && voiceChannels.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                    {copy.communities.noChannels}
-                  </div>
-                ) : visibleTextChannels.length === 0 &&
-                  visibleVoiceChannels.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                    {copy.communities.noMatchingChannels}
-                  </div>
-                ) : (
-                  <>
-                    {visibleTextChannels.map((channel) => (
-                      <button
-                        key={channel.id}
-                        type="button"
-                        onClick={() => handleChannelSelected(channel.id)}
-                        className={cx(
-                          'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
-                          selectedChannelId === channel.id
-                            ? 'bg-white text-slate-950'
-                            : 'bg-white/8 text-white hover:bg-white/14',
-                        )}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          # {channel.name}
-                        </span>
-                        {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
-                          <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
-                            {(channelUnreadCounts[channel.id] ?? 0) > 9
-                              ? '9+'
-                              : channelUnreadCounts[channel.id]}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                    {visibleVoiceChannels.length > 0 && (
-                      <div className="pt-3">
-                        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                          {copy.calls.voiceChannels}
-                        </div>
-                        <div className="space-y-2">
-                          {visibleVoiceChannels.map((channel) => (
-                            <VoiceChannelButton
-                              key={channel.id}
-                              active={activeVoiceChannelId === channel.id}
-                              channel={channel}
-                              onJoin={joinVoiceChannel}
-                              onParticipantClick={openVoiceParticipantProfile}
-                              participants={
-                                voiceParticipantsByChannelId.get(channel.id) ??
-                                []
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+            <CommunityChannelList
+              activeVoiceChannelId={activeVoiceChannelId}
+              channelSearch={channelSearch}
+              channelUnreadCounts={channelUnreadCounts}
+              onChannelSearchChange={setChannelSearch}
+              onTextChannelSelected={handleChannelSelected}
+              onVoiceChannelJoin={joinVoiceChannel}
+              onVoiceParticipantClick={openVoiceParticipantProfile}
+              selectedChannelId={selectedChannelId}
+              textChannels={textChannels}
+              visibleTextChannels={visibleTextChannels}
+              visibleVoiceChannels={visibleVoiceChannels}
+              voiceChannels={voiceChannels}
+              voiceParticipantsByChannelId={voiceParticipantsByChannelId}
+            />
             <UserProfileDropdown
               activeCall={activeCall}
               identityPictures={ownIdentityPictures}
