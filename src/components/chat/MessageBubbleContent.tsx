@@ -1,12 +1,15 @@
 import type { ChatMessage, StickerMessageReference } from '../../domain/types';
 
+import { cx } from '../../utils/classNameHelper';
 import { copy } from '../../i18n/en';
 import { stickerAssetUrl, useStickerPressPreview } from './StickerPressPreview';
 
 export function MessageStickerContent({
+  mine,
   onStickerClick,
   sticker,
 }: {
+  mine: boolean;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   sticker: StickerMessageReference;
 }) {
@@ -21,7 +24,10 @@ export function MessageStickerContent({
 
           onStickerClick?.(sticker);
         }}
-        className="block touch-none select-none rounded-2xl p-1 transition hover:bg-white/10"
+        className={cx(
+          'flex w-full touch-none select-none rounded-2xl p-1 transition hover:bg-white/10',
+          mine ? 'justify-end' : 'justify-start',
+        )}
         title="View sticker pack"
         {...stickerPreview.pressPreviewHandlers}
       >

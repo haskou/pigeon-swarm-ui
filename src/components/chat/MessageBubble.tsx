@@ -239,6 +239,7 @@ export function MessageBubble({
               )}
               {sticker && (
                 <MessageStickerContent
+                  mine={mine}
                   onStickerClick={onStickerClick}
                   sticker={sticker}
                 />
