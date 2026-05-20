@@ -428,6 +428,7 @@ describe(PigeonApiGateway.name, () => {
       createdAt: 1234,
       encryptedPayload: 'encrypted-payload',
       id: 'message-1',
+      mentions: [],
       signature: 'domain-signature',
     };
 
@@ -453,6 +454,7 @@ describe(PigeonApiGateway.name, () => {
         createdAt: 1234,
         encryptedPayload: 'encrypted-payload',
         id: 'message-1',
+        mentions: [],
         type: 'sent',
       }),
       'secret',

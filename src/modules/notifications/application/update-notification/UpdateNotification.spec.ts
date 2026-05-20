@@ -16,7 +16,9 @@ describe(UpdateNotification.name, () => {
       id: 'notification-1',
       state: 'declined',
     } as NotificationResource;
-    const updateNotification = jest.fn().mockResolvedValue(expected);
+    const updateNotification: jest.MockedFunction<
+      UpdateNotificationPort['updateNotification']
+    > = jest.fn().mockResolvedValue(expected);
     const gateway: UpdateNotificationPort = { updateNotification };
     const useCase = new UpdateNotification(gateway);
 

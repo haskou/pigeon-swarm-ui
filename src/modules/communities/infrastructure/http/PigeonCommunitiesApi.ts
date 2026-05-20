@@ -493,6 +493,7 @@ export class PigeonCommunitiesApi {
       `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}`;
     const attachmentExternalIdentifiers =
       input.attachmentExternalIdentifiers ?? [];
+    const mentions = input.mentions ?? [];
     const signaturePayload = {
       attachmentExternalIdentifiers,
       authorIdentityId: session.identity.id,
@@ -501,7 +502,7 @@ export class PigeonCommunitiesApi {
       createdAt,
       encryptedPayload: input.encryptedPayload,
       id,
-      ...(input.mentions?.length ? { mentions: input.mentions } : {}),
+      mentions,
       type: 'sent',
     };
     const signature = await session.encryptedKeyPair.sign(
@@ -513,7 +514,7 @@ export class PigeonCommunitiesApi {
       createdAt,
       encryptedPayload: input.encryptedPayload,
       id,
-      ...(input.mentions?.length ? { mentions: input.mentions } : {}),
+      mentions,
       signature: signature.toString(),
     };
     const path = `/communities/${encodeURIComponent(
