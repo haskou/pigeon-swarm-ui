@@ -113,6 +113,7 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { Rail } from './Rail';
 import { useSidebarGesture } from './useSidebarGesture';
 import {
@@ -125,11 +126,6 @@ import {
 } from './realtimeEventAttributes';
 import { ChatColumn } from './ChatColumn';
 
-const CommunityWorkspace = lazy(() =>
-  import('../community/CommunityWorkspace').then((module) => ({
-    default: module.CommunityWorkspace,
-  })),
-);
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
     default: module.Inspector,
