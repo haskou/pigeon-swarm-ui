@@ -36,7 +36,7 @@ import { stickerAssetUrl } from '../../../stickers/presentation/components/stick
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
-const COMPOSER_MAX_ROWS = 4;
+const COMPOSER_MAX_ROWS = 20;
 const LARGE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 interface ComposerProps {
