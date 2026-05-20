@@ -3,6 +3,7 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 import type {
   ChatMessage,
   MessageAttachment,
+  MessageLinkPreview,
   MessageReaction,
   MessageReplyPreview,
   MessageResource,
@@ -49,6 +50,7 @@ type PlainMessage = {
   attachments?: MessageAttachment[];
   authorIdentityId?: string;
   content?: string;
+  linkPreview?: MessageLinkPreview;
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
   timestamp?: number;
@@ -60,7 +62,7 @@ const projectedMessageCache = new Map<string, ChatMessage>();
 const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
 const projectedMessageCacheDatabaseName = 'pigeon-message-projection-cache';
-const projectedMessageCacheDatabaseVersion = 2;
+const projectedMessageCacheDatabaseVersion = 3;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
 let projectedMessageCacheDatabasePromise: Promise<IDBDatabase | null> | null =
@@ -198,6 +200,7 @@ async function decryptMessage(
       authorIdentityId,
       content: parsed.content ?? decryptedText,
       encrypted: false,
+      linkPreview: parsed.linkPreview,
       mine: authorIdentityId === request.currentIdentityId,
       raw: message,
       replyPreview: parsed.reply,
@@ -409,6 +412,7 @@ function cloneChatMessage(message: ChatMessage): ChatMessage {
   return {
     ...message,
     attachments: [...message.attachments],
+    linkPreview: message.linkPreview ? { ...message.linkPreview } : undefined,
     raw: { ...message.raw },
     reactions: [...message.reactions],
   };

@@ -2,6 +2,7 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
+  MessageLinkPreview,
   MessageAttachment,
   MessageReaction,
   MessageResource,
@@ -25,6 +26,7 @@ type PlainMessage = {
   attachments?: MessageAttachment[];
   authorIdentityId?: string;
   content?: string;
+  linkPreview?: MessageLinkPreview;
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
   timestamp?: number;
@@ -239,6 +241,7 @@ export class MessageProjector {
       authorIdentityId,
       content: parsed.content ?? decryptedText,
       encrypted: false,
+      linkPreview: parsed.linkPreview,
       mine: authorIdentityId === currentIdentityId,
       raw: message,
       replyPreview: parsed.reply,
