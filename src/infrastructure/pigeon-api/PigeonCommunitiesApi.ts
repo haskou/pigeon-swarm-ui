@@ -8,6 +8,7 @@ import type {
   CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
+  CommunityModerationLogPage,
   CommunityPermission,
   CommunityRoleResource,
   CommunityTextChannel,
@@ -51,6 +52,29 @@ export class PigeonCommunitiesApi {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
         }),
+    );
+  }
+
+  public async listModerationLogs(
+    session: Session,
+    communityId: string,
+    input: { beforeLogId?: string; limit?: number } = {},
+  ): Promise<CommunityModerationLogPage> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/moderation-logs`;
+    const query = new URLSearchParams();
+
+    if (input.limit) query.set('limit', String(input.limit));
+
+    if (input.beforeLogId) query.set('beforeLogId', input.beforeLogId);
+
+    return await this.http.request<CommunityModerationLogPage>(
+      `${path}${query.size > 0 ? `?${query.toString()}` : ''}`,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
     );
   }
 

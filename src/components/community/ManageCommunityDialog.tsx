@@ -6,6 +6,7 @@ import type {
   Community,
   CommunityChannel,
   CommunityMembershipRequest,
+  CommunityModerationLog,
   CommunityPermission,
   CommunityRoleResource,
   IdentityResource,
@@ -31,6 +32,7 @@ import {
 } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
+import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
 import {
   CommunitySettingsNavigation,
@@ -119,6 +121,12 @@ export function ManageCommunityDialog({
   const [membershipRequests, setMembershipRequests] = useState<
     CommunityMembershipRequest[]
   >([]);
+  const [moderationLogs, setModerationLogs] = useState<
+    CommunityModerationLog[]
+  >([]);
+  const [nextModerationLogId, setNextModerationLogId] = useState<
+    string | undefined
+  >(undefined);
   const [inviteIdentityInput, setInviteIdentityInput] = useState('');
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
@@ -163,6 +171,9 @@ export function ManageCommunityDialog({
       : []),
     ...(canCreateInvitations || canApproveRequests || canRejectRequests
       ? ([['invitations', copy.communities.invitations]] as const)
+      : []),
+    ...(canManageMembers
+      ? ([['moderation-logs', copy.communities.moderationLogs]] as const)
       : []),
   ];
 
@@ -279,6 +290,12 @@ export function ManageCommunityDialog({
     if (activeSection !== 'invitations') return;
 
     void refreshMembershipRequests();
+  }, [activeSection, community.id, session.identity.id]);
+
+  useEffect(() => {
+    if (activeSection !== 'moderation-logs') return;
+
+    void refreshModerationLogs();
   }, [activeSection, community.id, session.identity.id]);
 
   useEffect(() => {
@@ -534,6 +551,50 @@ export function ManageCommunityDialog({
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.membershipError));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const refreshModerationLogs = async () => {
+    setState('loading');
+    setError(null);
+    try {
+      const page = await pigeonApplication.listCommunityModerationLogs(
+        session,
+        community.id,
+        { limit: 50 },
+      );
+
+      setModerationLogs(page.logs);
+      setNextModerationLogId(page.nextBeforeLogId);
+    } catch (caught) {
+      setError(
+        toUserErrorMessage(caught, copy.communities.moderationLogsError),
+      );
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const loadMoreModerationLogs = async () => {
+    if (!nextModerationLogId || state === 'loading') return;
+
+    setState('loading');
+    setError(null);
+    try {
+      const page = await pigeonApplication.listCommunityModerationLogs(
+        session,
+        community.id,
+        { beforeLogId: nextModerationLogId, limit: 50 },
+      );
+
+      setModerationLogs((current) => [...current, ...page.logs]);
+      setNextModerationLogId(page.nextBeforeLogId);
+    } catch (caught) {
+      setError(
+        toUserErrorMessage(caught, copy.communities.moderationLogsError),
+      );
     } finally {
       setState('idle');
     }
@@ -1098,6 +1159,17 @@ export function ManageCommunityDialog({
                   onInvite={() => void inviteMember()}
                   requests={membershipRequests}
                   state={state}
+                />
+              )}
+              {activeSection === 'moderation-logs' && (
+                <CommunityModerationLogsPanel
+                  community={community}
+                  identityLookup={memberIdentities}
+                  loading={state === 'loading'}
+                  logs={moderationLogs}
+                  nextBeforeLogId={nextModerationLogId}
+                  onLoadMore={() => void loadMoreModerationLogs()}
+                  roles={roles}
                 />
               )}
               {error && (

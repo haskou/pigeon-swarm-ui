@@ -24,6 +24,7 @@ import type {
   CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
+  CommunityModerationLogPage,
   CommunityPermission,
   CommunityRoleResource,
   CommunityTextChannel,
@@ -385,6 +386,18 @@ export class PigeonApiGateway {
     communityId: string,
   ): Promise<Community> {
     return await this.communities.get(session, communityId);
+  }
+
+  public async listCommunityModerationLogs(
+    session: Session,
+    communityId: string,
+    input?: { beforeLogId?: string; limit?: number },
+  ): Promise<CommunityModerationLogPage> {
+    return await this.communities.listModerationLogs(
+      session,
+      communityId,
+      input,
+    );
   }
 
   public async discoverCommunities(

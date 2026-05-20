@@ -5,6 +5,7 @@ export type CommunitySettingsSection =
   | 'channels'
   | 'invitations'
   | 'members'
+  | 'moderation-logs'
   | 'profile'
   | 'roles';
 

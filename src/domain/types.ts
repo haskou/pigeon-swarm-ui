@@ -367,6 +367,51 @@ export type Community = {
   createdAt: number;
 };
 
+export type CommunityModerationAction =
+  | 'channel_created'
+  | 'channel_deleted'
+  | 'channel_permissions_updated'
+  | 'channel_renamed'
+  | 'community_updated'
+  | 'invitation_created'
+  | 'invite_link_created'
+  | 'member_banned'
+  | 'member_roles_updated'
+  | 'member_unbanned'
+  | 'membership_request_accepted'
+  | 'membership_request_declined'
+  | 'message_deleted'
+  | 'role_created'
+  | 'role_deleted'
+  | 'role_updated';
+
+export type CommunityModerationTargetType =
+  | 'channel'
+  | 'community'
+  | 'invite'
+  | 'member'
+  | 'membership_request'
+  | 'message'
+  | 'role';
+
+export type CommunityModerationLog = {
+  action: CommunityModerationAction;
+  actorIdentityId: string;
+  communityId: string;
+  createdAt: number;
+  details?: Record<string, unknown>;
+  id: string;
+  target: {
+    id: string;
+    type: CommunityModerationTargetType;
+  };
+};
+
+export type CommunityModerationLogPage = {
+  logs: CommunityModerationLog[];
+  nextBeforeLogId?: string;
+};
+
 export type CommunityMessageMention =
   | { type: 'everyone' }
   | { type: 'here' }
