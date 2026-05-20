@@ -14,6 +14,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { MetricCard } from '../common/MetricCard';
 
 interface NodeSettingsDialogProps {
   node: { id: string; owner: null | string } | null;
@@ -431,21 +432,25 @@ function ReplicationStatusPanel({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <ReplicationMetric
+        <MetricCard
           label={copy.nodeSettings.replicationContents}
           value={String(summary?.contentCount ?? 0)}
+          variant="dark"
         />
-        <ReplicationMetric
+        <MetricCard
           label={copy.nodeSettings.replicationTotalSize}
           value={formatBytes(summary?.totalSizeBytes ?? 0)}
+          variant="dark"
         />
-        <ReplicationMetric
+        <MetricCard
           label={copy.nodeSettings.replicationResponsible}
           value={String(summary?.localResponsibleCount ?? 0)}
+          variant="dark"
         />
-        <ReplicationMetric
+        <MetricCard
           label={copy.nodeSettings.replicationReleasable}
           value={String(summary?.releasableCount ?? 0)}
+          variant="dark"
         />
       </div>
 
@@ -461,23 +466,6 @@ function ReplicationStatusPanel({
         </div>
       )}
     </section>
-  );
-}
-
-function ReplicationMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl bg-black/20 p-3">
-      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-lg font-black text-white">{value}</div>
-    </div>
   );
 }
 

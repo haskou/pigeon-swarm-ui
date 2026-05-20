@@ -29,10 +29,8 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
-  IdentityPresence,
   IdentityResource,
   MessageResource,
-  SelectablePresenceStatus,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
@@ -48,7 +46,6 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import {
   communityChannels,
-  communityTextChannels,
 } from '../../domain/communities/communityChannels';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import {
@@ -85,10 +82,6 @@ import {
   communityNotificationPreview,
   conversationNotificationPreview,
 } from '../../presentation/workspace/notificationPreviews';
-import {
-  readPresencePreference,
-  writePresencePreference,
-} from '../../presentation/workspace/presencePreferenceStorage';
 import { presenceFromRealtimeEvent } from '../../presentation/workspace/presenceRealtimeEvents';
 import {
   activeTypingIdentityIds,
@@ -113,8 +106,12 @@ import {
   stopIncomingCallSound,
 } from '../../utils/sounds';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { Rail } from './Rail';
+import { useCommunitySelection } from './useCommunitySelection';
+import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
+import { useWorkspacePresence } from './useWorkspacePresence';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -123,16 +120,8 @@ import {
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
-const ChatColumn = lazy(() =>
-  import('./ChatColumn').then((module) => ({
-    default: module.ChatColumn,
-  })),
-);
-const CommunityWorkspace = lazy(() =>
-  import('../community/CommunityWorkspace').then((module) => ({
-    default: module.CommunityWorkspace,
-  })),
-);
+import { ChatColumn } from './ChatColumn';
+
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
     default: module.Inspector,
@@ -269,11 +258,6 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [presenceByIdentityId, setPresenceByIdentityId] = useState<
-    Record<string, IdentityPresence>
-  >({});
-  const notificationsMutedByPresence =
-    presenceByIdentityId[session.identity.id]?.status === 'busy';
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -289,10 +273,6 @@ export function GlassWorkspace({
     Record<string, Record<string, CallParticipantStatus>>
   >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
-  const pendingCommunityInviteRef = useRef<string | null>(null);
-  const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
-    readPresencePreference(session.identity.id),
-  );
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -323,16 +303,6 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
-  }, [session]);
-
-  useEffect(() => {
-    const preference = readPresencePreference(session.identity.id);
-
-    presencePreferenceRef.current = preference;
-    pigeonApplication.setRealtimeHeartbeatActivityMode(
-      session,
-      !preference || preference === 'available' ? 'auto' : 'inactive',
-    );
   }, [session]);
 
   useEffect(() => {
@@ -391,26 +361,11 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
-  const activeCommunity = useMemo(
-    () =>
-      communities.find((community) => community.id === activeCommunityId) ??
-      communities[0],
-    [activeCommunityId, communities],
-  );
-  const activeCommunityTextChannels = useMemo(
-    () => (activeCommunity ? communityTextChannels(activeCommunity) : []),
-    [activeCommunity],
-  );
-  const activeCommunityChannelId = useMemo(() => {
-    if (!activeCommunity) return null;
-
-    const storedId = communityChannelById[activeCommunity.id];
-
-    return storedId &&
-      activeCommunityTextChannels.some((channel) => channel.id === storedId)
-      ? storedId
-      : (activeCommunityTextChannels[0]?.id ?? null);
-  }, [activeCommunity, activeCommunityTextChannels, communityChannelById]);
+  const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
+    activeCommunityId,
+    communities,
+    communityChannelById,
+  });
 
   useWorkspacePreferences({
     activeCommunityId: activeCommunity?.id ?? activeCommunityId,
@@ -568,53 +523,16 @@ export function GlassWorkspace({
     setSession(null);
   };
 
-  useEffect(() => {
-    if (!pendingCommunityInvite) return;
-
-    if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
-      return;
-    }
-
-    pendingCommunityInviteRef.current = pendingCommunityInvite.token;
-    setSendError(null);
-    void (async () => {
-      if (!pendingCommunityInvite.keyEntry) {
-        throw new Error(copy.communities.linkKeyMissing);
-      }
-
-      let nextSession = sessionRef.current;
-
-      const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
-        nextSession,
-        pendingCommunityInvite.token,
-        pendingCommunityInvite.keyEntry,
-      );
-
-      const acceptedCommunity = accepted.community;
-      nextSession = {
-        ...nextSession,
-        keychain: accepted.keychain,
-        keychainExternalIdentifier: accepted.keychainExternalIdentifier,
-      };
-      setSession(nextSession);
-
-      setCommunities((current) => [
-        acceptedCommunity,
-        ...current.filter((community) => community.id !== acceptedCommunity.id),
-      ]);
-      setActiveCommunityId(acceptedCommunity.id);
-      setWorkspaceMode('community');
-      onPendingCommunityInviteHandled?.();
-    })().catch((caught) => {
-      pendingCommunityInviteRef.current = null;
-      setSendError(toUserErrorMessage(caught, copy.communities.memberError));
-    });
-  }, [
+  usePendingCommunityInvite({
     onPendingCommunityInviteHandled,
     pendingCommunityInvite,
+    session,
+    setActiveCommunityId,
     setCommunities,
+    setSendError,
     setSession,
-  ]);
+    setWorkspaceMode,
+  });
   const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
@@ -646,54 +564,17 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
-  const presenceIdentityIdsKey = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          session.identity.id,
-          ...conversations.flatMap((conversation) => [
-            conversationPeerIdentityId(
-              conversation,
-              session.identity.id,
-              session.keychain,
-            ),
-            ...(conversation.participantIdentityIds ??
-              conversation.participantIds ??
-              conversation.participants ??
-              []),
-          ]),
-          ...communities.flatMap((community) => community.memberIds),
-          ...messageAuthorIdentityIdsKey.split('\u0000'),
-        ]),
-      )
-        .filter((identityId): identityId is string => !!identityId)
-        .join('\u0000'),
-    [communities, conversations, messageAuthorIdentityIdsKey, session],
-  );
-  const presenceIdentityIds = useMemo(
-    () =>
-      presenceIdentityIdsKey.length > 0
-        ? presenceIdentityIdsKey.split('\u0000')
-        : [],
-    [presenceIdentityIdsKey],
-  );
-  const mergePresence = useCallback((presence: IdentityPresence) => {
-    setPresenceByIdentityId((current) => ({
-      ...current,
-      [presence.identityId]: presence,
-    }));
-  }, []);
-  const rememberPresencePreference = useCallback(
-    (status: SelectablePresenceStatus) => {
-      presencePreferenceRef.current = status;
-      writePresencePreference(sessionRef.current.identity.id, status);
-      pigeonApplication.setRealtimeHeartbeatActivityMode(
-        sessionRef.current,
-        status === 'available' ? 'auto' : 'inactive',
-      );
-    },
-    [],
-  );
+  const {
+    mergePresence,
+    notificationsMutedByPresence,
+    presenceByIdentityId,
+    rememberPresencePreference,
+  } = useWorkspacePresence({
+    communities,
+    conversations,
+    messageAuthorIdentityIdsKey,
+    session,
+  });
   const playNotificationSoundIfAllowed = useCallback(() => {
     if (notificationsMutedByPresence) return;
 
@@ -720,58 +601,6 @@ export function GlassWorkspace({
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
 
-  useEffect(() => {
-    if (presenceIdentityIds.length === 0) return;
-
-    let cancelled = false;
-
-    void pigeonApplication
-      .getPresences(session, presenceIdentityIds)
-      .then((presences) => {
-        if (cancelled) return;
-
-        setPresenceByIdentityId((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            presences.map((presence) => [presence.identityId, presence]),
-          ),
-        }));
-
-        const ownPresence = presences.find(
-          (presence) => presence.identityId === session.identity.id,
-        );
-        const preferredStatus = presencePreferenceRef.current;
-
-        if (preferredStatus && preferredStatus !== 'available') {
-          if (ownPresence?.status === preferredStatus) return;
-
-          void pigeonApplication
-            .updatePresence(session, { status: preferredStatus })
-            .then(mergePresence)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        if (
-          ownPresence &&
-          ownPresence.status !== 'away' &&
-          ownPresence.status !== 'disconnected'
-        ) {
-          return;
-        }
-
-        void pigeonApplication
-          .updatePresence(session, { status: 'available' })
-          .then(mergePresence)
-          .catch(() => undefined);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mergePresence, presenceIdentityIds, presenceIdentityIdsKey, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,

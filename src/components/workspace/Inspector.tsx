@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -10,6 +8,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import { Badge } from '../common/Badge';
+import { MetricCard } from '../common/MetricCard';
 import { SectionTitle } from '../common/SectionTitle';
 
 interface InspectorProps {
@@ -93,12 +92,14 @@ export function Inspector({
           icon={<MessagesIcon />}
           label={copy.inspector.eventsProjectedLocally}
           value={`${loadedMessageCount}`}
+          variant="inspector"
         />
         <MetricCard
           icon={<PeersIcon />}
           label={copy.peers.title}
           onClick={() => setPeersOpen(true)}
           value={`${peers.length}`}
+          variant="inspector"
         />
       </div>
 
@@ -117,44 +118,6 @@ export function Inspector({
       )}
     </aside>
   );
-}
-
-function MetricCard({
-  icon,
-  label,
-  onClick,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick?: () => void;
-  value: string;
-}) {
-  const content = (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/75">
-          {icon}
-        </div>
-        <div className="text-4xl font-black">{value}</div>
-      </div>
-      <div className="mt-2 text-sm text-white/45">{label}</div>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="rounded-2xl bg-white/8 p-4 text-left transition hover:bg-white/12"
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return <div className="rounded-2xl bg-white/8 p-4">{content}</div>;
 }
 
 function PeersDialog({

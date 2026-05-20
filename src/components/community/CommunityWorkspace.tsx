@@ -7,7 +7,6 @@ import {
 } from '@haskou/value-objects';
 import {
   lazy,
-  memo,
   type MouseEvent,
   type ReactNode,
   Suspense,
@@ -58,26 +57,34 @@ import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
-import { identityName } from '../../utils/identityDisplay';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
 import { Composer } from '../chat/Composer';
-import { StickerPackPreviewDialog } from '../chat/StickerPicker';
+import { StickerPackPreviewDialog } from '../chat/StickerPackPreviewDialog';
 import { TypingIndicator } from '../chat/TypingIndicator';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../profile/profilePopoverAnchor';
-import { LockIcon } from '../workspace/LockIcon';
 import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
-import { VoiceIcon } from './communityDialogPrimitives';
-import { loadIdentityPicture, loadPublicImage } from './communityImages';
-import { MemberRow } from './MemberRow';
+import { CommunityChannelList } from './CommunityChannelList';
+import { CommunityHeader } from './CommunityHeader';
+import { loadPublicImage } from './communityImages';
+import {
+  CommunityMembersPanel,
+  type CommunityMemberListItem,
+} from './CommunityMembersPanel';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import {
+  mergeChatMessages,
+  realtimeMessageAttribute,
+  realtimeStringAttribute,
+  resolveCommunityChannelId,
+} from './communityWorkspaceHelpers';
+import { useCommunityMembers } from './useCommunityMembers';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -163,11 +170,8 @@ interface CommunityWorkspaceProps {
   typingIdentityIds?: string[];
 }
 
-type MemberView = {
+type MemberView = CommunityMemberListItem & {
   anchor?: ProfilePopoverAnchor;
-  identity?: IdentityResource;
-  identityId: string;
-  pictureUrl: null | string;
 };
 
 type CommunityPendingSend = {
@@ -273,12 +277,6 @@ export function CommunityWorkspace({
     useState<StickerMessageReference | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
-  const [memberIdentities, setMemberIdentities] = useState<
-    Record<string, IdentityResource>
-  >({});
-  const [memberPictures, setMemberPictures] = useState<Record<string, string>>(
-    {},
-  );
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
@@ -331,8 +329,42 @@ export function CommunityWorkspace({
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
-      ? activeCall.channelId
+      ? (activeCall.channelId ?? null)
       : null;
+  const visibleTextChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return textChannels;
+
+    return textChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, textChannels]);
+  const visibleVoiceChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return voiceChannels;
+
+    return voiceChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, voiceChannels]);
+  const {
+    communityMemberIds,
+    memberIdentities,
+    memberPictures,
+    members,
+    ownIdentityPictures,
+    reactionAuthorNames,
+    voiceParticipantsByChannelId,
+  } = useCommunityMembers({
+    activeCall,
+    activeVoiceChannelId,
+    community,
+    session,
+    visibleVoiceChannels,
+    voiceChannels,
+  });
   const channelEncryptionReady =
     !!selectedChannel &&
     !!communityKey &&
@@ -382,38 +414,6 @@ export function CommunityWorkspace({
       (visibleMessages.length > 0 &&
         visibleMessages.every((message) => message.encrypted)));
 
-  const members = useMemo<MemberView[]>(
-    () =>
-      community.memberIds.map((identityId) => ({
-        identity: memberIdentities[identityId],
-        identityId,
-        pictureUrl: memberPictures[identityId] ?? null,
-      })),
-    [community.memberIds, memberIdentities, memberPictures],
-  );
-  const communityMemberIdsKey = useMemo(
-    () => community.memberIds.join('\u0000'),
-    [community.memberIds],
-  );
-  const communityMemberIds = useMemo(
-    () =>
-      communityMemberIdsKey.length > 0
-        ? communityMemberIdsKey.split('\u0000')
-        : [],
-    [communityMemberIdsKey],
-  );
-  const voiceConnectedIdentityIds = useMemo(
-    () =>
-      voiceChannels.flatMap((channel) => channel.connectedIdentityIds ?? []),
-    [voiceChannels],
-  );
-  const identityIdsToLoad = useMemo(
-    () =>
-      Array.from(
-        new Set([...communityMemberIds, ...voiceConnectedIdentityIds]),
-      ),
-    [communityMemberIds, voiceConnectedIdentityIds],
-  );
   const openMemberProfile = useCallback(
     (member: MemberView, anchor?: ProfilePopoverAnchor) =>
       setProfileViewer({ ...member, anchor }),
@@ -583,24 +583,6 @@ export function CommunityWorkspace({
       setCommunityLeaving(false);
     }
   };
-  const visibleTextChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-
-    if (!query) return textChannels;
-
-    return textChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [channelSearch, textChannels]);
-  const visibleVoiceChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-
-    if (!query) return voiceChannels;
-
-    return voiceChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [channelSearch, voiceChannels]);
   const isScrolledNearBottom = useCallback(() => {
     const scroller = scrollerRef.current;
 
@@ -637,109 +619,6 @@ export function CommunityWorkspace({
     },
     [onChannelSelected, onChannelViewed, onMobileSidebarClose],
   );
-  const ownIdentityPictures = useMemo(
-    () =>
-      memberPictures[session.identity.id]
-        ? { [session.identity.id]: memberPictures[session.identity.id] }
-        : {},
-    [memberPictures, session.identity.id],
-  );
-  const reactionAuthorNames = useMemo(
-    () =>
-      Object.fromEntries(
-        community.memberIds.map((identityId) => [
-          identityId,
-          memberDisplayName(memberIdentities[identityId], identityId),
-        ]),
-      ),
-    [community.memberIds, memberIdentities],
-  );
-  const callParticipantForIdentity = useCallback(
-    (identityId: string): CallParticipant => {
-      const identity =
-        identityId === session.identity.id
-          ? session.identity
-          : memberIdentities[identityId];
-
-      return {
-        identity,
-        identityId,
-        deafened: false,
-        muted: false,
-        name: identity
-          ? (identityName(identity) ?? shortId(identityId))
-          : shortId(identityId),
-        picture: memberPictures[identityId] ?? null,
-      };
-    },
-    [memberIdentities, memberPictures, session.identity],
-  );
-  const voiceParticipantViewForIdentity = useCallback(
-    (
-      identityId: string,
-      activeParticipant?: CallParticipant,
-    ): CallParticipant => {
-      const fallbackParticipant = callParticipantForIdentity(identityId);
-
-      if (!activeParticipant) return fallbackParticipant;
-
-      return {
-        ...activeParticipant,
-        identity: activeParticipant.identity ?? fallbackParticipant.identity,
-        name:
-          activeParticipant.name?.trim() &&
-          activeParticipant.name !== shortId(identityId)
-            ? activeParticipant.name
-            : fallbackParticipant.name,
-        picture: activeParticipant.picture ?? fallbackParticipant.picture,
-      };
-    },
-    [callParticipantForIdentity],
-  );
-  const voiceParticipantsForChannel = useCallback(
-    (channel: CommunityChannel): CallParticipant[] => {
-      if (channel.type !== 'voice') return [];
-
-      const activeParticipants =
-        activeVoiceChannelId === channel.id
-          ? (activeCall?.participants ?? [])
-          : [];
-      const activeByIdentityId = new Map(
-        activeParticipants.map((participant) => [
-          participant.identityId,
-          participant,
-        ]),
-      );
-      const identityIds = Array.from(
-        new Set([
-          ...(channel.connectedIdentityIds ?? []),
-          ...activeParticipants.map((participant) => participant.identityId),
-        ]),
-      );
-
-      return identityIds.map((identityId) =>
-        voiceParticipantViewForIdentity(
-          identityId,
-          activeByIdentityId.get(identityId),
-        ),
-      );
-    },
-    [
-      activeCall?.participants,
-      activeVoiceChannelId,
-      voiceParticipantViewForIdentity,
-    ],
-  );
-  const voiceParticipantsByChannelId = useMemo(
-    () =>
-      new Map(
-        visibleVoiceChannels.map((channel) => [
-          channel.id,
-          voiceParticipantsForChannel(channel),
-        ]),
-      ),
-    [visibleVoiceChannels, voiceParticipantsForChannel],
-  );
   const communityData = useMemo(
     () => ({
       frontendDerived: {
@@ -774,46 +653,6 @@ export function CommunityWorkspace({
 
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
   }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void Promise.all(
-      identityIdsToLoad.map(async (identityId) => {
-        try {
-          const identity =
-            identityId === session.identity.id
-              ? session.identity
-              : await pigeonApplication.getIdentity(
-                  normalizeIdentityId(identityId),
-                );
-          const pictureUrl = await loadIdentityPicture(identity);
-
-          return [identityId, identity, pictureUrl] as const;
-        } catch {
-          return [identityId, undefined, null] as const;
-        }
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-
-      const nextIdentities: Record<string, IdentityResource> = {};
-      const nextPictures: Record<string, string> = {};
-
-      for (const [identityId, identity, pictureUrl] of entries) {
-        if (identity) nextIdentities[identityId] = identity;
-
-        if (pictureUrl) nextPictures[identityId] = pictureUrl;
-      }
-
-      setMemberIdentities(nextIdentities);
-      setMemberPictures(nextPictures);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [identityIdsToLoad, session.identity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1525,78 +1364,21 @@ export function CommunityWorkspace({
               </div>
             </div>
 
-            <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.channels}
-              </div>
-              <input
-                value={channelSearch}
-                onChange={(event) => setChannelSearch(event.target.value)}
-                className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                placeholder={copy.communities.searchChannels}
-              />
-              <div className="space-y-2">
-                {textChannels.length === 0 && voiceChannels.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                    {copy.communities.noChannels}
-                  </div>
-                ) : visibleTextChannels.length === 0 &&
-                  visibleVoiceChannels.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-                    {copy.communities.noMatchingChannels}
-                  </div>
-                ) : (
-                  <>
-                    {visibleTextChannels.map((channel) => (
-                      <button
-                        key={channel.id}
-                        type="button"
-                        onClick={() => handleChannelSelected(channel.id)}
-                        className={cx(
-                          'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
-                          selectedChannelId === channel.id
-                            ? 'bg-white text-slate-950'
-                            : 'bg-white/8 text-white hover:bg-white/14',
-                        )}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          # {channel.name}
-                        </span>
-                        {(channelUnreadCounts[channel.id] ?? 0) > 0 && (
-                          <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
-                            {(channelUnreadCounts[channel.id] ?? 0) > 9
-                              ? '9+'
-                              : channelUnreadCounts[channel.id]}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                    {visibleVoiceChannels.length > 0 && (
-                      <div className="pt-3">
-                        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                          {copy.calls.voiceChannels}
-                        </div>
-                        <div className="space-y-2">
-                          {visibleVoiceChannels.map((channel) => (
-                            <VoiceChannelButton
-                              key={channel.id}
-                              active={activeVoiceChannelId === channel.id}
-                              channel={channel}
-                              onJoin={joinVoiceChannel}
-                              onParticipantClick={openVoiceParticipantProfile}
-                              participants={
-                                voiceParticipantsByChannelId.get(channel.id) ??
-                                []
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+            <CommunityChannelList
+              activeVoiceChannelId={activeVoiceChannelId}
+              channelSearch={channelSearch}
+              channelUnreadCounts={channelUnreadCounts}
+              onChannelSearchChange={setChannelSearch}
+              onTextChannelSelected={handleChannelSelected}
+              onVoiceChannelJoin={joinVoiceChannel}
+              onVoiceParticipantClick={openVoiceParticipantProfile}
+              selectedChannelId={selectedChannelId}
+              textChannels={textChannels}
+              visibleTextChannels={visibleTextChannels}
+              visibleVoiceChannels={visibleVoiceChannels}
+              voiceChannels={voiceChannels}
+              voiceParticipantsByChannelId={voiceParticipantsByChannelId}
+            />
             <UserProfileDropdown
               activeCall={activeCall}
               identityPictures={ownIdentityPictures}
@@ -1619,152 +1401,74 @@ export function CommunityWorkspace({
       </aside>
 
       <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
-        <header className="border-b border-white/10 p-4 sm:p-5">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onOpenMobileSidebar}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white lg:hidden"
-              aria-label={copy.chat.menu}
-            >
-              ☰
-            </button>
-            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
+        <CommunityHeader
+          avatarUrl={avatarUrl}
+          channelEncryptionReady={channelEncryptionReady}
+          channelEncryptionTooltip={channelEncryptionTooltip}
+          community={community}
+          communityLeaveError={communityLeaveError}
+          communityMenuOpen={communityMenuOpen}
+          menuContent={
+            communityMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-30 cursor-default"
+                  onClick={() => setCommunityMenuOpen(false)}
+                  aria-label={copy.dialog.close}
                 />
-              ) : (
-                community.name.slice(0, 1).toUpperCase()
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <h1 className="truncate text-2xl font-black">
-                  {selectedChannel
-                    ? `# ${selectedChannel.name}`
-                    : community.name}
-                </h1>
-                <span
-                  className={
-                    channelEncryptionReady
-                      ? 'shrink-0 text-emerald-300'
-                      : 'shrink-0 text-rose-300'
-                  }
-                  title={channelEncryptionTooltip}
-                  aria-label={channelEncryptionTooltip}
-                >
-                  <LockIcon locked={channelEncryptionReady} />
-                </span>
-              </div>
-              {selectedChannel ? (
-                <p className="truncate text-sm text-white/50">
-                  {copy.communities.channelMetadataOnly}{' '}
-                  <span title={community.networkId}>{networkName}</span>
-                </p>
-              ) : (
-                <p className="truncate text-sm text-white/50">
-                  {community.description}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onRealtimeEventsOpen}
-              className={cx(
-                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
-                realtimeStatus === 'connected'
-                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
-                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
-              )}
-              title={
-                realtimeStatus === 'connected'
-                  ? copy.chat.realtimeConnected
-                  : copy.chat.realtimeReconnecting
-              }
-            >
-              <span
-                className={cx(
-                  'h-2 w-2 rounded-full',
-                  realtimeStatus === 'connected'
-                    ? 'bg-emerald-300'
-                    : 'bg-amber-300',
-                )}
-              />
-              {realtimeStatus === 'connected'
-                ? copy.chat.realtimeConnected
-                : copy.chat.realtimeReconnecting}
-            </button>
-            <div className="relative ml-auto shrink-0">
-              {communityLeaveError ? (
-                <div className="absolute bottom-[calc(100%+.5rem)] right-0 z-40 w-72 rounded-2xl border border-rose-300/20 bg-rose-500/15 p-3 text-xs font-black text-rose-100 shadow-2xl shadow-black/40">
-                  {communityLeaveError}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setCommunityMenuOpen((isOpen) => !isOpen)}
-                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
-                aria-label={copy.chat.conversationMenu}
-                aria-expanded={communityMenuOpen}
-              >
-                ⋮
-              </button>
-              {communityMenuOpen && (
-                <>
+                <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
                   <button
                     type="button"
-                    className="fixed inset-0 z-30 cursor-default"
-                    onClick={() => setCommunityMenuOpen(false)}
-                    aria-label={copy.dialog.close}
-                  />
-                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCommunityDataOpen(true);
-                        setCommunityMenuOpen(false);
-                      }}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {copy.chat.viewData}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (communityKey) {
-                          openCopyCommunityKeyDialog();
-                        } else {
-                          setCommunityKeyError(null);
-                          setCommunityKeyDialog('add');
-                        }
+                    onClick={() => {
+                      setCommunityDataOpen(true);
+                      setCommunityMenuOpen(false);
+                    }}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                  >
+                    {copy.chat.viewData}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (communityKey) {
+                        openCopyCommunityKeyDialog();
+                      } else {
+                        setCommunityKeyError(null);
+                        setCommunityKeyDialog('add');
+                      }
 
-                        setCommunityMenuOpen(false);
-                      }}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {communityKey
-                        ? copy.chat.copyPrivateKey
-                        : copy.chat.addPrivateKey}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void leaveCommunity()}
-                      disabled={communityLeaving}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
-                    >
-                      {communityLeaving
-                        ? copy.communities.leaving
-                        : copy.communities.leave}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </header>
+                      setCommunityMenuOpen(false);
+                    }}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                  >
+                    {communityKey
+                      ? copy.chat.copyPrivateKey
+                      : copy.chat.addPrivateKey}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void leaveCommunity()}
+                    disabled={communityLeaving}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                  >
+                    {communityLeaving
+                      ? copy.communities.leaving
+                      : copy.communities.leave}
+                  </button>
+                </div>
+              </>
+            )
+          }
+          networkName={networkName}
+          onCommunityMenuToggle={() =>
+            setCommunityMenuOpen((isOpen) => !isOpen)
+          }
+          onOpenMobileSidebar={onOpenMobileSidebar}
+          onRealtimeEventsOpen={onRealtimeEventsOpen}
+          realtimeStatus={realtimeStatus}
+          selectedChannel={selectedChannel}
+        />
 
         {!selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
@@ -1867,76 +1571,20 @@ export function CommunityWorkspace({
         )}
       </section>
 
-      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block">
-        <button
-          type="button"
-          onClick={() => setMemberOpen(true)}
-          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-        >
-          {copy.communities.addMember}
-        </button>
-        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-          {copy.communities.members}
-        </div>
-        <div className="space-y-2">
-          {members.map((member) => (
-            <MemberRow
-              key={member.identityId}
-              identity={member.identity}
-              identityId={member.identityId}
-              onClick={(event) =>
-                openMemberProfile(
-                  member,
-                  profileAnchorFromTarget(event.currentTarget),
-                )
-              }
-              owner={member.identityId === community.ownerIdentityId}
-              pictureUrl={member.pictureUrl}
-              presence={presenceByIdentityId[member.identityId]}
-            />
-          ))}
-        </div>
-      </aside>
-
-      {mobileMembersOpen && (
-        <>
-          <button
-            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
-            onClick={onMobileMembersClose}
-            aria-label={copy.dialog.close}
-          />
-          <aside className="glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden">
-            <button
-              type="button"
-              onClick={() => setMemberOpen(true)}
-              className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              {copy.communities.addMember}
-            </button>
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              {copy.communities.members}
-            </div>
-            <div className="space-y-2">
-              {members.map((member) => (
-                <MemberRow
-                  key={member.identityId}
-                  identity={member.identity}
-                  identityId={member.identityId}
-                  onClick={(event) =>
-                    openMemberProfile(
-                      member,
-                      profileAnchorFromTarget(event.currentTarget),
-                    )
-                  }
-                  owner={member.identityId === community.ownerIdentityId}
-                  pictureUrl={member.pictureUrl}
-                  presence={presenceByIdentityId[member.identityId]}
-                />
-              ))}
-            </div>
-          </aside>
-        </>
-      )}
+      <CommunityMembersPanel
+        community={community}
+        members={members}
+        onAddMember={() => setMemberOpen(true)}
+        onCloseMobile={onMobileMembersClose}
+        onMemberClick={(member, event) =>
+          openMemberProfile(
+            member,
+            profileAnchorFromTarget(event.currentTarget),
+          )
+        }
+        openMobile={mobileMembersOpen}
+        presenceByIdentityId={presenceByIdentityId}
+      />
 
       <Suspense fallback={null}>
         {bannerViewerOpen && bannerUrl && (
@@ -2046,246 +1694,4 @@ export function CommunityWorkspace({
       </Suspense>
     </>
   );
-}
-
-type VoiceParticipantView = {
-  deafened?: boolean;
-  identityId: string;
-  muted: boolean;
-  name: string;
-  picture?: null | string;
-  speaking?: boolean;
-};
-
-const VoiceChannelButton = memo(function VoiceChannelButton({
-  active,
-  channel,
-  onJoin,
-  onParticipantClick,
-  participants,
-}: {
-  active: boolean;
-  channel: CommunityVoiceChannel;
-  onJoin: (channel: CommunityVoiceChannel) => void;
-  onParticipantClick: (
-    participant: VoiceParticipantView,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => void;
-  participants: VoiceParticipantView[];
-}) {
-  return (
-    <div
-      className={cx(
-        'overflow-hidden rounded-2xl',
-        active ? 'bg-white/10' : 'bg-white/5',
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => onJoin(channel)}
-        className={cx(
-          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-black transition',
-          active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/8',
-        )}
-        title={copy.calls.joinVoice}
-      >
-        <span className="text-emerald-300">
-          <VoiceIcon />
-        </span>
-        <span className="min-w-0 flex-1 truncate">{channel.name}</span>
-      </button>
-      {participants.length > 0 && (
-        <div className="space-y-1 px-3 pb-3">
-          {participants.map((participant) => (
-            <VoiceParticipantButton
-              active={active}
-              key={participant.identityId}
-              participant={participant}
-              onClick={onParticipantClick}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}, areVoiceChannelButtonPropsEqual);
-
-function areVoiceChannelButtonPropsEqual(
-  previous: {
-    active: boolean;
-    channel: CommunityVoiceChannel;
-    participants: VoiceParticipantView[];
-  },
-  next: {
-    active: boolean;
-    channel: CommunityVoiceChannel;
-    participants: VoiceParticipantView[];
-  },
-): boolean {
-  return (
-    previous.active === next.active &&
-    previous.channel.id === next.channel.id &&
-    previous.channel.name === next.channel.name &&
-    areVoiceParticipantsEqual(previous.participants, next.participants)
-  );
-}
-
-function areVoiceParticipantsEqual(
-  previous: VoiceParticipantView[],
-  next: VoiceParticipantView[],
-): boolean {
-  if (previous.length !== next.length) return false;
-
-  return previous.every((participant, index) => {
-    const nextParticipant = next[index];
-
-    return (
-      participant.identityId === nextParticipant.identityId &&
-      participant.name === nextParticipant.name &&
-      participant.picture === nextParticipant.picture &&
-      participant.muted === nextParticipant.muted &&
-      participant.deafened === nextParticipant.deafened &&
-      participant.speaking === nextParticipant.speaking
-    );
-  });
-}
-
-const VoiceParticipantButton = memo(function VoiceParticipantButton({
-  active,
-  onClick,
-  participant,
-}: {
-  active: boolean;
-  onClick: (
-    participant: VoiceParticipantView,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => void;
-  participant: VoiceParticipantView;
-}) {
-  const speaking = active && participant.speaking;
-
-  return (
-    <button
-      type="button"
-      onClick={(event) => onClick(participant, event)}
-      className={cx(
-        'flex w-full items-center gap-2 rounded-2xl border px-2 py-1.5 text-left text-sm transition hover:bg-white/8 hover:text-white',
-        speaking
-          ? 'border-emerald-300/80 bg-emerald-400/10 text-emerald-100 shadow-[0_0_0_2px_rgba(110,231,183,0.18)]'
-          : 'border-transparent text-white/55',
-      )}
-    >
-      <div
-        className={cx(
-          'grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950',
-          speaking && 'ring-2 ring-emerald-200/60',
-        )}
-      >
-        {participant.picture ? (
-          <img
-            src={participant.picture}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          participant.name.slice(0, 1).toUpperCase()
-        )}
-      </div>
-      <span className="min-w-0 flex-1 truncate">
-        {voiceParticipantName(participant.name)}
-      </span>
-      <VoiceParticipantStatusIcons
-        deafened={participant.deafened}
-        muted={participant.muted}
-      />
-    </button>
-  );
-}, areVoiceParticipantButtonPropsEqual);
-
-function areVoiceParticipantButtonPropsEqual(
-  previous: {
-    active: boolean;
-    participant: VoiceParticipantView;
-  },
-  next: {
-    active: boolean;
-    participant: VoiceParticipantView;
-  },
-): boolean {
-  return (
-    previous.active === next.active &&
-    previous.participant.identityId === next.participant.identityId &&
-    previous.participant.name === next.participant.name &&
-    previous.participant.picture === next.participant.picture &&
-    previous.participant.muted === next.participant.muted &&
-    previous.participant.deafened === next.participant.deafened &&
-    previous.participant.speaking === next.participant.speaking
-  );
-}
-
-const VoiceParticipantStatusIcons = memo(function VoiceParticipantStatusIcons({
-  deafened,
-  muted,
-}: {
-  deafened?: boolean;
-  muted: boolean;
-}) {
-  if (!muted && !deafened) return null;
-
-  return (
-    <span className="flex shrink-0 items-center gap-1 text-fuchsia-200 [&_svg]:h-4 [&_svg]:w-4">
-      {muted && <MicrophoneIcon muted />}
-      {deafened && <HeadphonesIcon deafened />}
-    </span>
-  );
-});
-
-function voiceParticipantName(name: string): string {
-  return name.replace(/\s*\(@[^)]*\)\s*$/, '').trim() || name;
-}
-
-function resolveCommunityChannelId(
-  channelId: null | string | undefined,
-  channels: CommunityTextChannel[],
-): null | string {
-  if (channelId && channels.some((channel) => channel.id === channelId)) {
-    return channelId;
-  }
-
-  return channels[0]?.id ?? null;
-}
-
-function mergeChatMessages(
-  currentMessages: ChatMessage[],
-  incomingMessages: ChatMessage[],
-): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>();
-
-  for (const message of currentMessages) byId.set(message.id, message);
-  for (const message of incomingMessages) byId.set(message.id, message);
-
-  return [...byId.values()].sort(
-    (left, right) => left.timestamp - right.timestamp,
-  );
-}
-
-function realtimeStringAttribute(
-  event: RealtimeDomainEvent,
-  ...keys: string[]
-): string | undefined {
-  for (const key of keys) {
-    const value = event.attributes[key];
-
-    if (typeof value === 'string' && value.length > 0) return value;
-  }
-
-  return undefined;
-}
-
-function realtimeMessageAttribute(
-  event: RealtimeDomainEvent,
-): MessageResource | null {
-  const value = event.attributes.message;
-
-  return value && typeof value === 'object' ? (value as MessageResource) : null;
 }
