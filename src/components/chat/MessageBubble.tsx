@@ -15,7 +15,7 @@ import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
-import { MarkdownMessage } from './MarkdownMessage';
+import { MarkdownMessage, type MarkdownMention } from './MarkdownMessage';
 import {
   AttachmentCard,
   ImageAttachmentAlbum,
@@ -44,6 +44,7 @@ interface MessageBubbleProps {
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onMentionClick?: (identityId: string, target: HTMLElement) => void;
   onReactionToggle?: (
     message: ChatMessage,
     emoji: string,
@@ -53,6 +54,7 @@ interface MessageBubbleProps {
   onRetryMessage?: (message: ChatMessage) => void;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
+  mentionTokens?: MarkdownMention[];
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -70,11 +72,13 @@ export function MessageBubble({
   onAttachmentPreview,
   onAvatarClick,
   onMessageMenuOpen,
+  onMentionClick,
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
   reactionAuthorNames = {},
+  mentionTokens = [],
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -257,7 +261,12 @@ export function MessageBubble({
                     message.encrypted && 'text-white/55',
                   )}
                 >
-                  <MarkdownMessage content={message.content} mine={mine} />
+                  <MarkdownMessage
+                    content={message.content}
+                    mentions={mentionTokens}
+                    mine={mine}
+                    onMentionClick={onMentionClick}
+                  />
                 </div>
               )}
               {linkPreview && (

@@ -8,6 +8,7 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../domain/types';
+import type { MarkdownMention } from '../chat/MarkdownMessage';
 
 import { copy } from '../../i18n/en';
 import { formatDateSeparator } from '../../utils/formatting';
@@ -42,6 +43,7 @@ interface CommunityMessageTimelineProps {
   onAddCommunityKey: () => void;
   onAttachmentOpen: (attachment?: MessageAttachment) => void;
   onAuthorProfileOpen: (message: ChatMessage, target: HTMLElement) => void;
+  onIdentityProfileOpen?: (identityId: string, target: HTMLElement) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReactionToggle: (
@@ -72,6 +74,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onAddCommunityKey,
   onAttachmentOpen,
   onAuthorProfileOpen,
+  onIdentityProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
   onReactionToggle,
@@ -181,11 +184,16 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         onAuthorProfileOpen(message, event.currentTarget)
                       }
                       onMessageMenuOpen={onMessageMenuOpen}
+                      onMentionClick={onIdentityProfileOpen}
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
                       onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
+                      mentionTokens={messageMentionTokens(
+                        message,
+                        memberIdentities,
+                      )}
                       replyImage={messageReplyImage(message, replyMessage)}
                       replySticker={messageReplySticker(message, replyMessage)}
                       replyAuthorName={
@@ -236,3 +244,25 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     </div>
   );
 });
+
+function messageMentionTokens(
+  message: ChatMessage,
+  memberIdentities: Record<string, IdentityResource>,
+): MarkdownMention[] {
+  return (message.mentions ?? []).flatMap((mention): MarkdownMention[] => {
+    if (mention.type !== 'identity') return [];
+
+    const identity = memberIdentities[mention.targetId];
+    const tokens = new Set<string>();
+    const handle = identity?.profile.handle?.trim();
+    const name = memberPrimaryName(identity, mention.targetId);
+
+    if (handle) tokens.add(`@${handle}`);
+    tokens.add(`@${name}`);
+
+    return [...tokens].map((token) => ({
+      identityId: mention.targetId,
+      token,
+    }));
+  });
+}

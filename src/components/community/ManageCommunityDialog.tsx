@@ -16,13 +16,9 @@ import {
   communityChannels,
   splitCommunityChannels,
 } from '../../domain/communities/communityChannels';
-import {
-  ALL_COMMUNITY_PERMISSIONS,
-  communityPermissionsFor,
-} from '../../domain/communities/communityPermissions';
+import { communityPermissionsFor } from '../../domain/communities/communityPermissions';
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
-import { shortId } from '../../utils/formatting';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import {
@@ -31,7 +27,12 @@ import {
   VoiceIcon,
 } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
-import { MemberRow } from './MemberRow';
+import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
+import { CommunityRolesPanel } from './CommunityRolesPanel';
+import {
+  CommunitySettingsNavigation,
+  type CommunitySettingsSection,
+} from './CommunitySettingsNavigation';
 
 const ImageCropEditor = lazy(() =>
   import('../common/ImageCropEditor').then((module) => ({
@@ -77,9 +78,8 @@ export function ManageCommunityDialog({
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
     communityChannels(community),
   );
-  const [activeSection, setActiveSection] = useState<
-    'channels' | 'members' | 'profile' | 'roles'
-  >('profile');
+  const [activeSection, setActiveSection] =
+    useState<CommunitySettingsSection>('profile');
   const [roles, setRoles] = useState<CommunityRoleResource[]>(
     community.roles ?? [],
   );
@@ -136,11 +136,11 @@ export function ManageCommunityDialog({
   const canManageRoles = isOwner || currentPermissions.has('manage_roles');
   const canBanMembers = isOwner || currentPermissions.has('ban_members');
   const sections = [
-    ...(isOwner ? ([['profile', 'Profile']] as const) : []),
+    ...(isOwner ? ([['profile', copy.communities.profile]] as const) : []),
     ...(canManageChannels
       ? ([['channels', copy.communities.channels]] as const)
       : []),
-    ...(canManageRoles ? ([['roles', 'Roles']] as const) : []),
+    ...(canManageRoles ? ([['roles', copy.communities.roles]] as const) : []),
     ...(canManageRoles || canBanMembers
       ? ([['members', copy.communities.members]] as const)
       : []),
@@ -361,7 +361,7 @@ export function ManageCommunityDialog({
       setSelectedRoleId(role.id);
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'The role could not be saved.'));
+      setError(toUserErrorMessage(caught, copy.communities.roleSaveError));
     } finally {
       setState('idle');
     }
@@ -384,7 +384,7 @@ export function ManageCommunityDialog({
       );
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'The role could not be saved.'));
+      setError(toUserErrorMessage(caught, copy.communities.roleSaveError));
     } finally {
       setState('idle');
     }
@@ -400,7 +400,7 @@ export function ManageCommunityDialog({
       setSelectedRoleId('');
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'The role could not be deleted.'));
+      setError(toUserErrorMessage(caught, copy.communities.roleDeleteError));
     } finally {
       setState('idle');
     }
@@ -418,7 +418,7 @@ export function ManageCommunityDialog({
       );
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Member roles could not be saved.'));
+      setError(toUserErrorMessage(caught, copy.communities.memberRolesError));
     } finally {
       setState('idle');
     }
@@ -431,7 +431,7 @@ export function ManageCommunityDialog({
       await pigeonApplication.banCommunityMember(session, community.id, identityId);
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'The member could not be banned.'));
+      setError(toUserErrorMessage(caught, copy.communities.banMemberError));
     } finally {
       setState('idle');
     }
@@ -448,7 +448,7 @@ export function ManageCommunityDialog({
       );
       await refreshCommunity();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'The member could not be unbanned.'));
+      setError(toUserErrorMessage(caught, copy.communities.unbanMemberError));
     } finally {
       setState('idle');
     }
@@ -643,23 +643,11 @@ export function ManageCommunityDialog({
       <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
-          <nav className="mb-4 flex gap-2 overflow-x-auto rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1 sm:overflow-visible">
-            {sections.map(([section, label]) => (
-              <button
-                key={section}
-                type="button"
-                onClick={() => setActiveSection(section)}
-                className={cx(
-                  'shrink-0 rounded-xl px-3 py-2 text-left text-xs font-black transition sm:block sm:w-full',
-                  activeSection === section
-                    ? 'bg-white text-slate-950'
-                    : 'text-white/55 hover:bg-white/10',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <CommunitySettingsNavigation
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            sections={sections}
+          />
           <div className="flex min-h-0 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid gap-5 lg:items-start">
@@ -807,7 +795,7 @@ export function ManageCommunityDialog({
                     </button>
                     <div className="w-full rounded-2xl bg-black/20 p-2">
                       <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
-                        Visible roles
+                        {copy.communities.visibleRoles}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {roles.map((role) => (
@@ -878,7 +866,7 @@ export function ManageCommunityDialog({
             )}
               </div>
               {activeSection === 'roles' && (
-            <RolesPanel
+              <CommunityRolesPanel
               editableRoles={editableRoles}
               onCreateRole={() => void createRole()}
               onDeleteRole={(role) => void deleteRole(role)}
@@ -894,7 +882,7 @@ export function ManageCommunityDialog({
             />
               )}
               {activeSection === 'members' && (
-            <MembersAndBansPanel
+            <CommunityMembersRolesPanel
               bannedMemberIds={community.bannedMemberIds ?? []}
               editableRoles={editableRoles}
               memberIdentities={memberIdentities}
@@ -950,240 +938,6 @@ export function ManageCommunityDialog({
     document.body,
   );
 }
-
-function RolesPanel({
-  editableRoles,
-  onCreateRole,
-  onDeleteRole,
-  onRoleNameChange,
-  onRolePermissionToggle,
-  onRoleSelect,
-  onUpdateRole,
-  roleName,
-  rolePermissions,
-  roles,
-  selectedRole,
-  state,
-}: {
-  editableRoles: CommunityRoleResource[];
-  onCreateRole: () => void;
-  onDeleteRole: (role: CommunityRoleResource) => void;
-  onRoleNameChange: (value: string) => void;
-  onRolePermissionToggle: (permission: CommunityPermission) => void;
-  onRoleSelect: (roleId: string) => void;
-  onUpdateRole: () => void;
-  roleName: string;
-  rolePermissions: CommunityPermission[];
-  roles: CommunityRoleResource[];
-  selectedRole: CommunityRoleResource | null;
-  state: 'idle' | 'loading';
-}) {
-  return (
-    <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <div className="flex min-h-[24rem] flex-col rounded-2xl border border-white/10 bg-black/20 p-3">
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {roles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              onClick={() => onRoleSelect(role.id)}
-              className={cx(
-                'block w-full rounded-2xl px-3 py-2 text-left text-sm font-black transition',
-                selectedRole?.id === role.id
-                  ? 'bg-white text-slate-950'
-                  : 'bg-white/8 text-white/75 hover:bg-white/12',
-              )}
-            >
-              {role.name}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            onRoleSelect('');
-            onRoleNameChange('');
-          }}
-          className="mt-3 w-full rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
-        >
-          + Role
-        </button>
-      </div>
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-        <input
-          value={roleName}
-          onChange={(event) => onRoleNameChange(event.target.value)}
-          className="mb-4 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none focus:border-cyan-300/60"
-          placeholder="Role name"
-        />
-        <div className="grid gap-2 sm:grid-cols-2">
-          {ALL_COMMUNITY_PERMISSIONS.map((permission) => (
-            <label
-              key={permission}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/75"
-            >
-              <span>{permission.replace(/_/g, ' ')}</span>
-              <input
-                type="checkbox"
-                checked={rolePermissions.includes(permission)}
-                onChange={() => onRolePermissionToggle(permission)}
-              />
-            </label>
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={selectedRole ? onUpdateRole : onCreateRole}
-            disabled={!roleName.trim() || selectedRole?.builtIn || state === 'loading'}
-            className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {selectedRole ? 'Save role' : 'Create role'}
-          </button>
-          {selectedRole && !selectedRole.builtIn && (
-            <button
-              type="button"
-              onClick={() => onDeleteRole(selectedRole)}
-              disabled={state === 'loading'}
-              className="rounded-2xl bg-rose-500/15 px-4 py-2 text-sm font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              Delete role
-            </button>
-          )}
-          {editableRoles.length === 0 && (
-            <span className="py-2 text-xs text-white/45">
-              Create a custom role to assign it to members.
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MembersAndBansPanel({
-  bannedMemberIds,
-  editableRoles,
-  memberIdentities,
-  memberIds,
-  memberPictures,
-  memberRoleDrafts,
-  onBan,
-  onSaveRoles,
-  onToggleMemberRole,
-  onUnban,
-  ownerIdentityId,
-  state,
-}: {
-  bannedMemberIds: string[];
-  editableRoles: CommunityRoleResource[];
-  memberIdentities: Record<string, IdentityResource>;
-  memberIds: string[];
-  memberPictures: Record<string, string>;
-  memberRoleDrafts: Record<string, string[]>;
-  onBan: (identityId: string) => void;
-  onSaveRoles: (identityId: string) => void;
-  onToggleMemberRole: (identityId: string, roleId: string) => void;
-  onUnban: (identityId: string) => void;
-  ownerIdentityId: string;
-  state: 'idle' | 'loading';
-}) {
-  const banned = new Set(bannedMemberIds);
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-        <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-          Members
-        </div>
-        <div className="space-y-3">
-          {memberIds
-            .filter((identityId) => !banned.has(identityId))
-            .map((identityId) => (
-              <div key={identityId} className="rounded-2xl bg-white/8 p-3">
-                <MemberRow
-                  identity={memberIdentities[identityId]}
-                  identityId={identityId}
-                  onClick={() => undefined}
-                  owner={identityId === ownerIdentityId}
-                  pictureUrl={memberPictures[identityId] ?? null}
-                />
-                {editableRoles.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {editableRoles.map((role) => (
-                      <label
-                        key={`${identityId}:${role.id}`}
-                        className="flex items-center gap-2 rounded-xl bg-black/25 px-3 py-2 text-xs font-black text-white/70"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(memberRoleDrafts[identityId] ?? []).includes(
-                            role.id,
-                          )}
-                          onChange={() => onToggleMemberRole(identityId, role.id)}
-                        />
-                        {role.name}
-                      </label>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => onSaveRoles(identityId)}
-                      disabled={state === 'loading'}
-                      className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      Save roles
-                    </button>
-                  </div>
-                )}
-                {identityId !== ownerIdentityId && (
-                  <button
-                    type="button"
-                    onClick={() => onBan(identityId)}
-                    disabled={state === 'loading'}
-                    className="mt-3 rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Ban
-                  </button>
-                )}
-              </div>
-            ))}
-        </div>
-      </div>
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-        <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-          Banned
-        </div>
-        {bannedMemberIds.length === 0 ? (
-          <div className="rounded-2xl bg-white/8 p-4 text-sm text-white/45">
-            No banned members.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {bannedMemberIds.map((identityId) => (
-              <div
-                key={identityId}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-white/8 p-3"
-              >
-                <span className="min-w-0 truncate text-sm font-black text-white">
-                  {shortId(identityId)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onUnban(identityId)}
-                  disabled={state === 'loading'}
-                  className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  Unban
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function draftChannelId(): string {
   return `draft:${UUID.generate().toString()}`;
 }

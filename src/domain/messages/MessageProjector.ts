@@ -210,6 +210,7 @@ export class MessageProjector {
       attachments: [],
       content: message.content ?? '',
       encrypted: false,
+      mentions: message.mentions,
       raw: message,
     };
   }

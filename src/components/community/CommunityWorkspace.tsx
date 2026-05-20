@@ -81,6 +81,10 @@ import {
 } from './CommunityMembersPanel';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 import {
+  CommunityMentionPanel,
+  type CommunityMentionSuggestion,
+} from './CommunityMentionPanel';
+import {
   mergeChatMessages,
   realtimeMessageAttribute,
   realtimeStringAttribute,
@@ -401,7 +405,7 @@ export function CommunityWorkspace({
         const handle = member.identity?.profile.handle?.trim();
 
         return {
-          description: handle ? `@${handle}` : shortId(member.identityId),
+          description: handle ? `@${handle}` : copy.composer.identityMention,
           id: member.identityId,
           label,
           mention: { targetId: member.identityId, type: 'identity' } as const,
@@ -421,7 +425,7 @@ export function CommunityWorkspace({
                 !role.builtIn && role.name.toLowerCase().includes(query),
             )
             .map((role) => ({
-              description: 'role',
+              description: copy.composer.roleMention,
               id: role.id,
               label: role.name,
               mention: { targetId: role.id, type: 'role' } as const,
@@ -432,7 +436,7 @@ export function CommunityWorkspace({
       [
         currentPermissions.has('mention_everyone')
           ? {
-              description: 'all members',
+              description: copy.composer.everyoneMention,
               id: 'everyone',
               label: 'everyone',
               mention: { type: 'everyone' } as const,
@@ -441,7 +445,7 @@ export function CommunityWorkspace({
           : null,
         currentPermissions.has('mention_here')
           ? {
-              description: 'channel members',
+              description: copy.composer.hereMention,
               id: 'here',
               label: 'here',
               mention: { type: 'here' } as const,
@@ -472,6 +476,27 @@ export function CommunityWorkspace({
     },
     [draft],
   );
+  const mentionTokens = useMemo(
+    () =>
+      selectedChannel
+        ? communityMentionTokens(
+            community,
+            selectedChannel,
+            memberIdentities,
+            currentPermissions,
+          )
+        : [],
+    [community, currentPermissions, memberIdentities, selectedChannel],
+  );
+  const autocompleteMention = useCallback(() => {
+    const suggestion = mentionSuggestions[0];
+
+    if (!suggestion) return false;
+
+    insertMention(suggestion.token);
+
+    return true;
+  }, [insertMention, mentionSuggestions]);
   const channelEncryptionReady =
     !!selectedChannel &&
     !!communityKey &&
@@ -1061,11 +1086,13 @@ export function CommunityWorkspace({
         deliveryStatus: 'pending',
         encrypted: false,
         id: optimisticId,
+        mentions: payload.mentions,
         mine: true,
         raw: {
           channelId: payload.channelId,
           communityId: community.id,
           id: optimisticId,
+          mentions: payload.mentions,
           type: 'sent',
         },
         reactions: [],
@@ -1650,6 +1677,19 @@ export function CommunityWorkspace({
                   profileAnchorFromTarget(target),
                 )
               }
+              onIdentityProfileOpen={(identityId, target) =>
+                openMemberProfile(
+                  {
+                    identity:
+                      identityId === session.identity.id
+                        ? session.identity
+                        : memberIdentities[identityId],
+                    identityId,
+                    pictureUrl: memberPictures[identityId] ?? null,
+                  },
+                  profileAnchorFromTarget(target),
+                )
+              }
               onJumpToLatest={() => {
                 setNewChannelMessageCount(0);
                 setIsAwayFromBottom(false);
@@ -1706,6 +1746,8 @@ export function CommunityWorkspace({
                   />
                 ) : null
               }
+              mentionTokens={mentionTokens}
+              onMentionAutocomplete={autocompleteMention}
               progress={attachmentProgress}
               replyTo={replyTarget}
               replyToAuthorName={
@@ -1858,53 +1900,6 @@ export function CommunityWorkspace({
   );
 }
 
-type CommunityMentionSuggestion = {
-  description: string;
-  id: string;
-  label: string;
-  mention: CommunityMessageMention;
-  token: string;
-};
-
-function CommunityMentionPanel({
-  onSelect,
-  suggestions,
-}: {
-  onSelect: (token: string) => void;
-  suggestions: CommunityMentionSuggestion[];
-}) {
-  return (
-    <div className="absolute bottom-full left-0 right-0 z-30 mb-2 overflow-hidden rounded-2xl border border-white/10 bg-[#24242b] p-2 shadow-2xl shadow-black/40">
-      <div className="mb-1 px-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
-        Mentions
-      </div>
-      {suggestions.map((suggestion) => (
-        <button
-          key={`${suggestion.mention.type}:${suggestion.id}`}
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            onSelect(suggestion.token);
-          }}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/10"
-        >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-400/20 text-sm font-black text-indigo-100">
-            @
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-black text-white">
-              {suggestion.label}
-            </span>
-            <span className="block truncate text-xs text-white/45">
-              {suggestion.description}
-            </span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function findMentionTrigger(
   value: string,
 ): { end: number; query: string; start: number } | null {
@@ -1970,6 +1965,38 @@ function communityMentionsForContent(
   }
 
   return dedupeCommunityMentions(mentions);
+}
+
+function communityMentionTokens(
+  community: Community,
+  channel: CommunityChannel,
+  identities: Record<string, IdentityResource>,
+  permissions: Set<CommunityPermission>,
+): string[] {
+  const tokens = new Set<string>();
+
+  if (permissions.has('mention_everyone')) tokens.add('@everyone');
+  if (permissions.has('mention_here')) tokens.add('@here');
+
+  if (permissions.has('mention_roles')) {
+    for (const role of community.roles ?? []) {
+      if (!role.builtIn) tokens.add(`@${role.name}`);
+    }
+  }
+
+  for (const identityId of communityMembersWithChannelAccess(
+    community,
+    channel,
+  )) {
+    const identity = identities[identityId];
+    const handle = identity?.profile.handle?.trim();
+    const name = memberDisplayName(identity, identityId);
+
+    if (handle) tokens.add(`@${handle}`);
+    tokens.add(`@${name}`);
+  }
+
+  return [...tokens];
 }
 
 function dedupeCommunityMentions(
