@@ -91,9 +91,7 @@ export function CommunityRolesPanel({
           <button
             type="button"
             onClick={selectedRole ? onUpdateRole : onCreateRole}
-            disabled={
-              !roleName.trim() || selectedRole?.builtIn || state === 'loading'
-            }
+            disabled={!roleName.trim() || state === 'loading'}
             className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {selectedRole

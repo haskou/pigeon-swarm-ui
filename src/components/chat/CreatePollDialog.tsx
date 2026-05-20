@@ -104,20 +104,36 @@ export function CreatePollDialog({
             {copy.polls.options}
           </div>
           {options.map((option, index) => (
-            <input
-              key={index}
-              value={option}
-              maxLength={OPTION_MAX_LENGTH}
-              onChange={(event) =>
-                setOptions((current) =>
-                  current.map((candidate, candidateIndex) =>
-                    candidateIndex === index ? event.target.value : candidate,
-                  ),
-                )
-              }
-              className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/60"
-              placeholder={`${copy.polls.option} ${index + 1}`}
-            />
+            <div key={index} className="flex gap-2">
+              <input
+                value={option}
+                maxLength={OPTION_MAX_LENGTH}
+                onChange={(event) =>
+                  setOptions((current) =>
+                    current.map((candidate, candidateIndex) =>
+                      candidateIndex === index ? event.target.value : candidate,
+                    ),
+                  )
+                }
+                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/60"
+                placeholder={`${copy.polls.option} ${index + 1}`}
+              />
+              {options.length > MIN_OPTIONS && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOptions((current) =>
+                      current.filter((_, candidateIndex) => candidateIndex !== index),
+                    )
+                  }
+                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-rose-500/15 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
+                  aria-label={copy.polls.removeOption}
+                  title={copy.polls.removeOption}
+                >
+                  ×
+                </button>
+              )}
+            </div>
           ))}
           {options.length < MAX_OPTIONS && (
             <button

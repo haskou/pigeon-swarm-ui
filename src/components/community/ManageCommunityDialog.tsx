@@ -371,8 +371,9 @@ export function ManageCommunityDialog({
     setActiveSection(sections[0]?.[0] ?? 'profile');
   }, [activeSection, sections]);
 
-  const selectedRole =
-    roles.find((role) => role.id === selectedRoleId) ?? roles[0] ?? null;
+  const selectedRole = selectedRoleId
+    ? (roles.find((role) => role.id === selectedRoleId) ?? null)
+    : null;
   const editableRoles = roles.filter((role) => !role.builtIn);
   const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
 
@@ -874,7 +875,7 @@ export function ManageCommunityDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
+      <section className="glass-panel-strong relative z-10 flex h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-w-5xl sm:rounded-2xl">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
         <div className="min-h-0 flex-1 gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
           <CommunitySettingsNavigation

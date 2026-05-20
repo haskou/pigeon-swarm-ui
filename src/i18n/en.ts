@@ -607,6 +607,7 @@ export const copy = {
     question: 'Question',
     questionInvalid:
       'Question is required and must be 200 characters or fewer.',
+    removeOption: 'Remove option',
     removeVote: 'Remove vote',
     vote: 'vote',
     voteAction: 'Vote',

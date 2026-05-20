@@ -4,6 +4,7 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 import type {
   ChatMessage,
   ConversationKeyEntry,
+  CommunityMessageMention,
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
@@ -47,6 +48,7 @@ type CommunityChannelPlainPayload = {
   authorIdentityId?: string;
   content?: string;
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
@@ -68,7 +70,7 @@ const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
 const projectedMessageCacheDatabaseName =
   'pigeon-community-message-projection-cache';
-const projectedMessageCacheDatabaseVersion = 2;
+const projectedMessageCacheDatabaseVersion = 3;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
 let projectedMessageCacheDatabasePromise: Promise<CacheDatabase> | null = null;
@@ -164,6 +166,7 @@ async function decryptMessage(
       content: payload.sticker ? '' : (payload.content ?? ''),
       encrypted: false,
       linkPreview: payload.linkPreview,
+      mentions: payload.mentions ?? message.mentions,
       mine: authorIdentityId === request.currentIdentityId,
       raw: message,
       replyPreview: payload.reply,
