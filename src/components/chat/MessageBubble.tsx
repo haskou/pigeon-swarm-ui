@@ -21,17 +21,17 @@ import {
   AttachmentCard,
   ImageAttachmentAlbum,
   isImageAttachment,
-  type IndexedAttachment,
 } from './MessageAttachments';
+import {
+  MessageAttachmentProgress,
+  MessageDeliveryStatus,
+  MessageStickerContent,
+} from './MessageBubbleContent';
 import {
   groupMessageReactions,
   MessageReactions,
 } from './MessageReactions';
 import { MessageReplyPreview } from './MessageReplyPreview';
-import {
-  stickerAssetUrl,
-  useStickerPressPreview,
-} from './StickerPressPreview';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -115,7 +115,6 @@ export function MessageBubble({
   );
   const linkPreview = message.linkPreview;
   const sticker = message.sticker;
-  const stickerPreview = useStickerPressPreview(sticker?.assetCid ?? '');
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -217,122 +216,65 @@ export function MessageBubble({
                   replySticker={replySticker}
                 />
               )}
-            {message.attachments.length > 0 && (
-              <div className="grid gap-2">
-                {imageAttachments.length > 0 && (
-                  <ImageAttachmentAlbum
-                    items={imageAttachments}
-                    mine={mine}
-                    onOpen={(images, index) => setLightbox({ images, index })}
-                    onPreview={onAttachmentPreview}
-                  />
-                )}
-                {otherAttachments.map(({ attachment, index }) => (
-                  <AttachmentCard
-                    attachment={attachment}
-                    key={`${message.id}-${attachment.cid}`}
-                    mine={mine}
-                    onPreview={onAttachmentPreview}
-                    pending={message.deliveryStatus === 'pending'}
-                    onClick={() => onAttachmentOpen(index)}
-                  />
-                ))}
-              </div>
-            )}
-            {sticker && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (stickerPreview.consumePreviewClick()) return;
-
-                    onStickerClick?.(sticker);
-                  }}
-                  className="block touch-none select-none rounded-2xl p-1 transition hover:bg-white/10"
-                  title="View sticker pack"
-                  {...stickerPreview.pressPreviewHandlers}
+              {message.attachments.length > 0 && (
+                <div className="grid gap-2">
+                  {imageAttachments.length > 0 && (
+                    <ImageAttachmentAlbum
+                      items={imageAttachments}
+                      mine={mine}
+                      onOpen={(images, index) => setLightbox({ images, index })}
+                      onPreview={onAttachmentPreview}
+                    />
+                  )}
+                  {otherAttachments.map(({ attachment, index }) => (
+                    <AttachmentCard
+                      attachment={attachment}
+                      key={`${message.id}-${attachment.cid}`}
+                      mine={mine}
+                      onPreview={onAttachmentPreview}
+                      pending={message.deliveryStatus === 'pending'}
+                      onClick={() => onAttachmentOpen(index)}
+                    />
+                  ))}
+                </div>
+              )}
+              {sticker && (
+                <MessageStickerContent
+                  onStickerClick={onStickerClick}
+                  sticker={sticker}
+                />
+              )}
+              {message.attachmentProgress && (
+                <MessageAttachmentProgress
+                  progress={message.attachmentProgress}
+                />
+              )}
+              {message.content && !sticker && (
+                <div
+                  className={cx(
+                    'whitespace-pre-wrap break-words',
+                    (hasReply || message.attachments.length > 0) && 'mt-3',
+                    message.encrypted && 'text-white/55',
+                  )}
                 >
-                  <img
-                    src={stickerAssetUrl(sticker.assetCid)}
-                    alt="Sticker"
-                    className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
-                    draggable={false}
-                  />
-                </button>
-                {stickerPreview.previewPortal}
-              </>
-            )}
-            {message.attachmentProgress && (
-              <div className="mt-3 rounded-2xl bg-black/20 p-3 text-left text-xs font-black text-white/75">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate">
-                    {message.attachmentProgress.phase === 'encrypt'
-                      ? copy.composer.encryptingAttachment
-                      : message.attachmentProgress.phase === 'upload'
-                        ? copy.composer.uploadingAttachment
-                        : message.attachmentProgress.phase === 'download'
-                          ? copy.composer.downloadingAttachment
-                          : copy.composer.decryptingAttachment}{' '}
-                    {message.attachmentProgress.filename}
-                  </span>
-                  <span className="shrink-0">
-                    {message.attachmentProgress.percent}%
-                  </span>
+                  <MarkdownMessage content={message.content} mine={mine} />
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-fuchsia-400"
-                    style={{ width: `${message.attachmentProgress.percent}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {message.content && !sticker && (
-              <div
-                className={cx(
-                  'whitespace-pre-wrap break-words',
-                  (hasReply || message.attachments.length > 0) && 'mt-3',
-                  message.encrypted && 'text-white/55',
-                )}
-              >
-                <MarkdownMessage content={message.content} mine={mine} />
-              </div>
-            )}
-            {linkPreview && (
-              <LinkPreviewCard
-                description={linkPreview.description}
-                finalUrl={linkPreview.finalUrl}
-                image={linkPreview.image}
-                mine={mine}
-                siteName={linkPreview.siteName}
-                title={linkPreview.title}
-                url={linkPreview.url}
+              )}
+              {linkPreview && (
+                <LinkPreviewCard
+                  description={linkPreview.description}
+                  finalUrl={linkPreview.finalUrl}
+                  image={linkPreview.image}
+                  mine={mine}
+                  siteName={linkPreview.siteName}
+                  title={linkPreview.title}
+                  url={linkPreview.url}
+                />
+              )}
+              <MessageDeliveryStatus
+                message={message}
+                onRetryMessage={onRetryMessage}
               />
-            )}
-            {(message.deliveryStatus === 'pending' ||
-              message.deliveryStatus === 'failed') && (
-              <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
-                {message.deliveryStatus === 'pending' && (
-                  <span>{copy.messages.sending}</span>
-                )}
-                {message.deliveryStatus === 'failed' && (
-                  <>
-                    <span className="text-rose-100">
-                      {copy.messages.sendFailed}
-                    </span>
-                    {onRetryMessage && (
-                      <button
-                        type="button"
-                        onClick={() => onRetryMessage(message)}
-                        className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
-                      >
-                        {copy.messages.retrySend}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
             </div>
             <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
               {formatTime(message.timestamp)}
