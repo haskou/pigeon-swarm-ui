@@ -2872,7 +2872,7 @@ export function GlassWorkspace({
       onPointerMove={handleWorkspacePointerMove}
       onPointerUp={clearSidebarGesture}
     >
-      <div className="app-workspace mx-auto grid max-w-[1800px] grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
+      <div className="app-workspace grid w-full grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail
           className="hidden lg:flex"
           activeMessages={workspaceMode === 'messages'}
