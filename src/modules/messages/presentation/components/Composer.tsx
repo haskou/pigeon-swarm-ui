@@ -102,6 +102,7 @@ export function Composer({
     [],
   );
   const [selectedEmojiIndex, setSelectedEmojiIndex] = useState(0);
+  const [textInputScrollTop, setTextInputScrollTop] = useState(0);
   const attachmentsRef = useRef(attachments);
   const dragDepthRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -188,13 +189,18 @@ export function Composer({
     setCaretIndex(textInputRef.current?.selectionStart ?? draft.length);
   };
 
+  const syncTextInputScroll = useCallback(() => {
+    setTextInputScrollTop(textInputRef.current?.scrollTop ?? 0);
+  }, []);
+
   const resizeTextInput = useCallback(() => {
     const input = textInputRef.current;
 
     if (!input) return;
 
     const shouldKeepBottomVisible =
-      input.selectionStart >= input.value.length && input.selectionEnd >= input.value.length;
+      input.selectionStart >= input.value.length &&
+      input.selectionEnd >= input.value.length;
 
     input.style.height = 'auto';
 
@@ -209,9 +215,14 @@ export function Composer({
     input.style.height = `${nextHeight}px`;
     input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
 
-    if (input.scrollHeight <= maxHeight || !shouldKeepBottomVisible) return;
+    if (input.scrollHeight <= maxHeight || !shouldKeepBottomVisible) {
+      setTextInputScrollTop(input.scrollTop);
+
+      return;
+    }
 
     input.scrollTop = input.scrollHeight;
+    setTextInputScrollTop(input.scrollTop);
     requestAnimationFrame(() => {
       if (
         textInputRef.current !== input ||
@@ -222,6 +233,7 @@ export function Composer({
       }
 
       input.scrollTop = input.scrollHeight;
+      setTextInputScrollTop(input.scrollTop);
     });
   }, []);
 
@@ -654,6 +666,7 @@ export function Composer({
           <div className="relative flex min-h-10 min-w-0 flex-1 items-center">
             <ComposerMentionOverlay
               mentionTokens={mentionTokens}
+              scrollTop={textInputScrollTop}
               value={draft}
             />
             <textarea
@@ -664,6 +677,7 @@ export function Composer({
               onKeyDown={handleKeyDown}
               onKeyUp={syncCaret}
               onPaste={handlePaste}
+              onScroll={syncTextInputScroll}
               onSelect={syncCaret}
               disabled={disabled}
               maxLength={MESSAGE_MAX_LENGTH}

@@ -2,9 +2,11 @@ import { cx } from '../../../../shared/presentation/cx';
 
 export function ComposerMentionOverlay({
   mentionTokens,
+  scrollTop,
   value,
 }: {
   mentionTokens: string[];
+  scrollTop: number;
   value: string;
 }) {
   if (mentionTokens.length === 0) return null;
@@ -12,9 +14,12 @@ export function ComposerMentionOverlay({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 py-0 text-sm leading-5 tracking-normal text-white [font:inherit]"
+      className="pointer-events-none absolute inset-0 overflow-hidden px-2 py-0 text-sm leading-5 tracking-normal text-white [font:inherit]"
     >
-      <div className="whitespace-pre-wrap break-words">
+      <div
+        className="whitespace-pre-wrap break-words"
+        style={{ transform: `translateY(-${scrollTop}px)` }}
+      >
         {highlightMentionTokens(value, mentionTokens)}
       </div>
     </div>
