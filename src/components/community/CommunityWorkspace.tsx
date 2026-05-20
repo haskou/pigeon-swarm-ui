@@ -60,7 +60,7 @@ import { shortId } from '../../utils/formatting';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
-import { StickerPackPreviewDialog } from '../chat/StickerPicker';
+import { StickerPackPreviewDialog } from '../chat/StickerPackPreviewDialog';
 import { TypingIndicator } from '../chat/TypingIndicator';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import {

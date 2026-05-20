@@ -26,7 +26,7 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
-import { StickerPackPreviewDialog } from '../chat/StickerPicker';
+import { StickerPackPreviewDialog } from '../chat/StickerPackPreviewDialog';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
