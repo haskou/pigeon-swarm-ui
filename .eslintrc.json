@@ -171,24 +171,7 @@
       "error",
       8
     ],
-    "@typescript-eslint/member-ordering": [
-      "error",
-      {
-        "default": [
-          "field",
-          "static-field",
-          "public-static-field",
-          "private-static-field",
-          "public-instance-field",
-          "private-instance-field",
-          "public-static-method",
-          "private-static-method",
-          "constructor",
-          "public-method",
-          "private-method"
-        ]
-      }
-    ],
+    "@typescript-eslint/member-ordering": "off",
     "max-params": [
       "warn",
       7

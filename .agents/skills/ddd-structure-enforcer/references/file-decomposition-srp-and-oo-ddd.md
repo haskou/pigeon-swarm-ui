@@ -35,7 +35,7 @@ example/
 Rules:
 
 - Folder name: `kebab-case`.
-- Main implementation file: `lowerCamelCase` matching the concept.
+- Main implementation file: exactly matches the primary public export when the file has a single public export.
 - Types: `<concept>.types.ts`.
 - Constants: `<concept>.constants.ts`.
 - Helpers: `<concept>.helpers.ts`, only when necessary.
@@ -160,7 +160,8 @@ export class BackupDatabase {
   private readonly botConfigStore = new LowdbBotConfigStore();
   private readonly folderRepository = new LowdbFolderRepository();
   private readonly thumbnailStore = new LocalThumbnailStore();
-  private readonly backupDatabase = createDatabaseBackupUseCases().backupDatabase;
+  private readonly backupDatabase =
+    createDatabaseBackupUseCases().backupDatabase;
 }
 ```
 

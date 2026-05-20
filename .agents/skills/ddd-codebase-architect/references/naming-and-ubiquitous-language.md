@@ -4,7 +4,7 @@ These conventions are mandatory unless the project has a documented language-spe
 
 ## Names
 
-- Files: `lowerCamelCase`.
+- Files: exactly match the primary public export when a file has a single public export, including casing.
 - Folders: `kebab-case`.
 - Classes and types: `PascalCase`.
 - Variables, functions, methods, and properties: `lowerCamelCase`.
@@ -25,7 +25,7 @@ Inside those files:
 
 ```ts
 export class Order {}
-export type OrderSnapshot = {}
+export type OrderSnapshot = {};
 export interface OrderRepository {}
 export class PlaceOrder {}
 export class PostgresOrderRepository implements OrderRepository {}
