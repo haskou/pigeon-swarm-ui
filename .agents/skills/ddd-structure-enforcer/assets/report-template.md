@@ -1,15 +1,9 @@
-# DDD structure report
+# DDD validation report
 
-Detected project type:
-Detected flavor:
-Recommended action:
+## Errors
 
-## Pass
+## Warnings
 
-## Warn
+## Info
 
-## Fail
-
-## Suggested fixes
-
-## Checks run
+## Recommended fixes
