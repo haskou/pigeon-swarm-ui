@@ -3,6 +3,7 @@ import {
   ChangeEvent,
   FormEvent,
   KeyboardEvent,
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -50,6 +51,7 @@ interface ComposerProps {
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
   focusKey?: string | null;
+  mentionHelper?: ReactNode;
   placeholder?: string;
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
@@ -63,6 +65,7 @@ export function Composer({
   draft,
   error,
   focusKey,
+  mentionHelper,
   onCancelReply,
   onDraftChange,
   onEscape,
@@ -549,6 +552,7 @@ export function Composer({
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
+          {mentionHelper}
           {emojiPanelOpen && emojiTrigger && (
             <EmojiSuggestionPanel
               onSelect={insertEmoji}

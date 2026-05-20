@@ -14,8 +14,11 @@ import type {
   CommunityChannel,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
+  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
+  CommunityPermission,
+  CommunityRoleResource,
   CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -465,6 +468,30 @@ export class PigeonApplication {
     );
   }
 
+  public async banCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.banCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
+  public async unbanCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.unbanCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
@@ -571,6 +598,57 @@ export class PigeonApplication {
     return await this.gateway.listCommunityMembers(session, communityId);
   }
 
+  public async listCommunityRoles(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityRoleResource[]> {
+    return await this.gateway.listCommunityRoles(session, communityId);
+  }
+
+  public async createCommunityRole(
+    session: Session,
+    communityId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    return await this.gateway.createCommunityRole(session, communityId, input);
+  }
+
+  public async updateCommunityRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    return await this.gateway.updateCommunityRole(
+      session,
+      communityId,
+      roleId,
+      input,
+    );
+  }
+
+  public async deleteCommunityRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+  ): Promise<void> {
+    await this.gateway.deleteCommunityRole(session, communityId, roleId);
+  }
+
+  public async assignCommunityMemberRoles(
+    session: Session,
+    communityId: string,
+    identityId: string,
+    roleIds: string[],
+  ): Promise<Community> {
+    return await this.gateway.assignCommunityMemberRoles(
+      session,
+      communityId,
+      identityId,
+      roleIds,
+    );
+  }
+
   public async createCommunityTextChannel(
     session: Session,
     communityId: string,
@@ -628,6 +706,20 @@ export class PigeonApplication {
     );
   }
 
+  public async updateCommunityChannelPermissions(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    visibleRoleIds: string[],
+  ): Promise<CommunityChannel> {
+    return await this.gateway.updateCommunityChannelPermissions(
+      session,
+      communityId,
+      channelId,
+      visibleRoleIds,
+    );
+  }
+
   public async createCommunityChannelMessage(
     session: Session,
     communityId: string,
@@ -636,6 +728,7 @@ export class PigeonApplication {
       attachmentExternalIdentifiers?: string[];
       encryptedPayload: string;
       id?: string;
+      mentions?: CommunityMessageMention[];
       timestamp?: number;
     },
   ): Promise<MessageResource> {

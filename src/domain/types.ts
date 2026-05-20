@@ -264,6 +264,7 @@ export type AttachmentUploadOptions = {
 export type SendMessageOptions = {
   attachments?: File[];
   attachmentUpload?: AttachmentUploadOptions;
+  mentions?: CommunityMessageMention[];
   onAttachmentProgress?: (progress: AttachmentProgress) => void;
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;
@@ -298,6 +299,7 @@ export type CommunityTextChannel = {
   name: string;
   type: 'text';
   createdAt: number;
+  permissions?: CommunityChannelPermissions;
 };
 
 export type CommunityVoiceChannel = {
@@ -306,9 +308,46 @@ export type CommunityVoiceChannel = {
   name: string;
   type: 'voice';
   createdAt: number;
+  permissions?: CommunityChannelPermissions;
 };
 
 export type CommunityChannel = CommunityTextChannel | CommunityVoiceChannel;
+
+export type CommunityPermission =
+  | 'approve_members'
+  | 'attach_files'
+  | 'ban_members'
+  | 'connect_voice'
+  | 'create_invites'
+  | 'create_polls'
+  | 'embed_links'
+  | 'manage_channels'
+  | 'manage_members'
+  | 'manage_messages'
+  | 'manage_roles'
+  | 'mention_everyone'
+  | 'mention_here'
+  | 'mention_roles'
+  | 'reject_members'
+  | 'send_messages'
+  | 'send_stickers'
+  | 'view_channels';
+
+export type CommunityRoleResource = {
+  builtIn?: boolean;
+  id: string;
+  name: string;
+  permissions: CommunityPermission[];
+};
+
+export type CommunityMemberRolesResource = {
+  identityId: string;
+  roleIds: string[];
+};
+
+export type CommunityChannelPermissions = {
+  visibleRoleIds: string[];
+};
 
 export type Community = {
   id: string;
@@ -318,12 +357,21 @@ export type Community = {
   description: string;
   avatar?: string | null;
   banner?: string | null;
+  bannedMemberIds?: string[];
   memberIds: string[];
+  memberRoles?: CommunityMemberRolesResource[];
+  roles?: CommunityRoleResource[];
   textChannels: CommunityTextChannel[];
   visibility: 'private';
   voiceChannels?: CommunityVoiceChannel[];
   createdAt: number;
 };
+
+export type CommunityMessageMention =
+  | { type: 'everyone' }
+  | { type: 'here' }
+  | { targetId: string; type: 'identity' }
+  | { targetId: string; type: 'role' };
 
 export type CommunityMembershipRequestStatus =
   | 'accepted'
@@ -389,6 +437,7 @@ export type MessageResource = {
   callId?: string;
   actorIdentityId?: string;
   durationMs?: number;
+  mentions?: CommunityMessageMention[];
   previousMessageIds?: string[];
   reactions?: MessageReaction[];
   replyToMessageId?: string;
@@ -431,6 +480,7 @@ export type ChatMessage = {
   raw: MessageResource;
   reactions: MessageReaction[];
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
   sticker?: StickerMessageReference;
 };
 

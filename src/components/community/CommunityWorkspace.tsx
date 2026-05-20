@@ -26,6 +26,8 @@ import type {
 import type {
   Community,
   CommunityChannel,
+  CommunityMessageMention,
+  CommunityPermission,
   CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -51,6 +53,11 @@ import {
   communityTextChannels,
   communityVoiceChannels,
 } from '../../domain/communities/communityChannels';
+import {
+  canSeeCommunityChannel,
+  communityMembersWithChannelAccess,
+  communityPermissionsFor,
+} from '../../domain/communities/communityPermissions';
 import { firstMessageLinkPreviewUrl } from '../../domain/messages/linkPreviewUrls';
 import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import { copy } from '../../i18n/en';
@@ -179,6 +186,7 @@ type CommunityPendingSend = {
   attachments: File[];
   channelId: string;
   content: string;
+  mentions?: CommunityMessageMention[];
   replyTarget: ChatMessage | null;
   sticker?: StickerMessageReference;
 };
@@ -258,9 +266,27 @@ export function CommunityWorkspace({
     () => communityVoiceChannels(community),
     [community],
   );
+  const currentPermissions = useMemo(
+    () => communityPermissionsFor(community, session.identity.id),
+    [community, session.identity.id],
+  );
+  const accessibleTextChannels = useMemo(
+    () =>
+      textChannels.filter((channel) =>
+        canSeeCommunityChannel(community, channel, session.identity.id),
+      ),
+    [community, session.identity.id, textChannels],
+  );
+  const accessibleVoiceChannels = useMemo(
+    () =>
+      voiceChannels.filter((channel) =>
+        canSeeCommunityChannel(community, channel, session.identity.id),
+      ),
+    [community, session.identity.id, voiceChannels],
+  );
   const resolvedChannelId = useMemo(
-    () => resolveCommunityChannelId(activeChannelId, textChannels),
-    [activeChannelId, textChannels],
+    () => resolveCommunityChannelId(activeChannelId, accessibleTextChannels),
+    [accessibleTextChannels, activeChannelId],
   );
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
     resolvedChannelId,
@@ -334,21 +360,21 @@ export function CommunityWorkspace({
   const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
-    if (!query) return textChannels;
+    if (!query) return accessibleTextChannels;
 
-    return textChannels.filter((channel) =>
+    return accessibleTextChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [channelSearch, textChannels]);
+  }, [accessibleTextChannels, channelSearch]);
   const visibleVoiceChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
-    if (!query) return voiceChannels;
+    if (!query) return accessibleVoiceChannels;
 
-    return voiceChannels.filter((channel) =>
+    return accessibleVoiceChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [channelSearch, voiceChannels]);
+  }, [accessibleVoiceChannels, channelSearch]);
   const {
     communityMemberIds,
     memberIdentities,
@@ -365,10 +391,98 @@ export function CommunityWorkspace({
     visibleVoiceChannels,
     voiceChannels,
   });
+  const mentionSuggestions = useMemo(() => {
+    if (!selectedChannel) return [];
+
+    const trigger = findMentionTrigger(draft);
+
+    if (!trigger) return [];
+
+    const query = trigger.query.toLowerCase();
+    const accessibleMemberIds = new Set(
+      communityMembersWithChannelAccess(community, selectedChannel),
+    );
+    const memberSuggestions = members
+      .filter((member) => accessibleMemberIds.has(member.identityId))
+      .map((member) => {
+        const label = memberDisplayName(member.identity, member.identityId);
+        const handle = member.identity?.profile.handle?.trim();
+
+        return {
+          description: handle ? `@${handle}` : shortId(member.identityId),
+          id: member.identityId,
+          label,
+          mention: { targetId: member.identityId, type: 'identity' } as const,
+          token: `@${handle || label}`,
+        };
+      })
+      .filter((suggestion) =>
+        `${suggestion.label} ${suggestion.description}`
+          .toLowerCase()
+          .includes(query),
+      );
+    const roleSuggestions =
+      currentPermissions.has('mention_roles') && community.roles
+        ? community.roles
+            .filter(
+              (role) =>
+                !role.builtIn && role.name.toLowerCase().includes(query),
+            )
+            .map((role) => ({
+              description: 'role',
+              id: role.id,
+              label: role.name,
+              mention: { targetId: role.id, type: 'role' } as const,
+              token: `@${role.name}`,
+            }))
+        : [];
+    const specialSuggestionCandidates: Array<CommunityMentionSuggestion | null> = [
+      currentPermissions.has('mention_everyone')
+        ? {
+            description: 'all members',
+            id: 'everyone',
+            label: 'everyone',
+            mention: { type: 'everyone' } as const,
+            token: '@everyone',
+          }
+        : null,
+      currentPermissions.has('mention_here')
+        ? {
+            description: 'active members',
+            id: 'here',
+            label: 'here',
+            mention: { type: 'here' } as const,
+            token: '@here',
+          }
+        : null,
+    ];
+    const specialSuggestions = specialSuggestionCandidates.filter(
+      (suggestion): suggestion is CommunityMentionSuggestion =>
+      Boolean(suggestion && suggestion.label.includes(query)),
+    );
+
+    return [
+      ...specialSuggestions,
+      ...roleSuggestions,
+      ...memberSuggestions,
+    ].slice(0, 8);
+  }, [community, currentPermissions, draft, members, selectedChannel]);
+  const insertMention = useCallback(
+    (token: string) => {
+      const trigger = findMentionTrigger(draft);
+
+      if (!trigger) return;
+
+      setDraft(
+        `${draft.slice(0, trigger.start)}${token} ${draft.slice(trigger.end)}`,
+      );
+    },
+    [draft],
+  );
   const channelEncryptionReady =
     !!selectedChannel &&
     !!communityKey &&
-    community.memberIds.every(
+    communityMemberIds.every(
       (identityId) =>
         identityId === session.identity.id || memberIdentities[identityId],
     );
@@ -420,8 +534,12 @@ export function CommunityWorkspace({
     [],
   );
   const joinVoiceChannel = useCallback(
-    (channel: CommunityVoiceChannel) => onJoinVoiceChannel?.(channel),
-    [onJoinVoiceChannel],
+    (channel: CommunityVoiceChannel) => {
+      if (!currentPermissions.has('connect_voice')) return;
+
+      onJoinVoiceChannel?.(channel);
+    },
+    [currentPermissions, onJoinVoiceChannel],
   );
   const openVoiceParticipantProfile = useCallback(
     (
@@ -644,15 +762,22 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     const nextSelectedChannel =
-      textChannels.find((channel) => channel.id === activeChannelId)?.id ??
-      textChannels.find((channel) => channel.id === selectedChannelId)?.id ??
-      textChannels[0]?.id ??
+      accessibleTextChannels.find((channel) => channel.id === activeChannelId)
+        ?.id ??
+      accessibleTextChannels.find((channel) => channel.id === selectedChannelId)
+        ?.id ??
+      accessibleTextChannels[0]?.id ??
       null;
 
     setSelectedChannelId(nextSelectedChannel);
 
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
-  }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
+  }, [
+    accessibleTextChannels,
+    activeChannelId,
+    onChannelSelected,
+    selectedChannelId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -864,6 +989,15 @@ export function CommunityWorkspace({
       attachments,
       channelId: selectedChannelId,
       content,
+      mentions: selectedChannel
+        ? communityMentionsForContent(
+            content,
+            community,
+            selectedChannel,
+            memberIdentities,
+            currentPermissions,
+          )
+        : [],
       replyTarget,
     });
     setReplyTarget(null);
@@ -881,6 +1015,7 @@ export function CommunityWorkspace({
       attachments: [],
       channelId: selectedChannelId,
       content: '',
+      mentions: [],
       replyTarget,
       sticker,
     });
@@ -976,6 +1111,7 @@ export function CommunityWorkspace({
           communityKey: session.keychain.conversations[community.id],
           content: payload.content,
           linkPreview,
+          mentions: payload.mentions,
           replyPreview: replyPreviewFromMessage(payload.replyTarget),
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
@@ -990,6 +1126,7 @@ export function CommunityWorkspace({
               (attachment) => attachment.cid,
             ),
             encryptedPayload,
+            mentions: payload.mentions,
             timestamp,
           },
         );
@@ -1061,7 +1198,11 @@ export function CommunityWorkspace({
   };
 
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
-    if (!selectedChannelId || !message.mine) return;
+    if (
+      !selectedChannelId ||
+      (!message.mine && !owner && !currentPermissions.has('manage_messages'))
+    )
+      return;
 
     if (!window.confirm(copy.messages.deleteConfirm)) return;
 
@@ -1351,7 +1492,10 @@ export function CommunityWorkspace({
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
                     {community.description}
                   </p>
-                  {owner && (
+                  {(owner ||
+                    currentPermissions.has('manage_channels') ||
+                    currentPermissions.has('manage_roles') ||
+                    currentPermissions.has('ban_members')) && (
                     <button
                       type="button"
                       onClick={() => setManageOpen(true)}
@@ -1538,7 +1682,11 @@ export function CommunityWorkspace({
               />
             )}
             <Composer
-              disabled={messageState === 'loading' || !communityKey}
+              disabled={
+                messageState === 'loading' ||
+                !communityKey ||
+                !currentPermissions.has('send_messages')
+              }
               draft={draft}
               error={sendError}
               focusKey={selectedChannelId}
@@ -1546,7 +1694,19 @@ export function CommunityWorkspace({
               onDraftChange={handleDraftChange}
               onEscape={() => undefined}
               onSend={handleSendChannelMessage}
-              onStickerSend={handleSendChannelSticker}
+              onStickerSend={
+                currentPermissions.has('send_stickers')
+                  ? handleSendChannelSticker
+                  : undefined
+              }
+              mentionHelper={
+                mentionSuggestions.length > 0 ? (
+                  <CommunityMentionPanel
+                    onSelect={insertMention}
+                    suggestions={mentionSuggestions}
+                  />
+                ) : null
+              }
               progress={attachmentProgress}
               replyTo={replyTarget}
               replyToAuthorName={
@@ -1573,6 +1733,7 @@ export function CommunityWorkspace({
 
       <CommunityMembersPanel
         community={community}
+        canInvite={owner || currentPermissions.has('create_invites')}
         members={members}
         onAddMember={() => setMemberOpen(true)}
         onCloseMobile={onMobileMembersClose}
@@ -1647,7 +1808,9 @@ export function CommunityWorkspace({
             menu={messageContextMenu}
             onClose={() => setMessageContextMenu(null)}
             onDelete={
-              messageContextMenu.message.mine
+              messageContextMenu.message.mine ||
+              owner ||
+              currentPermissions.has('manage_messages')
                 ? () =>
                     void handleDeleteChannelMessage(messageContextMenu.message)
                 : undefined
@@ -1694,4 +1857,134 @@ export function CommunityWorkspace({
       </Suspense>
     </>
   );
+}
+
+type CommunityMentionSuggestion = {
+  description: string;
+  id: string;
+  label: string;
+  mention: CommunityMessageMention;
+  token: string;
+};
+
+function CommunityMentionPanel({
+  onSelect,
+  suggestions,
+}: {
+  onSelect: (token: string) => void;
+  suggestions: CommunityMentionSuggestion[];
+}) {
+  return (
+    <div className="absolute bottom-full left-0 right-0 z-30 mb-2 overflow-hidden rounded-2xl border border-white/10 bg-[#24242b] p-2 shadow-2xl shadow-black/40">
+      <div className="mb-1 px-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
+        Mentions
+      </div>
+      {suggestions.map((suggestion) => (
+        <button
+          key={`${suggestion.mention.type}:${suggestion.id}`}
+          type="button"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            onSelect(suggestion.token);
+          }}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/10"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-400/20 text-sm font-black text-indigo-100">
+            @
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-black text-white">
+              {suggestion.label}
+            </span>
+            <span className="block truncate text-xs text-white/45">
+              {suggestion.description}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function findMentionTrigger(
+  value: string,
+): { end: number; query: string; start: number } | null {
+  const match = /(^|\s)@([^\s@]*)$/.exec(value);
+
+  if (!match || match.index === undefined) return null;
+
+  const prefixLength = match[1]?.length ?? 0;
+  const start = match.index + prefixLength;
+
+  return {
+    end: value.length,
+    query: match[2] ?? '',
+    start,
+  };
+}
+
+function communityMentionsForContent(
+  content: string,
+  community: Community,
+  channel: CommunityChannel,
+  identities: Record<string, IdentityResource>,
+  permissions: Set<CommunityPermission>,
+): CommunityMessageMention[] {
+  const lowerContent = content.toLowerCase();
+  const mentions: CommunityMessageMention[] = [];
+
+  if (permissions.has('mention_everyone') && lowerContent.includes('@everyone')) {
+    mentions.push({ type: 'everyone' });
+  }
+
+  if (permissions.has('mention_here') && lowerContent.includes('@here')) {
+    mentions.push({ type: 'here' });
+  }
+
+  if (permissions.has('mention_roles')) {
+    for (const role of community.roles ?? []) {
+      if (role.builtIn) continue;
+
+      if (lowerContent.includes(`@${role.name.toLowerCase()}`)) {
+        mentions.push({ targetId: role.id, type: 'role' });
+      }
+    }
+  }
+
+  for (const identityId of communityMembersWithChannelAccess(
+    community,
+    channel,
+  )) {
+    const identity = identities[identityId];
+    const handle = identity?.profile.handle?.trim();
+    const name = memberDisplayName(identity, identityId);
+    const tokens = [handle ? `@${handle}` : null, `@${name}`]
+      .filter((token): token is string => !!token)
+      .map((token) => token.toLowerCase());
+
+    if (tokens.some((token) => lowerContent.includes(token))) {
+      mentions.push({ targetId: identityId, type: 'identity' });
+    }
+  }
+
+  return dedupeCommunityMentions(mentions);
+}
+
+function dedupeCommunityMentions(
+  mentions: CommunityMessageMention[],
+): CommunityMessageMention[] {
+  const seen = new Set<string>();
+
+  return mentions.filter((mention) => {
+    const key =
+      mention.type === 'identity' || mention.type === 'role'
+        ? `${mention.type}:${mention.targetId}`
+        : mention.type;
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+
+    return true;
+  });
 }

@@ -46,11 +46,16 @@ export function useCommunityMembers({
     [community.memberIds],
   );
   const communityMemberIds = useMemo(
-    () =>
-      communityMemberIdsKey.length > 0
-        ? communityMemberIdsKey.split('\u0000')
-        : [],
-    [communityMemberIdsKey],
+    () => {
+      const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
+
+      return communityMemberIdsKey.length > 0
+        ? communityMemberIdsKey
+            .split('\u0000')
+            .filter((identityId) => !bannedMemberIds.has(identityId))
+        : [];
+    },
+    [community.bannedMemberIds, communityMemberIdsKey],
   );
   const voiceConnectedIdentityIds = useMemo(
     () =>

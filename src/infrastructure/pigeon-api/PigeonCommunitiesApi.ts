@@ -4,8 +4,11 @@ import type {
   Community,
   CommunityChannel,
   CommunityDiscoveryResource,
+  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
+  CommunityPermission,
+  CommunityRoleResource,
   CommunityTextChannel,
   CommunityVoiceChannel,
   MessageResource,
@@ -140,6 +143,36 @@ export class PigeonCommunitiesApi {
     });
   }
 
+  public async banMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(communityId)}/bans`;
+    const body = { identityId };
+
+    return await this.http.request<Community>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async unbanMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/bans/${encodeURIComponent(identityId)}`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
   public async createJoinRequest(
     session: Session,
     communityId: string,
@@ -210,6 +243,96 @@ export class PigeonCommunitiesApi {
     });
 
     return result.memberIds;
+  }
+
+  public async listRoles(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityRoleResource[]> {
+    const path = `/communities/${encodeURIComponent(communityId)}/roles`;
+    const result = await this.http.request<
+      | {
+          roles?: CommunityRoleResource[];
+        }
+      | CommunityRoleResource[]
+    >(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return Array.isArray(result) ? result : (result.roles ?? []);
+  }
+
+  public async createRole(
+    session: Session,
+    communityId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    const path = `/communities/${encodeURIComponent(communityId)}/roles`;
+    const body = {
+      name: input.name,
+      permissions: input.permissions,
+    };
+
+    return await this.http.request<CommunityRoleResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  public async updateRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/roles/${encodeURIComponent(roleId)}`;
+    const body = {
+      name: input.name,
+      permissions: input.permissions,
+    };
+
+    return await this.http.request<CommunityRoleResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
+    });
+  }
+
+  public async deleteRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+  ): Promise<void> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/roles/${encodeURIComponent(roleId)}`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async assignMemberRoles(
+    session: Session,
+    communityId: string,
+    identityId: string,
+    roleIds: string[],
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/members/${encodeURIComponent(identityId)}/roles`;
+    const body = { roleIds };
+
+    return await this.http.request<Community>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
   }
 
   public async createTextChannel(
@@ -294,6 +417,24 @@ export class PigeonCommunitiesApi {
     });
   }
 
+  public async updateChannelPermissions(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    visibleRoleIds: string[],
+  ): Promise<CommunityChannel> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/permissions`;
+    const body = { visibleRoleIds };
+
+    return await this.http.request<CommunityChannel>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
+    });
+  }
+
   public async createChannelMessage(
     session: Session,
     communityId: string,
@@ -302,6 +443,7 @@ export class PigeonCommunitiesApi {
       attachmentExternalIdentifiers?: string[];
       encryptedPayload: string;
       id?: string;
+      mentions?: CommunityMessageMention[];
       timestamp?: number;
     },
   ): Promise<MessageResource> {
@@ -319,6 +461,7 @@ export class PigeonCommunitiesApi {
       createdAt,
       encryptedPayload: input.encryptedPayload,
       id,
+      ...(input.mentions?.length ? { mentions: input.mentions } : {}),
       type: 'sent',
     };
     const signature = await session.encryptedKeyPair.sign(
@@ -330,6 +473,7 @@ export class PigeonCommunitiesApi {
       createdAt,
       encryptedPayload: input.encryptedPayload,
       id,
+      ...(input.mentions?.length ? { mentions: input.mentions } : {}),
       signature: signature.toString(),
     };
     const path = `/communities/${encodeURIComponent(
