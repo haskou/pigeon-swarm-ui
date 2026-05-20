@@ -3,7 +3,7 @@ import { UUID } from '@haskou/value-objects';
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/config';
-import { normalizeIdentityId } from '../../../modules/identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../modules/identities/domain/value-objects/identityId';
 import { ApiUrlBuilder } from '../http/apiUrlBuilder';
 import { RequestSigner } from '../http/requestSigner';
 
@@ -114,7 +114,7 @@ export class RealtimeGateway {
 
     url.searchParams.set(
       'identityId',
-      normalizeIdentityId(session.identity.id),
+      IdentityId.normalize(session.identity.id),
     );
     url.searchParams.set('timestamp', timestamp);
     url.searchParams.set('nonce', nonce);

@@ -1,8 +1,11 @@
-import type { NotificationResource, Session } from '../../../../shared/domain/pigeonResources.types';
-import { NotificationDecision } from '../../domain/notificationDecision';
-import { NotificationId } from '../../domain/notificationId';
+import type {
+  NotificationResource,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 import type { UpdateNotificationPort } from '../ports/updateNotificationPort';
 
+import { NotificationDecision } from '../../domain/notificationDecision';
+import { NotificationId } from '../../domain/notificationId';
 import { UpdateNotificationMessage } from './messages/updateNotificationMessage';
 import { UpdateNotification } from './updateNotification';
 
@@ -31,9 +34,9 @@ describe(UpdateNotification.name, () => {
 
     expect(sentSession).toBe(session);
     expect(notificationId).toBeInstanceOf(NotificationId);
-    expect(notificationId.isEqual(NotificationId.fromString('notification-1'))).toBe(
-      true,
-    );
+    expect(
+      notificationId.isEqual(NotificationId.fromString('notification-1')),
+    ).toBe(true);
     expect(decision).toBeInstanceOf(NotificationDecision);
     expect(decision.isDeclined()).toBe(true);
   });

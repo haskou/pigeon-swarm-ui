@@ -1,9 +1,12 @@
 import { PrivateKey, UUID } from '@haskou/value-objects';
 
-import type { Peer } from '../../../peers/application/list-peers/listPeers';
-import type { IpfsReplicationStatus, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  IpfsReplicationStatus,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
+import type { Peer } from '../../application/list-peers/listPeers';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();

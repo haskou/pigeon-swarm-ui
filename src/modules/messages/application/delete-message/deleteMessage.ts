@@ -1,15 +1,15 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { DeleteMessagePort } from '../ports/deleteMessagePort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { DeleteMessageMessage } from './messages/deleteMessageMessage';
 
 export class DeleteMessage {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly messages: DeleteMessagePort) {}
 
-  public async execute(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.gateway.deleteMessage(session, conversationId, messageId);
+  public async delete(message: DeleteMessageMessage): Promise<void> {
+    await this.messages.deleteMessage(
+      message.getSession(),
+      message.getConversationId(),
+      message.getMessageId(),
+    );
   }
 }

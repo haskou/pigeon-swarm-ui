@@ -1,10666 +1,10666 @@
 export const DISCORD_EMOJI_SHORTCODES = [
   {
-    "shortcode": "100",
-    "emoji": "💯"
+    emoji: '💯',
+    shortcode: '100',
   },
   {
-    "shortcode": "1234",
-    "emoji": "🔢"
+    emoji: '🔢',
+    shortcode: '1234',
   },
   {
-    "shortcode": "8ball",
-    "emoji": "🎱"
+    emoji: '🎱',
+    shortcode: '8ball',
   },
   {
-    "shortcode": "a",
-    "emoji": "🅰"
+    emoji: '🅰',
+    shortcode: 'a',
   },
   {
-    "shortcode": "ab",
-    "emoji": "🆎"
+    emoji: '🆎',
+    shortcode: 'ab',
   },
   {
-    "shortcode": "abc",
-    "emoji": "🔤"
+    emoji: '🔤',
+    shortcode: 'abc',
   },
   {
-    "shortcode": "abcd",
-    "emoji": "🔡"
+    emoji: '🔡',
+    shortcode: 'abcd',
   },
   {
-    "shortcode": "accept",
-    "emoji": "🉑"
+    emoji: '🉑',
+    shortcode: 'accept',
   },
   {
-    "shortcode": "adult",
-    "emoji": "🧑"
+    emoji: '🧑',
+    shortcode: 'adult',
   },
   {
-    "shortcode": "adult_tone1",
-    "emoji": "🧑🏻"
+    emoji: '🧑🏻',
+    shortcode: 'adult_tone1',
   },
   {
-    "shortcode": "adult_tone2",
-    "emoji": "🧑🏼"
+    emoji: '🧑🏼',
+    shortcode: 'adult_tone2',
   },
   {
-    "shortcode": "adult_tone3",
-    "emoji": "🧑🏽"
+    emoji: '🧑🏽',
+    shortcode: 'adult_tone3',
   },
   {
-    "shortcode": "adult_tone4",
-    "emoji": "🧑🏾"
+    emoji: '🧑🏾',
+    shortcode: 'adult_tone4',
   },
   {
-    "shortcode": "adult_tone5",
-    "emoji": "🧑🏿"
+    emoji: '🧑🏿',
+    shortcode: 'adult_tone5',
   },
   {
-    "shortcode": "aerial_tramway",
-    "emoji": "🚡"
+    emoji: '🚡',
+    shortcode: 'aerial_tramway',
   },
   {
-    "shortcode": "airplane",
-    "emoji": "✈"
+    emoji: '✈',
+    shortcode: 'airplane',
   },
   {
-    "shortcode": "airplane_arriving",
-    "emoji": "🛬"
+    emoji: '🛬',
+    shortcode: 'airplane_arriving',
   },
   {
-    "shortcode": "airplane_departure",
-    "emoji": "🛫"
+    emoji: '🛫',
+    shortcode: 'airplane_departure',
   },
   {
-    "shortcode": "airplane_small",
-    "emoji": "🛩"
+    emoji: '🛩',
+    shortcode: 'airplane_small',
   },
   {
-    "shortcode": "alarm_clock",
-    "emoji": "⏰"
+    emoji: '⏰',
+    shortcode: 'alarm_clock',
   },
   {
-    "shortcode": "alembic",
-    "emoji": "⚗"
+    emoji: '⚗',
+    shortcode: 'alembic',
   },
   {
-    "shortcode": "alien",
-    "emoji": "👽"
+    emoji: '👽',
+    shortcode: 'alien',
   },
   {
-    "shortcode": "ambulance",
-    "emoji": "🚑"
+    emoji: '🚑',
+    shortcode: 'ambulance',
   },
   {
-    "shortcode": "amphora",
-    "emoji": "🏺"
+    emoji: '🏺',
+    shortcode: 'amphora',
   },
   {
-    "shortcode": "anchor",
-    "emoji": "⚓"
+    emoji: '⚓',
+    shortcode: 'anchor',
   },
   {
-    "shortcode": "angel",
-    "emoji": "👼"
+    emoji: '👼',
+    shortcode: 'angel',
   },
   {
-    "shortcode": "angel_tone1",
-    "emoji": "👼🏻"
+    emoji: '👼🏻',
+    shortcode: 'angel_tone1',
   },
   {
-    "shortcode": "angel_tone2",
-    "emoji": "👼🏼"
+    emoji: '👼🏼',
+    shortcode: 'angel_tone2',
   },
   {
-    "shortcode": "angel_tone3",
-    "emoji": "👼🏽"
+    emoji: '👼🏽',
+    shortcode: 'angel_tone3',
   },
   {
-    "shortcode": "angel_tone4",
-    "emoji": "👼🏾"
+    emoji: '👼🏾',
+    shortcode: 'angel_tone4',
   },
   {
-    "shortcode": "angel_tone5",
-    "emoji": "👼🏿"
+    emoji: '👼🏿',
+    shortcode: 'angel_tone5',
   },
   {
-    "shortcode": "anger",
-    "emoji": "💢"
+    emoji: '💢',
+    shortcode: 'anger',
   },
   {
-    "shortcode": "anger_right",
-    "emoji": "🗯"
+    emoji: '🗯',
+    shortcode: 'anger_right',
   },
   {
-    "shortcode": "angry",
-    "emoji": "😠"
+    emoji: '😠',
+    shortcode: 'angry',
   },
   {
-    "shortcode": "anguished",
-    "emoji": "😧"
+    emoji: '😧',
+    shortcode: 'anguished',
   },
   {
-    "shortcode": "ant",
-    "emoji": "🐜"
+    emoji: '🐜',
+    shortcode: 'ant',
   },
   {
-    "shortcode": "apple",
-    "emoji": "🍎"
+    emoji: '🍎',
+    shortcode: 'apple',
   },
   {
-    "shortcode": "aquarius",
-    "emoji": "♒"
+    emoji: '♒',
+    shortcode: 'aquarius',
   },
   {
-    "shortcode": "aries",
-    "emoji": "♈"
+    emoji: '♈',
+    shortcode: 'aries',
   },
   {
-    "shortcode": "arrow_backward",
-    "emoji": "◀"
+    emoji: '◀',
+    shortcode: 'arrow_backward',
   },
   {
-    "shortcode": "arrow_double_down",
-    "emoji": "⏬"
+    emoji: '⏬',
+    shortcode: 'arrow_double_down',
   },
   {
-    "shortcode": "arrow_double_up",
-    "emoji": "⏫"
+    emoji: '⏫',
+    shortcode: 'arrow_double_up',
   },
   {
-    "shortcode": "arrow_down",
-    "emoji": "⬇"
+    emoji: '⬇',
+    shortcode: 'arrow_down',
   },
   {
-    "shortcode": "arrow_down_small",
-    "emoji": "🔽"
+    emoji: '🔽',
+    shortcode: 'arrow_down_small',
   },
   {
-    "shortcode": "arrow_forward",
-    "emoji": "▶"
+    emoji: '▶',
+    shortcode: 'arrow_forward',
   },
   {
-    "shortcode": "arrow_heading_down",
-    "emoji": "⤵"
+    emoji: '⤵',
+    shortcode: 'arrow_heading_down',
   },
   {
-    "shortcode": "arrow_heading_up",
-    "emoji": "⤴"
+    emoji: '⤴',
+    shortcode: 'arrow_heading_up',
   },
   {
-    "shortcode": "arrow_left",
-    "emoji": "⬅"
+    emoji: '⬅',
+    shortcode: 'arrow_left',
   },
   {
-    "shortcode": "arrow_lower_left",
-    "emoji": "↙"
+    emoji: '↙',
+    shortcode: 'arrow_lower_left',
   },
   {
-    "shortcode": "arrow_lower_right",
-    "emoji": "↘"
+    emoji: '↘',
+    shortcode: 'arrow_lower_right',
   },
   {
-    "shortcode": "arrow_right",
-    "emoji": "➡"
+    emoji: '➡',
+    shortcode: 'arrow_right',
   },
   {
-    "shortcode": "arrow_right_hook",
-    "emoji": "↪"
+    emoji: '↪',
+    shortcode: 'arrow_right_hook',
   },
   {
-    "shortcode": "arrow_up",
-    "emoji": "⬆"
+    emoji: '⬆',
+    shortcode: 'arrow_up',
   },
   {
-    "shortcode": "arrow_up_down",
-    "emoji": "↕"
+    emoji: '↕',
+    shortcode: 'arrow_up_down',
   },
   {
-    "shortcode": "arrow_up_small",
-    "emoji": "🔼"
+    emoji: '🔼',
+    shortcode: 'arrow_up_small',
   },
   {
-    "shortcode": "arrow_upper_left",
-    "emoji": "↖"
+    emoji: '↖',
+    shortcode: 'arrow_upper_left',
   },
   {
-    "shortcode": "arrow_upper_right",
-    "emoji": "↗"
+    emoji: '↗',
+    shortcode: 'arrow_upper_right',
   },
   {
-    "shortcode": "arrows_clockwise",
-    "emoji": "🔃"
+    emoji: '🔃',
+    shortcode: 'arrows_clockwise',
   },
   {
-    "shortcode": "arrows_counterclockwise",
-    "emoji": "🔄"
+    emoji: '🔄',
+    shortcode: 'arrows_counterclockwise',
   },
   {
-    "shortcode": "art",
-    "emoji": "🎨"
+    emoji: '🎨',
+    shortcode: 'art',
   },
   {
-    "shortcode": "articulated_lorry",
-    "emoji": "🚛"
+    emoji: '🚛',
+    shortcode: 'articulated_lorry',
   },
   {
-    "shortcode": "asterisk",
-    "emoji": "*⃣"
+    emoji: '*⃣',
+    shortcode: 'asterisk',
   },
   {
-    "shortcode": "asterisk_symbol",
-    "emoji": "*"
+    emoji: '*',
+    shortcode: 'asterisk_symbol',
   },
   {
-    "shortcode": "astonished",
-    "emoji": "😲"
+    emoji: '😲',
+    shortcode: 'astonished',
   },
   {
-    "shortcode": "athletic_shoe",
-    "emoji": "👟"
+    emoji: '👟',
+    shortcode: 'athletic_shoe',
   },
   {
-    "shortcode": "atm",
-    "emoji": "🏧"
+    emoji: '🏧',
+    shortcode: 'atm',
   },
   {
-    "shortcode": "atom",
-    "emoji": "⚛"
+    emoji: '⚛',
+    shortcode: 'atom',
   },
   {
-    "shortcode": "avocado",
-    "emoji": "🥑"
+    emoji: '🥑',
+    shortcode: 'avocado',
   },
   {
-    "shortcode": "b",
-    "emoji": "🅱"
+    emoji: '🅱',
+    shortcode: 'b',
   },
   {
-    "shortcode": "baby",
-    "emoji": "👶"
+    emoji: '👶',
+    shortcode: 'baby',
   },
   {
-    "shortcode": "baby_bottle",
-    "emoji": "🍼"
+    emoji: '🍼',
+    shortcode: 'baby_bottle',
   },
   {
-    "shortcode": "baby_chick",
-    "emoji": "🐤"
+    emoji: '🐤',
+    shortcode: 'baby_chick',
   },
   {
-    "shortcode": "baby_symbol",
-    "emoji": "🚼"
+    emoji: '🚼',
+    shortcode: 'baby_symbol',
   },
   {
-    "shortcode": "baby_tone1",
-    "emoji": "👶🏻"
+    emoji: '👶🏻',
+    shortcode: 'baby_tone1',
   },
   {
-    "shortcode": "baby_tone2",
-    "emoji": "👶🏼"
+    emoji: '👶🏼',
+    shortcode: 'baby_tone2',
   },
   {
-    "shortcode": "baby_tone3",
-    "emoji": "👶🏽"
+    emoji: '👶🏽',
+    shortcode: 'baby_tone3',
   },
   {
-    "shortcode": "baby_tone4",
-    "emoji": "👶🏾"
+    emoji: '👶🏾',
+    shortcode: 'baby_tone4',
   },
   {
-    "shortcode": "baby_tone5",
-    "emoji": "👶🏿"
+    emoji: '👶🏿',
+    shortcode: 'baby_tone5',
   },
   {
-    "shortcode": "back",
-    "emoji": "🔙"
+    emoji: '🔙',
+    shortcode: 'back',
   },
   {
-    "shortcode": "bacon",
-    "emoji": "🥓"
+    emoji: '🥓',
+    shortcode: 'bacon',
   },
   {
-    "shortcode": "badminton",
-    "emoji": "🏸"
+    emoji: '🏸',
+    shortcode: 'badminton',
   },
   {
-    "shortcode": "baggage_claim",
-    "emoji": "🛄"
+    emoji: '🛄',
+    shortcode: 'baggage_claim',
   },
   {
-    "shortcode": "balloon",
-    "emoji": "🎈"
+    emoji: '🎈',
+    shortcode: 'balloon',
   },
   {
-    "shortcode": "ballot_box",
-    "emoji": "🗳"
+    emoji: '🗳',
+    shortcode: 'ballot_box',
   },
   {
-    "shortcode": "ballot_box_with_check",
-    "emoji": "☑"
+    emoji: '☑',
+    shortcode: 'ballot_box_with_check',
   },
   {
-    "shortcode": "bamboo",
-    "emoji": "🎍"
+    emoji: '🎍',
+    shortcode: 'bamboo',
   },
   {
-    "shortcode": "banana",
-    "emoji": "🍌"
+    emoji: '🍌',
+    shortcode: 'banana',
   },
   {
-    "shortcode": "bangbang",
-    "emoji": "‼"
+    emoji: '‼',
+    shortcode: 'bangbang',
   },
   {
-    "shortcode": "bank",
-    "emoji": "🏦"
+    emoji: '🏦',
+    shortcode: 'bank',
   },
   {
-    "shortcode": "bar_chart",
-    "emoji": "📊"
+    emoji: '📊',
+    shortcode: 'bar_chart',
   },
   {
-    "shortcode": "barber",
-    "emoji": "💈"
+    emoji: '💈',
+    shortcode: 'barber',
   },
   {
-    "shortcode": "baseball",
-    "emoji": "⚾"
+    emoji: '⚾',
+    shortcode: 'baseball',
   },
   {
-    "shortcode": "basketball",
-    "emoji": "🏀"
+    emoji: '🏀',
+    shortcode: 'basketball',
   },
   {
-    "shortcode": "bat",
-    "emoji": "🦇"
+    emoji: '🦇',
+    shortcode: 'bat',
   },
   {
-    "shortcode": "bath",
-    "emoji": "🛀"
+    emoji: '🛀',
+    shortcode: 'bath',
   },
   {
-    "shortcode": "bath_tone1",
-    "emoji": "🛀🏻"
+    emoji: '🛀🏻',
+    shortcode: 'bath_tone1',
   },
   {
-    "shortcode": "bath_tone2",
-    "emoji": "🛀🏼"
+    emoji: '🛀🏼',
+    shortcode: 'bath_tone2',
   },
   {
-    "shortcode": "bath_tone3",
-    "emoji": "🛀🏽"
+    emoji: '🛀🏽',
+    shortcode: 'bath_tone3',
   },
   {
-    "shortcode": "bath_tone4",
-    "emoji": "🛀🏾"
+    emoji: '🛀🏾',
+    shortcode: 'bath_tone4',
   },
   {
-    "shortcode": "bath_tone5",
-    "emoji": "🛀🏿"
+    emoji: '🛀🏿',
+    shortcode: 'bath_tone5',
   },
   {
-    "shortcode": "bathtub",
-    "emoji": "🛁"
+    emoji: '🛁',
+    shortcode: 'bathtub',
   },
   {
-    "shortcode": "battery",
-    "emoji": "🔋"
+    emoji: '🔋',
+    shortcode: 'battery',
   },
   {
-    "shortcode": "beach",
-    "emoji": "🏖"
+    emoji: '🏖',
+    shortcode: 'beach',
   },
   {
-    "shortcode": "beach_umbrella",
-    "emoji": "⛱"
+    emoji: '⛱',
+    shortcode: 'beach_umbrella',
   },
   {
-    "shortcode": "bear",
-    "emoji": "🐻"
+    emoji: '🐻',
+    shortcode: 'bear',
   },
   {
-    "shortcode": "bearded_person",
-    "emoji": "🧔"
+    emoji: '🧔',
+    shortcode: 'bearded_person',
   },
   {
-    "shortcode": "bearded_person_tone1",
-    "emoji": "🧔🏻"
+    emoji: '🧔🏻',
+    shortcode: 'bearded_person_tone1',
   },
   {
-    "shortcode": "bearded_person_tone2",
-    "emoji": "🧔🏼"
+    emoji: '🧔🏼',
+    shortcode: 'bearded_person_tone2',
   },
   {
-    "shortcode": "bearded_person_tone3",
-    "emoji": "🧔🏽"
+    emoji: '🧔🏽',
+    shortcode: 'bearded_person_tone3',
   },
   {
-    "shortcode": "bearded_person_tone4",
-    "emoji": "🧔🏾"
+    emoji: '🧔🏾',
+    shortcode: 'bearded_person_tone4',
   },
   {
-    "shortcode": "bearded_person_tone5",
-    "emoji": "🧔🏿"
+    emoji: '🧔🏿',
+    shortcode: 'bearded_person_tone5',
   },
   {
-    "shortcode": "bed",
-    "emoji": "🛏"
+    emoji: '🛏',
+    shortcode: 'bed',
   },
   {
-    "shortcode": "bee",
-    "emoji": "🐝"
+    emoji: '🐝',
+    shortcode: 'bee',
   },
   {
-    "shortcode": "beer",
-    "emoji": "🍺"
+    emoji: '🍺',
+    shortcode: 'beer',
   },
   {
-    "shortcode": "beers",
-    "emoji": "🍻"
+    emoji: '🍻',
+    shortcode: 'beers',
   },
   {
-    "shortcode": "beetle",
-    "emoji": "🐞"
+    emoji: '🐞',
+    shortcode: 'beetle',
   },
   {
-    "shortcode": "beginner",
-    "emoji": "🔰"
+    emoji: '🔰',
+    shortcode: 'beginner',
   },
   {
-    "shortcode": "bell",
-    "emoji": "🔔"
+    emoji: '🔔',
+    shortcode: 'bell',
   },
   {
-    "shortcode": "bellhop",
-    "emoji": "🛎"
+    emoji: '🛎',
+    shortcode: 'bellhop',
   },
   {
-    "shortcode": "bento",
-    "emoji": "🍱"
+    emoji: '🍱',
+    shortcode: 'bento',
   },
   {
-    "shortcode": "bike",
-    "emoji": "🚲"
+    emoji: '🚲',
+    shortcode: 'bike',
   },
   {
-    "shortcode": "bikini",
-    "emoji": "👙"
+    emoji: '👙',
+    shortcode: 'bikini',
   },
   {
-    "shortcode": "billed_cap",
-    "emoji": "🧢"
+    emoji: '🧢',
+    shortcode: 'billed_cap',
   },
   {
-    "shortcode": "biohazard",
-    "emoji": "☣"
+    emoji: '☣',
+    shortcode: 'biohazard',
   },
   {
-    "shortcode": "bird",
-    "emoji": "🐦"
+    emoji: '🐦',
+    shortcode: 'bird',
   },
   {
-    "shortcode": "birthday",
-    "emoji": "🎂"
+    emoji: '🎂',
+    shortcode: 'birthday',
   },
   {
-    "shortcode": "black_circle",
-    "emoji": "⚫"
+    emoji: '⚫',
+    shortcode: 'black_circle',
   },
   {
-    "shortcode": "black_heart",
-    "emoji": "🖤"
+    emoji: '🖤',
+    shortcode: 'black_heart',
   },
   {
-    "shortcode": "black_joker",
-    "emoji": "🃏"
+    emoji: '🃏',
+    shortcode: 'black_joker',
   },
   {
-    "shortcode": "black_large_square",
-    "emoji": "⬛"
+    emoji: '⬛',
+    shortcode: 'black_large_square',
   },
   {
-    "shortcode": "black_medium_small_square",
-    "emoji": "◾"
+    emoji: '◾',
+    shortcode: 'black_medium_small_square',
   },
   {
-    "shortcode": "black_medium_square",
-    "emoji": "◼"
+    emoji: '◼',
+    shortcode: 'black_medium_square',
   },
   {
-    "shortcode": "black_nib",
-    "emoji": "✒"
+    emoji: '✒',
+    shortcode: 'black_nib',
   },
   {
-    "shortcode": "black_small_square",
-    "emoji": "▪"
+    emoji: '▪',
+    shortcode: 'black_small_square',
   },
   {
-    "shortcode": "black_square_button",
-    "emoji": "🔲"
+    emoji: '🔲',
+    shortcode: 'black_square_button',
   },
   {
-    "shortcode": "blond_haired_person",
-    "emoji": "👱"
+    emoji: '👱',
+    shortcode: 'blond_haired_person',
   },
   {
-    "shortcode": "blond_haired_person_tone1",
-    "emoji": "👱🏻"
+    emoji: '👱🏻',
+    shortcode: 'blond_haired_person_tone1',
   },
   {
-    "shortcode": "blond_haired_person_tone2",
-    "emoji": "👱🏼"
+    emoji: '👱🏼',
+    shortcode: 'blond_haired_person_tone2',
   },
   {
-    "shortcode": "blond_haired_person_tone3",
-    "emoji": "👱🏽"
+    emoji: '👱🏽',
+    shortcode: 'blond_haired_person_tone3',
   },
   {
-    "shortcode": "blond_haired_person_tone4",
-    "emoji": "👱🏾"
+    emoji: '👱🏾',
+    shortcode: 'blond_haired_person_tone4',
   },
   {
-    "shortcode": "blond_haired_person_tone5",
-    "emoji": "👱🏿"
+    emoji: '👱🏿',
+    shortcode: 'blond_haired_person_tone5',
   },
   {
-    "shortcode": "blond-haired_man",
-    "emoji": "👱♂"
+    emoji: '👱♂',
+    shortcode: 'blond-haired_man',
   },
   {
-    "shortcode": "blond-haired_man_tone1",
-    "emoji": "👱🏻♂"
+    emoji: '👱🏻♂',
+    shortcode: 'blond-haired_man_tone1',
   },
   {
-    "shortcode": "blond-haired_man_tone2",
-    "emoji": "👱🏼♂"
+    emoji: '👱🏼♂',
+    shortcode: 'blond-haired_man_tone2',
   },
   {
-    "shortcode": "blond-haired_man_tone3",
-    "emoji": "👱🏽♂"
+    emoji: '👱🏽♂',
+    shortcode: 'blond-haired_man_tone3',
   },
   {
-    "shortcode": "blond-haired_man_tone4",
-    "emoji": "👱🏾♂"
+    emoji: '👱🏾♂',
+    shortcode: 'blond-haired_man_tone4',
   },
   {
-    "shortcode": "blond-haired_man_tone5",
-    "emoji": "👱🏿♂"
+    emoji: '👱🏿♂',
+    shortcode: 'blond-haired_man_tone5',
   },
   {
-    "shortcode": "blond-haired_woman",
-    "emoji": "👱♀"
+    emoji: '👱♀',
+    shortcode: 'blond-haired_woman',
   },
   {
-    "shortcode": "blond-haired_woman_tone1",
-    "emoji": "👱🏻♀"
+    emoji: '👱🏻♀',
+    shortcode: 'blond-haired_woman_tone1',
   },
   {
-    "shortcode": "blond-haired_woman_tone2",
-    "emoji": "👱🏼♀"
+    emoji: '👱🏼♀',
+    shortcode: 'blond-haired_woman_tone2',
   },
   {
-    "shortcode": "blond-haired_woman_tone3",
-    "emoji": "👱🏽♀"
+    emoji: '👱🏽♀',
+    shortcode: 'blond-haired_woman_tone3',
   },
   {
-    "shortcode": "blond-haired_woman_tone4",
-    "emoji": "👱🏾♀"
+    emoji: '👱🏾♀',
+    shortcode: 'blond-haired_woman_tone4',
   },
   {
-    "shortcode": "blond-haired_woman_tone5",
-    "emoji": "👱🏿♀"
+    emoji: '👱🏿♀',
+    shortcode: 'blond-haired_woman_tone5',
   },
   {
-    "shortcode": "blossom",
-    "emoji": "🌼"
+    emoji: '🌼',
+    shortcode: 'blossom',
   },
   {
-    "shortcode": "blowfish",
-    "emoji": "🐡"
+    emoji: '🐡',
+    shortcode: 'blowfish',
   },
   {
-    "shortcode": "blue_book",
-    "emoji": "📘"
+    emoji: '📘',
+    shortcode: 'blue_book',
   },
   {
-    "shortcode": "blue_car",
-    "emoji": "🚙"
+    emoji: '🚙',
+    shortcode: 'blue_car',
   },
   {
-    "shortcode": "blue_circle",
-    "emoji": "🔵"
+    emoji: '🔵',
+    shortcode: 'blue_circle',
   },
   {
-    "shortcode": "blue_heart",
-    "emoji": "💙"
+    emoji: '💙',
+    shortcode: 'blue_heart',
   },
   {
-    "shortcode": "blush",
-    "emoji": "😊"
+    emoji: '😊',
+    shortcode: 'blush',
   },
   {
-    "shortcode": "boar",
-    "emoji": "🐗"
+    emoji: '🐗',
+    shortcode: 'boar',
   },
   {
-    "shortcode": "bomb",
-    "emoji": "💣"
+    emoji: '💣',
+    shortcode: 'bomb',
   },
   {
-    "shortcode": "book",
-    "emoji": "📖"
+    emoji: '📖',
+    shortcode: 'book',
   },
   {
-    "shortcode": "bookmark",
-    "emoji": "🔖"
+    emoji: '🔖',
+    shortcode: 'bookmark',
   },
   {
-    "shortcode": "bookmark_tabs",
-    "emoji": "📑"
+    emoji: '📑',
+    shortcode: 'bookmark_tabs',
   },
   {
-    "shortcode": "books",
-    "emoji": "📚"
+    emoji: '📚',
+    shortcode: 'books',
   },
   {
-    "shortcode": "boom",
-    "emoji": "💥"
+    emoji: '💥',
+    shortcode: 'boom',
   },
   {
-    "shortcode": "boot",
-    "emoji": "👢"
+    emoji: '👢',
+    shortcode: 'boot',
   },
   {
-    "shortcode": "bouquet",
-    "emoji": "💐"
+    emoji: '💐',
+    shortcode: 'bouquet',
   },
   {
-    "shortcode": "bow_and_arrow",
-    "emoji": "🏹"
+    emoji: '🏹',
+    shortcode: 'bow_and_arrow',
   },
   {
-    "shortcode": "bowl_with_spoon",
-    "emoji": "🥣"
+    emoji: '🥣',
+    shortcode: 'bowl_with_spoon',
   },
   {
-    "shortcode": "bowling",
-    "emoji": "🎳"
+    emoji: '🎳',
+    shortcode: 'bowling',
   },
   {
-    "shortcode": "boxing_glove",
-    "emoji": "🥊"
+    emoji: '🥊',
+    shortcode: 'boxing_glove',
   },
   {
-    "shortcode": "boy",
-    "emoji": "👦"
+    emoji: '👦',
+    shortcode: 'boy',
   },
   {
-    "shortcode": "boy_tone1",
-    "emoji": "👦🏻"
+    emoji: '👦🏻',
+    shortcode: 'boy_tone1',
   },
   {
-    "shortcode": "boy_tone2",
-    "emoji": "👦🏼"
+    emoji: '👦🏼',
+    shortcode: 'boy_tone2',
   },
   {
-    "shortcode": "boy_tone3",
-    "emoji": "👦🏽"
+    emoji: '👦🏽',
+    shortcode: 'boy_tone3',
   },
   {
-    "shortcode": "boy_tone4",
-    "emoji": "👦🏾"
+    emoji: '👦🏾',
+    shortcode: 'boy_tone4',
   },
   {
-    "shortcode": "boy_tone5",
-    "emoji": "👦🏿"
+    emoji: '👦🏿',
+    shortcode: 'boy_tone5',
   },
   {
-    "shortcode": "brain",
-    "emoji": "🧠"
+    emoji: '🧠',
+    shortcode: 'brain',
   },
   {
-    "shortcode": "bread",
-    "emoji": "🍞"
+    emoji: '🍞',
+    shortcode: 'bread',
   },
   {
-    "shortcode": "breast_feeding",
-    "emoji": "🤱"
+    emoji: '🤱',
+    shortcode: 'breast_feeding',
   },
   {
-    "shortcode": "breast_feeding_tone1",
-    "emoji": "🤱🏻"
+    emoji: '🤱🏻',
+    shortcode: 'breast_feeding_tone1',
   },
   {
-    "shortcode": "breast_feeding_tone2",
-    "emoji": "🤱🏼"
+    emoji: '🤱🏼',
+    shortcode: 'breast_feeding_tone2',
   },
   {
-    "shortcode": "breast_feeding_tone3",
-    "emoji": "🤱🏽"
+    emoji: '🤱🏽',
+    shortcode: 'breast_feeding_tone3',
   },
   {
-    "shortcode": "breast_feeding_tone4",
-    "emoji": "🤱🏾"
+    emoji: '🤱🏾',
+    shortcode: 'breast_feeding_tone4',
   },
   {
-    "shortcode": "breast_feeding_tone5",
-    "emoji": "🤱🏿"
+    emoji: '🤱🏿',
+    shortcode: 'breast_feeding_tone5',
   },
   {
-    "shortcode": "bride_with_veil",
-    "emoji": "👰"
+    emoji: '👰',
+    shortcode: 'bride_with_veil',
   },
   {
-    "shortcode": "bride_with_veil_tone1",
-    "emoji": "👰🏻"
+    emoji: '👰🏻',
+    shortcode: 'bride_with_veil_tone1',
   },
   {
-    "shortcode": "bride_with_veil_tone2",
-    "emoji": "👰🏼"
+    emoji: '👰🏼',
+    shortcode: 'bride_with_veil_tone2',
   },
   {
-    "shortcode": "bride_with_veil_tone3",
-    "emoji": "👰🏽"
+    emoji: '👰🏽',
+    shortcode: 'bride_with_veil_tone3',
   },
   {
-    "shortcode": "bride_with_veil_tone4",
-    "emoji": "👰🏾"
+    emoji: '👰🏾',
+    shortcode: 'bride_with_veil_tone4',
   },
   {
-    "shortcode": "bride_with_veil_tone5",
-    "emoji": "👰🏿"
+    emoji: '👰🏿',
+    shortcode: 'bride_with_veil_tone5',
   },
   {
-    "shortcode": "bridge_at_night",
-    "emoji": "🌉"
+    emoji: '🌉',
+    shortcode: 'bridge_at_night',
   },
   {
-    "shortcode": "briefcase",
-    "emoji": "💼"
+    emoji: '💼',
+    shortcode: 'briefcase',
   },
   {
-    "shortcode": "broccoli",
-    "emoji": "🥦"
+    emoji: '🥦',
+    shortcode: 'broccoli',
   },
   {
-    "shortcode": "broken_heart",
-    "emoji": "💔"
+    emoji: '💔',
+    shortcode: 'broken_heart',
   },
   {
-    "shortcode": "bug",
-    "emoji": "🐛"
+    emoji: '🐛',
+    shortcode: 'bug',
   },
   {
-    "shortcode": "bulb",
-    "emoji": "💡"
+    emoji: '💡',
+    shortcode: 'bulb',
   },
   {
-    "shortcode": "bullettrain_front",
-    "emoji": "🚅"
+    emoji: '🚅',
+    shortcode: 'bullettrain_front',
   },
   {
-    "shortcode": "bullettrain_side",
-    "emoji": "🚄"
+    emoji: '🚄',
+    shortcode: 'bullettrain_side',
   },
   {
-    "shortcode": "burrito",
-    "emoji": "🌯"
+    emoji: '🌯',
+    shortcode: 'burrito',
   },
   {
-    "shortcode": "bus",
-    "emoji": "🚌"
+    emoji: '🚌',
+    shortcode: 'bus',
   },
   {
-    "shortcode": "busstop",
-    "emoji": "🚏"
+    emoji: '🚏',
+    shortcode: 'busstop',
   },
   {
-    "shortcode": "bust_in_silhouette",
-    "emoji": "👤"
+    emoji: '👤',
+    shortcode: 'bust_in_silhouette',
   },
   {
-    "shortcode": "busts_in_silhouette",
-    "emoji": "👥"
+    emoji: '👥',
+    shortcode: 'busts_in_silhouette',
   },
   {
-    "shortcode": "butterfly",
-    "emoji": "🦋"
+    emoji: '🦋',
+    shortcode: 'butterfly',
   },
   {
-    "shortcode": "cactus",
-    "emoji": "🌵"
+    emoji: '🌵',
+    shortcode: 'cactus',
   },
   {
-    "shortcode": "cake",
-    "emoji": "🍰"
+    emoji: '🍰',
+    shortcode: 'cake',
   },
   {
-    "shortcode": "calendar",
-    "emoji": "📆"
+    emoji: '📆',
+    shortcode: 'calendar',
   },
   {
-    "shortcode": "calendar_spiral",
-    "emoji": "🗓"
+    emoji: '🗓',
+    shortcode: 'calendar_spiral',
   },
   {
-    "shortcode": "call_me",
-    "emoji": "🤙"
+    emoji: '🤙',
+    shortcode: 'call_me',
   },
   {
-    "shortcode": "call_me_tone1",
-    "emoji": "🤙🏻"
+    emoji: '🤙🏻',
+    shortcode: 'call_me_tone1',
   },
   {
-    "shortcode": "call_me_tone2",
-    "emoji": "🤙🏼"
+    emoji: '🤙🏼',
+    shortcode: 'call_me_tone2',
   },
   {
-    "shortcode": "call_me_tone3",
-    "emoji": "🤙🏽"
+    emoji: '🤙🏽',
+    shortcode: 'call_me_tone3',
   },
   {
-    "shortcode": "call_me_tone4",
-    "emoji": "🤙🏾"
+    emoji: '🤙🏾',
+    shortcode: 'call_me_tone4',
   },
   {
-    "shortcode": "call_me_tone5",
-    "emoji": "🤙🏿"
+    emoji: '🤙🏿',
+    shortcode: 'call_me_tone5',
   },
   {
-    "shortcode": "calling",
-    "emoji": "📲"
+    emoji: '📲',
+    shortcode: 'calling',
   },
   {
-    "shortcode": "camel",
-    "emoji": "🐫"
+    emoji: '🐫',
+    shortcode: 'camel',
   },
   {
-    "shortcode": "camera",
-    "emoji": "📷"
+    emoji: '📷',
+    shortcode: 'camera',
   },
   {
-    "shortcode": "camera_with_flash",
-    "emoji": "📸"
+    emoji: '📸',
+    shortcode: 'camera_with_flash',
   },
   {
-    "shortcode": "camping",
-    "emoji": "🏕"
+    emoji: '🏕',
+    shortcode: 'camping',
   },
   {
-    "shortcode": "cancer",
-    "emoji": "♋"
+    emoji: '♋',
+    shortcode: 'cancer',
   },
   {
-    "shortcode": "candle",
-    "emoji": "🕯"
+    emoji: '🕯',
+    shortcode: 'candle',
   },
   {
-    "shortcode": "candy",
-    "emoji": "🍬"
+    emoji: '🍬',
+    shortcode: 'candy',
   },
   {
-    "shortcode": "canned_food",
-    "emoji": "🥫"
+    emoji: '🥫',
+    shortcode: 'canned_food',
   },
   {
-    "shortcode": "canoe",
-    "emoji": "🛶"
+    emoji: '🛶',
+    shortcode: 'canoe',
   },
   {
-    "shortcode": "capital_abcd",
-    "emoji": "🔠"
+    emoji: '🔠',
+    shortcode: 'capital_abcd',
   },
   {
-    "shortcode": "capricorn",
-    "emoji": "♑"
+    emoji: '♑',
+    shortcode: 'capricorn',
   },
   {
-    "shortcode": "card_box",
-    "emoji": "🗃"
+    emoji: '🗃',
+    shortcode: 'card_box',
   },
   {
-    "shortcode": "card_index",
-    "emoji": "📇"
+    emoji: '📇',
+    shortcode: 'card_index',
   },
   {
-    "shortcode": "carousel_horse",
-    "emoji": "🎠"
+    emoji: '🎠',
+    shortcode: 'carousel_horse',
   },
   {
-    "shortcode": "carrot",
-    "emoji": "🥕"
+    emoji: '🥕',
+    shortcode: 'carrot',
   },
   {
-    "shortcode": "cat",
-    "emoji": "🐱"
+    emoji: '🐱',
+    shortcode: 'cat',
   },
   {
-    "shortcode": "cat2",
-    "emoji": "🐈"
+    emoji: '🐈',
+    shortcode: 'cat2',
   },
   {
-    "shortcode": "cd",
-    "emoji": "💿"
+    emoji: '💿',
+    shortcode: 'cd',
   },
   {
-    "shortcode": "chains",
-    "emoji": "⛓"
+    emoji: '⛓',
+    shortcode: 'chains',
   },
   {
-    "shortcode": "champagne",
-    "emoji": "🍾"
+    emoji: '🍾',
+    shortcode: 'champagne',
   },
   {
-    "shortcode": "champagne_glass",
-    "emoji": "🥂"
+    emoji: '🥂',
+    shortcode: 'champagne_glass',
   },
   {
-    "shortcode": "chart",
-    "emoji": "💹"
+    emoji: '💹',
+    shortcode: 'chart',
   },
   {
-    "shortcode": "chart_with_downwards_trend",
-    "emoji": "📉"
+    emoji: '📉',
+    shortcode: 'chart_with_downwards_trend',
   },
   {
-    "shortcode": "chart_with_upwards_trend",
-    "emoji": "📈"
+    emoji: '📈',
+    shortcode: 'chart_with_upwards_trend',
   },
   {
-    "shortcode": "checkered_flag",
-    "emoji": "🏁"
+    emoji: '🏁',
+    shortcode: 'checkered_flag',
   },
   {
-    "shortcode": "cheese",
-    "emoji": "🧀"
+    emoji: '🧀',
+    shortcode: 'cheese',
   },
   {
-    "shortcode": "cherries",
-    "emoji": "🍒"
+    emoji: '🍒',
+    shortcode: 'cherries',
   },
   {
-    "shortcode": "cherry_blossom",
-    "emoji": "🌸"
+    emoji: '🌸',
+    shortcode: 'cherry_blossom',
   },
   {
-    "shortcode": "chestnut",
-    "emoji": "🌰"
+    emoji: '🌰',
+    shortcode: 'chestnut',
   },
   {
-    "shortcode": "chicken",
-    "emoji": "🐔"
+    emoji: '🐔',
+    shortcode: 'chicken',
   },
   {
-    "shortcode": "child",
-    "emoji": "🧒"
+    emoji: '🧒',
+    shortcode: 'child',
   },
   {
-    "shortcode": "child_tone1",
-    "emoji": "🧒🏻"
+    emoji: '🧒🏻',
+    shortcode: 'child_tone1',
   },
   {
-    "shortcode": "child_tone2",
-    "emoji": "🧒🏼"
+    emoji: '🧒🏼',
+    shortcode: 'child_tone2',
   },
   {
-    "shortcode": "child_tone3",
-    "emoji": "🧒🏽"
+    emoji: '🧒🏽',
+    shortcode: 'child_tone3',
   },
   {
-    "shortcode": "child_tone4",
-    "emoji": "🧒🏾"
+    emoji: '🧒🏾',
+    shortcode: 'child_tone4',
   },
   {
-    "shortcode": "child_tone5",
-    "emoji": "🧒🏿"
+    emoji: '🧒🏿',
+    shortcode: 'child_tone5',
   },
   {
-    "shortcode": "children_crossing",
-    "emoji": "🚸"
+    emoji: '🚸',
+    shortcode: 'children_crossing',
   },
   {
-    "shortcode": "chipmunk",
-    "emoji": "🐿"
+    emoji: '🐿',
+    shortcode: 'chipmunk',
   },
   {
-    "shortcode": "chocolate_bar",
-    "emoji": "🍫"
+    emoji: '🍫',
+    shortcode: 'chocolate_bar',
   },
   {
-    "shortcode": "chopsticks",
-    "emoji": "🥢"
+    emoji: '🥢',
+    shortcode: 'chopsticks',
   },
   {
-    "shortcode": "christmas_tree",
-    "emoji": "🎄"
+    emoji: '🎄',
+    shortcode: 'christmas_tree',
   },
   {
-    "shortcode": "church",
-    "emoji": "⛪"
+    emoji: '⛪',
+    shortcode: 'church',
   },
   {
-    "shortcode": "cinema",
-    "emoji": "🎦"
+    emoji: '🎦',
+    shortcode: 'cinema',
   },
   {
-    "shortcode": "circus_tent",
-    "emoji": "🎪"
+    emoji: '🎪',
+    shortcode: 'circus_tent',
   },
   {
-    "shortcode": "city_dusk",
-    "emoji": "🌆"
+    emoji: '🌆',
+    shortcode: 'city_dusk',
   },
   {
-    "shortcode": "city_sunset",
-    "emoji": "🌇"
+    emoji: '🌇',
+    shortcode: 'city_sunset',
   },
   {
-    "shortcode": "cityscape",
-    "emoji": "🏙"
+    emoji: '🏙',
+    shortcode: 'cityscape',
   },
   {
-    "shortcode": "cl",
-    "emoji": "🆑"
+    emoji: '🆑',
+    shortcode: 'cl',
   },
   {
-    "shortcode": "clap",
-    "emoji": "👏"
+    emoji: '👏',
+    shortcode: 'clap',
   },
   {
-    "shortcode": "clap_tone1",
-    "emoji": "👏🏻"
+    emoji: '👏🏻',
+    shortcode: 'clap_tone1',
   },
   {
-    "shortcode": "clap_tone2",
-    "emoji": "👏🏼"
+    emoji: '👏🏼',
+    shortcode: 'clap_tone2',
   },
   {
-    "shortcode": "clap_tone3",
-    "emoji": "👏🏽"
+    emoji: '👏🏽',
+    shortcode: 'clap_tone3',
   },
   {
-    "shortcode": "clap_tone4",
-    "emoji": "👏🏾"
+    emoji: '👏🏾',
+    shortcode: 'clap_tone4',
   },
   {
-    "shortcode": "clap_tone5",
-    "emoji": "👏🏿"
+    emoji: '👏🏿',
+    shortcode: 'clap_tone5',
   },
   {
-    "shortcode": "clapper",
-    "emoji": "🎬"
+    emoji: '🎬',
+    shortcode: 'clapper',
   },
   {
-    "shortcode": "classical_building",
-    "emoji": "🏛"
+    emoji: '🏛',
+    shortcode: 'classical_building',
   },
   {
-    "shortcode": "clipboard",
-    "emoji": "📋"
+    emoji: '📋',
+    shortcode: 'clipboard',
   },
   {
-    "shortcode": "clock",
-    "emoji": "🕰"
+    emoji: '🕰',
+    shortcode: 'clock',
   },
   {
-    "shortcode": "clock1",
-    "emoji": "🕐"
+    emoji: '🕐',
+    shortcode: 'clock1',
   },
   {
-    "shortcode": "clock10",
-    "emoji": "🕙"
+    emoji: '🕙',
+    shortcode: 'clock10',
   },
   {
-    "shortcode": "clock1030",
-    "emoji": "🕥"
+    emoji: '🕥',
+    shortcode: 'clock1030',
   },
   {
-    "shortcode": "clock11",
-    "emoji": "🕚"
+    emoji: '🕚',
+    shortcode: 'clock11',
   },
   {
-    "shortcode": "clock1130",
-    "emoji": "🕦"
+    emoji: '🕦',
+    shortcode: 'clock1130',
   },
   {
-    "shortcode": "clock12",
-    "emoji": "🕛"
+    emoji: '🕛',
+    shortcode: 'clock12',
   },
   {
-    "shortcode": "clock1230",
-    "emoji": "🕧"
+    emoji: '🕧',
+    shortcode: 'clock1230',
   },
   {
-    "shortcode": "clock130",
-    "emoji": "🕜"
+    emoji: '🕜',
+    shortcode: 'clock130',
   },
   {
-    "shortcode": "clock2",
-    "emoji": "🕑"
+    emoji: '🕑',
+    shortcode: 'clock2',
   },
   {
-    "shortcode": "clock230",
-    "emoji": "🕝"
+    emoji: '🕝',
+    shortcode: 'clock230',
   },
   {
-    "shortcode": "clock3",
-    "emoji": "🕒"
+    emoji: '🕒',
+    shortcode: 'clock3',
   },
   {
-    "shortcode": "clock330",
-    "emoji": "🕞"
+    emoji: '🕞',
+    shortcode: 'clock330',
   },
   {
-    "shortcode": "clock4",
-    "emoji": "🕓"
+    emoji: '🕓',
+    shortcode: 'clock4',
   },
   {
-    "shortcode": "clock430",
-    "emoji": "🕟"
+    emoji: '🕟',
+    shortcode: 'clock430',
   },
   {
-    "shortcode": "clock5",
-    "emoji": "🕔"
+    emoji: '🕔',
+    shortcode: 'clock5',
   },
   {
-    "shortcode": "clock530",
-    "emoji": "🕠"
+    emoji: '🕠',
+    shortcode: 'clock530',
   },
   {
-    "shortcode": "clock6",
-    "emoji": "🕕"
+    emoji: '🕕',
+    shortcode: 'clock6',
   },
   {
-    "shortcode": "clock630",
-    "emoji": "🕡"
+    emoji: '🕡',
+    shortcode: 'clock630',
   },
   {
-    "shortcode": "clock7",
-    "emoji": "🕖"
+    emoji: '🕖',
+    shortcode: 'clock7',
   },
   {
-    "shortcode": "clock730",
-    "emoji": "🕢"
+    emoji: '🕢',
+    shortcode: 'clock730',
   },
   {
-    "shortcode": "clock8",
-    "emoji": "🕗"
+    emoji: '🕗',
+    shortcode: 'clock8',
   },
   {
-    "shortcode": "clock830",
-    "emoji": "🕣"
+    emoji: '🕣',
+    shortcode: 'clock830',
   },
   {
-    "shortcode": "clock9",
-    "emoji": "🕘"
+    emoji: '🕘',
+    shortcode: 'clock9',
   },
   {
-    "shortcode": "clock930",
-    "emoji": "🕤"
+    emoji: '🕤',
+    shortcode: 'clock930',
   },
   {
-    "shortcode": "closed_book",
-    "emoji": "📕"
+    emoji: '📕',
+    shortcode: 'closed_book',
   },
   {
-    "shortcode": "closed_lock_with_key",
-    "emoji": "🔐"
+    emoji: '🔐',
+    shortcode: 'closed_lock_with_key',
   },
   {
-    "shortcode": "closed_umbrella",
-    "emoji": "🌂"
+    emoji: '🌂',
+    shortcode: 'closed_umbrella',
   },
   {
-    "shortcode": "cloud",
-    "emoji": "☁"
+    emoji: '☁',
+    shortcode: 'cloud',
   },
   {
-    "shortcode": "cloud_lightning",
-    "emoji": "🌩"
+    emoji: '🌩',
+    shortcode: 'cloud_lightning',
   },
   {
-    "shortcode": "cloud_rain",
-    "emoji": "🌧"
+    emoji: '🌧',
+    shortcode: 'cloud_rain',
   },
   {
-    "shortcode": "cloud_snow",
-    "emoji": "🌨"
+    emoji: '🌨',
+    shortcode: 'cloud_snow',
   },
   {
-    "shortcode": "cloud_tornado",
-    "emoji": "🌪"
+    emoji: '🌪',
+    shortcode: 'cloud_tornado',
   },
   {
-    "shortcode": "clown",
-    "emoji": "🤡"
+    emoji: '🤡',
+    shortcode: 'clown',
   },
   {
-    "shortcode": "clubs",
-    "emoji": "♣"
+    emoji: '♣',
+    shortcode: 'clubs',
   },
   {
-    "shortcode": "coat",
-    "emoji": "🧥"
+    emoji: '🧥',
+    shortcode: 'coat',
   },
   {
-    "shortcode": "cocktail",
-    "emoji": "🍸"
+    emoji: '🍸',
+    shortcode: 'cocktail',
   },
   {
-    "shortcode": "coconut",
-    "emoji": "🥥"
+    emoji: '🥥',
+    shortcode: 'coconut',
   },
   {
-    "shortcode": "coffee",
-    "emoji": "☕"
+    emoji: '☕',
+    shortcode: 'coffee',
   },
   {
-    "shortcode": "coffin",
-    "emoji": "⚰"
+    emoji: '⚰',
+    shortcode: 'coffin',
   },
   {
-    "shortcode": "cold_sweat",
-    "emoji": "😰"
+    emoji: '😰',
+    shortcode: 'cold_sweat',
   },
   {
-    "shortcode": "comet",
-    "emoji": "☄"
+    emoji: '☄',
+    shortcode: 'comet',
   },
   {
-    "shortcode": "compression",
-    "emoji": "🗜"
+    emoji: '🗜',
+    shortcode: 'compression',
   },
   {
-    "shortcode": "computer",
-    "emoji": "💻"
+    emoji: '💻',
+    shortcode: 'computer',
   },
   {
-    "shortcode": "confetti_ball",
-    "emoji": "🎊"
+    emoji: '🎊',
+    shortcode: 'confetti_ball',
   },
   {
-    "shortcode": "confounded",
-    "emoji": "😖"
+    emoji: '😖',
+    shortcode: 'confounded',
   },
   {
-    "shortcode": "confused",
-    "emoji": "😕"
+    emoji: '😕',
+    shortcode: 'confused',
   },
   {
-    "shortcode": "congratulations",
-    "emoji": "㊗"
+    emoji: '㊗',
+    shortcode: 'congratulations',
   },
   {
-    "shortcode": "construction",
-    "emoji": "🚧"
+    emoji: '🚧',
+    shortcode: 'construction',
   },
   {
-    "shortcode": "construction_site",
-    "emoji": "🏗"
+    emoji: '🏗',
+    shortcode: 'construction_site',
   },
   {
-    "shortcode": "construction_worker",
-    "emoji": "👷"
+    emoji: '👷',
+    shortcode: 'construction_worker',
   },
   {
-    "shortcode": "construction_worker_tone1",
-    "emoji": "👷🏻"
+    emoji: '👷🏻',
+    shortcode: 'construction_worker_tone1',
   },
   {
-    "shortcode": "construction_worker_tone2",
-    "emoji": "👷🏼"
+    emoji: '👷🏼',
+    shortcode: 'construction_worker_tone2',
   },
   {
-    "shortcode": "construction_worker_tone3",
-    "emoji": "👷🏽"
+    emoji: '👷🏽',
+    shortcode: 'construction_worker_tone3',
   },
   {
-    "shortcode": "construction_worker_tone4",
-    "emoji": "👷🏾"
+    emoji: '👷🏾',
+    shortcode: 'construction_worker_tone4',
   },
   {
-    "shortcode": "construction_worker_tone5",
-    "emoji": "👷🏿"
+    emoji: '👷🏿',
+    shortcode: 'construction_worker_tone5',
   },
   {
-    "shortcode": "control_knobs",
-    "emoji": "🎛"
+    emoji: '🎛',
+    shortcode: 'control_knobs',
   },
   {
-    "shortcode": "convenience_store",
-    "emoji": "🏪"
+    emoji: '🏪',
+    shortcode: 'convenience_store',
   },
   {
-    "shortcode": "cookie",
-    "emoji": "🍪"
+    emoji: '🍪',
+    shortcode: 'cookie',
   },
   {
-    "shortcode": "cooking",
-    "emoji": "🍳"
+    emoji: '🍳',
+    shortcode: 'cooking',
   },
   {
-    "shortcode": "cool",
-    "emoji": "🆒"
+    emoji: '🆒',
+    shortcode: 'cool',
   },
   {
-    "shortcode": "copyright",
-    "emoji": "©"
+    emoji: '©',
+    shortcode: 'copyright',
   },
   {
-    "shortcode": "corn",
-    "emoji": "🌽"
+    emoji: '🌽',
+    shortcode: 'corn',
   },
   {
-    "shortcode": "couch",
-    "emoji": "🛋"
+    emoji: '🛋',
+    shortcode: 'couch',
   },
   {
-    "shortcode": "couple",
-    "emoji": "👫"
+    emoji: '👫',
+    shortcode: 'couple',
   },
   {
-    "shortcode": "couple_mm",
-    "emoji": "👨❤👨"
+    emoji: '👨❤👨',
+    shortcode: 'couple_mm',
   },
   {
-    "shortcode": "couple_with_heart",
-    "emoji": "💑"
+    emoji: '💑',
+    shortcode: 'couple_with_heart',
   },
   {
-    "shortcode": "couple_with_heart_woman_man",
-    "emoji": "👩❤👨"
+    emoji: '👩❤👨',
+    shortcode: 'couple_with_heart_woman_man',
   },
   {
-    "shortcode": "couple_ww",
-    "emoji": "👩❤👩"
+    emoji: '👩❤👩',
+    shortcode: 'couple_ww',
   },
   {
-    "shortcode": "couplekiss",
-    "emoji": "💏"
+    emoji: '💏',
+    shortcode: 'couplekiss',
   },
   {
-    "shortcode": "cow",
-    "emoji": "🐮"
+    emoji: '🐮',
+    shortcode: 'cow',
   },
   {
-    "shortcode": "cow2",
-    "emoji": "🐄"
+    emoji: '🐄',
+    shortcode: 'cow2',
   },
   {
-    "shortcode": "cowboy",
-    "emoji": "🤠"
+    emoji: '🤠',
+    shortcode: 'cowboy',
   },
   {
-    "shortcode": "crab",
-    "emoji": "🦀"
+    emoji: '🦀',
+    shortcode: 'crab',
   },
   {
-    "shortcode": "crayon",
-    "emoji": "🖍"
+    emoji: '🖍',
+    shortcode: 'crayon',
   },
   {
-    "shortcode": "crazy_face",
-    "emoji": "🤪"
+    emoji: '🤪',
+    shortcode: 'crazy_face',
   },
   {
-    "shortcode": "credit_card",
-    "emoji": "💳"
+    emoji: '💳',
+    shortcode: 'credit_card',
   },
   {
-    "shortcode": "crescent_moon",
-    "emoji": "🌙"
+    emoji: '🌙',
+    shortcode: 'crescent_moon',
   },
   {
-    "shortcode": "cricket",
-    "emoji": "🦗"
+    emoji: '🦗',
+    shortcode: 'cricket',
   },
   {
-    "shortcode": "cricket_game",
-    "emoji": "🏏"
+    emoji: '🏏',
+    shortcode: 'cricket_game',
   },
   {
-    "shortcode": "crocodile",
-    "emoji": "🐊"
+    emoji: '🐊',
+    shortcode: 'crocodile',
   },
   {
-    "shortcode": "croissant",
-    "emoji": "🥐"
+    emoji: '🥐',
+    shortcode: 'croissant',
   },
   {
-    "shortcode": "cross",
-    "emoji": "✝"
+    emoji: '✝',
+    shortcode: 'cross',
   },
   {
-    "shortcode": "crossed_flags",
-    "emoji": "🎌"
+    emoji: '🎌',
+    shortcode: 'crossed_flags',
   },
   {
-    "shortcode": "crossed_swords",
-    "emoji": "⚔"
+    emoji: '⚔',
+    shortcode: 'crossed_swords',
   },
   {
-    "shortcode": "crown",
-    "emoji": "👑"
+    emoji: '👑',
+    shortcode: 'crown',
   },
   {
-    "shortcode": "cruise_ship",
-    "emoji": "🛳"
+    emoji: '🛳',
+    shortcode: 'cruise_ship',
   },
   {
-    "shortcode": "cry",
-    "emoji": "😢"
+    emoji: '😢',
+    shortcode: 'cry',
   },
   {
-    "shortcode": "crying_cat_face",
-    "emoji": "😿"
+    emoji: '😿',
+    shortcode: 'crying_cat_face',
   },
   {
-    "shortcode": "crystal_ball",
-    "emoji": "🔮"
+    emoji: '🔮',
+    shortcode: 'crystal_ball',
   },
   {
-    "shortcode": "cucumber",
-    "emoji": "🥒"
+    emoji: '🥒',
+    shortcode: 'cucumber',
   },
   {
-    "shortcode": "cup_with_straw",
-    "emoji": "🥤"
+    emoji: '🥤',
+    shortcode: 'cup_with_straw',
   },
   {
-    "shortcode": "cupid",
-    "emoji": "💘"
+    emoji: '💘',
+    shortcode: 'cupid',
   },
   {
-    "shortcode": "curling_stone",
-    "emoji": "🥌"
+    emoji: '🥌',
+    shortcode: 'curling_stone',
   },
   {
-    "shortcode": "curly_loop",
-    "emoji": "➰"
+    emoji: '➰',
+    shortcode: 'curly_loop',
   },
   {
-    "shortcode": "currency_exchange",
-    "emoji": "💱"
+    emoji: '💱',
+    shortcode: 'currency_exchange',
   },
   {
-    "shortcode": "curry",
-    "emoji": "🍛"
+    emoji: '🍛',
+    shortcode: 'curry',
   },
   {
-    "shortcode": "custard",
-    "emoji": "🍮"
+    emoji: '🍮',
+    shortcode: 'custard',
   },
   {
-    "shortcode": "customs",
-    "emoji": "🛃"
+    emoji: '🛃',
+    shortcode: 'customs',
   },
   {
-    "shortcode": "cut_of_meat",
-    "emoji": "🥩"
+    emoji: '🥩',
+    shortcode: 'cut_of_meat',
   },
   {
-    "shortcode": "cyclone",
-    "emoji": "🌀"
+    emoji: '🌀',
+    shortcode: 'cyclone',
   },
   {
-    "shortcode": "dagger",
-    "emoji": "🗡"
+    emoji: '🗡',
+    shortcode: 'dagger',
   },
   {
-    "shortcode": "dancer",
-    "emoji": "💃"
+    emoji: '💃',
+    shortcode: 'dancer',
   },
   {
-    "shortcode": "dancer_tone1",
-    "emoji": "💃🏻"
+    emoji: '💃🏻',
+    shortcode: 'dancer_tone1',
   },
   {
-    "shortcode": "dancer_tone2",
-    "emoji": "💃🏼"
+    emoji: '💃🏼',
+    shortcode: 'dancer_tone2',
   },
   {
-    "shortcode": "dancer_tone3",
-    "emoji": "💃🏽"
+    emoji: '💃🏽',
+    shortcode: 'dancer_tone3',
   },
   {
-    "shortcode": "dancer_tone4",
-    "emoji": "💃🏾"
+    emoji: '💃🏾',
+    shortcode: 'dancer_tone4',
   },
   {
-    "shortcode": "dancer_tone5",
-    "emoji": "💃🏿"
+    emoji: '💃🏿',
+    shortcode: 'dancer_tone5',
   },
   {
-    "shortcode": "dango",
-    "emoji": "🍡"
+    emoji: '🍡',
+    shortcode: 'dango',
   },
   {
-    "shortcode": "dark_sunglasses",
-    "emoji": "🕶"
+    emoji: '🕶',
+    shortcode: 'dark_sunglasses',
   },
   {
-    "shortcode": "dart",
-    "emoji": "🎯"
+    emoji: '🎯',
+    shortcode: 'dart',
   },
   {
-    "shortcode": "dash",
-    "emoji": "💨"
+    emoji: '💨',
+    shortcode: 'dash',
   },
   {
-    "shortcode": "date",
-    "emoji": "📅"
+    emoji: '📅',
+    shortcode: 'date',
   },
   {
-    "shortcode": "deciduous_tree",
-    "emoji": "🌳"
+    emoji: '🌳',
+    shortcode: 'deciduous_tree',
   },
   {
-    "shortcode": "deer",
-    "emoji": "🦌"
+    emoji: '🦌',
+    shortcode: 'deer',
   },
   {
-    "shortcode": "department_store",
-    "emoji": "🏬"
+    emoji: '🏬',
+    shortcode: 'department_store',
   },
   {
-    "shortcode": "desert",
-    "emoji": "🏜"
+    emoji: '🏜',
+    shortcode: 'desert',
   },
   {
-    "shortcode": "desktop",
-    "emoji": "🖥"
+    emoji: '🖥',
+    shortcode: 'desktop',
   },
   {
-    "shortcode": "detective",
-    "emoji": "🕵"
+    emoji: '🕵',
+    shortcode: 'detective',
   },
   {
-    "shortcode": "detective_tone1",
-    "emoji": "🕵🏻"
+    emoji: '🕵🏻',
+    shortcode: 'detective_tone1',
   },
   {
-    "shortcode": "detective_tone2",
-    "emoji": "🕵🏼"
+    emoji: '🕵🏼',
+    shortcode: 'detective_tone2',
   },
   {
-    "shortcode": "detective_tone3",
-    "emoji": "🕵🏽"
+    emoji: '🕵🏽',
+    shortcode: 'detective_tone3',
   },
   {
-    "shortcode": "detective_tone4",
-    "emoji": "🕵🏾"
+    emoji: '🕵🏾',
+    shortcode: 'detective_tone4',
   },
   {
-    "shortcode": "detective_tone5",
-    "emoji": "🕵🏿"
+    emoji: '🕵🏿',
+    shortcode: 'detective_tone5',
   },
   {
-    "shortcode": "diamond_shape_with_a_dot_inside",
-    "emoji": "💠"
+    emoji: '💠',
+    shortcode: 'diamond_shape_with_a_dot_inside',
   },
   {
-    "shortcode": "diamonds",
-    "emoji": "♦"
+    emoji: '♦',
+    shortcode: 'diamonds',
   },
   {
-    "shortcode": "digit_eight",
-    "emoji": "8"
+    emoji: '8',
+    shortcode: 'digit_eight',
   },
   {
-    "shortcode": "digit_five",
-    "emoji": "5"
+    emoji: '5',
+    shortcode: 'digit_five',
   },
   {
-    "shortcode": "digit_four",
-    "emoji": "4"
+    emoji: '4',
+    shortcode: 'digit_four',
   },
   {
-    "shortcode": "digit_nine",
-    "emoji": "9"
+    emoji: '9',
+    shortcode: 'digit_nine',
   },
   {
-    "shortcode": "digit_one",
-    "emoji": "1"
+    emoji: '1',
+    shortcode: 'digit_one',
   },
   {
-    "shortcode": "digit_seven",
-    "emoji": "7"
+    emoji: '7',
+    shortcode: 'digit_seven',
   },
   {
-    "shortcode": "digit_six",
-    "emoji": "6"
+    emoji: '6',
+    shortcode: 'digit_six',
   },
   {
-    "shortcode": "digit_three",
-    "emoji": "3"
+    emoji: '3',
+    shortcode: 'digit_three',
   },
   {
-    "shortcode": "digit_two",
-    "emoji": "2"
+    emoji: '2',
+    shortcode: 'digit_two',
   },
   {
-    "shortcode": "digit_zero",
-    "emoji": "0"
+    emoji: '0',
+    shortcode: 'digit_zero',
   },
   {
-    "shortcode": "disappointed",
-    "emoji": "😞"
+    emoji: '😞',
+    shortcode: 'disappointed',
   },
   {
-    "shortcode": "disappointed_relieved",
-    "emoji": "😥"
+    emoji: '😥',
+    shortcode: 'disappointed_relieved',
   },
   {
-    "shortcode": "dividers",
-    "emoji": "🗂"
+    emoji: '🗂',
+    shortcode: 'dividers',
   },
   {
-    "shortcode": "dizzy",
-    "emoji": "💫"
+    emoji: '💫',
+    shortcode: 'dizzy',
   },
   {
-    "shortcode": "dizzy_face",
-    "emoji": "😵"
+    emoji: '😵',
+    shortcode: 'dizzy_face',
   },
   {
-    "shortcode": "do_not_litter",
-    "emoji": "🚯"
+    emoji: '🚯',
+    shortcode: 'do_not_litter',
   },
   {
-    "shortcode": "dog",
-    "emoji": "🐶"
+    emoji: '🐶',
+    shortcode: 'dog',
   },
   {
-    "shortcode": "dog2",
-    "emoji": "🐕"
+    emoji: '🐕',
+    shortcode: 'dog2',
   },
   {
-    "shortcode": "dollar",
-    "emoji": "💵"
+    emoji: '💵',
+    shortcode: 'dollar',
   },
   {
-    "shortcode": "dolls",
-    "emoji": "🎎"
+    emoji: '🎎',
+    shortcode: 'dolls',
   },
   {
-    "shortcode": "dolphin",
-    "emoji": "🐬"
+    emoji: '🐬',
+    shortcode: 'dolphin',
   },
   {
-    "shortcode": "door",
-    "emoji": "🚪"
+    emoji: '🚪',
+    shortcode: 'door',
   },
   {
-    "shortcode": "doughnut",
-    "emoji": "🍩"
+    emoji: '🍩',
+    shortcode: 'doughnut',
   },
   {
-    "shortcode": "dove",
-    "emoji": "🕊"
+    emoji: '🕊',
+    shortcode: 'dove',
   },
   {
-    "shortcode": "dragon",
-    "emoji": "🐉"
+    emoji: '🐉',
+    shortcode: 'dragon',
   },
   {
-    "shortcode": "dragon_face",
-    "emoji": "🐲"
+    emoji: '🐲',
+    shortcode: 'dragon_face',
   },
   {
-    "shortcode": "dress",
-    "emoji": "👗"
+    emoji: '👗',
+    shortcode: 'dress',
   },
   {
-    "shortcode": "dromedary_camel",
-    "emoji": "🐪"
+    emoji: '🐪',
+    shortcode: 'dromedary_camel',
   },
   {
-    "shortcode": "drooling_face",
-    "emoji": "🤤"
+    emoji: '🤤',
+    shortcode: 'drooling_face',
   },
   {
-    "shortcode": "droplet",
-    "emoji": "💧"
+    emoji: '💧',
+    shortcode: 'droplet',
   },
   {
-    "shortcode": "drum",
-    "emoji": "🥁"
+    emoji: '🥁',
+    shortcode: 'drum',
   },
   {
-    "shortcode": "duck",
-    "emoji": "🦆"
+    emoji: '🦆',
+    shortcode: 'duck',
   },
   {
-    "shortcode": "dumpling",
-    "emoji": "🥟"
+    emoji: '🥟',
+    shortcode: 'dumpling',
   },
   {
-    "shortcode": "dvd",
-    "emoji": "📀"
+    emoji: '📀',
+    shortcode: 'dvd',
   },
   {
-    "shortcode": "e-mail",
-    "emoji": "📧"
+    emoji: '📧',
+    shortcode: 'e-mail',
   },
   {
-    "shortcode": "eagle",
-    "emoji": "🦅"
+    emoji: '🦅',
+    shortcode: 'eagle',
   },
   {
-    "shortcode": "ear",
-    "emoji": "👂"
+    emoji: '👂',
+    shortcode: 'ear',
   },
   {
-    "shortcode": "ear_of_rice",
-    "emoji": "🌾"
+    emoji: '🌾',
+    shortcode: 'ear_of_rice',
   },
   {
-    "shortcode": "ear_tone1",
-    "emoji": "👂🏻"
+    emoji: '👂🏻',
+    shortcode: 'ear_tone1',
   },
   {
-    "shortcode": "ear_tone2",
-    "emoji": "👂🏼"
+    emoji: '👂🏼',
+    shortcode: 'ear_tone2',
   },
   {
-    "shortcode": "ear_tone3",
-    "emoji": "👂🏽"
+    emoji: '👂🏽',
+    shortcode: 'ear_tone3',
   },
   {
-    "shortcode": "ear_tone4",
-    "emoji": "👂🏾"
+    emoji: '👂🏾',
+    shortcode: 'ear_tone4',
   },
   {
-    "shortcode": "ear_tone5",
-    "emoji": "👂🏿"
+    emoji: '👂🏿',
+    shortcode: 'ear_tone5',
   },
   {
-    "shortcode": "earth_africa",
-    "emoji": "🌍"
+    emoji: '🌍',
+    shortcode: 'earth_africa',
   },
   {
-    "shortcode": "earth_americas",
-    "emoji": "🌎"
+    emoji: '🌎',
+    shortcode: 'earth_americas',
   },
   {
-    "shortcode": "earth_asia",
-    "emoji": "🌏"
+    emoji: '🌏',
+    shortcode: 'earth_asia',
   },
   {
-    "shortcode": "egg",
-    "emoji": "🥚"
+    emoji: '🥚',
+    shortcode: 'egg',
   },
   {
-    "shortcode": "eggplant",
-    "emoji": "🍆"
+    emoji: '🍆',
+    shortcode: 'eggplant',
   },
   {
-    "shortcode": "eight",
-    "emoji": "8⃣"
+    emoji: '8⃣',
+    shortcode: 'eight',
   },
   {
-    "shortcode": "eight_pointed_black_star",
-    "emoji": "✴"
+    emoji: '✴',
+    shortcode: 'eight_pointed_black_star',
   },
   {
-    "shortcode": "eight_spoked_asterisk",
-    "emoji": "✳"
+    emoji: '✳',
+    shortcode: 'eight_spoked_asterisk',
   },
   {
-    "shortcode": "eject",
-    "emoji": "⏏"
+    emoji: '⏏',
+    shortcode: 'eject',
   },
   {
-    "shortcode": "electric_plug",
-    "emoji": "🔌"
+    emoji: '🔌',
+    shortcode: 'electric_plug',
   },
   {
-    "shortcode": "elephant",
-    "emoji": "🐘"
+    emoji: '🐘',
+    shortcode: 'elephant',
   },
   {
-    "shortcode": "elf",
-    "emoji": "🧝"
+    emoji: '🧝',
+    shortcode: 'elf',
   },
   {
-    "shortcode": "elf_tone1",
-    "emoji": "🧝🏻"
+    emoji: '🧝🏻',
+    shortcode: 'elf_tone1',
   },
   {
-    "shortcode": "elf_tone2",
-    "emoji": "🧝🏼"
+    emoji: '🧝🏼',
+    shortcode: 'elf_tone2',
   },
   {
-    "shortcode": "elf_tone3",
-    "emoji": "🧝🏽"
+    emoji: '🧝🏽',
+    shortcode: 'elf_tone3',
   },
   {
-    "shortcode": "elf_tone4",
-    "emoji": "🧝🏾"
+    emoji: '🧝🏾',
+    shortcode: 'elf_tone4',
   },
   {
-    "shortcode": "elf_tone5",
-    "emoji": "🧝🏿"
+    emoji: '🧝🏿',
+    shortcode: 'elf_tone5',
   },
   {
-    "shortcode": "end",
-    "emoji": "🔚"
+    emoji: '🔚',
+    shortcode: 'end',
   },
   {
-    "shortcode": "england",
-    "emoji": "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+    emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    shortcode: 'england',
   },
   {
-    "shortcode": "envelope",
-    "emoji": "✉"
+    emoji: '✉',
+    shortcode: 'envelope',
   },
   {
-    "shortcode": "envelope_with_arrow",
-    "emoji": "📩"
+    emoji: '📩',
+    shortcode: 'envelope_with_arrow',
   },
   {
-    "shortcode": "euro",
-    "emoji": "💶"
+    emoji: '💶',
+    shortcode: 'euro',
   },
   {
-    "shortcode": "european_castle",
-    "emoji": "🏰"
+    emoji: '🏰',
+    shortcode: 'european_castle',
   },
   {
-    "shortcode": "european_post_office",
-    "emoji": "🏤"
+    emoji: '🏤',
+    shortcode: 'european_post_office',
   },
   {
-    "shortcode": "evergreen_tree",
-    "emoji": "🌲"
+    emoji: '🌲',
+    shortcode: 'evergreen_tree',
   },
   {
-    "shortcode": "exclamation",
-    "emoji": "❗"
+    emoji: '❗',
+    shortcode: 'exclamation',
   },
   {
-    "shortcode": "exploding_head",
-    "emoji": "🤯"
+    emoji: '🤯',
+    shortcode: 'exploding_head',
   },
   {
-    "shortcode": "expressionless",
-    "emoji": "😑"
+    emoji: '😑',
+    shortcode: 'expressionless',
   },
   {
-    "shortcode": "eye",
-    "emoji": "👁"
+    emoji: '👁',
+    shortcode: 'eye',
   },
   {
-    "shortcode": "eye_in_speech_bubble",
-    "emoji": "👁🗨"
+    emoji: '👁🗨',
+    shortcode: 'eye_in_speech_bubble',
   },
   {
-    "shortcode": "eyeglasses",
-    "emoji": "👓"
+    emoji: '👓',
+    shortcode: 'eyeglasses',
   },
   {
-    "shortcode": "eyes",
-    "emoji": "👀"
+    emoji: '👀',
+    shortcode: 'eyes',
   },
   {
-    "shortcode": "face_vomiting",
-    "emoji": "🤮"
+    emoji: '🤮',
+    shortcode: 'face_vomiting',
   },
   {
-    "shortcode": "face_with_hand_over_mouth",
-    "emoji": "🤭"
+    emoji: '🤭',
+    shortcode: 'face_with_hand_over_mouth',
   },
   {
-    "shortcode": "face_with_monocle",
-    "emoji": "🧐"
+    emoji: '🧐',
+    shortcode: 'face_with_monocle',
   },
   {
-    "shortcode": "face_with_raised_eyebrow",
-    "emoji": "🤨"
+    emoji: '🤨',
+    shortcode: 'face_with_raised_eyebrow',
   },
   {
-    "shortcode": "face_with_symbols_over_mouth",
-    "emoji": "🤬"
+    emoji: '🤬',
+    shortcode: 'face_with_symbols_over_mouth',
   },
   {
-    "shortcode": "factory",
-    "emoji": "🏭"
+    emoji: '🏭',
+    shortcode: 'factory',
   },
   {
-    "shortcode": "fairy",
-    "emoji": "🧚"
+    emoji: '🧚',
+    shortcode: 'fairy',
   },
   {
-    "shortcode": "fairy_tone1",
-    "emoji": "🧚🏻"
+    emoji: '🧚🏻',
+    shortcode: 'fairy_tone1',
   },
   {
-    "shortcode": "fairy_tone2",
-    "emoji": "🧚🏼"
+    emoji: '🧚🏼',
+    shortcode: 'fairy_tone2',
   },
   {
-    "shortcode": "fairy_tone3",
-    "emoji": "🧚🏽"
+    emoji: '🧚🏽',
+    shortcode: 'fairy_tone3',
   },
   {
-    "shortcode": "fairy_tone4",
-    "emoji": "🧚🏾"
+    emoji: '🧚🏾',
+    shortcode: 'fairy_tone4',
   },
   {
-    "shortcode": "fairy_tone5",
-    "emoji": "🧚🏿"
+    emoji: '🧚🏿',
+    shortcode: 'fairy_tone5',
   },
   {
-    "shortcode": "fallen_leaf",
-    "emoji": "🍂"
+    emoji: '🍂',
+    shortcode: 'fallen_leaf',
   },
   {
-    "shortcode": "family",
-    "emoji": "👪"
+    emoji: '👪',
+    shortcode: 'family',
   },
   {
-    "shortcode": "family_man_boy",
-    "emoji": "👨👦"
+    emoji: '👨👦',
+    shortcode: 'family_man_boy',
   },
   {
-    "shortcode": "family_man_boy_boy",
-    "emoji": "👨👦👦"
+    emoji: '👨👦👦',
+    shortcode: 'family_man_boy_boy',
   },
   {
-    "shortcode": "family_man_girl",
-    "emoji": "👨👧"
+    emoji: '👨👧',
+    shortcode: 'family_man_girl',
   },
   {
-    "shortcode": "family_man_girl_boy",
-    "emoji": "👨👧👦"
+    emoji: '👨👧👦',
+    shortcode: 'family_man_girl_boy',
   },
   {
-    "shortcode": "family_man_girl_girl",
-    "emoji": "👨👧👧"
+    emoji: '👨👧👧',
+    shortcode: 'family_man_girl_girl',
   },
   {
-    "shortcode": "family_man_woman_boy",
-    "emoji": "👨👩👦"
+    emoji: '👨👩👦',
+    shortcode: 'family_man_woman_boy',
   },
   {
-    "shortcode": "family_mmb",
-    "emoji": "👨👨👦"
+    emoji: '👨👨👦',
+    shortcode: 'family_mmb',
   },
   {
-    "shortcode": "family_mmbb",
-    "emoji": "👨👨👦👦"
+    emoji: '👨👨👦👦',
+    shortcode: 'family_mmbb',
   },
   {
-    "shortcode": "family_mmg",
-    "emoji": "👨👨👧"
+    emoji: '👨👨👧',
+    shortcode: 'family_mmg',
   },
   {
-    "shortcode": "family_mmgb",
-    "emoji": "👨👨👧👦"
+    emoji: '👨👨👧👦',
+    shortcode: 'family_mmgb',
   },
   {
-    "shortcode": "family_mmgg",
-    "emoji": "👨👨👧👧"
+    emoji: '👨👨👧👧',
+    shortcode: 'family_mmgg',
   },
   {
-    "shortcode": "family_mwbb",
-    "emoji": "👨👩👦👦"
+    emoji: '👨👩👦👦',
+    shortcode: 'family_mwbb',
   },
   {
-    "shortcode": "family_mwg",
-    "emoji": "👨👩👧"
+    emoji: '👨👩👧',
+    shortcode: 'family_mwg',
   },
   {
-    "shortcode": "family_mwgb",
-    "emoji": "👨👩👧👦"
+    emoji: '👨👩👧👦',
+    shortcode: 'family_mwgb',
   },
   {
-    "shortcode": "family_mwgg",
-    "emoji": "👨👩👧👧"
+    emoji: '👨👩👧👧',
+    shortcode: 'family_mwgg',
   },
   {
-    "shortcode": "family_woman_boy",
-    "emoji": "👩👦"
+    emoji: '👩👦',
+    shortcode: 'family_woman_boy',
   },
   {
-    "shortcode": "family_woman_boy_boy",
-    "emoji": "👩👦👦"
+    emoji: '👩👦👦',
+    shortcode: 'family_woman_boy_boy',
   },
   {
-    "shortcode": "family_woman_girl",
-    "emoji": "👩👧"
+    emoji: '👩👧',
+    shortcode: 'family_woman_girl',
   },
   {
-    "shortcode": "family_woman_girl_boy",
-    "emoji": "👩👧👦"
+    emoji: '👩👧👦',
+    shortcode: 'family_woman_girl_boy',
   },
   {
-    "shortcode": "family_woman_girl_girl",
-    "emoji": "👩👧👧"
+    emoji: '👩👧👧',
+    shortcode: 'family_woman_girl_girl',
   },
   {
-    "shortcode": "family_wwb",
-    "emoji": "👩👩👦"
+    emoji: '👩👩👦',
+    shortcode: 'family_wwb',
   },
   {
-    "shortcode": "family_wwbb",
-    "emoji": "👩👩👦👦"
+    emoji: '👩👩👦👦',
+    shortcode: 'family_wwbb',
   },
   {
-    "shortcode": "family_wwg",
-    "emoji": "👩👩👧"
+    emoji: '👩👩👧',
+    shortcode: 'family_wwg',
   },
   {
-    "shortcode": "family_wwgb",
-    "emoji": "👩👩👧👦"
+    emoji: '👩👩👧👦',
+    shortcode: 'family_wwgb',
   },
   {
-    "shortcode": "family_wwgg",
-    "emoji": "👩👩👧👧"
+    emoji: '👩👩👧👧',
+    shortcode: 'family_wwgg',
   },
   {
-    "shortcode": "fast_forward",
-    "emoji": "⏩"
+    emoji: '⏩',
+    shortcode: 'fast_forward',
   },
   {
-    "shortcode": "fax",
-    "emoji": "📠"
+    emoji: '📠',
+    shortcode: 'fax',
   },
   {
-    "shortcode": "fearful",
-    "emoji": "😨"
+    emoji: '😨',
+    shortcode: 'fearful',
   },
   {
-    "shortcode": "feet",
-    "emoji": "🐾"
+    emoji: '🐾',
+    shortcode: 'feet',
   },
   {
-    "shortcode": "female_sign",
-    "emoji": "♀"
+    emoji: '♀',
+    shortcode: 'female_sign',
   },
   {
-    "shortcode": "ferris_wheel",
-    "emoji": "🎡"
+    emoji: '🎡',
+    shortcode: 'ferris_wheel',
   },
   {
-    "shortcode": "ferry",
-    "emoji": "⛴"
+    emoji: '⛴',
+    shortcode: 'ferry',
   },
   {
-    "shortcode": "field_hockey",
-    "emoji": "🏑"
+    emoji: '🏑',
+    shortcode: 'field_hockey',
   },
   {
-    "shortcode": "file_cabinet",
-    "emoji": "🗄"
+    emoji: '🗄',
+    shortcode: 'file_cabinet',
   },
   {
-    "shortcode": "file_folder",
-    "emoji": "📁"
+    emoji: '📁',
+    shortcode: 'file_folder',
   },
   {
-    "shortcode": "film_frames",
-    "emoji": "🎞"
+    emoji: '🎞',
+    shortcode: 'film_frames',
   },
   {
-    "shortcode": "fingers_crossed",
-    "emoji": "🤞"
+    emoji: '🤞',
+    shortcode: 'fingers_crossed',
   },
   {
-    "shortcode": "fingers_crossed_tone1",
-    "emoji": "🤞🏻"
+    emoji: '🤞🏻',
+    shortcode: 'fingers_crossed_tone1',
   },
   {
-    "shortcode": "fingers_crossed_tone2",
-    "emoji": "🤞🏼"
+    emoji: '🤞🏼',
+    shortcode: 'fingers_crossed_tone2',
   },
   {
-    "shortcode": "fingers_crossed_tone3",
-    "emoji": "🤞🏽"
+    emoji: '🤞🏽',
+    shortcode: 'fingers_crossed_tone3',
   },
   {
-    "shortcode": "fingers_crossed_tone4",
-    "emoji": "🤞🏾"
+    emoji: '🤞🏾',
+    shortcode: 'fingers_crossed_tone4',
   },
   {
-    "shortcode": "fingers_crossed_tone5",
-    "emoji": "🤞🏿"
+    emoji: '🤞🏿',
+    shortcode: 'fingers_crossed_tone5',
   },
   {
-    "shortcode": "fire",
-    "emoji": "🔥"
+    emoji: '🔥',
+    shortcode: 'fire',
   },
   {
-    "shortcode": "fire_engine",
-    "emoji": "🚒"
+    emoji: '🚒',
+    shortcode: 'fire_engine',
   },
   {
-    "shortcode": "fireworks",
-    "emoji": "🎆"
+    emoji: '🎆',
+    shortcode: 'fireworks',
   },
   {
-    "shortcode": "first_place",
-    "emoji": "🥇"
+    emoji: '🥇',
+    shortcode: 'first_place',
   },
   {
-    "shortcode": "first_quarter_moon",
-    "emoji": "🌓"
+    emoji: '🌓',
+    shortcode: 'first_quarter_moon',
   },
   {
-    "shortcode": "first_quarter_moon_with_face",
-    "emoji": "🌛"
+    emoji: '🌛',
+    shortcode: 'first_quarter_moon_with_face',
   },
   {
-    "shortcode": "fish",
-    "emoji": "🐟"
+    emoji: '🐟',
+    shortcode: 'fish',
   },
   {
-    "shortcode": "fish_cake",
-    "emoji": "🍥"
+    emoji: '🍥',
+    shortcode: 'fish_cake',
   },
   {
-    "shortcode": "fishing_pole_and_fish",
-    "emoji": "🎣"
+    emoji: '🎣',
+    shortcode: 'fishing_pole_and_fish',
   },
   {
-    "shortcode": "fist",
-    "emoji": "✊"
+    emoji: '✊',
+    shortcode: 'fist',
   },
   {
-    "shortcode": "fist_tone1",
-    "emoji": "✊🏻"
+    emoji: '✊🏻',
+    shortcode: 'fist_tone1',
   },
   {
-    "shortcode": "fist_tone2",
-    "emoji": "✊🏼"
+    emoji: '✊🏼',
+    shortcode: 'fist_tone2',
   },
   {
-    "shortcode": "fist_tone3",
-    "emoji": "✊🏽"
+    emoji: '✊🏽',
+    shortcode: 'fist_tone3',
   },
   {
-    "shortcode": "fist_tone4",
-    "emoji": "✊🏾"
+    emoji: '✊🏾',
+    shortcode: 'fist_tone4',
   },
   {
-    "shortcode": "fist_tone5",
-    "emoji": "✊🏿"
+    emoji: '✊🏿',
+    shortcode: 'fist_tone5',
   },
   {
-    "shortcode": "five",
-    "emoji": "5⃣"
+    emoji: '5⃣',
+    shortcode: 'five',
   },
   {
-    "shortcode": "flag_ac",
-    "emoji": "🇦🇨"
+    emoji: '🇦🇨',
+    shortcode: 'flag_ac',
   },
   {
-    "shortcode": "flag_ad",
-    "emoji": "🇦🇩"
+    emoji: '🇦🇩',
+    shortcode: 'flag_ad',
   },
   {
-    "shortcode": "flag_ae",
-    "emoji": "🇦🇪"
+    emoji: '🇦🇪',
+    shortcode: 'flag_ae',
   },
   {
-    "shortcode": "flag_af",
-    "emoji": "🇦🇫"
+    emoji: '🇦🇫',
+    shortcode: 'flag_af',
   },
   {
-    "shortcode": "flag_ag",
-    "emoji": "🇦🇬"
+    emoji: '🇦🇬',
+    shortcode: 'flag_ag',
   },
   {
-    "shortcode": "flag_ai",
-    "emoji": "🇦🇮"
+    emoji: '🇦🇮',
+    shortcode: 'flag_ai',
   },
   {
-    "shortcode": "flag_al",
-    "emoji": "🇦🇱"
+    emoji: '🇦🇱',
+    shortcode: 'flag_al',
   },
   {
-    "shortcode": "flag_am",
-    "emoji": "🇦🇲"
+    emoji: '🇦🇲',
+    shortcode: 'flag_am',
   },
   {
-    "shortcode": "flag_ao",
-    "emoji": "🇦🇴"
+    emoji: '🇦🇴',
+    shortcode: 'flag_ao',
   },
   {
-    "shortcode": "flag_aq",
-    "emoji": "🇦🇶"
+    emoji: '🇦🇶',
+    shortcode: 'flag_aq',
   },
   {
-    "shortcode": "flag_ar",
-    "emoji": "🇦🇷"
+    emoji: '🇦🇷',
+    shortcode: 'flag_ar',
   },
   {
-    "shortcode": "flag_as",
-    "emoji": "🇦🇸"
+    emoji: '🇦🇸',
+    shortcode: 'flag_as',
   },
   {
-    "shortcode": "flag_at",
-    "emoji": "🇦🇹"
+    emoji: '🇦🇹',
+    shortcode: 'flag_at',
   },
   {
-    "shortcode": "flag_au",
-    "emoji": "🇦🇺"
+    emoji: '🇦🇺',
+    shortcode: 'flag_au',
   },
   {
-    "shortcode": "flag_aw",
-    "emoji": "🇦🇼"
+    emoji: '🇦🇼',
+    shortcode: 'flag_aw',
   },
   {
-    "shortcode": "flag_ax",
-    "emoji": "🇦🇽"
+    emoji: '🇦🇽',
+    shortcode: 'flag_ax',
   },
   {
-    "shortcode": "flag_az",
-    "emoji": "🇦🇿"
+    emoji: '🇦🇿',
+    shortcode: 'flag_az',
   },
   {
-    "shortcode": "flag_ba",
-    "emoji": "🇧🇦"
+    emoji: '🇧🇦',
+    shortcode: 'flag_ba',
   },
   {
-    "shortcode": "flag_bb",
-    "emoji": "🇧🇧"
+    emoji: '🇧🇧',
+    shortcode: 'flag_bb',
   },
   {
-    "shortcode": "flag_bd",
-    "emoji": "🇧🇩"
+    emoji: '🇧🇩',
+    shortcode: 'flag_bd',
   },
   {
-    "shortcode": "flag_be",
-    "emoji": "🇧🇪"
+    emoji: '🇧🇪',
+    shortcode: 'flag_be',
   },
   {
-    "shortcode": "flag_bf",
-    "emoji": "🇧🇫"
+    emoji: '🇧🇫',
+    shortcode: 'flag_bf',
   },
   {
-    "shortcode": "flag_bg",
-    "emoji": "🇧🇬"
+    emoji: '🇧🇬',
+    shortcode: 'flag_bg',
   },
   {
-    "shortcode": "flag_bh",
-    "emoji": "🇧🇭"
+    emoji: '🇧🇭',
+    shortcode: 'flag_bh',
   },
   {
-    "shortcode": "flag_bi",
-    "emoji": "🇧🇮"
+    emoji: '🇧🇮',
+    shortcode: 'flag_bi',
   },
   {
-    "shortcode": "flag_bj",
-    "emoji": "🇧🇯"
+    emoji: '🇧🇯',
+    shortcode: 'flag_bj',
   },
   {
-    "shortcode": "flag_bl",
-    "emoji": "🇧🇱"
+    emoji: '🇧🇱',
+    shortcode: 'flag_bl',
   },
   {
-    "shortcode": "flag_black",
-    "emoji": "🏴"
+    emoji: '🏴',
+    shortcode: 'flag_black',
   },
   {
-    "shortcode": "flag_bm",
-    "emoji": "🇧🇲"
+    emoji: '🇧🇲',
+    shortcode: 'flag_bm',
   },
   {
-    "shortcode": "flag_bn",
-    "emoji": "🇧🇳"
+    emoji: '🇧🇳',
+    shortcode: 'flag_bn',
   },
   {
-    "shortcode": "flag_bo",
-    "emoji": "🇧🇴"
+    emoji: '🇧🇴',
+    shortcode: 'flag_bo',
   },
   {
-    "shortcode": "flag_bq",
-    "emoji": "🇧🇶"
+    emoji: '🇧🇶',
+    shortcode: 'flag_bq',
   },
   {
-    "shortcode": "flag_br",
-    "emoji": "🇧🇷"
+    emoji: '🇧🇷',
+    shortcode: 'flag_br',
   },
   {
-    "shortcode": "flag_bs",
-    "emoji": "🇧🇸"
+    emoji: '🇧🇸',
+    shortcode: 'flag_bs',
   },
   {
-    "shortcode": "flag_bt",
-    "emoji": "🇧🇹"
+    emoji: '🇧🇹',
+    shortcode: 'flag_bt',
   },
   {
-    "shortcode": "flag_bv",
-    "emoji": "🇧🇻"
+    emoji: '🇧🇻',
+    shortcode: 'flag_bv',
   },
   {
-    "shortcode": "flag_bw",
-    "emoji": "🇧🇼"
+    emoji: '🇧🇼',
+    shortcode: 'flag_bw',
   },
   {
-    "shortcode": "flag_by",
-    "emoji": "🇧🇾"
+    emoji: '🇧🇾',
+    shortcode: 'flag_by',
   },
   {
-    "shortcode": "flag_bz",
-    "emoji": "🇧🇿"
+    emoji: '🇧🇿',
+    shortcode: 'flag_bz',
   },
   {
-    "shortcode": "flag_ca",
-    "emoji": "🇨🇦"
+    emoji: '🇨🇦',
+    shortcode: 'flag_ca',
   },
   {
-    "shortcode": "flag_cc",
-    "emoji": "🇨🇨"
+    emoji: '🇨🇨',
+    shortcode: 'flag_cc',
   },
   {
-    "shortcode": "flag_cd",
-    "emoji": "🇨🇩"
+    emoji: '🇨🇩',
+    shortcode: 'flag_cd',
   },
   {
-    "shortcode": "flag_cf",
-    "emoji": "🇨🇫"
+    emoji: '🇨🇫',
+    shortcode: 'flag_cf',
   },
   {
-    "shortcode": "flag_cg",
-    "emoji": "🇨🇬"
+    emoji: '🇨🇬',
+    shortcode: 'flag_cg',
   },
   {
-    "shortcode": "flag_ch",
-    "emoji": "🇨🇭"
+    emoji: '🇨🇭',
+    shortcode: 'flag_ch',
   },
   {
-    "shortcode": "flag_ci",
-    "emoji": "🇨🇮"
+    emoji: '🇨🇮',
+    shortcode: 'flag_ci',
   },
   {
-    "shortcode": "flag_ck",
-    "emoji": "🇨🇰"
+    emoji: '🇨🇰',
+    shortcode: 'flag_ck',
   },
   {
-    "shortcode": "flag_cl",
-    "emoji": "🇨🇱"
+    emoji: '🇨🇱',
+    shortcode: 'flag_cl',
   },
   {
-    "shortcode": "flag_cm",
-    "emoji": "🇨🇲"
+    emoji: '🇨🇲',
+    shortcode: 'flag_cm',
   },
   {
-    "shortcode": "flag_cn",
-    "emoji": "🇨🇳"
+    emoji: '🇨🇳',
+    shortcode: 'flag_cn',
   },
   {
-    "shortcode": "flag_co",
-    "emoji": "🇨🇴"
+    emoji: '🇨🇴',
+    shortcode: 'flag_co',
   },
   {
-    "shortcode": "flag_cp",
-    "emoji": "🇨🇵"
+    emoji: '🇨🇵',
+    shortcode: 'flag_cp',
   },
   {
-    "shortcode": "flag_cr",
-    "emoji": "🇨🇷"
+    emoji: '🇨🇷',
+    shortcode: 'flag_cr',
   },
   {
-    "shortcode": "flag_cu",
-    "emoji": "🇨🇺"
+    emoji: '🇨🇺',
+    shortcode: 'flag_cu',
   },
   {
-    "shortcode": "flag_cv",
-    "emoji": "🇨🇻"
+    emoji: '🇨🇻',
+    shortcode: 'flag_cv',
   },
   {
-    "shortcode": "flag_cw",
-    "emoji": "🇨🇼"
+    emoji: '🇨🇼',
+    shortcode: 'flag_cw',
   },
   {
-    "shortcode": "flag_cx",
-    "emoji": "🇨🇽"
+    emoji: '🇨🇽',
+    shortcode: 'flag_cx',
   },
   {
-    "shortcode": "flag_cy",
-    "emoji": "🇨🇾"
+    emoji: '🇨🇾',
+    shortcode: 'flag_cy',
   },
   {
-    "shortcode": "flag_cz",
-    "emoji": "🇨🇿"
+    emoji: '🇨🇿',
+    shortcode: 'flag_cz',
   },
   {
-    "shortcode": "flag_de",
-    "emoji": "🇩🇪"
+    emoji: '🇩🇪',
+    shortcode: 'flag_de',
   },
   {
-    "shortcode": "flag_dg",
-    "emoji": "🇩🇬"
+    emoji: '🇩🇬',
+    shortcode: 'flag_dg',
   },
   {
-    "shortcode": "flag_dj",
-    "emoji": "🇩🇯"
+    emoji: '🇩🇯',
+    shortcode: 'flag_dj',
   },
   {
-    "shortcode": "flag_dk",
-    "emoji": "🇩🇰"
+    emoji: '🇩🇰',
+    shortcode: 'flag_dk',
   },
   {
-    "shortcode": "flag_dm",
-    "emoji": "🇩🇲"
+    emoji: '🇩🇲',
+    shortcode: 'flag_dm',
   },
   {
-    "shortcode": "flag_do",
-    "emoji": "🇩🇴"
+    emoji: '🇩🇴',
+    shortcode: 'flag_do',
   },
   {
-    "shortcode": "flag_dz",
-    "emoji": "🇩🇿"
+    emoji: '🇩🇿',
+    shortcode: 'flag_dz',
   },
   {
-    "shortcode": "flag_ea",
-    "emoji": "🇪🇦"
+    emoji: '🇪🇦',
+    shortcode: 'flag_ea',
   },
   {
-    "shortcode": "flag_ec",
-    "emoji": "🇪🇨"
+    emoji: '🇪🇨',
+    shortcode: 'flag_ec',
   },
   {
-    "shortcode": "flag_ee",
-    "emoji": "🇪🇪"
+    emoji: '🇪🇪',
+    shortcode: 'flag_ee',
   },
   {
-    "shortcode": "flag_eg",
-    "emoji": "🇪🇬"
+    emoji: '🇪🇬',
+    shortcode: 'flag_eg',
   },
   {
-    "shortcode": "flag_eh",
-    "emoji": "🇪🇭"
+    emoji: '🇪🇭',
+    shortcode: 'flag_eh',
   },
   {
-    "shortcode": "flag_er",
-    "emoji": "🇪🇷"
+    emoji: '🇪🇷',
+    shortcode: 'flag_er',
   },
   {
-    "shortcode": "flag_es",
-    "emoji": "🇪🇸"
+    emoji: '🇪🇸',
+    shortcode: 'flag_es',
   },
   {
-    "shortcode": "flag_et",
-    "emoji": "🇪🇹"
+    emoji: '🇪🇹',
+    shortcode: 'flag_et',
   },
   {
-    "shortcode": "flag_eu",
-    "emoji": "🇪🇺"
+    emoji: '🇪🇺',
+    shortcode: 'flag_eu',
   },
   {
-    "shortcode": "flag_fi",
-    "emoji": "🇫🇮"
+    emoji: '🇫🇮',
+    shortcode: 'flag_fi',
   },
   {
-    "shortcode": "flag_fj",
-    "emoji": "🇫🇯"
+    emoji: '🇫🇯',
+    shortcode: 'flag_fj',
   },
   {
-    "shortcode": "flag_fk",
-    "emoji": "🇫🇰"
+    emoji: '🇫🇰',
+    shortcode: 'flag_fk',
   },
   {
-    "shortcode": "flag_fm",
-    "emoji": "🇫🇲"
+    emoji: '🇫🇲',
+    shortcode: 'flag_fm',
   },
   {
-    "shortcode": "flag_fo",
-    "emoji": "🇫🇴"
+    emoji: '🇫🇴',
+    shortcode: 'flag_fo',
   },
   {
-    "shortcode": "flag_fr",
-    "emoji": "🇫🇷"
+    emoji: '🇫🇷',
+    shortcode: 'flag_fr',
   },
   {
-    "shortcode": "flag_ga",
-    "emoji": "🇬🇦"
+    emoji: '🇬🇦',
+    shortcode: 'flag_ga',
   },
   {
-    "shortcode": "flag_gb",
-    "emoji": "🇬🇧"
+    emoji: '🇬🇧',
+    shortcode: 'flag_gb',
   },
   {
-    "shortcode": "flag_gd",
-    "emoji": "🇬🇩"
+    emoji: '🇬🇩',
+    shortcode: 'flag_gd',
   },
   {
-    "shortcode": "flag_ge",
-    "emoji": "🇬🇪"
+    emoji: '🇬🇪',
+    shortcode: 'flag_ge',
   },
   {
-    "shortcode": "flag_gf",
-    "emoji": "🇬🇫"
+    emoji: '🇬🇫',
+    shortcode: 'flag_gf',
   },
   {
-    "shortcode": "flag_gg",
-    "emoji": "🇬🇬"
+    emoji: '🇬🇬',
+    shortcode: 'flag_gg',
   },
   {
-    "shortcode": "flag_gh",
-    "emoji": "🇬🇭"
+    emoji: '🇬🇭',
+    shortcode: 'flag_gh',
   },
   {
-    "shortcode": "flag_gi",
-    "emoji": "🇬🇮"
+    emoji: '🇬🇮',
+    shortcode: 'flag_gi',
   },
   {
-    "shortcode": "flag_gl",
-    "emoji": "🇬🇱"
+    emoji: '🇬🇱',
+    shortcode: 'flag_gl',
   },
   {
-    "shortcode": "flag_gm",
-    "emoji": "🇬🇲"
+    emoji: '🇬🇲',
+    shortcode: 'flag_gm',
   },
   {
-    "shortcode": "flag_gn",
-    "emoji": "🇬🇳"
+    emoji: '🇬🇳',
+    shortcode: 'flag_gn',
   },
   {
-    "shortcode": "flag_gp",
-    "emoji": "🇬🇵"
+    emoji: '🇬🇵',
+    shortcode: 'flag_gp',
   },
   {
-    "shortcode": "flag_gq",
-    "emoji": "🇬🇶"
+    emoji: '🇬🇶',
+    shortcode: 'flag_gq',
   },
   {
-    "shortcode": "flag_gr",
-    "emoji": "🇬🇷"
+    emoji: '🇬🇷',
+    shortcode: 'flag_gr',
   },
   {
-    "shortcode": "flag_gs",
-    "emoji": "🇬🇸"
+    emoji: '🇬🇸',
+    shortcode: 'flag_gs',
   },
   {
-    "shortcode": "flag_gt",
-    "emoji": "🇬🇹"
+    emoji: '🇬🇹',
+    shortcode: 'flag_gt',
   },
   {
-    "shortcode": "flag_gu",
-    "emoji": "🇬🇺"
+    emoji: '🇬🇺',
+    shortcode: 'flag_gu',
   },
   {
-    "shortcode": "flag_gw",
-    "emoji": "🇬🇼"
+    emoji: '🇬🇼',
+    shortcode: 'flag_gw',
   },
   {
-    "shortcode": "flag_gy",
-    "emoji": "🇬🇾"
+    emoji: '🇬🇾',
+    shortcode: 'flag_gy',
   },
   {
-    "shortcode": "flag_hk",
-    "emoji": "🇭🇰"
+    emoji: '🇭🇰',
+    shortcode: 'flag_hk',
   },
   {
-    "shortcode": "flag_hm",
-    "emoji": "🇭🇲"
+    emoji: '🇭🇲',
+    shortcode: 'flag_hm',
   },
   {
-    "shortcode": "flag_hn",
-    "emoji": "🇭🇳"
+    emoji: '🇭🇳',
+    shortcode: 'flag_hn',
   },
   {
-    "shortcode": "flag_hr",
-    "emoji": "🇭🇷"
+    emoji: '🇭🇷',
+    shortcode: 'flag_hr',
   },
   {
-    "shortcode": "flag_ht",
-    "emoji": "🇭🇹"
+    emoji: '🇭🇹',
+    shortcode: 'flag_ht',
   },
   {
-    "shortcode": "flag_hu",
-    "emoji": "🇭🇺"
+    emoji: '🇭🇺',
+    shortcode: 'flag_hu',
   },
   {
-    "shortcode": "flag_ic",
-    "emoji": "🇮🇨"
+    emoji: '🇮🇨',
+    shortcode: 'flag_ic',
   },
   {
-    "shortcode": "flag_id",
-    "emoji": "🇮🇩"
+    emoji: '🇮🇩',
+    shortcode: 'flag_id',
   },
   {
-    "shortcode": "flag_ie",
-    "emoji": "🇮🇪"
+    emoji: '🇮🇪',
+    shortcode: 'flag_ie',
   },
   {
-    "shortcode": "flag_il",
-    "emoji": "🇮🇱"
+    emoji: '🇮🇱',
+    shortcode: 'flag_il',
   },
   {
-    "shortcode": "flag_im",
-    "emoji": "🇮🇲"
+    emoji: '🇮🇲',
+    shortcode: 'flag_im',
   },
   {
-    "shortcode": "flag_in",
-    "emoji": "🇮🇳"
+    emoji: '🇮🇳',
+    shortcode: 'flag_in',
   },
   {
-    "shortcode": "flag_io",
-    "emoji": "🇮🇴"
+    emoji: '🇮🇴',
+    shortcode: 'flag_io',
   },
   {
-    "shortcode": "flag_iq",
-    "emoji": "🇮🇶"
+    emoji: '🇮🇶',
+    shortcode: 'flag_iq',
   },
   {
-    "shortcode": "flag_ir",
-    "emoji": "🇮🇷"
+    emoji: '🇮🇷',
+    shortcode: 'flag_ir',
   },
   {
-    "shortcode": "flag_is",
-    "emoji": "🇮🇸"
+    emoji: '🇮🇸',
+    shortcode: 'flag_is',
   },
   {
-    "shortcode": "flag_it",
-    "emoji": "🇮🇹"
+    emoji: '🇮🇹',
+    shortcode: 'flag_it',
   },
   {
-    "shortcode": "flag_je",
-    "emoji": "🇯🇪"
+    emoji: '🇯🇪',
+    shortcode: 'flag_je',
   },
   {
-    "shortcode": "flag_jm",
-    "emoji": "🇯🇲"
+    emoji: '🇯🇲',
+    shortcode: 'flag_jm',
   },
   {
-    "shortcode": "flag_jo",
-    "emoji": "🇯🇴"
+    emoji: '🇯🇴',
+    shortcode: 'flag_jo',
   },
   {
-    "shortcode": "flag_jp",
-    "emoji": "🇯🇵"
+    emoji: '🇯🇵',
+    shortcode: 'flag_jp',
   },
   {
-    "shortcode": "flag_ke",
-    "emoji": "🇰🇪"
+    emoji: '🇰🇪',
+    shortcode: 'flag_ke',
   },
   {
-    "shortcode": "flag_kg",
-    "emoji": "🇰🇬"
+    emoji: '🇰🇬',
+    shortcode: 'flag_kg',
   },
   {
-    "shortcode": "flag_kh",
-    "emoji": "🇰🇭"
+    emoji: '🇰🇭',
+    shortcode: 'flag_kh',
   },
   {
-    "shortcode": "flag_ki",
-    "emoji": "🇰🇮"
+    emoji: '🇰🇮',
+    shortcode: 'flag_ki',
   },
   {
-    "shortcode": "flag_km",
-    "emoji": "🇰🇲"
+    emoji: '🇰🇲',
+    shortcode: 'flag_km',
   },
   {
-    "shortcode": "flag_kn",
-    "emoji": "🇰🇳"
+    emoji: '🇰🇳',
+    shortcode: 'flag_kn',
   },
   {
-    "shortcode": "flag_kp",
-    "emoji": "🇰🇵"
+    emoji: '🇰🇵',
+    shortcode: 'flag_kp',
   },
   {
-    "shortcode": "flag_kr",
-    "emoji": "🇰🇷"
+    emoji: '🇰🇷',
+    shortcode: 'flag_kr',
   },
   {
-    "shortcode": "flag_kw",
-    "emoji": "🇰🇼"
+    emoji: '🇰🇼',
+    shortcode: 'flag_kw',
   },
   {
-    "shortcode": "flag_ky",
-    "emoji": "🇰🇾"
+    emoji: '🇰🇾',
+    shortcode: 'flag_ky',
   },
   {
-    "shortcode": "flag_kz",
-    "emoji": "🇰🇿"
+    emoji: '🇰🇿',
+    shortcode: 'flag_kz',
   },
   {
-    "shortcode": "flag_la",
-    "emoji": "🇱🇦"
+    emoji: '🇱🇦',
+    shortcode: 'flag_la',
   },
   {
-    "shortcode": "flag_lb",
-    "emoji": "🇱🇧"
+    emoji: '🇱🇧',
+    shortcode: 'flag_lb',
   },
   {
-    "shortcode": "flag_lc",
-    "emoji": "🇱🇨"
+    emoji: '🇱🇨',
+    shortcode: 'flag_lc',
   },
   {
-    "shortcode": "flag_li",
-    "emoji": "🇱🇮"
+    emoji: '🇱🇮',
+    shortcode: 'flag_li',
   },
   {
-    "shortcode": "flag_lk",
-    "emoji": "🇱🇰"
+    emoji: '🇱🇰',
+    shortcode: 'flag_lk',
   },
   {
-    "shortcode": "flag_lr",
-    "emoji": "🇱🇷"
+    emoji: '🇱🇷',
+    shortcode: 'flag_lr',
   },
   {
-    "shortcode": "flag_ls",
-    "emoji": "🇱🇸"
+    emoji: '🇱🇸',
+    shortcode: 'flag_ls',
   },
   {
-    "shortcode": "flag_lt",
-    "emoji": "🇱🇹"
+    emoji: '🇱🇹',
+    shortcode: 'flag_lt',
   },
   {
-    "shortcode": "flag_lu",
-    "emoji": "🇱🇺"
+    emoji: '🇱🇺',
+    shortcode: 'flag_lu',
   },
   {
-    "shortcode": "flag_lv",
-    "emoji": "🇱🇻"
+    emoji: '🇱🇻',
+    shortcode: 'flag_lv',
   },
   {
-    "shortcode": "flag_ly",
-    "emoji": "🇱🇾"
+    emoji: '🇱🇾',
+    shortcode: 'flag_ly',
   },
   {
-    "shortcode": "flag_ma",
-    "emoji": "🇲🇦"
+    emoji: '🇲🇦',
+    shortcode: 'flag_ma',
   },
   {
-    "shortcode": "flag_mc",
-    "emoji": "🇲🇨"
+    emoji: '🇲🇨',
+    shortcode: 'flag_mc',
   },
   {
-    "shortcode": "flag_md",
-    "emoji": "🇲🇩"
+    emoji: '🇲🇩',
+    shortcode: 'flag_md',
   },
   {
-    "shortcode": "flag_me",
-    "emoji": "🇲🇪"
+    emoji: '🇲🇪',
+    shortcode: 'flag_me',
   },
   {
-    "shortcode": "flag_mf",
-    "emoji": "🇲🇫"
+    emoji: '🇲🇫',
+    shortcode: 'flag_mf',
   },
   {
-    "shortcode": "flag_mg",
-    "emoji": "🇲🇬"
+    emoji: '🇲🇬',
+    shortcode: 'flag_mg',
   },
   {
-    "shortcode": "flag_mh",
-    "emoji": "🇲🇭"
+    emoji: '🇲🇭',
+    shortcode: 'flag_mh',
   },
   {
-    "shortcode": "flag_mk",
-    "emoji": "🇲🇰"
+    emoji: '🇲🇰',
+    shortcode: 'flag_mk',
   },
   {
-    "shortcode": "flag_ml",
-    "emoji": "🇲🇱"
+    emoji: '🇲🇱',
+    shortcode: 'flag_ml',
   },
   {
-    "shortcode": "flag_mm",
-    "emoji": "🇲🇲"
+    emoji: '🇲🇲',
+    shortcode: 'flag_mm',
   },
   {
-    "shortcode": "flag_mn",
-    "emoji": "🇲🇳"
+    emoji: '🇲🇳',
+    shortcode: 'flag_mn',
   },
   {
-    "shortcode": "flag_mo",
-    "emoji": "🇲🇴"
+    emoji: '🇲🇴',
+    shortcode: 'flag_mo',
   },
   {
-    "shortcode": "flag_mp",
-    "emoji": "🇲🇵"
+    emoji: '🇲🇵',
+    shortcode: 'flag_mp',
   },
   {
-    "shortcode": "flag_mq",
-    "emoji": "🇲🇶"
+    emoji: '🇲🇶',
+    shortcode: 'flag_mq',
   },
   {
-    "shortcode": "flag_mr",
-    "emoji": "🇲🇷"
+    emoji: '🇲🇷',
+    shortcode: 'flag_mr',
   },
   {
-    "shortcode": "flag_ms",
-    "emoji": "🇲🇸"
+    emoji: '🇲🇸',
+    shortcode: 'flag_ms',
   },
   {
-    "shortcode": "flag_mt",
-    "emoji": "🇲🇹"
+    emoji: '🇲🇹',
+    shortcode: 'flag_mt',
   },
   {
-    "shortcode": "flag_mu",
-    "emoji": "🇲🇺"
+    emoji: '🇲🇺',
+    shortcode: 'flag_mu',
   },
   {
-    "shortcode": "flag_mv",
-    "emoji": "🇲🇻"
+    emoji: '🇲🇻',
+    shortcode: 'flag_mv',
   },
   {
-    "shortcode": "flag_mw",
-    "emoji": "🇲🇼"
+    emoji: '🇲🇼',
+    shortcode: 'flag_mw',
   },
   {
-    "shortcode": "flag_mx",
-    "emoji": "🇲🇽"
+    emoji: '🇲🇽',
+    shortcode: 'flag_mx',
   },
   {
-    "shortcode": "flag_my",
-    "emoji": "🇲🇾"
+    emoji: '🇲🇾',
+    shortcode: 'flag_my',
   },
   {
-    "shortcode": "flag_mz",
-    "emoji": "🇲🇿"
+    emoji: '🇲🇿',
+    shortcode: 'flag_mz',
   },
   {
-    "shortcode": "flag_na",
-    "emoji": "🇳🇦"
+    emoji: '🇳🇦',
+    shortcode: 'flag_na',
   },
   {
-    "shortcode": "flag_nc",
-    "emoji": "🇳🇨"
+    emoji: '🇳🇨',
+    shortcode: 'flag_nc',
   },
   {
-    "shortcode": "flag_ne",
-    "emoji": "🇳🇪"
+    emoji: '🇳🇪',
+    shortcode: 'flag_ne',
   },
   {
-    "shortcode": "flag_nf",
-    "emoji": "🇳🇫"
+    emoji: '🇳🇫',
+    shortcode: 'flag_nf',
   },
   {
-    "shortcode": "flag_ng",
-    "emoji": "🇳🇬"
+    emoji: '🇳🇬',
+    shortcode: 'flag_ng',
   },
   {
-    "shortcode": "flag_ni",
-    "emoji": "🇳🇮"
+    emoji: '🇳🇮',
+    shortcode: 'flag_ni',
   },
   {
-    "shortcode": "flag_nl",
-    "emoji": "🇳🇱"
+    emoji: '🇳🇱',
+    shortcode: 'flag_nl',
   },
   {
-    "shortcode": "flag_no",
-    "emoji": "🇳🇴"
+    emoji: '🇳🇴',
+    shortcode: 'flag_no',
   },
   {
-    "shortcode": "flag_np",
-    "emoji": "🇳🇵"
+    emoji: '🇳🇵',
+    shortcode: 'flag_np',
   },
   {
-    "shortcode": "flag_nr",
-    "emoji": "🇳🇷"
+    emoji: '🇳🇷',
+    shortcode: 'flag_nr',
   },
   {
-    "shortcode": "flag_nu",
-    "emoji": "🇳🇺"
+    emoji: '🇳🇺',
+    shortcode: 'flag_nu',
   },
   {
-    "shortcode": "flag_nz",
-    "emoji": "🇳🇿"
+    emoji: '🇳🇿',
+    shortcode: 'flag_nz',
   },
   {
-    "shortcode": "flag_om",
-    "emoji": "🇴🇲"
+    emoji: '🇴🇲',
+    shortcode: 'flag_om',
   },
   {
-    "shortcode": "flag_pa",
-    "emoji": "🇵🇦"
+    emoji: '🇵🇦',
+    shortcode: 'flag_pa',
   },
   {
-    "shortcode": "flag_pe",
-    "emoji": "🇵🇪"
+    emoji: '🇵🇪',
+    shortcode: 'flag_pe',
   },
   {
-    "shortcode": "flag_pf",
-    "emoji": "🇵🇫"
+    emoji: '🇵🇫',
+    shortcode: 'flag_pf',
   },
   {
-    "shortcode": "flag_pg",
-    "emoji": "🇵🇬"
+    emoji: '🇵🇬',
+    shortcode: 'flag_pg',
   },
   {
-    "shortcode": "flag_ph",
-    "emoji": "🇵🇭"
+    emoji: '🇵🇭',
+    shortcode: 'flag_ph',
   },
   {
-    "shortcode": "flag_pk",
-    "emoji": "🇵🇰"
+    emoji: '🇵🇰',
+    shortcode: 'flag_pk',
   },
   {
-    "shortcode": "flag_pl",
-    "emoji": "🇵🇱"
+    emoji: '🇵🇱',
+    shortcode: 'flag_pl',
   },
   {
-    "shortcode": "flag_pm",
-    "emoji": "🇵🇲"
+    emoji: '🇵🇲',
+    shortcode: 'flag_pm',
   },
   {
-    "shortcode": "flag_pn",
-    "emoji": "🇵🇳"
+    emoji: '🇵🇳',
+    shortcode: 'flag_pn',
   },
   {
-    "shortcode": "flag_pr",
-    "emoji": "🇵🇷"
+    emoji: '🇵🇷',
+    shortcode: 'flag_pr',
   },
   {
-    "shortcode": "flag_ps",
-    "emoji": "🇵🇸"
+    emoji: '🇵🇸',
+    shortcode: 'flag_ps',
   },
   {
-    "shortcode": "flag_pt",
-    "emoji": "🇵🇹"
+    emoji: '🇵🇹',
+    shortcode: 'flag_pt',
   },
   {
-    "shortcode": "flag_pw",
-    "emoji": "🇵🇼"
+    emoji: '🇵🇼',
+    shortcode: 'flag_pw',
   },
   {
-    "shortcode": "flag_py",
-    "emoji": "🇵🇾"
+    emoji: '🇵🇾',
+    shortcode: 'flag_py',
   },
   {
-    "shortcode": "flag_qa",
-    "emoji": "🇶🇦"
+    emoji: '🇶🇦',
+    shortcode: 'flag_qa',
   },
   {
-    "shortcode": "flag_re",
-    "emoji": "🇷🇪"
+    emoji: '🇷🇪',
+    shortcode: 'flag_re',
   },
   {
-    "shortcode": "flag_ro",
-    "emoji": "🇷🇴"
+    emoji: '🇷🇴',
+    shortcode: 'flag_ro',
   },
   {
-    "shortcode": "flag_rs",
-    "emoji": "🇷🇸"
+    emoji: '🇷🇸',
+    shortcode: 'flag_rs',
   },
   {
-    "shortcode": "flag_ru",
-    "emoji": "🇷🇺"
+    emoji: '🇷🇺',
+    shortcode: 'flag_ru',
   },
   {
-    "shortcode": "flag_rw",
-    "emoji": "🇷🇼"
+    emoji: '🇷🇼',
+    shortcode: 'flag_rw',
   },
   {
-    "shortcode": "flag_sa",
-    "emoji": "🇸🇦"
+    emoji: '🇸🇦',
+    shortcode: 'flag_sa',
   },
   {
-    "shortcode": "flag_sb",
-    "emoji": "🇸🇧"
+    emoji: '🇸🇧',
+    shortcode: 'flag_sb',
   },
   {
-    "shortcode": "flag_sc",
-    "emoji": "🇸🇨"
+    emoji: '🇸🇨',
+    shortcode: 'flag_sc',
   },
   {
-    "shortcode": "flag_sd",
-    "emoji": "🇸🇩"
+    emoji: '🇸🇩',
+    shortcode: 'flag_sd',
   },
   {
-    "shortcode": "flag_se",
-    "emoji": "🇸🇪"
+    emoji: '🇸🇪',
+    shortcode: 'flag_se',
   },
   {
-    "shortcode": "flag_sg",
-    "emoji": "🇸🇬"
+    emoji: '🇸🇬',
+    shortcode: 'flag_sg',
   },
   {
-    "shortcode": "flag_sh",
-    "emoji": "🇸🇭"
+    emoji: '🇸🇭',
+    shortcode: 'flag_sh',
   },
   {
-    "shortcode": "flag_si",
-    "emoji": "🇸🇮"
+    emoji: '🇸🇮',
+    shortcode: 'flag_si',
   },
   {
-    "shortcode": "flag_sj",
-    "emoji": "🇸🇯"
+    emoji: '🇸🇯',
+    shortcode: 'flag_sj',
   },
   {
-    "shortcode": "flag_sk",
-    "emoji": "🇸🇰"
+    emoji: '🇸🇰',
+    shortcode: 'flag_sk',
   },
   {
-    "shortcode": "flag_sl",
-    "emoji": "🇸🇱"
+    emoji: '🇸🇱',
+    shortcode: 'flag_sl',
   },
   {
-    "shortcode": "flag_sm",
-    "emoji": "🇸🇲"
+    emoji: '🇸🇲',
+    shortcode: 'flag_sm',
   },
   {
-    "shortcode": "flag_sn",
-    "emoji": "🇸🇳"
+    emoji: '🇸🇳',
+    shortcode: 'flag_sn',
   },
   {
-    "shortcode": "flag_so",
-    "emoji": "🇸🇴"
+    emoji: '🇸🇴',
+    shortcode: 'flag_so',
   },
   {
-    "shortcode": "flag_sr",
-    "emoji": "🇸🇷"
+    emoji: '🇸🇷',
+    shortcode: 'flag_sr',
   },
   {
-    "shortcode": "flag_ss",
-    "emoji": "🇸🇸"
+    emoji: '🇸🇸',
+    shortcode: 'flag_ss',
   },
   {
-    "shortcode": "flag_st",
-    "emoji": "🇸🇹"
+    emoji: '🇸🇹',
+    shortcode: 'flag_st',
   },
   {
-    "shortcode": "flag_sv",
-    "emoji": "🇸🇻"
+    emoji: '🇸🇻',
+    shortcode: 'flag_sv',
   },
   {
-    "shortcode": "flag_sx",
-    "emoji": "🇸🇽"
+    emoji: '🇸🇽',
+    shortcode: 'flag_sx',
   },
   {
-    "shortcode": "flag_sy",
-    "emoji": "🇸🇾"
+    emoji: '🇸🇾',
+    shortcode: 'flag_sy',
   },
   {
-    "shortcode": "flag_sz",
-    "emoji": "🇸🇿"
+    emoji: '🇸🇿',
+    shortcode: 'flag_sz',
   },
   {
-    "shortcode": "flag_ta",
-    "emoji": "🇹🇦"
+    emoji: '🇹🇦',
+    shortcode: 'flag_ta',
   },
   {
-    "shortcode": "flag_tc",
-    "emoji": "🇹🇨"
+    emoji: '🇹🇨',
+    shortcode: 'flag_tc',
   },
   {
-    "shortcode": "flag_td",
-    "emoji": "🇹🇩"
+    emoji: '🇹🇩',
+    shortcode: 'flag_td',
   },
   {
-    "shortcode": "flag_tf",
-    "emoji": "🇹🇫"
+    emoji: '🇹🇫',
+    shortcode: 'flag_tf',
   },
   {
-    "shortcode": "flag_tg",
-    "emoji": "🇹🇬"
+    emoji: '🇹🇬',
+    shortcode: 'flag_tg',
   },
   {
-    "shortcode": "flag_th",
-    "emoji": "🇹🇭"
+    emoji: '🇹🇭',
+    shortcode: 'flag_th',
   },
   {
-    "shortcode": "flag_tj",
-    "emoji": "🇹🇯"
+    emoji: '🇹🇯',
+    shortcode: 'flag_tj',
   },
   {
-    "shortcode": "flag_tk",
-    "emoji": "🇹🇰"
+    emoji: '🇹🇰',
+    shortcode: 'flag_tk',
   },
   {
-    "shortcode": "flag_tl",
-    "emoji": "🇹🇱"
+    emoji: '🇹🇱',
+    shortcode: 'flag_tl',
   },
   {
-    "shortcode": "flag_tm",
-    "emoji": "🇹🇲"
+    emoji: '🇹🇲',
+    shortcode: 'flag_tm',
   },
   {
-    "shortcode": "flag_tn",
-    "emoji": "🇹🇳"
+    emoji: '🇹🇳',
+    shortcode: 'flag_tn',
   },
   {
-    "shortcode": "flag_to",
-    "emoji": "🇹🇴"
+    emoji: '🇹🇴',
+    shortcode: 'flag_to',
   },
   {
-    "shortcode": "flag_tr",
-    "emoji": "🇹🇷"
+    emoji: '🇹🇷',
+    shortcode: 'flag_tr',
   },
   {
-    "shortcode": "flag_tt",
-    "emoji": "🇹🇹"
+    emoji: '🇹🇹',
+    shortcode: 'flag_tt',
   },
   {
-    "shortcode": "flag_tv",
-    "emoji": "🇹🇻"
+    emoji: '🇹🇻',
+    shortcode: 'flag_tv',
   },
   {
-    "shortcode": "flag_tw",
-    "emoji": "🇹🇼"
+    emoji: '🇹🇼',
+    shortcode: 'flag_tw',
   },
   {
-    "shortcode": "flag_tz",
-    "emoji": "🇹🇿"
+    emoji: '🇹🇿',
+    shortcode: 'flag_tz',
   },
   {
-    "shortcode": "flag_ua",
-    "emoji": "🇺🇦"
+    emoji: '🇺🇦',
+    shortcode: 'flag_ua',
   },
   {
-    "shortcode": "flag_ug",
-    "emoji": "🇺🇬"
+    emoji: '🇺🇬',
+    shortcode: 'flag_ug',
   },
   {
-    "shortcode": "flag_um",
-    "emoji": "🇺🇲"
+    emoji: '🇺🇲',
+    shortcode: 'flag_um',
   },
   {
-    "shortcode": "flag_us",
-    "emoji": "🇺🇸"
+    emoji: '🇺🇸',
+    shortcode: 'flag_us',
   },
   {
-    "shortcode": "flag_uy",
-    "emoji": "🇺🇾"
+    emoji: '🇺🇾',
+    shortcode: 'flag_uy',
   },
   {
-    "shortcode": "flag_uz",
-    "emoji": "🇺🇿"
+    emoji: '🇺🇿',
+    shortcode: 'flag_uz',
   },
   {
-    "shortcode": "flag_va",
-    "emoji": "🇻🇦"
+    emoji: '🇻🇦',
+    shortcode: 'flag_va',
   },
   {
-    "shortcode": "flag_vc",
-    "emoji": "🇻🇨"
+    emoji: '🇻🇨',
+    shortcode: 'flag_vc',
   },
   {
-    "shortcode": "flag_ve",
-    "emoji": "🇻🇪"
+    emoji: '🇻🇪',
+    shortcode: 'flag_ve',
   },
   {
-    "shortcode": "flag_vg",
-    "emoji": "🇻🇬"
+    emoji: '🇻🇬',
+    shortcode: 'flag_vg',
   },
   {
-    "shortcode": "flag_vi",
-    "emoji": "🇻🇮"
+    emoji: '🇻🇮',
+    shortcode: 'flag_vi',
   },
   {
-    "shortcode": "flag_vn",
-    "emoji": "🇻🇳"
+    emoji: '🇻🇳',
+    shortcode: 'flag_vn',
   },
   {
-    "shortcode": "flag_vu",
-    "emoji": "🇻🇺"
+    emoji: '🇻🇺',
+    shortcode: 'flag_vu',
   },
   {
-    "shortcode": "flag_wf",
-    "emoji": "🇼🇫"
+    emoji: '🇼🇫',
+    shortcode: 'flag_wf',
   },
   {
-    "shortcode": "flag_white",
-    "emoji": "🏳"
+    emoji: '🏳',
+    shortcode: 'flag_white',
   },
   {
-    "shortcode": "flag_ws",
-    "emoji": "🇼🇸"
+    emoji: '🇼🇸',
+    shortcode: 'flag_ws',
   },
   {
-    "shortcode": "flag_xk",
-    "emoji": "🇽🇰"
+    emoji: '🇽🇰',
+    shortcode: 'flag_xk',
   },
   {
-    "shortcode": "flag_ye",
-    "emoji": "🇾🇪"
+    emoji: '🇾🇪',
+    shortcode: 'flag_ye',
   },
   {
-    "shortcode": "flag_yt",
-    "emoji": "🇾🇹"
+    emoji: '🇾🇹',
+    shortcode: 'flag_yt',
   },
   {
-    "shortcode": "flag_za",
-    "emoji": "🇿🇦"
+    emoji: '🇿🇦',
+    shortcode: 'flag_za',
   },
   {
-    "shortcode": "flag_zm",
-    "emoji": "🇿🇲"
+    emoji: '🇿🇲',
+    shortcode: 'flag_zm',
   },
   {
-    "shortcode": "flag_zw",
-    "emoji": "🇿🇼"
+    emoji: '🇿🇼',
+    shortcode: 'flag_zw',
   },
   {
-    "shortcode": "flags",
-    "emoji": "🎏"
+    emoji: '🎏',
+    shortcode: 'flags',
   },
   {
-    "shortcode": "flashlight",
-    "emoji": "🔦"
+    emoji: '🔦',
+    shortcode: 'flashlight',
   },
   {
-    "shortcode": "fleur-de-lis",
-    "emoji": "⚜"
+    emoji: '⚜',
+    shortcode: 'fleur-de-lis',
   },
   {
-    "shortcode": "floppy_disk",
-    "emoji": "💾"
+    emoji: '💾',
+    shortcode: 'floppy_disk',
   },
   {
-    "shortcode": "flower_playing_cards",
-    "emoji": "🎴"
+    emoji: '🎴',
+    shortcode: 'flower_playing_cards',
   },
   {
-    "shortcode": "flushed",
-    "emoji": "😳"
+    emoji: '😳',
+    shortcode: 'flushed',
   },
   {
-    "shortcode": "flying_saucer",
-    "emoji": "🛸"
+    emoji: '🛸',
+    shortcode: 'flying_saucer',
   },
   {
-    "shortcode": "fog",
-    "emoji": "🌫"
+    emoji: '🌫',
+    shortcode: 'fog',
   },
   {
-    "shortcode": "foggy",
-    "emoji": "🌁"
+    emoji: '🌁',
+    shortcode: 'foggy',
   },
   {
-    "shortcode": "football",
-    "emoji": "🏈"
+    emoji: '🏈',
+    shortcode: 'football',
   },
   {
-    "shortcode": "footprints",
-    "emoji": "👣"
+    emoji: '👣',
+    shortcode: 'footprints',
   },
   {
-    "shortcode": "fork_and_knife",
-    "emoji": "🍴"
+    emoji: '🍴',
+    shortcode: 'fork_and_knife',
   },
   {
-    "shortcode": "fork_knife_plate",
-    "emoji": "🍽"
+    emoji: '🍽',
+    shortcode: 'fork_knife_plate',
   },
   {
-    "shortcode": "fortune_cookie",
-    "emoji": "🥠"
+    emoji: '🥠',
+    shortcode: 'fortune_cookie',
   },
   {
-    "shortcode": "fountain",
-    "emoji": "⛲"
+    emoji: '⛲',
+    shortcode: 'fountain',
   },
   {
-    "shortcode": "four",
-    "emoji": "4⃣"
+    emoji: '4⃣',
+    shortcode: 'four',
   },
   {
-    "shortcode": "four_leaf_clover",
-    "emoji": "🍀"
+    emoji: '🍀',
+    shortcode: 'four_leaf_clover',
   },
   {
-    "shortcode": "fox",
-    "emoji": "🦊"
+    emoji: '🦊',
+    shortcode: 'fox',
   },
   {
-    "shortcode": "frame_photo",
-    "emoji": "🖼"
+    emoji: '🖼',
+    shortcode: 'frame_photo',
   },
   {
-    "shortcode": "free",
-    "emoji": "🆓"
+    emoji: '🆓',
+    shortcode: 'free',
   },
   {
-    "shortcode": "french_bread",
-    "emoji": "🥖"
+    emoji: '🥖',
+    shortcode: 'french_bread',
   },
   {
-    "shortcode": "fried_shrimp",
-    "emoji": "🍤"
+    emoji: '🍤',
+    shortcode: 'fried_shrimp',
   },
   {
-    "shortcode": "fries",
-    "emoji": "🍟"
+    emoji: '🍟',
+    shortcode: 'fries',
   },
   {
-    "shortcode": "frog",
-    "emoji": "🐸"
+    emoji: '🐸',
+    shortcode: 'frog',
   },
   {
-    "shortcode": "frowning",
-    "emoji": "😦"
+    emoji: '😦',
+    shortcode: 'frowning',
   },
   {
-    "shortcode": "frowning2",
-    "emoji": "☹"
+    emoji: '☹',
+    shortcode: 'frowning2',
   },
   {
-    "shortcode": "fuelpump",
-    "emoji": "⛽"
+    emoji: '⛽',
+    shortcode: 'fuelpump',
   },
   {
-    "shortcode": "full_moon",
-    "emoji": "🌕"
+    emoji: '🌕',
+    shortcode: 'full_moon',
   },
   {
-    "shortcode": "full_moon_with_face",
-    "emoji": "🌝"
+    emoji: '🌝',
+    shortcode: 'full_moon_with_face',
   },
   {
-    "shortcode": "game_die",
-    "emoji": "🎲"
+    emoji: '🎲',
+    shortcode: 'game_die',
   },
   {
-    "shortcode": "gear",
-    "emoji": "⚙"
+    emoji: '⚙',
+    shortcode: 'gear',
   },
   {
-    "shortcode": "gem",
-    "emoji": "💎"
+    emoji: '💎',
+    shortcode: 'gem',
   },
   {
-    "shortcode": "gemini",
-    "emoji": "♊"
+    emoji: '♊',
+    shortcode: 'gemini',
   },
   {
-    "shortcode": "genie",
-    "emoji": "🧞"
+    emoji: '🧞',
+    shortcode: 'genie',
   },
   {
-    "shortcode": "ghost",
-    "emoji": "👻"
+    emoji: '👻',
+    shortcode: 'ghost',
   },
   {
-    "shortcode": "gift",
-    "emoji": "🎁"
+    emoji: '🎁',
+    shortcode: 'gift',
   },
   {
-    "shortcode": "gift_heart",
-    "emoji": "💝"
+    emoji: '💝',
+    shortcode: 'gift_heart',
   },
   {
-    "shortcode": "giraffe",
-    "emoji": "🦒"
+    emoji: '🦒',
+    shortcode: 'giraffe',
   },
   {
-    "shortcode": "girl",
-    "emoji": "👧"
+    emoji: '👧',
+    shortcode: 'girl',
   },
   {
-    "shortcode": "girl_tone1",
-    "emoji": "👧🏻"
+    emoji: '👧🏻',
+    shortcode: 'girl_tone1',
   },
   {
-    "shortcode": "girl_tone2",
-    "emoji": "👧🏼"
+    emoji: '👧🏼',
+    shortcode: 'girl_tone2',
   },
   {
-    "shortcode": "girl_tone3",
-    "emoji": "👧🏽"
+    emoji: '👧🏽',
+    shortcode: 'girl_tone3',
   },
   {
-    "shortcode": "girl_tone4",
-    "emoji": "👧🏾"
+    emoji: '👧🏾',
+    shortcode: 'girl_tone4',
   },
   {
-    "shortcode": "girl_tone5",
-    "emoji": "👧🏿"
+    emoji: '👧🏿',
+    shortcode: 'girl_tone5',
   },
   {
-    "shortcode": "globe_with_meridians",
-    "emoji": "🌐"
+    emoji: '🌐',
+    shortcode: 'globe_with_meridians',
   },
   {
-    "shortcode": "gloves",
-    "emoji": "🧤"
+    emoji: '🧤',
+    shortcode: 'gloves',
   },
   {
-    "shortcode": "goal",
-    "emoji": "🥅"
+    emoji: '🥅',
+    shortcode: 'goal',
   },
   {
-    "shortcode": "goat",
-    "emoji": "🐐"
+    emoji: '🐐',
+    shortcode: 'goat',
   },
   {
-    "shortcode": "golf",
-    "emoji": "⛳"
+    emoji: '⛳',
+    shortcode: 'golf',
   },
   {
-    "shortcode": "gorilla",
-    "emoji": "🦍"
+    emoji: '🦍',
+    shortcode: 'gorilla',
   },
   {
-    "shortcode": "grapes",
-    "emoji": "🍇"
+    emoji: '🍇',
+    shortcode: 'grapes',
   },
   {
-    "shortcode": "green_apple",
-    "emoji": "🍏"
+    emoji: '🍏',
+    shortcode: 'green_apple',
   },
   {
-    "shortcode": "green_book",
-    "emoji": "📗"
+    emoji: '📗',
+    shortcode: 'green_book',
   },
   {
-    "shortcode": "green_heart",
-    "emoji": "💚"
+    emoji: '💚',
+    shortcode: 'green_heart',
   },
   {
-    "shortcode": "grey_exclamation",
-    "emoji": "❕"
+    emoji: '❕',
+    shortcode: 'grey_exclamation',
   },
   {
-    "shortcode": "grey_question",
-    "emoji": "❔"
+    emoji: '❔',
+    shortcode: 'grey_question',
   },
   {
-    "shortcode": "grimacing",
-    "emoji": "😬"
+    emoji: '😬',
+    shortcode: 'grimacing',
   },
   {
-    "shortcode": "grin",
-    "emoji": "😁"
+    emoji: '😁',
+    shortcode: 'grin',
   },
   {
-    "shortcode": "grinning",
-    "emoji": "😀"
+    emoji: '😀',
+    shortcode: 'grinning',
   },
   {
-    "shortcode": "guard",
-    "emoji": "💂"
+    emoji: '💂',
+    shortcode: 'guard',
   },
   {
-    "shortcode": "guard_tone1",
-    "emoji": "💂🏻"
+    emoji: '💂🏻',
+    shortcode: 'guard_tone1',
   },
   {
-    "shortcode": "guard_tone2",
-    "emoji": "💂🏼"
+    emoji: '💂🏼',
+    shortcode: 'guard_tone2',
   },
   {
-    "shortcode": "guard_tone3",
-    "emoji": "💂🏽"
+    emoji: '💂🏽',
+    shortcode: 'guard_tone3',
   },
   {
-    "shortcode": "guard_tone4",
-    "emoji": "💂🏾"
+    emoji: '💂🏾',
+    shortcode: 'guard_tone4',
   },
   {
-    "shortcode": "guard_tone5",
-    "emoji": "💂🏿"
+    emoji: '💂🏿',
+    shortcode: 'guard_tone5',
   },
   {
-    "shortcode": "guitar",
-    "emoji": "🎸"
+    emoji: '🎸',
+    shortcode: 'guitar',
   },
   {
-    "shortcode": "gun",
-    "emoji": "🔫"
+    emoji: '🔫',
+    shortcode: 'gun',
   },
   {
-    "shortcode": "hamburger",
-    "emoji": "🍔"
+    emoji: '🍔',
+    shortcode: 'hamburger',
   },
   {
-    "shortcode": "hammer",
-    "emoji": "🔨"
+    emoji: '🔨',
+    shortcode: 'hammer',
   },
   {
-    "shortcode": "hammer_pick",
-    "emoji": "⚒"
+    emoji: '⚒',
+    shortcode: 'hammer_pick',
   },
   {
-    "shortcode": "hamster",
-    "emoji": "🐹"
+    emoji: '🐹',
+    shortcode: 'hamster',
   },
   {
-    "shortcode": "hand_splayed",
-    "emoji": "🖐"
+    emoji: '🖐',
+    shortcode: 'hand_splayed',
   },
   {
-    "shortcode": "hand_splayed_tone1",
-    "emoji": "🖐🏻"
+    emoji: '🖐🏻',
+    shortcode: 'hand_splayed_tone1',
   },
   {
-    "shortcode": "hand_splayed_tone2",
-    "emoji": "🖐🏼"
+    emoji: '🖐🏼',
+    shortcode: 'hand_splayed_tone2',
   },
   {
-    "shortcode": "hand_splayed_tone3",
-    "emoji": "🖐🏽"
+    emoji: '🖐🏽',
+    shortcode: 'hand_splayed_tone3',
   },
   {
-    "shortcode": "hand_splayed_tone4",
-    "emoji": "🖐🏾"
+    emoji: '🖐🏾',
+    shortcode: 'hand_splayed_tone4',
   },
   {
-    "shortcode": "hand_splayed_tone5",
-    "emoji": "🖐🏿"
+    emoji: '🖐🏿',
+    shortcode: 'hand_splayed_tone5',
   },
   {
-    "shortcode": "handbag",
-    "emoji": "👜"
+    emoji: '👜',
+    shortcode: 'handbag',
   },
   {
-    "shortcode": "handshake",
-    "emoji": "🤝"
+    emoji: '🤝',
+    shortcode: 'handshake',
   },
   {
-    "shortcode": "hash",
-    "emoji": "#⃣"
+    emoji: '#⃣',
+    shortcode: 'hash',
   },
   {
-    "shortcode": "hatched_chick",
-    "emoji": "🐥"
+    emoji: '🐥',
+    shortcode: 'hatched_chick',
   },
   {
-    "shortcode": "hatching_chick",
-    "emoji": "🐣"
+    emoji: '🐣',
+    shortcode: 'hatching_chick',
   },
   {
-    "shortcode": "head_bandage",
-    "emoji": "🤕"
+    emoji: '🤕',
+    shortcode: 'head_bandage',
   },
   {
-    "shortcode": "headphones",
-    "emoji": "🎧"
+    emoji: '🎧',
+    shortcode: 'headphones',
   },
   {
-    "shortcode": "hear_no_evil",
-    "emoji": "🙉"
+    emoji: '🙉',
+    shortcode: 'hear_no_evil',
   },
   {
-    "shortcode": "heart",
-    "emoji": "❤"
+    emoji: '❤',
+    shortcode: 'heart',
   },
   {
-    "shortcode": "heart_decoration",
-    "emoji": "💟"
+    emoji: '💟',
+    shortcode: 'heart_decoration',
   },
   {
-    "shortcode": "heart_exclamation",
-    "emoji": "❣"
+    emoji: '❣',
+    shortcode: 'heart_exclamation',
   },
   {
-    "shortcode": "heart_eyes",
-    "emoji": "😍"
+    emoji: '😍',
+    shortcode: 'heart_eyes',
   },
   {
-    "shortcode": "heart_eyes_cat",
-    "emoji": "😻"
+    emoji: '😻',
+    shortcode: 'heart_eyes_cat',
   },
   {
-    "shortcode": "heartbeat",
-    "emoji": "💓"
+    emoji: '💓',
+    shortcode: 'heartbeat',
   },
   {
-    "shortcode": "heartpulse",
-    "emoji": "💗"
+    emoji: '💗',
+    shortcode: 'heartpulse',
   },
   {
-    "shortcode": "hearts",
-    "emoji": "♥"
+    emoji: '♥',
+    shortcode: 'hearts',
   },
   {
-    "shortcode": "heavy_check_mark",
-    "emoji": "✔"
+    emoji: '✔',
+    shortcode: 'heavy_check_mark',
   },
   {
-    "shortcode": "heavy_division_sign",
-    "emoji": "➗"
+    emoji: '➗',
+    shortcode: 'heavy_division_sign',
   },
   {
-    "shortcode": "heavy_dollar_sign",
-    "emoji": "💲"
+    emoji: '💲',
+    shortcode: 'heavy_dollar_sign',
   },
   {
-    "shortcode": "heavy_minus_sign",
-    "emoji": "➖"
+    emoji: '➖',
+    shortcode: 'heavy_minus_sign',
   },
   {
-    "shortcode": "heavy_multiplication_x",
-    "emoji": "✖"
+    emoji: '✖',
+    shortcode: 'heavy_multiplication_x',
   },
   {
-    "shortcode": "heavy_plus_sign",
-    "emoji": "➕"
+    emoji: '➕',
+    shortcode: 'heavy_plus_sign',
   },
   {
-    "shortcode": "hedgehog",
-    "emoji": "🦔"
+    emoji: '🦔',
+    shortcode: 'hedgehog',
   },
   {
-    "shortcode": "helicopter",
-    "emoji": "🚁"
+    emoji: '🚁',
+    shortcode: 'helicopter',
   },
   {
-    "shortcode": "helmet_with_cross",
-    "emoji": "⛑"
+    emoji: '⛑',
+    shortcode: 'helmet_with_cross',
   },
   {
-    "shortcode": "herb",
-    "emoji": "🌿"
+    emoji: '🌿',
+    shortcode: 'herb',
   },
   {
-    "shortcode": "hibiscus",
-    "emoji": "🌺"
+    emoji: '🌺',
+    shortcode: 'hibiscus',
   },
   {
-    "shortcode": "high_brightness",
-    "emoji": "🔆"
+    emoji: '🔆',
+    shortcode: 'high_brightness',
   },
   {
-    "shortcode": "high_heel",
-    "emoji": "👠"
+    emoji: '👠',
+    shortcode: 'high_heel',
   },
   {
-    "shortcode": "hockey",
-    "emoji": "🏒"
+    emoji: '🏒',
+    shortcode: 'hockey',
   },
   {
-    "shortcode": "hole",
-    "emoji": "🕳"
+    emoji: '🕳',
+    shortcode: 'hole',
   },
   {
-    "shortcode": "homes",
-    "emoji": "🏘"
+    emoji: '🏘',
+    shortcode: 'homes',
   },
   {
-    "shortcode": "honey_pot",
-    "emoji": "🍯"
+    emoji: '🍯',
+    shortcode: 'honey_pot',
   },
   {
-    "shortcode": "horse",
-    "emoji": "🐴"
+    emoji: '🐴',
+    shortcode: 'horse',
   },
   {
-    "shortcode": "horse_racing",
-    "emoji": "🏇"
+    emoji: '🏇',
+    shortcode: 'horse_racing',
   },
   {
-    "shortcode": "horse_racing_tone1",
-    "emoji": "🏇🏻"
+    emoji: '🏇🏻',
+    shortcode: 'horse_racing_tone1',
   },
   {
-    "shortcode": "horse_racing_tone2",
-    "emoji": "🏇🏼"
+    emoji: '🏇🏼',
+    shortcode: 'horse_racing_tone2',
   },
   {
-    "shortcode": "horse_racing_tone3",
-    "emoji": "🏇🏽"
+    emoji: '🏇🏽',
+    shortcode: 'horse_racing_tone3',
   },
   {
-    "shortcode": "horse_racing_tone4",
-    "emoji": "🏇🏾"
+    emoji: '🏇🏾',
+    shortcode: 'horse_racing_tone4',
   },
   {
-    "shortcode": "horse_racing_tone5",
-    "emoji": "🏇🏿"
+    emoji: '🏇🏿',
+    shortcode: 'horse_racing_tone5',
   },
   {
-    "shortcode": "hospital",
-    "emoji": "🏥"
+    emoji: '🏥',
+    shortcode: 'hospital',
   },
   {
-    "shortcode": "hot_pepper",
-    "emoji": "🌶"
+    emoji: '🌶',
+    shortcode: 'hot_pepper',
   },
   {
-    "shortcode": "hotdog",
-    "emoji": "🌭"
+    emoji: '🌭',
+    shortcode: 'hotdog',
   },
   {
-    "shortcode": "hotel",
-    "emoji": "🏨"
+    emoji: '🏨',
+    shortcode: 'hotel',
   },
   {
-    "shortcode": "hotsprings",
-    "emoji": "♨"
+    emoji: '♨',
+    shortcode: 'hotsprings',
   },
   {
-    "shortcode": "hourglass",
-    "emoji": "⌛"
+    emoji: '⌛',
+    shortcode: 'hourglass',
   },
   {
-    "shortcode": "hourglass_flowing_sand",
-    "emoji": "⏳"
+    emoji: '⏳',
+    shortcode: 'hourglass_flowing_sand',
   },
   {
-    "shortcode": "house",
-    "emoji": "🏠"
+    emoji: '🏠',
+    shortcode: 'house',
   },
   {
-    "shortcode": "house_abandoned",
-    "emoji": "🏚"
+    emoji: '🏚',
+    shortcode: 'house_abandoned',
   },
   {
-    "shortcode": "house_with_garden",
-    "emoji": "🏡"
+    emoji: '🏡',
+    shortcode: 'house_with_garden',
   },
   {
-    "shortcode": "hugging",
-    "emoji": "🤗"
+    emoji: '🤗',
+    shortcode: 'hugging',
   },
   {
-    "shortcode": "hushed",
-    "emoji": "😯"
+    emoji: '😯',
+    shortcode: 'hushed',
   },
   {
-    "shortcode": "ice_cream",
-    "emoji": "🍨"
+    emoji: '🍨',
+    shortcode: 'ice_cream',
   },
   {
-    "shortcode": "ice_skate",
-    "emoji": "⛸"
+    emoji: '⛸',
+    shortcode: 'ice_skate',
   },
   {
-    "shortcode": "icecream",
-    "emoji": "🍦"
+    emoji: '🍦',
+    shortcode: 'icecream',
   },
   {
-    "shortcode": "id",
-    "emoji": "🆔"
+    emoji: '🆔',
+    shortcode: 'id',
   },
   {
-    "shortcode": "ideograph_advantage",
-    "emoji": "🉐"
+    emoji: '🉐',
+    shortcode: 'ideograph_advantage',
   },
   {
-    "shortcode": "imp",
-    "emoji": "👿"
+    emoji: '👿',
+    shortcode: 'imp',
   },
   {
-    "shortcode": "inbox_tray",
-    "emoji": "📥"
+    emoji: '📥',
+    shortcode: 'inbox_tray',
   },
   {
-    "shortcode": "incoming_envelope",
-    "emoji": "📨"
+    emoji: '📨',
+    shortcode: 'incoming_envelope',
   },
   {
-    "shortcode": "information_source",
-    "emoji": "ℹ"
+    emoji: 'ℹ',
+    shortcode: 'information_source',
   },
   {
-    "shortcode": "innocent",
-    "emoji": "😇"
+    emoji: '😇',
+    shortcode: 'innocent',
   },
   {
-    "shortcode": "interrobang",
-    "emoji": "⁉"
+    emoji: '⁉',
+    shortcode: 'interrobang',
   },
   {
-    "shortcode": "iphone",
-    "emoji": "📱"
+    emoji: '📱',
+    shortcode: 'iphone',
   },
   {
-    "shortcode": "island",
-    "emoji": "🏝"
+    emoji: '🏝',
+    shortcode: 'island',
   },
   {
-    "shortcode": "izakaya_lantern",
-    "emoji": "🏮"
+    emoji: '🏮',
+    shortcode: 'izakaya_lantern',
   },
   {
-    "shortcode": "jack_o_lantern",
-    "emoji": "🎃"
+    emoji: '🎃',
+    shortcode: 'jack_o_lantern',
   },
   {
-    "shortcode": "japan",
-    "emoji": "🗾"
+    emoji: '🗾',
+    shortcode: 'japan',
   },
   {
-    "shortcode": "japanese_castle",
-    "emoji": "🏯"
+    emoji: '🏯',
+    shortcode: 'japanese_castle',
   },
   {
-    "shortcode": "japanese_goblin",
-    "emoji": "👺"
+    emoji: '👺',
+    shortcode: 'japanese_goblin',
   },
   {
-    "shortcode": "japanese_ogre",
-    "emoji": "👹"
+    emoji: '👹',
+    shortcode: 'japanese_ogre',
   },
   {
-    "shortcode": "jeans",
-    "emoji": "👖"
+    emoji: '👖',
+    shortcode: 'jeans',
   },
   {
-    "shortcode": "joy",
-    "emoji": "😂"
+    emoji: '😂',
+    shortcode: 'joy',
   },
   {
-    "shortcode": "joy_cat",
-    "emoji": "😹"
+    emoji: '😹',
+    shortcode: 'joy_cat',
   },
   {
-    "shortcode": "joystick",
-    "emoji": "🕹"
+    emoji: '🕹',
+    shortcode: 'joystick',
   },
   {
-    "shortcode": "kaaba",
-    "emoji": "🕋"
+    emoji: '🕋',
+    shortcode: 'kaaba',
   },
   {
-    "shortcode": "key",
-    "emoji": "🔑"
+    emoji: '🔑',
+    shortcode: 'key',
   },
   {
-    "shortcode": "key2",
-    "emoji": "🗝"
+    emoji: '🗝',
+    shortcode: 'key2',
   },
   {
-    "shortcode": "keyboard",
-    "emoji": "⌨"
+    emoji: '⌨',
+    shortcode: 'keyboard',
   },
   {
-    "shortcode": "keycap_ten",
-    "emoji": "🔟"
+    emoji: '🔟',
+    shortcode: 'keycap_ten',
   },
   {
-    "shortcode": "kimono",
-    "emoji": "👘"
+    emoji: '👘',
+    shortcode: 'kimono',
   },
   {
-    "shortcode": "kiss",
-    "emoji": "💋"
+    emoji: '💋',
+    shortcode: 'kiss',
   },
   {
-    "shortcode": "kiss_mm",
-    "emoji": "👨❤💋👨"
+    emoji: '👨❤💋👨',
+    shortcode: 'kiss_mm',
   },
   {
-    "shortcode": "kiss_woman_man",
-    "emoji": "👩❤💋👨"
+    emoji: '👩❤💋👨',
+    shortcode: 'kiss_woman_man',
   },
   {
-    "shortcode": "kiss_ww",
-    "emoji": "👩❤💋👩"
+    emoji: '👩❤💋👩',
+    shortcode: 'kiss_ww',
   },
   {
-    "shortcode": "kissing",
-    "emoji": "😗"
+    emoji: '😗',
+    shortcode: 'kissing',
   },
   {
-    "shortcode": "kissing_cat",
-    "emoji": "😽"
+    emoji: '😽',
+    shortcode: 'kissing_cat',
   },
   {
-    "shortcode": "kissing_closed_eyes",
-    "emoji": "😚"
+    emoji: '😚',
+    shortcode: 'kissing_closed_eyes',
   },
   {
-    "shortcode": "kissing_heart",
-    "emoji": "😘"
+    emoji: '😘',
+    shortcode: 'kissing_heart',
   },
   {
-    "shortcode": "kissing_smiling_eyes",
-    "emoji": "😙"
+    emoji: '😙',
+    shortcode: 'kissing_smiling_eyes',
   },
   {
-    "shortcode": "kiwi",
-    "emoji": "🥝"
+    emoji: '🥝',
+    shortcode: 'kiwi',
   },
   {
-    "shortcode": "knife",
-    "emoji": "🔪"
+    emoji: '🔪',
+    shortcode: 'knife',
   },
   {
-    "shortcode": "koala",
-    "emoji": "🐨"
+    emoji: '🐨',
+    shortcode: 'koala',
   },
   {
-    "shortcode": "koko",
-    "emoji": "🈁"
+    emoji: '🈁',
+    shortcode: 'koko',
   },
   {
-    "shortcode": "label",
-    "emoji": "🏷"
+    emoji: '🏷',
+    shortcode: 'label',
   },
   {
-    "shortcode": "large_blue_diamond",
-    "emoji": "🔷"
+    emoji: '🔷',
+    shortcode: 'large_blue_diamond',
   },
   {
-    "shortcode": "large_orange_diamond",
-    "emoji": "🔶"
+    emoji: '🔶',
+    shortcode: 'large_orange_diamond',
   },
   {
-    "shortcode": "last_quarter_moon",
-    "emoji": "🌗"
+    emoji: '🌗',
+    shortcode: 'last_quarter_moon',
   },
   {
-    "shortcode": "last_quarter_moon_with_face",
-    "emoji": "🌜"
+    emoji: '🌜',
+    shortcode: 'last_quarter_moon_with_face',
   },
   {
-    "shortcode": "laughing",
-    "emoji": "😆"
+    emoji: '😆',
+    shortcode: 'laughing',
   },
   {
-    "shortcode": "leaves",
-    "emoji": "🍃"
+    emoji: '🍃',
+    shortcode: 'leaves',
   },
   {
-    "shortcode": "ledger",
-    "emoji": "📒"
+    emoji: '📒',
+    shortcode: 'ledger',
   },
   {
-    "shortcode": "left_facing_fist",
-    "emoji": "🤛"
+    emoji: '🤛',
+    shortcode: 'left_facing_fist',
   },
   {
-    "shortcode": "left_facing_fist_tone1",
-    "emoji": "🤛🏻"
+    emoji: '🤛🏻',
+    shortcode: 'left_facing_fist_tone1',
   },
   {
-    "shortcode": "left_facing_fist_tone2",
-    "emoji": "🤛🏼"
+    emoji: '🤛🏼',
+    shortcode: 'left_facing_fist_tone2',
   },
   {
-    "shortcode": "left_facing_fist_tone3",
-    "emoji": "🤛🏽"
+    emoji: '🤛🏽',
+    shortcode: 'left_facing_fist_tone3',
   },
   {
-    "shortcode": "left_facing_fist_tone4",
-    "emoji": "🤛🏾"
+    emoji: '🤛🏾',
+    shortcode: 'left_facing_fist_tone4',
   },
   {
-    "shortcode": "left_facing_fist_tone5",
-    "emoji": "🤛🏿"
+    emoji: '🤛🏿',
+    shortcode: 'left_facing_fist_tone5',
   },
   {
-    "shortcode": "left_luggage",
-    "emoji": "🛅"
+    emoji: '🛅',
+    shortcode: 'left_luggage',
   },
   {
-    "shortcode": "left_right_arrow",
-    "emoji": "↔"
+    emoji: '↔',
+    shortcode: 'left_right_arrow',
   },
   {
-    "shortcode": "leftwards_arrow_with_hook",
-    "emoji": "↩"
+    emoji: '↩',
+    shortcode: 'leftwards_arrow_with_hook',
   },
   {
-    "shortcode": "lemon",
-    "emoji": "🍋"
+    emoji: '🍋',
+    shortcode: 'lemon',
   },
   {
-    "shortcode": "leo",
-    "emoji": "♌"
+    emoji: '♌',
+    shortcode: 'leo',
   },
   {
-    "shortcode": "leopard",
-    "emoji": "🐆"
+    emoji: '🐆',
+    shortcode: 'leopard',
   },
   {
-    "shortcode": "level_slider",
-    "emoji": "🎚"
+    emoji: '🎚',
+    shortcode: 'level_slider',
   },
   {
-    "shortcode": "levitate",
-    "emoji": "🕴"
+    emoji: '🕴',
+    shortcode: 'levitate',
   },
   {
-    "shortcode": "libra",
-    "emoji": "♎"
+    emoji: '♎',
+    shortcode: 'libra',
   },
   {
-    "shortcode": "light_rail",
-    "emoji": "🚈"
+    emoji: '🚈',
+    shortcode: 'light_rail',
   },
   {
-    "shortcode": "link",
-    "emoji": "🔗"
+    emoji: '🔗',
+    shortcode: 'link',
   },
   {
-    "shortcode": "lion_face",
-    "emoji": "🦁"
+    emoji: '🦁',
+    shortcode: 'lion_face',
   },
   {
-    "shortcode": "lips",
-    "emoji": "👄"
+    emoji: '👄',
+    shortcode: 'lips',
   },
   {
-    "shortcode": "lipstick",
-    "emoji": "💄"
+    emoji: '💄',
+    shortcode: 'lipstick',
   },
   {
-    "shortcode": "lizard",
-    "emoji": "🦎"
+    emoji: '🦎',
+    shortcode: 'lizard',
   },
   {
-    "shortcode": "lock",
-    "emoji": "🔒"
+    emoji: '🔒',
+    shortcode: 'lock',
   },
   {
-    "shortcode": "lock_with_ink_pen",
-    "emoji": "🔏"
+    emoji: '🔏',
+    shortcode: 'lock_with_ink_pen',
   },
   {
-    "shortcode": "lollipop",
-    "emoji": "🍭"
+    emoji: '🍭',
+    shortcode: 'lollipop',
   },
   {
-    "shortcode": "loop",
-    "emoji": "➿"
+    emoji: '➿',
+    shortcode: 'loop',
   },
   {
-    "shortcode": "loud_sound",
-    "emoji": "🔊"
+    emoji: '🔊',
+    shortcode: 'loud_sound',
   },
   {
-    "shortcode": "loudspeaker",
-    "emoji": "📢"
+    emoji: '📢',
+    shortcode: 'loudspeaker',
   },
   {
-    "shortcode": "love_hotel",
-    "emoji": "🏩"
+    emoji: '🏩',
+    shortcode: 'love_hotel',
   },
   {
-    "shortcode": "love_letter",
-    "emoji": "💌"
+    emoji: '💌',
+    shortcode: 'love_letter',
   },
   {
-    "shortcode": "love_you_gesture",
-    "emoji": "🤟"
+    emoji: '🤟',
+    shortcode: 'love_you_gesture',
   },
   {
-    "shortcode": "love_you_gesture_tone1",
-    "emoji": "🤟🏻"
+    emoji: '🤟🏻',
+    shortcode: 'love_you_gesture_tone1',
   },
   {
-    "shortcode": "love_you_gesture_tone2",
-    "emoji": "🤟🏼"
+    emoji: '🤟🏼',
+    shortcode: 'love_you_gesture_tone2',
   },
   {
-    "shortcode": "love_you_gesture_tone3",
-    "emoji": "🤟🏽"
+    emoji: '🤟🏽',
+    shortcode: 'love_you_gesture_tone3',
   },
   {
-    "shortcode": "love_you_gesture_tone4",
-    "emoji": "🤟🏾"
+    emoji: '🤟🏾',
+    shortcode: 'love_you_gesture_tone4',
   },
   {
-    "shortcode": "love_you_gesture_tone5",
-    "emoji": "🤟🏿"
+    emoji: '🤟🏿',
+    shortcode: 'love_you_gesture_tone5',
   },
   {
-    "shortcode": "low_brightness",
-    "emoji": "🔅"
+    emoji: '🔅',
+    shortcode: 'low_brightness',
   },
   {
-    "shortcode": "lying_face",
-    "emoji": "🤥"
+    emoji: '🤥',
+    shortcode: 'lying_face',
   },
   {
-    "shortcode": "m",
-    "emoji": "Ⓜ"
+    emoji: 'Ⓜ',
+    shortcode: 'm',
   },
   {
-    "shortcode": "mag",
-    "emoji": "🔍"
+    emoji: '🔍',
+    shortcode: 'mag',
   },
   {
-    "shortcode": "mag_right",
-    "emoji": "🔎"
+    emoji: '🔎',
+    shortcode: 'mag_right',
   },
   {
-    "shortcode": "mage",
-    "emoji": "🧙"
+    emoji: '🧙',
+    shortcode: 'mage',
   },
   {
-    "shortcode": "mage_tone1",
-    "emoji": "🧙🏻"
+    emoji: '🧙🏻',
+    shortcode: 'mage_tone1',
   },
   {
-    "shortcode": "mage_tone2",
-    "emoji": "🧙🏼"
+    emoji: '🧙🏼',
+    shortcode: 'mage_tone2',
   },
   {
-    "shortcode": "mage_tone3",
-    "emoji": "🧙🏽"
+    emoji: '🧙🏽',
+    shortcode: 'mage_tone3',
   },
   {
-    "shortcode": "mage_tone4",
-    "emoji": "🧙🏾"
+    emoji: '🧙🏾',
+    shortcode: 'mage_tone4',
   },
   {
-    "shortcode": "mage_tone5",
-    "emoji": "🧙🏿"
+    emoji: '🧙🏿',
+    shortcode: 'mage_tone5',
   },
   {
-    "shortcode": "mahjong",
-    "emoji": "🀄"
+    emoji: '🀄',
+    shortcode: 'mahjong',
   },
   {
-    "shortcode": "mailbox",
-    "emoji": "📫"
+    emoji: '📫',
+    shortcode: 'mailbox',
   },
   {
-    "shortcode": "mailbox_closed",
-    "emoji": "📪"
+    emoji: '📪',
+    shortcode: 'mailbox_closed',
   },
   {
-    "shortcode": "mailbox_with_mail",
-    "emoji": "📬"
+    emoji: '📬',
+    shortcode: 'mailbox_with_mail',
   },
   {
-    "shortcode": "mailbox_with_no_mail",
-    "emoji": "📭"
+    emoji: '📭',
+    shortcode: 'mailbox_with_no_mail',
   },
   {
-    "shortcode": "male_sign",
-    "emoji": "♂"
+    emoji: '♂',
+    shortcode: 'male_sign',
   },
   {
-    "shortcode": "man",
-    "emoji": "👨"
+    emoji: '👨',
+    shortcode: 'man',
   },
   {
-    "shortcode": "man_artist",
-    "emoji": "👨🎨"
+    emoji: '👨🎨',
+    shortcode: 'man_artist',
   },
   {
-    "shortcode": "man_artist_tone1",
-    "emoji": "👨🏻🎨"
+    emoji: '👨🏻🎨',
+    shortcode: 'man_artist_tone1',
   },
   {
-    "shortcode": "man_artist_tone2",
-    "emoji": "👨🏼🎨"
+    emoji: '👨🏼🎨',
+    shortcode: 'man_artist_tone2',
   },
   {
-    "shortcode": "man_artist_tone3",
-    "emoji": "👨🏽🎨"
+    emoji: '👨🏽🎨',
+    shortcode: 'man_artist_tone3',
   },
   {
-    "shortcode": "man_artist_tone4",
-    "emoji": "👨🏾🎨"
+    emoji: '👨🏾🎨',
+    shortcode: 'man_artist_tone4',
   },
   {
-    "shortcode": "man_artist_tone5",
-    "emoji": "👨🏿🎨"
+    emoji: '👨🏿🎨',
+    shortcode: 'man_artist_tone5',
   },
   {
-    "shortcode": "man_astronaut",
-    "emoji": "👨🚀"
+    emoji: '👨🚀',
+    shortcode: 'man_astronaut',
   },
   {
-    "shortcode": "man_astronaut_tone1",
-    "emoji": "👨🏻🚀"
+    emoji: '👨🏻🚀',
+    shortcode: 'man_astronaut_tone1',
   },
   {
-    "shortcode": "man_astronaut_tone2",
-    "emoji": "👨🏼🚀"
+    emoji: '👨🏼🚀',
+    shortcode: 'man_astronaut_tone2',
   },
   {
-    "shortcode": "man_astronaut_tone3",
-    "emoji": "👨🏽🚀"
+    emoji: '👨🏽🚀',
+    shortcode: 'man_astronaut_tone3',
   },
   {
-    "shortcode": "man_astronaut_tone4",
-    "emoji": "👨🏾🚀"
+    emoji: '👨🏾🚀',
+    shortcode: 'man_astronaut_tone4',
   },
   {
-    "shortcode": "man_astronaut_tone5",
-    "emoji": "👨🏿🚀"
+    emoji: '👨🏿🚀',
+    shortcode: 'man_astronaut_tone5',
   },
   {
-    "shortcode": "man_biking",
-    "emoji": "🚴♂"
+    emoji: '🚴♂',
+    shortcode: 'man_biking',
   },
   {
-    "shortcode": "man_biking_tone1",
-    "emoji": "🚴🏻♂"
+    emoji: '🚴🏻♂',
+    shortcode: 'man_biking_tone1',
   },
   {
-    "shortcode": "man_biking_tone2",
-    "emoji": "🚴🏼♂"
+    emoji: '🚴🏼♂',
+    shortcode: 'man_biking_tone2',
   },
   {
-    "shortcode": "man_biking_tone3",
-    "emoji": "🚴🏽♂"
+    emoji: '🚴🏽♂',
+    shortcode: 'man_biking_tone3',
   },
   {
-    "shortcode": "man_biking_tone4",
-    "emoji": "🚴🏾♂"
+    emoji: '🚴🏾♂',
+    shortcode: 'man_biking_tone4',
   },
   {
-    "shortcode": "man_biking_tone5",
-    "emoji": "🚴🏿♂"
+    emoji: '🚴🏿♂',
+    shortcode: 'man_biking_tone5',
   },
   {
-    "shortcode": "man_bouncing_ball",
-    "emoji": "⛹♂"
+    emoji: '⛹♂',
+    shortcode: 'man_bouncing_ball',
   },
   {
-    "shortcode": "man_bouncing_ball_tone1",
-    "emoji": "⛹🏻♂"
+    emoji: '⛹🏻♂',
+    shortcode: 'man_bouncing_ball_tone1',
   },
   {
-    "shortcode": "man_bouncing_ball_tone2",
-    "emoji": "⛹🏼♂"
+    emoji: '⛹🏼♂',
+    shortcode: 'man_bouncing_ball_tone2',
   },
   {
-    "shortcode": "man_bouncing_ball_tone3",
-    "emoji": "⛹🏽♂"
+    emoji: '⛹🏽♂',
+    shortcode: 'man_bouncing_ball_tone3',
   },
   {
-    "shortcode": "man_bouncing_ball_tone4",
-    "emoji": "⛹🏾♂"
+    emoji: '⛹🏾♂',
+    shortcode: 'man_bouncing_ball_tone4',
   },
   {
-    "shortcode": "man_bouncing_ball_tone5",
-    "emoji": "⛹🏿♂"
+    emoji: '⛹🏿♂',
+    shortcode: 'man_bouncing_ball_tone5',
   },
   {
-    "shortcode": "man_bowing",
-    "emoji": "🙇♂"
+    emoji: '🙇♂',
+    shortcode: 'man_bowing',
   },
   {
-    "shortcode": "man_bowing_tone1",
-    "emoji": "🙇🏻♂"
+    emoji: '🙇🏻♂',
+    shortcode: 'man_bowing_tone1',
   },
   {
-    "shortcode": "man_bowing_tone2",
-    "emoji": "🙇🏼♂"
+    emoji: '🙇🏼♂',
+    shortcode: 'man_bowing_tone2',
   },
   {
-    "shortcode": "man_bowing_tone3",
-    "emoji": "🙇🏽♂"
+    emoji: '🙇🏽♂',
+    shortcode: 'man_bowing_tone3',
   },
   {
-    "shortcode": "man_bowing_tone4",
-    "emoji": "🙇🏾♂"
+    emoji: '🙇🏾♂',
+    shortcode: 'man_bowing_tone4',
   },
   {
-    "shortcode": "man_bowing_tone5",
-    "emoji": "🙇🏿♂"
+    emoji: '🙇🏿♂',
+    shortcode: 'man_bowing_tone5',
   },
   {
-    "shortcode": "man_cartwheeling",
-    "emoji": "🤸♂"
+    emoji: '🤸♂',
+    shortcode: 'man_cartwheeling',
   },
   {
-    "shortcode": "man_cartwheeling_tone1",
-    "emoji": "🤸🏻♂"
+    emoji: '🤸🏻♂',
+    shortcode: 'man_cartwheeling_tone1',
   },
   {
-    "shortcode": "man_cartwheeling_tone2",
-    "emoji": "🤸🏼♂"
+    emoji: '🤸🏼♂',
+    shortcode: 'man_cartwheeling_tone2',
   },
   {
-    "shortcode": "man_cartwheeling_tone3",
-    "emoji": "🤸🏽♂"
+    emoji: '🤸🏽♂',
+    shortcode: 'man_cartwheeling_tone3',
   },
   {
-    "shortcode": "man_cartwheeling_tone4",
-    "emoji": "🤸🏾♂"
+    emoji: '🤸🏾♂',
+    shortcode: 'man_cartwheeling_tone4',
   },
   {
-    "shortcode": "man_cartwheeling_tone5",
-    "emoji": "🤸🏿♂"
+    emoji: '🤸🏿♂',
+    shortcode: 'man_cartwheeling_tone5',
   },
   {
-    "shortcode": "man_climbing",
-    "emoji": "🧗♂"
+    emoji: '🧗♂',
+    shortcode: 'man_climbing',
   },
   {
-    "shortcode": "man_climbing_tone1",
-    "emoji": "🧗🏻♂"
+    emoji: '🧗🏻♂',
+    shortcode: 'man_climbing_tone1',
   },
   {
-    "shortcode": "man_climbing_tone2",
-    "emoji": "🧗🏼♂"
+    emoji: '🧗🏼♂',
+    shortcode: 'man_climbing_tone2',
   },
   {
-    "shortcode": "man_climbing_tone3",
-    "emoji": "🧗🏽♂"
+    emoji: '🧗🏽♂',
+    shortcode: 'man_climbing_tone3',
   },
   {
-    "shortcode": "man_climbing_tone4",
-    "emoji": "🧗🏾♂"
+    emoji: '🧗🏾♂',
+    shortcode: 'man_climbing_tone4',
   },
   {
-    "shortcode": "man_climbing_tone5",
-    "emoji": "🧗🏿♂"
+    emoji: '🧗🏿♂',
+    shortcode: 'man_climbing_tone5',
   },
   {
-    "shortcode": "man_construction_worker",
-    "emoji": "👷♂"
+    emoji: '👷♂',
+    shortcode: 'man_construction_worker',
   },
   {
-    "shortcode": "man_construction_worker_tone1",
-    "emoji": "👷🏻♂"
+    emoji: '👷🏻♂',
+    shortcode: 'man_construction_worker_tone1',
   },
   {
-    "shortcode": "man_construction_worker_tone2",
-    "emoji": "👷🏼♂"
+    emoji: '👷🏼♂',
+    shortcode: 'man_construction_worker_tone2',
   },
   {
-    "shortcode": "man_construction_worker_tone3",
-    "emoji": "👷🏽♂"
+    emoji: '👷🏽♂',
+    shortcode: 'man_construction_worker_tone3',
   },
   {
-    "shortcode": "man_construction_worker_tone4",
-    "emoji": "👷🏾♂"
+    emoji: '👷🏾♂',
+    shortcode: 'man_construction_worker_tone4',
   },
   {
-    "shortcode": "man_construction_worker_tone5",
-    "emoji": "👷🏿♂"
+    emoji: '👷🏿♂',
+    shortcode: 'man_construction_worker_tone5',
   },
   {
-    "shortcode": "man_cook",
-    "emoji": "👨🍳"
+    emoji: '👨🍳',
+    shortcode: 'man_cook',
   },
   {
-    "shortcode": "man_cook_tone1",
-    "emoji": "👨🏻🍳"
+    emoji: '👨🏻🍳',
+    shortcode: 'man_cook_tone1',
   },
   {
-    "shortcode": "man_cook_tone2",
-    "emoji": "👨🏼🍳"
+    emoji: '👨🏼🍳',
+    shortcode: 'man_cook_tone2',
   },
   {
-    "shortcode": "man_cook_tone3",
-    "emoji": "👨🏽🍳"
+    emoji: '👨🏽🍳',
+    shortcode: 'man_cook_tone3',
   },
   {
-    "shortcode": "man_cook_tone4",
-    "emoji": "👨🏾🍳"
+    emoji: '👨🏾🍳',
+    shortcode: 'man_cook_tone4',
   },
   {
-    "shortcode": "man_cook_tone5",
-    "emoji": "👨🏿🍳"
+    emoji: '👨🏿🍳',
+    shortcode: 'man_cook_tone5',
   },
   {
-    "shortcode": "man_dancing",
-    "emoji": "🕺"
+    emoji: '🕺',
+    shortcode: 'man_dancing',
   },
   {
-    "shortcode": "man_dancing_tone1",
-    "emoji": "🕺🏻"
+    emoji: '🕺🏻',
+    shortcode: 'man_dancing_tone1',
   },
   {
-    "shortcode": "man_dancing_tone2",
-    "emoji": "🕺🏼"
+    emoji: '🕺🏼',
+    shortcode: 'man_dancing_tone2',
   },
   {
-    "shortcode": "man_dancing_tone3",
-    "emoji": "🕺🏽"
+    emoji: '🕺🏽',
+    shortcode: 'man_dancing_tone3',
   },
   {
-    "shortcode": "man_dancing_tone4",
-    "emoji": "🕺🏾"
+    emoji: '🕺🏾',
+    shortcode: 'man_dancing_tone4',
   },
   {
-    "shortcode": "man_dancing_tone5",
-    "emoji": "🕺🏿"
+    emoji: '🕺🏿',
+    shortcode: 'man_dancing_tone5',
   },
   {
-    "shortcode": "man_detective",
-    "emoji": "🕵♂"
+    emoji: '🕵♂',
+    shortcode: 'man_detective',
   },
   {
-    "shortcode": "man_detective_tone1",
-    "emoji": "🕵🏻♂"
+    emoji: '🕵🏻♂',
+    shortcode: 'man_detective_tone1',
   },
   {
-    "shortcode": "man_detective_tone2",
-    "emoji": "🕵🏼♂"
+    emoji: '🕵🏼♂',
+    shortcode: 'man_detective_tone2',
   },
   {
-    "shortcode": "man_detective_tone3",
-    "emoji": "🕵🏽♂"
+    emoji: '🕵🏽♂',
+    shortcode: 'man_detective_tone3',
   },
   {
-    "shortcode": "man_detective_tone4",
-    "emoji": "🕵🏾♂"
+    emoji: '🕵🏾♂',
+    shortcode: 'man_detective_tone4',
   },
   {
-    "shortcode": "man_detective_tone5",
-    "emoji": "🕵🏿♂"
+    emoji: '🕵🏿♂',
+    shortcode: 'man_detective_tone5',
   },
   {
-    "shortcode": "man_elf",
-    "emoji": "🧝♂"
+    emoji: '🧝♂',
+    shortcode: 'man_elf',
   },
   {
-    "shortcode": "man_elf_tone1",
-    "emoji": "🧝🏻♂"
+    emoji: '🧝🏻♂',
+    shortcode: 'man_elf_tone1',
   },
   {
-    "shortcode": "man_elf_tone2",
-    "emoji": "🧝🏼♂"
+    emoji: '🧝🏼♂',
+    shortcode: 'man_elf_tone2',
   },
   {
-    "shortcode": "man_elf_tone3",
-    "emoji": "🧝🏽♂"
+    emoji: '🧝🏽♂',
+    shortcode: 'man_elf_tone3',
   },
   {
-    "shortcode": "man_elf_tone4",
-    "emoji": "🧝🏾♂"
+    emoji: '🧝🏾♂',
+    shortcode: 'man_elf_tone4',
   },
   {
-    "shortcode": "man_elf_tone5",
-    "emoji": "🧝🏿♂"
+    emoji: '🧝🏿♂',
+    shortcode: 'man_elf_tone5',
   },
   {
-    "shortcode": "man_facepalming",
-    "emoji": "🤦♂"
+    emoji: '🤦♂',
+    shortcode: 'man_facepalming',
   },
   {
-    "shortcode": "man_facepalming_tone1",
-    "emoji": "🤦🏻♂"
+    emoji: '🤦🏻♂',
+    shortcode: 'man_facepalming_tone1',
   },
   {
-    "shortcode": "man_facepalming_tone2",
-    "emoji": "🤦🏼♂"
+    emoji: '🤦🏼♂',
+    shortcode: 'man_facepalming_tone2',
   },
   {
-    "shortcode": "man_facepalming_tone3",
-    "emoji": "🤦🏽♂"
+    emoji: '🤦🏽♂',
+    shortcode: 'man_facepalming_tone3',
   },
   {
-    "shortcode": "man_facepalming_tone4",
-    "emoji": "🤦🏾♂"
+    emoji: '🤦🏾♂',
+    shortcode: 'man_facepalming_tone4',
   },
   {
-    "shortcode": "man_facepalming_tone5",
-    "emoji": "🤦🏿♂"
+    emoji: '🤦🏿♂',
+    shortcode: 'man_facepalming_tone5',
   },
   {
-    "shortcode": "man_factory_worker",
-    "emoji": "👨🏭"
+    emoji: '👨🏭',
+    shortcode: 'man_factory_worker',
   },
   {
-    "shortcode": "man_factory_worker_tone1",
-    "emoji": "👨🏻🏭"
+    emoji: '👨🏻🏭',
+    shortcode: 'man_factory_worker_tone1',
   },
   {
-    "shortcode": "man_factory_worker_tone2",
-    "emoji": "👨🏼🏭"
+    emoji: '👨🏼🏭',
+    shortcode: 'man_factory_worker_tone2',
   },
   {
-    "shortcode": "man_factory_worker_tone3",
-    "emoji": "👨🏽🏭"
+    emoji: '👨🏽🏭',
+    shortcode: 'man_factory_worker_tone3',
   },
   {
-    "shortcode": "man_factory_worker_tone4",
-    "emoji": "👨🏾🏭"
+    emoji: '👨🏾🏭',
+    shortcode: 'man_factory_worker_tone4',
   },
   {
-    "shortcode": "man_factory_worker_tone5",
-    "emoji": "👨🏿🏭"
+    emoji: '👨🏿🏭',
+    shortcode: 'man_factory_worker_tone5',
   },
   {
-    "shortcode": "man_fairy",
-    "emoji": "🧚♂"
+    emoji: '🧚♂',
+    shortcode: 'man_fairy',
   },
   {
-    "shortcode": "man_fairy_tone1",
-    "emoji": "🧚🏻♂"
+    emoji: '🧚🏻♂',
+    shortcode: 'man_fairy_tone1',
   },
   {
-    "shortcode": "man_fairy_tone2",
-    "emoji": "🧚🏼♂"
+    emoji: '🧚🏼♂',
+    shortcode: 'man_fairy_tone2',
   },
   {
-    "shortcode": "man_fairy_tone3",
-    "emoji": "🧚🏽♂"
+    emoji: '🧚🏽♂',
+    shortcode: 'man_fairy_tone3',
   },
   {
-    "shortcode": "man_fairy_tone4",
-    "emoji": "🧚🏾♂"
+    emoji: '🧚🏾♂',
+    shortcode: 'man_fairy_tone4',
   },
   {
-    "shortcode": "man_fairy_tone5",
-    "emoji": "🧚🏿♂"
+    emoji: '🧚🏿♂',
+    shortcode: 'man_fairy_tone5',
   },
   {
-    "shortcode": "man_farmer",
-    "emoji": "👨🌾"
+    emoji: '👨🌾',
+    shortcode: 'man_farmer',
   },
   {
-    "shortcode": "man_farmer_tone1",
-    "emoji": "👨🏻🌾"
+    emoji: '👨🏻🌾',
+    shortcode: 'man_farmer_tone1',
   },
   {
-    "shortcode": "man_farmer_tone2",
-    "emoji": "👨🏼🌾"
+    emoji: '👨🏼🌾',
+    shortcode: 'man_farmer_tone2',
   },
   {
-    "shortcode": "man_farmer_tone3",
-    "emoji": "👨🏽🌾"
+    emoji: '👨🏽🌾',
+    shortcode: 'man_farmer_tone3',
   },
   {
-    "shortcode": "man_farmer_tone4",
-    "emoji": "👨🏾🌾"
+    emoji: '👨🏾🌾',
+    shortcode: 'man_farmer_tone4',
   },
   {
-    "shortcode": "man_farmer_tone5",
-    "emoji": "👨🏿🌾"
+    emoji: '👨🏿🌾',
+    shortcode: 'man_farmer_tone5',
   },
   {
-    "shortcode": "man_firefighter",
-    "emoji": "👨🚒"
+    emoji: '👨🚒',
+    shortcode: 'man_firefighter',
   },
   {
-    "shortcode": "man_firefighter_tone1",
-    "emoji": "👨🏻🚒"
+    emoji: '👨🏻🚒',
+    shortcode: 'man_firefighter_tone1',
   },
   {
-    "shortcode": "man_firefighter_tone2",
-    "emoji": "👨🏼🚒"
+    emoji: '👨🏼🚒',
+    shortcode: 'man_firefighter_tone2',
   },
   {
-    "shortcode": "man_firefighter_tone3",
-    "emoji": "👨🏽🚒"
+    emoji: '👨🏽🚒',
+    shortcode: 'man_firefighter_tone3',
   },
   {
-    "shortcode": "man_firefighter_tone4",
-    "emoji": "👨🏾🚒"
+    emoji: '👨🏾🚒',
+    shortcode: 'man_firefighter_tone4',
   },
   {
-    "shortcode": "man_firefighter_tone5",
-    "emoji": "👨🏿🚒"
+    emoji: '👨🏿🚒',
+    shortcode: 'man_firefighter_tone5',
   },
   {
-    "shortcode": "man_frowning",
-    "emoji": "🙍♂"
+    emoji: '🙍♂',
+    shortcode: 'man_frowning',
   },
   {
-    "shortcode": "man_frowning_tone1",
-    "emoji": "🙍🏻♂"
+    emoji: '🙍🏻♂',
+    shortcode: 'man_frowning_tone1',
   },
   {
-    "shortcode": "man_frowning_tone2",
-    "emoji": "🙍🏼♂"
+    emoji: '🙍🏼♂',
+    shortcode: 'man_frowning_tone2',
   },
   {
-    "shortcode": "man_frowning_tone3",
-    "emoji": "🙍🏽♂"
+    emoji: '🙍🏽♂',
+    shortcode: 'man_frowning_tone3',
   },
   {
-    "shortcode": "man_frowning_tone4",
-    "emoji": "🙍🏾♂"
+    emoji: '🙍🏾♂',
+    shortcode: 'man_frowning_tone4',
   },
   {
-    "shortcode": "man_frowning_tone5",
-    "emoji": "🙍🏿♂"
+    emoji: '🙍🏿♂',
+    shortcode: 'man_frowning_tone5',
   },
   {
-    "shortcode": "man_genie",
-    "emoji": "🧞♂"
+    emoji: '🧞♂',
+    shortcode: 'man_genie',
   },
   {
-    "shortcode": "man_gesturing_no",
-    "emoji": "🙅♂"
+    emoji: '🙅♂',
+    shortcode: 'man_gesturing_no',
   },
   {
-    "shortcode": "man_gesturing_no_tone1",
-    "emoji": "🙅🏻♂"
+    emoji: '🙅🏻♂',
+    shortcode: 'man_gesturing_no_tone1',
   },
   {
-    "shortcode": "man_gesturing_no_tone2",
-    "emoji": "🙅🏼♂"
+    emoji: '🙅🏼♂',
+    shortcode: 'man_gesturing_no_tone2',
   },
   {
-    "shortcode": "man_gesturing_no_tone3",
-    "emoji": "🙅🏽♂"
+    emoji: '🙅🏽♂',
+    shortcode: 'man_gesturing_no_tone3',
   },
   {
-    "shortcode": "man_gesturing_no_tone4",
-    "emoji": "🙅🏾♂"
+    emoji: '🙅🏾♂',
+    shortcode: 'man_gesturing_no_tone4',
   },
   {
-    "shortcode": "man_gesturing_no_tone5",
-    "emoji": "🙅🏿♂"
+    emoji: '🙅🏿♂',
+    shortcode: 'man_gesturing_no_tone5',
   },
   {
-    "shortcode": "man_gesturing_ok",
-    "emoji": "🙆♂"
+    emoji: '🙆♂',
+    shortcode: 'man_gesturing_ok',
   },
   {
-    "shortcode": "man_gesturing_ok_tone1",
-    "emoji": "🙆🏻♂"
+    emoji: '🙆🏻♂',
+    shortcode: 'man_gesturing_ok_tone1',
   },
   {
-    "shortcode": "man_gesturing_ok_tone2",
-    "emoji": "🙆🏼♂"
+    emoji: '🙆🏼♂',
+    shortcode: 'man_gesturing_ok_tone2',
   },
   {
-    "shortcode": "man_gesturing_ok_tone3",
-    "emoji": "🙆🏽♂"
+    emoji: '🙆🏽♂',
+    shortcode: 'man_gesturing_ok_tone3',
   },
   {
-    "shortcode": "man_gesturing_ok_tone4",
-    "emoji": "🙆🏾♂"
+    emoji: '🙆🏾♂',
+    shortcode: 'man_gesturing_ok_tone4',
   },
   {
-    "shortcode": "man_gesturing_ok_tone5",
-    "emoji": "🙆🏿♂"
+    emoji: '🙆🏿♂',
+    shortcode: 'man_gesturing_ok_tone5',
   },
   {
-    "shortcode": "man_getting_face_massage",
-    "emoji": "💆♂"
+    emoji: '💆♂',
+    shortcode: 'man_getting_face_massage',
   },
   {
-    "shortcode": "man_getting_face_massage_tone1",
-    "emoji": "💆🏻♂"
+    emoji: '💆🏻♂',
+    shortcode: 'man_getting_face_massage_tone1',
   },
   {
-    "shortcode": "man_getting_face_massage_tone2",
-    "emoji": "💆🏼♂"
+    emoji: '💆🏼♂',
+    shortcode: 'man_getting_face_massage_tone2',
   },
   {
-    "shortcode": "man_getting_face_massage_tone3",
-    "emoji": "💆🏽♂"
+    emoji: '💆🏽♂',
+    shortcode: 'man_getting_face_massage_tone3',
   },
   {
-    "shortcode": "man_getting_face_massage_tone4",
-    "emoji": "💆🏾♂"
+    emoji: '💆🏾♂',
+    shortcode: 'man_getting_face_massage_tone4',
   },
   {
-    "shortcode": "man_getting_face_massage_tone5",
-    "emoji": "💆🏿♂"
+    emoji: '💆🏿♂',
+    shortcode: 'man_getting_face_massage_tone5',
   },
   {
-    "shortcode": "man_getting_haircut",
-    "emoji": "💇♂"
+    emoji: '💇♂',
+    shortcode: 'man_getting_haircut',
   },
   {
-    "shortcode": "man_getting_haircut_tone1",
-    "emoji": "💇🏻♂"
+    emoji: '💇🏻♂',
+    shortcode: 'man_getting_haircut_tone1',
   },
   {
-    "shortcode": "man_getting_haircut_tone2",
-    "emoji": "💇🏼♂"
+    emoji: '💇🏼♂',
+    shortcode: 'man_getting_haircut_tone2',
   },
   {
-    "shortcode": "man_getting_haircut_tone3",
-    "emoji": "💇🏽♂"
+    emoji: '💇🏽♂',
+    shortcode: 'man_getting_haircut_tone3',
   },
   {
-    "shortcode": "man_getting_haircut_tone4",
-    "emoji": "💇🏾♂"
+    emoji: '💇🏾♂',
+    shortcode: 'man_getting_haircut_tone4',
   },
   {
-    "shortcode": "man_getting_haircut_tone5",
-    "emoji": "💇🏿♂"
+    emoji: '💇🏿♂',
+    shortcode: 'man_getting_haircut_tone5',
   },
   {
-    "shortcode": "man_golfing",
-    "emoji": "🏌♂"
+    emoji: '🏌♂',
+    shortcode: 'man_golfing',
   },
   {
-    "shortcode": "man_golfing_tone1",
-    "emoji": "🏌🏻♂"
+    emoji: '🏌🏻♂',
+    shortcode: 'man_golfing_tone1',
   },
   {
-    "shortcode": "man_golfing_tone2",
-    "emoji": "🏌🏼♂"
+    emoji: '🏌🏼♂',
+    shortcode: 'man_golfing_tone2',
   },
   {
-    "shortcode": "man_golfing_tone3",
-    "emoji": "🏌🏽♂"
+    emoji: '🏌🏽♂',
+    shortcode: 'man_golfing_tone3',
   },
   {
-    "shortcode": "man_golfing_tone4",
-    "emoji": "🏌🏾♂"
+    emoji: '🏌🏾♂',
+    shortcode: 'man_golfing_tone4',
   },
   {
-    "shortcode": "man_golfing_tone5",
-    "emoji": "🏌🏿♂"
+    emoji: '🏌🏿♂',
+    shortcode: 'man_golfing_tone5',
   },
   {
-    "shortcode": "man_guard",
-    "emoji": "💂♂"
+    emoji: '💂♂',
+    shortcode: 'man_guard',
   },
   {
-    "shortcode": "man_guard_tone1",
-    "emoji": "💂🏻♂"
+    emoji: '💂🏻♂',
+    shortcode: 'man_guard_tone1',
   },
   {
-    "shortcode": "man_guard_tone2",
-    "emoji": "💂🏼♂"
+    emoji: '💂🏼♂',
+    shortcode: 'man_guard_tone2',
   },
   {
-    "shortcode": "man_guard_tone3",
-    "emoji": "💂🏽♂"
+    emoji: '💂🏽♂',
+    shortcode: 'man_guard_tone3',
   },
   {
-    "shortcode": "man_guard_tone4",
-    "emoji": "💂🏾♂"
+    emoji: '💂🏾♂',
+    shortcode: 'man_guard_tone4',
   },
   {
-    "shortcode": "man_guard_tone5",
-    "emoji": "💂🏿♂"
+    emoji: '💂🏿♂',
+    shortcode: 'man_guard_tone5',
   },
   {
-    "shortcode": "man_health_worker",
-    "emoji": "👨⚕"
+    emoji: '👨⚕',
+    shortcode: 'man_health_worker',
   },
   {
-    "shortcode": "man_health_worker_tone1",
-    "emoji": "👨🏻⚕"
+    emoji: '👨🏻⚕',
+    shortcode: 'man_health_worker_tone1',
   },
   {
-    "shortcode": "man_health_worker_tone2",
-    "emoji": "👨🏼⚕"
+    emoji: '👨🏼⚕',
+    shortcode: 'man_health_worker_tone2',
   },
   {
-    "shortcode": "man_health_worker_tone3",
-    "emoji": "👨🏽⚕"
+    emoji: '👨🏽⚕',
+    shortcode: 'man_health_worker_tone3',
   },
   {
-    "shortcode": "man_health_worker_tone4",
-    "emoji": "👨🏾⚕"
+    emoji: '👨🏾⚕',
+    shortcode: 'man_health_worker_tone4',
   },
   {
-    "shortcode": "man_health_worker_tone5",
-    "emoji": "👨🏿⚕"
+    emoji: '👨🏿⚕',
+    shortcode: 'man_health_worker_tone5',
   },
   {
-    "shortcode": "man_in_business_suit_levitating_tone1",
-    "emoji": "🕴🏻"
+    emoji: '🕴🏻',
+    shortcode: 'man_in_business_suit_levitating_tone1',
   },
   {
-    "shortcode": "man_in_business_suit_levitating_tone2",
-    "emoji": "🕴🏼"
+    emoji: '🕴🏼',
+    shortcode: 'man_in_business_suit_levitating_tone2',
   },
   {
-    "shortcode": "man_in_business_suit_levitating_tone3",
-    "emoji": "🕴🏽"
+    emoji: '🕴🏽',
+    shortcode: 'man_in_business_suit_levitating_tone3',
   },
   {
-    "shortcode": "man_in_business_suit_levitating_tone4",
-    "emoji": "🕴🏾"
+    emoji: '🕴🏾',
+    shortcode: 'man_in_business_suit_levitating_tone4',
   },
   {
-    "shortcode": "man_in_business_suit_levitating_tone5",
-    "emoji": "🕴🏿"
+    emoji: '🕴🏿',
+    shortcode: 'man_in_business_suit_levitating_tone5',
   },
   {
-    "shortcode": "man_in_lotus_position",
-    "emoji": "🧘♂"
+    emoji: '🧘♂',
+    shortcode: 'man_in_lotus_position',
   },
   {
-    "shortcode": "man_in_lotus_position_tone1",
-    "emoji": "🧘🏻♂"
+    emoji: '🧘🏻♂',
+    shortcode: 'man_in_lotus_position_tone1',
   },
   {
-    "shortcode": "man_in_lotus_position_tone2",
-    "emoji": "🧘🏼♂"
+    emoji: '🧘🏼♂',
+    shortcode: 'man_in_lotus_position_tone2',
   },
   {
-    "shortcode": "man_in_lotus_position_tone3",
-    "emoji": "🧘🏽♂"
+    emoji: '🧘🏽♂',
+    shortcode: 'man_in_lotus_position_tone3',
   },
   {
-    "shortcode": "man_in_lotus_position_tone4",
-    "emoji": "🧘🏾♂"
+    emoji: '🧘🏾♂',
+    shortcode: 'man_in_lotus_position_tone4',
   },
   {
-    "shortcode": "man_in_lotus_position_tone5",
-    "emoji": "🧘🏿♂"
+    emoji: '🧘🏿♂',
+    shortcode: 'man_in_lotus_position_tone5',
   },
   {
-    "shortcode": "man_in_steamy_room",
-    "emoji": "🧖♂"
+    emoji: '🧖♂',
+    shortcode: 'man_in_steamy_room',
   },
   {
-    "shortcode": "man_in_steamy_room_tone1",
-    "emoji": "🧖🏻♂"
+    emoji: '🧖🏻♂',
+    shortcode: 'man_in_steamy_room_tone1',
   },
   {
-    "shortcode": "man_in_steamy_room_tone2",
-    "emoji": "🧖🏼♂"
+    emoji: '🧖🏼♂',
+    shortcode: 'man_in_steamy_room_tone2',
   },
   {
-    "shortcode": "man_in_steamy_room_tone3",
-    "emoji": "🧖🏽♂"
+    emoji: '🧖🏽♂',
+    shortcode: 'man_in_steamy_room_tone3',
   },
   {
-    "shortcode": "man_in_steamy_room_tone4",
-    "emoji": "🧖🏾♂"
+    emoji: '🧖🏾♂',
+    shortcode: 'man_in_steamy_room_tone4',
   },
   {
-    "shortcode": "man_in_steamy_room_tone5",
-    "emoji": "🧖🏿♂"
+    emoji: '🧖🏿♂',
+    shortcode: 'man_in_steamy_room_tone5',
   },
   {
-    "shortcode": "man_in_tuxedo",
-    "emoji": "🤵"
+    emoji: '🤵',
+    shortcode: 'man_in_tuxedo',
   },
   {
-    "shortcode": "man_in_tuxedo_tone1",
-    "emoji": "🤵🏻"
+    emoji: '🤵🏻',
+    shortcode: 'man_in_tuxedo_tone1',
   },
   {
-    "shortcode": "man_in_tuxedo_tone2",
-    "emoji": "🤵🏼"
+    emoji: '🤵🏼',
+    shortcode: 'man_in_tuxedo_tone2',
   },
   {
-    "shortcode": "man_in_tuxedo_tone3",
-    "emoji": "🤵🏽"
+    emoji: '🤵🏽',
+    shortcode: 'man_in_tuxedo_tone3',
   },
   {
-    "shortcode": "man_in_tuxedo_tone4",
-    "emoji": "🤵🏾"
+    emoji: '🤵🏾',
+    shortcode: 'man_in_tuxedo_tone4',
   },
   {
-    "shortcode": "man_in_tuxedo_tone5",
-    "emoji": "🤵🏿"
+    emoji: '🤵🏿',
+    shortcode: 'man_in_tuxedo_tone5',
   },
   {
-    "shortcode": "man_judge",
-    "emoji": "👨⚖"
+    emoji: '👨⚖',
+    shortcode: 'man_judge',
   },
   {
-    "shortcode": "man_judge_tone1",
-    "emoji": "👨🏻⚖"
+    emoji: '👨🏻⚖',
+    shortcode: 'man_judge_tone1',
   },
   {
-    "shortcode": "man_judge_tone2",
-    "emoji": "👨🏼⚖"
+    emoji: '👨🏼⚖',
+    shortcode: 'man_judge_tone2',
   },
   {
-    "shortcode": "man_judge_tone3",
-    "emoji": "👨🏽⚖"
+    emoji: '👨🏽⚖',
+    shortcode: 'man_judge_tone3',
   },
   {
-    "shortcode": "man_judge_tone4",
-    "emoji": "👨🏾⚖"
+    emoji: '👨🏾⚖',
+    shortcode: 'man_judge_tone4',
   },
   {
-    "shortcode": "man_judge_tone5",
-    "emoji": "👨🏿⚖"
+    emoji: '👨🏿⚖',
+    shortcode: 'man_judge_tone5',
   },
   {
-    "shortcode": "man_juggling",
-    "emoji": "🤹♂"
+    emoji: '🤹♂',
+    shortcode: 'man_juggling',
   },
   {
-    "shortcode": "man_juggling_tone1",
-    "emoji": "🤹🏻♂"
+    emoji: '🤹🏻♂',
+    shortcode: 'man_juggling_tone1',
   },
   {
-    "shortcode": "man_juggling_tone2",
-    "emoji": "🤹🏼♂"
+    emoji: '🤹🏼♂',
+    shortcode: 'man_juggling_tone2',
   },
   {
-    "shortcode": "man_juggling_tone3",
-    "emoji": "🤹🏽♂"
+    emoji: '🤹🏽♂',
+    shortcode: 'man_juggling_tone3',
   },
   {
-    "shortcode": "man_juggling_tone4",
-    "emoji": "🤹🏾♂"
+    emoji: '🤹🏾♂',
+    shortcode: 'man_juggling_tone4',
   },
   {
-    "shortcode": "man_juggling_tone5",
-    "emoji": "🤹🏿♂"
+    emoji: '🤹🏿♂',
+    shortcode: 'man_juggling_tone5',
   },
   {
-    "shortcode": "man_lifting_weights",
-    "emoji": "🏋♂"
+    emoji: '🏋♂',
+    shortcode: 'man_lifting_weights',
   },
   {
-    "shortcode": "man_lifting_weights_tone1",
-    "emoji": "🏋🏻♂"
+    emoji: '🏋🏻♂',
+    shortcode: 'man_lifting_weights_tone1',
   },
   {
-    "shortcode": "man_lifting_weights_tone2",
-    "emoji": "🏋🏼♂"
+    emoji: '🏋🏼♂',
+    shortcode: 'man_lifting_weights_tone2',
   },
   {
-    "shortcode": "man_lifting_weights_tone3",
-    "emoji": "🏋🏽♂"
+    emoji: '🏋🏽♂',
+    shortcode: 'man_lifting_weights_tone3',
   },
   {
-    "shortcode": "man_lifting_weights_tone4",
-    "emoji": "🏋🏾♂"
+    emoji: '🏋🏾♂',
+    shortcode: 'man_lifting_weights_tone4',
   },
   {
-    "shortcode": "man_lifting_weights_tone5",
-    "emoji": "🏋🏿♂"
+    emoji: '🏋🏿♂',
+    shortcode: 'man_lifting_weights_tone5',
   },
   {
-    "shortcode": "man_mage",
-    "emoji": "🧙♂"
+    emoji: '🧙♂',
+    shortcode: 'man_mage',
   },
   {
-    "shortcode": "man_mage_tone1",
-    "emoji": "🧙🏻♂"
+    emoji: '🧙🏻♂',
+    shortcode: 'man_mage_tone1',
   },
   {
-    "shortcode": "man_mage_tone2",
-    "emoji": "🧙🏼♂"
+    emoji: '🧙🏼♂',
+    shortcode: 'man_mage_tone2',
   },
   {
-    "shortcode": "man_mage_tone3",
-    "emoji": "🧙🏽♂"
+    emoji: '🧙🏽♂',
+    shortcode: 'man_mage_tone3',
   },
   {
-    "shortcode": "man_mage_tone4",
-    "emoji": "🧙🏾♂"
+    emoji: '🧙🏾♂',
+    shortcode: 'man_mage_tone4',
   },
   {
-    "shortcode": "man_mage_tone5",
-    "emoji": "🧙🏿♂"
+    emoji: '🧙🏿♂',
+    shortcode: 'man_mage_tone5',
   },
   {
-    "shortcode": "man_mechanic",
-    "emoji": "👨🔧"
+    emoji: '👨🔧',
+    shortcode: 'man_mechanic',
   },
   {
-    "shortcode": "man_mechanic_tone1",
-    "emoji": "👨🏻🔧"
+    emoji: '👨🏻🔧',
+    shortcode: 'man_mechanic_tone1',
   },
   {
-    "shortcode": "man_mechanic_tone2",
-    "emoji": "👨🏼🔧"
+    emoji: '👨🏼🔧',
+    shortcode: 'man_mechanic_tone2',
   },
   {
-    "shortcode": "man_mechanic_tone3",
-    "emoji": "👨🏽🔧"
+    emoji: '👨🏽🔧',
+    shortcode: 'man_mechanic_tone3',
   },
   {
-    "shortcode": "man_mechanic_tone4",
-    "emoji": "👨🏾🔧"
+    emoji: '👨🏾🔧',
+    shortcode: 'man_mechanic_tone4',
   },
   {
-    "shortcode": "man_mechanic_tone5",
-    "emoji": "👨🏿🔧"
+    emoji: '👨🏿🔧',
+    shortcode: 'man_mechanic_tone5',
   },
   {
-    "shortcode": "man_mountain_biking",
-    "emoji": "🚵♂"
+    emoji: '🚵♂',
+    shortcode: 'man_mountain_biking',
   },
   {
-    "shortcode": "man_mountain_biking_tone1",
-    "emoji": "🚵🏻♂"
+    emoji: '🚵🏻♂',
+    shortcode: 'man_mountain_biking_tone1',
   },
   {
-    "shortcode": "man_mountain_biking_tone2",
-    "emoji": "🚵🏼♂"
+    emoji: '🚵🏼♂',
+    shortcode: 'man_mountain_biking_tone2',
   },
   {
-    "shortcode": "man_mountain_biking_tone3",
-    "emoji": "🚵🏽♂"
+    emoji: '🚵🏽♂',
+    shortcode: 'man_mountain_biking_tone3',
   },
   {
-    "shortcode": "man_mountain_biking_tone4",
-    "emoji": "🚵🏾♂"
+    emoji: '🚵🏾♂',
+    shortcode: 'man_mountain_biking_tone4',
   },
   {
-    "shortcode": "man_mountain_biking_tone5",
-    "emoji": "🚵🏿♂"
+    emoji: '🚵🏿♂',
+    shortcode: 'man_mountain_biking_tone5',
   },
   {
-    "shortcode": "man_office_worker",
-    "emoji": "👨💼"
+    emoji: '👨💼',
+    shortcode: 'man_office_worker',
   },
   {
-    "shortcode": "man_office_worker_tone1",
-    "emoji": "👨🏻💼"
+    emoji: '👨🏻💼',
+    shortcode: 'man_office_worker_tone1',
   },
   {
-    "shortcode": "man_office_worker_tone2",
-    "emoji": "👨🏼💼"
+    emoji: '👨🏼💼',
+    shortcode: 'man_office_worker_tone2',
   },
   {
-    "shortcode": "man_office_worker_tone3",
-    "emoji": "👨🏽💼"
+    emoji: '👨🏽💼',
+    shortcode: 'man_office_worker_tone3',
   },
   {
-    "shortcode": "man_office_worker_tone4",
-    "emoji": "👨🏾💼"
+    emoji: '👨🏾💼',
+    shortcode: 'man_office_worker_tone4',
   },
   {
-    "shortcode": "man_office_worker_tone5",
-    "emoji": "👨🏿💼"
+    emoji: '👨🏿💼',
+    shortcode: 'man_office_worker_tone5',
   },
   {
-    "shortcode": "man_pilot",
-    "emoji": "👨✈"
+    emoji: '👨✈',
+    shortcode: 'man_pilot',
   },
   {
-    "shortcode": "man_pilot_tone1",
-    "emoji": "👨🏻✈"
+    emoji: '👨🏻✈',
+    shortcode: 'man_pilot_tone1',
   },
   {
-    "shortcode": "man_pilot_tone2",
-    "emoji": "👨🏼✈"
+    emoji: '👨🏼✈',
+    shortcode: 'man_pilot_tone2',
   },
   {
-    "shortcode": "man_pilot_tone3",
-    "emoji": "👨🏽✈"
+    emoji: '👨🏽✈',
+    shortcode: 'man_pilot_tone3',
   },
   {
-    "shortcode": "man_pilot_tone4",
-    "emoji": "👨🏾✈"
+    emoji: '👨🏾✈',
+    shortcode: 'man_pilot_tone4',
   },
   {
-    "shortcode": "man_pilot_tone5",
-    "emoji": "👨🏿✈"
+    emoji: '👨🏿✈',
+    shortcode: 'man_pilot_tone5',
   },
   {
-    "shortcode": "man_playing_handball",
-    "emoji": "🤾♂"
+    emoji: '🤾♂',
+    shortcode: 'man_playing_handball',
   },
   {
-    "shortcode": "man_playing_handball_tone1",
-    "emoji": "🤾🏻♂"
+    emoji: '🤾🏻♂',
+    shortcode: 'man_playing_handball_tone1',
   },
   {
-    "shortcode": "man_playing_handball_tone2",
-    "emoji": "🤾🏼♂"
+    emoji: '🤾🏼♂',
+    shortcode: 'man_playing_handball_tone2',
   },
   {
-    "shortcode": "man_playing_handball_tone3",
-    "emoji": "🤾🏽♂"
+    emoji: '🤾🏽♂',
+    shortcode: 'man_playing_handball_tone3',
   },
   {
-    "shortcode": "man_playing_handball_tone4",
-    "emoji": "🤾🏾♂"
+    emoji: '🤾🏾♂',
+    shortcode: 'man_playing_handball_tone4',
   },
   {
-    "shortcode": "man_playing_handball_tone5",
-    "emoji": "🤾🏿♂"
+    emoji: '🤾🏿♂',
+    shortcode: 'man_playing_handball_tone5',
   },
   {
-    "shortcode": "man_playing_water_polo",
-    "emoji": "🤽♂"
+    emoji: '🤽♂',
+    shortcode: 'man_playing_water_polo',
   },
   {
-    "shortcode": "man_playing_water_polo_tone1",
-    "emoji": "🤽🏻♂"
+    emoji: '🤽🏻♂',
+    shortcode: 'man_playing_water_polo_tone1',
   },
   {
-    "shortcode": "man_playing_water_polo_tone2",
-    "emoji": "🤽🏼♂"
+    emoji: '🤽🏼♂',
+    shortcode: 'man_playing_water_polo_tone2',
   },
   {
-    "shortcode": "man_playing_water_polo_tone3",
-    "emoji": "🤽🏽♂"
+    emoji: '🤽🏽♂',
+    shortcode: 'man_playing_water_polo_tone3',
   },
   {
-    "shortcode": "man_playing_water_polo_tone4",
-    "emoji": "🤽🏾♂"
+    emoji: '🤽🏾♂',
+    shortcode: 'man_playing_water_polo_tone4',
   },
   {
-    "shortcode": "man_playing_water_polo_tone5",
-    "emoji": "🤽🏿♂"
+    emoji: '🤽🏿♂',
+    shortcode: 'man_playing_water_polo_tone5',
   },
   {
-    "shortcode": "man_police_officer",
-    "emoji": "👮♂"
+    emoji: '👮♂',
+    shortcode: 'man_police_officer',
   },
   {
-    "shortcode": "man_police_officer_tone1",
-    "emoji": "👮🏻♂"
+    emoji: '👮🏻♂',
+    shortcode: 'man_police_officer_tone1',
   },
   {
-    "shortcode": "man_police_officer_tone2",
-    "emoji": "👮🏼♂"
+    emoji: '👮🏼♂',
+    shortcode: 'man_police_officer_tone2',
   },
   {
-    "shortcode": "man_police_officer_tone3",
-    "emoji": "👮🏽♂"
+    emoji: '👮🏽♂',
+    shortcode: 'man_police_officer_tone3',
   },
   {
-    "shortcode": "man_police_officer_tone4",
-    "emoji": "👮🏾♂"
+    emoji: '👮🏾♂',
+    shortcode: 'man_police_officer_tone4',
   },
   {
-    "shortcode": "man_police_officer_tone5",
-    "emoji": "👮🏿♂"
+    emoji: '👮🏿♂',
+    shortcode: 'man_police_officer_tone5',
   },
   {
-    "shortcode": "man_pouting",
-    "emoji": "🙎♂"
+    emoji: '🙎♂',
+    shortcode: 'man_pouting',
   },
   {
-    "shortcode": "man_pouting_tone1",
-    "emoji": "🙎🏻♂"
+    emoji: '🙎🏻♂',
+    shortcode: 'man_pouting_tone1',
   },
   {
-    "shortcode": "man_pouting_tone2",
-    "emoji": "🙎🏼♂"
+    emoji: '🙎🏼♂',
+    shortcode: 'man_pouting_tone2',
   },
   {
-    "shortcode": "man_pouting_tone3",
-    "emoji": "🙎🏽♂"
+    emoji: '🙎🏽♂',
+    shortcode: 'man_pouting_tone3',
   },
   {
-    "shortcode": "man_pouting_tone4",
-    "emoji": "🙎🏾♂"
+    emoji: '🙎🏾♂',
+    shortcode: 'man_pouting_tone4',
   },
   {
-    "shortcode": "man_pouting_tone5",
-    "emoji": "🙎🏿♂"
+    emoji: '🙎🏿♂',
+    shortcode: 'man_pouting_tone5',
   },
   {
-    "shortcode": "man_raising_hand",
-    "emoji": "🙋♂"
+    emoji: '🙋♂',
+    shortcode: 'man_raising_hand',
   },
   {
-    "shortcode": "man_raising_hand_tone1",
-    "emoji": "🙋🏻♂"
+    emoji: '🙋🏻♂',
+    shortcode: 'man_raising_hand_tone1',
   },
   {
-    "shortcode": "man_raising_hand_tone2",
-    "emoji": "🙋🏼♂"
+    emoji: '🙋🏼♂',
+    shortcode: 'man_raising_hand_tone2',
   },
   {
-    "shortcode": "man_raising_hand_tone3",
-    "emoji": "🙋🏽♂"
+    emoji: '🙋🏽♂',
+    shortcode: 'man_raising_hand_tone3',
   },
   {
-    "shortcode": "man_raising_hand_tone4",
-    "emoji": "🙋🏾♂"
+    emoji: '🙋🏾♂',
+    shortcode: 'man_raising_hand_tone4',
   },
   {
-    "shortcode": "man_raising_hand_tone5",
-    "emoji": "🙋🏿♂"
+    emoji: '🙋🏿♂',
+    shortcode: 'man_raising_hand_tone5',
   },
   {
-    "shortcode": "man_rowing_boat",
-    "emoji": "🚣♂"
+    emoji: '🚣♂',
+    shortcode: 'man_rowing_boat',
   },
   {
-    "shortcode": "man_rowing_boat_tone1",
-    "emoji": "🚣🏻♂"
+    emoji: '🚣🏻♂',
+    shortcode: 'man_rowing_boat_tone1',
   },
   {
-    "shortcode": "man_rowing_boat_tone2",
-    "emoji": "🚣🏼♂"
+    emoji: '🚣🏼♂',
+    shortcode: 'man_rowing_boat_tone2',
   },
   {
-    "shortcode": "man_rowing_boat_tone3",
-    "emoji": "🚣🏽♂"
+    emoji: '🚣🏽♂',
+    shortcode: 'man_rowing_boat_tone3',
   },
   {
-    "shortcode": "man_rowing_boat_tone4",
-    "emoji": "🚣🏾♂"
+    emoji: '🚣🏾♂',
+    shortcode: 'man_rowing_boat_tone4',
   },
   {
-    "shortcode": "man_rowing_boat_tone5",
-    "emoji": "🚣🏿♂"
+    emoji: '🚣🏿♂',
+    shortcode: 'man_rowing_boat_tone5',
   },
   {
-    "shortcode": "man_running",
-    "emoji": "🏃♂"
+    emoji: '🏃♂',
+    shortcode: 'man_running',
   },
   {
-    "shortcode": "man_running_tone1",
-    "emoji": "🏃🏻♂"
+    emoji: '🏃🏻♂',
+    shortcode: 'man_running_tone1',
   },
   {
-    "shortcode": "man_running_tone2",
-    "emoji": "🏃🏼♂"
+    emoji: '🏃🏼♂',
+    shortcode: 'man_running_tone2',
   },
   {
-    "shortcode": "man_running_tone3",
-    "emoji": "🏃🏽♂"
+    emoji: '🏃🏽♂',
+    shortcode: 'man_running_tone3',
   },
   {
-    "shortcode": "man_running_tone4",
-    "emoji": "🏃🏾♂"
+    emoji: '🏃🏾♂',
+    shortcode: 'man_running_tone4',
   },
   {
-    "shortcode": "man_running_tone5",
-    "emoji": "🏃🏿♂"
+    emoji: '🏃🏿♂',
+    shortcode: 'man_running_tone5',
   },
   {
-    "shortcode": "man_scientist",
-    "emoji": "👨🔬"
+    emoji: '👨🔬',
+    shortcode: 'man_scientist',
   },
   {
-    "shortcode": "man_scientist_tone1",
-    "emoji": "👨🏻🔬"
+    emoji: '👨🏻🔬',
+    shortcode: 'man_scientist_tone1',
   },
   {
-    "shortcode": "man_scientist_tone2",
-    "emoji": "👨🏼🔬"
+    emoji: '👨🏼🔬',
+    shortcode: 'man_scientist_tone2',
   },
   {
-    "shortcode": "man_scientist_tone3",
-    "emoji": "👨🏽🔬"
+    emoji: '👨🏽🔬',
+    shortcode: 'man_scientist_tone3',
   },
   {
-    "shortcode": "man_scientist_tone4",
-    "emoji": "👨🏾🔬"
+    emoji: '👨🏾🔬',
+    shortcode: 'man_scientist_tone4',
   },
   {
-    "shortcode": "man_scientist_tone5",
-    "emoji": "👨🏿🔬"
+    emoji: '👨🏿🔬',
+    shortcode: 'man_scientist_tone5',
   },
   {
-    "shortcode": "man_shrugging",
-    "emoji": "🤷♂"
+    emoji: '🤷♂',
+    shortcode: 'man_shrugging',
   },
   {
-    "shortcode": "man_shrugging_tone1",
-    "emoji": "🤷🏻♂"
+    emoji: '🤷🏻♂',
+    shortcode: 'man_shrugging_tone1',
   },
   {
-    "shortcode": "man_shrugging_tone2",
-    "emoji": "🤷🏼♂"
+    emoji: '🤷🏼♂',
+    shortcode: 'man_shrugging_tone2',
   },
   {
-    "shortcode": "man_shrugging_tone3",
-    "emoji": "🤷🏽♂"
+    emoji: '🤷🏽♂',
+    shortcode: 'man_shrugging_tone3',
   },
   {
-    "shortcode": "man_shrugging_tone4",
-    "emoji": "🤷🏾♂"
+    emoji: '🤷🏾♂',
+    shortcode: 'man_shrugging_tone4',
   },
   {
-    "shortcode": "man_shrugging_tone5",
-    "emoji": "🤷🏿♂"
+    emoji: '🤷🏿♂',
+    shortcode: 'man_shrugging_tone5',
   },
   {
-    "shortcode": "man_singer",
-    "emoji": "👨🎤"
+    emoji: '👨🎤',
+    shortcode: 'man_singer',
   },
   {
-    "shortcode": "man_singer_tone1",
-    "emoji": "👨🏻🎤"
+    emoji: '👨🏻🎤',
+    shortcode: 'man_singer_tone1',
   },
   {
-    "shortcode": "man_singer_tone2",
-    "emoji": "👨🏼🎤"
+    emoji: '👨🏼🎤',
+    shortcode: 'man_singer_tone2',
   },
   {
-    "shortcode": "man_singer_tone3",
-    "emoji": "👨🏽🎤"
+    emoji: '👨🏽🎤',
+    shortcode: 'man_singer_tone3',
   },
   {
-    "shortcode": "man_singer_tone4",
-    "emoji": "👨🏾🎤"
+    emoji: '👨🏾🎤',
+    shortcode: 'man_singer_tone4',
   },
   {
-    "shortcode": "man_singer_tone5",
-    "emoji": "👨🏿🎤"
+    emoji: '👨🏿🎤',
+    shortcode: 'man_singer_tone5',
   },
   {
-    "shortcode": "man_student",
-    "emoji": "👨🎓"
+    emoji: '👨🎓',
+    shortcode: 'man_student',
   },
   {
-    "shortcode": "man_student_tone1",
-    "emoji": "👨🏻🎓"
+    emoji: '👨🏻🎓',
+    shortcode: 'man_student_tone1',
   },
   {
-    "shortcode": "man_student_tone2",
-    "emoji": "👨🏼🎓"
+    emoji: '👨🏼🎓',
+    shortcode: 'man_student_tone2',
   },
   {
-    "shortcode": "man_student_tone3",
-    "emoji": "👨🏽🎓"
+    emoji: '👨🏽🎓',
+    shortcode: 'man_student_tone3',
   },
   {
-    "shortcode": "man_student_tone4",
-    "emoji": "👨🏾🎓"
+    emoji: '👨🏾🎓',
+    shortcode: 'man_student_tone4',
   },
   {
-    "shortcode": "man_student_tone5",
-    "emoji": "👨🏿🎓"
+    emoji: '👨🏿🎓',
+    shortcode: 'man_student_tone5',
   },
   {
-    "shortcode": "man_surfing",
-    "emoji": "🏄♂"
+    emoji: '🏄♂',
+    shortcode: 'man_surfing',
   },
   {
-    "shortcode": "man_surfing_tone1",
-    "emoji": "🏄🏻♂"
+    emoji: '🏄🏻♂',
+    shortcode: 'man_surfing_tone1',
   },
   {
-    "shortcode": "man_surfing_tone2",
-    "emoji": "🏄🏼♂"
+    emoji: '🏄🏼♂',
+    shortcode: 'man_surfing_tone2',
   },
   {
-    "shortcode": "man_surfing_tone3",
-    "emoji": "🏄🏽♂"
+    emoji: '🏄🏽♂',
+    shortcode: 'man_surfing_tone3',
   },
   {
-    "shortcode": "man_surfing_tone4",
-    "emoji": "🏄🏾♂"
+    emoji: '🏄🏾♂',
+    shortcode: 'man_surfing_tone4',
   },
   {
-    "shortcode": "man_surfing_tone5",
-    "emoji": "🏄🏿♂"
+    emoji: '🏄🏿♂',
+    shortcode: 'man_surfing_tone5',
   },
   {
-    "shortcode": "man_swimming",
-    "emoji": "🏊♂"
+    emoji: '🏊♂',
+    shortcode: 'man_swimming',
   },
   {
-    "shortcode": "man_swimming_tone1",
-    "emoji": "🏊🏻♂"
+    emoji: '🏊🏻♂',
+    shortcode: 'man_swimming_tone1',
   },
   {
-    "shortcode": "man_swimming_tone2",
-    "emoji": "🏊🏼♂"
+    emoji: '🏊🏼♂',
+    shortcode: 'man_swimming_tone2',
   },
   {
-    "shortcode": "man_swimming_tone3",
-    "emoji": "🏊🏽♂"
+    emoji: '🏊🏽♂',
+    shortcode: 'man_swimming_tone3',
   },
   {
-    "shortcode": "man_swimming_tone4",
-    "emoji": "🏊🏾♂"
+    emoji: '🏊🏾♂',
+    shortcode: 'man_swimming_tone4',
   },
   {
-    "shortcode": "man_swimming_tone5",
-    "emoji": "🏊🏿♂"
+    emoji: '🏊🏿♂',
+    shortcode: 'man_swimming_tone5',
   },
   {
-    "shortcode": "man_teacher",
-    "emoji": "👨🏫"
+    emoji: '👨🏫',
+    shortcode: 'man_teacher',
   },
   {
-    "shortcode": "man_teacher_tone1",
-    "emoji": "👨🏻🏫"
+    emoji: '👨🏻🏫',
+    shortcode: 'man_teacher_tone1',
   },
   {
-    "shortcode": "man_teacher_tone2",
-    "emoji": "👨🏼🏫"
+    emoji: '👨🏼🏫',
+    shortcode: 'man_teacher_tone2',
   },
   {
-    "shortcode": "man_teacher_tone3",
-    "emoji": "👨🏽🏫"
+    emoji: '👨🏽🏫',
+    shortcode: 'man_teacher_tone3',
   },
   {
-    "shortcode": "man_teacher_tone4",
-    "emoji": "👨🏾🏫"
+    emoji: '👨🏾🏫',
+    shortcode: 'man_teacher_tone4',
   },
   {
-    "shortcode": "man_teacher_tone5",
-    "emoji": "👨🏿🏫"
+    emoji: '👨🏿🏫',
+    shortcode: 'man_teacher_tone5',
   },
   {
-    "shortcode": "man_technologist",
-    "emoji": "👨💻"
+    emoji: '👨💻',
+    shortcode: 'man_technologist',
   },
   {
-    "shortcode": "man_technologist_tone1",
-    "emoji": "👨🏻💻"
+    emoji: '👨🏻💻',
+    shortcode: 'man_technologist_tone1',
   },
   {
-    "shortcode": "man_technologist_tone2",
-    "emoji": "👨🏼💻"
+    emoji: '👨🏼💻',
+    shortcode: 'man_technologist_tone2',
   },
   {
-    "shortcode": "man_technologist_tone3",
-    "emoji": "👨🏽💻"
+    emoji: '👨🏽💻',
+    shortcode: 'man_technologist_tone3',
   },
   {
-    "shortcode": "man_technologist_tone4",
-    "emoji": "👨🏾💻"
+    emoji: '👨🏾💻',
+    shortcode: 'man_technologist_tone4',
   },
   {
-    "shortcode": "man_technologist_tone5",
-    "emoji": "👨🏿💻"
+    emoji: '👨🏿💻',
+    shortcode: 'man_technologist_tone5',
   },
   {
-    "shortcode": "man_tipping_hand",
-    "emoji": "💁♂"
+    emoji: '💁♂',
+    shortcode: 'man_tipping_hand',
   },
   {
-    "shortcode": "man_tipping_hand_tone1",
-    "emoji": "💁🏻♂"
+    emoji: '💁🏻♂',
+    shortcode: 'man_tipping_hand_tone1',
   },
   {
-    "shortcode": "man_tipping_hand_tone2",
-    "emoji": "💁🏼♂"
+    emoji: '💁🏼♂',
+    shortcode: 'man_tipping_hand_tone2',
   },
   {
-    "shortcode": "man_tipping_hand_tone3",
-    "emoji": "💁🏽♂"
+    emoji: '💁🏽♂',
+    shortcode: 'man_tipping_hand_tone3',
   },
   {
-    "shortcode": "man_tipping_hand_tone4",
-    "emoji": "💁🏾♂"
+    emoji: '💁🏾♂',
+    shortcode: 'man_tipping_hand_tone4',
   },
   {
-    "shortcode": "man_tipping_hand_tone5",
-    "emoji": "💁🏿♂"
+    emoji: '💁🏿♂',
+    shortcode: 'man_tipping_hand_tone5',
   },
   {
-    "shortcode": "man_tone1",
-    "emoji": "👨🏻"
+    emoji: '👨🏻',
+    shortcode: 'man_tone1',
   },
   {
-    "shortcode": "man_tone2",
-    "emoji": "👨🏼"
+    emoji: '👨🏼',
+    shortcode: 'man_tone2',
   },
   {
-    "shortcode": "man_tone3",
-    "emoji": "👨🏽"
+    emoji: '👨🏽',
+    shortcode: 'man_tone3',
   },
   {
-    "shortcode": "man_tone4",
-    "emoji": "👨🏾"
+    emoji: '👨🏾',
+    shortcode: 'man_tone4',
   },
   {
-    "shortcode": "man_tone5",
-    "emoji": "👨🏿"
+    emoji: '👨🏿',
+    shortcode: 'man_tone5',
   },
   {
-    "shortcode": "man_vampire",
-    "emoji": "🧛♂"
+    emoji: '🧛♂',
+    shortcode: 'man_vampire',
   },
   {
-    "shortcode": "man_vampire_tone1",
-    "emoji": "🧛🏻♂"
+    emoji: '🧛🏻♂',
+    shortcode: 'man_vampire_tone1',
   },
   {
-    "shortcode": "man_vampire_tone2",
-    "emoji": "🧛🏼♂"
+    emoji: '🧛🏼♂',
+    shortcode: 'man_vampire_tone2',
   },
   {
-    "shortcode": "man_vampire_tone3",
-    "emoji": "🧛🏽♂"
+    emoji: '🧛🏽♂',
+    shortcode: 'man_vampire_tone3',
   },
   {
-    "shortcode": "man_vampire_tone4",
-    "emoji": "🧛🏾♂"
+    emoji: '🧛🏾♂',
+    shortcode: 'man_vampire_tone4',
   },
   {
-    "shortcode": "man_vampire_tone5",
-    "emoji": "🧛🏿♂"
+    emoji: '🧛🏿♂',
+    shortcode: 'man_vampire_tone5',
   },
   {
-    "shortcode": "man_walking",
-    "emoji": "🚶♂"
+    emoji: '🚶♂',
+    shortcode: 'man_walking',
   },
   {
-    "shortcode": "man_walking_tone1",
-    "emoji": "🚶🏻♂"
+    emoji: '🚶🏻♂',
+    shortcode: 'man_walking_tone1',
   },
   {
-    "shortcode": "man_walking_tone2",
-    "emoji": "🚶🏼♂"
+    emoji: '🚶🏼♂',
+    shortcode: 'man_walking_tone2',
   },
   {
-    "shortcode": "man_walking_tone3",
-    "emoji": "🚶🏽♂"
+    emoji: '🚶🏽♂',
+    shortcode: 'man_walking_tone3',
   },
   {
-    "shortcode": "man_walking_tone4",
-    "emoji": "🚶🏾♂"
+    emoji: '🚶🏾♂',
+    shortcode: 'man_walking_tone4',
   },
   {
-    "shortcode": "man_walking_tone5",
-    "emoji": "🚶🏿♂"
+    emoji: '🚶🏿♂',
+    shortcode: 'man_walking_tone5',
   },
   {
-    "shortcode": "man_wearing_turban",
-    "emoji": "👳♂"
+    emoji: '👳♂',
+    shortcode: 'man_wearing_turban',
   },
   {
-    "shortcode": "man_wearing_turban_tone1",
-    "emoji": "👳🏻♂"
+    emoji: '👳🏻♂',
+    shortcode: 'man_wearing_turban_tone1',
   },
   {
-    "shortcode": "man_wearing_turban_tone2",
-    "emoji": "👳🏼♂"
+    emoji: '👳🏼♂',
+    shortcode: 'man_wearing_turban_tone2',
   },
   {
-    "shortcode": "man_wearing_turban_tone3",
-    "emoji": "👳🏽♂"
+    emoji: '👳🏽♂',
+    shortcode: 'man_wearing_turban_tone3',
   },
   {
-    "shortcode": "man_wearing_turban_tone4",
-    "emoji": "👳🏾♂"
+    emoji: '👳🏾♂',
+    shortcode: 'man_wearing_turban_tone4',
   },
   {
-    "shortcode": "man_wearing_turban_tone5",
-    "emoji": "👳🏿♂"
+    emoji: '👳🏿♂',
+    shortcode: 'man_wearing_turban_tone5',
   },
   {
-    "shortcode": "man_with_chinese_cap",
-    "emoji": "👲"
+    emoji: '👲',
+    shortcode: 'man_with_chinese_cap',
   },
   {
-    "shortcode": "man_with_chinese_cap_tone1",
-    "emoji": "👲🏻"
+    emoji: '👲🏻',
+    shortcode: 'man_with_chinese_cap_tone1',
   },
   {
-    "shortcode": "man_with_chinese_cap_tone2",
-    "emoji": "👲🏼"
+    emoji: '👲🏼',
+    shortcode: 'man_with_chinese_cap_tone2',
   },
   {
-    "shortcode": "man_with_chinese_cap_tone3",
-    "emoji": "👲🏽"
+    emoji: '👲🏽',
+    shortcode: 'man_with_chinese_cap_tone3',
   },
   {
-    "shortcode": "man_with_chinese_cap_tone4",
-    "emoji": "👲🏾"
+    emoji: '👲🏾',
+    shortcode: 'man_with_chinese_cap_tone4',
   },
   {
-    "shortcode": "man_with_chinese_cap_tone5",
-    "emoji": "👲🏿"
+    emoji: '👲🏿',
+    shortcode: 'man_with_chinese_cap_tone5',
   },
   {
-    "shortcode": "man_zombie",
-    "emoji": "🧟♂"
+    emoji: '🧟♂',
+    shortcode: 'man_zombie',
   },
   {
-    "shortcode": "mans_shoe",
-    "emoji": "👞"
+    emoji: '👞',
+    shortcode: 'mans_shoe',
   },
   {
-    "shortcode": "map",
-    "emoji": "🗺"
+    emoji: '🗺',
+    shortcode: 'map',
   },
   {
-    "shortcode": "maple_leaf",
-    "emoji": "🍁"
+    emoji: '🍁',
+    shortcode: 'maple_leaf',
   },
   {
-    "shortcode": "martial_arts_uniform",
-    "emoji": "🥋"
+    emoji: '🥋',
+    shortcode: 'martial_arts_uniform',
   },
   {
-    "shortcode": "mask",
-    "emoji": "😷"
+    emoji: '😷',
+    shortcode: 'mask',
   },
   {
-    "shortcode": "meat_on_bone",
-    "emoji": "🍖"
+    emoji: '🍖',
+    shortcode: 'meat_on_bone',
   },
   {
-    "shortcode": "medal",
-    "emoji": "🏅"
+    emoji: '🏅',
+    shortcode: 'medal',
   },
   {
-    "shortcode": "medical_symbol",
-    "emoji": "⚕"
+    emoji: '⚕',
+    shortcode: 'medical_symbol',
   },
   {
-    "shortcode": "mega",
-    "emoji": "📣"
+    emoji: '📣',
+    shortcode: 'mega',
   },
   {
-    "shortcode": "melon",
-    "emoji": "🍈"
+    emoji: '🍈',
+    shortcode: 'melon',
   },
   {
-    "shortcode": "men_with_bunny_ears_partying",
-    "emoji": "👯♂"
+    emoji: '👯♂',
+    shortcode: 'men_with_bunny_ears_partying',
   },
   {
-    "shortcode": "men_wrestling",
-    "emoji": "🤼♂"
+    emoji: '🤼♂',
+    shortcode: 'men_wrestling',
   },
   {
-    "shortcode": "menorah",
-    "emoji": "🕎"
+    emoji: '🕎',
+    shortcode: 'menorah',
   },
   {
-    "shortcode": "mens",
-    "emoji": "🚹"
+    emoji: '🚹',
+    shortcode: 'mens',
   },
   {
-    "shortcode": "mermaid",
-    "emoji": "🧜♀"
+    emoji: '🧜♀',
+    shortcode: 'mermaid',
   },
   {
-    "shortcode": "mermaid_tone1",
-    "emoji": "🧜🏻♀"
+    emoji: '🧜🏻♀',
+    shortcode: 'mermaid_tone1',
   },
   {
-    "shortcode": "mermaid_tone2",
-    "emoji": "🧜🏼♀"
+    emoji: '🧜🏼♀',
+    shortcode: 'mermaid_tone2',
   },
   {
-    "shortcode": "mermaid_tone3",
-    "emoji": "🧜🏽♀"
+    emoji: '🧜🏽♀',
+    shortcode: 'mermaid_tone3',
   },
   {
-    "shortcode": "mermaid_tone4",
-    "emoji": "🧜🏾♀"
+    emoji: '🧜🏾♀',
+    shortcode: 'mermaid_tone4',
   },
   {
-    "shortcode": "mermaid_tone5",
-    "emoji": "🧜🏿♀"
+    emoji: '🧜🏿♀',
+    shortcode: 'mermaid_tone5',
   },
   {
-    "shortcode": "merman",
-    "emoji": "🧜♂"
+    emoji: '🧜♂',
+    shortcode: 'merman',
   },
   {
-    "shortcode": "merman_tone1",
-    "emoji": "🧜🏻♂"
+    emoji: '🧜🏻♂',
+    shortcode: 'merman_tone1',
   },
   {
-    "shortcode": "merman_tone2",
-    "emoji": "🧜🏼♂"
+    emoji: '🧜🏼♂',
+    shortcode: 'merman_tone2',
   },
   {
-    "shortcode": "merman_tone3",
-    "emoji": "🧜🏽♂"
+    emoji: '🧜🏽♂',
+    shortcode: 'merman_tone3',
   },
   {
-    "shortcode": "merman_tone4",
-    "emoji": "🧜🏾♂"
+    emoji: '🧜🏾♂',
+    shortcode: 'merman_tone4',
   },
   {
-    "shortcode": "merman_tone5",
-    "emoji": "🧜🏿♂"
+    emoji: '🧜🏿♂',
+    shortcode: 'merman_tone5',
   },
   {
-    "shortcode": "merperson",
-    "emoji": "🧜"
+    emoji: '🧜',
+    shortcode: 'merperson',
   },
   {
-    "shortcode": "merperson_tone1",
-    "emoji": "🧜🏻"
+    emoji: '🧜🏻',
+    shortcode: 'merperson_tone1',
   },
   {
-    "shortcode": "merperson_tone2",
-    "emoji": "🧜🏼"
+    emoji: '🧜🏼',
+    shortcode: 'merperson_tone2',
   },
   {
-    "shortcode": "merperson_tone3",
-    "emoji": "🧜🏽"
+    emoji: '🧜🏽',
+    shortcode: 'merperson_tone3',
   },
   {
-    "shortcode": "merperson_tone4",
-    "emoji": "🧜🏾"
+    emoji: '🧜🏾',
+    shortcode: 'merperson_tone4',
   },
   {
-    "shortcode": "merperson_tone5",
-    "emoji": "🧜🏿"
+    emoji: '🧜🏿',
+    shortcode: 'merperson_tone5',
   },
   {
-    "shortcode": "metal",
-    "emoji": "🤘"
+    emoji: '🤘',
+    shortcode: 'metal',
   },
   {
-    "shortcode": "metal_tone1",
-    "emoji": "🤘🏻"
+    emoji: '🤘🏻',
+    shortcode: 'metal_tone1',
   },
   {
-    "shortcode": "metal_tone2",
-    "emoji": "🤘🏼"
+    emoji: '🤘🏼',
+    shortcode: 'metal_tone2',
   },
   {
-    "shortcode": "metal_tone3",
-    "emoji": "🤘🏽"
+    emoji: '🤘🏽',
+    shortcode: 'metal_tone3',
   },
   {
-    "shortcode": "metal_tone4",
-    "emoji": "🤘🏾"
+    emoji: '🤘🏾',
+    shortcode: 'metal_tone4',
   },
   {
-    "shortcode": "metal_tone5",
-    "emoji": "🤘🏿"
+    emoji: '🤘🏿',
+    shortcode: 'metal_tone5',
   },
   {
-    "shortcode": "metro",
-    "emoji": "🚇"
+    emoji: '🚇',
+    shortcode: 'metro',
   },
   {
-    "shortcode": "microphone",
-    "emoji": "🎤"
+    emoji: '🎤',
+    shortcode: 'microphone',
   },
   {
-    "shortcode": "microphone2",
-    "emoji": "🎙"
+    emoji: '🎙',
+    shortcode: 'microphone2',
   },
   {
-    "shortcode": "microscope",
-    "emoji": "🔬"
+    emoji: '🔬',
+    shortcode: 'microscope',
   },
   {
-    "shortcode": "middle_finger",
-    "emoji": "🖕"
+    emoji: '🖕',
+    shortcode: 'middle_finger',
   },
   {
-    "shortcode": "middle_finger_tone1",
-    "emoji": "🖕🏻"
+    emoji: '🖕🏻',
+    shortcode: 'middle_finger_tone1',
   },
   {
-    "shortcode": "middle_finger_tone2",
-    "emoji": "🖕🏼"
+    emoji: '🖕🏼',
+    shortcode: 'middle_finger_tone2',
   },
   {
-    "shortcode": "middle_finger_tone3",
-    "emoji": "🖕🏽"
+    emoji: '🖕🏽',
+    shortcode: 'middle_finger_tone3',
   },
   {
-    "shortcode": "middle_finger_tone4",
-    "emoji": "🖕🏾"
+    emoji: '🖕🏾',
+    shortcode: 'middle_finger_tone4',
   },
   {
-    "shortcode": "middle_finger_tone5",
-    "emoji": "🖕🏿"
+    emoji: '🖕🏿',
+    shortcode: 'middle_finger_tone5',
   },
   {
-    "shortcode": "military_medal",
-    "emoji": "🎖"
+    emoji: '🎖',
+    shortcode: 'military_medal',
   },
   {
-    "shortcode": "milk",
-    "emoji": "🥛"
+    emoji: '🥛',
+    shortcode: 'milk',
   },
   {
-    "shortcode": "milky_way",
-    "emoji": "🌌"
+    emoji: '🌌',
+    shortcode: 'milky_way',
   },
   {
-    "shortcode": "minibus",
-    "emoji": "🚐"
+    emoji: '🚐',
+    shortcode: 'minibus',
   },
   {
-    "shortcode": "minidisc",
-    "emoji": "💽"
+    emoji: '💽',
+    shortcode: 'minidisc',
   },
   {
-    "shortcode": "mobile_phone_off",
-    "emoji": "📴"
+    emoji: '📴',
+    shortcode: 'mobile_phone_off',
   },
   {
-    "shortcode": "money_mouth",
-    "emoji": "🤑"
+    emoji: '🤑',
+    shortcode: 'money_mouth',
   },
   {
-    "shortcode": "money_with_wings",
-    "emoji": "💸"
+    emoji: '💸',
+    shortcode: 'money_with_wings',
   },
   {
-    "shortcode": "moneybag",
-    "emoji": "💰"
+    emoji: '💰',
+    shortcode: 'moneybag',
   },
   {
-    "shortcode": "monkey",
-    "emoji": "🐒"
+    emoji: '🐒',
+    shortcode: 'monkey',
   },
   {
-    "shortcode": "monkey_face",
-    "emoji": "🐵"
+    emoji: '🐵',
+    shortcode: 'monkey_face',
   },
   {
-    "shortcode": "monorail",
-    "emoji": "🚝"
+    emoji: '🚝',
+    shortcode: 'monorail',
   },
   {
-    "shortcode": "mortar_board",
-    "emoji": "🎓"
+    emoji: '🎓',
+    shortcode: 'mortar_board',
   },
   {
-    "shortcode": "mosque",
-    "emoji": "🕌"
+    emoji: '🕌',
+    shortcode: 'mosque',
   },
   {
-    "shortcode": "motor_scooter",
-    "emoji": "🛵"
+    emoji: '🛵',
+    shortcode: 'motor_scooter',
   },
   {
-    "shortcode": "motorboat",
-    "emoji": "🛥"
+    emoji: '🛥',
+    shortcode: 'motorboat',
   },
   {
-    "shortcode": "motorcycle",
-    "emoji": "🏍"
+    emoji: '🏍',
+    shortcode: 'motorcycle',
   },
   {
-    "shortcode": "motorway",
-    "emoji": "🛣"
+    emoji: '🛣',
+    shortcode: 'motorway',
   },
   {
-    "shortcode": "mount_fuji",
-    "emoji": "🗻"
+    emoji: '🗻',
+    shortcode: 'mount_fuji',
   },
   {
-    "shortcode": "mountain",
-    "emoji": "⛰"
+    emoji: '⛰',
+    shortcode: 'mountain',
   },
   {
-    "shortcode": "mountain_cableway",
-    "emoji": "🚠"
+    emoji: '🚠',
+    shortcode: 'mountain_cableway',
   },
   {
-    "shortcode": "mountain_railway",
-    "emoji": "🚞"
+    emoji: '🚞',
+    shortcode: 'mountain_railway',
   },
   {
-    "shortcode": "mountain_snow",
-    "emoji": "🏔"
+    emoji: '🏔',
+    shortcode: 'mountain_snow',
   },
   {
-    "shortcode": "mouse",
-    "emoji": "🐭"
+    emoji: '🐭',
+    shortcode: 'mouse',
   },
   {
-    "shortcode": "mouse_three_button",
-    "emoji": "🖱"
+    emoji: '🖱',
+    shortcode: 'mouse_three_button',
   },
   {
-    "shortcode": "mouse2",
-    "emoji": "🐁"
+    emoji: '🐁',
+    shortcode: 'mouse2',
   },
   {
-    "shortcode": "movie_camera",
-    "emoji": "🎥"
+    emoji: '🎥',
+    shortcode: 'movie_camera',
   },
   {
-    "shortcode": "moyai",
-    "emoji": "🗿"
+    emoji: '🗿',
+    shortcode: 'moyai',
   },
   {
-    "shortcode": "mrs_claus",
-    "emoji": "🤶"
+    emoji: '🤶',
+    shortcode: 'mrs_claus',
   },
   {
-    "shortcode": "mrs_claus_tone1",
-    "emoji": "🤶🏻"
+    emoji: '🤶🏻',
+    shortcode: 'mrs_claus_tone1',
   },
   {
-    "shortcode": "mrs_claus_tone2",
-    "emoji": "🤶🏼"
+    emoji: '🤶🏼',
+    shortcode: 'mrs_claus_tone2',
   },
   {
-    "shortcode": "mrs_claus_tone3",
-    "emoji": "🤶🏽"
+    emoji: '🤶🏽',
+    shortcode: 'mrs_claus_tone3',
   },
   {
-    "shortcode": "mrs_claus_tone4",
-    "emoji": "🤶🏾"
+    emoji: '🤶🏾',
+    shortcode: 'mrs_claus_tone4',
   },
   {
-    "shortcode": "mrs_claus_tone5",
-    "emoji": "🤶🏿"
+    emoji: '🤶🏿',
+    shortcode: 'mrs_claus_tone5',
   },
   {
-    "shortcode": "muscle",
-    "emoji": "💪"
+    emoji: '💪',
+    shortcode: 'muscle',
   },
   {
-    "shortcode": "muscle_tone1",
-    "emoji": "💪🏻"
+    emoji: '💪🏻',
+    shortcode: 'muscle_tone1',
   },
   {
-    "shortcode": "muscle_tone2",
-    "emoji": "💪🏼"
+    emoji: '💪🏼',
+    shortcode: 'muscle_tone2',
   },
   {
-    "shortcode": "muscle_tone3",
-    "emoji": "💪🏽"
+    emoji: '💪🏽',
+    shortcode: 'muscle_tone3',
   },
   {
-    "shortcode": "muscle_tone4",
-    "emoji": "💪🏾"
+    emoji: '💪🏾',
+    shortcode: 'muscle_tone4',
   },
   {
-    "shortcode": "muscle_tone5",
-    "emoji": "💪🏿"
+    emoji: '💪🏿',
+    shortcode: 'muscle_tone5',
   },
   {
-    "shortcode": "mushroom",
-    "emoji": "🍄"
+    emoji: '🍄',
+    shortcode: 'mushroom',
   },
   {
-    "shortcode": "musical_keyboard",
-    "emoji": "🎹"
+    emoji: '🎹',
+    shortcode: 'musical_keyboard',
   },
   {
-    "shortcode": "musical_note",
-    "emoji": "🎵"
+    emoji: '🎵',
+    shortcode: 'musical_note',
   },
   {
-    "shortcode": "musical_score",
-    "emoji": "🎼"
+    emoji: '🎼',
+    shortcode: 'musical_score',
   },
   {
-    "shortcode": "mute",
-    "emoji": "🔇"
+    emoji: '🔇',
+    shortcode: 'mute',
   },
   {
-    "shortcode": "nail_care",
-    "emoji": "💅"
+    emoji: '💅',
+    shortcode: 'nail_care',
   },
   {
-    "shortcode": "nail_care_tone1",
-    "emoji": "💅🏻"
+    emoji: '💅🏻',
+    shortcode: 'nail_care_tone1',
   },
   {
-    "shortcode": "nail_care_tone2",
-    "emoji": "💅🏼"
+    emoji: '💅🏼',
+    shortcode: 'nail_care_tone2',
   },
   {
-    "shortcode": "nail_care_tone3",
-    "emoji": "💅🏽"
+    emoji: '💅🏽',
+    shortcode: 'nail_care_tone3',
   },
   {
-    "shortcode": "nail_care_tone4",
-    "emoji": "💅🏾"
+    emoji: '💅🏾',
+    shortcode: 'nail_care_tone4',
   },
   {
-    "shortcode": "nail_care_tone5",
-    "emoji": "💅🏿"
+    emoji: '💅🏿',
+    shortcode: 'nail_care_tone5',
   },
   {
-    "shortcode": "name_badge",
-    "emoji": "📛"
+    emoji: '📛',
+    shortcode: 'name_badge',
   },
   {
-    "shortcode": "nauseated_face",
-    "emoji": "🤢"
+    emoji: '🤢',
+    shortcode: 'nauseated_face',
   },
   {
-    "shortcode": "necktie",
-    "emoji": "👔"
+    emoji: '👔',
+    shortcode: 'necktie',
   },
   {
-    "shortcode": "negative_squared_cross_mark",
-    "emoji": "❎"
+    emoji: '❎',
+    shortcode: 'negative_squared_cross_mark',
   },
   {
-    "shortcode": "nerd",
-    "emoji": "🤓"
+    emoji: '🤓',
+    shortcode: 'nerd',
   },
   {
-    "shortcode": "neutral_face",
-    "emoji": "😐"
+    emoji: '😐',
+    shortcode: 'neutral_face',
   },
   {
-    "shortcode": "new",
-    "emoji": "🆕"
+    emoji: '🆕',
+    shortcode: 'new',
   },
   {
-    "shortcode": "new_moon",
-    "emoji": "🌑"
+    emoji: '🌑',
+    shortcode: 'new_moon',
   },
   {
-    "shortcode": "new_moon_with_face",
-    "emoji": "🌚"
+    emoji: '🌚',
+    shortcode: 'new_moon_with_face',
   },
   {
-    "shortcode": "newspaper",
-    "emoji": "📰"
+    emoji: '📰',
+    shortcode: 'newspaper',
   },
   {
-    "shortcode": "newspaper2",
-    "emoji": "🗞"
+    emoji: '🗞',
+    shortcode: 'newspaper2',
   },
   {
-    "shortcode": "ng",
-    "emoji": "🆖"
+    emoji: '🆖',
+    shortcode: 'ng',
   },
   {
-    "shortcode": "night_with_stars",
-    "emoji": "🌃"
+    emoji: '🌃',
+    shortcode: 'night_with_stars',
   },
   {
-    "shortcode": "nine",
-    "emoji": "9⃣"
+    emoji: '9⃣',
+    shortcode: 'nine',
   },
   {
-    "shortcode": "no_bell",
-    "emoji": "🔕"
+    emoji: '🔕',
+    shortcode: 'no_bell',
   },
   {
-    "shortcode": "no_bicycles",
-    "emoji": "🚳"
+    emoji: '🚳',
+    shortcode: 'no_bicycles',
   },
   {
-    "shortcode": "no_entry",
-    "emoji": "⛔"
+    emoji: '⛔',
+    shortcode: 'no_entry',
   },
   {
-    "shortcode": "no_entry_sign",
-    "emoji": "🚫"
+    emoji: '🚫',
+    shortcode: 'no_entry_sign',
   },
   {
-    "shortcode": "no_mobile_phones",
-    "emoji": "📵"
+    emoji: '📵',
+    shortcode: 'no_mobile_phones',
   },
   {
-    "shortcode": "no_mouth",
-    "emoji": "😶"
+    emoji: '😶',
+    shortcode: 'no_mouth',
   },
   {
-    "shortcode": "no_pedestrians",
-    "emoji": "🚷"
+    emoji: '🚷',
+    shortcode: 'no_pedestrians',
   },
   {
-    "shortcode": "no_smoking",
-    "emoji": "🚭"
+    emoji: '🚭',
+    shortcode: 'no_smoking',
   },
   {
-    "shortcode": "non-potable_water",
-    "emoji": "🚱"
+    emoji: '🚱',
+    shortcode: 'non-potable_water',
   },
   {
-    "shortcode": "nose",
-    "emoji": "👃"
+    emoji: '👃',
+    shortcode: 'nose',
   },
   {
-    "shortcode": "nose_tone1",
-    "emoji": "👃🏻"
+    emoji: '👃🏻',
+    shortcode: 'nose_tone1',
   },
   {
-    "shortcode": "nose_tone2",
-    "emoji": "👃🏼"
+    emoji: '👃🏼',
+    shortcode: 'nose_tone2',
   },
   {
-    "shortcode": "nose_tone3",
-    "emoji": "👃🏽"
+    emoji: '👃🏽',
+    shortcode: 'nose_tone3',
   },
   {
-    "shortcode": "nose_tone4",
-    "emoji": "👃🏾"
+    emoji: '👃🏾',
+    shortcode: 'nose_tone4',
   },
   {
-    "shortcode": "nose_tone5",
-    "emoji": "👃🏿"
+    emoji: '👃🏿',
+    shortcode: 'nose_tone5',
   },
   {
-    "shortcode": "notebook",
-    "emoji": "📓"
+    emoji: '📓',
+    shortcode: 'notebook',
   },
   {
-    "shortcode": "notebook_with_decorative_cover",
-    "emoji": "📔"
+    emoji: '📔',
+    shortcode: 'notebook_with_decorative_cover',
   },
   {
-    "shortcode": "notepad_spiral",
-    "emoji": "🗒"
+    emoji: '🗒',
+    shortcode: 'notepad_spiral',
   },
   {
-    "shortcode": "notes",
-    "emoji": "🎶"
+    emoji: '🎶',
+    shortcode: 'notes',
   },
   {
-    "shortcode": "nut_and_bolt",
-    "emoji": "🔩"
+    emoji: '🔩',
+    shortcode: 'nut_and_bolt',
   },
   {
-    "shortcode": "o",
-    "emoji": "⭕"
+    emoji: '⭕',
+    shortcode: 'o',
   },
   {
-    "shortcode": "o2",
-    "emoji": "🅾"
+    emoji: '🅾',
+    shortcode: 'o2',
   },
   {
-    "shortcode": "ocean",
-    "emoji": "🌊"
+    emoji: '🌊',
+    shortcode: 'ocean',
   },
   {
-    "shortcode": "octagonal_sign",
-    "emoji": "🛑"
+    emoji: '🛑',
+    shortcode: 'octagonal_sign',
   },
   {
-    "shortcode": "octopus",
-    "emoji": "🐙"
+    emoji: '🐙',
+    shortcode: 'octopus',
   },
   {
-    "shortcode": "oden",
-    "emoji": "🍢"
+    emoji: '🍢',
+    shortcode: 'oden',
   },
   {
-    "shortcode": "office",
-    "emoji": "🏢"
+    emoji: '🏢',
+    shortcode: 'office',
   },
   {
-    "shortcode": "oil",
-    "emoji": "🛢"
+    emoji: '🛢',
+    shortcode: 'oil',
   },
   {
-    "shortcode": "ok",
-    "emoji": "🆗"
+    emoji: '🆗',
+    shortcode: 'ok',
   },
   {
-    "shortcode": "ok_hand",
-    "emoji": "👌"
+    emoji: '👌',
+    shortcode: 'ok_hand',
   },
   {
-    "shortcode": "ok_hand_tone1",
-    "emoji": "👌🏻"
+    emoji: '👌🏻',
+    shortcode: 'ok_hand_tone1',
   },
   {
-    "shortcode": "ok_hand_tone2",
-    "emoji": "👌🏼"
+    emoji: '👌🏼',
+    shortcode: 'ok_hand_tone2',
   },
   {
-    "shortcode": "ok_hand_tone3",
-    "emoji": "👌🏽"
+    emoji: '👌🏽',
+    shortcode: 'ok_hand_tone3',
   },
   {
-    "shortcode": "ok_hand_tone4",
-    "emoji": "👌🏾"
+    emoji: '👌🏾',
+    shortcode: 'ok_hand_tone4',
   },
   {
-    "shortcode": "ok_hand_tone5",
-    "emoji": "👌🏿"
+    emoji: '👌🏿',
+    shortcode: 'ok_hand_tone5',
   },
   {
-    "shortcode": "older_adult",
-    "emoji": "🧓"
+    emoji: '🧓',
+    shortcode: 'older_adult',
   },
   {
-    "shortcode": "older_adult_tone1",
-    "emoji": "🧓🏻"
+    emoji: '🧓🏻',
+    shortcode: 'older_adult_tone1',
   },
   {
-    "shortcode": "older_adult_tone2",
-    "emoji": "🧓🏼"
+    emoji: '🧓🏼',
+    shortcode: 'older_adult_tone2',
   },
   {
-    "shortcode": "older_adult_tone3",
-    "emoji": "🧓🏽"
+    emoji: '🧓🏽',
+    shortcode: 'older_adult_tone3',
   },
   {
-    "shortcode": "older_adult_tone4",
-    "emoji": "🧓🏾"
+    emoji: '🧓🏾',
+    shortcode: 'older_adult_tone4',
   },
   {
-    "shortcode": "older_adult_tone5",
-    "emoji": "🧓🏿"
+    emoji: '🧓🏿',
+    shortcode: 'older_adult_tone5',
   },
   {
-    "shortcode": "older_man",
-    "emoji": "👴"
+    emoji: '👴',
+    shortcode: 'older_man',
   },
   {
-    "shortcode": "older_man_tone1",
-    "emoji": "👴🏻"
+    emoji: '👴🏻',
+    shortcode: 'older_man_tone1',
   },
   {
-    "shortcode": "older_man_tone2",
-    "emoji": "👴🏼"
+    emoji: '👴🏼',
+    shortcode: 'older_man_tone2',
   },
   {
-    "shortcode": "older_man_tone3",
-    "emoji": "👴🏽"
+    emoji: '👴🏽',
+    shortcode: 'older_man_tone3',
   },
   {
-    "shortcode": "older_man_tone4",
-    "emoji": "👴🏾"
+    emoji: '👴🏾',
+    shortcode: 'older_man_tone4',
   },
   {
-    "shortcode": "older_man_tone5",
-    "emoji": "👴🏿"
+    emoji: '👴🏿',
+    shortcode: 'older_man_tone5',
   },
   {
-    "shortcode": "older_woman",
-    "emoji": "👵"
+    emoji: '👵',
+    shortcode: 'older_woman',
   },
   {
-    "shortcode": "older_woman_tone1",
-    "emoji": "👵🏻"
+    emoji: '👵🏻',
+    shortcode: 'older_woman_tone1',
   },
   {
-    "shortcode": "older_woman_tone2",
-    "emoji": "👵🏼"
+    emoji: '👵🏼',
+    shortcode: 'older_woman_tone2',
   },
   {
-    "shortcode": "older_woman_tone3",
-    "emoji": "👵🏽"
+    emoji: '👵🏽',
+    shortcode: 'older_woman_tone3',
   },
   {
-    "shortcode": "older_woman_tone4",
-    "emoji": "👵🏾"
+    emoji: '👵🏾',
+    shortcode: 'older_woman_tone4',
   },
   {
-    "shortcode": "older_woman_tone5",
-    "emoji": "👵🏿"
+    emoji: '👵🏿',
+    shortcode: 'older_woman_tone5',
   },
   {
-    "shortcode": "om_symbol",
-    "emoji": "🕉"
+    emoji: '🕉',
+    shortcode: 'om_symbol',
   },
   {
-    "shortcode": "on",
-    "emoji": "🔛"
+    emoji: '🔛',
+    shortcode: 'on',
   },
   {
-    "shortcode": "oncoming_automobile",
-    "emoji": "🚘"
+    emoji: '🚘',
+    shortcode: 'oncoming_automobile',
   },
   {
-    "shortcode": "oncoming_bus",
-    "emoji": "🚍"
+    emoji: '🚍',
+    shortcode: 'oncoming_bus',
   },
   {
-    "shortcode": "oncoming_police_car",
-    "emoji": "🚔"
+    emoji: '🚔',
+    shortcode: 'oncoming_police_car',
   },
   {
-    "shortcode": "oncoming_taxi",
-    "emoji": "🚖"
+    emoji: '🚖',
+    shortcode: 'oncoming_taxi',
   },
   {
-    "shortcode": "one",
-    "emoji": "1⃣"
+    emoji: '1⃣',
+    shortcode: 'one',
   },
   {
-    "shortcode": "open_file_folder",
-    "emoji": "📂"
+    emoji: '📂',
+    shortcode: 'open_file_folder',
   },
   {
-    "shortcode": "open_hands",
-    "emoji": "👐"
+    emoji: '👐',
+    shortcode: 'open_hands',
   },
   {
-    "shortcode": "open_hands_tone1",
-    "emoji": "👐🏻"
+    emoji: '👐🏻',
+    shortcode: 'open_hands_tone1',
   },
   {
-    "shortcode": "open_hands_tone2",
-    "emoji": "👐🏼"
+    emoji: '👐🏼',
+    shortcode: 'open_hands_tone2',
   },
   {
-    "shortcode": "open_hands_tone3",
-    "emoji": "👐🏽"
+    emoji: '👐🏽',
+    shortcode: 'open_hands_tone3',
   },
   {
-    "shortcode": "open_hands_tone4",
-    "emoji": "👐🏾"
+    emoji: '👐🏾',
+    shortcode: 'open_hands_tone4',
   },
   {
-    "shortcode": "open_hands_tone5",
-    "emoji": "👐🏿"
+    emoji: '👐🏿',
+    shortcode: 'open_hands_tone5',
   },
   {
-    "shortcode": "open_mouth",
-    "emoji": "😮"
+    emoji: '😮',
+    shortcode: 'open_mouth',
   },
   {
-    "shortcode": "ophiuchus",
-    "emoji": "⛎"
+    emoji: '⛎',
+    shortcode: 'ophiuchus',
   },
   {
-    "shortcode": "orange_book",
-    "emoji": "📙"
+    emoji: '📙',
+    shortcode: 'orange_book',
   },
   {
-    "shortcode": "orange_heart",
-    "emoji": "🧡"
+    emoji: '🧡',
+    shortcode: 'orange_heart',
   },
   {
-    "shortcode": "orthodox_cross",
-    "emoji": "☦"
+    emoji: '☦',
+    shortcode: 'orthodox_cross',
   },
   {
-    "shortcode": "outbox_tray",
-    "emoji": "📤"
+    emoji: '📤',
+    shortcode: 'outbox_tray',
   },
   {
-    "shortcode": "owl",
-    "emoji": "🦉"
+    emoji: '🦉',
+    shortcode: 'owl',
   },
   {
-    "shortcode": "ox",
-    "emoji": "🐂"
+    emoji: '🐂',
+    shortcode: 'ox',
   },
   {
-    "shortcode": "package",
-    "emoji": "📦"
+    emoji: '📦',
+    shortcode: 'package',
   },
   {
-    "shortcode": "page_facing_up",
-    "emoji": "📄"
+    emoji: '📄',
+    shortcode: 'page_facing_up',
   },
   {
-    "shortcode": "page_with_curl",
-    "emoji": "📃"
+    emoji: '📃',
+    shortcode: 'page_with_curl',
   },
   {
-    "shortcode": "pager",
-    "emoji": "📟"
+    emoji: '📟',
+    shortcode: 'pager',
   },
   {
-    "shortcode": "paintbrush",
-    "emoji": "🖌"
+    emoji: '🖌',
+    shortcode: 'paintbrush',
   },
   {
-    "shortcode": "palm_tree",
-    "emoji": "🌴"
+    emoji: '🌴',
+    shortcode: 'palm_tree',
   },
   {
-    "shortcode": "palms_up_together",
-    "emoji": "🤲"
+    emoji: '🤲',
+    shortcode: 'palms_up_together',
   },
   {
-    "shortcode": "palms_up_together_tone1",
-    "emoji": "🤲🏻"
+    emoji: '🤲🏻',
+    shortcode: 'palms_up_together_tone1',
   },
   {
-    "shortcode": "palms_up_together_tone2",
-    "emoji": "🤲🏼"
+    emoji: '🤲🏼',
+    shortcode: 'palms_up_together_tone2',
   },
   {
-    "shortcode": "palms_up_together_tone3",
-    "emoji": "🤲🏽"
+    emoji: '🤲🏽',
+    shortcode: 'palms_up_together_tone3',
   },
   {
-    "shortcode": "palms_up_together_tone4",
-    "emoji": "🤲🏾"
+    emoji: '🤲🏾',
+    shortcode: 'palms_up_together_tone4',
   },
   {
-    "shortcode": "palms_up_together_tone5",
-    "emoji": "🤲🏿"
+    emoji: '🤲🏿',
+    shortcode: 'palms_up_together_tone5',
   },
   {
-    "shortcode": "pancakes",
-    "emoji": "🥞"
+    emoji: '🥞',
+    shortcode: 'pancakes',
   },
   {
-    "shortcode": "panda_face",
-    "emoji": "🐼"
+    emoji: '🐼',
+    shortcode: 'panda_face',
   },
   {
-    "shortcode": "paperclip",
-    "emoji": "📎"
+    emoji: '📎',
+    shortcode: 'paperclip',
   },
   {
-    "shortcode": "paperclips",
-    "emoji": "🖇"
+    emoji: '🖇',
+    shortcode: 'paperclips',
   },
   {
-    "shortcode": "park",
-    "emoji": "🏞"
+    emoji: '🏞',
+    shortcode: 'park',
   },
   {
-    "shortcode": "parking",
-    "emoji": "🅿"
+    emoji: '🅿',
+    shortcode: 'parking',
   },
   {
-    "shortcode": "part_alternation_mark",
-    "emoji": "〽"
+    emoji: '〽',
+    shortcode: 'part_alternation_mark',
   },
   {
-    "shortcode": "partly_sunny",
-    "emoji": "⛅"
+    emoji: '⛅',
+    shortcode: 'partly_sunny',
   },
   {
-    "shortcode": "passport_control",
-    "emoji": "🛂"
+    emoji: '🛂',
+    shortcode: 'passport_control',
   },
   {
-    "shortcode": "pause_button",
-    "emoji": "⏸"
+    emoji: '⏸',
+    shortcode: 'pause_button',
   },
   {
-    "shortcode": "peace",
-    "emoji": "☮"
+    emoji: '☮',
+    shortcode: 'peace',
   },
   {
-    "shortcode": "peach",
-    "emoji": "🍑"
+    emoji: '🍑',
+    shortcode: 'peach',
   },
   {
-    "shortcode": "peanuts",
-    "emoji": "🥜"
+    emoji: '🥜',
+    shortcode: 'peanuts',
   },
   {
-    "shortcode": "pear",
-    "emoji": "🍐"
+    emoji: '🍐',
+    shortcode: 'pear',
   },
   {
-    "shortcode": "pen_ballpoint",
-    "emoji": "🖊"
+    emoji: '🖊',
+    shortcode: 'pen_ballpoint',
   },
   {
-    "shortcode": "pen_fountain",
-    "emoji": "🖋"
+    emoji: '🖋',
+    shortcode: 'pen_fountain',
   },
   {
-    "shortcode": "pencil",
-    "emoji": "📝"
+    emoji: '📝',
+    shortcode: 'pencil',
   },
   {
-    "shortcode": "pencil2",
-    "emoji": "✏"
+    emoji: '✏',
+    shortcode: 'pencil2',
   },
   {
-    "shortcode": "penguin",
-    "emoji": "🐧"
+    emoji: '🐧',
+    shortcode: 'penguin',
   },
   {
-    "shortcode": "pensive",
-    "emoji": "😔"
+    emoji: '😔',
+    shortcode: 'pensive',
   },
   {
-    "shortcode": "people_with_bunny_ears_partying",
-    "emoji": "👯"
+    emoji: '👯',
+    shortcode: 'people_with_bunny_ears_partying',
   },
   {
-    "shortcode": "people_wrestling",
-    "emoji": "🤼"
+    emoji: '🤼',
+    shortcode: 'people_wrestling',
   },
   {
-    "shortcode": "performing_arts",
-    "emoji": "🎭"
+    emoji: '🎭',
+    shortcode: 'performing_arts',
   },
   {
-    "shortcode": "persevere",
-    "emoji": "😣"
+    emoji: '😣',
+    shortcode: 'persevere',
   },
   {
-    "shortcode": "person_biking",
-    "emoji": "🚴"
+    emoji: '🚴',
+    shortcode: 'person_biking',
   },
   {
-    "shortcode": "person_biking_tone1",
-    "emoji": "🚴🏻"
+    emoji: '🚴🏻',
+    shortcode: 'person_biking_tone1',
   },
   {
-    "shortcode": "person_biking_tone2",
-    "emoji": "🚴🏼"
+    emoji: '🚴🏼',
+    shortcode: 'person_biking_tone2',
   },
   {
-    "shortcode": "person_biking_tone3",
-    "emoji": "🚴🏽"
+    emoji: '🚴🏽',
+    shortcode: 'person_biking_tone3',
   },
   {
-    "shortcode": "person_biking_tone4",
-    "emoji": "🚴🏾"
+    emoji: '🚴🏾',
+    shortcode: 'person_biking_tone4',
   },
   {
-    "shortcode": "person_biking_tone5",
-    "emoji": "🚴🏿"
+    emoji: '🚴🏿',
+    shortcode: 'person_biking_tone5',
   },
   {
-    "shortcode": "person_bouncing_ball",
-    "emoji": "⛹"
+    emoji: '⛹',
+    shortcode: 'person_bouncing_ball',
   },
   {
-    "shortcode": "person_bouncing_ball_tone1",
-    "emoji": "⛹🏻"
+    emoji: '⛹🏻',
+    shortcode: 'person_bouncing_ball_tone1',
   },
   {
-    "shortcode": "person_bouncing_ball_tone2",
-    "emoji": "⛹🏼"
+    emoji: '⛹🏼',
+    shortcode: 'person_bouncing_ball_tone2',
   },
   {
-    "shortcode": "person_bouncing_ball_tone3",
-    "emoji": "⛹🏽"
+    emoji: '⛹🏽',
+    shortcode: 'person_bouncing_ball_tone3',
   },
   {
-    "shortcode": "person_bouncing_ball_tone4",
-    "emoji": "⛹🏾"
+    emoji: '⛹🏾',
+    shortcode: 'person_bouncing_ball_tone4',
   },
   {
-    "shortcode": "person_bouncing_ball_tone5",
-    "emoji": "⛹🏿"
+    emoji: '⛹🏿',
+    shortcode: 'person_bouncing_ball_tone5',
   },
   {
-    "shortcode": "person_bowing",
-    "emoji": "🙇"
+    emoji: '🙇',
+    shortcode: 'person_bowing',
   },
   {
-    "shortcode": "person_bowing_tone1",
-    "emoji": "🙇🏻"
+    emoji: '🙇🏻',
+    shortcode: 'person_bowing_tone1',
   },
   {
-    "shortcode": "person_bowing_tone2",
-    "emoji": "🙇🏼"
+    emoji: '🙇🏼',
+    shortcode: 'person_bowing_tone2',
   },
   {
-    "shortcode": "person_bowing_tone3",
-    "emoji": "🙇🏽"
+    emoji: '🙇🏽',
+    shortcode: 'person_bowing_tone3',
   },
   {
-    "shortcode": "person_bowing_tone4",
-    "emoji": "🙇🏾"
+    emoji: '🙇🏾',
+    shortcode: 'person_bowing_tone4',
   },
   {
-    "shortcode": "person_bowing_tone5",
-    "emoji": "🙇🏿"
+    emoji: '🙇🏿',
+    shortcode: 'person_bowing_tone5',
   },
   {
-    "shortcode": "person_climbing",
-    "emoji": "🧗"
+    emoji: '🧗',
+    shortcode: 'person_climbing',
   },
   {
-    "shortcode": "person_climbing_tone1",
-    "emoji": "🧗🏻"
+    emoji: '🧗🏻',
+    shortcode: 'person_climbing_tone1',
   },
   {
-    "shortcode": "person_climbing_tone2",
-    "emoji": "🧗🏼"
+    emoji: '🧗🏼',
+    shortcode: 'person_climbing_tone2',
   },
   {
-    "shortcode": "person_climbing_tone3",
-    "emoji": "🧗🏽"
+    emoji: '🧗🏽',
+    shortcode: 'person_climbing_tone3',
   },
   {
-    "shortcode": "person_climbing_tone4",
-    "emoji": "🧗🏾"
+    emoji: '🧗🏾',
+    shortcode: 'person_climbing_tone4',
   },
   {
-    "shortcode": "person_climbing_tone5",
-    "emoji": "🧗🏿"
+    emoji: '🧗🏿',
+    shortcode: 'person_climbing_tone5',
   },
   {
-    "shortcode": "person_doing_cartwheel",
-    "emoji": "🤸"
+    emoji: '🤸',
+    shortcode: 'person_doing_cartwheel',
   },
   {
-    "shortcode": "person_doing_cartwheel_tone1",
-    "emoji": "🤸🏻"
+    emoji: '🤸🏻',
+    shortcode: 'person_doing_cartwheel_tone1',
   },
   {
-    "shortcode": "person_doing_cartwheel_tone2",
-    "emoji": "🤸🏼"
+    emoji: '🤸🏼',
+    shortcode: 'person_doing_cartwheel_tone2',
   },
   {
-    "shortcode": "person_doing_cartwheel_tone3",
-    "emoji": "🤸🏽"
+    emoji: '🤸🏽',
+    shortcode: 'person_doing_cartwheel_tone3',
   },
   {
-    "shortcode": "person_doing_cartwheel_tone4",
-    "emoji": "🤸🏾"
+    emoji: '🤸🏾',
+    shortcode: 'person_doing_cartwheel_tone4',
   },
   {
-    "shortcode": "person_doing_cartwheel_tone5",
-    "emoji": "🤸🏿"
+    emoji: '🤸🏿',
+    shortcode: 'person_doing_cartwheel_tone5',
   },
   {
-    "shortcode": "person_facepalming",
-    "emoji": "🤦"
+    emoji: '🤦',
+    shortcode: 'person_facepalming',
   },
   {
-    "shortcode": "person_facepalming_tone1",
-    "emoji": "🤦🏻"
+    emoji: '🤦🏻',
+    shortcode: 'person_facepalming_tone1',
   },
   {
-    "shortcode": "person_facepalming_tone2",
-    "emoji": "🤦🏼"
+    emoji: '🤦🏼',
+    shortcode: 'person_facepalming_tone2',
   },
   {
-    "shortcode": "person_facepalming_tone3",
-    "emoji": "🤦🏽"
+    emoji: '🤦🏽',
+    shortcode: 'person_facepalming_tone3',
   },
   {
-    "shortcode": "person_facepalming_tone4",
-    "emoji": "🤦🏾"
+    emoji: '🤦🏾',
+    shortcode: 'person_facepalming_tone4',
   },
   {
-    "shortcode": "person_facepalming_tone5",
-    "emoji": "🤦🏿"
+    emoji: '🤦🏿',
+    shortcode: 'person_facepalming_tone5',
   },
   {
-    "shortcode": "person_fencing",
-    "emoji": "🤺"
+    emoji: '🤺',
+    shortcode: 'person_fencing',
   },
   {
-    "shortcode": "person_frowning",
-    "emoji": "🙍"
+    emoji: '🙍',
+    shortcode: 'person_frowning',
   },
   {
-    "shortcode": "person_frowning_tone1",
-    "emoji": "🙍🏻"
+    emoji: '🙍🏻',
+    shortcode: 'person_frowning_tone1',
   },
   {
-    "shortcode": "person_frowning_tone2",
-    "emoji": "🙍🏼"
+    emoji: '🙍🏼',
+    shortcode: 'person_frowning_tone2',
   },
   {
-    "shortcode": "person_frowning_tone3",
-    "emoji": "🙍🏽"
+    emoji: '🙍🏽',
+    shortcode: 'person_frowning_tone3',
   },
   {
-    "shortcode": "person_frowning_tone4",
-    "emoji": "🙍🏾"
+    emoji: '🙍🏾',
+    shortcode: 'person_frowning_tone4',
   },
   {
-    "shortcode": "person_frowning_tone5",
-    "emoji": "🙍🏿"
+    emoji: '🙍🏿',
+    shortcode: 'person_frowning_tone5',
   },
   {
-    "shortcode": "person_gesturing_no",
-    "emoji": "🙅"
+    emoji: '🙅',
+    shortcode: 'person_gesturing_no',
   },
   {
-    "shortcode": "person_gesturing_no_tone1",
-    "emoji": "🙅🏻"
+    emoji: '🙅🏻',
+    shortcode: 'person_gesturing_no_tone1',
   },
   {
-    "shortcode": "person_gesturing_no_tone2",
-    "emoji": "🙅🏼"
+    emoji: '🙅🏼',
+    shortcode: 'person_gesturing_no_tone2',
   },
   {
-    "shortcode": "person_gesturing_no_tone3",
-    "emoji": "🙅🏽"
+    emoji: '🙅🏽',
+    shortcode: 'person_gesturing_no_tone3',
   },
   {
-    "shortcode": "person_gesturing_no_tone4",
-    "emoji": "🙅🏾"
+    emoji: '🙅🏾',
+    shortcode: 'person_gesturing_no_tone4',
   },
   {
-    "shortcode": "person_gesturing_no_tone5",
-    "emoji": "🙅🏿"
+    emoji: '🙅🏿',
+    shortcode: 'person_gesturing_no_tone5',
   },
   {
-    "shortcode": "person_gesturing_ok",
-    "emoji": "🙆"
+    emoji: '🙆',
+    shortcode: 'person_gesturing_ok',
   },
   {
-    "shortcode": "person_gesturing_ok_tone1",
-    "emoji": "🙆🏻"
+    emoji: '🙆🏻',
+    shortcode: 'person_gesturing_ok_tone1',
   },
   {
-    "shortcode": "person_gesturing_ok_tone2",
-    "emoji": "🙆🏼"
+    emoji: '🙆🏼',
+    shortcode: 'person_gesturing_ok_tone2',
   },
   {
-    "shortcode": "person_gesturing_ok_tone3",
-    "emoji": "🙆🏽"
+    emoji: '🙆🏽',
+    shortcode: 'person_gesturing_ok_tone3',
   },
   {
-    "shortcode": "person_gesturing_ok_tone4",
-    "emoji": "🙆🏾"
+    emoji: '🙆🏾',
+    shortcode: 'person_gesturing_ok_tone4',
   },
   {
-    "shortcode": "person_gesturing_ok_tone5",
-    "emoji": "🙆🏿"
+    emoji: '🙆🏿',
+    shortcode: 'person_gesturing_ok_tone5',
   },
   {
-    "shortcode": "person_getting_haircut",
-    "emoji": "💇"
+    emoji: '💇',
+    shortcode: 'person_getting_haircut',
   },
   {
-    "shortcode": "person_getting_haircut_tone1",
-    "emoji": "💇🏻"
+    emoji: '💇🏻',
+    shortcode: 'person_getting_haircut_tone1',
   },
   {
-    "shortcode": "person_getting_haircut_tone2",
-    "emoji": "💇🏼"
+    emoji: '💇🏼',
+    shortcode: 'person_getting_haircut_tone2',
   },
   {
-    "shortcode": "person_getting_haircut_tone3",
-    "emoji": "💇🏽"
+    emoji: '💇🏽',
+    shortcode: 'person_getting_haircut_tone3',
   },
   {
-    "shortcode": "person_getting_haircut_tone4",
-    "emoji": "💇🏾"
+    emoji: '💇🏾',
+    shortcode: 'person_getting_haircut_tone4',
   },
   {
-    "shortcode": "person_getting_haircut_tone5",
-    "emoji": "💇🏿"
+    emoji: '💇🏿',
+    shortcode: 'person_getting_haircut_tone5',
   },
   {
-    "shortcode": "person_getting_massage",
-    "emoji": "💆"
+    emoji: '💆',
+    shortcode: 'person_getting_massage',
   },
   {
-    "shortcode": "person_getting_massage_tone1",
-    "emoji": "💆🏻"
+    emoji: '💆🏻',
+    shortcode: 'person_getting_massage_tone1',
   },
   {
-    "shortcode": "person_getting_massage_tone2",
-    "emoji": "💆🏼"
+    emoji: '💆🏼',
+    shortcode: 'person_getting_massage_tone2',
   },
   {
-    "shortcode": "person_getting_massage_tone3",
-    "emoji": "💆🏽"
+    emoji: '💆🏽',
+    shortcode: 'person_getting_massage_tone3',
   },
   {
-    "shortcode": "person_getting_massage_tone4",
-    "emoji": "💆🏾"
+    emoji: '💆🏾',
+    shortcode: 'person_getting_massage_tone4',
   },
   {
-    "shortcode": "person_getting_massage_tone5",
-    "emoji": "💆🏿"
+    emoji: '💆🏿',
+    shortcode: 'person_getting_massage_tone5',
   },
   {
-    "shortcode": "person_golfing",
-    "emoji": "🏌"
+    emoji: '🏌',
+    shortcode: 'person_golfing',
   },
   {
-    "shortcode": "person_golfing_tone1",
-    "emoji": "🏌🏻"
+    emoji: '🏌🏻',
+    shortcode: 'person_golfing_tone1',
   },
   {
-    "shortcode": "person_golfing_tone2",
-    "emoji": "🏌🏼"
+    emoji: '🏌🏼',
+    shortcode: 'person_golfing_tone2',
   },
   {
-    "shortcode": "person_golfing_tone3",
-    "emoji": "🏌🏽"
+    emoji: '🏌🏽',
+    shortcode: 'person_golfing_tone3',
   },
   {
-    "shortcode": "person_golfing_tone4",
-    "emoji": "🏌🏾"
+    emoji: '🏌🏾',
+    shortcode: 'person_golfing_tone4',
   },
   {
-    "shortcode": "person_golfing_tone5",
-    "emoji": "🏌🏿"
+    emoji: '🏌🏿',
+    shortcode: 'person_golfing_tone5',
   },
   {
-    "shortcode": "person_in_bed_tone1",
-    "emoji": "🛌🏻"
+    emoji: '🛌🏻',
+    shortcode: 'person_in_bed_tone1',
   },
   {
-    "shortcode": "person_in_bed_tone2",
-    "emoji": "🛌🏼"
+    emoji: '🛌🏼',
+    shortcode: 'person_in_bed_tone2',
   },
   {
-    "shortcode": "person_in_bed_tone3",
-    "emoji": "🛌🏽"
+    emoji: '🛌🏽',
+    shortcode: 'person_in_bed_tone3',
   },
   {
-    "shortcode": "person_in_bed_tone4",
-    "emoji": "🛌🏾"
+    emoji: '🛌🏾',
+    shortcode: 'person_in_bed_tone4',
   },
   {
-    "shortcode": "person_in_bed_tone5",
-    "emoji": "🛌🏿"
+    emoji: '🛌🏿',
+    shortcode: 'person_in_bed_tone5',
   },
   {
-    "shortcode": "person_in_lotus_position",
-    "emoji": "🧘"
+    emoji: '🧘',
+    shortcode: 'person_in_lotus_position',
   },
   {
-    "shortcode": "person_in_lotus_position_tone1",
-    "emoji": "🧘🏻"
+    emoji: '🧘🏻',
+    shortcode: 'person_in_lotus_position_tone1',
   },
   {
-    "shortcode": "person_in_lotus_position_tone2",
-    "emoji": "🧘🏼"
+    emoji: '🧘🏼',
+    shortcode: 'person_in_lotus_position_tone2',
   },
   {
-    "shortcode": "person_in_lotus_position_tone3",
-    "emoji": "🧘🏽"
+    emoji: '🧘🏽',
+    shortcode: 'person_in_lotus_position_tone3',
   },
   {
-    "shortcode": "person_in_lotus_position_tone4",
-    "emoji": "🧘🏾"
+    emoji: '🧘🏾',
+    shortcode: 'person_in_lotus_position_tone4',
   },
   {
-    "shortcode": "person_in_lotus_position_tone5",
-    "emoji": "🧘🏿"
+    emoji: '🧘🏿',
+    shortcode: 'person_in_lotus_position_tone5',
   },
   {
-    "shortcode": "person_in_steamy_room",
-    "emoji": "🧖"
+    emoji: '🧖',
+    shortcode: 'person_in_steamy_room',
   },
   {
-    "shortcode": "person_in_steamy_room_tone1",
-    "emoji": "🧖🏻"
+    emoji: '🧖🏻',
+    shortcode: 'person_in_steamy_room_tone1',
   },
   {
-    "shortcode": "person_in_steamy_room_tone2",
-    "emoji": "🧖🏼"
+    emoji: '🧖🏼',
+    shortcode: 'person_in_steamy_room_tone2',
   },
   {
-    "shortcode": "person_in_steamy_room_tone3",
-    "emoji": "🧖🏽"
+    emoji: '🧖🏽',
+    shortcode: 'person_in_steamy_room_tone3',
   },
   {
-    "shortcode": "person_in_steamy_room_tone4",
-    "emoji": "🧖🏾"
+    emoji: '🧖🏾',
+    shortcode: 'person_in_steamy_room_tone4',
   },
   {
-    "shortcode": "person_in_steamy_room_tone5",
-    "emoji": "🧖🏿"
+    emoji: '🧖🏿',
+    shortcode: 'person_in_steamy_room_tone5',
   },
   {
-    "shortcode": "person_juggling",
-    "emoji": "🤹"
+    emoji: '🤹',
+    shortcode: 'person_juggling',
   },
   {
-    "shortcode": "person_juggling_tone1",
-    "emoji": "🤹🏻"
+    emoji: '🤹🏻',
+    shortcode: 'person_juggling_tone1',
   },
   {
-    "shortcode": "person_juggling_tone2",
-    "emoji": "🤹🏼"
+    emoji: '🤹🏼',
+    shortcode: 'person_juggling_tone2',
   },
   {
-    "shortcode": "person_juggling_tone3",
-    "emoji": "🤹🏽"
+    emoji: '🤹🏽',
+    shortcode: 'person_juggling_tone3',
   },
   {
-    "shortcode": "person_juggling_tone4",
-    "emoji": "🤹🏾"
+    emoji: '🤹🏾',
+    shortcode: 'person_juggling_tone4',
   },
   {
-    "shortcode": "person_juggling_tone5",
-    "emoji": "🤹🏿"
+    emoji: '🤹🏿',
+    shortcode: 'person_juggling_tone5',
   },
   {
-    "shortcode": "person_lifting_weights",
-    "emoji": "🏋"
+    emoji: '🏋',
+    shortcode: 'person_lifting_weights',
   },
   {
-    "shortcode": "person_lifting_weights_tone1",
-    "emoji": "🏋🏻"
+    emoji: '🏋🏻',
+    shortcode: 'person_lifting_weights_tone1',
   },
   {
-    "shortcode": "person_lifting_weights_tone2",
-    "emoji": "🏋🏼"
+    emoji: '🏋🏼',
+    shortcode: 'person_lifting_weights_tone2',
   },
   {
-    "shortcode": "person_lifting_weights_tone3",
-    "emoji": "🏋🏽"
+    emoji: '🏋🏽',
+    shortcode: 'person_lifting_weights_tone3',
   },
   {
-    "shortcode": "person_lifting_weights_tone4",
-    "emoji": "🏋🏾"
+    emoji: '🏋🏾',
+    shortcode: 'person_lifting_weights_tone4',
   },
   {
-    "shortcode": "person_lifting_weights_tone5",
-    "emoji": "🏋🏿"
+    emoji: '🏋🏿',
+    shortcode: 'person_lifting_weights_tone5',
   },
   {
-    "shortcode": "person_mountain_biking",
-    "emoji": "🚵"
+    emoji: '🚵',
+    shortcode: 'person_mountain_biking',
   },
   {
-    "shortcode": "person_mountain_biking_tone1",
-    "emoji": "🚵🏻"
+    emoji: '🚵🏻',
+    shortcode: 'person_mountain_biking_tone1',
   },
   {
-    "shortcode": "person_mountain_biking_tone2",
-    "emoji": "🚵🏼"
+    emoji: '🚵🏼',
+    shortcode: 'person_mountain_biking_tone2',
   },
   {
-    "shortcode": "person_mountain_biking_tone3",
-    "emoji": "🚵🏽"
+    emoji: '🚵🏽',
+    shortcode: 'person_mountain_biking_tone3',
   },
   {
-    "shortcode": "person_mountain_biking_tone4",
-    "emoji": "🚵🏾"
+    emoji: '🚵🏾',
+    shortcode: 'person_mountain_biking_tone4',
   },
   {
-    "shortcode": "person_mountain_biking_tone5",
-    "emoji": "🚵🏿"
+    emoji: '🚵🏿',
+    shortcode: 'person_mountain_biking_tone5',
   },
   {
-    "shortcode": "person_playing_handball",
-    "emoji": "🤾"
+    emoji: '🤾',
+    shortcode: 'person_playing_handball',
   },
   {
-    "shortcode": "person_playing_handball_tone1",
-    "emoji": "🤾🏻"
+    emoji: '🤾🏻',
+    shortcode: 'person_playing_handball_tone1',
   },
   {
-    "shortcode": "person_playing_handball_tone2",
-    "emoji": "🤾🏼"
+    emoji: '🤾🏼',
+    shortcode: 'person_playing_handball_tone2',
   },
   {
-    "shortcode": "person_playing_handball_tone3",
-    "emoji": "🤾🏽"
+    emoji: '🤾🏽',
+    shortcode: 'person_playing_handball_tone3',
   },
   {
-    "shortcode": "person_playing_handball_tone4",
-    "emoji": "🤾🏾"
+    emoji: '🤾🏾',
+    shortcode: 'person_playing_handball_tone4',
   },
   {
-    "shortcode": "person_playing_handball_tone5",
-    "emoji": "🤾🏿"
+    emoji: '🤾🏿',
+    shortcode: 'person_playing_handball_tone5',
   },
   {
-    "shortcode": "person_playing_water_polo",
-    "emoji": "🤽"
+    emoji: '🤽',
+    shortcode: 'person_playing_water_polo',
   },
   {
-    "shortcode": "person_playing_water_polo_tone1",
-    "emoji": "🤽🏻"
+    emoji: '🤽🏻',
+    shortcode: 'person_playing_water_polo_tone1',
   },
   {
-    "shortcode": "person_playing_water_polo_tone2",
-    "emoji": "🤽🏼"
+    emoji: '🤽🏼',
+    shortcode: 'person_playing_water_polo_tone2',
   },
   {
-    "shortcode": "person_playing_water_polo_tone3",
-    "emoji": "🤽🏽"
+    emoji: '🤽🏽',
+    shortcode: 'person_playing_water_polo_tone3',
   },
   {
-    "shortcode": "person_playing_water_polo_tone4",
-    "emoji": "🤽🏾"
+    emoji: '🤽🏾',
+    shortcode: 'person_playing_water_polo_tone4',
   },
   {
-    "shortcode": "person_playing_water_polo_tone5",
-    "emoji": "🤽🏿"
+    emoji: '🤽🏿',
+    shortcode: 'person_playing_water_polo_tone5',
   },
   {
-    "shortcode": "person_pouting",
-    "emoji": "🙎"
+    emoji: '🙎',
+    shortcode: 'person_pouting',
   },
   {
-    "shortcode": "person_pouting_tone1",
-    "emoji": "🙎🏻"
+    emoji: '🙎🏻',
+    shortcode: 'person_pouting_tone1',
   },
   {
-    "shortcode": "person_pouting_tone2",
-    "emoji": "🙎🏼"
+    emoji: '🙎🏼',
+    shortcode: 'person_pouting_tone2',
   },
   {
-    "shortcode": "person_pouting_tone3",
-    "emoji": "🙎🏽"
+    emoji: '🙎🏽',
+    shortcode: 'person_pouting_tone3',
   },
   {
-    "shortcode": "person_pouting_tone4",
-    "emoji": "🙎🏾"
+    emoji: '🙎🏾',
+    shortcode: 'person_pouting_tone4',
   },
   {
-    "shortcode": "person_pouting_tone5",
-    "emoji": "🙎🏿"
+    emoji: '🙎🏿',
+    shortcode: 'person_pouting_tone5',
   },
   {
-    "shortcode": "person_raising_hand",
-    "emoji": "🙋"
+    emoji: '🙋',
+    shortcode: 'person_raising_hand',
   },
   {
-    "shortcode": "person_raising_hand_tone1",
-    "emoji": "🙋🏻"
+    emoji: '🙋🏻',
+    shortcode: 'person_raising_hand_tone1',
   },
   {
-    "shortcode": "person_raising_hand_tone2",
-    "emoji": "🙋🏼"
+    emoji: '🙋🏼',
+    shortcode: 'person_raising_hand_tone2',
   },
   {
-    "shortcode": "person_raising_hand_tone3",
-    "emoji": "🙋🏽"
+    emoji: '🙋🏽',
+    shortcode: 'person_raising_hand_tone3',
   },
   {
-    "shortcode": "person_raising_hand_tone4",
-    "emoji": "🙋🏾"
+    emoji: '🙋🏾',
+    shortcode: 'person_raising_hand_tone4',
   },
   {
-    "shortcode": "person_raising_hand_tone5",
-    "emoji": "🙋🏿"
+    emoji: '🙋🏿',
+    shortcode: 'person_raising_hand_tone5',
   },
   {
-    "shortcode": "person_rowing_boat",
-    "emoji": "🚣"
+    emoji: '🚣',
+    shortcode: 'person_rowing_boat',
   },
   {
-    "shortcode": "person_rowing_boat_tone1",
-    "emoji": "🚣🏻"
+    emoji: '🚣🏻',
+    shortcode: 'person_rowing_boat_tone1',
   },
   {
-    "shortcode": "person_rowing_boat_tone2",
-    "emoji": "🚣🏼"
+    emoji: '🚣🏼',
+    shortcode: 'person_rowing_boat_tone2',
   },
   {
-    "shortcode": "person_rowing_boat_tone3",
-    "emoji": "🚣🏽"
+    emoji: '🚣🏽',
+    shortcode: 'person_rowing_boat_tone3',
   },
   {
-    "shortcode": "person_rowing_boat_tone4",
-    "emoji": "🚣🏾"
+    emoji: '🚣🏾',
+    shortcode: 'person_rowing_boat_tone4',
   },
   {
-    "shortcode": "person_rowing_boat_tone5",
-    "emoji": "🚣🏿"
+    emoji: '🚣🏿',
+    shortcode: 'person_rowing_boat_tone5',
   },
   {
-    "shortcode": "person_running",
-    "emoji": "🏃"
+    emoji: '🏃',
+    shortcode: 'person_running',
   },
   {
-    "shortcode": "person_running_tone1",
-    "emoji": "🏃🏻"
+    emoji: '🏃🏻',
+    shortcode: 'person_running_tone1',
   },
   {
-    "shortcode": "person_running_tone2",
-    "emoji": "🏃🏼"
+    emoji: '🏃🏼',
+    shortcode: 'person_running_tone2',
   },
   {
-    "shortcode": "person_running_tone3",
-    "emoji": "🏃🏽"
+    emoji: '🏃🏽',
+    shortcode: 'person_running_tone3',
   },
   {
-    "shortcode": "person_running_tone4",
-    "emoji": "🏃🏾"
+    emoji: '🏃🏾',
+    shortcode: 'person_running_tone4',
   },
   {
-    "shortcode": "person_running_tone5",
-    "emoji": "🏃🏿"
+    emoji: '🏃🏿',
+    shortcode: 'person_running_tone5',
   },
   {
-    "shortcode": "person_shrugging",
-    "emoji": "🤷"
+    emoji: '🤷',
+    shortcode: 'person_shrugging',
   },
   {
-    "shortcode": "person_shrugging_tone1",
-    "emoji": "🤷🏻"
+    emoji: '🤷🏻',
+    shortcode: 'person_shrugging_tone1',
   },
   {
-    "shortcode": "person_shrugging_tone2",
-    "emoji": "🤷🏼"
+    emoji: '🤷🏼',
+    shortcode: 'person_shrugging_tone2',
   },
   {
-    "shortcode": "person_shrugging_tone3",
-    "emoji": "🤷🏽"
+    emoji: '🤷🏽',
+    shortcode: 'person_shrugging_tone3',
   },
   {
-    "shortcode": "person_shrugging_tone4",
-    "emoji": "🤷🏾"
+    emoji: '🤷🏾',
+    shortcode: 'person_shrugging_tone4',
   },
   {
-    "shortcode": "person_shrugging_tone5",
-    "emoji": "🤷🏿"
+    emoji: '🤷🏿',
+    shortcode: 'person_shrugging_tone5',
   },
   {
-    "shortcode": "person_surfing",
-    "emoji": "🏄"
+    emoji: '🏄',
+    shortcode: 'person_surfing',
   },
   {
-    "shortcode": "person_surfing_tone1",
-    "emoji": "🏄🏻"
+    emoji: '🏄🏻',
+    shortcode: 'person_surfing_tone1',
   },
   {
-    "shortcode": "person_surfing_tone2",
-    "emoji": "🏄🏼"
+    emoji: '🏄🏼',
+    shortcode: 'person_surfing_tone2',
   },
   {
-    "shortcode": "person_surfing_tone3",
-    "emoji": "🏄🏽"
+    emoji: '🏄🏽',
+    shortcode: 'person_surfing_tone3',
   },
   {
-    "shortcode": "person_surfing_tone4",
-    "emoji": "🏄🏾"
+    emoji: '🏄🏾',
+    shortcode: 'person_surfing_tone4',
   },
   {
-    "shortcode": "person_surfing_tone5",
-    "emoji": "🏄🏿"
+    emoji: '🏄🏿',
+    shortcode: 'person_surfing_tone5',
   },
   {
-    "shortcode": "person_swimming",
-    "emoji": "🏊"
+    emoji: '🏊',
+    shortcode: 'person_swimming',
   },
   {
-    "shortcode": "person_swimming_tone1",
-    "emoji": "🏊🏻"
+    emoji: '🏊🏻',
+    shortcode: 'person_swimming_tone1',
   },
   {
-    "shortcode": "person_swimming_tone2",
-    "emoji": "🏊🏼"
+    emoji: '🏊🏼',
+    shortcode: 'person_swimming_tone2',
   },
   {
-    "shortcode": "person_swimming_tone3",
-    "emoji": "🏊🏽"
+    emoji: '🏊🏽',
+    shortcode: 'person_swimming_tone3',
   },
   {
-    "shortcode": "person_swimming_tone4",
-    "emoji": "🏊🏾"
+    emoji: '🏊🏾',
+    shortcode: 'person_swimming_tone4',
   },
   {
-    "shortcode": "person_swimming_tone5",
-    "emoji": "🏊🏿"
+    emoji: '🏊🏿',
+    shortcode: 'person_swimming_tone5',
   },
   {
-    "shortcode": "person_tipping_hand",
-    "emoji": "💁"
+    emoji: '💁',
+    shortcode: 'person_tipping_hand',
   },
   {
-    "shortcode": "person_tipping_hand_tone1",
-    "emoji": "💁🏻"
+    emoji: '💁🏻',
+    shortcode: 'person_tipping_hand_tone1',
   },
   {
-    "shortcode": "person_tipping_hand_tone2",
-    "emoji": "💁🏼"
+    emoji: '💁🏼',
+    shortcode: 'person_tipping_hand_tone2',
   },
   {
-    "shortcode": "person_tipping_hand_tone3",
-    "emoji": "💁🏽"
+    emoji: '💁🏽',
+    shortcode: 'person_tipping_hand_tone3',
   },
   {
-    "shortcode": "person_tipping_hand_tone4",
-    "emoji": "💁🏾"
+    emoji: '💁🏾',
+    shortcode: 'person_tipping_hand_tone4',
   },
   {
-    "shortcode": "person_tipping_hand_tone5",
-    "emoji": "💁🏿"
+    emoji: '💁🏿',
+    shortcode: 'person_tipping_hand_tone5',
   },
   {
-    "shortcode": "person_walking",
-    "emoji": "🚶"
+    emoji: '🚶',
+    shortcode: 'person_walking',
   },
   {
-    "shortcode": "person_walking_tone1",
-    "emoji": "🚶🏻"
+    emoji: '🚶🏻',
+    shortcode: 'person_walking_tone1',
   },
   {
-    "shortcode": "person_walking_tone2",
-    "emoji": "🚶🏼"
+    emoji: '🚶🏼',
+    shortcode: 'person_walking_tone2',
   },
   {
-    "shortcode": "person_walking_tone3",
-    "emoji": "🚶🏽"
+    emoji: '🚶🏽',
+    shortcode: 'person_walking_tone3',
   },
   {
-    "shortcode": "person_walking_tone4",
-    "emoji": "🚶🏾"
+    emoji: '🚶🏾',
+    shortcode: 'person_walking_tone4',
   },
   {
-    "shortcode": "person_walking_tone5",
-    "emoji": "🚶🏿"
+    emoji: '🚶🏿',
+    shortcode: 'person_walking_tone5',
   },
   {
-    "shortcode": "person_wearing_turban",
-    "emoji": "👳"
+    emoji: '👳',
+    shortcode: 'person_wearing_turban',
   },
   {
-    "shortcode": "person_wearing_turban_tone1",
-    "emoji": "👳🏻"
+    emoji: '👳🏻',
+    shortcode: 'person_wearing_turban_tone1',
   },
   {
-    "shortcode": "person_wearing_turban_tone2",
-    "emoji": "👳🏼"
+    emoji: '👳🏼',
+    shortcode: 'person_wearing_turban_tone2',
   },
   {
-    "shortcode": "person_wearing_turban_tone3",
-    "emoji": "👳🏽"
+    emoji: '👳🏽',
+    shortcode: 'person_wearing_turban_tone3',
   },
   {
-    "shortcode": "person_wearing_turban_tone4",
-    "emoji": "👳🏾"
+    emoji: '👳🏾',
+    shortcode: 'person_wearing_turban_tone4',
   },
   {
-    "shortcode": "person_wearing_turban_tone5",
-    "emoji": "👳🏿"
+    emoji: '👳🏿',
+    shortcode: 'person_wearing_turban_tone5',
   },
   {
-    "shortcode": "pick",
-    "emoji": "⛏"
+    emoji: '⛏',
+    shortcode: 'pick',
   },
   {
-    "shortcode": "pie",
-    "emoji": "🥧"
+    emoji: '🥧',
+    shortcode: 'pie',
   },
   {
-    "shortcode": "pig",
-    "emoji": "🐷"
+    emoji: '🐷',
+    shortcode: 'pig',
   },
   {
-    "shortcode": "pig_nose",
-    "emoji": "🐽"
+    emoji: '🐽',
+    shortcode: 'pig_nose',
   },
   {
-    "shortcode": "pig2",
-    "emoji": "🐖"
+    emoji: '🐖',
+    shortcode: 'pig2',
   },
   {
-    "shortcode": "pill",
-    "emoji": "💊"
+    emoji: '💊',
+    shortcode: 'pill',
   },
   {
-    "shortcode": "pineapple",
-    "emoji": "🍍"
+    emoji: '🍍',
+    shortcode: 'pineapple',
   },
   {
-    "shortcode": "ping_pong",
-    "emoji": "🏓"
+    emoji: '🏓',
+    shortcode: 'ping_pong',
   },
   {
-    "shortcode": "pisces",
-    "emoji": "♓"
+    emoji: '♓',
+    shortcode: 'pisces',
   },
   {
-    "shortcode": "pizza",
-    "emoji": "🍕"
+    emoji: '🍕',
+    shortcode: 'pizza',
   },
   {
-    "shortcode": "place_of_worship",
-    "emoji": "🛐"
+    emoji: '🛐',
+    shortcode: 'place_of_worship',
   },
   {
-    "shortcode": "play_pause",
-    "emoji": "⏯"
+    emoji: '⏯',
+    shortcode: 'play_pause',
   },
   {
-    "shortcode": "point_down",
-    "emoji": "👇"
+    emoji: '👇',
+    shortcode: 'point_down',
   },
   {
-    "shortcode": "point_down_tone1",
-    "emoji": "👇🏻"
+    emoji: '👇🏻',
+    shortcode: 'point_down_tone1',
   },
   {
-    "shortcode": "point_down_tone2",
-    "emoji": "👇🏼"
+    emoji: '👇🏼',
+    shortcode: 'point_down_tone2',
   },
   {
-    "shortcode": "point_down_tone3",
-    "emoji": "👇🏽"
+    emoji: '👇🏽',
+    shortcode: 'point_down_tone3',
   },
   {
-    "shortcode": "point_down_tone4",
-    "emoji": "👇🏾"
+    emoji: '👇🏾',
+    shortcode: 'point_down_tone4',
   },
   {
-    "shortcode": "point_down_tone5",
-    "emoji": "👇🏿"
+    emoji: '👇🏿',
+    shortcode: 'point_down_tone5',
   },
   {
-    "shortcode": "point_left",
-    "emoji": "👈"
+    emoji: '👈',
+    shortcode: 'point_left',
   },
   {
-    "shortcode": "point_left_tone1",
-    "emoji": "👈🏻"
+    emoji: '👈🏻',
+    shortcode: 'point_left_tone1',
   },
   {
-    "shortcode": "point_left_tone2",
-    "emoji": "👈🏼"
+    emoji: '👈🏼',
+    shortcode: 'point_left_tone2',
   },
   {
-    "shortcode": "point_left_tone3",
-    "emoji": "👈🏽"
+    emoji: '👈🏽',
+    shortcode: 'point_left_tone3',
   },
   {
-    "shortcode": "point_left_tone4",
-    "emoji": "👈🏾"
+    emoji: '👈🏾',
+    shortcode: 'point_left_tone4',
   },
   {
-    "shortcode": "point_left_tone5",
-    "emoji": "👈🏿"
+    emoji: '👈🏿',
+    shortcode: 'point_left_tone5',
   },
   {
-    "shortcode": "point_right",
-    "emoji": "👉"
+    emoji: '👉',
+    shortcode: 'point_right',
   },
   {
-    "shortcode": "point_right_tone1",
-    "emoji": "👉🏻"
+    emoji: '👉🏻',
+    shortcode: 'point_right_tone1',
   },
   {
-    "shortcode": "point_right_tone2",
-    "emoji": "👉🏼"
+    emoji: '👉🏼',
+    shortcode: 'point_right_tone2',
   },
   {
-    "shortcode": "point_right_tone3",
-    "emoji": "👉🏽"
+    emoji: '👉🏽',
+    shortcode: 'point_right_tone3',
   },
   {
-    "shortcode": "point_right_tone4",
-    "emoji": "👉🏾"
+    emoji: '👉🏾',
+    shortcode: 'point_right_tone4',
   },
   {
-    "shortcode": "point_right_tone5",
-    "emoji": "👉🏿"
+    emoji: '👉🏿',
+    shortcode: 'point_right_tone5',
   },
   {
-    "shortcode": "point_up",
-    "emoji": "☝"
+    emoji: '☝',
+    shortcode: 'point_up',
   },
   {
-    "shortcode": "point_up_2",
-    "emoji": "👆"
+    emoji: '👆',
+    shortcode: 'point_up_2',
   },
   {
-    "shortcode": "point_up_2_tone1",
-    "emoji": "👆🏻"
+    emoji: '👆🏻',
+    shortcode: 'point_up_2_tone1',
   },
   {
-    "shortcode": "point_up_2_tone2",
-    "emoji": "👆🏼"
+    emoji: '👆🏼',
+    shortcode: 'point_up_2_tone2',
   },
   {
-    "shortcode": "point_up_2_tone3",
-    "emoji": "👆🏽"
+    emoji: '👆🏽',
+    shortcode: 'point_up_2_tone3',
   },
   {
-    "shortcode": "point_up_2_tone4",
-    "emoji": "👆🏾"
+    emoji: '👆🏾',
+    shortcode: 'point_up_2_tone4',
   },
   {
-    "shortcode": "point_up_2_tone5",
-    "emoji": "👆🏿"
+    emoji: '👆🏿',
+    shortcode: 'point_up_2_tone5',
   },
   {
-    "shortcode": "point_up_tone1",
-    "emoji": "☝🏻"
+    emoji: '☝🏻',
+    shortcode: 'point_up_tone1',
   },
   {
-    "shortcode": "point_up_tone2",
-    "emoji": "☝🏼"
+    emoji: '☝🏼',
+    shortcode: 'point_up_tone2',
   },
   {
-    "shortcode": "point_up_tone3",
-    "emoji": "☝🏽"
+    emoji: '☝🏽',
+    shortcode: 'point_up_tone3',
   },
   {
-    "shortcode": "point_up_tone4",
-    "emoji": "☝🏾"
+    emoji: '☝🏾',
+    shortcode: 'point_up_tone4',
   },
   {
-    "shortcode": "point_up_tone5",
-    "emoji": "☝🏿"
+    emoji: '☝🏿',
+    shortcode: 'point_up_tone5',
   },
   {
-    "shortcode": "police_car",
-    "emoji": "🚓"
+    emoji: '🚓',
+    shortcode: 'police_car',
   },
   {
-    "shortcode": "police_officer",
-    "emoji": "👮"
+    emoji: '👮',
+    shortcode: 'police_officer',
   },
   {
-    "shortcode": "police_officer_tone1",
-    "emoji": "👮🏻"
+    emoji: '👮🏻',
+    shortcode: 'police_officer_tone1',
   },
   {
-    "shortcode": "police_officer_tone2",
-    "emoji": "👮🏼"
+    emoji: '👮🏼',
+    shortcode: 'police_officer_tone2',
   },
   {
-    "shortcode": "police_officer_tone3",
-    "emoji": "👮🏽"
+    emoji: '👮🏽',
+    shortcode: 'police_officer_tone3',
   },
   {
-    "shortcode": "police_officer_tone4",
-    "emoji": "👮🏾"
+    emoji: '👮🏾',
+    shortcode: 'police_officer_tone4',
   },
   {
-    "shortcode": "police_officer_tone5",
-    "emoji": "👮🏿"
+    emoji: '👮🏿',
+    shortcode: 'police_officer_tone5',
   },
   {
-    "shortcode": "poodle",
-    "emoji": "🐩"
+    emoji: '🐩',
+    shortcode: 'poodle',
   },
   {
-    "shortcode": "poop",
-    "emoji": "💩"
+    emoji: '💩',
+    shortcode: 'poop',
   },
   {
-    "shortcode": "popcorn",
-    "emoji": "🍿"
+    emoji: '🍿',
+    shortcode: 'popcorn',
   },
   {
-    "shortcode": "post_office",
-    "emoji": "🏣"
+    emoji: '🏣',
+    shortcode: 'post_office',
   },
   {
-    "shortcode": "postal_horn",
-    "emoji": "📯"
+    emoji: '📯',
+    shortcode: 'postal_horn',
   },
   {
-    "shortcode": "postbox",
-    "emoji": "📮"
+    emoji: '📮',
+    shortcode: 'postbox',
   },
   {
-    "shortcode": "potable_water",
-    "emoji": "🚰"
+    emoji: '🚰',
+    shortcode: 'potable_water',
   },
   {
-    "shortcode": "potato",
-    "emoji": "🥔"
+    emoji: '🥔',
+    shortcode: 'potato',
   },
   {
-    "shortcode": "pouch",
-    "emoji": "👝"
+    emoji: '👝',
+    shortcode: 'pouch',
   },
   {
-    "shortcode": "poultry_leg",
-    "emoji": "🍗"
+    emoji: '🍗',
+    shortcode: 'poultry_leg',
   },
   {
-    "shortcode": "pound",
-    "emoji": "💷"
+    emoji: '💷',
+    shortcode: 'pound',
   },
   {
-    "shortcode": "pound_symbol",
-    "emoji": "#"
+    emoji: '#',
+    shortcode: 'pound_symbol',
   },
   {
-    "shortcode": "pouting_cat",
-    "emoji": "😾"
+    emoji: '😾',
+    shortcode: 'pouting_cat',
   },
   {
-    "shortcode": "pray",
-    "emoji": "🙏"
+    emoji: '🙏',
+    shortcode: 'pray',
   },
   {
-    "shortcode": "pray_tone1",
-    "emoji": "🙏🏻"
+    emoji: '🙏🏻',
+    shortcode: 'pray_tone1',
   },
   {
-    "shortcode": "pray_tone2",
-    "emoji": "🙏🏼"
+    emoji: '🙏🏼',
+    shortcode: 'pray_tone2',
   },
   {
-    "shortcode": "pray_tone3",
-    "emoji": "🙏🏽"
+    emoji: '🙏🏽',
+    shortcode: 'pray_tone3',
   },
   {
-    "shortcode": "pray_tone4",
-    "emoji": "🙏🏾"
+    emoji: '🙏🏾',
+    shortcode: 'pray_tone4',
   },
   {
-    "shortcode": "pray_tone5",
-    "emoji": "🙏🏿"
+    emoji: '🙏🏿',
+    shortcode: 'pray_tone5',
   },
   {
-    "shortcode": "prayer_beads",
-    "emoji": "📿"
+    emoji: '📿',
+    shortcode: 'prayer_beads',
   },
   {
-    "shortcode": "pregnant_woman",
-    "emoji": "🤰"
+    emoji: '🤰',
+    shortcode: 'pregnant_woman',
   },
   {
-    "shortcode": "pregnant_woman_tone1",
-    "emoji": "🤰🏻"
+    emoji: '🤰🏻',
+    shortcode: 'pregnant_woman_tone1',
   },
   {
-    "shortcode": "pregnant_woman_tone2",
-    "emoji": "🤰🏼"
+    emoji: '🤰🏼',
+    shortcode: 'pregnant_woman_tone2',
   },
   {
-    "shortcode": "pregnant_woman_tone3",
-    "emoji": "🤰🏽"
+    emoji: '🤰🏽',
+    shortcode: 'pregnant_woman_tone3',
   },
   {
-    "shortcode": "pregnant_woman_tone4",
-    "emoji": "🤰🏾"
+    emoji: '🤰🏾',
+    shortcode: 'pregnant_woman_tone4',
   },
   {
-    "shortcode": "pregnant_woman_tone5",
-    "emoji": "🤰🏿"
+    emoji: '🤰🏿',
+    shortcode: 'pregnant_woman_tone5',
   },
   {
-    "shortcode": "pretzel",
-    "emoji": "🥨"
+    emoji: '🥨',
+    shortcode: 'pretzel',
   },
   {
-    "shortcode": "prince",
-    "emoji": "🤴"
+    emoji: '🤴',
+    shortcode: 'prince',
   },
   {
-    "shortcode": "prince_tone1",
-    "emoji": "🤴🏻"
+    emoji: '🤴🏻',
+    shortcode: 'prince_tone1',
   },
   {
-    "shortcode": "prince_tone2",
-    "emoji": "🤴🏼"
+    emoji: '🤴🏼',
+    shortcode: 'prince_tone2',
   },
   {
-    "shortcode": "prince_tone3",
-    "emoji": "🤴🏽"
+    emoji: '🤴🏽',
+    shortcode: 'prince_tone3',
   },
   {
-    "shortcode": "prince_tone4",
-    "emoji": "🤴🏾"
+    emoji: '🤴🏾',
+    shortcode: 'prince_tone4',
   },
   {
-    "shortcode": "prince_tone5",
-    "emoji": "🤴🏿"
+    emoji: '🤴🏿',
+    shortcode: 'prince_tone5',
   },
   {
-    "shortcode": "princess",
-    "emoji": "👸"
+    emoji: '👸',
+    shortcode: 'princess',
   },
   {
-    "shortcode": "princess_tone1",
-    "emoji": "👸🏻"
+    emoji: '👸🏻',
+    shortcode: 'princess_tone1',
   },
   {
-    "shortcode": "princess_tone2",
-    "emoji": "👸🏼"
+    emoji: '👸🏼',
+    shortcode: 'princess_tone2',
   },
   {
-    "shortcode": "princess_tone3",
-    "emoji": "👸🏽"
+    emoji: '👸🏽',
+    shortcode: 'princess_tone3',
   },
   {
-    "shortcode": "princess_tone4",
-    "emoji": "👸🏾"
+    emoji: '👸🏾',
+    shortcode: 'princess_tone4',
   },
   {
-    "shortcode": "princess_tone5",
-    "emoji": "👸🏿"
+    emoji: '👸🏿',
+    shortcode: 'princess_tone5',
   },
   {
-    "shortcode": "printer",
-    "emoji": "🖨"
+    emoji: '🖨',
+    shortcode: 'printer',
   },
   {
-    "shortcode": "projector",
-    "emoji": "📽"
+    emoji: '📽',
+    shortcode: 'projector',
   },
   {
-    "shortcode": "punch",
-    "emoji": "👊"
+    emoji: '👊',
+    shortcode: 'punch',
   },
   {
-    "shortcode": "punch_tone1",
-    "emoji": "👊🏻"
+    emoji: '👊🏻',
+    shortcode: 'punch_tone1',
   },
   {
-    "shortcode": "punch_tone2",
-    "emoji": "👊🏼"
+    emoji: '👊🏼',
+    shortcode: 'punch_tone2',
   },
   {
-    "shortcode": "punch_tone3",
-    "emoji": "👊🏽"
+    emoji: '👊🏽',
+    shortcode: 'punch_tone3',
   },
   {
-    "shortcode": "punch_tone4",
-    "emoji": "👊🏾"
+    emoji: '👊🏾',
+    shortcode: 'punch_tone4',
   },
   {
-    "shortcode": "punch_tone5",
-    "emoji": "👊🏿"
+    emoji: '👊🏿',
+    shortcode: 'punch_tone5',
   },
   {
-    "shortcode": "purple_heart",
-    "emoji": "💜"
+    emoji: '💜',
+    shortcode: 'purple_heart',
   },
   {
-    "shortcode": "purse",
-    "emoji": "👛"
+    emoji: '👛',
+    shortcode: 'purse',
   },
   {
-    "shortcode": "pushpin",
-    "emoji": "📌"
+    emoji: '📌',
+    shortcode: 'pushpin',
   },
   {
-    "shortcode": "put_litter_in_its_place",
-    "emoji": "🚮"
+    emoji: '🚮',
+    shortcode: 'put_litter_in_its_place',
   },
   {
-    "shortcode": "question",
-    "emoji": "❓"
+    emoji: '❓',
+    shortcode: 'question',
   },
   {
-    "shortcode": "rabbit",
-    "emoji": "🐰"
+    emoji: '🐰',
+    shortcode: 'rabbit',
   },
   {
-    "shortcode": "rabbit2",
-    "emoji": "🐇"
+    emoji: '🐇',
+    shortcode: 'rabbit2',
   },
   {
-    "shortcode": "race_car",
-    "emoji": "🏎"
+    emoji: '🏎',
+    shortcode: 'race_car',
   },
   {
-    "shortcode": "racehorse",
-    "emoji": "🐎"
+    emoji: '🐎',
+    shortcode: 'racehorse',
   },
   {
-    "shortcode": "radio",
-    "emoji": "📻"
+    emoji: '📻',
+    shortcode: 'radio',
   },
   {
-    "shortcode": "radio_button",
-    "emoji": "🔘"
+    emoji: '🔘',
+    shortcode: 'radio_button',
   },
   {
-    "shortcode": "radioactive",
-    "emoji": "☢"
+    emoji: '☢',
+    shortcode: 'radioactive',
   },
   {
-    "shortcode": "rage",
-    "emoji": "😡"
+    emoji: '😡',
+    shortcode: 'rage',
   },
   {
-    "shortcode": "railway_car",
-    "emoji": "🚃"
+    emoji: '🚃',
+    shortcode: 'railway_car',
   },
   {
-    "shortcode": "railway_track",
-    "emoji": "🛤"
+    emoji: '🛤',
+    shortcode: 'railway_track',
   },
   {
-    "shortcode": "rainbow",
-    "emoji": "🌈"
+    emoji: '🌈',
+    shortcode: 'rainbow',
   },
   {
-    "shortcode": "rainbow_flag",
-    "emoji": "🏳🌈"
+    emoji: '🏳🌈',
+    shortcode: 'rainbow_flag',
   },
   {
-    "shortcode": "raised_back_of_hand",
-    "emoji": "🤚"
+    emoji: '🤚',
+    shortcode: 'raised_back_of_hand',
   },
   {
-    "shortcode": "raised_back_of_hand_tone1",
-    "emoji": "🤚🏻"
+    emoji: '🤚🏻',
+    shortcode: 'raised_back_of_hand_tone1',
   },
   {
-    "shortcode": "raised_back_of_hand_tone2",
-    "emoji": "🤚🏼"
+    emoji: '🤚🏼',
+    shortcode: 'raised_back_of_hand_tone2',
   },
   {
-    "shortcode": "raised_back_of_hand_tone3",
-    "emoji": "🤚🏽"
+    emoji: '🤚🏽',
+    shortcode: 'raised_back_of_hand_tone3',
   },
   {
-    "shortcode": "raised_back_of_hand_tone4",
-    "emoji": "🤚🏾"
+    emoji: '🤚🏾',
+    shortcode: 'raised_back_of_hand_tone4',
   },
   {
-    "shortcode": "raised_back_of_hand_tone5",
-    "emoji": "🤚🏿"
+    emoji: '🤚🏿',
+    shortcode: 'raised_back_of_hand_tone5',
   },
   {
-    "shortcode": "raised_hand",
-    "emoji": "✋"
+    emoji: '✋',
+    shortcode: 'raised_hand',
   },
   {
-    "shortcode": "raised_hand_tone1",
-    "emoji": "✋🏻"
+    emoji: '✋🏻',
+    shortcode: 'raised_hand_tone1',
   },
   {
-    "shortcode": "raised_hand_tone2",
-    "emoji": "✋🏼"
+    emoji: '✋🏼',
+    shortcode: 'raised_hand_tone2',
   },
   {
-    "shortcode": "raised_hand_tone3",
-    "emoji": "✋🏽"
+    emoji: '✋🏽',
+    shortcode: 'raised_hand_tone3',
   },
   {
-    "shortcode": "raised_hand_tone4",
-    "emoji": "✋🏾"
+    emoji: '✋🏾',
+    shortcode: 'raised_hand_tone4',
   },
   {
-    "shortcode": "raised_hand_tone5",
-    "emoji": "✋🏿"
+    emoji: '✋🏿',
+    shortcode: 'raised_hand_tone5',
   },
   {
-    "shortcode": "raised_hands",
-    "emoji": "🙌"
+    emoji: '🙌',
+    shortcode: 'raised_hands',
   },
   {
-    "shortcode": "raised_hands_tone1",
-    "emoji": "🙌🏻"
+    emoji: '🙌🏻',
+    shortcode: 'raised_hands_tone1',
   },
   {
-    "shortcode": "raised_hands_tone2",
-    "emoji": "🙌🏼"
+    emoji: '🙌🏼',
+    shortcode: 'raised_hands_tone2',
   },
   {
-    "shortcode": "raised_hands_tone3",
-    "emoji": "🙌🏽"
+    emoji: '🙌🏽',
+    shortcode: 'raised_hands_tone3',
   },
   {
-    "shortcode": "raised_hands_tone4",
-    "emoji": "🙌🏾"
+    emoji: '🙌🏾',
+    shortcode: 'raised_hands_tone4',
   },
   {
-    "shortcode": "raised_hands_tone5",
-    "emoji": "🙌🏿"
+    emoji: '🙌🏿',
+    shortcode: 'raised_hands_tone5',
   },
   {
-    "shortcode": "ram",
-    "emoji": "🐏"
+    emoji: '🐏',
+    shortcode: 'ram',
   },
   {
-    "shortcode": "ramen",
-    "emoji": "🍜"
+    emoji: '🍜',
+    shortcode: 'ramen',
   },
   {
-    "shortcode": "rat",
-    "emoji": "🐀"
+    emoji: '🐀',
+    shortcode: 'rat',
   },
   {
-    "shortcode": "record_button",
-    "emoji": "⏺"
+    emoji: '⏺',
+    shortcode: 'record_button',
   },
   {
-    "shortcode": "recycle",
-    "emoji": "♻"
+    emoji: '♻',
+    shortcode: 'recycle',
   },
   {
-    "shortcode": "red_car",
-    "emoji": "🚗"
+    emoji: '🚗',
+    shortcode: 'red_car',
   },
   {
-    "shortcode": "red_circle",
-    "emoji": "🔴"
+    emoji: '🔴',
+    shortcode: 'red_circle',
   },
   {
-    "shortcode": "regional_indicator_a",
-    "emoji": "🇦"
+    emoji: '🇦',
+    shortcode: 'regional_indicator_a',
   },
   {
-    "shortcode": "regional_indicator_b",
-    "emoji": "🇧"
+    emoji: '🇧',
+    shortcode: 'regional_indicator_b',
   },
   {
-    "shortcode": "regional_indicator_c",
-    "emoji": "🇨"
+    emoji: '🇨',
+    shortcode: 'regional_indicator_c',
   },
   {
-    "shortcode": "regional_indicator_d",
-    "emoji": "🇩"
+    emoji: '🇩',
+    shortcode: 'regional_indicator_d',
   },
   {
-    "shortcode": "regional_indicator_e",
-    "emoji": "🇪"
+    emoji: '🇪',
+    shortcode: 'regional_indicator_e',
   },
   {
-    "shortcode": "regional_indicator_f",
-    "emoji": "🇫"
+    emoji: '🇫',
+    shortcode: 'regional_indicator_f',
   },
   {
-    "shortcode": "regional_indicator_g",
-    "emoji": "🇬"
+    emoji: '🇬',
+    shortcode: 'regional_indicator_g',
   },
   {
-    "shortcode": "regional_indicator_h",
-    "emoji": "🇭"
+    emoji: '🇭',
+    shortcode: 'regional_indicator_h',
   },
   {
-    "shortcode": "regional_indicator_i",
-    "emoji": "🇮"
+    emoji: '🇮',
+    shortcode: 'regional_indicator_i',
   },
   {
-    "shortcode": "regional_indicator_j",
-    "emoji": "🇯"
+    emoji: '🇯',
+    shortcode: 'regional_indicator_j',
   },
   {
-    "shortcode": "regional_indicator_k",
-    "emoji": "🇰"
+    emoji: '🇰',
+    shortcode: 'regional_indicator_k',
   },
   {
-    "shortcode": "regional_indicator_l",
-    "emoji": "🇱"
+    emoji: '🇱',
+    shortcode: 'regional_indicator_l',
   },
   {
-    "shortcode": "regional_indicator_m",
-    "emoji": "🇲"
+    emoji: '🇲',
+    shortcode: 'regional_indicator_m',
   },
   {
-    "shortcode": "regional_indicator_n",
-    "emoji": "🇳"
+    emoji: '🇳',
+    shortcode: 'regional_indicator_n',
   },
   {
-    "shortcode": "regional_indicator_o",
-    "emoji": "🇴"
+    emoji: '🇴',
+    shortcode: 'regional_indicator_o',
   },
   {
-    "shortcode": "regional_indicator_p",
-    "emoji": "🇵"
+    emoji: '🇵',
+    shortcode: 'regional_indicator_p',
   },
   {
-    "shortcode": "regional_indicator_q",
-    "emoji": "🇶"
+    emoji: '🇶',
+    shortcode: 'regional_indicator_q',
   },
   {
-    "shortcode": "regional_indicator_r",
-    "emoji": "🇷"
+    emoji: '🇷',
+    shortcode: 'regional_indicator_r',
   },
   {
-    "shortcode": "regional_indicator_s",
-    "emoji": "🇸"
+    emoji: '🇸',
+    shortcode: 'regional_indicator_s',
   },
   {
-    "shortcode": "regional_indicator_t",
-    "emoji": "🇹"
+    emoji: '🇹',
+    shortcode: 'regional_indicator_t',
   },
   {
-    "shortcode": "regional_indicator_u",
-    "emoji": "🇺"
+    emoji: '🇺',
+    shortcode: 'regional_indicator_u',
   },
   {
-    "shortcode": "regional_indicator_v",
-    "emoji": "🇻"
+    emoji: '🇻',
+    shortcode: 'regional_indicator_v',
   },
   {
-    "shortcode": "regional_indicator_w",
-    "emoji": "🇼"
+    emoji: '🇼',
+    shortcode: 'regional_indicator_w',
   },
   {
-    "shortcode": "regional_indicator_x",
-    "emoji": "🇽"
+    emoji: '🇽',
+    shortcode: 'regional_indicator_x',
   },
   {
-    "shortcode": "regional_indicator_y",
-    "emoji": "🇾"
+    emoji: '🇾',
+    shortcode: 'regional_indicator_y',
   },
   {
-    "shortcode": "regional_indicator_z",
-    "emoji": "🇿"
+    emoji: '🇿',
+    shortcode: 'regional_indicator_z',
   },
   {
-    "shortcode": "registered",
-    "emoji": "®"
+    emoji: '®',
+    shortcode: 'registered',
   },
   {
-    "shortcode": "relaxed",
-    "emoji": "☺"
+    emoji: '☺',
+    shortcode: 'relaxed',
   },
   {
-    "shortcode": "relieved",
-    "emoji": "😌"
+    emoji: '😌',
+    shortcode: 'relieved',
   },
   {
-    "shortcode": "reminder_ribbon",
-    "emoji": "🎗"
+    emoji: '🎗',
+    shortcode: 'reminder_ribbon',
   },
   {
-    "shortcode": "repeat",
-    "emoji": "🔁"
+    emoji: '🔁',
+    shortcode: 'repeat',
   },
   {
-    "shortcode": "repeat_one",
-    "emoji": "🔂"
+    emoji: '🔂',
+    shortcode: 'repeat_one',
   },
   {
-    "shortcode": "restroom",
-    "emoji": "🚻"
+    emoji: '🚻',
+    shortcode: 'restroom',
   },
   {
-    "shortcode": "revolving_hearts",
-    "emoji": "💞"
+    emoji: '💞',
+    shortcode: 'revolving_hearts',
   },
   {
-    "shortcode": "rewind",
-    "emoji": "⏪"
+    emoji: '⏪',
+    shortcode: 'rewind',
   },
   {
-    "shortcode": "rhino",
-    "emoji": "🦏"
+    emoji: '🦏',
+    shortcode: 'rhino',
   },
   {
-    "shortcode": "ribbon",
-    "emoji": "🎀"
+    emoji: '🎀',
+    shortcode: 'ribbon',
   },
   {
-    "shortcode": "rice",
-    "emoji": "🍚"
+    emoji: '🍚',
+    shortcode: 'rice',
   },
   {
-    "shortcode": "rice_ball",
-    "emoji": "🍙"
+    emoji: '🍙',
+    shortcode: 'rice_ball',
   },
   {
-    "shortcode": "rice_cracker",
-    "emoji": "🍘"
+    emoji: '🍘',
+    shortcode: 'rice_cracker',
   },
   {
-    "shortcode": "rice_scene",
-    "emoji": "🎑"
+    emoji: '🎑',
+    shortcode: 'rice_scene',
   },
   {
-    "shortcode": "right_facing_fist",
-    "emoji": "🤜"
+    emoji: '🤜',
+    shortcode: 'right_facing_fist',
   },
   {
-    "shortcode": "right_facing_fist_tone1",
-    "emoji": "🤜🏻"
+    emoji: '🤜🏻',
+    shortcode: 'right_facing_fist_tone1',
   },
   {
-    "shortcode": "right_facing_fist_tone2",
-    "emoji": "🤜🏼"
+    emoji: '🤜🏼',
+    shortcode: 'right_facing_fist_tone2',
   },
   {
-    "shortcode": "right_facing_fist_tone3",
-    "emoji": "🤜🏽"
+    emoji: '🤜🏽',
+    shortcode: 'right_facing_fist_tone3',
   },
   {
-    "shortcode": "right_facing_fist_tone4",
-    "emoji": "🤜🏾"
+    emoji: '🤜🏾',
+    shortcode: 'right_facing_fist_tone4',
   },
   {
-    "shortcode": "right_facing_fist_tone5",
-    "emoji": "🤜🏿"
+    emoji: '🤜🏿',
+    shortcode: 'right_facing_fist_tone5',
   },
   {
-    "shortcode": "ring",
-    "emoji": "💍"
+    emoji: '💍',
+    shortcode: 'ring',
   },
   {
-    "shortcode": "robot",
-    "emoji": "🤖"
+    emoji: '🤖',
+    shortcode: 'robot',
   },
   {
-    "shortcode": "rocket",
-    "emoji": "🚀"
+    emoji: '🚀',
+    shortcode: 'rocket',
   },
   {
-    "shortcode": "rofl",
-    "emoji": "🤣"
+    emoji: '🤣',
+    shortcode: 'rofl',
   },
   {
-    "shortcode": "roller_coaster",
-    "emoji": "🎢"
+    emoji: '🎢',
+    shortcode: 'roller_coaster',
   },
   {
-    "shortcode": "rolling_eyes",
-    "emoji": "🙄"
+    emoji: '🙄',
+    shortcode: 'rolling_eyes',
   },
   {
-    "shortcode": "rooster",
-    "emoji": "🐓"
+    emoji: '🐓',
+    shortcode: 'rooster',
   },
   {
-    "shortcode": "rose",
-    "emoji": "🌹"
+    emoji: '🌹',
+    shortcode: 'rose',
   },
   {
-    "shortcode": "rosette",
-    "emoji": "🏵"
+    emoji: '🏵',
+    shortcode: 'rosette',
   },
   {
-    "shortcode": "rotating_light",
-    "emoji": "🚨"
+    emoji: '🚨',
+    shortcode: 'rotating_light',
   },
   {
-    "shortcode": "round_pushpin",
-    "emoji": "📍"
+    emoji: '📍',
+    shortcode: 'round_pushpin',
   },
   {
-    "shortcode": "rugby_football",
-    "emoji": "🏉"
+    emoji: '🏉',
+    shortcode: 'rugby_football',
   },
   {
-    "shortcode": "running_shirt_with_sash",
-    "emoji": "🎽"
+    emoji: '🎽',
+    shortcode: 'running_shirt_with_sash',
   },
   {
-    "shortcode": "sa",
-    "emoji": "🈂"
+    emoji: '🈂',
+    shortcode: 'sa',
   },
   {
-    "shortcode": "sagittarius",
-    "emoji": "♐"
+    emoji: '♐',
+    shortcode: 'sagittarius',
   },
   {
-    "shortcode": "sailboat",
-    "emoji": "⛵"
+    emoji: '⛵',
+    shortcode: 'sailboat',
   },
   {
-    "shortcode": "sake",
-    "emoji": "🍶"
+    emoji: '🍶',
+    shortcode: 'sake',
   },
   {
-    "shortcode": "salad",
-    "emoji": "🥗"
+    emoji: '🥗',
+    shortcode: 'salad',
   },
   {
-    "shortcode": "sandal",
-    "emoji": "👡"
+    emoji: '👡',
+    shortcode: 'sandal',
   },
   {
-    "shortcode": "sandwich",
-    "emoji": "🥪"
+    emoji: '🥪',
+    shortcode: 'sandwich',
   },
   {
-    "shortcode": "santa",
-    "emoji": "🎅"
+    emoji: '🎅',
+    shortcode: 'santa',
   },
   {
-    "shortcode": "santa_tone1",
-    "emoji": "🎅🏻"
+    emoji: '🎅🏻',
+    shortcode: 'santa_tone1',
   },
   {
-    "shortcode": "santa_tone2",
-    "emoji": "🎅🏼"
+    emoji: '🎅🏼',
+    shortcode: 'santa_tone2',
   },
   {
-    "shortcode": "santa_tone3",
-    "emoji": "🎅🏽"
+    emoji: '🎅🏽',
+    shortcode: 'santa_tone3',
   },
   {
-    "shortcode": "santa_tone4",
-    "emoji": "🎅🏾"
+    emoji: '🎅🏾',
+    shortcode: 'santa_tone4',
   },
   {
-    "shortcode": "santa_tone5",
-    "emoji": "🎅🏿"
+    emoji: '🎅🏿',
+    shortcode: 'santa_tone5',
   },
   {
-    "shortcode": "satellite",
-    "emoji": "📡"
+    emoji: '📡',
+    shortcode: 'satellite',
   },
   {
-    "shortcode": "satellite_orbital",
-    "emoji": "🛰"
+    emoji: '🛰',
+    shortcode: 'satellite_orbital',
   },
   {
-    "shortcode": "sauropod",
-    "emoji": "🦕"
+    emoji: '🦕',
+    shortcode: 'sauropod',
   },
   {
-    "shortcode": "saxophone",
-    "emoji": "🎷"
+    emoji: '🎷',
+    shortcode: 'saxophone',
   },
   {
-    "shortcode": "scales",
-    "emoji": "⚖"
+    emoji: '⚖',
+    shortcode: 'scales',
   },
   {
-    "shortcode": "scarf",
-    "emoji": "🧣"
+    emoji: '🧣',
+    shortcode: 'scarf',
   },
   {
-    "shortcode": "school",
-    "emoji": "🏫"
+    emoji: '🏫',
+    shortcode: 'school',
   },
   {
-    "shortcode": "school_satchel",
-    "emoji": "🎒"
+    emoji: '🎒',
+    shortcode: 'school_satchel',
   },
   {
-    "shortcode": "scissors",
-    "emoji": "✂"
+    emoji: '✂',
+    shortcode: 'scissors',
   },
   {
-    "shortcode": "scooter",
-    "emoji": "🛴"
+    emoji: '🛴',
+    shortcode: 'scooter',
   },
   {
-    "shortcode": "scorpion",
-    "emoji": "🦂"
+    emoji: '🦂',
+    shortcode: 'scorpion',
   },
   {
-    "shortcode": "scorpius",
-    "emoji": "♏"
+    emoji: '♏',
+    shortcode: 'scorpius',
   },
   {
-    "shortcode": "scotland",
-    "emoji": "🏴󠁧󠁢󠁳󠁣󠁴󠁿"
+    emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    shortcode: 'scotland',
   },
   {
-    "shortcode": "scream",
-    "emoji": "😱"
+    emoji: '😱',
+    shortcode: 'scream',
   },
   {
-    "shortcode": "scream_cat",
-    "emoji": "🙀"
+    emoji: '🙀',
+    shortcode: 'scream_cat',
   },
   {
-    "shortcode": "scroll",
-    "emoji": "📜"
+    emoji: '📜',
+    shortcode: 'scroll',
   },
   {
-    "shortcode": "seat",
-    "emoji": "💺"
+    emoji: '💺',
+    shortcode: 'seat',
   },
   {
-    "shortcode": "second_place",
-    "emoji": "🥈"
+    emoji: '🥈',
+    shortcode: 'second_place',
   },
   {
-    "shortcode": "secret",
-    "emoji": "㊙"
+    emoji: '㊙',
+    shortcode: 'secret',
   },
   {
-    "shortcode": "see_no_evil",
-    "emoji": "🙈"
+    emoji: '🙈',
+    shortcode: 'see_no_evil',
   },
   {
-    "shortcode": "seedling",
-    "emoji": "🌱"
+    emoji: '🌱',
+    shortcode: 'seedling',
   },
   {
-    "shortcode": "selfie",
-    "emoji": "🤳"
+    emoji: '🤳',
+    shortcode: 'selfie',
   },
   {
-    "shortcode": "selfie_tone1",
-    "emoji": "🤳🏻"
+    emoji: '🤳🏻',
+    shortcode: 'selfie_tone1',
   },
   {
-    "shortcode": "selfie_tone2",
-    "emoji": "🤳🏼"
+    emoji: '🤳🏼',
+    shortcode: 'selfie_tone2',
   },
   {
-    "shortcode": "selfie_tone3",
-    "emoji": "🤳🏽"
+    emoji: '🤳🏽',
+    shortcode: 'selfie_tone3',
   },
   {
-    "shortcode": "selfie_tone4",
-    "emoji": "🤳🏾"
+    emoji: '🤳🏾',
+    shortcode: 'selfie_tone4',
   },
   {
-    "shortcode": "selfie_tone5",
-    "emoji": "🤳🏿"
+    emoji: '🤳🏿',
+    shortcode: 'selfie_tone5',
   },
   {
-    "shortcode": "seven",
-    "emoji": "7⃣"
+    emoji: '7⃣',
+    shortcode: 'seven',
   },
   {
-    "shortcode": "shallow_pan_of_food",
-    "emoji": "🥘"
+    emoji: '🥘',
+    shortcode: 'shallow_pan_of_food',
   },
   {
-    "shortcode": "shamrock",
-    "emoji": "☘"
+    emoji: '☘',
+    shortcode: 'shamrock',
   },
   {
-    "shortcode": "shark",
-    "emoji": "🦈"
+    emoji: '🦈',
+    shortcode: 'shark',
   },
   {
-    "shortcode": "shaved_ice",
-    "emoji": "🍧"
+    emoji: '🍧',
+    shortcode: 'shaved_ice',
   },
   {
-    "shortcode": "sheep",
-    "emoji": "🐑"
+    emoji: '🐑',
+    shortcode: 'sheep',
   },
   {
-    "shortcode": "shell",
-    "emoji": "🐚"
+    emoji: '🐚',
+    shortcode: 'shell',
   },
   {
-    "shortcode": "shield",
-    "emoji": "🛡"
+    emoji: '🛡',
+    shortcode: 'shield',
   },
   {
-    "shortcode": "shinto_shrine",
-    "emoji": "⛩"
+    emoji: '⛩',
+    shortcode: 'shinto_shrine',
   },
   {
-    "shortcode": "ship",
-    "emoji": "🚢"
+    emoji: '🚢',
+    shortcode: 'ship',
   },
   {
-    "shortcode": "shirt",
-    "emoji": "👕"
+    emoji: '👕',
+    shortcode: 'shirt',
   },
   {
-    "shortcode": "shopping_bags",
-    "emoji": "🛍"
+    emoji: '🛍',
+    shortcode: 'shopping_bags',
   },
   {
-    "shortcode": "shopping_cart",
-    "emoji": "🛒"
+    emoji: '🛒',
+    shortcode: 'shopping_cart',
   },
   {
-    "shortcode": "shower",
-    "emoji": "🚿"
+    emoji: '🚿',
+    shortcode: 'shower',
   },
   {
-    "shortcode": "shrimp",
-    "emoji": "🦐"
+    emoji: '🦐',
+    shortcode: 'shrimp',
   },
   {
-    "shortcode": "shushing_face",
-    "emoji": "🤫"
+    emoji: '🤫',
+    shortcode: 'shushing_face',
   },
   {
-    "shortcode": "signal_strength",
-    "emoji": "📶"
+    emoji: '📶',
+    shortcode: 'signal_strength',
   },
   {
-    "shortcode": "six",
-    "emoji": "6⃣"
+    emoji: '6⃣',
+    shortcode: 'six',
   },
   {
-    "shortcode": "six_pointed_star",
-    "emoji": "🔯"
+    emoji: '🔯',
+    shortcode: 'six_pointed_star',
   },
   {
-    "shortcode": "ski",
-    "emoji": "🎿"
+    emoji: '🎿',
+    shortcode: 'ski',
   },
   {
-    "shortcode": "skier",
-    "emoji": "⛷"
+    emoji: '⛷',
+    shortcode: 'skier',
   },
   {
-    "shortcode": "skull",
-    "emoji": "💀"
+    emoji: '💀',
+    shortcode: 'skull',
   },
   {
-    "shortcode": "skull_crossbones",
-    "emoji": "☠"
+    emoji: '☠',
+    shortcode: 'skull_crossbones',
   },
   {
-    "shortcode": "sled",
-    "emoji": "🛷"
+    emoji: '🛷',
+    shortcode: 'sled',
   },
   {
-    "shortcode": "sleeping",
-    "emoji": "😴"
+    emoji: '😴',
+    shortcode: 'sleeping',
   },
   {
-    "shortcode": "sleeping_accommodation",
-    "emoji": "🛌"
+    emoji: '🛌',
+    shortcode: 'sleeping_accommodation',
   },
   {
-    "shortcode": "sleepy",
-    "emoji": "😪"
+    emoji: '😪',
+    shortcode: 'sleepy',
   },
   {
-    "shortcode": "slight_frown",
-    "emoji": "🙁"
+    emoji: '🙁',
+    shortcode: 'slight_frown',
   },
   {
-    "shortcode": "slight_smile",
-    "emoji": "🙂"
+    emoji: '🙂',
+    shortcode: 'slight_smile',
   },
   {
-    "shortcode": "slot_machine",
-    "emoji": "🎰"
+    emoji: '🎰',
+    shortcode: 'slot_machine',
   },
   {
-    "shortcode": "small_blue_diamond",
-    "emoji": "🔹"
+    emoji: '🔹',
+    shortcode: 'small_blue_diamond',
   },
   {
-    "shortcode": "small_orange_diamond",
-    "emoji": "🔸"
+    emoji: '🔸',
+    shortcode: 'small_orange_diamond',
   },
   {
-    "shortcode": "small_red_triangle",
-    "emoji": "🔺"
+    emoji: '🔺',
+    shortcode: 'small_red_triangle',
   },
   {
-    "shortcode": "small_red_triangle_down",
-    "emoji": "🔻"
+    emoji: '🔻',
+    shortcode: 'small_red_triangle_down',
   },
   {
-    "shortcode": "smile",
-    "emoji": "😄"
+    emoji: '😄',
+    shortcode: 'smile',
   },
   {
-    "shortcode": "smile_cat",
-    "emoji": "😸"
+    emoji: '😸',
+    shortcode: 'smile_cat',
   },
   {
-    "shortcode": "smiley",
-    "emoji": "😃"
+    emoji: '😃',
+    shortcode: 'smiley',
   },
   {
-    "shortcode": "smiley_cat",
-    "emoji": "😺"
+    emoji: '😺',
+    shortcode: 'smiley_cat',
   },
   {
-    "shortcode": "smiling_imp",
-    "emoji": "😈"
+    emoji: '😈',
+    shortcode: 'smiling_imp',
   },
   {
-    "shortcode": "smirk",
-    "emoji": "😏"
+    emoji: '😏',
+    shortcode: 'smirk',
   },
   {
-    "shortcode": "smirk_cat",
-    "emoji": "😼"
+    emoji: '😼',
+    shortcode: 'smirk_cat',
   },
   {
-    "shortcode": "smoking",
-    "emoji": "🚬"
+    emoji: '🚬',
+    shortcode: 'smoking',
   },
   {
-    "shortcode": "snail",
-    "emoji": "🐌"
+    emoji: '🐌',
+    shortcode: 'snail',
   },
   {
-    "shortcode": "snake",
-    "emoji": "🐍"
+    emoji: '🐍',
+    shortcode: 'snake',
   },
   {
-    "shortcode": "sneezing_face",
-    "emoji": "🤧"
+    emoji: '🤧',
+    shortcode: 'sneezing_face',
   },
   {
-    "shortcode": "snowboarder",
-    "emoji": "🏂"
+    emoji: '🏂',
+    shortcode: 'snowboarder',
   },
   {
-    "shortcode": "snowboarder_tone1",
-    "emoji": "🏂🏻"
+    emoji: '🏂🏻',
+    shortcode: 'snowboarder_tone1',
   },
   {
-    "shortcode": "snowboarder_tone2",
-    "emoji": "🏂🏼"
+    emoji: '🏂🏼',
+    shortcode: 'snowboarder_tone2',
   },
   {
-    "shortcode": "snowboarder_tone3",
-    "emoji": "🏂🏽"
+    emoji: '🏂🏽',
+    shortcode: 'snowboarder_tone3',
   },
   {
-    "shortcode": "snowboarder_tone4",
-    "emoji": "🏂🏾"
+    emoji: '🏂🏾',
+    shortcode: 'snowboarder_tone4',
   },
   {
-    "shortcode": "snowboarder_tone5",
-    "emoji": "🏂🏿"
+    emoji: '🏂🏿',
+    shortcode: 'snowboarder_tone5',
   },
   {
-    "shortcode": "snowflake",
-    "emoji": "❄"
+    emoji: '❄',
+    shortcode: 'snowflake',
   },
   {
-    "shortcode": "snowman",
-    "emoji": "⛄"
+    emoji: '⛄',
+    shortcode: 'snowman',
   },
   {
-    "shortcode": "snowman2",
-    "emoji": "☃"
+    emoji: '☃',
+    shortcode: 'snowman2',
   },
   {
-    "shortcode": "sob",
-    "emoji": "😭"
+    emoji: '😭',
+    shortcode: 'sob',
   },
   {
-    "shortcode": "soccer",
-    "emoji": "⚽"
+    emoji: '⚽',
+    shortcode: 'soccer',
   },
   {
-    "shortcode": "socks",
-    "emoji": "🧦"
+    emoji: '🧦',
+    shortcode: 'socks',
   },
   {
-    "shortcode": "soon",
-    "emoji": "🔜"
+    emoji: '🔜',
+    shortcode: 'soon',
   },
   {
-    "shortcode": "sos",
-    "emoji": "🆘"
+    emoji: '🆘',
+    shortcode: 'sos',
   },
   {
-    "shortcode": "sound",
-    "emoji": "🔉"
+    emoji: '🔉',
+    shortcode: 'sound',
   },
   {
-    "shortcode": "space_invader",
-    "emoji": "👾"
+    emoji: '👾',
+    shortcode: 'space_invader',
   },
   {
-    "shortcode": "spades",
-    "emoji": "♠"
+    emoji: '♠',
+    shortcode: 'spades',
   },
   {
-    "shortcode": "spaghetti",
-    "emoji": "🍝"
+    emoji: '🍝',
+    shortcode: 'spaghetti',
   },
   {
-    "shortcode": "sparkle",
-    "emoji": "❇"
+    emoji: '❇',
+    shortcode: 'sparkle',
   },
   {
-    "shortcode": "sparkler",
-    "emoji": "🎇"
+    emoji: '🎇',
+    shortcode: 'sparkler',
   },
   {
-    "shortcode": "sparkles",
-    "emoji": "✨"
+    emoji: '✨',
+    shortcode: 'sparkles',
   },
   {
-    "shortcode": "sparkling_heart",
-    "emoji": "💖"
+    emoji: '💖',
+    shortcode: 'sparkling_heart',
   },
   {
-    "shortcode": "speak_no_evil",
-    "emoji": "🙊"
+    emoji: '🙊',
+    shortcode: 'speak_no_evil',
   },
   {
-    "shortcode": "speaker",
-    "emoji": "🔈"
+    emoji: '🔈',
+    shortcode: 'speaker',
   },
   {
-    "shortcode": "speaking_head",
-    "emoji": "🗣"
+    emoji: '🗣',
+    shortcode: 'speaking_head',
   },
   {
-    "shortcode": "speech_balloon",
-    "emoji": "💬"
+    emoji: '💬',
+    shortcode: 'speech_balloon',
   },
   {
-    "shortcode": "speech_left",
-    "emoji": "🗨"
+    emoji: '🗨',
+    shortcode: 'speech_left',
   },
   {
-    "shortcode": "speedboat",
-    "emoji": "🚤"
+    emoji: '🚤',
+    shortcode: 'speedboat',
   },
   {
-    "shortcode": "spider",
-    "emoji": "🕷"
+    emoji: '🕷',
+    shortcode: 'spider',
   },
   {
-    "shortcode": "spider_web",
-    "emoji": "🕸"
+    emoji: '🕸',
+    shortcode: 'spider_web',
   },
   {
-    "shortcode": "spoon",
-    "emoji": "🥄"
+    emoji: '🥄',
+    shortcode: 'spoon',
   },
   {
-    "shortcode": "squid",
-    "emoji": "🦑"
+    emoji: '🦑',
+    shortcode: 'squid',
   },
   {
-    "shortcode": "stadium",
-    "emoji": "🏟"
+    emoji: '🏟',
+    shortcode: 'stadium',
   },
   {
-    "shortcode": "star",
-    "emoji": "⭐"
+    emoji: '⭐',
+    shortcode: 'star',
   },
   {
-    "shortcode": "star_and_crescent",
-    "emoji": "☪"
+    emoji: '☪',
+    shortcode: 'star_and_crescent',
   },
   {
-    "shortcode": "star_of_david",
-    "emoji": "✡"
+    emoji: '✡',
+    shortcode: 'star_of_david',
   },
   {
-    "shortcode": "star_struck",
-    "emoji": "🤩"
+    emoji: '🤩',
+    shortcode: 'star_struck',
   },
   {
-    "shortcode": "star2",
-    "emoji": "🌟"
+    emoji: '🌟',
+    shortcode: 'star2',
   },
   {
-    "shortcode": "stars",
-    "emoji": "🌠"
+    emoji: '🌠',
+    shortcode: 'stars',
   },
   {
-    "shortcode": "station",
-    "emoji": "🚉"
+    emoji: '🚉',
+    shortcode: 'station',
   },
   {
-    "shortcode": "statue_of_liberty",
-    "emoji": "🗽"
+    emoji: '🗽',
+    shortcode: 'statue_of_liberty',
   },
   {
-    "shortcode": "steam_locomotive",
-    "emoji": "🚂"
+    emoji: '🚂',
+    shortcode: 'steam_locomotive',
   },
   {
-    "shortcode": "stew",
-    "emoji": "🍲"
+    emoji: '🍲',
+    shortcode: 'stew',
   },
   {
-    "shortcode": "stop_button",
-    "emoji": "⏹"
+    emoji: '⏹',
+    shortcode: 'stop_button',
   },
   {
-    "shortcode": "stopwatch",
-    "emoji": "⏱"
+    emoji: '⏱',
+    shortcode: 'stopwatch',
   },
   {
-    "shortcode": "straight_ruler",
-    "emoji": "📏"
+    emoji: '📏',
+    shortcode: 'straight_ruler',
   },
   {
-    "shortcode": "strawberry",
-    "emoji": "🍓"
+    emoji: '🍓',
+    shortcode: 'strawberry',
   },
   {
-    "shortcode": "stuck_out_tongue",
-    "emoji": "😛"
+    emoji: '😛',
+    shortcode: 'stuck_out_tongue',
   },
   {
-    "shortcode": "stuck_out_tongue_closed_eyes",
-    "emoji": "😝"
+    emoji: '😝',
+    shortcode: 'stuck_out_tongue_closed_eyes',
   },
   {
-    "shortcode": "stuck_out_tongue_winking_eye",
-    "emoji": "😜"
+    emoji: '😜',
+    shortcode: 'stuck_out_tongue_winking_eye',
   },
   {
-    "shortcode": "stuffed_flatbread",
-    "emoji": "🥙"
+    emoji: '🥙',
+    shortcode: 'stuffed_flatbread',
   },
   {
-    "shortcode": "sun_with_face",
-    "emoji": "🌞"
+    emoji: '🌞',
+    shortcode: 'sun_with_face',
   },
   {
-    "shortcode": "sunflower",
-    "emoji": "🌻"
+    emoji: '🌻',
+    shortcode: 'sunflower',
   },
   {
-    "shortcode": "sunglasses",
-    "emoji": "😎"
+    emoji: '😎',
+    shortcode: 'sunglasses',
   },
   {
-    "shortcode": "sunny",
-    "emoji": "☀"
+    emoji: '☀',
+    shortcode: 'sunny',
   },
   {
-    "shortcode": "sunrise",
-    "emoji": "🌅"
+    emoji: '🌅',
+    shortcode: 'sunrise',
   },
   {
-    "shortcode": "sunrise_over_mountains",
-    "emoji": "🌄"
+    emoji: '🌄',
+    shortcode: 'sunrise_over_mountains',
   },
   {
-    "shortcode": "sushi",
-    "emoji": "🍣"
+    emoji: '🍣',
+    shortcode: 'sushi',
   },
   {
-    "shortcode": "suspension_railway",
-    "emoji": "🚟"
+    emoji: '🚟',
+    shortcode: 'suspension_railway',
   },
   {
-    "shortcode": "sweat",
-    "emoji": "😓"
+    emoji: '😓',
+    shortcode: 'sweat',
   },
   {
-    "shortcode": "sweat_drops",
-    "emoji": "💦"
+    emoji: '💦',
+    shortcode: 'sweat_drops',
   },
   {
-    "shortcode": "sweat_smile",
-    "emoji": "😅"
+    emoji: '😅',
+    shortcode: 'sweat_smile',
   },
   {
-    "shortcode": "sweet_potato",
-    "emoji": "🍠"
+    emoji: '🍠',
+    shortcode: 'sweet_potato',
   },
   {
-    "shortcode": "symbols",
-    "emoji": "🔣"
+    emoji: '🔣',
+    shortcode: 'symbols',
   },
   {
-    "shortcode": "synagogue",
-    "emoji": "🕍"
+    emoji: '🕍',
+    shortcode: 'synagogue',
   },
   {
-    "shortcode": "syringe",
-    "emoji": "💉"
+    emoji: '💉',
+    shortcode: 'syringe',
   },
   {
-    "shortcode": "t_rex",
-    "emoji": "🦖"
+    emoji: '🦖',
+    shortcode: 't_rex',
   },
   {
-    "shortcode": "taco",
-    "emoji": "🌮"
+    emoji: '🌮',
+    shortcode: 'taco',
   },
   {
-    "shortcode": "tada",
-    "emoji": "🎉"
+    emoji: '🎉',
+    shortcode: 'tada',
   },
   {
-    "shortcode": "takeout_box",
-    "emoji": "🥡"
+    emoji: '🥡',
+    shortcode: 'takeout_box',
   },
   {
-    "shortcode": "tanabata_tree",
-    "emoji": "🎋"
+    emoji: '🎋',
+    shortcode: 'tanabata_tree',
   },
   {
-    "shortcode": "tangerine",
-    "emoji": "🍊"
+    emoji: '🍊',
+    shortcode: 'tangerine',
   },
   {
-    "shortcode": "taurus",
-    "emoji": "♉"
+    emoji: '♉',
+    shortcode: 'taurus',
   },
   {
-    "shortcode": "taxi",
-    "emoji": "🚕"
+    emoji: '🚕',
+    shortcode: 'taxi',
   },
   {
-    "shortcode": "tea",
-    "emoji": "🍵"
+    emoji: '🍵',
+    shortcode: 'tea',
   },
   {
-    "shortcode": "telephone",
-    "emoji": "☎"
+    emoji: '☎',
+    shortcode: 'telephone',
   },
   {
-    "shortcode": "telephone_receiver",
-    "emoji": "📞"
+    emoji: '📞',
+    shortcode: 'telephone_receiver',
   },
   {
-    "shortcode": "telescope",
-    "emoji": "🔭"
+    emoji: '🔭',
+    shortcode: 'telescope',
   },
   {
-    "shortcode": "tennis",
-    "emoji": "🎾"
+    emoji: '🎾',
+    shortcode: 'tennis',
   },
   {
-    "shortcode": "tent",
-    "emoji": "⛺"
+    emoji: '⛺',
+    shortcode: 'tent',
   },
   {
-    "shortcode": "thermometer",
-    "emoji": "🌡"
+    emoji: '🌡',
+    shortcode: 'thermometer',
   },
   {
-    "shortcode": "thermometer_face",
-    "emoji": "🤒"
+    emoji: '🤒',
+    shortcode: 'thermometer_face',
   },
   {
-    "shortcode": "thinking",
-    "emoji": "🤔"
+    emoji: '🤔',
+    shortcode: 'thinking',
   },
   {
-    "shortcode": "third_place",
-    "emoji": "🥉"
+    emoji: '🥉',
+    shortcode: 'third_place',
   },
   {
-    "shortcode": "thought_balloon",
-    "emoji": "💭"
+    emoji: '💭',
+    shortcode: 'thought_balloon',
   },
   {
-    "shortcode": "three",
-    "emoji": "3⃣"
+    emoji: '3⃣',
+    shortcode: 'three',
   },
   {
-    "shortcode": "thumbsdown",
-    "emoji": "👎"
+    emoji: '👎',
+    shortcode: 'thumbsdown',
   },
   {
-    "shortcode": "thumbsdown_tone1",
-    "emoji": "👎🏻"
+    emoji: '👎🏻',
+    shortcode: 'thumbsdown_tone1',
   },
   {
-    "shortcode": "thumbsdown_tone2",
-    "emoji": "👎🏼"
+    emoji: '👎🏼',
+    shortcode: 'thumbsdown_tone2',
   },
   {
-    "shortcode": "thumbsdown_tone3",
-    "emoji": "👎🏽"
+    emoji: '👎🏽',
+    shortcode: 'thumbsdown_tone3',
   },
   {
-    "shortcode": "thumbsdown_tone4",
-    "emoji": "👎🏾"
+    emoji: '👎🏾',
+    shortcode: 'thumbsdown_tone4',
   },
   {
-    "shortcode": "thumbsdown_tone5",
-    "emoji": "👎🏿"
+    emoji: '👎🏿',
+    shortcode: 'thumbsdown_tone5',
   },
   {
-    "shortcode": "thumbsup",
-    "emoji": "👍"
+    emoji: '👍',
+    shortcode: 'thumbsup',
   },
   {
-    "shortcode": "thumbsup_tone1",
-    "emoji": "👍🏻"
+    emoji: '👍🏻',
+    shortcode: 'thumbsup_tone1',
   },
   {
-    "shortcode": "thumbsup_tone2",
-    "emoji": "👍🏼"
+    emoji: '👍🏼',
+    shortcode: 'thumbsup_tone2',
   },
   {
-    "shortcode": "thumbsup_tone3",
-    "emoji": "👍🏽"
+    emoji: '👍🏽',
+    shortcode: 'thumbsup_tone3',
   },
   {
-    "shortcode": "thumbsup_tone4",
-    "emoji": "👍🏾"
+    emoji: '👍🏾',
+    shortcode: 'thumbsup_tone4',
   },
   {
-    "shortcode": "thumbsup_tone5",
-    "emoji": "👍🏿"
+    emoji: '👍🏿',
+    shortcode: 'thumbsup_tone5',
   },
   {
-    "shortcode": "thunder_cloud_rain",
-    "emoji": "⛈"
+    emoji: '⛈',
+    shortcode: 'thunder_cloud_rain',
   },
   {
-    "shortcode": "ticket",
-    "emoji": "🎫"
+    emoji: '🎫',
+    shortcode: 'ticket',
   },
   {
-    "shortcode": "tickets",
-    "emoji": "🎟"
+    emoji: '🎟',
+    shortcode: 'tickets',
   },
   {
-    "shortcode": "tiger",
-    "emoji": "🐯"
+    emoji: '🐯',
+    shortcode: 'tiger',
   },
   {
-    "shortcode": "tiger2",
-    "emoji": "🐅"
+    emoji: '🐅',
+    shortcode: 'tiger2',
   },
   {
-    "shortcode": "timer",
-    "emoji": "⏲"
+    emoji: '⏲',
+    shortcode: 'timer',
   },
   {
-    "shortcode": "tired_face",
-    "emoji": "😫"
+    emoji: '😫',
+    shortcode: 'tired_face',
   },
   {
-    "shortcode": "tm",
-    "emoji": "™"
+    emoji: '™',
+    shortcode: 'tm',
   },
   {
-    "shortcode": "toilet",
-    "emoji": "🚽"
+    emoji: '🚽',
+    shortcode: 'toilet',
   },
   {
-    "shortcode": "tokyo_tower",
-    "emoji": "🗼"
+    emoji: '🗼',
+    shortcode: 'tokyo_tower',
   },
   {
-    "shortcode": "tomato",
-    "emoji": "🍅"
+    emoji: '🍅',
+    shortcode: 'tomato',
   },
   {
-    "shortcode": "tone1",
-    "emoji": "🏻"
+    emoji: '🏻',
+    shortcode: 'tone1',
   },
   {
-    "shortcode": "tone2",
-    "emoji": "🏼"
+    emoji: '🏼',
+    shortcode: 'tone2',
   },
   {
-    "shortcode": "tone3",
-    "emoji": "🏽"
+    emoji: '🏽',
+    shortcode: 'tone3',
   },
   {
-    "shortcode": "tone4",
-    "emoji": "🏾"
+    emoji: '🏾',
+    shortcode: 'tone4',
   },
   {
-    "shortcode": "tone5",
-    "emoji": "🏿"
+    emoji: '🏿',
+    shortcode: 'tone5',
   },
   {
-    "shortcode": "tongue",
-    "emoji": "👅"
+    emoji: '👅',
+    shortcode: 'tongue',
   },
   {
-    "shortcode": "tools",
-    "emoji": "🛠"
+    emoji: '🛠',
+    shortcode: 'tools',
   },
   {
-    "shortcode": "top",
-    "emoji": "🔝"
+    emoji: '🔝',
+    shortcode: 'top',
   },
   {
-    "shortcode": "tophat",
-    "emoji": "🎩"
+    emoji: '🎩',
+    shortcode: 'tophat',
   },
   {
-    "shortcode": "track_next",
-    "emoji": "⏭"
+    emoji: '⏭',
+    shortcode: 'track_next',
   },
   {
-    "shortcode": "track_previous",
-    "emoji": "⏮"
+    emoji: '⏮',
+    shortcode: 'track_previous',
   },
   {
-    "shortcode": "trackball",
-    "emoji": "🖲"
+    emoji: '🖲',
+    shortcode: 'trackball',
   },
   {
-    "shortcode": "tractor",
-    "emoji": "🚜"
+    emoji: '🚜',
+    shortcode: 'tractor',
   },
   {
-    "shortcode": "traffic_light",
-    "emoji": "🚥"
+    emoji: '🚥',
+    shortcode: 'traffic_light',
   },
   {
-    "shortcode": "train",
-    "emoji": "🚋"
+    emoji: '🚋',
+    shortcode: 'train',
   },
   {
-    "shortcode": "train2",
-    "emoji": "🚆"
+    emoji: '🚆',
+    shortcode: 'train2',
   },
   {
-    "shortcode": "tram",
-    "emoji": "🚊"
+    emoji: '🚊',
+    shortcode: 'tram',
   },
   {
-    "shortcode": "triangular_flag_on_post",
-    "emoji": "🚩"
+    emoji: '🚩',
+    shortcode: 'triangular_flag_on_post',
   },
   {
-    "shortcode": "triangular_ruler",
-    "emoji": "📐"
+    emoji: '📐',
+    shortcode: 'triangular_ruler',
   },
   {
-    "shortcode": "trident",
-    "emoji": "🔱"
+    emoji: '🔱',
+    shortcode: 'trident',
   },
   {
-    "shortcode": "triumph",
-    "emoji": "😤"
+    emoji: '😤',
+    shortcode: 'triumph',
   },
   {
-    "shortcode": "trolleybus",
-    "emoji": "🚎"
+    emoji: '🚎',
+    shortcode: 'trolleybus',
   },
   {
-    "shortcode": "trophy",
-    "emoji": "🏆"
+    emoji: '🏆',
+    shortcode: 'trophy',
   },
   {
-    "shortcode": "tropical_drink",
-    "emoji": "🍹"
+    emoji: '🍹',
+    shortcode: 'tropical_drink',
   },
   {
-    "shortcode": "tropical_fish",
-    "emoji": "🐠"
+    emoji: '🐠',
+    shortcode: 'tropical_fish',
   },
   {
-    "shortcode": "truck",
-    "emoji": "🚚"
+    emoji: '🚚',
+    shortcode: 'truck',
   },
   {
-    "shortcode": "trumpet",
-    "emoji": "🎺"
+    emoji: '🎺',
+    shortcode: 'trumpet',
   },
   {
-    "shortcode": "tulip",
-    "emoji": "🌷"
+    emoji: '🌷',
+    shortcode: 'tulip',
   },
   {
-    "shortcode": "tumbler_glass",
-    "emoji": "🥃"
+    emoji: '🥃',
+    shortcode: 'tumbler_glass',
   },
   {
-    "shortcode": "turkey",
-    "emoji": "🦃"
+    emoji: '🦃',
+    shortcode: 'turkey',
   },
   {
-    "shortcode": "turtle",
-    "emoji": "🐢"
+    emoji: '🐢',
+    shortcode: 'turtle',
   },
   {
-    "shortcode": "tv",
-    "emoji": "📺"
+    emoji: '📺',
+    shortcode: 'tv',
   },
   {
-    "shortcode": "twisted_rightwards_arrows",
-    "emoji": "🔀"
+    emoji: '🔀',
+    shortcode: 'twisted_rightwards_arrows',
   },
   {
-    "shortcode": "two",
-    "emoji": "2⃣"
+    emoji: '2⃣',
+    shortcode: 'two',
   },
   {
-    "shortcode": "two_hearts",
-    "emoji": "💕"
+    emoji: '💕',
+    shortcode: 'two_hearts',
   },
   {
-    "shortcode": "two_men_holding_hands",
-    "emoji": "👬"
+    emoji: '👬',
+    shortcode: 'two_men_holding_hands',
   },
   {
-    "shortcode": "two_women_holding_hands",
-    "emoji": "👭"
+    emoji: '👭',
+    shortcode: 'two_women_holding_hands',
   },
   {
-    "shortcode": "u5272",
-    "emoji": "🈹"
+    emoji: '🈹',
+    shortcode: 'u5272',
   },
   {
-    "shortcode": "u5408",
-    "emoji": "🈴"
+    emoji: '🈴',
+    shortcode: 'u5408',
   },
   {
-    "shortcode": "u55b6",
-    "emoji": "🈺"
+    emoji: '🈺',
+    shortcode: 'u55b6',
   },
   {
-    "shortcode": "u6307",
-    "emoji": "🈯"
+    emoji: '🈯',
+    shortcode: 'u6307',
   },
   {
-    "shortcode": "u6708",
-    "emoji": "🈷"
+    emoji: '🈷',
+    shortcode: 'u6708',
   },
   {
-    "shortcode": "u6709",
-    "emoji": "🈶"
+    emoji: '🈶',
+    shortcode: 'u6709',
   },
   {
-    "shortcode": "u6e80",
-    "emoji": "🈵"
+    emoji: '🈵',
+    shortcode: 'u6e80',
   },
   {
-    "shortcode": "u7121",
-    "emoji": "🈚"
+    emoji: '🈚',
+    shortcode: 'u7121',
   },
   {
-    "shortcode": "u7533",
-    "emoji": "🈸"
+    emoji: '🈸',
+    shortcode: 'u7533',
   },
   {
-    "shortcode": "u7981",
-    "emoji": "🈲"
+    emoji: '🈲',
+    shortcode: 'u7981',
   },
   {
-    "shortcode": "u7a7a",
-    "emoji": "🈳"
+    emoji: '🈳',
+    shortcode: 'u7a7a',
   },
   {
-    "shortcode": "umbrella",
-    "emoji": "☔"
+    emoji: '☔',
+    shortcode: 'umbrella',
   },
   {
-    "shortcode": "umbrella2",
-    "emoji": "☂"
+    emoji: '☂',
+    shortcode: 'umbrella2',
   },
   {
-    "shortcode": "unamused",
-    "emoji": "😒"
+    emoji: '😒',
+    shortcode: 'unamused',
   },
   {
-    "shortcode": "underage",
-    "emoji": "🔞"
+    emoji: '🔞',
+    shortcode: 'underage',
   },
   {
-    "shortcode": "unicorn",
-    "emoji": "🦄"
+    emoji: '🦄',
+    shortcode: 'unicorn',
   },
   {
-    "shortcode": "united_nations",
-    "emoji": "🇺🇳"
+    emoji: '🇺🇳',
+    shortcode: 'united_nations',
   },
   {
-    "shortcode": "unlock",
-    "emoji": "🔓"
+    emoji: '🔓',
+    shortcode: 'unlock',
   },
   {
-    "shortcode": "up",
-    "emoji": "🆙"
+    emoji: '🆙',
+    shortcode: 'up',
   },
   {
-    "shortcode": "upside_down",
-    "emoji": "🙃"
+    emoji: '🙃',
+    shortcode: 'upside_down',
   },
   {
-    "shortcode": "urn",
-    "emoji": "⚱"
+    emoji: '⚱',
+    shortcode: 'urn',
   },
   {
-    "shortcode": "v",
-    "emoji": "✌"
+    emoji: '✌',
+    shortcode: 'v',
   },
   {
-    "shortcode": "v_tone1",
-    "emoji": "✌🏻"
+    emoji: '✌🏻',
+    shortcode: 'v_tone1',
   },
   {
-    "shortcode": "v_tone2",
-    "emoji": "✌🏼"
+    emoji: '✌🏼',
+    shortcode: 'v_tone2',
   },
   {
-    "shortcode": "v_tone3",
-    "emoji": "✌🏽"
+    emoji: '✌🏽',
+    shortcode: 'v_tone3',
   },
   {
-    "shortcode": "v_tone4",
-    "emoji": "✌🏾"
+    emoji: '✌🏾',
+    shortcode: 'v_tone4',
   },
   {
-    "shortcode": "v_tone5",
-    "emoji": "✌🏿"
+    emoji: '✌🏿',
+    shortcode: 'v_tone5',
   },
   {
-    "shortcode": "vampire",
-    "emoji": "🧛"
+    emoji: '🧛',
+    shortcode: 'vampire',
   },
   {
-    "shortcode": "vampire_tone1",
-    "emoji": "🧛🏻"
+    emoji: '🧛🏻',
+    shortcode: 'vampire_tone1',
   },
   {
-    "shortcode": "vampire_tone2",
-    "emoji": "🧛🏼"
+    emoji: '🧛🏼',
+    shortcode: 'vampire_tone2',
   },
   {
-    "shortcode": "vampire_tone3",
-    "emoji": "🧛🏽"
+    emoji: '🧛🏽',
+    shortcode: 'vampire_tone3',
   },
   {
-    "shortcode": "vampire_tone4",
-    "emoji": "🧛🏾"
+    emoji: '🧛🏾',
+    shortcode: 'vampire_tone4',
   },
   {
-    "shortcode": "vampire_tone5",
-    "emoji": "🧛🏿"
+    emoji: '🧛🏿',
+    shortcode: 'vampire_tone5',
   },
   {
-    "shortcode": "vertical_traffic_light",
-    "emoji": "🚦"
+    emoji: '🚦',
+    shortcode: 'vertical_traffic_light',
   },
   {
-    "shortcode": "vhs",
-    "emoji": "📼"
+    emoji: '📼',
+    shortcode: 'vhs',
   },
   {
-    "shortcode": "vibration_mode",
-    "emoji": "📳"
+    emoji: '📳',
+    shortcode: 'vibration_mode',
   },
   {
-    "shortcode": "video_camera",
-    "emoji": "📹"
+    emoji: '📹',
+    shortcode: 'video_camera',
   },
   {
-    "shortcode": "video_game",
-    "emoji": "🎮"
+    emoji: '🎮',
+    shortcode: 'video_game',
   },
   {
-    "shortcode": "violin",
-    "emoji": "🎻"
+    emoji: '🎻',
+    shortcode: 'violin',
   },
   {
-    "shortcode": "virgo",
-    "emoji": "♍"
+    emoji: '♍',
+    shortcode: 'virgo',
   },
   {
-    "shortcode": "volcano",
-    "emoji": "🌋"
+    emoji: '🌋',
+    shortcode: 'volcano',
   },
   {
-    "shortcode": "volleyball",
-    "emoji": "🏐"
+    emoji: '🏐',
+    shortcode: 'volleyball',
   },
   {
-    "shortcode": "vs",
-    "emoji": "🆚"
+    emoji: '🆚',
+    shortcode: 'vs',
   },
   {
-    "shortcode": "vulcan",
-    "emoji": "🖖"
+    emoji: '🖖',
+    shortcode: 'vulcan',
   },
   {
-    "shortcode": "vulcan_tone1",
-    "emoji": "🖖🏻"
+    emoji: '🖖🏻',
+    shortcode: 'vulcan_tone1',
   },
   {
-    "shortcode": "vulcan_tone2",
-    "emoji": "🖖🏼"
+    emoji: '🖖🏼',
+    shortcode: 'vulcan_tone2',
   },
   {
-    "shortcode": "vulcan_tone3",
-    "emoji": "🖖🏽"
+    emoji: '🖖🏽',
+    shortcode: 'vulcan_tone3',
   },
   {
-    "shortcode": "vulcan_tone4",
-    "emoji": "🖖🏾"
+    emoji: '🖖🏾',
+    shortcode: 'vulcan_tone4',
   },
   {
-    "shortcode": "vulcan_tone5",
-    "emoji": "🖖🏿"
+    emoji: '🖖🏿',
+    shortcode: 'vulcan_tone5',
   },
   {
-    "shortcode": "wales",
-    "emoji": "🏴󠁧󠁢󠁷󠁬󠁳󠁿"
+    emoji: '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+    shortcode: 'wales',
   },
   {
-    "shortcode": "waning_crescent_moon",
-    "emoji": "🌘"
+    emoji: '🌘',
+    shortcode: 'waning_crescent_moon',
   },
   {
-    "shortcode": "waning_gibbous_moon",
-    "emoji": "🌖"
+    emoji: '🌖',
+    shortcode: 'waning_gibbous_moon',
   },
   {
-    "shortcode": "warning",
-    "emoji": "⚠"
+    emoji: '⚠',
+    shortcode: 'warning',
   },
   {
-    "shortcode": "wastebasket",
-    "emoji": "🗑"
+    emoji: '🗑',
+    shortcode: 'wastebasket',
   },
   {
-    "shortcode": "watch",
-    "emoji": "⌚"
+    emoji: '⌚',
+    shortcode: 'watch',
   },
   {
-    "shortcode": "water_buffalo",
-    "emoji": "🐃"
+    emoji: '🐃',
+    shortcode: 'water_buffalo',
   },
   {
-    "shortcode": "watermelon",
-    "emoji": "🍉"
+    emoji: '🍉',
+    shortcode: 'watermelon',
   },
   {
-    "shortcode": "wave",
-    "emoji": "👋"
+    emoji: '👋',
+    shortcode: 'wave',
   },
   {
-    "shortcode": "wave_tone1",
-    "emoji": "👋🏻"
+    emoji: '👋🏻',
+    shortcode: 'wave_tone1',
   },
   {
-    "shortcode": "wave_tone2",
-    "emoji": "👋🏼"
+    emoji: '👋🏼',
+    shortcode: 'wave_tone2',
   },
   {
-    "shortcode": "wave_tone3",
-    "emoji": "👋🏽"
+    emoji: '👋🏽',
+    shortcode: 'wave_tone3',
   },
   {
-    "shortcode": "wave_tone4",
-    "emoji": "👋🏾"
+    emoji: '👋🏾',
+    shortcode: 'wave_tone4',
   },
   {
-    "shortcode": "wave_tone5",
-    "emoji": "👋🏿"
+    emoji: '👋🏿',
+    shortcode: 'wave_tone5',
   },
   {
-    "shortcode": "wavy_dash",
-    "emoji": "〰"
+    emoji: '〰',
+    shortcode: 'wavy_dash',
   },
   {
-    "shortcode": "waxing_crescent_moon",
-    "emoji": "🌒"
+    emoji: '🌒',
+    shortcode: 'waxing_crescent_moon',
   },
   {
-    "shortcode": "waxing_gibbous_moon",
-    "emoji": "🌔"
+    emoji: '🌔',
+    shortcode: 'waxing_gibbous_moon',
   },
   {
-    "shortcode": "wc",
-    "emoji": "🚾"
+    emoji: '🚾',
+    shortcode: 'wc',
   },
   {
-    "shortcode": "weary",
-    "emoji": "😩"
+    emoji: '😩',
+    shortcode: 'weary',
   },
   {
-    "shortcode": "wedding",
-    "emoji": "💒"
+    emoji: '💒',
+    shortcode: 'wedding',
   },
   {
-    "shortcode": "whale",
-    "emoji": "🐳"
+    emoji: '🐳',
+    shortcode: 'whale',
   },
   {
-    "shortcode": "whale2",
-    "emoji": "🐋"
+    emoji: '🐋',
+    shortcode: 'whale2',
   },
   {
-    "shortcode": "wheel_of_dharma",
-    "emoji": "☸"
+    emoji: '☸',
+    shortcode: 'wheel_of_dharma',
   },
   {
-    "shortcode": "wheelchair",
-    "emoji": "♿"
+    emoji: '♿',
+    shortcode: 'wheelchair',
   },
   {
-    "shortcode": "white_check_mark",
-    "emoji": "✅"
+    emoji: '✅',
+    shortcode: 'white_check_mark',
   },
   {
-    "shortcode": "white_circle",
-    "emoji": "⚪"
+    emoji: '⚪',
+    shortcode: 'white_circle',
   },
   {
-    "shortcode": "white_flower",
-    "emoji": "💮"
+    emoji: '💮',
+    shortcode: 'white_flower',
   },
   {
-    "shortcode": "white_large_square",
-    "emoji": "⬜"
+    emoji: '⬜',
+    shortcode: 'white_large_square',
   },
   {
-    "shortcode": "white_medium_small_square",
-    "emoji": "◽"
+    emoji: '◽',
+    shortcode: 'white_medium_small_square',
   },
   {
-    "shortcode": "white_medium_square",
-    "emoji": "◻"
+    emoji: '◻',
+    shortcode: 'white_medium_square',
   },
   {
-    "shortcode": "white_small_square",
-    "emoji": "▫"
+    emoji: '▫',
+    shortcode: 'white_small_square',
   },
   {
-    "shortcode": "white_square_button",
-    "emoji": "🔳"
+    emoji: '🔳',
+    shortcode: 'white_square_button',
   },
   {
-    "shortcode": "white_sun_cloud",
-    "emoji": "🌥"
+    emoji: '🌥',
+    shortcode: 'white_sun_cloud',
   },
   {
-    "shortcode": "white_sun_rain_cloud",
-    "emoji": "🌦"
+    emoji: '🌦',
+    shortcode: 'white_sun_rain_cloud',
   },
   {
-    "shortcode": "white_sun_small_cloud",
-    "emoji": "🌤"
+    emoji: '🌤',
+    shortcode: 'white_sun_small_cloud',
   },
   {
-    "shortcode": "wilted_rose",
-    "emoji": "🥀"
+    emoji: '🥀',
+    shortcode: 'wilted_rose',
   },
   {
-    "shortcode": "wind_blowing_face",
-    "emoji": "🌬"
+    emoji: '🌬',
+    shortcode: 'wind_blowing_face',
   },
   {
-    "shortcode": "wind_chime",
-    "emoji": "🎐"
+    emoji: '🎐',
+    shortcode: 'wind_chime',
   },
   {
-    "shortcode": "wine_glass",
-    "emoji": "🍷"
+    emoji: '🍷',
+    shortcode: 'wine_glass',
   },
   {
-    "shortcode": "wink",
-    "emoji": "😉"
+    emoji: '😉',
+    shortcode: 'wink',
   },
   {
-    "shortcode": "wolf",
-    "emoji": "🐺"
+    emoji: '🐺',
+    shortcode: 'wolf',
   },
   {
-    "shortcode": "woman",
-    "emoji": "👩"
+    emoji: '👩',
+    shortcode: 'woman',
   },
   {
-    "shortcode": "woman_artist",
-    "emoji": "👩🎨"
+    emoji: '👩🎨',
+    shortcode: 'woman_artist',
   },
   {
-    "shortcode": "woman_artist_tone1",
-    "emoji": "👩🏻🎨"
+    emoji: '👩🏻🎨',
+    shortcode: 'woman_artist_tone1',
   },
   {
-    "shortcode": "woman_artist_tone2",
-    "emoji": "👩🏼🎨"
+    emoji: '👩🏼🎨',
+    shortcode: 'woman_artist_tone2',
   },
   {
-    "shortcode": "woman_artist_tone3",
-    "emoji": "👩🏽🎨"
+    emoji: '👩🏽🎨',
+    shortcode: 'woman_artist_tone3',
   },
   {
-    "shortcode": "woman_artist_tone4",
-    "emoji": "👩🏾🎨"
+    emoji: '👩🏾🎨',
+    shortcode: 'woman_artist_tone4',
   },
   {
-    "shortcode": "woman_artist_tone5",
-    "emoji": "👩🏿🎨"
+    emoji: '👩🏿🎨',
+    shortcode: 'woman_artist_tone5',
   },
   {
-    "shortcode": "woman_astronaut",
-    "emoji": "👩🚀"
+    emoji: '👩🚀',
+    shortcode: 'woman_astronaut',
   },
   {
-    "shortcode": "woman_astronaut_tone1",
-    "emoji": "👩🏻🚀"
+    emoji: '👩🏻🚀',
+    shortcode: 'woman_astronaut_tone1',
   },
   {
-    "shortcode": "woman_astronaut_tone2",
-    "emoji": "👩🏼🚀"
+    emoji: '👩🏼🚀',
+    shortcode: 'woman_astronaut_tone2',
   },
   {
-    "shortcode": "woman_astronaut_tone3",
-    "emoji": "👩🏽🚀"
+    emoji: '👩🏽🚀',
+    shortcode: 'woman_astronaut_tone3',
   },
   {
-    "shortcode": "woman_astronaut_tone4",
-    "emoji": "👩🏾🚀"
+    emoji: '👩🏾🚀',
+    shortcode: 'woman_astronaut_tone4',
   },
   {
-    "shortcode": "woman_astronaut_tone5",
-    "emoji": "👩🏿🚀"
+    emoji: '👩🏿🚀',
+    shortcode: 'woman_astronaut_tone5',
   },
   {
-    "shortcode": "woman_biking",
-    "emoji": "🚴♀"
+    emoji: '🚴♀',
+    shortcode: 'woman_biking',
   },
   {
-    "shortcode": "woman_biking_tone1",
-    "emoji": "🚴🏻♀"
+    emoji: '🚴🏻♀',
+    shortcode: 'woman_biking_tone1',
   },
   {
-    "shortcode": "woman_biking_tone2",
-    "emoji": "🚴🏼♀"
+    emoji: '🚴🏼♀',
+    shortcode: 'woman_biking_tone2',
   },
   {
-    "shortcode": "woman_biking_tone3",
-    "emoji": "🚴🏽♀"
+    emoji: '🚴🏽♀',
+    shortcode: 'woman_biking_tone3',
   },
   {
-    "shortcode": "woman_biking_tone4",
-    "emoji": "🚴🏾♀"
+    emoji: '🚴🏾♀',
+    shortcode: 'woman_biking_tone4',
   },
   {
-    "shortcode": "woman_biking_tone5",
-    "emoji": "🚴🏿♀"
+    emoji: '🚴🏿♀',
+    shortcode: 'woman_biking_tone5',
   },
   {
-    "shortcode": "woman_bouncing_ball",
-    "emoji": "⛹♀"
+    emoji: '⛹♀',
+    shortcode: 'woman_bouncing_ball',
   },
   {
-    "shortcode": "woman_bouncing_ball_tone1",
-    "emoji": "⛹🏻♀"
+    emoji: '⛹🏻♀',
+    shortcode: 'woman_bouncing_ball_tone1',
   },
   {
-    "shortcode": "woman_bouncing_ball_tone2",
-    "emoji": "⛹🏼♀"
+    emoji: '⛹🏼♀',
+    shortcode: 'woman_bouncing_ball_tone2',
   },
   {
-    "shortcode": "woman_bouncing_ball_tone3",
-    "emoji": "⛹🏽♀"
+    emoji: '⛹🏽♀',
+    shortcode: 'woman_bouncing_ball_tone3',
   },
   {
-    "shortcode": "woman_bouncing_ball_tone4",
-    "emoji": "⛹🏾♀"
+    emoji: '⛹🏾♀',
+    shortcode: 'woman_bouncing_ball_tone4',
   },
   {
-    "shortcode": "woman_bouncing_ball_tone5",
-    "emoji": "⛹🏿♀"
+    emoji: '⛹🏿♀',
+    shortcode: 'woman_bouncing_ball_tone5',
   },
   {
-    "shortcode": "woman_bowing",
-    "emoji": "🙇♀"
+    emoji: '🙇♀',
+    shortcode: 'woman_bowing',
   },
   {
-    "shortcode": "woman_bowing_tone1",
-    "emoji": "🙇🏻♀"
+    emoji: '🙇🏻♀',
+    shortcode: 'woman_bowing_tone1',
   },
   {
-    "shortcode": "woman_bowing_tone2",
-    "emoji": "🙇🏼♀"
+    emoji: '🙇🏼♀',
+    shortcode: 'woman_bowing_tone2',
   },
   {
-    "shortcode": "woman_bowing_tone3",
-    "emoji": "🙇🏽♀"
+    emoji: '🙇🏽♀',
+    shortcode: 'woman_bowing_tone3',
   },
   {
-    "shortcode": "woman_bowing_tone4",
-    "emoji": "🙇🏾♀"
+    emoji: '🙇🏾♀',
+    shortcode: 'woman_bowing_tone4',
   },
   {
-    "shortcode": "woman_bowing_tone5",
-    "emoji": "🙇🏿♀"
+    emoji: '🙇🏿♀',
+    shortcode: 'woman_bowing_tone5',
   },
   {
-    "shortcode": "woman_cartwheeling",
-    "emoji": "🤸♀"
+    emoji: '🤸♀',
+    shortcode: 'woman_cartwheeling',
   },
   {
-    "shortcode": "woman_cartwheeling_tone1",
-    "emoji": "🤸🏻♀"
+    emoji: '🤸🏻♀',
+    shortcode: 'woman_cartwheeling_tone1',
   },
   {
-    "shortcode": "woman_cartwheeling_tone2",
-    "emoji": "🤸🏼♀"
+    emoji: '🤸🏼♀',
+    shortcode: 'woman_cartwheeling_tone2',
   },
   {
-    "shortcode": "woman_cartwheeling_tone3",
-    "emoji": "🤸🏽♀"
+    emoji: '🤸🏽♀',
+    shortcode: 'woman_cartwheeling_tone3',
   },
   {
-    "shortcode": "woman_cartwheeling_tone4",
-    "emoji": "🤸🏾♀"
+    emoji: '🤸🏾♀',
+    shortcode: 'woman_cartwheeling_tone4',
   },
   {
-    "shortcode": "woman_cartwheeling_tone5",
-    "emoji": "🤸🏿♀"
+    emoji: '🤸🏿♀',
+    shortcode: 'woman_cartwheeling_tone5',
   },
   {
-    "shortcode": "woman_climbing",
-    "emoji": "🧗♀"
+    emoji: '🧗♀',
+    shortcode: 'woman_climbing',
   },
   {
-    "shortcode": "woman_climbing_tone1",
-    "emoji": "🧗🏻♀"
+    emoji: '🧗🏻♀',
+    shortcode: 'woman_climbing_tone1',
   },
   {
-    "shortcode": "woman_climbing_tone2",
-    "emoji": "🧗🏼♀"
+    emoji: '🧗🏼♀',
+    shortcode: 'woman_climbing_tone2',
   },
   {
-    "shortcode": "woman_climbing_tone3",
-    "emoji": "🧗🏽♀"
+    emoji: '🧗🏽♀',
+    shortcode: 'woman_climbing_tone3',
   },
   {
-    "shortcode": "woman_climbing_tone4",
-    "emoji": "🧗🏾♀"
+    emoji: '🧗🏾♀',
+    shortcode: 'woman_climbing_tone4',
   },
   {
-    "shortcode": "woman_climbing_tone5",
-    "emoji": "🧗🏿♀"
+    emoji: '🧗🏿♀',
+    shortcode: 'woman_climbing_tone5',
   },
   {
-    "shortcode": "woman_construction_worker",
-    "emoji": "👷♀"
+    emoji: '👷♀',
+    shortcode: 'woman_construction_worker',
   },
   {
-    "shortcode": "woman_construction_worker_tone1",
-    "emoji": "👷🏻♀"
+    emoji: '👷🏻♀',
+    shortcode: 'woman_construction_worker_tone1',
   },
   {
-    "shortcode": "woman_construction_worker_tone2",
-    "emoji": "👷🏼♀"
+    emoji: '👷🏼♀',
+    shortcode: 'woman_construction_worker_tone2',
   },
   {
-    "shortcode": "woman_construction_worker_tone3",
-    "emoji": "👷🏽♀"
+    emoji: '👷🏽♀',
+    shortcode: 'woman_construction_worker_tone3',
   },
   {
-    "shortcode": "woman_construction_worker_tone4",
-    "emoji": "👷🏾♀"
+    emoji: '👷🏾♀',
+    shortcode: 'woman_construction_worker_tone4',
   },
   {
-    "shortcode": "woman_construction_worker_tone5",
-    "emoji": "👷🏿♀"
+    emoji: '👷🏿♀',
+    shortcode: 'woman_construction_worker_tone5',
   },
   {
-    "shortcode": "woman_cook",
-    "emoji": "👩🍳"
+    emoji: '👩🍳',
+    shortcode: 'woman_cook',
   },
   {
-    "shortcode": "woman_cook_tone1",
-    "emoji": "👩🏻🍳"
+    emoji: '👩🏻🍳',
+    shortcode: 'woman_cook_tone1',
   },
   {
-    "shortcode": "woman_cook_tone2",
-    "emoji": "👩🏼🍳"
+    emoji: '👩🏼🍳',
+    shortcode: 'woman_cook_tone2',
   },
   {
-    "shortcode": "woman_cook_tone3",
-    "emoji": "👩🏽🍳"
+    emoji: '👩🏽🍳',
+    shortcode: 'woman_cook_tone3',
   },
   {
-    "shortcode": "woman_cook_tone4",
-    "emoji": "👩🏾🍳"
+    emoji: '👩🏾🍳',
+    shortcode: 'woman_cook_tone4',
   },
   {
-    "shortcode": "woman_cook_tone5",
-    "emoji": "👩🏿🍳"
+    emoji: '👩🏿🍳',
+    shortcode: 'woman_cook_tone5',
   },
   {
-    "shortcode": "woman_detective",
-    "emoji": "🕵♀"
+    emoji: '🕵♀',
+    shortcode: 'woman_detective',
   },
   {
-    "shortcode": "woman_detective_tone1",
-    "emoji": "🕵🏻♀"
+    emoji: '🕵🏻♀',
+    shortcode: 'woman_detective_tone1',
   },
   {
-    "shortcode": "woman_detective_tone2",
-    "emoji": "🕵🏼♀"
+    emoji: '🕵🏼♀',
+    shortcode: 'woman_detective_tone2',
   },
   {
-    "shortcode": "woman_detective_tone3",
-    "emoji": "🕵🏽♀"
+    emoji: '🕵🏽♀',
+    shortcode: 'woman_detective_tone3',
   },
   {
-    "shortcode": "woman_detective_tone4",
-    "emoji": "🕵🏾♀"
+    emoji: '🕵🏾♀',
+    shortcode: 'woman_detective_tone4',
   },
   {
-    "shortcode": "woman_detective_tone5",
-    "emoji": "🕵🏿♀"
+    emoji: '🕵🏿♀',
+    shortcode: 'woman_detective_tone5',
   },
   {
-    "shortcode": "woman_elf",
-    "emoji": "🧝♀"
+    emoji: '🧝♀',
+    shortcode: 'woman_elf',
   },
   {
-    "shortcode": "woman_elf_tone1",
-    "emoji": "🧝🏻♀"
+    emoji: '🧝🏻♀',
+    shortcode: 'woman_elf_tone1',
   },
   {
-    "shortcode": "woman_elf_tone2",
-    "emoji": "🧝🏼♀"
+    emoji: '🧝🏼♀',
+    shortcode: 'woman_elf_tone2',
   },
   {
-    "shortcode": "woman_elf_tone3",
-    "emoji": "🧝🏽♀"
+    emoji: '🧝🏽♀',
+    shortcode: 'woman_elf_tone3',
   },
   {
-    "shortcode": "woman_elf_tone4",
-    "emoji": "🧝🏾♀"
+    emoji: '🧝🏾♀',
+    shortcode: 'woman_elf_tone4',
   },
   {
-    "shortcode": "woman_elf_tone5",
-    "emoji": "🧝🏿♀"
+    emoji: '🧝🏿♀',
+    shortcode: 'woman_elf_tone5',
   },
   {
-    "shortcode": "woman_facepalming",
-    "emoji": "🤦♀"
+    emoji: '🤦♀',
+    shortcode: 'woman_facepalming',
   },
   {
-    "shortcode": "woman_facepalming_tone1",
-    "emoji": "🤦🏻♀"
+    emoji: '🤦🏻♀',
+    shortcode: 'woman_facepalming_tone1',
   },
   {
-    "shortcode": "woman_facepalming_tone2",
-    "emoji": "🤦🏼♀"
+    emoji: '🤦🏼♀',
+    shortcode: 'woman_facepalming_tone2',
   },
   {
-    "shortcode": "woman_facepalming_tone3",
-    "emoji": "🤦🏽♀"
+    emoji: '🤦🏽♀',
+    shortcode: 'woman_facepalming_tone3',
   },
   {
-    "shortcode": "woman_facepalming_tone4",
-    "emoji": "🤦🏾♀"
+    emoji: '🤦🏾♀',
+    shortcode: 'woman_facepalming_tone4',
   },
   {
-    "shortcode": "woman_facepalming_tone5",
-    "emoji": "🤦🏿♀"
+    emoji: '🤦🏿♀',
+    shortcode: 'woman_facepalming_tone5',
   },
   {
-    "shortcode": "woman_factory_worker",
-    "emoji": "👩🏭"
+    emoji: '👩🏭',
+    shortcode: 'woman_factory_worker',
   },
   {
-    "shortcode": "woman_factory_worker_tone1",
-    "emoji": "👩🏻🏭"
+    emoji: '👩🏻🏭',
+    shortcode: 'woman_factory_worker_tone1',
   },
   {
-    "shortcode": "woman_factory_worker_tone2",
-    "emoji": "👩🏼🏭"
+    emoji: '👩🏼🏭',
+    shortcode: 'woman_factory_worker_tone2',
   },
   {
-    "shortcode": "woman_factory_worker_tone3",
-    "emoji": "👩🏽🏭"
+    emoji: '👩🏽🏭',
+    shortcode: 'woman_factory_worker_tone3',
   },
   {
-    "shortcode": "woman_factory_worker_tone4",
-    "emoji": "👩🏾🏭"
+    emoji: '👩🏾🏭',
+    shortcode: 'woman_factory_worker_tone4',
   },
   {
-    "shortcode": "woman_factory_worker_tone5",
-    "emoji": "👩🏿🏭"
+    emoji: '👩🏿🏭',
+    shortcode: 'woman_factory_worker_tone5',
   },
   {
-    "shortcode": "woman_fairy",
-    "emoji": "🧚♀"
+    emoji: '🧚♀',
+    shortcode: 'woman_fairy',
   },
   {
-    "shortcode": "woman_fairy_tone1",
-    "emoji": "🧚🏻♀"
+    emoji: '🧚🏻♀',
+    shortcode: 'woman_fairy_tone1',
   },
   {
-    "shortcode": "woman_fairy_tone2",
-    "emoji": "🧚🏼♀"
+    emoji: '🧚🏼♀',
+    shortcode: 'woman_fairy_tone2',
   },
   {
-    "shortcode": "woman_fairy_tone3",
-    "emoji": "🧚🏽♀"
+    emoji: '🧚🏽♀',
+    shortcode: 'woman_fairy_tone3',
   },
   {
-    "shortcode": "woman_fairy_tone4",
-    "emoji": "🧚🏾♀"
+    emoji: '🧚🏾♀',
+    shortcode: 'woman_fairy_tone4',
   },
   {
-    "shortcode": "woman_fairy_tone5",
-    "emoji": "🧚🏿♀"
+    emoji: '🧚🏿♀',
+    shortcode: 'woman_fairy_tone5',
   },
   {
-    "shortcode": "woman_farmer",
-    "emoji": "👩🌾"
+    emoji: '👩🌾',
+    shortcode: 'woman_farmer',
   },
   {
-    "shortcode": "woman_farmer_tone1",
-    "emoji": "👩🏻🌾"
+    emoji: '👩🏻🌾',
+    shortcode: 'woman_farmer_tone1',
   },
   {
-    "shortcode": "woman_farmer_tone2",
-    "emoji": "👩🏼🌾"
+    emoji: '👩🏼🌾',
+    shortcode: 'woman_farmer_tone2',
   },
   {
-    "shortcode": "woman_farmer_tone3",
-    "emoji": "👩🏽🌾"
+    emoji: '👩🏽🌾',
+    shortcode: 'woman_farmer_tone3',
   },
   {
-    "shortcode": "woman_farmer_tone4",
-    "emoji": "👩🏾🌾"
+    emoji: '👩🏾🌾',
+    shortcode: 'woman_farmer_tone4',
   },
   {
-    "shortcode": "woman_farmer_tone5",
-    "emoji": "👩🏿🌾"
+    emoji: '👩🏿🌾',
+    shortcode: 'woman_farmer_tone5',
   },
   {
-    "shortcode": "woman_firefighter",
-    "emoji": "👩🚒"
+    emoji: '👩🚒',
+    shortcode: 'woman_firefighter',
   },
   {
-    "shortcode": "woman_firefighter_tone1",
-    "emoji": "👩🏻🚒"
+    emoji: '👩🏻🚒',
+    shortcode: 'woman_firefighter_tone1',
   },
   {
-    "shortcode": "woman_firefighter_tone2",
-    "emoji": "👩🏼🚒"
+    emoji: '👩🏼🚒',
+    shortcode: 'woman_firefighter_tone2',
   },
   {
-    "shortcode": "woman_firefighter_tone3",
-    "emoji": "👩🏽🚒"
+    emoji: '👩🏽🚒',
+    shortcode: 'woman_firefighter_tone3',
   },
   {
-    "shortcode": "woman_firefighter_tone4",
-    "emoji": "👩🏾🚒"
+    emoji: '👩🏾🚒',
+    shortcode: 'woman_firefighter_tone4',
   },
   {
-    "shortcode": "woman_firefighter_tone5",
-    "emoji": "👩🏿🚒"
+    emoji: '👩🏿🚒',
+    shortcode: 'woman_firefighter_tone5',
   },
   {
-    "shortcode": "woman_frowning",
-    "emoji": "🙍♀"
+    emoji: '🙍♀',
+    shortcode: 'woman_frowning',
   },
   {
-    "shortcode": "woman_frowning_tone1",
-    "emoji": "🙍🏻♀"
+    emoji: '🙍🏻♀',
+    shortcode: 'woman_frowning_tone1',
   },
   {
-    "shortcode": "woman_frowning_tone2",
-    "emoji": "🙍🏼♀"
+    emoji: '🙍🏼♀',
+    shortcode: 'woman_frowning_tone2',
   },
   {
-    "shortcode": "woman_frowning_tone3",
-    "emoji": "🙍🏽♀"
+    emoji: '🙍🏽♀',
+    shortcode: 'woman_frowning_tone3',
   },
   {
-    "shortcode": "woman_frowning_tone4",
-    "emoji": "🙍🏾♀"
+    emoji: '🙍🏾♀',
+    shortcode: 'woman_frowning_tone4',
   },
   {
-    "shortcode": "woman_frowning_tone5",
-    "emoji": "🙍🏿♀"
+    emoji: '🙍🏿♀',
+    shortcode: 'woman_frowning_tone5',
   },
   {
-    "shortcode": "woman_genie",
-    "emoji": "🧞♀"
+    emoji: '🧞♀',
+    shortcode: 'woman_genie',
   },
   {
-    "shortcode": "woman_gesturing_no",
-    "emoji": "🙅♀"
+    emoji: '🙅♀',
+    shortcode: 'woman_gesturing_no',
   },
   {
-    "shortcode": "woman_gesturing_no_tone1",
-    "emoji": "🙅🏻♀"
+    emoji: '🙅🏻♀',
+    shortcode: 'woman_gesturing_no_tone1',
   },
   {
-    "shortcode": "woman_gesturing_no_tone2",
-    "emoji": "🙅🏼♀"
+    emoji: '🙅🏼♀',
+    shortcode: 'woman_gesturing_no_tone2',
   },
   {
-    "shortcode": "woman_gesturing_no_tone3",
-    "emoji": "🙅🏽♀"
+    emoji: '🙅🏽♀',
+    shortcode: 'woman_gesturing_no_tone3',
   },
   {
-    "shortcode": "woman_gesturing_no_tone4",
-    "emoji": "🙅🏾♀"
+    emoji: '🙅🏾♀',
+    shortcode: 'woman_gesturing_no_tone4',
   },
   {
-    "shortcode": "woman_gesturing_no_tone5",
-    "emoji": "🙅🏿♀"
+    emoji: '🙅🏿♀',
+    shortcode: 'woman_gesturing_no_tone5',
   },
   {
-    "shortcode": "woman_gesturing_ok",
-    "emoji": "🙆♀"
+    emoji: '🙆♀',
+    shortcode: 'woman_gesturing_ok',
   },
   {
-    "shortcode": "woman_gesturing_ok_tone1",
-    "emoji": "🙆🏻♀"
+    emoji: '🙆🏻♀',
+    shortcode: 'woman_gesturing_ok_tone1',
   },
   {
-    "shortcode": "woman_gesturing_ok_tone2",
-    "emoji": "🙆🏼♀"
+    emoji: '🙆🏼♀',
+    shortcode: 'woman_gesturing_ok_tone2',
   },
   {
-    "shortcode": "woman_gesturing_ok_tone3",
-    "emoji": "🙆🏽♀"
+    emoji: '🙆🏽♀',
+    shortcode: 'woman_gesturing_ok_tone3',
   },
   {
-    "shortcode": "woman_gesturing_ok_tone4",
-    "emoji": "🙆🏾♀"
+    emoji: '🙆🏾♀',
+    shortcode: 'woman_gesturing_ok_tone4',
   },
   {
-    "shortcode": "woman_gesturing_ok_tone5",
-    "emoji": "🙆🏿♀"
+    emoji: '🙆🏿♀',
+    shortcode: 'woman_gesturing_ok_tone5',
   },
   {
-    "shortcode": "woman_getting_face_massage",
-    "emoji": "💆♀"
+    emoji: '💆♀',
+    shortcode: 'woman_getting_face_massage',
   },
   {
-    "shortcode": "woman_getting_face_massage_tone1",
-    "emoji": "💆🏻♀"
+    emoji: '💆🏻♀',
+    shortcode: 'woman_getting_face_massage_tone1',
   },
   {
-    "shortcode": "woman_getting_face_massage_tone2",
-    "emoji": "💆🏼♀"
+    emoji: '💆🏼♀',
+    shortcode: 'woman_getting_face_massage_tone2',
   },
   {
-    "shortcode": "woman_getting_face_massage_tone3",
-    "emoji": "💆🏽♀"
+    emoji: '💆🏽♀',
+    shortcode: 'woman_getting_face_massage_tone3',
   },
   {
-    "shortcode": "woman_getting_face_massage_tone4",
-    "emoji": "💆🏾♀"
+    emoji: '💆🏾♀',
+    shortcode: 'woman_getting_face_massage_tone4',
   },
   {
-    "shortcode": "woman_getting_face_massage_tone5",
-    "emoji": "💆🏿♀"
+    emoji: '💆🏿♀',
+    shortcode: 'woman_getting_face_massage_tone5',
   },
   {
-    "shortcode": "woman_getting_haircut",
-    "emoji": "💇♀"
+    emoji: '💇♀',
+    shortcode: 'woman_getting_haircut',
   },
   {
-    "shortcode": "woman_getting_haircut_tone1",
-    "emoji": "💇🏻♀"
+    emoji: '💇🏻♀',
+    shortcode: 'woman_getting_haircut_tone1',
   },
   {
-    "shortcode": "woman_getting_haircut_tone2",
-    "emoji": "💇🏼♀"
+    emoji: '💇🏼♀',
+    shortcode: 'woman_getting_haircut_tone2',
   },
   {
-    "shortcode": "woman_getting_haircut_tone3",
-    "emoji": "💇🏽♀"
+    emoji: '💇🏽♀',
+    shortcode: 'woman_getting_haircut_tone3',
   },
   {
-    "shortcode": "woman_getting_haircut_tone4",
-    "emoji": "💇🏾♀"
+    emoji: '💇🏾♀',
+    shortcode: 'woman_getting_haircut_tone4',
   },
   {
-    "shortcode": "woman_getting_haircut_tone5",
-    "emoji": "💇🏿♀"
+    emoji: '💇🏿♀',
+    shortcode: 'woman_getting_haircut_tone5',
   },
   {
-    "shortcode": "woman_golfing",
-    "emoji": "🏌♀"
+    emoji: '🏌♀',
+    shortcode: 'woman_golfing',
   },
   {
-    "shortcode": "woman_golfing_tone1",
-    "emoji": "🏌🏻♀"
+    emoji: '🏌🏻♀',
+    shortcode: 'woman_golfing_tone1',
   },
   {
-    "shortcode": "woman_golfing_tone2",
-    "emoji": "🏌🏼♀"
+    emoji: '🏌🏼♀',
+    shortcode: 'woman_golfing_tone2',
   },
   {
-    "shortcode": "woman_golfing_tone3",
-    "emoji": "🏌🏽♀"
+    emoji: '🏌🏽♀',
+    shortcode: 'woman_golfing_tone3',
   },
   {
-    "shortcode": "woman_golfing_tone4",
-    "emoji": "🏌🏾♀"
+    emoji: '🏌🏾♀',
+    shortcode: 'woman_golfing_tone4',
   },
   {
-    "shortcode": "woman_golfing_tone5",
-    "emoji": "🏌🏿♀"
+    emoji: '🏌🏿♀',
+    shortcode: 'woman_golfing_tone5',
   },
   {
-    "shortcode": "woman_guard",
-    "emoji": "💂♀"
+    emoji: '💂♀',
+    shortcode: 'woman_guard',
   },
   {
-    "shortcode": "woman_guard_tone1",
-    "emoji": "💂🏻♀"
+    emoji: '💂🏻♀',
+    shortcode: 'woman_guard_tone1',
   },
   {
-    "shortcode": "woman_guard_tone2",
-    "emoji": "💂🏼♀"
+    emoji: '💂🏼♀',
+    shortcode: 'woman_guard_tone2',
   },
   {
-    "shortcode": "woman_guard_tone3",
-    "emoji": "💂🏽♀"
+    emoji: '💂🏽♀',
+    shortcode: 'woman_guard_tone3',
   },
   {
-    "shortcode": "woman_guard_tone4",
-    "emoji": "💂🏾♀"
+    emoji: '💂🏾♀',
+    shortcode: 'woman_guard_tone4',
   },
   {
-    "shortcode": "woman_guard_tone5",
-    "emoji": "💂🏿♀"
+    emoji: '💂🏿♀',
+    shortcode: 'woman_guard_tone5',
   },
   {
-    "shortcode": "woman_health_worker",
-    "emoji": "👩⚕"
+    emoji: '👩⚕',
+    shortcode: 'woman_health_worker',
   },
   {
-    "shortcode": "woman_health_worker_tone1",
-    "emoji": "👩🏻⚕"
+    emoji: '👩🏻⚕',
+    shortcode: 'woman_health_worker_tone1',
   },
   {
-    "shortcode": "woman_health_worker_tone2",
-    "emoji": "👩🏼⚕"
+    emoji: '👩🏼⚕',
+    shortcode: 'woman_health_worker_tone2',
   },
   {
-    "shortcode": "woman_health_worker_tone3",
-    "emoji": "👩🏽⚕"
+    emoji: '👩🏽⚕',
+    shortcode: 'woman_health_worker_tone3',
   },
   {
-    "shortcode": "woman_health_worker_tone4",
-    "emoji": "👩🏾⚕"
+    emoji: '👩🏾⚕',
+    shortcode: 'woman_health_worker_tone4',
   },
   {
-    "shortcode": "woman_health_worker_tone5",
-    "emoji": "👩🏿⚕"
+    emoji: '👩🏿⚕',
+    shortcode: 'woman_health_worker_tone5',
   },
   {
-    "shortcode": "woman_in_lotus_position",
-    "emoji": "🧘♀"
+    emoji: '🧘♀',
+    shortcode: 'woman_in_lotus_position',
   },
   {
-    "shortcode": "woman_in_lotus_position_tone1",
-    "emoji": "🧘🏻♀"
+    emoji: '🧘🏻♀',
+    shortcode: 'woman_in_lotus_position_tone1',
   },
   {
-    "shortcode": "woman_in_lotus_position_tone2",
-    "emoji": "🧘🏼♀"
+    emoji: '🧘🏼♀',
+    shortcode: 'woman_in_lotus_position_tone2',
   },
   {
-    "shortcode": "woman_in_lotus_position_tone3",
-    "emoji": "🧘🏽♀"
+    emoji: '🧘🏽♀',
+    shortcode: 'woman_in_lotus_position_tone3',
   },
   {
-    "shortcode": "woman_in_lotus_position_tone4",
-    "emoji": "🧘🏾♀"
+    emoji: '🧘🏾♀',
+    shortcode: 'woman_in_lotus_position_tone4',
   },
   {
-    "shortcode": "woman_in_lotus_position_tone5",
-    "emoji": "🧘🏿♀"
+    emoji: '🧘🏿♀',
+    shortcode: 'woman_in_lotus_position_tone5',
   },
   {
-    "shortcode": "woman_in_steamy_room",
-    "emoji": "🧖♀"
+    emoji: '🧖♀',
+    shortcode: 'woman_in_steamy_room',
   },
   {
-    "shortcode": "woman_in_steamy_room_tone1",
-    "emoji": "🧖🏻♀"
+    emoji: '🧖🏻♀',
+    shortcode: 'woman_in_steamy_room_tone1',
   },
   {
-    "shortcode": "woman_in_steamy_room_tone2",
-    "emoji": "🧖🏼♀"
+    emoji: '🧖🏼♀',
+    shortcode: 'woman_in_steamy_room_tone2',
   },
   {
-    "shortcode": "woman_in_steamy_room_tone3",
-    "emoji": "🧖🏽♀"
+    emoji: '🧖🏽♀',
+    shortcode: 'woman_in_steamy_room_tone3',
   },
   {
-    "shortcode": "woman_in_steamy_room_tone4",
-    "emoji": "🧖🏾♀"
+    emoji: '🧖🏾♀',
+    shortcode: 'woman_in_steamy_room_tone4',
   },
   {
-    "shortcode": "woman_in_steamy_room_tone5",
-    "emoji": "🧖🏿♀"
+    emoji: '🧖🏿♀',
+    shortcode: 'woman_in_steamy_room_tone5',
   },
   {
-    "shortcode": "woman_judge",
-    "emoji": "👩⚖"
+    emoji: '👩⚖',
+    shortcode: 'woman_judge',
   },
   {
-    "shortcode": "woman_judge_tone1",
-    "emoji": "👩🏻⚖"
+    emoji: '👩🏻⚖',
+    shortcode: 'woman_judge_tone1',
   },
   {
-    "shortcode": "woman_judge_tone2",
-    "emoji": "👩🏼⚖"
+    emoji: '👩🏼⚖',
+    shortcode: 'woman_judge_tone2',
   },
   {
-    "shortcode": "woman_judge_tone3",
-    "emoji": "👩🏽⚖"
+    emoji: '👩🏽⚖',
+    shortcode: 'woman_judge_tone3',
   },
   {
-    "shortcode": "woman_judge_tone4",
-    "emoji": "👩🏾⚖"
+    emoji: '👩🏾⚖',
+    shortcode: 'woman_judge_tone4',
   },
   {
-    "shortcode": "woman_judge_tone5",
-    "emoji": "👩🏿⚖"
+    emoji: '👩🏿⚖',
+    shortcode: 'woman_judge_tone5',
   },
   {
-    "shortcode": "woman_juggling",
-    "emoji": "🤹♀"
+    emoji: '🤹♀',
+    shortcode: 'woman_juggling',
   },
   {
-    "shortcode": "woman_juggling_tone1",
-    "emoji": "🤹🏻♀"
+    emoji: '🤹🏻♀',
+    shortcode: 'woman_juggling_tone1',
   },
   {
-    "shortcode": "woman_juggling_tone2",
-    "emoji": "🤹🏼♀"
+    emoji: '🤹🏼♀',
+    shortcode: 'woman_juggling_tone2',
   },
   {
-    "shortcode": "woman_juggling_tone3",
-    "emoji": "🤹🏽♀"
+    emoji: '🤹🏽♀',
+    shortcode: 'woman_juggling_tone3',
   },
   {
-    "shortcode": "woman_juggling_tone4",
-    "emoji": "🤹🏾♀"
+    emoji: '🤹🏾♀',
+    shortcode: 'woman_juggling_tone4',
   },
   {
-    "shortcode": "woman_juggling_tone5",
-    "emoji": "🤹🏿♀"
+    emoji: '🤹🏿♀',
+    shortcode: 'woman_juggling_tone5',
   },
   {
-    "shortcode": "woman_lifting_weights",
-    "emoji": "🏋♀"
+    emoji: '🏋♀',
+    shortcode: 'woman_lifting_weights',
   },
   {
-    "shortcode": "woman_lifting_weights_tone1",
-    "emoji": "🏋🏻♀"
+    emoji: '🏋🏻♀',
+    shortcode: 'woman_lifting_weights_tone1',
   },
   {
-    "shortcode": "woman_lifting_weights_tone2",
-    "emoji": "🏋🏼♀"
+    emoji: '🏋🏼♀',
+    shortcode: 'woman_lifting_weights_tone2',
   },
   {
-    "shortcode": "woman_lifting_weights_tone3",
-    "emoji": "🏋🏽♀"
+    emoji: '🏋🏽♀',
+    shortcode: 'woman_lifting_weights_tone3',
   },
   {
-    "shortcode": "woman_lifting_weights_tone4",
-    "emoji": "🏋🏾♀"
+    emoji: '🏋🏾♀',
+    shortcode: 'woman_lifting_weights_tone4',
   },
   {
-    "shortcode": "woman_lifting_weights_tone5",
-    "emoji": "🏋🏿♀"
+    emoji: '🏋🏿♀',
+    shortcode: 'woman_lifting_weights_tone5',
   },
   {
-    "shortcode": "woman_mage",
-    "emoji": "🧙♀"
+    emoji: '🧙♀',
+    shortcode: 'woman_mage',
   },
   {
-    "shortcode": "woman_mage_tone1",
-    "emoji": "🧙🏻♀"
+    emoji: '🧙🏻♀',
+    shortcode: 'woman_mage_tone1',
   },
   {
-    "shortcode": "woman_mage_tone2",
-    "emoji": "🧙🏼♀"
+    emoji: '🧙🏼♀',
+    shortcode: 'woman_mage_tone2',
   },
   {
-    "shortcode": "woman_mage_tone3",
-    "emoji": "🧙🏽♀"
+    emoji: '🧙🏽♀',
+    shortcode: 'woman_mage_tone3',
   },
   {
-    "shortcode": "woman_mage_tone4",
-    "emoji": "🧙🏾♀"
+    emoji: '🧙🏾♀',
+    shortcode: 'woman_mage_tone4',
   },
   {
-    "shortcode": "woman_mage_tone5",
-    "emoji": "🧙🏿♀"
+    emoji: '🧙🏿♀',
+    shortcode: 'woman_mage_tone5',
   },
   {
-    "shortcode": "woman_mechanic",
-    "emoji": "👩🔧"
+    emoji: '👩🔧',
+    shortcode: 'woman_mechanic',
   },
   {
-    "shortcode": "woman_mechanic_tone1",
-    "emoji": "👩🏻🔧"
+    emoji: '👩🏻🔧',
+    shortcode: 'woman_mechanic_tone1',
   },
   {
-    "shortcode": "woman_mechanic_tone2",
-    "emoji": "👩🏼🔧"
+    emoji: '👩🏼🔧',
+    shortcode: 'woman_mechanic_tone2',
   },
   {
-    "shortcode": "woman_mechanic_tone3",
-    "emoji": "👩🏽🔧"
+    emoji: '👩🏽🔧',
+    shortcode: 'woman_mechanic_tone3',
   },
   {
-    "shortcode": "woman_mechanic_tone4",
-    "emoji": "👩🏾🔧"
+    emoji: '👩🏾🔧',
+    shortcode: 'woman_mechanic_tone4',
   },
   {
-    "shortcode": "woman_mechanic_tone5",
-    "emoji": "👩🏿🔧"
+    emoji: '👩🏿🔧',
+    shortcode: 'woman_mechanic_tone5',
   },
   {
-    "shortcode": "woman_mountain_biking",
-    "emoji": "🚵♀"
+    emoji: '🚵♀',
+    shortcode: 'woman_mountain_biking',
   },
   {
-    "shortcode": "woman_mountain_biking_tone1",
-    "emoji": "🚵🏻♀"
+    emoji: '🚵🏻♀',
+    shortcode: 'woman_mountain_biking_tone1',
   },
   {
-    "shortcode": "woman_mountain_biking_tone2",
-    "emoji": "🚵🏼♀"
+    emoji: '🚵🏼♀',
+    shortcode: 'woman_mountain_biking_tone2',
   },
   {
-    "shortcode": "woman_mountain_biking_tone3",
-    "emoji": "🚵🏽♀"
+    emoji: '🚵🏽♀',
+    shortcode: 'woman_mountain_biking_tone3',
   },
   {
-    "shortcode": "woman_mountain_biking_tone4",
-    "emoji": "🚵🏾♀"
+    emoji: '🚵🏾♀',
+    shortcode: 'woman_mountain_biking_tone4',
   },
   {
-    "shortcode": "woman_mountain_biking_tone5",
-    "emoji": "🚵🏿♀"
+    emoji: '🚵🏿♀',
+    shortcode: 'woman_mountain_biking_tone5',
   },
   {
-    "shortcode": "woman_office_worker",
-    "emoji": "👩💼"
+    emoji: '👩💼',
+    shortcode: 'woman_office_worker',
   },
   {
-    "shortcode": "woman_office_worker_tone1",
-    "emoji": "👩🏻💼"
+    emoji: '👩🏻💼',
+    shortcode: 'woman_office_worker_tone1',
   },
   {
-    "shortcode": "woman_office_worker_tone2",
-    "emoji": "👩🏼💼"
+    emoji: '👩🏼💼',
+    shortcode: 'woman_office_worker_tone2',
   },
   {
-    "shortcode": "woman_office_worker_tone3",
-    "emoji": "👩🏽💼"
+    emoji: '👩🏽💼',
+    shortcode: 'woman_office_worker_tone3',
   },
   {
-    "shortcode": "woman_office_worker_tone4",
-    "emoji": "👩🏾💼"
+    emoji: '👩🏾💼',
+    shortcode: 'woman_office_worker_tone4',
   },
   {
-    "shortcode": "woman_office_worker_tone5",
-    "emoji": "👩🏿💼"
+    emoji: '👩🏿💼',
+    shortcode: 'woman_office_worker_tone5',
   },
   {
-    "shortcode": "woman_pilot",
-    "emoji": "👩✈"
+    emoji: '👩✈',
+    shortcode: 'woman_pilot',
   },
   {
-    "shortcode": "woman_pilot_tone1",
-    "emoji": "👩🏻✈"
+    emoji: '👩🏻✈',
+    shortcode: 'woman_pilot_tone1',
   },
   {
-    "shortcode": "woman_pilot_tone2",
-    "emoji": "👩🏼✈"
+    emoji: '👩🏼✈',
+    shortcode: 'woman_pilot_tone2',
   },
   {
-    "shortcode": "woman_pilot_tone3",
-    "emoji": "👩🏽✈"
+    emoji: '👩🏽✈',
+    shortcode: 'woman_pilot_tone3',
   },
   {
-    "shortcode": "woman_pilot_tone4",
-    "emoji": "👩🏾✈"
+    emoji: '👩🏾✈',
+    shortcode: 'woman_pilot_tone4',
   },
   {
-    "shortcode": "woman_pilot_tone5",
-    "emoji": "👩🏿✈"
+    emoji: '👩🏿✈',
+    shortcode: 'woman_pilot_tone5',
   },
   {
-    "shortcode": "woman_playing_handball",
-    "emoji": "🤾♀"
+    emoji: '🤾♀',
+    shortcode: 'woman_playing_handball',
   },
   {
-    "shortcode": "woman_playing_handball_tone1",
-    "emoji": "🤾🏻♀"
+    emoji: '🤾🏻♀',
+    shortcode: 'woman_playing_handball_tone1',
   },
   {
-    "shortcode": "woman_playing_handball_tone2",
-    "emoji": "🤾🏼♀"
+    emoji: '🤾🏼♀',
+    shortcode: 'woman_playing_handball_tone2',
   },
   {
-    "shortcode": "woman_playing_handball_tone3",
-    "emoji": "🤾🏽♀"
+    emoji: '🤾🏽♀',
+    shortcode: 'woman_playing_handball_tone3',
   },
   {
-    "shortcode": "woman_playing_handball_tone4",
-    "emoji": "🤾🏾♀"
+    emoji: '🤾🏾♀',
+    shortcode: 'woman_playing_handball_tone4',
   },
   {
-    "shortcode": "woman_playing_handball_tone5",
-    "emoji": "🤾🏿♀"
+    emoji: '🤾🏿♀',
+    shortcode: 'woman_playing_handball_tone5',
   },
   {
-    "shortcode": "woman_playing_water_polo",
-    "emoji": "🤽♀"
+    emoji: '🤽♀',
+    shortcode: 'woman_playing_water_polo',
   },
   {
-    "shortcode": "woman_playing_water_polo_tone1",
-    "emoji": "🤽🏻♀"
+    emoji: '🤽🏻♀',
+    shortcode: 'woman_playing_water_polo_tone1',
   },
   {
-    "shortcode": "woman_playing_water_polo_tone2",
-    "emoji": "🤽🏼♀"
+    emoji: '🤽🏼♀',
+    shortcode: 'woman_playing_water_polo_tone2',
   },
   {
-    "shortcode": "woman_playing_water_polo_tone3",
-    "emoji": "🤽🏽♀"
+    emoji: '🤽🏽♀',
+    shortcode: 'woman_playing_water_polo_tone3',
   },
   {
-    "shortcode": "woman_playing_water_polo_tone4",
-    "emoji": "🤽🏾♀"
+    emoji: '🤽🏾♀',
+    shortcode: 'woman_playing_water_polo_tone4',
   },
   {
-    "shortcode": "woman_playing_water_polo_tone5",
-    "emoji": "🤽🏿♀"
+    emoji: '🤽🏿♀',
+    shortcode: 'woman_playing_water_polo_tone5',
   },
   {
-    "shortcode": "woman_police_officer",
-    "emoji": "👮♀"
+    emoji: '👮♀',
+    shortcode: 'woman_police_officer',
   },
   {
-    "shortcode": "woman_police_officer_tone1",
-    "emoji": "👮🏻♀"
+    emoji: '👮🏻♀',
+    shortcode: 'woman_police_officer_tone1',
   },
   {
-    "shortcode": "woman_police_officer_tone2",
-    "emoji": "👮🏼♀"
+    emoji: '👮🏼♀',
+    shortcode: 'woman_police_officer_tone2',
   },
   {
-    "shortcode": "woman_police_officer_tone3",
-    "emoji": "👮🏽♀"
+    emoji: '👮🏽♀',
+    shortcode: 'woman_police_officer_tone3',
   },
   {
-    "shortcode": "woman_police_officer_tone4",
-    "emoji": "👮🏾♀"
+    emoji: '👮🏾♀',
+    shortcode: 'woman_police_officer_tone4',
   },
   {
-    "shortcode": "woman_police_officer_tone5",
-    "emoji": "👮🏿♀"
+    emoji: '👮🏿♀',
+    shortcode: 'woman_police_officer_tone5',
   },
   {
-    "shortcode": "woman_pouting",
-    "emoji": "🙎♀"
+    emoji: '🙎♀',
+    shortcode: 'woman_pouting',
   },
   {
-    "shortcode": "woman_pouting_tone1",
-    "emoji": "🙎🏻♀"
+    emoji: '🙎🏻♀',
+    shortcode: 'woman_pouting_tone1',
   },
   {
-    "shortcode": "woman_pouting_tone2",
-    "emoji": "🙎🏼♀"
+    emoji: '🙎🏼♀',
+    shortcode: 'woman_pouting_tone2',
   },
   {
-    "shortcode": "woman_pouting_tone3",
-    "emoji": "🙎🏽♀"
+    emoji: '🙎🏽♀',
+    shortcode: 'woman_pouting_tone3',
   },
   {
-    "shortcode": "woman_pouting_tone4",
-    "emoji": "🙎🏾♀"
+    emoji: '🙎🏾♀',
+    shortcode: 'woman_pouting_tone4',
   },
   {
-    "shortcode": "woman_pouting_tone5",
-    "emoji": "🙎🏿♀"
+    emoji: '🙎🏿♀',
+    shortcode: 'woman_pouting_tone5',
   },
   {
-    "shortcode": "woman_raising_hand",
-    "emoji": "🙋♀"
+    emoji: '🙋♀',
+    shortcode: 'woman_raising_hand',
   },
   {
-    "shortcode": "woman_raising_hand_tone1",
-    "emoji": "🙋🏻♀"
+    emoji: '🙋🏻♀',
+    shortcode: 'woman_raising_hand_tone1',
   },
   {
-    "shortcode": "woman_raising_hand_tone2",
-    "emoji": "🙋🏼♀"
+    emoji: '🙋🏼♀',
+    shortcode: 'woman_raising_hand_tone2',
   },
   {
-    "shortcode": "woman_raising_hand_tone3",
-    "emoji": "🙋🏽♀"
+    emoji: '🙋🏽♀',
+    shortcode: 'woman_raising_hand_tone3',
   },
   {
-    "shortcode": "woman_raising_hand_tone4",
-    "emoji": "🙋🏾♀"
+    emoji: '🙋🏾♀',
+    shortcode: 'woman_raising_hand_tone4',
   },
   {
-    "shortcode": "woman_raising_hand_tone5",
-    "emoji": "🙋🏿♀"
+    emoji: '🙋🏿♀',
+    shortcode: 'woman_raising_hand_tone5',
   },
   {
-    "shortcode": "woman_rowing_boat",
-    "emoji": "🚣♀"
+    emoji: '🚣♀',
+    shortcode: 'woman_rowing_boat',
   },
   {
-    "shortcode": "woman_rowing_boat_tone1",
-    "emoji": "🚣🏻♀"
+    emoji: '🚣🏻♀',
+    shortcode: 'woman_rowing_boat_tone1',
   },
   {
-    "shortcode": "woman_rowing_boat_tone2",
-    "emoji": "🚣🏼♀"
+    emoji: '🚣🏼♀',
+    shortcode: 'woman_rowing_boat_tone2',
   },
   {
-    "shortcode": "woman_rowing_boat_tone3",
-    "emoji": "🚣🏽♀"
+    emoji: '🚣🏽♀',
+    shortcode: 'woman_rowing_boat_tone3',
   },
   {
-    "shortcode": "woman_rowing_boat_tone4",
-    "emoji": "🚣🏾♀"
+    emoji: '🚣🏾♀',
+    shortcode: 'woman_rowing_boat_tone4',
   },
   {
-    "shortcode": "woman_rowing_boat_tone5",
-    "emoji": "🚣🏿♀"
+    emoji: '🚣🏿♀',
+    shortcode: 'woman_rowing_boat_tone5',
   },
   {
-    "shortcode": "woman_running",
-    "emoji": "🏃♀"
+    emoji: '🏃♀',
+    shortcode: 'woman_running',
   },
   {
-    "shortcode": "woman_running_tone1",
-    "emoji": "🏃🏻♀"
+    emoji: '🏃🏻♀',
+    shortcode: 'woman_running_tone1',
   },
   {
-    "shortcode": "woman_running_tone2",
-    "emoji": "🏃🏼♀"
+    emoji: '🏃🏼♀',
+    shortcode: 'woman_running_tone2',
   },
   {
-    "shortcode": "woman_running_tone3",
-    "emoji": "🏃🏽♀"
+    emoji: '🏃🏽♀',
+    shortcode: 'woman_running_tone3',
   },
   {
-    "shortcode": "woman_running_tone4",
-    "emoji": "🏃🏾♀"
+    emoji: '🏃🏾♀',
+    shortcode: 'woman_running_tone4',
   },
   {
-    "shortcode": "woman_running_tone5",
-    "emoji": "🏃🏿♀"
+    emoji: '🏃🏿♀',
+    shortcode: 'woman_running_tone5',
   },
   {
-    "shortcode": "woman_scientist",
-    "emoji": "👩🔬"
+    emoji: '👩🔬',
+    shortcode: 'woman_scientist',
   },
   {
-    "shortcode": "woman_scientist_tone1",
-    "emoji": "👩🏻🔬"
+    emoji: '👩🏻🔬',
+    shortcode: 'woman_scientist_tone1',
   },
   {
-    "shortcode": "woman_scientist_tone2",
-    "emoji": "👩🏼🔬"
+    emoji: '👩🏼🔬',
+    shortcode: 'woman_scientist_tone2',
   },
   {
-    "shortcode": "woman_scientist_tone3",
-    "emoji": "👩🏽🔬"
+    emoji: '👩🏽🔬',
+    shortcode: 'woman_scientist_tone3',
   },
   {
-    "shortcode": "woman_scientist_tone4",
-    "emoji": "👩🏾🔬"
+    emoji: '👩🏾🔬',
+    shortcode: 'woman_scientist_tone4',
   },
   {
-    "shortcode": "woman_scientist_tone5",
-    "emoji": "👩🏿🔬"
+    emoji: '👩🏿🔬',
+    shortcode: 'woman_scientist_tone5',
   },
   {
-    "shortcode": "woman_shrugging",
-    "emoji": "🤷♀"
+    emoji: '🤷♀',
+    shortcode: 'woman_shrugging',
   },
   {
-    "shortcode": "woman_shrugging_tone1",
-    "emoji": "🤷🏻♀"
+    emoji: '🤷🏻♀',
+    shortcode: 'woman_shrugging_tone1',
   },
   {
-    "shortcode": "woman_shrugging_tone2",
-    "emoji": "🤷🏼♀"
+    emoji: '🤷🏼♀',
+    shortcode: 'woman_shrugging_tone2',
   },
   {
-    "shortcode": "woman_shrugging_tone3",
-    "emoji": "🤷🏽♀"
+    emoji: '🤷🏽♀',
+    shortcode: 'woman_shrugging_tone3',
   },
   {
-    "shortcode": "woman_shrugging_tone4",
-    "emoji": "🤷🏾♀"
+    emoji: '🤷🏾♀',
+    shortcode: 'woman_shrugging_tone4',
   },
   {
-    "shortcode": "woman_shrugging_tone5",
-    "emoji": "🤷🏿♀"
+    emoji: '🤷🏿♀',
+    shortcode: 'woman_shrugging_tone5',
   },
   {
-    "shortcode": "woman_singer",
-    "emoji": "👩🎤"
+    emoji: '👩🎤',
+    shortcode: 'woman_singer',
   },
   {
-    "shortcode": "woman_singer_tone1",
-    "emoji": "👩🏻🎤"
+    emoji: '👩🏻🎤',
+    shortcode: 'woman_singer_tone1',
   },
   {
-    "shortcode": "woman_singer_tone2",
-    "emoji": "👩🏼🎤"
+    emoji: '👩🏼🎤',
+    shortcode: 'woman_singer_tone2',
   },
   {
-    "shortcode": "woman_singer_tone3",
-    "emoji": "👩🏽🎤"
+    emoji: '👩🏽🎤',
+    shortcode: 'woman_singer_tone3',
   },
   {
-    "shortcode": "woman_singer_tone4",
-    "emoji": "👩🏾🎤"
+    emoji: '👩🏾🎤',
+    shortcode: 'woman_singer_tone4',
   },
   {
-    "shortcode": "woman_singer_tone5",
-    "emoji": "👩🏿🎤"
+    emoji: '👩🏿🎤',
+    shortcode: 'woman_singer_tone5',
   },
   {
-    "shortcode": "woman_student",
-    "emoji": "👩🎓"
+    emoji: '👩🎓',
+    shortcode: 'woman_student',
   },
   {
-    "shortcode": "woman_student_tone1",
-    "emoji": "👩🏻🎓"
+    emoji: '👩🏻🎓',
+    shortcode: 'woman_student_tone1',
   },
   {
-    "shortcode": "woman_student_tone2",
-    "emoji": "👩🏼🎓"
+    emoji: '👩🏼🎓',
+    shortcode: 'woman_student_tone2',
   },
   {
-    "shortcode": "woman_student_tone3",
-    "emoji": "👩🏽🎓"
+    emoji: '👩🏽🎓',
+    shortcode: 'woman_student_tone3',
   },
   {
-    "shortcode": "woman_student_tone4",
-    "emoji": "👩🏾🎓"
+    emoji: '👩🏾🎓',
+    shortcode: 'woman_student_tone4',
   },
   {
-    "shortcode": "woman_student_tone5",
-    "emoji": "👩🏿🎓"
+    emoji: '👩🏿🎓',
+    shortcode: 'woman_student_tone5',
   },
   {
-    "shortcode": "woman_surfing",
-    "emoji": "🏄♀"
+    emoji: '🏄♀',
+    shortcode: 'woman_surfing',
   },
   {
-    "shortcode": "woman_surfing_tone1",
-    "emoji": "🏄🏻♀"
+    emoji: '🏄🏻♀',
+    shortcode: 'woman_surfing_tone1',
   },
   {
-    "shortcode": "woman_surfing_tone2",
-    "emoji": "🏄🏼♀"
+    emoji: '🏄🏼♀',
+    shortcode: 'woman_surfing_tone2',
   },
   {
-    "shortcode": "woman_surfing_tone3",
-    "emoji": "🏄🏽♀"
+    emoji: '🏄🏽♀',
+    shortcode: 'woman_surfing_tone3',
   },
   {
-    "shortcode": "woman_surfing_tone4",
-    "emoji": "🏄🏾♀"
+    emoji: '🏄🏾♀',
+    shortcode: 'woman_surfing_tone4',
   },
   {
-    "shortcode": "woman_surfing_tone5",
-    "emoji": "🏄🏿♀"
+    emoji: '🏄🏿♀',
+    shortcode: 'woman_surfing_tone5',
   },
   {
-    "shortcode": "woman_swimming",
-    "emoji": "🏊♀"
+    emoji: '🏊♀',
+    shortcode: 'woman_swimming',
   },
   {
-    "shortcode": "woman_swimming_tone1",
-    "emoji": "🏊🏻♀"
+    emoji: '🏊🏻♀',
+    shortcode: 'woman_swimming_tone1',
   },
   {
-    "shortcode": "woman_swimming_tone2",
-    "emoji": "🏊🏼♀"
+    emoji: '🏊🏼♀',
+    shortcode: 'woman_swimming_tone2',
   },
   {
-    "shortcode": "woman_swimming_tone3",
-    "emoji": "🏊🏽♀"
+    emoji: '🏊🏽♀',
+    shortcode: 'woman_swimming_tone3',
   },
   {
-    "shortcode": "woman_swimming_tone4",
-    "emoji": "🏊🏾♀"
+    emoji: '🏊🏾♀',
+    shortcode: 'woman_swimming_tone4',
   },
   {
-    "shortcode": "woman_swimming_tone5",
-    "emoji": "🏊🏿♀"
+    emoji: '🏊🏿♀',
+    shortcode: 'woman_swimming_tone5',
   },
   {
-    "shortcode": "woman_teacher",
-    "emoji": "👩🏫"
+    emoji: '👩🏫',
+    shortcode: 'woman_teacher',
   },
   {
-    "shortcode": "woman_teacher_tone1",
-    "emoji": "👩🏻🏫"
+    emoji: '👩🏻🏫',
+    shortcode: 'woman_teacher_tone1',
   },
   {
-    "shortcode": "woman_teacher_tone2",
-    "emoji": "👩🏼🏫"
+    emoji: '👩🏼🏫',
+    shortcode: 'woman_teacher_tone2',
   },
   {
-    "shortcode": "woman_teacher_tone3",
-    "emoji": "👩🏽🏫"
+    emoji: '👩🏽🏫',
+    shortcode: 'woman_teacher_tone3',
   },
   {
-    "shortcode": "woman_teacher_tone4",
-    "emoji": "👩🏾🏫"
+    emoji: '👩🏾🏫',
+    shortcode: 'woman_teacher_tone4',
   },
   {
-    "shortcode": "woman_teacher_tone5",
-    "emoji": "👩🏿🏫"
+    emoji: '👩🏿🏫',
+    shortcode: 'woman_teacher_tone5',
   },
   {
-    "shortcode": "woman_technologist",
-    "emoji": "👩💻"
+    emoji: '👩💻',
+    shortcode: 'woman_technologist',
   },
   {
-    "shortcode": "woman_technologist_tone1",
-    "emoji": "👩🏻💻"
+    emoji: '👩🏻💻',
+    shortcode: 'woman_technologist_tone1',
   },
   {
-    "shortcode": "woman_technologist_tone2",
-    "emoji": "👩🏼💻"
+    emoji: '👩🏼💻',
+    shortcode: 'woman_technologist_tone2',
   },
   {
-    "shortcode": "woman_technologist_tone3",
-    "emoji": "👩🏽💻"
+    emoji: '👩🏽💻',
+    shortcode: 'woman_technologist_tone3',
   },
   {
-    "shortcode": "woman_technologist_tone4",
-    "emoji": "👩🏾💻"
+    emoji: '👩🏾💻',
+    shortcode: 'woman_technologist_tone4',
   },
   {
-    "shortcode": "woman_technologist_tone5",
-    "emoji": "👩🏿💻"
+    emoji: '👩🏿💻',
+    shortcode: 'woman_technologist_tone5',
   },
   {
-    "shortcode": "woman_tipping_hand",
-    "emoji": "💁♀"
+    emoji: '💁♀',
+    shortcode: 'woman_tipping_hand',
   },
   {
-    "shortcode": "woman_tipping_hand_tone1",
-    "emoji": "💁🏻♀"
+    emoji: '💁🏻♀',
+    shortcode: 'woman_tipping_hand_tone1',
   },
   {
-    "shortcode": "woman_tipping_hand_tone2",
-    "emoji": "💁🏼♀"
+    emoji: '💁🏼♀',
+    shortcode: 'woman_tipping_hand_tone2',
   },
   {
-    "shortcode": "woman_tipping_hand_tone3",
-    "emoji": "💁🏽♀"
+    emoji: '💁🏽♀',
+    shortcode: 'woman_tipping_hand_tone3',
   },
   {
-    "shortcode": "woman_tipping_hand_tone4",
-    "emoji": "💁🏾♀"
+    emoji: '💁🏾♀',
+    shortcode: 'woman_tipping_hand_tone4',
   },
   {
-    "shortcode": "woman_tipping_hand_tone5",
-    "emoji": "💁🏿♀"
+    emoji: '💁🏿♀',
+    shortcode: 'woman_tipping_hand_tone5',
   },
   {
-    "shortcode": "woman_tone1",
-    "emoji": "👩🏻"
+    emoji: '👩🏻',
+    shortcode: 'woman_tone1',
   },
   {
-    "shortcode": "woman_tone2",
-    "emoji": "👩🏼"
+    emoji: '👩🏼',
+    shortcode: 'woman_tone2',
   },
   {
-    "shortcode": "woman_tone3",
-    "emoji": "👩🏽"
+    emoji: '👩🏽',
+    shortcode: 'woman_tone3',
   },
   {
-    "shortcode": "woman_tone4",
-    "emoji": "👩🏾"
+    emoji: '👩🏾',
+    shortcode: 'woman_tone4',
   },
   {
-    "shortcode": "woman_tone5",
-    "emoji": "👩🏿"
+    emoji: '👩🏿',
+    shortcode: 'woman_tone5',
   },
   {
-    "shortcode": "woman_vampire",
-    "emoji": "🧛♀"
+    emoji: '🧛♀',
+    shortcode: 'woman_vampire',
   },
   {
-    "shortcode": "woman_vampire_tone1",
-    "emoji": "🧛🏻♀"
+    emoji: '🧛🏻♀',
+    shortcode: 'woman_vampire_tone1',
   },
   {
-    "shortcode": "woman_vampire_tone2",
-    "emoji": "🧛🏼♀"
+    emoji: '🧛🏼♀',
+    shortcode: 'woman_vampire_tone2',
   },
   {
-    "shortcode": "woman_vampire_tone3",
-    "emoji": "🧛🏽♀"
+    emoji: '🧛🏽♀',
+    shortcode: 'woman_vampire_tone3',
   },
   {
-    "shortcode": "woman_vampire_tone4",
-    "emoji": "🧛🏾♀"
+    emoji: '🧛🏾♀',
+    shortcode: 'woman_vampire_tone4',
   },
   {
-    "shortcode": "woman_vampire_tone5",
-    "emoji": "🧛🏿♀"
+    emoji: '🧛🏿♀',
+    shortcode: 'woman_vampire_tone5',
   },
   {
-    "shortcode": "woman_walking",
-    "emoji": "🚶♀"
+    emoji: '🚶♀',
+    shortcode: 'woman_walking',
   },
   {
-    "shortcode": "woman_walking_tone1",
-    "emoji": "🚶🏻♀"
+    emoji: '🚶🏻♀',
+    shortcode: 'woman_walking_tone1',
   },
   {
-    "shortcode": "woman_walking_tone2",
-    "emoji": "🚶🏼♀"
+    emoji: '🚶🏼♀',
+    shortcode: 'woman_walking_tone2',
   },
   {
-    "shortcode": "woman_walking_tone3",
-    "emoji": "🚶🏽♀"
+    emoji: '🚶🏽♀',
+    shortcode: 'woman_walking_tone3',
   },
   {
-    "shortcode": "woman_walking_tone4",
-    "emoji": "🚶🏾♀"
+    emoji: '🚶🏾♀',
+    shortcode: 'woman_walking_tone4',
   },
   {
-    "shortcode": "woman_walking_tone5",
-    "emoji": "🚶🏿♀"
+    emoji: '🚶🏿♀',
+    shortcode: 'woman_walking_tone5',
   },
   {
-    "shortcode": "woman_wearing_turban",
-    "emoji": "👳♀"
+    emoji: '👳♀',
+    shortcode: 'woman_wearing_turban',
   },
   {
-    "shortcode": "woman_wearing_turban_tone1",
-    "emoji": "👳🏻♀"
+    emoji: '👳🏻♀',
+    shortcode: 'woman_wearing_turban_tone1',
   },
   {
-    "shortcode": "woman_wearing_turban_tone2",
-    "emoji": "👳🏼♀"
+    emoji: '👳🏼♀',
+    shortcode: 'woman_wearing_turban_tone2',
   },
   {
-    "shortcode": "woman_wearing_turban_tone3",
-    "emoji": "👳🏽♀"
+    emoji: '👳🏽♀',
+    shortcode: 'woman_wearing_turban_tone3',
   },
   {
-    "shortcode": "woman_wearing_turban_tone4",
-    "emoji": "👳🏾♀"
+    emoji: '👳🏾♀',
+    shortcode: 'woman_wearing_turban_tone4',
   },
   {
-    "shortcode": "woman_wearing_turban_tone5",
-    "emoji": "👳🏿♀"
+    emoji: '👳🏿♀',
+    shortcode: 'woman_wearing_turban_tone5',
   },
   {
-    "shortcode": "woman_with_headscarf",
-    "emoji": "🧕"
+    emoji: '🧕',
+    shortcode: 'woman_with_headscarf',
   },
   {
-    "shortcode": "woman_with_headscarf_tone1",
-    "emoji": "🧕🏻"
+    emoji: '🧕🏻',
+    shortcode: 'woman_with_headscarf_tone1',
   },
   {
-    "shortcode": "woman_with_headscarf_tone2",
-    "emoji": "🧕🏼"
+    emoji: '🧕🏼',
+    shortcode: 'woman_with_headscarf_tone2',
   },
   {
-    "shortcode": "woman_with_headscarf_tone3",
-    "emoji": "🧕🏽"
+    emoji: '🧕🏽',
+    shortcode: 'woman_with_headscarf_tone3',
   },
   {
-    "shortcode": "woman_with_headscarf_tone4",
-    "emoji": "🧕🏾"
+    emoji: '🧕🏾',
+    shortcode: 'woman_with_headscarf_tone4',
   },
   {
-    "shortcode": "woman_with_headscarf_tone5",
-    "emoji": "🧕🏿"
+    emoji: '🧕🏿',
+    shortcode: 'woman_with_headscarf_tone5',
   },
   {
-    "shortcode": "woman_zombie",
-    "emoji": "🧟♀"
+    emoji: '🧟♀',
+    shortcode: 'woman_zombie',
   },
   {
-    "shortcode": "womans_clothes",
-    "emoji": "👚"
+    emoji: '👚',
+    shortcode: 'womans_clothes',
   },
   {
-    "shortcode": "womans_hat",
-    "emoji": "👒"
+    emoji: '👒',
+    shortcode: 'womans_hat',
   },
   {
-    "shortcode": "women_with_bunny_ears_partying",
-    "emoji": "👯♀"
+    emoji: '👯♀',
+    shortcode: 'women_with_bunny_ears_partying',
   },
   {
-    "shortcode": "women_wrestling",
-    "emoji": "🤼♀"
+    emoji: '🤼♀',
+    shortcode: 'women_wrestling',
   },
   {
-    "shortcode": "womens",
-    "emoji": "🚺"
+    emoji: '🚺',
+    shortcode: 'womens',
   },
   {
-    "shortcode": "worried",
-    "emoji": "😟"
+    emoji: '😟',
+    shortcode: 'worried',
   },
   {
-    "shortcode": "wrench",
-    "emoji": "🔧"
+    emoji: '🔧',
+    shortcode: 'wrench',
   },
   {
-    "shortcode": "writing_hand",
-    "emoji": "✍"
+    emoji: '✍',
+    shortcode: 'writing_hand',
   },
   {
-    "shortcode": "writing_hand_tone1",
-    "emoji": "✍🏻"
+    emoji: '✍🏻',
+    shortcode: 'writing_hand_tone1',
   },
   {
-    "shortcode": "writing_hand_tone2",
-    "emoji": "✍🏼"
+    emoji: '✍🏼',
+    shortcode: 'writing_hand_tone2',
   },
   {
-    "shortcode": "writing_hand_tone3",
-    "emoji": "✍🏽"
+    emoji: '✍🏽',
+    shortcode: 'writing_hand_tone3',
   },
   {
-    "shortcode": "writing_hand_tone4",
-    "emoji": "✍🏾"
+    emoji: '✍🏾',
+    shortcode: 'writing_hand_tone4',
   },
   {
-    "shortcode": "writing_hand_tone5",
-    "emoji": "✍🏿"
+    emoji: '✍🏿',
+    shortcode: 'writing_hand_tone5',
   },
   {
-    "shortcode": "x",
-    "emoji": "❌"
+    emoji: '❌',
+    shortcode: 'x',
   },
   {
-    "shortcode": "yellow_heart",
-    "emoji": "💛"
+    emoji: '💛',
+    shortcode: 'yellow_heart',
   },
   {
-    "shortcode": "yen",
-    "emoji": "💴"
+    emoji: '💴',
+    shortcode: 'yen',
   },
   {
-    "shortcode": "yin_yang",
-    "emoji": "☯"
+    emoji: '☯',
+    shortcode: 'yin_yang',
   },
   {
-    "shortcode": "yum",
-    "emoji": "😋"
+    emoji: '😋',
+    shortcode: 'yum',
   },
   {
-    "shortcode": "zap",
-    "emoji": "⚡"
+    emoji: '⚡',
+    shortcode: 'zap',
   },
   {
-    "shortcode": "zebra",
-    "emoji": "🦓"
+    emoji: '🦓',
+    shortcode: 'zebra',
   },
   {
-    "shortcode": "zero",
-    "emoji": "0⃣"
+    emoji: '0⃣',
+    shortcode: 'zero',
   },
   {
-    "shortcode": "zipper_mouth",
-    "emoji": "🤐"
+    emoji: '🤐',
+    shortcode: 'zipper_mouth',
   },
   {
-    "shortcode": "zombie",
-    "emoji": "🧟"
+    emoji: '🧟',
+    shortcode: 'zombie',
   },
   {
-    "shortcode": "zzz",
-    "emoji": "💤"
-  }
+    emoji: '💤',
+    shortcode: 'zzz',
+  },
 ] as const;

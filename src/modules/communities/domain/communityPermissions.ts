@@ -27,85 +27,98 @@ export const ALL_COMMUNITY_PERMISSIONS: CommunityPermission[] = [
   'connect_voice',
 ];
 
-export function communityPermissionsFor(
-  community: Community,
-  identityId: string,
-): Set<CommunityPermission> {
-  if (community.ownerIdentityId === identityId) {
-    return new Set(ALL_COMMUNITY_PERMISSIONS);
+export class CommunityAccessPolicy {
+  public static assignedRoleIdsFor(
+    community: Community,
+    identityId: string,
+  ): Set<string> {
+    const roleIds = new Set<string>(['everyone']);
+    const assignment = community.memberRoles?.find(
+      (memberRole) => memberRole.identityId === identityId,
+    );
+
+    assignment?.roleIds.forEach((roleId) => roleIds.add(roleId));
+
+    return roleIds;
   }
 
-  const permissions = new Set<CommunityPermission>();
+  public static assignedRolesFor(
+    community: Community,
+    identityId: string,
+  ): CommunityRoleResource[] {
+    const roleIds = CommunityAccessPolicy.assignedRoleIdsFor(
+      community,
+      identityId,
+    );
 
-  everyoneRole(community)?.permissions.forEach((permission) =>
-    permissions.add(permission),
-  );
-
-  for (const role of assignedRolesFor(community, identityId)) {
-    role.permissions.forEach((permission) => permissions.add(permission));
+    return (community.roles ?? []).filter((role) => roleIds.has(role.id));
   }
 
-  return permissions;
-}
+  public static canSeeChannel(
+    community: Community,
+    channel: CommunityChannel,
+    identityId: string,
+  ): boolean {
+    if (community.ownerIdentityId === identityId) return true;
 
-export function hasCommunityPermission(
-  community: Community,
-  identityId: string,
-  permission: CommunityPermission,
-): boolean {
-  return communityPermissionsFor(community, identityId).has(permission);
-}
+    const visibleRoleIds = channel.permissions?.visibleRoleIds;
 
-export function canSeeCommunityChannel(
-  community: Community,
-  channel: CommunityChannel,
-  identityId: string,
-): boolean {
-  if (community.ownerIdentityId === identityId) return true;
+    if (!visibleRoleIds || visibleRoleIds.includes('everyone')) return true;
 
-  const visibleRoleIds = channel.permissions?.visibleRoleIds;
+    const roleIds = CommunityAccessPolicy.assignedRoleIdsFor(
+      community,
+      identityId,
+    );
 
-  if (!visibleRoleIds || visibleRoleIds.includes('everyone')) return true;
+    return visibleRoleIds.some((roleId) => roleIds.has(roleId));
+  }
 
-  const roleIds = assignedRoleIdsFor(community, identityId);
+  public static hasPermission(
+    community: Community,
+    identityId: string,
+    permission: CommunityPermission,
+  ): boolean {
+    return CommunityAccessPolicy.permissionsFor(community, identityId).has(
+      permission,
+    );
+  }
 
-  return visibleRoleIds.some((roleId) => roleIds.has(roleId));
-}
+  public static membersWithChannelAccess(
+    community: Community,
+    channel: CommunityChannel,
+  ): string[] {
+    const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
 
-export function assignedRoleIdsFor(
-  community: Community,
-  identityId: string,
-): Set<string> {
-  const roleIds = new Set<string>(['everyone']);
-  const assignment = community.memberRoles?.find(
-    (memberRole) => memberRole.identityId === identityId,
-  );
+    return community.memberIds.filter(
+      (identityId) =>
+        !bannedMemberIds.has(identityId) &&
+        CommunityAccessPolicy.canSeeChannel(community, channel, identityId),
+    );
+  }
 
-  assignment?.roleIds.forEach((roleId) => roleIds.add(roleId));
+  public static permissionsFor(
+    community: Community,
+    identityId: string,
+  ): Set<CommunityPermission> {
+    if (community.ownerIdentityId === identityId) {
+      return new Set(ALL_COMMUNITY_PERMISSIONS);
+    }
 
-  return roleIds;
-}
+    const permissions = new Set<CommunityPermission>();
 
-export function assignedRolesFor(
-  community: Community,
-  identityId: string,
-): CommunityRoleResource[] {
-  const roleIds = assignedRoleIdsFor(community, identityId);
+    everyoneRole(community)?.permissions.forEach((permission) =>
+      permissions.add(permission),
+    );
 
-  return (community.roles ?? []).filter((role) => roleIds.has(role.id));
-}
+    for (const role of CommunityAccessPolicy.assignedRolesFor(
+      community,
+      identityId,
+    )) {
+      role.permissions.forEach((permission) => permissions.add(permission));
+    }
 
-export function communityMembersWithChannelAccess(
-  community: Community,
-  channel: CommunityChannel,
-): string[] {
-  const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
-
-  return community.memberIds.filter(
-    (identityId) =>
-      !bannedMemberIds.has(identityId) &&
-      canSeeCommunityChannel(community, channel, identityId),
-  );
+    return permissions;
+  }
 }
 
 function everyoneRole(community: Community): CommunityRoleResource | undefined {

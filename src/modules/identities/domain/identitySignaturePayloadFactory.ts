@@ -1,9 +1,9 @@
 import type { IdentityResource } from '../../../shared/domain/pigeonResources.types';
 
-import { normalizeIdentityId } from './value-objects/identityId';
 import { ProfileBiography } from './profile/profileBiography';
 import { ProfileHandle } from './profile/profileHandle';
 import { ProfileName } from './profile/profileName';
+import { IdentityId } from './value-objects/identityId';
 
 function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];
@@ -55,7 +55,7 @@ export class IdentitySignaturePayloadFactory {
   }): Omit<IdentityResource, 'signature'> {
     return {
       encryptedKeyPair: input.encryptedKeyPair,
-      id: normalizeIdentityId(input.id),
+      id: IdentityId.normalize(input.id),
       networks: uniqueNetworks(input.networks),
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),
@@ -74,7 +74,7 @@ export class IdentitySignaturePayloadFactory {
     return {
       encryptedKeyPair:
         input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
-      id: normalizeIdentityId(input.identity.id),
+      id: IdentityId.normalize(input.identity.id),
       networks: uniqueNetworks([
         ...input.identity.networks,
         ...(input.profile.networks ?? []),

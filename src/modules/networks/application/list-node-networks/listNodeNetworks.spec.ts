@@ -1,17 +1,20 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-import type { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import type { ListNodeNetworksPort } from '../ports/listNodeNetworksPort';
 
 import { ListNodeNetworks } from './listNodeNetworks';
+import { ListNodeNetworksMessage } from './messages/listNodeNetworksMessage';
 
 describe(ListNodeNetworks.name, () => {
   it('loads node networks through the pigeon API gateway', async () => {
     const expected = [{ id: 'network-1', name: 'Public Swarm' }];
     const gateway = {
       getNodeNetworks: jest.fn().mockResolvedValue(expected),
-    } as unknown as PigeonApiGateway;
+    } as unknown as ListNodeNetworksPort;
     const useCase = new ListNodeNetworks(gateway);
 
-    await expect(useCase.execute()).resolves.toBe(expected);
+    await expect(useCase.list(new ListNodeNetworksMessage())).resolves.toBe(
+      expected,
+    );
     expect(gateway.getNodeNetworks).toHaveBeenCalledWith(undefined);
   });
 
@@ -20,10 +23,12 @@ describe(ListNodeNetworks.name, () => {
     const session = { identity: { id: 'identity-1' } } as unknown as Session;
     const gateway = {
       getNodeNetworks: jest.fn().mockResolvedValue(expected),
-    } as unknown as PigeonApiGateway;
+    } as unknown as ListNodeNetworksPort;
     const useCase = new ListNodeNetworks(gateway);
 
-    await expect(useCase.execute(session)).resolves.toBe(expected);
+    await expect(
+      useCase.list(new ListNodeNetworksMessage(session)),
+    ).resolves.toBe(expected);
     expect(gateway.getNodeNetworks).toHaveBeenCalledWith(session);
   });
 });

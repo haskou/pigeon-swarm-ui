@@ -10,10 +10,14 @@ export class ProfileHandle extends StringValueObject {
     return value.valueOf().toLowerCase();
   }
 
+  public static fromString(value: string | StringValueObject): ProfileHandle {
+    return new ProfileHandle(value);
+  }
+
   public constructor(value: string | StringValueObject) {
     super(ProfileHandle.normalize(value), ProfileHandle.MAX_LENGTH);
 
-    assert(this.isValid(), new Error('InvalidProfileHandleError'));
+    assert(this.isValid(), Error('InvalidProfileHandleError'));
   }
 
   private isValid(): boolean {

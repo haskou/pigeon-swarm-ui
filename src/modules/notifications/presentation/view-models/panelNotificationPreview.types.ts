@@ -3,7 +3,6 @@ import type {
   ConversationResource,
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
-
 import type {
   IdentityNames,
   IdentityPictures,

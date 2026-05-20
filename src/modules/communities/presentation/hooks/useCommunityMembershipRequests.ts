@@ -7,7 +7,10 @@ import {
   useState,
 } from 'react';
 
-import type { CommunityMembershipRequest, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  CommunityMembershipRequest,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/en';
@@ -49,9 +52,7 @@ export function useCommunityMembershipRequests({
     setError(null);
     try {
       setRequests(
-        await pigeonApplication.listCommunityMembershipRequests(
-          currentSession,
-        ),
+        await pigeonApplication.listCommunityMembershipRequests(currentSession),
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.membershipError));

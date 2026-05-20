@@ -1,21 +1,16 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { RemoveMessageReactionPort } from '../ports/removeMessageReactionPort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { RemoveMessageReactionMessage } from './messages/removeMessageReactionMessage';
 
 export class RemoveMessageReaction {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly messages: RemoveMessageReactionPort) {}
 
-  public async execute(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<void> {
-    await this.gateway.removeMessageReaction(
-      session,
-      conversationId,
-      messageId,
-      emoji,
+  public async remove(message: RemoveMessageReactionMessage): Promise<void> {
+    await this.messages.removeMessageReaction(
+      message.getSession(),
+      message.getConversationId(),
+      message.getMessageId(),
+      message.getEmoji(),
     );
   }
 }

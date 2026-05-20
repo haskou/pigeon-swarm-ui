@@ -8,7 +8,8 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { conversationPeerIdentityId } from '../../../conversations/domain/conversationPeer';
+import { ConversationPeer } from '../../../conversations/domain/conversationPeer';
+import { IdentityId } from '../../domain/value-objects/identityId';
 import {
   identityName,
   identityPicture,
@@ -16,7 +17,6 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../view-models/identityDisplay';
-import { normalizeIdentityId } from '../../domain/value-objects/identityId';
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
@@ -89,7 +89,7 @@ export function useIdentityDirectory({
     const ids = new Set<string>();
 
     conversations.forEach((conversation) => {
-      const peerIdentityId = conversationPeerIdentityId(
+      const peerIdentityId = ConversationPeer.identityId(
         conversation,
         session.identity.id,
         session.keychain,
@@ -213,7 +213,7 @@ function isResolvableIdentityId(
 async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
   try {
     const identity = await pigeonApplication.getIdentity(
-      normalizeIdentityId(identityId),
+      IdentityId.normalize(identityId),
     );
     const picture = await loadIdentityPicture(identity).catch(() => null);
 

@@ -2,9 +2,12 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useCallback, useEffect, useState } from 'react';
 
-import type { ConversationResource, Session } from '../../shared/domain/pigeonResources.types';
+import type {
+  ConversationResource,
+  Session,
+} from '../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../composition/applicationContainer';
+import { useCommunities } from '../../modules/communities/presentation/hooks/useCommunities';
 import {
   clearCommunityInviteUrl,
   parseCommunityInviteUrl,
@@ -14,10 +17,10 @@ import {
   clearSavedCredentials,
   loadSavedCredentials,
 } from '../../modules/identities/infrastructure/storage/savedCredentials';
-import { useCommunities } from '../../modules/communities/presentation/hooks/useCommunities';
 import { useNodeNetworks } from '../../modules/networks/presentation/hooks/useNodeNetworks';
-import { usePeers } from '../../modules/peers/presentation/hooks/usePeers';
+import { usePeers } from '../../modules/networks/presentation/hooks/usePeers';
 import { requestPwaNotificationPermission } from '../../modules/notifications/infrastructure/browser/pwaNotifications';
+import { pigeonApplication } from '../composition/applicationContainer';
 
 type RestoreState = 'done' | 'loading';
 

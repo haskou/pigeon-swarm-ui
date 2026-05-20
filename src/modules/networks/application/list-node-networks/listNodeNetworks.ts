@@ -1,17 +1,14 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { ListNodeNetworksPort } from '../ports/listNodeNetworksPort';
+import type { NodeNetwork } from './listNodeNetworks.types';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
-
-export type NodeNetwork = {
-  id: string;
-  key?: string | null;
-  name: string;
-};
+import { ListNodeNetworksMessage } from './messages/listNodeNetworksMessage';
 
 export class ListNodeNetworks {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly networks: ListNodeNetworksPort) {}
 
-  public async execute(session?: Session): Promise<NodeNetwork[]> {
-    return await this.gateway.getNodeNetworks(session);
+  public async list(message: ListNodeNetworksMessage): Promise<NodeNetwork[]> {
+    return await this.networks.getNodeNetworks(message.getSession());
   }
 }
+
+export type { NodeNetwork };

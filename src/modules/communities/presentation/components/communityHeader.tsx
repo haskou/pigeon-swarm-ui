@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
 
-import type { Community, CommunityTextChannel } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  CommunityTextChannel,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/en';
 import { cx } from '../../../../shared/presentation/classNameHelper';
 import { FallbackImage } from '../../../../shared/presentation/components/fallbackImage';
-import { WorkspaceHeader } from '../../../workspace/presentation/components/workspaceHeader';
-import { LockIcon } from '../../../workspace/presentation/components/lockIcon';
+import { WorkspaceHeader } from '../../../../app/presentation/workspace/components/workspaceHeader';
+import { LockIcon } from '../../../../app/presentation/workspace/components/lockIcon';
 
 export function CommunityHeader({
   avatarUrl,

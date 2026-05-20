@@ -17,15 +17,15 @@ import { formatDateSeparator } from '../../../../shared/presentation/formatting'
 import { DateSeparator } from '../../../messages/presentation/components/dateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/messageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/messageListSkeleton';
-import { messagePollTimelineItems } from '../../../messages/presentation/components/messagePollTimelineItems';
+import { messagePollTimelineItems } from '../../../polls/presentation/components/messagePollTimelineItems';
 import {
   endsAuthorRun,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
 } from '../../../messages/presentation/components/messageTimelineHelpers';
-import { PollCard } from '../../../messages/presentation/components/pollCard';
-import { LockIcon } from '../../../workspace/presentation/components/lockIcon';
+import { PollCard } from '../../../polls/presentation/components/pollCard';
+import { LockIcon } from '../../../../app/presentation/workspace/components/lockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 type LoadState = 'error' | 'idle' | 'loading';

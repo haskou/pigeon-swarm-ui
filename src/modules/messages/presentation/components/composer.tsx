@@ -31,8 +31,8 @@ import {
 } from '../emoji/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
 import { ComposerMentionOverlay } from './composerMentionOverlay';
-import { StickerPicker } from './stickerPicker';
-import { stickerAssetUrl } from './stickerPressPreview';
+import { StickerPicker } from '../../../stickers/presentation/components/stickerPicker';
+import { stickerAssetUrl } from '../../../stickers/presentation/components/stickerPressPreview';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -87,8 +87,7 @@ export function Composer({
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
   >([]);
-  const [encryptLargeAttachments, setEncryptLargeAttachments] =
-    useState(false);
+  const [encryptLargeAttachments, setEncryptLargeAttachments] = useState(false);
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -242,10 +241,7 @@ export function Composer({
       setCaretIndex(nextCaretIndex);
       requestAnimationFrame(() => {
         textInputRef.current?.focus();
-        textInputRef.current?.setSelectionRange(
-          nextCaretIndex,
-          nextCaretIndex,
-        );
+        textInputRef.current?.setSelectionRange(nextCaretIndex, nextCaretIndex);
       });
     },
     [caretIndex, draft, onDraftChange],
@@ -464,17 +460,17 @@ export function Composer({
                 />
               )}
               <div className="min-w-0">
-              <div className="text-xs font-black uppercase text-fuchsia-100/70">
-                {copy.messages.replyingTo}{' '}
-                {replyToAuthorName ?? replyTo.authorIdentityId}
-              </div>
-              {replyTo.content ? (
-                <div className="mt-1 truncate text-white/80">
-                  {replyTo.content}
+                <div className="text-xs font-black uppercase text-fuchsia-100/70">
+                  {copy.messages.replyingTo}{' '}
+                  {replyToAuthorName ?? replyTo.authorIdentityId}
                 </div>
-              ) : replyTo.sticker ? (
-                <div className="mt-1 truncate text-white/80">Sticker</div>
-              ) : null}
+                {replyTo.content ? (
+                  <div className="mt-1 truncate text-white/80">
+                    {replyTo.content}
+                  </div>
+                ) : replyTo.sticker ? (
+                  <div className="mt-1 truncate text-white/80">Sticker</div>
+                ) : null}
               </div>
             </div>
             <button

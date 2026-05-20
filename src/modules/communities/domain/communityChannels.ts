@@ -5,40 +5,38 @@ import type {
   CommunityVoiceChannel,
 } from '../../../shared/domain/pigeonResources.types';
 
-export function isCommunityTextChannel(
-  channel: CommunityChannel,
-): channel is CommunityTextChannel {
-  return channel.type === 'text';
-}
+export class CommunityChannels {
+  public static all(community: Community): CommunityChannel[] {
+    return [...community.textChannels, ...(community.voiceChannels ?? [])];
+  }
 
-export function isCommunityVoiceChannel(
-  channel: CommunityChannel,
-): channel is CommunityVoiceChannel {
-  return channel.type === 'voice';
-}
+  public static isText(
+    channel: CommunityChannel,
+  ): channel is CommunityTextChannel {
+    return channel.type === 'text';
+  }
 
-export function communityChannels(community: Community): CommunityChannel[] {
-  return [...community.textChannels, ...(community.voiceChannels ?? [])];
-}
+  public static isVoice(
+    channel: CommunityChannel,
+  ): channel is CommunityVoiceChannel {
+    return channel.type === 'voice';
+  }
 
-export function communityTextChannels(
-  community: Community,
-): CommunityTextChannel[] {
-  return communityChannels(community).filter(isCommunityTextChannel);
-}
+  public static split(channels: CommunityChannel[]): {
+    textChannels: CommunityTextChannel[];
+    voiceChannels: CommunityVoiceChannel[];
+  } {
+    return {
+      textChannels: channels.filter(CommunityChannels.isText),
+      voiceChannels: channels.filter(CommunityChannels.isVoice),
+    };
+  }
 
-export function communityVoiceChannels(
-  community: Community,
-): CommunityVoiceChannel[] {
-  return communityChannels(community).filter(isCommunityVoiceChannel);
-}
+  public static text(community: Community): CommunityTextChannel[] {
+    return CommunityChannels.all(community).filter(CommunityChannels.isText);
+  }
 
-export function splitCommunityChannels(channels: CommunityChannel[]): {
-  textChannels: CommunityTextChannel[];
-  voiceChannels: CommunityVoiceChannel[];
-} {
-  return {
-    textChannels: channels.filter(isCommunityTextChannel),
-    voiceChannels: channels.filter(isCommunityVoiceChannel),
-  };
+  public static voice(community: Community): CommunityVoiceChannel[] {
+    return CommunityChannels.all(community).filter(CommunityChannels.isVoice);
+  }
 }

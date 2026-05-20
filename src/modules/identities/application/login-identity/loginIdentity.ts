@@ -1,20 +1,23 @@
 import type { LoginResult } from '../../../../shared/domain/pigeonResources.types';
+import type { LoginIdentityPort } from '../ports/loginIdentityPort';
 
-import { sortConversationsByLatestMessage } from '../../../conversations/domain/conversationOrdering';
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { ConversationTimeline } from '../../../conversations/domain/conversationOrdering';
+import { LoginIdentityMessage } from './messages/loginIdentityMessage';
 
 export class LoginIdentity {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly identities: LoginIdentityPort) {}
 
-  public async execute(
-    identityId: string,
-    password: string,
-  ): Promise<LoginResult> {
-    const result = await this.gateway.login(identityId, password);
+  public async login(message: LoginIdentityMessage): Promise<LoginResult> {
+    const result = await this.identities.login(
+      message.getIdentityId(),
+      message.getPassword(),
+    );
 
     return {
       ...result,
-      conversations: sortConversationsByLatestMessage(result.conversations),
+      conversations: ConversationTimeline.sortByLatestMessage(
+        result.conversations,
+      ),
     };
   }
 }

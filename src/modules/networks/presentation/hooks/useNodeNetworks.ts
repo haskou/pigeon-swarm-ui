@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { NodeNetwork } from '../../application/list-node-networks/listNodeNetworks';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { NodeNetwork } from '../../application/list-node-networks/listNodeNetworks';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/en';

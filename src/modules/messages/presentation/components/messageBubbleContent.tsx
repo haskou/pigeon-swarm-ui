@@ -1,8 +1,14 @@
-import type { ChatMessage, StickerMessageReference } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  StickerMessageReference,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { cx } from '../../../../shared/presentation/classNameHelper';
 import { copy } from '../../../../shared/presentation/i18n/en';
-import { stickerAssetUrl, useStickerPressPreview } from './stickerPressPreview';
+import {
+  stickerAssetUrl,
+  useStickerPressPreview,
+} from '../../../stickers/presentation/components/stickerPressPreview';
 
 export function MessageStickerContent({
   mine,
@@ -82,7 +88,9 @@ export function MessageDeliveryStatus({
 
   return (
     <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
-      {message.deliveryStatus === 'pending' && <span>{copy.messages.sending}</span>}
+      {message.deliveryStatus === 'pending' && (
+        <span>{copy.messages.sending}</span>
+      )}
       {message.deliveryStatus === 'failed' && (
         <>
           <span className="text-rose-100">{copy.messages.sendFailed}</span>

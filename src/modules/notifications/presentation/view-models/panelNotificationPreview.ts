@@ -1,18 +1,12 @@
-import type {
-  Community,
-  IdentityResource,
-  NotificationResource,
-} from '../../../../shared/domain/pigeonResources.types';
-
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { shortId } from '../../../../shared/presentation/formatting';
-import {
-  identityDisplayName,
-} from '../../../identities/presentation/view-models/identityDisplay';
+import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
 import type {
   NotificationPreview,
   NotificationPreviewContext,
 } from './panelNotificationPreview.types';
+
+import { shortId } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function notificationPreview(
   notification: NotificationResource,

@@ -1,7 +1,8 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-import type { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import type { ListConversationsPort } from '../ports/listConversationsPort';
 
 import { ListConversations } from './listConversations';
+import { ListConversationsMessage } from './messages/listConversationsMessage';
 
 describe(ListConversations.name, () => {
   it('orders conversations by latest loaded message when the list has no activity timestamp', async () => {
@@ -18,10 +19,12 @@ describe(ListConversations.name, () => {
             : { messages: [{ id: '1', timestamp: 10 }] },
         ),
       ),
-    } as unknown as PigeonApiGateway;
+    } as unknown as ListConversationsPort;
 
     await expect(
-      new ListConversations(gateway).execute(session),
+      new ListConversations(gateway).list(
+        new ListConversationsMessage(session),
+      ),
     ).resolves.toEqual([
       { id: 'newer', latestMessageAt: 20, networkId: 'net' },
       { id: 'older', latestMessageAt: 10, networkId: 'net' },
@@ -42,10 +45,12 @@ describe(ListConversations.name, () => {
 
         return Promise.resolve({ messages: [{ id: '1', timestamp: 10 }] });
       }),
-    } as unknown as PigeonApiGateway;
+    } as unknown as ListConversationsPort;
 
     await expect(
-      new ListConversations(gateway).execute(session),
+      new ListConversations(gateway).list(
+        new ListConversationsMessage(session),
+      ),
     ).resolves.toEqual([
       { id: 'with-key', latestMessageAt: 10, networkId: 'net' },
       { id: 'without-key', networkId: 'net' },

@@ -7,13 +7,21 @@ import {
 
 const gcmTagBytes = 16;
 
-export function assert(condition: unknown, error: Error | string): void {
+function assert(condition: unknown, error: Error | string): void {
   if (condition) return;
 
   throw typeof error === 'string' ? new Error(error) : error;
 }
 
-export class StringValueObject {
+class DomainError extends Error {}
+
+class ValueNotInEnumError extends DomainError {
+  public constructor(value: string, validValues: string[]) {
+    super(`Value "${value}" must be one of: ${validValues.join(', ')}`);
+  }
+}
+
+class StringValueObject {
   public constructor(
     private readonly value: string,
     maxLength?: number,
@@ -44,11 +52,57 @@ export class StringValueObject {
   }
 }
 
-export class EncryptedPayload extends StringValueObject {}
+class EncryptedPayload extends StringValueObject {}
 
-export class Signature extends StringValueObject {}
+class Timestamp {
+  private readonly value: number;
 
-export class SHA256Hash extends StringValueObject {
+  public constructor(value?: Date | number | string | Timestamp) {
+    if (value instanceof Timestamp) {
+      this.value = value.valueOf();
+      return;
+    }
+
+    if (value instanceof Date) {
+      this.value = value.getTime();
+      return;
+    }
+
+    this.value = value === undefined ? Date.now() : new Date(value).getTime();
+  }
+
+  public static now(): Timestamp {
+    return new Timestamp();
+  }
+
+  public isAfter(other: Timestamp): boolean {
+    return this.value > other.valueOf();
+  }
+
+  public isAfterOrEqual(other: Timestamp): boolean {
+    return this.value >= other.valueOf();
+  }
+
+  public isBefore(other: Timestamp): boolean {
+    return this.value < other.valueOf();
+  }
+
+  public isBeforeOrEqual(other: Timestamp): boolean {
+    return this.value <= other.valueOf();
+  }
+
+  public isEqual(other: Timestamp): boolean {
+    return this.value === other.valueOf();
+  }
+
+  public valueOf(): number {
+    return this.value;
+  }
+}
+
+class Signature extends StringValueObject {}
+
+class SHA256Hash extends StringValueObject {
   public static from(value: Buffer | string | StringValueObject): SHA256Hash {
     return new SHA256Hash(
       createHash('sha256').update(value.toString()).digest('hex'),
@@ -56,13 +110,13 @@ export class SHA256Hash extends StringValueObject {
   }
 }
 
-export class UUID extends StringValueObject {
+class UUID extends StringValueObject {
   public static generate(): UUID {
     return new UUID(globalThis.crypto.randomUUID());
   }
 }
 
-export class CryptoAdapter {
+class CryptoAdapter {
   public static decryptAes256Gcm(
     key: Uint8Array,
     iv: Uint8Array,
@@ -103,7 +157,7 @@ export class CryptoAdapter {
   }
 }
 
-export class PrivateKey extends StringValueObject {
+class PrivateKey extends StringValueObject {
   public static fromPEM(value: string | StringValueObject): PrivateKey {
     return new PrivateKey(value.toString());
   }
@@ -117,7 +171,7 @@ export class PrivateKey extends StringValueObject {
   }
 }
 
-export class PublicKey extends StringValueObject {
+class PublicKey extends StringValueObject {
   public static fromPEM(value: string | StringValueObject): PublicKey {
     return new PublicKey(value.toString());
   }
@@ -127,9 +181,9 @@ export class PublicKey extends StringValueObject {
   }
 }
 
-export class EncryptedPrivateKey extends StringValueObject {}
+class EncryptedPrivateKey extends StringValueObject {}
 
-export class EncryptedKeyPair {
+class EncryptedKeyPair {
   public constructor(
     public readonly publicKey: PublicKey,
     public readonly encryptedPrivateKey: EncryptedPrivateKey,
@@ -147,7 +201,7 @@ export class EncryptedKeyPair {
   }
 }
 
-export class KeyPair {
+class KeyPair {
   public static async generate(): Promise<KeyPair> {
     return new KeyPair();
   }
@@ -170,3 +224,21 @@ export class KeyPair {
     };
   }
 }
+
+export {
+  assert,
+  CryptoAdapter,
+  DomainError,
+  EncryptedKeyPair,
+  EncryptedPayload,
+  EncryptedPrivateKey,
+  KeyPair,
+  PrivateKey,
+  PublicKey,
+  SHA256Hash,
+  Signature,
+  StringValueObject,
+  Timestamp,
+  UUID,
+  ValueNotInEnumError,
+};

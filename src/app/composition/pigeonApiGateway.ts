@@ -8,13 +8,13 @@ import {
   UUID,
 } from '@haskou/value-objects';
 
-import type { Peer } from '../../modules/peers/application/list-peers/listPeers';
 import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
 } from '../../modules/calls/domain/callSession.types';
 import type { IdentityUpdateProfileInput } from '../../modules/identities/domain/identitySignaturePayloadFactory';
+import type { Peer } from '../../modules/networks/application/list-peers/listPeers';
 import type {
   ChatMessage,
   Community,
@@ -62,16 +62,22 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 
-import { API_SERVER_URL } from '../config';
-import { AttachmentCipher } from '../../modules/attachments/domain/attachmentCipher';
+import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/attachmentCipher';
+import { PigeonFilesApi } from '../../modules/attachments/infrastructure/http/pigeonFilesApi';
+import { PigeonCallsApi } from '../../modules/calls/infrastructure/http/pigeonCallsApi';
+import { PigeonCommunitiesApi } from '../../modules/communities/infrastructure/http/pigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../modules/conversations/domain/conversationIdFactory';
-import { conversationKeyEntry } from '../../modules/conversations/domain/conversationKey';
+import { ConversationKeychain } from '../../modules/conversations/domain/conversationKey';
+import { ConversationMapper } from '../../modules/conversations/infrastructure/http/conversationMapper';
 import { IdentitySignaturePayloadFactory } from '../../modules/identities/domain/identitySignaturePayloadFactory';
-import { KeychainCipher } from '../../modules/keychains/domain/keychainCipher';
-import { firstMessageLinkPreviewUrl } from '../../modules/messages/domain/linkPreviewUrls';
+import { IdentityId } from '../../modules/identities/domain/value-objects/identityId';
+import { KeychainCipher } from '../../modules/identities/infrastructure/crypto/keychainCipher';
+import { PigeonPresenceApi } from '../../modules/identities/infrastructure/http/pigeonPresenceApi';
+import { MessageLinkPreviews } from '../../modules/messages/domain/linkPreviewUrls';
 import { MessageProjector } from '../../modules/messages/domain/messageProjector';
 import { MessageSignaturePayloadFactory } from '../../modules/messages/domain/messageSignaturePayloadFactory';
-import { copy } from '../../shared/presentation/i18n/en';
+import { PigeonLinkPreviewsApi } from '../../modules/messages/infrastructure/http/pigeonLinkPreviewsApi';
+import { PigeonNodeApi } from '../../modules/networks/infrastructure/http/pigeonNodeApi';
 import { NotificationDecision } from '../../modules/notifications/domain/notificationDecision';
 import { NotificationId } from '../../modules/notifications/domain/notificationId';
 import { PigeonNotificationsApi } from '../../modules/notifications/infrastructure/http/pigeonNotificationsApi';
@@ -79,20 +85,14 @@ import {
   PigeonPushApi,
   type PushSubscriptionPayload,
 } from '../../modules/notifications/infrastructure/http/pigeonPushApi';
-import { normalizeIdentityId } from '../../modules/identities/domain/value-objects/identityId';
+import { PigeonPollsApi } from '../../modules/polls/infrastructure/http/pigeonPollsApi';
+import { PigeonStickersApi } from '../../modules/stickers/infrastructure/http/pigeonStickersApi';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/apiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/httpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/httpJsonError';
-import { ConversationMapper } from '../../modules/conversations/infrastructure/http/conversationMapper';
-import { PigeonCallsApi } from '../../modules/calls/infrastructure/http/pigeonCallsApi';
-import { PigeonCommunitiesApi } from '../../modules/communities/infrastructure/http/pigeonCommunitiesApi';
-import { PigeonFilesApi } from '../../modules/attachments/infrastructure/http/pigeonFilesApi';
-import { PigeonLinkPreviewsApi } from '../../modules/messages/infrastructure/http/pigeonLinkPreviewsApi';
-import { PigeonNodeApi } from '../../modules/networks/infrastructure/http/pigeonNodeApi';
-import { PigeonPollsApi } from '../../modules/polls/infrastructure/http/pigeonPollsApi';
-import { PigeonPresenceApi } from '../../modules/identities/infrastructure/http/pigeonPresenceApi';
-import { PigeonStickersApi } from '../../modules/stickers/infrastructure/http/pigeonStickersApi';
 import { RequestSigner } from '../../shared/infrastructure/http/requestSigner';
+import { copy } from '../../shared/presentation/i18n/en';
+import { API_SERVER_URL } from '../config';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -1008,7 +1008,7 @@ export class PigeonApiGateway {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const encryptedKeyPairPrimitives = encryptedKeyPair.toPrimitives();
-    const identityId = normalizeIdentityId(keyPair.toPrimitives().publicKey);
+    const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
     const path = '/identities/';
     const unsigned = this.identitySignatures.createInitial({
       encryptedKeyPair: encryptedKeyPairPrimitives,
@@ -1078,7 +1078,7 @@ export class PigeonApiGateway {
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
   ): Promise<IdentityResource> {
-    const identityId = normalizeIdentityId(session.identity.id);
+    const identityId = IdentityId.normalize(session.identity.id);
     const currentIdentity = await this.getIdentity(identityId);
     const previousIdentityExternalIdentifier =
       currentIdentity.identityExternalIdentifier ??
@@ -1480,7 +1480,7 @@ export class PigeonApiGateway {
       replyPreview,
       replyToMessageId,
     } = options;
-    const key = conversationKeyEntry(
+    const key = ConversationKeychain.entry(
       session.keychain,
       session.identity.id,
       conversationId,
@@ -1688,7 +1688,7 @@ export class PigeonApiGateway {
       (message) => message.type !== 'deleted',
     );
     const key = pendingMessages.some(hasEncryptedPayload)
-      ? conversationKeyEntry(
+      ? ConversationKeychain.entry(
           session.keychain,
           session.identity.id,
           conversationId,
@@ -1750,7 +1750,7 @@ export class PigeonApiGateway {
     session: Session,
     content: string,
   ): Promise<MessageLinkPreview | undefined> {
-    const url = firstMessageLinkPreviewUrl(content);
+    const url = MessageLinkPreviews.firstUrl(content);
 
     if (!url) return undefined;
 

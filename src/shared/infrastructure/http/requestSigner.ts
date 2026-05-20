@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/config';
-import { normalizeIdentityId } from '../../../modules/identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../modules/identities/domain/value-objects/identityId';
 import { ApiUrlBuilder } from './apiUrlBuilder';
 
 type Clock = () => number;
@@ -31,7 +31,7 @@ export class RequestSigner {
     );
 
     return {
-      'X-Identity-Id': normalizeIdentityId(session.identity.id),
+      'X-Identity-Id': IdentityId.normalize(session.identity.id),
       'X-Nonce': nonce,
       'X-Signature': signature.toString(),
       'X-Timestamp': timestamp,

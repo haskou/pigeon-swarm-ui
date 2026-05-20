@@ -1,10 +1,10 @@
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
+import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle as isValidCredentialHandle,
   normalizeHandleInput,
 } from '../auth/credentialsValidation';
-import { shortId } from '../../../../shared/presentation/formatting';
 
 export type IdentityNames = Record<string, string>;
 export type IdentityPictures = Record<string, string>;

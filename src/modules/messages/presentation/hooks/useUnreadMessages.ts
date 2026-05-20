@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { sortConversationsByLatestMessage } from '../../../conversations/domain/conversationOrdering';
+import { ConversationTimeline } from '../../../conversations/domain/conversationOrdering';
 
 type UnreadCountsByConversation = Record<string, number>;
 
@@ -22,7 +22,7 @@ export function useUnreadMessages(conversations: ConversationResource[]): {
 
   const conversationsWithUnread = useMemo(
     () =>
-      sortConversationsByLatestMessage(
+      ConversationTimeline.sortByLatestMessage(
         conversations.map((conversation) => ({
           ...conversation,
           unreadCount: Math.max(

@@ -5,9 +5,9 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { communityChannels } from '../../../communities/domain/communityChannels';
-import { conversationPeerIdentityId } from '../../../conversations/domain/conversationPeer';
 import { copy } from '../../../../shared/presentation/i18n/en';
+import { CommunityChannels } from '../../../communities/domain/communityChannels';
+import { ConversationPeer } from '../../../conversations/domain/conversationPeer';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function communityNotificationPreview(
@@ -19,7 +19,7 @@ export function communityNotificationPreview(
 ): { body: string; title: string } {
   const community = communities.find((item) => item.id === communityId);
   const channel = community
-    ? communityChannels(community).find((item) => item.id === channelId)
+    ? CommunityChannels.all(community).find((item) => item.id === channelId)
     : undefined;
   const author = authorIdentityId ? identityNames[authorIdentityId] : undefined;
   const location = channel ? `#${channel.name}` : copy.chat.newMessage;
@@ -66,7 +66,7 @@ function oneToOneConversationNotificationPreview(
   identityNames: Record<string, string>,
   identityProfiles: Record<string, IdentityResource>,
 ): { body: string; title: string } {
-  const peerIdentityId = conversationPeerIdentityId(
+  const peerIdentityId = ConversationPeer.identityId(
     conversation,
     session.identity.id,
     session.keychain,

@@ -1,25 +1,17 @@
-import type {
-  ChatMessage,
-  SendMessageOptions,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { SendMessagePort } from '../ports/sendMessagePort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { SendMessageMessage } from './messages/sendMessageMessage';
 
 export class SendMessage {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly messages: SendMessagePort) {}
 
-  public async execute(
-    session: Session,
-    conversationId: string,
-    content: string,
-    options: SendMessageOptions = {},
-  ): Promise<ChatMessage> {
-    return await this.gateway.sendMessage(
-      session,
-      conversationId,
-      content,
-      options,
+  public async send(message: SendMessageMessage): Promise<ChatMessage> {
+    return await this.messages.sendMessage(
+      message.getSession(),
+      message.getConversationId(),
+      message.getContent(),
+      message.getOptions(),
     );
   }
 }

@@ -10,7 +10,7 @@ import type {
 import type { HttpJsonClient } from '../../shared/infrastructure/http/httpJsonClient';
 import type { RequestSigner } from '../../shared/infrastructure/http/requestSigner';
 
-import { AttachmentCipher } from '../../modules/attachments/domain/attachmentCipher';
+import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/attachmentCipher';
 import { PigeonApiGateway } from './pigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {

@@ -1,9 +1,11 @@
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import type { CreateNetworkPort } from '../ports/createNetworkPort';
+
+import { CreateNetworkMessage } from './messages/createNetworkMessage';
 
 export class CreateNetwork {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly networks: CreateNetworkPort) {}
 
-  public async execute(name: string): Promise<void> {
-    await this.gateway.createNetwork(name);
+  public async create(message: CreateNetworkMessage): Promise<void> {
+    await this.networks.create(message.getName());
   }
 }

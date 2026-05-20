@@ -162,6 +162,7 @@ export function useCallSession(): {
     sendSignalRef.current = input.onSignal;
     const nextCall: CallSession = {
       call: input.call,
+      cameraEnabled: false,
       channelId: input.channelId,
       communityId: input.communityId,
       conversationId: input.conversationId,
@@ -169,7 +170,6 @@ export function useCallSession(): {
       deafened: false,
       hasMicrophone: input.localStream !== null,
       id: input.id,
-      cameraEnabled: false,
       kind: input.kind,
       muted: input.localStream === null,
       participants: input.participants,
@@ -439,8 +439,8 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled,
               localPreviewStream: stream ?? undefined,
-              screenStream: mediaManager.screenPreviewStream(),
               screenSharing: mediaManager.hasScreenShare(),
+              screenStream: mediaManager.screenPreviewStream(),
             })
           : active,
       );
@@ -472,8 +472,8 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled: mediaManager.hasCamera(),
               localPreviewStream: stream ?? undefined,
-              screenStream: mediaManager.screenPreviewStream(),
               screenSharing,
+              screenStream: mediaManager.screenPreviewStream(),
             })
           : active,
       );
@@ -668,9 +668,9 @@ function localParticipantWithMediaState(
     audioLevel,
     deafened: call.deafened,
     mediaStream: call.localPreviewStream,
-    screenStream,
     muted: call.muted,
     screenSharing: call.screenSharing,
+    screenStream,
     speaking: !call.muted && audioLevel > 0.04,
     videoEnabled: hasVideoTrack(call.localPreviewStream),
   };
@@ -715,8 +715,8 @@ function localMediaSession(
         ? {
             ...participant,
             mediaStream: media.localPreviewStream,
-            screenStream: media.screenStream,
             screenSharing: media.screenSharing,
+            screenStream: media.screenStream,
             videoEnabled: hasVideoTrack(media.localPreviewStream),
           }
         : participant,

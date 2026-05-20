@@ -1,4 +1,7 @@
-import type { MessageLinkPreview, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  MessageLinkPreview,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
 

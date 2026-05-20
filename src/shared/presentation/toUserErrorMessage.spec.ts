@@ -1,5 +1,5 @@
-import { copy } from './i18n/en';
 import { HttpJsonError } from '../infrastructure/http/httpJsonError';
+import { copy } from './i18n/en';
 import { toUserErrorMessage } from './toUserErrorMessage';
 
 describe(toUserErrorMessage.name, () => {

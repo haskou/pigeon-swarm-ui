@@ -39,7 +39,9 @@ export class NotificationDecision extends StringValueObject {
     return this.isEqual(NotificationDecision.declined());
   }
 
-  private static isValidState(state: string): state is NotificationDecisionState {
+  private static isValidState(
+    state: string,
+  ): state is NotificationDecisionState {
     return (
       state === acceptedNotificationDecision ||
       state === declinedNotificationDecision

@@ -1,12 +1,9 @@
-import {
-  bumpConversationActivity,
-  sortConversationsByLatestMessage,
-} from './conversationOrdering';
+import { ConversationTimeline } from './conversationOrdering';
 
 describe('conversation ordering', () => {
   it('orders conversations with the newest latest message first', () => {
     expect(
-      sortConversationsByLatestMessage([
+      ConversationTimeline.sortByLatestMessage([
         { id: 'old', latestMessageAt: 10, networkId: 'net' },
         { id: 'new', latestMessageAt: 30, networkId: 'net' },
         { id: 'empty', networkId: 'net' },
@@ -16,7 +13,7 @@ describe('conversation ordering', () => {
 
   it('bumps a conversation activity and keeps the list ordered', () => {
     expect(
-      bumpConversationActivity(
+      ConversationTimeline.bumpActivity(
         [
           { id: 'first', latestMessageAt: 50, networkId: 'net' },
           { id: 'second', latestMessageAt: 20, networkId: 'net' },

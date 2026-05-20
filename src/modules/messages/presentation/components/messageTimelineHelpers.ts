@@ -44,7 +44,8 @@ export function messageReplyImage(
   return (
     replyMessage?.attachments.find((attachment) =>
       isBrowserPreviewImage(attachment.contentType),
-    ) ?? (isReplyPreviewImageAttachment(previewImage) ? previewImage : undefined)
+    ) ??
+    (isReplyPreviewImageAttachment(previewImage) ? previewImage : undefined)
   );
 }
 

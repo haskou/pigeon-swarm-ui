@@ -14,14 +14,11 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import {
-  communityChannels,
-  splitCommunityChannels,
-} from '../../domain/communityChannels';
-import { communityPermissionsFor } from '../../domain/communityPermissions';
+import { CommunityChannels } from '../../domain/communityChannels';
+import { CommunityAccessPolicy } from '../../domain/communityPermissions';
 import { copy } from '../../../../shared/presentation/i18n/en';
 import { cx } from '../../../../shared/presentation/classNameHelper';
-import { normalizeIdentityId } from '../../../identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../identities/domain/value-objects/identityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { CommunityBannedMembersPanel } from './communityBannedMembersPanel';
 import { CommunityInvitationsPanel } from './communityInvitationsPanel';
@@ -40,9 +37,11 @@ import {
 } from './communitySettingsNavigation';
 
 const ImageCropEditor = lazy(() =>
-  import('../../../../shared/presentation/components/imageCropEditor').then((module) => ({
-    default: module.ImageCropEditor,
-  })),
+  import('../../../../shared/presentation/components/imageCropEditor').then(
+    (module) => ({
+      default: module.ImageCropEditor,
+    }),
+  ),
 );
 
 type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
@@ -81,7 +80,7 @@ export function ManageCommunityDialog({
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
-    communityChannels(community),
+    CommunityChannels.all(community),
   );
   const [activeSection, setActiveSection] =
     useState<CommunitySettingsSection>('profile');
@@ -111,7 +110,7 @@ export function ManageCommunityDialog({
     Record<string, string[]>
   >(() =>
     Object.fromEntries(
-      communityChannels(community).map((channel) => [
+      CommunityChannels.all(community).map((channel) => [
         channel.id,
         channel.permissions?.visibleRoleIds ?? ['everyone'],
       ]),
@@ -131,7 +130,7 @@ export function ManageCommunityDialog({
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
-        communityChannels(community).map((channel) => [
+        CommunityChannels.all(community).map((channel) => [
           channel.id,
           channel.name,
         ]),
@@ -141,7 +140,7 @@ export function ManageCommunityDialog({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
-  const currentPermissions = communityPermissionsFor(
+  const currentPermissions = CommunityAccessPolicy.permissionsFor(
     community,
     session.identity.id,
   );
@@ -155,8 +154,7 @@ export function ManageCommunityDialog({
     isOwner || currentPermissions.has('create_invites');
   const canApproveRequests =
     isOwner || currentPermissions.has('approve_members');
-  const canRejectRequests =
-    isOwner || currentPermissions.has('reject_members');
+  const canRejectRequests = isOwner || currentPermissions.has('reject_members');
   const sections = [
     ...(isOwner ? ([['profile', copy.communities.profile]] as const) : []),
     ...(canManageChannels
@@ -247,7 +245,7 @@ export function ManageCommunityDialog({
             identityId === session.identity.id
               ? session.identity
               : await pigeonApplication.getIdentity(
-                  normalizeIdentityId(identityId),
+                  IdentityId.normalize(identityId),
                 );
           const pictureUrl = await loadIdentityPicture(identity);
 
@@ -319,7 +317,7 @@ export function ManageCommunityDialog({
             identityId === session.identity.id
               ? session.identity
               : await pigeonApplication.getIdentity(
-                  normalizeIdentityId(identityId),
+                  IdentityId.normalize(identityId),
                 );
 
           return [identityId, identity] as const;
@@ -498,7 +496,11 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await pigeonApplication.deleteCommunityRole(session, community.id, role.id);
+      await pigeonApplication.deleteCommunityRole(
+        session,
+        community.id,
+        role.id,
+      );
       setSelectedRoleId('');
       await refreshCommunity();
     } catch (caught) {
@@ -530,7 +532,11 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await pigeonApplication.banCommunityMember(session, community.id, identityId);
+      await pigeonApplication.banCommunityMember(
+        session,
+        community.id,
+        identityId,
+      );
       await refreshCommunity();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.banMemberError));
@@ -543,9 +549,8 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const requests = await pigeonApplication.listCommunityMembershipRequests(
-        session,
-      );
+      const requests =
+        await pigeonApplication.listCommunityMembershipRequests(session);
 
       setMembershipRequests(
         requests.filter((request) => request.communityId === community.id),
@@ -602,7 +607,7 @@ export function ManageCommunityDialog({
   };
 
   const inviteMember = async () => {
-    const identityId = normalizeIdentityId(inviteIdentityInput);
+    const identityId = IdentityId.normalize(inviteIdentityInput);
 
     if (!identityId || state === 'loading') return;
 
@@ -634,12 +639,11 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const request =
-        await pigeonApplication.updateCommunityMembershipRequest(
-          session,
-          requestId,
-          status,
-        );
+      const request = await pigeonApplication.updateCommunityMembershipRequest(
+        session,
+        requestId,
+        status,
+      );
 
       setMembershipRequests((current) =>
         current.map((item) => (item.id === request.id ? request : item)),
@@ -773,7 +777,7 @@ export function ManageCommunityDialog({
 
       onCommunityUpdated({
         ...updatedCommunity,
-        ...splitCommunityChannels(updatedChannels),
+        ...CommunityChannels.split(updatedChannels),
       });
 
       return true;
@@ -886,254 +890,256 @@ export function ManageCommunityDialog({
           <div className="flex min-h-0 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid gap-5 lg:items-start">
-            {activeSection === 'profile' && (
-            <div className="overflow-hidden rounded-2xl bg-black/25">
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
-                aria-label={copy.communities.banner}
-              >
-                {bannerPreview || currentBannerUrl ? (
-                  <img
-                    src={bannerPreview ?? currentBannerUrl ?? ''}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
-                    {community.name.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                  ✎
-                </span>
-              </button>
-              <div className="relative px-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
-                  aria-label={copy.communities.avatar}
-                >
-                  {avatarPreview || currentAvatarUrl ? (
-                    <img
-                      src={avatarPreview ?? currentAvatarUrl ?? ''}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    community.name.slice(0, 1).toUpperCase()
-                  )}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                    ✎
-                  </span>
-                </button>
-                <div className="mt-4 grid gap-3">
-                  <input
-                    aria-label={copy.communities.name}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                  <textarea
-                    aria-label={copy.communities.description}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  />
-                </div>
-              </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-
-                  if (file) setImageEditor({ file, shape: 'avatar' });
-                  event.target.value = '';
-                }}
-                className="sr-only"
-              />
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-
-                  if (file) setImageEditor({ file, shape: 'banner' });
-                  event.target.value = '';
-                }}
-                className="sr-only"
-              />
-            </div>
-            )}
-
-            {activeSection === 'channels' && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.channels}
-              </div>
-              <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
-                {channelOrder.map((channel, index) => (
-                  <div
-                    key={channel.id}
-                    className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/8 p-2"
-                  >
-                    <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/8 text-white/55">
-                      {channel.type === 'voice' ? <VoiceIcon /> : '#'}
-                    </span>
-                    <input
-                      value={channelDrafts[channel.id] ?? channel.name}
-                      onChange={(event) =>
-                        setChannelDrafts((current) => ({
-                          ...current,
-                          [channel.id]: event.target.value,
-                        }))
-                      }
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
-                    />
-                    <span className="hidden rounded-2xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
-                      {channel.type === 'voice'
-                        ? copy.communities.voiceChannel
-                        : copy.communities.textChannel}
-                    </span>
+                {activeSection === 'profile' && (
+                  <div className="overflow-hidden rounded-2xl bg-black/25">
                     <button
                       type="button"
-                      onClick={() => moveChannel(channel.id, -1)}
-                      disabled={index === 0}
-                      className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.moveChannelUp}
+                      onClick={() => bannerInputRef.current?.click()}
+                      className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                      aria-label={copy.communities.banner}
                     >
-                      ↑
+                      {bannerPreview || currentBannerUrl ? (
+                        <img
+                          src={bannerPreview ?? currentBannerUrl ?? ''}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="grid h-full w-full place-items-center text-4xl font-black text-white/80">
+                          {community.name.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                        ✎
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => moveChannel(channel.id, 1)}
-                      disabled={index === channelOrder.length - 1}
-                      className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.moveChannelDown}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteChannel(channel)}
-                      disabled={state === 'loading'}
-                      className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label={copy.communities.deleteChannel}
-                      title={copy.communities.deleteChannel}
-                    >
-                      <TrashIcon />
-                    </button>
-                    <div className="w-full rounded-2xl bg-black/20 p-2">
-                      <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
-                        {copy.communities.visibleRoles}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {roles.map((role) => (
-                          <label
-                            key={`${channel.id}:${role.id}`}
-                            className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-2 text-xs font-black text-white/70"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(
-                                channelPermissionDrafts[channel.id] ?? [
-                                  'everyone',
-                                ]
-                              ).includes(role.id)}
-                              onChange={() =>
-                                toggleChannelRole(channel.id, role.id)
-                              }
-                            />
-                            {role.name}
-                          </label>
-                        ))}
+                    <div className="relative px-4 pb-4">
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                        aria-label={copy.communities.avatar}
+                      >
+                        {avatarPreview || currentAvatarUrl ? (
+                          <img
+                            src={avatarPreview ?? currentAvatarUrl ?? ''}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          community.name.slice(0, 1).toUpperCase()
+                        )}
+                        <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                          ✎
+                        </span>
+                      </button>
+                      <div className="mt-4 grid gap-3">
+                        <input
+                          aria-label={copy.communities.name}
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        />
+                        <textarea
+                          aria-label={copy.communities.description}
+                          value={description}
+                          onChange={(event) =>
+                            setDescription(event.target.value)
+                          }
+                          className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        />
                       </div>
                     </div>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+
+                        if (file) setImageEditor({ file, shape: 'avatar' });
+                        event.target.value = '';
+                      }}
+                      className="sr-only"
+                    />
+                    <input
+                      ref={bannerInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+
+                        if (file) setImageEditor({ file, shape: 'banner' });
+                        event.target.value = '';
+                      }}
+                      className="sr-only"
+                    />
                   </div>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
-                {(['text', 'voice'] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setChannelType(type)}
-                    className={cx(
-                      'rounded-2xl px-3 py-2 text-xs font-black transition',
-                      channelType === type
-                        ? 'bg-white text-slate-950'
-                        : 'text-white/55 hover:bg-white/10',
-                    )}
-                  >
-                    {type === 'voice'
-                      ? copy.communities.voiceChannel
-                      : copy.communities.textChannel}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={channelName}
-                  onChange={(event) => setChannelName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    void createChannel();
-                  }}
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.communities.addChannelPlaceholder}
-                />
-                <button
-                  type="button"
-                  onClick={() => void createChannel()}
-                  disabled={!channelName.trim() || state === 'loading'}
-                  className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            )}
+                )}
+
+                {activeSection === 'channels' && (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                      {copy.communities.channels}
+                    </div>
+                    <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
+                      {channelOrder.map((channel, index) => (
+                        <div
+                          key={channel.id}
+                          className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/8 p-2"
+                        >
+                          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/8 text-white/55">
+                            {channel.type === 'voice' ? <VoiceIcon /> : '#'}
+                          </span>
+                          <input
+                            value={channelDrafts[channel.id] ?? channel.name}
+                            onChange={(event) =>
+                              setChannelDrafts((current) => ({
+                                ...current,
+                                [channel.id]: event.target.value,
+                              }))
+                            }
+                            className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
+                          />
+                          <span className="hidden rounded-2xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
+                            {channel.type === 'voice'
+                              ? copy.communities.voiceChannel
+                              : copy.communities.textChannel}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => moveChannel(channel.id, -1)}
+                            disabled={index === 0}
+                            className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                            aria-label={copy.communities.moveChannelUp}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveChannel(channel.id, 1)}
+                            disabled={index === channelOrder.length - 1}
+                            className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
+                            aria-label={copy.communities.moveChannelDown}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteChannel(channel)}
+                            disabled={state === 'loading'}
+                            className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
+                            aria-label={copy.communities.deleteChannel}
+                            title={copy.communities.deleteChannel}
+                          >
+                            <TrashIcon />
+                          </button>
+                          <div className="w-full rounded-2xl bg-black/20 p-2">
+                            <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
+                              {copy.communities.visibleRoles}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {roles.map((role) => (
+                                <label
+                                  key={`${channel.id}:${role.id}`}
+                                  className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-2 text-xs font-black text-white/70"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(
+                                      channelPermissionDrafts[channel.id] ?? [
+                                        'everyone',
+                                      ]
+                                    ).includes(role.id)}
+                                    onChange={() =>
+                                      toggleChannelRole(channel.id, role.id)
+                                    }
+                                  />
+                                  {role.name}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
+                      {(['text', 'voice'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setChannelType(type)}
+                          className={cx(
+                            'rounded-2xl px-3 py-2 text-xs font-black transition',
+                            channelType === type
+                              ? 'bg-white text-slate-950'
+                              : 'text-white/55 hover:bg-white/10',
+                          )}
+                        >
+                          {type === 'voice'
+                            ? copy.communities.voiceChannel
+                            : copy.communities.textChannel}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={channelName}
+                        onChange={(event) => setChannelName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter') return;
+                          event.preventDefault();
+                          void createChannel();
+                        }}
+                        className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        placeholder={copy.communities.addChannelPlaceholder}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void createChannel()}
+                        disabled={!channelName.trim() || state === 'loading'}
+                        className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               {activeSection === 'roles' && (
-              <CommunityRolesPanel
-              editableRoles={editableRoles}
-              onCreateRole={() => void createRole()}
-              onDeleteRole={(role) => void deleteRole(role)}
-              onRoleNameChange={setRoleName}
-              onRolePermissionToggle={togglePermission}
-              onRoleSelect={setSelectedRoleId}
-              onUpdateRole={() => void updateRole()}
-              roleName={roleName}
-              rolePermissions={rolePermissions}
-              roles={roles}
-              selectedRole={selectedRole}
-              state={state}
-            />
+                <CommunityRolesPanel
+                  editableRoles={editableRoles}
+                  onCreateRole={() => void createRole()}
+                  onDeleteRole={(role) => void deleteRole(role)}
+                  onRoleNameChange={setRoleName}
+                  onRolePermissionToggle={togglePermission}
+                  onRoleSelect={setSelectedRoleId}
+                  onUpdateRole={() => void updateRole()}
+                  roleName={roleName}
+                  rolePermissions={rolePermissions}
+                  roles={roles}
+                  selectedRole={selectedRole}
+                  state={state}
+                />
               )}
               {activeSection === 'members' && (
-            <CommunityMembersRolesPanel
-              bannedMemberIds={community.bannedMemberIds ?? []}
-              canBanMembers={canBanMembers}
-              canKickMembers={canManageMembers}
-              canManageRoles={canManageRoles}
-              editableRoles={editableRoles}
-              memberIdentities={memberIdentities}
-              memberIds={community.memberIds}
-              memberPictures={memberPictures}
-              memberRoleDrafts={memberRoleDrafts}
-              onBan={(identityId) => void banMember(identityId)}
-              onKick={(identityId) => void kickMember(identityId)}
-              onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
-              onToggleMemberRole={toggleMemberRole}
-              ownerIdentityId={community.ownerIdentityId}
-              state={state}
-            />
+                <CommunityMembersRolesPanel
+                  bannedMemberIds={community.bannedMemberIds ?? []}
+                  canBanMembers={canBanMembers}
+                  canKickMembers={canManageMembers}
+                  canManageRoles={canManageRoles}
+                  editableRoles={editableRoles}
+                  memberIdentities={memberIdentities}
+                  memberIds={community.memberIds}
+                  memberPictures={memberPictures}
+                  memberRoleDrafts={memberRoleDrafts}
+                  onBan={(identityId) => void banMember(identityId)}
+                  onKick={(identityId) => void kickMember(identityId)}
+                  onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
+                  onToggleMemberRole={toggleMemberRole}
+                  ownerIdentityId={community.ownerIdentityId}
+                  state={state}
+                />
               )}
               {activeSection === 'banned-members' && (
                 <CommunityBannedMembersPanel

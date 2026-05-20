@@ -1,16 +1,24 @@
-import type { ConversationResource, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ConversationResource,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
+import type { ListConversationsPort } from '../ports/listConversationsPort';
 
-import { sortConversationsByLatestMessage } from '../../domain/conversationOrdering';
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { ConversationTimeline } from '../../domain/conversationOrdering';
+import { ListConversationsMessage } from './messages/listConversationsMessage';
 
 export class ListConversations {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly conversations: ListConversationsPort) {}
 
-  public async execute(session: Session): Promise<ConversationResource[]> {
-    return sortConversationsByLatestMessage(
+  public async list(
+    message: ListConversationsMessage,
+  ): Promise<ConversationResource[]> {
+    const session = message.getSession();
+
+    return ConversationTimeline.sortByLatestMessage(
       await this.withLatestMessageActivity(
         session,
-        await this.gateway.listConversations(session),
+        await this.conversations.listConversations(session),
       ),
     );
   }
@@ -24,7 +32,7 @@ export class ListConversations {
         if (conversation.latestMessageAt) return conversation;
 
         try {
-          const { messages } = await this.gateway.loadMessages(
+          const { messages } = await this.conversations.loadMessages(
             session,
             conversation.id,
             null,

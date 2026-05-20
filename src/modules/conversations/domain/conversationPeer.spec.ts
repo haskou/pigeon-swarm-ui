@@ -1,11 +1,14 @@
-import type { ConversationResource, LocalKeychain } from '../../../shared/domain/pigeonResources.types';
+import type {
+  ConversationResource,
+  LocalKeychain,
+} from '../../../shared/domain/pigeonResources.types';
 
-import { conversationPeerIdentityId } from './conversationPeer';
+import { ConversationPeer } from './conversationPeer';
 
-describe(conversationPeerIdentityId.name, () => {
+describe(ConversationPeer.name, () => {
   it('returns the participant that is not the current identity', () => {
     expect(
-      conversationPeerIdentityId(
+      ConversationPeer.identityId(
         {
           id: 'conversation-1',
           participantIds: ['identity-1', 'identity-2'],
@@ -30,7 +33,7 @@ describe(conversationPeerIdentityId.name, () => {
     } satisfies LocalKeychain;
 
     expect(
-      conversationPeerIdentityId(
+      ConversationPeer.identityId(
         { id: 'conversation-1' } as ConversationResource,
         'identity-1',
         keychain,
@@ -40,7 +43,7 @@ describe(conversationPeerIdentityId.name, () => {
 
   it('does not resolve a group participant as a one-to-one peer', () => {
     expect(
-      conversationPeerIdentityId(
+      ConversationPeer.identityId(
         {
           id: 'group:conversation-1',
           participantIds: ['identity-1', 'identity-2', 'identity-3'],

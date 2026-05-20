@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
-  CallParticipant,
-  CallSession,
-} from '../../../calls/domain/callSession.types';
-import type {
   Community,
   CommunityChannel,
   CommunityVoiceChannel,
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  CallParticipant,
+  CallSession,
+} from '../../../calls/domain/callSession.types';
+import type { CommunityMemberListItem } from './communityMembersPanel';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { normalizeIdentityId } from '../../../identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../identities/domain/value-objects/identityId';
+import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { loadIdentityPicture } from './communityImages';
-import type { CommunityMemberListItem } from './communityMembersPanel';
 import { memberDisplayName } from './communityMemberNames';
 
 export function useCommunityMembers({
@@ -45,18 +45,15 @@ export function useCommunityMembers({
     () => community.memberIds.join('\u0000'),
     [community.memberIds],
   );
-  const communityMemberIds = useMemo(
-    () => {
-      const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
+  const communityMemberIds = useMemo(() => {
+    const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
 
-      return communityMemberIdsKey.length > 0
-        ? communityMemberIdsKey
-            .split('\u0000')
-            .filter((identityId) => !bannedMemberIds.has(identityId))
-        : [];
-    },
-    [community.bannedMemberIds, communityMemberIdsKey],
-  );
+    return communityMemberIdsKey.length > 0
+      ? communityMemberIdsKey
+          .split('\u0000')
+          .filter((identityId) => !bannedMemberIds.has(identityId))
+      : [];
+  }, [community.bannedMemberIds, communityMemberIdsKey]);
   const voiceConnectedIdentityIds = useMemo(
     () =>
       voiceChannels.flatMap((channel) => channel.connectedIdentityIds ?? []),
@@ -80,7 +77,7 @@ export function useCommunityMembers({
             identityId === session.identity.id
               ? session.identity
               : await pigeonApplication.getIdentity(
-                  normalizeIdentityId(identityId),
+                  IdentityId.normalize(identityId),
                 );
           const pictureUrl = await loadIdentityPicture(identity);
 
@@ -144,9 +141,9 @@ export function useCommunityMembers({
           : memberIdentities[identityId];
 
       return {
+        deafened: false,
         identity,
         identityId,
-        deafened: false,
         muted: false,
         name: identity
           ? (identityName(identity) ?? shortId(identityId))

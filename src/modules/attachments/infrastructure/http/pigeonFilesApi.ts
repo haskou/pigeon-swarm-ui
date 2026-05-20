@@ -15,7 +15,7 @@ import type {
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
 
-import { AttachmentCipher } from '../../domain/attachmentCipher';
+import { AttachmentCipher } from '../crypto/attachmentCipher';
 import { attachmentBlobCacheKey } from './attachmentBlobCacheKey';
 import { PigeonFileRequestCache } from './pigeonFileRequestCache';
 import { PigeonPrivateFilesClient } from './pigeonPrivateFilesClient';

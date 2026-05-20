@@ -13,8 +13,8 @@ import type {
   StickerMessageReference,
 } from '../../../shared/domain/pigeonResources.types';
 
-import { conversationKeyEntry } from '../../conversations/domain/conversationKey';
-import { pollChatMessage } from './pollMessageProjection';
+import { ConversationKeychain } from '../../conversations/domain/conversationKey';
+import { PollMessageProjection } from './pollMessageProjection';
 
 type MessageListEnvelope = {
   cursor?: string | null;
@@ -82,7 +82,10 @@ export class MessageProjector {
     conversationId: string,
     message: MessageResource,
   ): Promise<ChatMessage> {
-    const pollMessage = pollChatMessage(message, session.identity.id);
+    const pollMessage = PollMessageProjection.toChatMessage(
+      message,
+      session.identity.id,
+    );
 
     if (pollMessage) return pollMessage;
 
@@ -149,7 +152,7 @@ export class MessageProjector {
   }
 
   private conversationKey(session: Session, conversationId: string) {
-    return conversationKeyEntry(
+    return ConversationKeychain.entry(
       session.keychain,
       session.identity.id,
       conversationId,

@@ -1,11 +1,11 @@
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
+import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
 import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
 } from '../../domain/callSession.types';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
-import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
-import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
 
 export class PigeonCallsApi {
   public constructor(

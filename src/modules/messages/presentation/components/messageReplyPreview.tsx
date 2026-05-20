@@ -8,7 +8,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/en';
 import { cx } from '../../../../shared/presentation/classNameHelper';
-import { stickerAssetUrl } from './stickerPressPreview';
+import { stickerAssetUrl } from '../../../stickers/presentation/components/stickerPressPreview';
 
 export function MessageReplyPreview({
   mine,

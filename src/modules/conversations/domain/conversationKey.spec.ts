@@ -1,6 +1,6 @@
 import type { LocalKeychain } from '../../../shared/domain/pigeonResources.types';
 
-import { conversationKeyEntry } from './conversationKey';
+import { ConversationKeychain } from './conversationKey';
 
 const keychain = {
   conversations: {
@@ -15,16 +15,20 @@ const keychain = {
   version: 1,
 } satisfies LocalKeychain;
 
-describe(conversationKeyEntry.name, () => {
+describe(ConversationKeychain.name, () => {
   it('returns keys by exact conversation id', () => {
-    expect(conversationKeyEntry(keychain, 'identity-1', 'local-key-id')).toBe(
-      keychain.conversations['local-key-id'],
-    );
+    expect(
+      ConversationKeychain.entry(keychain, 'identity-1', 'local-key-id'),
+    ).toBe(keychain.conversations['local-key-id']);
   });
 
   it('does not infer legacy conversation ids without an exact key', () => {
     expect(
-      conversationKeyEntry(keychain, 'identity-1', 'missing-conversation-id'),
+      ConversationKeychain.entry(
+        keychain,
+        'identity-1',
+        'missing-conversation-id',
+      ),
     ).toBeUndefined();
   });
 });

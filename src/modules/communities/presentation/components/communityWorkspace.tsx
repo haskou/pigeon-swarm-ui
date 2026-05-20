@@ -40,39 +40,32 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
-import type { MessageContextMenuState } from '../../../workspace/presentation/components/messageContextMenu';
+import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { pendingFileAttachments } from '../../../attachments/domain/pendingFileAttachments';
-import { encryptCommunityChannelPayload } from '../../domain/communityChannelPayloadCipher';
-import {
-  communityTextChannels,
-  communityVoiceChannels,
-} from '../../domain/communityChannels';
-import { CommunityMessageDecryptWorkerClient } from '../../domain/communityMessageDecryptWorkerClient';
-import {
-  canSeeCommunityChannel,
-  communityMembersWithChannelAccess,
-  communityPermissionsFor,
-} from '../../domain/communityPermissions';
-import { firstMessageLinkPreviewUrl } from '../../../messages/domain/linkPreviewUrls';
-import { updateMessageReaction } from '../../../messages/domain/updateMessageReaction';
+import { PendingMessageAttachments } from '../../../attachments/domain/pendingMessageAttachments';
+import { encryptCommunityChannelPayload } from '../../infrastructure/crypto/communityChannelPayloadCipher';
+import { CommunityChannels } from '../../domain/communityChannels';
+import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/communityMessageDecryptWorkerClient';
+import { CommunityAccessPolicy } from '../../domain/communityPermissions';
+import { MessageLinkPreviews } from '../../../messages/domain/linkPreviewUrls';
+import { MessageReactions } from '../../../messages/domain/messageReactions';
 import { copy } from '../../../../shared/presentation/i18n/en';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/browserPreview';
 import { cx } from '../../../../shared/presentation/classNameHelper';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { normalizeIdentityId } from '../../../identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../identities/domain/value-objects/identityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/composer';
-import { CreatePollDialog } from '../../../messages/presentation/components/createPollDialog';
-import { StickerPackPreviewDialog } from '../../../messages/presentation/components/stickerPackPreviewDialog';
+import { CreatePollDialog } from '../../../polls/presentation/components/createPollDialog';
+import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/stickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/typingIndicator';
-import { useAttachmentDownload } from '../../../messages/presentation/components/useAttachmentDownload';
+import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
-import { UserProfileDropdown } from '../../../workspace/presentation/components/sessionIdentityDropdown';
+import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/sessionIdentityDropdown';
 import { CommunityChannelList } from './communityChannelList';
 import { CommunityHeader } from './communityHeader';
 import { loadPublicImage } from './communityImages';
@@ -100,19 +93,25 @@ const AddCommunityMemberDialog = lazy(() =>
   })),
 );
 const ConversationDataDialog = lazy(() =>
-  import('../../../workspace/presentation/components/conversationDataDialog').then((module) => ({
-    default: module.ConversationDataDialog,
-  })),
+  import('../../../../app/presentation/workspace/components/conversationDataDialog').then(
+    (module) => ({
+      default: module.ConversationDataDialog,
+    }),
+  ),
 );
 const ConversationKeyDialog = lazy(() =>
-  import('../../../workspace/presentation/components/conversationKeyDialog').then((module) => ({
-    default: module.ConversationKeyDialog,
-  })),
+  import('../../../../app/presentation/workspace/components/conversationKeyDialog').then(
+    (module) => ({
+      default: module.ConversationKeyDialog,
+    }),
+  ),
 );
 const ImageLightbox = lazy(() =>
-  import('../../../messages/presentation/components/imageLightbox').then((module) => ({
-    default: module.ImageLightbox,
-  })),
+  import('../../../messages/presentation/components/imageLightbox').then(
+    (module) => ({
+      default: module.ImageLightbox,
+    }),
+  ),
 );
 const ManageCommunityDialog = lazy(() =>
   import('./manageCommunityDialog').then((module) => ({
@@ -120,19 +119,25 @@ const ManageCommunityDialog = lazy(() =>
   })),
 );
 const MessageContextMenu = lazy(() =>
-  import('../../../workspace/presentation/components/messageContextMenu').then((module) => ({
-    default: module.MessageContextMenu,
-  })),
+  import('../../../../app/presentation/workspace/components/messageContextMenu').then(
+    (module) => ({
+      default: module.MessageContextMenu,
+    }),
+  ),
 );
 const RawMessageDialog = lazy(() =>
-  import('../../../workspace/presentation/components/rawMessageDialog').then((module) => ({
-    default: module.RawMessageDialog,
-  })),
+  import('../../../../app/presentation/workspace/components/rawMessageDialog').then(
+    (module) => ({
+      default: module.RawMessageDialog,
+    }),
+  ),
 );
 const UserProfileDialog = lazy(() =>
-  import('../../../identities/presentation/components/userProfileDialog').then((module) => ({
-    default: module.UserProfileDialog,
-  })),
+  import('../../../identities/presentation/components/userProfileDialog').then(
+    (module) => ({
+      default: module.UserProfileDialog,
+    }),
+  ),
 );
 
 interface CommunityWorkspaceProps {
@@ -211,7 +216,7 @@ function replyPreviewFromMessage(
 }
 
 async function createLinkPreviewForContent(session: Session, content: string) {
-  const url = firstMessageLinkPreviewUrl(content);
+  const url = MessageLinkPreviews.firstUrl(content);
 
   if (!url) return undefined;
 
@@ -257,28 +262,36 @@ export function CommunityWorkspace({
   typingIdentityIds = [],
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
-    () => communityTextChannels(community),
+    () => CommunityChannels.text(community),
     [community],
   );
   const voiceChannels = useMemo(
-    () => communityVoiceChannels(community),
+    () => CommunityChannels.voice(community),
     [community],
   );
   const currentPermissions = useMemo(
-    () => communityPermissionsFor(community, session.identity.id),
+    () => CommunityAccessPolicy.permissionsFor(community, session.identity.id),
     [community, session.identity.id],
   );
   const accessibleTextChannels = useMemo(
     () =>
       textChannels.filter((channel) =>
-        canSeeCommunityChannel(community, channel, session.identity.id),
+        CommunityAccessPolicy.canSeeChannel(
+          community,
+          channel,
+          session.identity.id,
+        ),
       ),
     [community, session.identity.id, textChannels],
   );
   const accessibleVoiceChannels = useMemo(
     () =>
       voiceChannels.filter((channel) =>
-        canSeeCommunityChannel(community, channel, session.identity.id),
+        CommunityAccessPolicy.canSeeChannel(
+          community,
+          channel,
+          session.identity.id,
+        ),
       ),
     [community, session.identity.id, voiceChannels],
   );
@@ -412,7 +425,10 @@ export function CommunityWorkspace({
 
     const query = trigger.query.toLowerCase();
     const accessibleMemberIds = new Set(
-      communityMembersWithChannelAccess(community, selectedChannel),
+      CommunityAccessPolicy.membersWithChannelAccess(
+        community,
+        selectedChannel,
+      ),
     );
     const memberSuggestions = members
       .filter((member) => accessibleMemberIds.has(member.identityId))
@@ -880,7 +896,7 @@ export function CommunityWorkspace({
           return [
             identityId,
             await pigeonApplication.getIdentity(
-              normalizeIdentityId(identityId),
+              IdentityId.normalize(identityId),
             ),
           ] as const;
         } catch {
@@ -1128,7 +1144,10 @@ export function CommunityWorkspace({
     setMessages((current) => [
       ...current,
       {
-        attachments: pendingFileAttachments(payload.attachments, optimisticId),
+        attachments: PendingMessageAttachments.fromFiles(
+          payload.attachments,
+          optimisticId,
+        ),
         authorIdentityId: session.identity.id,
         content: payload.sticker
           ? ''
@@ -1313,7 +1332,7 @@ export function CommunityWorkspace({
     setMessages((current) =>
       current.map((item) =>
         item.id === message.id
-          ? updateMessageReaction(
+          ? MessageReactions.update(
               item,
               session.identity.id,
               emoji,
@@ -1346,7 +1365,7 @@ export function CommunityWorkspace({
       setMessages((current) =>
         current.map((item) =>
           item.id === message.id
-            ? updateMessageReaction(
+            ? MessageReactions.update(
                 item,
                 session.identity.id,
                 emoji,
@@ -1475,7 +1494,7 @@ export function CommunityWorkspace({
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId
-            ? updateMessageReaction(
+            ? MessageReactions.update(
                 message,
                 authorIdentityId,
                 emoji,
@@ -2036,7 +2055,7 @@ function communityMentionsForContent(
     }
   }
 
-  for (const identityId of communityMembersWithChannelAccess(
+  for (const identityId of CommunityAccessPolicy.membersWithChannelAccess(
     community,
     channel,
   )) {
@@ -2072,7 +2091,7 @@ function communityMentionTokens(
     }
   }
 
-  for (const identityId of communityMembersWithChannelAccess(
+  for (const identityId of CommunityAccessPolicy.membersWithChannelAccess(
     community,
     channel,
   )) {

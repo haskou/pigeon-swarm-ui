@@ -1,4 +1,7 @@
-import type { ChatMessage, MessageResource } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  MessageResource,
+} from '../../../../shared/domain/pigeonResources.types';
 
 type MessageDecryptWorkerRequest = {
   conversationId: string;

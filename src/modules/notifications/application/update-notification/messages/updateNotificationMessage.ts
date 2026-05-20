@@ -10,13 +10,11 @@ export class UpdateNotificationMessage {
 
   private readonly session: Session;
 
-  public constructor(
-    input: {
-      notificationId: string;
-      session: Session;
-      state: string;
-    },
-  ) {
+  public constructor(input: {
+    notificationId: string;
+    session: Session;
+    state: string;
+  }) {
     this.decision = NotificationDecision.fromState(input.state);
     this.notificationId = NotificationId.fromString(input.notificationId);
     this.session = input.session;

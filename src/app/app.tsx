@@ -12,14 +12,18 @@ const AuthScreen = lazy(() =>
   ),
 );
 const GlassWorkspace = lazy(() =>
-  import('../modules/workspace/presentation/components/glassWorkspace').then((module) => ({
-    default: module.GlassWorkspace,
-  })),
+  import('./presentation/workspace/components/glassWorkspace').then(
+    (module) => ({
+      default: module.GlassWorkspace,
+    }),
+  ),
 );
 const NetworkCreationScreen = lazy(() =>
-  import('../modules/networks/presentation/components/networkCreationScreen').then((module) => ({
-    default: module.NetworkCreationScreen,
-  })),
+  import('../modules/networks/presentation/components/networkCreationScreen').then(
+    (module) => ({
+      default: module.NetworkCreationScreen,
+    }),
+  ),
 );
 const ServerConnectionScreen = lazy(() =>
   import('./presentation/components/serverConnectionScreen').then((module) => ({

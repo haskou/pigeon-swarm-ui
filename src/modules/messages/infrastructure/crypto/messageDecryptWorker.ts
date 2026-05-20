@@ -11,7 +11,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pollChatMessage } from '../../domain/pollMessageProjection';
+import { PollMessageProjection } from '../../domain/pollMessageProjection';
 
 type MessageDecryptRequest = {
   conversationId: string;
@@ -149,7 +149,10 @@ async function projectMessage(
   message: MessageResource,
   privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
-  const pollMessage = pollChatMessage(message, request.currentIdentityId);
+  const pollMessage = PollMessageProjection.toChatMessage(
+    message,
+    request.currentIdentityId,
+  );
 
   if (pollMessage) return pollMessage;
 

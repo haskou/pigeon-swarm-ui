@@ -1,21 +1,19 @@
-import type { ChatMessage, Session } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { LoadMessagesPort } from '../ports/loadMessagesPort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { LoadMessagesMessage } from './messages/loadMessagesMessage';
 
 export class LoadMessages {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly messages: LoadMessagesPort) {}
 
-  public async execute(
-    session: Session,
-    conversationId: string,
-    before?: null | string,
-    options?: { signal?: AbortSignal },
+  public async load(
+    message: LoadMessagesMessage,
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.gateway.loadMessages(
-      session,
-      conversationId,
-      before,
-      options,
+    return await this.messages.loadMessages(
+      message.getSession(),
+      message.getConversationId(),
+      message.getBefore(),
+      message.getOptions(),
     );
   }
 }

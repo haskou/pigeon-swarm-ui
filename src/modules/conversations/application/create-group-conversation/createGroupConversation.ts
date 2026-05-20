@@ -1,28 +1,26 @@
 import type {
   ConversationResource,
   LocalKeychain,
-  Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { CreateGroupConversationPort } from '../ports/createGroupConversationPort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { CreateGroupConversationMessage } from './messages/createGroupConversationMessage';
 
-export type CreateGroupConversationInput = {
-  name: string;
-  networkId: string;
-  participantIds: string[];
-};
+export type { CreateGroupConversationInput } from './messages/createGroupConversationMessage';
 
 export class CreateGroupConversation {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(
+    private readonly conversations: CreateGroupConversationPort,
+  ) {}
 
-  public async execute(
-    session: Session,
-    input: CreateGroupConversationInput,
-  ): Promise<{
+  public async create(message: CreateGroupConversationMessage): Promise<{
     conversation: ConversationResource;
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.createGroupConversation(session, input);
+    return await this.conversations.createGroupConversation(
+      message.getSession(),
+      message.getGroup(),
+    );
   }
 }

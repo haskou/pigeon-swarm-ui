@@ -1,27 +1,23 @@
 import type {
   ConversationResource,
   LocalKeychain,
-  Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { CreateConversationPort } from '../ports/createConversationPort';
 
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import { CreateConversationMessage } from './messages/createConversationMessage';
 
 export class CreateConversation {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly conversations: CreateConversationPort) {}
 
-  public async execute(
-    session: Session,
-    peerIdentityId: string,
-    networkId: string,
-  ): Promise<{
+  public async create(message: CreateConversationMessage): Promise<{
     conversation: ConversationResource;
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.createConversation(
-      session,
-      peerIdentityId,
-      networkId,
+    return await this.conversations.createConversation(
+      message.getSession(),
+      message.getPeerIdentityId(),
+      message.getNetworkId(),
     );
   }
 }

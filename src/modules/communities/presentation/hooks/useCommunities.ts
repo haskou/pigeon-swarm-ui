@@ -6,7 +6,10 @@ import {
   useState,
 } from 'react';
 
-import type { Community, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { pigeonApplication } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/en';

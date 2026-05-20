@@ -1,9 +1,15 @@
-import { PigeonApiGateway } from '../../../../app/composition/pigeonApiGateway';
+import type { JoinNetworkPort } from '../ports/joinNetworkPort';
+
+import { JoinNetworkMessage } from './messages/joinNetworkMessage';
 
 export class JoinNetwork {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly networks: JoinNetworkPort) {}
 
-  public async execute(id: string, name: string, key: string): Promise<void> {
-    await this.gateway.joinNetwork(id, name, key);
+  public async join(message: JoinNetworkMessage): Promise<void> {
+    await this.networks.joinNetwork(
+      message.getId(),
+      message.getName(),
+      message.getKey(),
+    );
   }
 }

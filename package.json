@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsc -b && vite build",
     "dev": "vite --host 0.0.0.0",
-    "lint": "eslint \"src/{application,domain,infrastructure}/**/*.ts\"",
-    "lint:fix": "eslint \"src/{application,domain,infrastructure}/**/*.ts\" --fix",
+    "lint": "eslint \"src/{app/composition,modules/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\"",
+    "lint:fix": "eslint \"src/{app/composition,modules/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\" --fix",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest --runInBand",
     "typecheck": "tsc -b"

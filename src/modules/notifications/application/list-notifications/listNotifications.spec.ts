@@ -1,4 +1,7 @@
-import type { NotificationResource, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  NotificationResource,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 import type { ListNotificationsPort } from '../ports/listNotificationsPort';
 
 import { ListNotifications } from './listNotifications';

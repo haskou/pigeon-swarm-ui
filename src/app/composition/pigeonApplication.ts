@@ -48,41 +48,70 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 
-import { PigeonApiGateway } from './pigeonApiGateway';
+import { PublishMessageAttachmentsMessage } from '../../modules/attachments/application/publish-message-attachments/messages/publishMessageAttachmentsMessage';
+import { PublishMessageAttachments } from '../../modules/attachments/application/publish-message-attachments/publishMessageAttachments';
+import { ListCalls } from '../../modules/calls/application/list-calls/listCalls';
+import { ListCallsMessage } from '../../modules/calls/application/list-calls/messages/listCallsMessage';
+import { ListCommunities } from '../../modules/communities/application/list-communities/listCommunities';
+import { ListCommunitiesMessage } from '../../modules/communities/application/list-communities/messages/listCommunitiesMessage';
+import { CreateConversation } from '../../modules/conversations/application/create-conversation/createConversation';
+import { CreateConversationMessage } from '../../modules/conversations/application/create-conversation/messages/createConversationMessage';
 import {
-  RealtimeGateway,
-  type RealtimeHeartbeatActivityMode,
-  type RealtimeMessage,
-  type RealtimeTypingInput,
-} from '../../shared/infrastructure/realtime/realtimeGateway';
+  CreateGroupConversation,
+  type CreateGroupConversationInput,
+} from '../../modules/conversations/application/create-group-conversation/createGroupConversation';
+import { CreateGroupConversationMessage } from '../../modules/conversations/application/create-group-conversation/messages/createGroupConversationMessage';
+import { ListConversations } from '../../modules/conversations/application/list-conversations/listConversations';
+import { ListConversationsMessage } from '../../modules/conversations/application/list-conversations/messages/listConversationsMessage';
+import { LoginIdentity } from '../../modules/identities/application/login-identity/loginIdentity';
+import { LoginIdentityMessage } from '../../modules/identities/application/login-identity/messages/loginIdentityMessage';
+import { RegisterIdentityMessage } from '../../modules/identities/application/register-identity/messages/registerIdentityMessage';
+import { RegisterIdentity } from '../../modules/identities/application/register-identity/registerIdentity';
+import { AddMessageReaction } from '../../modules/messages/application/add-message-reaction/addMessageReaction';
+import { AddMessageReactionMessage } from '../../modules/messages/application/add-message-reaction/messages/addMessageReactionMessage';
+import { DeleteMessage } from '../../modules/messages/application/delete-message/deleteMessage';
+import { DeleteMessageMessage } from '../../modules/messages/application/delete-message/messages/deleteMessageMessage';
+import { LoadMessage } from '../../modules/messages/application/load-message/loadMessage';
+import { LoadMessageMessage } from '../../modules/messages/application/load-message/messages/loadMessageMessage';
+import { LoadMessagesAround } from '../../modules/messages/application/load-messages-around/loadMessagesAround';
+import { LoadMessagesAroundMessage } from '../../modules/messages/application/load-messages-around/messages/loadMessagesAroundMessage';
+import { LoadMessages } from '../../modules/messages/application/load-messages/loadMessages';
+import { LoadMessagesMessage } from '../../modules/messages/application/load-messages/messages/loadMessagesMessage';
+import { RemoveMessageReactionMessage } from '../../modules/messages/application/remove-message-reaction/messages/removeMessageReactionMessage';
+import { RemoveMessageReaction } from '../../modules/messages/application/remove-message-reaction/removeMessageReaction';
+import { SendMessageMessage } from '../../modules/messages/application/send-message/messages/sendMessageMessage';
+import { SendMessage } from '../../modules/messages/application/send-message/sendMessage';
+import { CreateNetwork } from '../../modules/networks/application/create-network/createNetwork';
+import { CreateNetworkMessage } from '../../modules/networks/application/create-network/messages/createNetworkMessage';
+import { JoinNetwork } from '../../modules/networks/application/join-network/joinNetwork';
+import { JoinNetworkMessage } from '../../modules/networks/application/join-network/messages/joinNetworkMessage';
+import {
+  ListNodeNetworks,
+  type NodeNetwork,
+} from '../../modules/networks/application/list-node-networks/listNodeNetworks';
+import { ListNodeNetworksMessage } from '../../modules/networks/application/list-node-networks/messages/listNodeNetworksMessage';
+import {
+  ListPeers,
+  type Peer,
+} from '../../modules/networks/application/list-peers/listPeers';
+import { ListPeersMessage } from '../../modules/networks/application/list-peers/messages/listPeersMessage';
 import { AcceptConversationInvitation } from '../../modules/notifications/application/accept-conversation-invitation/acceptConversationInvitation';
 import { AcceptConversationInvitationMessage } from '../../modules/notifications/application/accept-conversation-invitation/messages/acceptConversationInvitationMessage';
 import { ListNotifications } from '../../modules/notifications/application/list-notifications/listNotifications';
 import { ListNotificationsMessage } from '../../modules/notifications/application/list-notifications/messages/listNotificationsMessage';
 import { UpdateNotificationMessage } from '../../modules/notifications/application/update-notification/messages/updateNotificationMessage';
 import { UpdateNotification } from '../../modules/notifications/application/update-notification/updateNotification';
-import { CreateConversation } from '../../modules/conversations/application/create-conversation/createConversation';
+import { VotePollMessage } from '../../modules/polls/application/vote-poll/messages/votePollMessage';
+import { VotePoll } from '../../modules/polls/application/vote-poll/votePoll';
+import { ListStickerPacks } from '../../modules/stickers/application/list-sticker-packs/listStickerPacks';
+import { ListStickerPacksMessage } from '../../modules/stickers/application/list-sticker-packs/messages/listStickerPacksMessage';
 import {
-  CreateGroupConversation,
-  type CreateGroupConversationInput,
-} from '../../modules/conversations/application/create-group-conversation/createGroupConversation';
-import { ListConversations } from '../../modules/conversations/application/list-conversations/listConversations';
-import { LoginIdentity } from '../../modules/identities/application/login-identity/loginIdentity';
-import { RegisterIdentity } from '../../modules/identities/application/register-identity/registerIdentity';
-import { AddMessageReaction } from '../../modules/messages/application/add-message-reaction/addMessageReaction';
-import { DeleteMessage } from '../../modules/messages/application/delete-message/deleteMessage';
-import { LoadMessage } from '../../modules/messages/application/load-message/loadMessage';
-import { LoadMessages } from '../../modules/messages/application/load-messages/loadMessages';
-import { LoadMessagesAround } from '../../modules/messages/application/load-messages-around/loadMessagesAround';
-import { RemoveMessageReaction } from '../../modules/messages/application/remove-message-reaction/removeMessageReaction';
-import { SendMessage } from '../../modules/messages/application/send-message/sendMessage';
-import { CreateNetwork } from '../../modules/networks/application/create-network/createNetwork';
-import { JoinNetwork } from '../../modules/networks/application/join-network/joinNetwork';
-import {
-  ListNodeNetworks,
-  type NodeNetwork,
-} from '../../modules/networks/application/list-node-networks/listNodeNetworks';
-import { ListPeers, type Peer } from '../../modules/peers/application/list-peers/listPeers';
+  RealtimeGateway,
+  type RealtimeHeartbeatActivityMode,
+  type RealtimeMessage,
+  type RealtimeTypingInput,
+} from '../../shared/infrastructure/realtime/realtimeGateway';
+import { PigeonApiGateway } from './pigeonApiGateway';
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
   endpoint: string;
@@ -122,6 +151,10 @@ export class PigeonApplication {
 
   private readonly joinNetworkUseCase: JoinNetwork;
 
+  private readonly listCallsUseCase: ListCalls;
+
+  private readonly listCommunitiesUseCase: ListCommunities;
+
   private readonly deleteMessageUseCase: DeleteMessage;
 
   private readonly addMessageReactionUseCase: AddMessageReaction;
@@ -133,6 +166,8 @@ export class PigeonApplication {
   private readonly listNotificationsUseCase: ListNotifications;
 
   private readonly listPeersUseCase: ListPeers;
+
+  private readonly listStickerPacksUseCase: ListStickerPacks;
 
   private readonly loadMessagesUseCase: LoadMessages;
 
@@ -148,6 +183,10 @@ export class PigeonApplication {
 
   private readonly sendMessageUseCase: SendMessage;
 
+  private readonly publishMessageAttachmentsUseCase: PublishMessageAttachments;
+
+  private readonly votePollUseCase: VotePoll;
+
   private readonly updateNotificationUseCase: UpdateNotification;
 
   public constructor(
@@ -159,21 +198,68 @@ export class PigeonApplication {
     this.acceptInvitationUseCase = new AcceptConversationInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
-    this.createNetworkUseCase = new CreateNetwork(gateway);
+    this.createNetworkUseCase = new CreateNetwork({
+      create: async (name) => await gateway.createNetwork(name.toString()),
+    });
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
-    this.joinNetworkUseCase = new JoinNetwork(gateway);
+    this.joinNetworkUseCase = new JoinNetwork({
+      joinNetwork: async (id, name, key) =>
+        await gateway.joinNetwork(
+          id.toString(),
+          name.toString(),
+          key.toString(),
+        ),
+    });
+    this.listCallsUseCase = new ListCalls({
+      list: async (message) => await gateway.listCalls(message.getSession()),
+    });
+    this.listCommunitiesUseCase = new ListCommunities({
+      list: async (message) =>
+        await gateway.listCommunities(message.getSession()),
+    });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
     this.listNotificationsUseCase = new ListNotifications(gateway);
     this.listPeersUseCase = new ListPeers(gateway);
+    this.listStickerPacksUseCase = new ListStickerPacks({
+      list: async (message) =>
+        await gateway.listStickerPacks({
+          ownerIdentityId: message.getOwnerIdentityId(),
+        }),
+    });
     this.loadMessageUseCase = new LoadMessage(gateway);
     this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.loginIdentityUseCase = new LoginIdentity(gateway);
-    this.registerIdentityUseCase = new RegisterIdentity(gateway);
+    this.publishMessageAttachmentsUseCase = new PublishMessageAttachments({
+      publish: async (message) =>
+        await gateway.publishMessageAttachments(
+          message.getSession(),
+          message.getAttachments(),
+          message.getProgressReporter(),
+          message.getOptions(),
+        ),
+    });
+    this.registerIdentityUseCase = new RegisterIdentity({
+      register: async (name, password, networks, handle) =>
+        await gateway.register(
+          name.toString(),
+          password,
+          networks.toPrimitives(),
+          handle?.toString(),
+        ),
+    });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
     this.sendMessageUseCase = new SendMessage(gateway);
+    this.votePollUseCase = new VotePoll({
+      vote: async (message) =>
+        await gateway.votePoll(
+          message.getSession(),
+          message.getPollId().toString(),
+          message.getOptionIds().map((optionId) => optionId.toString()),
+        ),
+    });
     this.updateNotificationUseCase = new UpdateNotification(gateway);
   }
 
@@ -195,7 +281,7 @@ export class PigeonApplication {
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
-    return await this.gateway.listCalls(session);
+    return await this.listCallsUseCase.list(new ListCallsMessage(session));
   }
 
   public async getCall(
@@ -344,10 +430,8 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.createConversationUseCase.execute(
-      session,
-      peerIdentityId,
-      networkId,
+    return await this.createConversationUseCase.create(
+      new CreateConversationMessage({ networkId, peerIdentityId, session }),
     );
   }
 
@@ -359,15 +443,19 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.createGroupConversationUseCase.execute(session, input);
+    return await this.createGroupConversationUseCase.create(
+      new CreateGroupConversationMessage({ group: input, session }),
+    );
   }
 
   public async createNetwork(name: string): Promise<void> {
-    await this.createNetworkUseCase.execute(name);
+    await this.createNetworkUseCase.create(new CreateNetworkMessage(name));
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
-    return await this.gateway.listCommunities(session);
+    return await this.listCommunitiesUseCase.list(
+      new ListCommunitiesMessage(session),
+    );
   }
 
   public async getCommunity(
@@ -827,11 +915,13 @@ export class PigeonApplication {
     onProgress?: (progress: AttachmentProgress) => void,
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
-    return await this.gateway.publishMessageAttachments(
-      session,
-      attachments,
-      onProgress,
-      options,
+    return await this.publishMessageAttachmentsUseCase.publish(
+      new PublishMessageAttachmentsMessage({
+        attachments,
+        onProgress,
+        options,
+        session,
+      }),
     );
   }
 
@@ -861,7 +951,9 @@ export class PigeonApplication {
     pollId: string,
     optionIds: string[],
   ): Promise<PollResource> {
-    return await this.gateway.votePoll(session, pollId, optionIds);
+    return await this.votePollUseCase.vote(
+      new VotePollMessage({ optionIds, pollId, session }),
+    );
   }
 
   public async removePollVote(
@@ -890,7 +982,9 @@ export class PigeonApplication {
     name: string,
     key: string,
   ): Promise<void> {
-    await this.joinNetworkUseCase.execute(id, name, key);
+    await this.joinNetworkUseCase.join(
+      new JoinNetworkMessage({ id, key, name }),
+    );
   }
 
   public async joinNodeNetwork(
@@ -926,7 +1020,9 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.deleteMessageUseCase.execute(session, conversationId, messageId);
+    await this.deleteMessageUseCase.delete(
+      new DeleteMessageMessage({ conversationId, messageId, session }),
+    );
   }
 
   public async addMessageReaction(
@@ -935,11 +1031,13 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.addMessageReactionUseCase.execute(
-      session,
-      conversationId,
-      messageId,
-      emoji,
+    await this.addMessageReactionUseCase.add(
+      new AddMessageReactionMessage({
+        conversationId,
+        emoji,
+        messageId,
+        session,
+      }),
     );
   }
 
@@ -949,11 +1047,13 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.removeMessageReactionUseCase.execute(
-      session,
-      conversationId,
-      messageId,
-      emoji,
+    await this.removeMessageReactionUseCase.remove(
+      new RemoveMessageReactionMessage({
+        conversationId,
+        emoji,
+        messageId,
+        session,
+      }),
     );
   }
 
@@ -1020,7 +1120,9 @@ export class PigeonApplication {
       ownerIdentityId?: string;
     } = {},
   ): Promise<StickerPackResource[]> {
-    return await this.gateway.listStickerPacks(input);
+    return await this.listStickerPacksUseCase.list(
+      new ListStickerPacksMessage(input),
+    );
   }
 
   public async getStickerPack(packId: string): Promise<StickerPackResource> {
@@ -1119,7 +1221,9 @@ export class PigeonApplication {
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
-    return await this.listConversationsUseCase.execute(session);
+    return await this.listConversationsUseCase.list(
+      new ListConversationsMessage(session),
+    );
   }
 
   public async markConversationReadUntil(
@@ -1135,7 +1239,9 @@ export class PigeonApplication {
   }
 
   public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
-    return await this.listNodeNetworksUseCase.execute(session);
+    return await this.listNodeNetworksUseCase.list(
+      new ListNodeNetworksMessage(session),
+    );
   }
 
   public async listNotifications(
@@ -1147,7 +1253,7 @@ export class PigeonApplication {
   }
 
   public async listPeers(): Promise<Peer[]> {
-    return await this.listPeersUseCase.execute();
+    return await this.listPeersUseCase.list(new ListPeersMessage());
   }
 
   public async publishKeychain(
@@ -1163,11 +1269,13 @@ export class PigeonApplication {
     before?: null | string,
     options?: { signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.loadMessagesUseCase.execute(
-      session,
-      conversationId,
-      before,
-      options,
+    return await this.loadMessagesUseCase.load(
+      new LoadMessagesMessage({
+        before,
+        conversationId,
+        options,
+        session,
+      }),
     );
   }
 
@@ -1176,10 +1284,8 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<ChatMessage | null> {
-    return await this.loadMessageUseCase.execute(
-      session,
-      conversationId,
-      messageId,
+    return await this.loadMessageUseCase.load(
+      new LoadMessageMessage({ conversationId, messageId, session }),
     );
   }
 
@@ -1192,10 +1298,8 @@ export class PigeonApplication {
     nextCursor?: null | string;
     previousCursor?: null | string;
   }> {
-    return await this.loadMessagesAroundUseCase.execute(
-      session,
-      conversationId,
-      messageId,
+    return await this.loadMessagesAroundUseCase.loadAround(
+      new LoadMessagesAroundMessage({ conversationId, messageId, session }),
     );
   }
 
@@ -1203,7 +1307,9 @@ export class PigeonApplication {
     identityId: string,
     password: string,
   ): Promise<LoginResult> {
-    return await this.loginIdentityUseCase.execute(identityId, password);
+    return await this.loginIdentityUseCase.login(
+      new LoginIdentityMessage({ identityId, password }),
+    );
   }
 
   public async register(
@@ -1212,11 +1318,13 @@ export class PigeonApplication {
     networks: string[],
     handle?: string,
   ): Promise<LoginResult> {
-    return await this.registerIdentityUseCase.execute(
-      name,
-      password,
-      networks,
-      handle,
+    return await this.registerIdentityUseCase.register(
+      new RegisterIdentityMessage({
+        handle,
+        name,
+        networks,
+        password,
+      }),
     );
   }
 
@@ -1226,11 +1334,13 @@ export class PigeonApplication {
     content: string,
     options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
-    return await this.sendMessageUseCase.execute(
-      session,
-      conversationId,
-      content,
-      options,
+    return await this.sendMessageUseCase.send(
+      new SendMessageMessage({
+        content,
+        conversationId,
+        options,
+        session,
+      }),
     );
   }
 

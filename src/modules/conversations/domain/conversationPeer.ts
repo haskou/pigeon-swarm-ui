@@ -1,26 +1,22 @@
-import type { ConversationResource, LocalKeychain } from '../../../shared/domain/pigeonResources.types';
+import type {
+  ConversationResource,
+  LocalKeychain,
+} from '../../../shared/domain/pigeonResources.types';
 
-export function conversationPeerIdentityId(
-  conversation: ConversationResource,
-  currentIdentityId: string,
-  keychain?: LocalKeychain,
-): string | undefined {
-  if (conversation.type === 'group' || conversation.id.startsWith('group:')) {
-    return undefined;
+import { Conversation } from './aggregates/conversation';
+import { ConversationParticipantId } from './value-objects/conversationParticipantId';
+
+export class ConversationPeer {
+  public static identityId(
+    conversation: ConversationResource,
+    currentIdentityId: string,
+    keychain?: LocalKeychain,
+  ): string | undefined {
+    return Conversation.fromResource(conversation)
+      .peerIdentity(
+        ConversationParticipantId.fromString(currentIdentityId),
+        keychain,
+      )
+      ?.toString();
   }
-
-  if (conversation.peerIdentityId) return conversation.peerIdentityId;
-
-  const participantIds =
-    conversation.participantIdentityIds ??
-    conversation.participantIds ??
-    conversation.participants ??
-    [];
-  const participantPeer = participantIds.find(
-    (identityId) => identityId !== currentIdentityId,
-  );
-
-  if (participantPeer) return participantPeer;
-
-  return keychain?.conversations[conversation.id]?.peerIdentityId;
 }
