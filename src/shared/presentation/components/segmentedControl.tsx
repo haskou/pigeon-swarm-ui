@@ -1,4 +1,4 @@
-import { cx } from '../classNameHelper';
+import { cx } from '../cx';
 
 export type SegmentOption<TValue extends string> = {
   label: string;

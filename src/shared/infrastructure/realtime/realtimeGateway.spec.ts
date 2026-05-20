@@ -1,7 +1,7 @@
 import type { Session } from '../../domain/pigeonResources.types';
 
-import { ApiUrlBuilder } from '../http/apiUrlBuilder';
-import { RequestSigner } from '../http/requestSigner';
+import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
+import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeGateway } from './realtimeGateway';
 
 class WebSocketMock {

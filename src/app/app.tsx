@@ -1,32 +1,32 @@
 import { lazy, Suspense, type ReactElement, type ReactNode } from 'react';
 
-import { copy } from '../shared/presentation/i18n/en';
+import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';
 import { useAppBootstrap } from './presentation/useAppBootstrap';
 
 const AuthScreen = lazy(() =>
-  import('../modules/identities/presentation/auth/authScreen').then(
+  import('../modules/identities/presentation/auth/AuthScreen').then(
     (module) => ({
       default: module.AuthScreen,
     }),
   ),
 );
 const GlassWorkspace = lazy(() =>
-  import('./presentation/workspace/components/glassWorkspace').then(
+  import('./presentation/workspace/components/GlassWorkspace').then(
     (module) => ({
       default: module.GlassWorkspace,
     }),
   ),
 );
 const NetworkCreationScreen = lazy(() =>
-  import('../modules/networks/presentation/components/networkCreationScreen').then(
+  import('../modules/networks/presentation/components/NetworkCreationScreen').then(
     (module) => ({
       default: module.NetworkCreationScreen,
     }),
   ),
 );
 const ServerConnectionScreen = lazy(() =>
-  import('./presentation/components/serverConnectionScreen').then((module) => ({
+  import('./presentation/components/ServerConnectionScreen').then((module) => ({
     default: module.ServerConnectionScreen,
   })),
 );

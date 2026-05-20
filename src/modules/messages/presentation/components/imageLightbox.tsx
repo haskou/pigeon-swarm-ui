@@ -3,8 +3,8 @@ import type { PointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 
 export type LightboxImage = {
   alt: string;

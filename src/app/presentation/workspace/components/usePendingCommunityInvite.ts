@@ -6,8 +6,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 export function usePendingCommunityInvite({
@@ -52,11 +52,12 @@ export function usePendingCommunityInvite({
 
       let nextSession = sessionRef.current;
 
-      const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
-        nextSession,
-        pendingCommunityInvite.token,
-        pendingCommunityInvite.keyEntry,
-      );
+      const accepted =
+        await applicationContainer.acceptCommunityInviteLinkWithKey(
+          nextSession,
+          pendingCommunityInvite.token,
+          pendingCommunityInvite.keyEntry,
+        );
 
       const acceptedCommunity = accepted.community;
       nextSession = {

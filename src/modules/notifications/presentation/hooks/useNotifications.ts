@@ -7,10 +7,10 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { ArchivedNotifications } from '../../infrastructure/storage/archivedNotifications';
+import { ArchivedNotifications } from '../../infrastructure/storage/ArchivedNotifications';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
@@ -88,7 +88,7 @@ export function useNotifications({
     setError(null);
     try {
       setNotifications(
-        await pigeonApplication.listNotifications(currentSession),
+        await applicationContainer.listNotifications(currentSession),
       );
       setArchivedNotificationIds(
         archivedNotifications.get(currentSession.identity.id),
@@ -112,7 +112,7 @@ export function useNotifications({
       setError(null);
 
       try {
-        const result = await pigeonApplication.acceptConversationInvitation(
+        const result = await applicationContainer.acceptConversationInvitation(
           currentSession,
           notification,
         );
@@ -124,7 +124,7 @@ export function useNotifications({
         const conversations =
           notification.type === 'community_invitation'
             ? undefined
-            : await pigeonApplication.listConversations(nextSession);
+            : await applicationContainer.listConversations(nextSession);
         const communityId =
           notification.type === 'community_invitation'
             ? notification.payload.communityId
@@ -167,7 +167,7 @@ export function useNotifications({
 
       try {
         replaceNotification(
-          await pigeonApplication.updateNotification(
+          await applicationContainer.updateNotification(
             currentSession,
             notificationId,
             'declined',
@@ -207,7 +207,7 @@ async function listCommunitiesAfterCommunityAccept(
   communityId?: string,
 ): Promise<Community[]> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const communities = await pigeonApplication.listCommunities(session);
+    const communities = await applicationContainer.listCommunities(session);
 
     if (
       !communityId ||
@@ -221,5 +221,5 @@ async function listCommunitiesAfterCommunityAccept(
     );
   }
 
-  return await pigeonApplication.listCommunities(session);
+  return await applicationContainer.listCommunities(session);
 }

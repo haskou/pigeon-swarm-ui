@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Peer } from '../../application/list-peers/listPeers';
+import type { Peer } from '../../application/list-peers/ListPeers';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 type PeersState = {
@@ -23,7 +23,7 @@ export function usePeers(): PeersState {
     setError(null);
 
     try {
-      setPeers(await pigeonApplication.listPeers());
+      setPeers(await applicationContainer.listPeers());
     } catch (caught) {
       setError(new Error(toUserErrorMessage(caught, copy.peers.error)));
     } finally {

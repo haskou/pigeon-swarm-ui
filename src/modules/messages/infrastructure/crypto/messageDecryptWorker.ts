@@ -11,7 +11,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { PollMessageProjection } from '../../domain/pollMessageProjection';
+import { PollMessageProjection } from '../../domain/PollMessageProjection';
 
 type MessageDecryptRequest = {
   conversationId: string;

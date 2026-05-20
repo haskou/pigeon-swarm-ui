@@ -1,9 +1,9 @@
-import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/attachmentCipher';
+import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
 import { browserAttachmentWorkerFactory } from '../../modules/attachments/infrastructure/crypto/browserAttachmentWorkerFactory';
-import { PigeonApiGateway } from './pigeonApiGateway';
-import { PigeonApplication } from './pigeonApplication';
+import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonApplication } from './PigeonApplication';
 
-export const pigeonApplication = new PigeonApplication(
+export const applicationContainer = new PigeonApplication(
   new PigeonApiGateway(
     undefined,
     undefined,

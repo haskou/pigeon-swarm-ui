@@ -1,6 +1,6 @@
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import {
   identityPicture,
   publicFileObjectUrl,
@@ -27,7 +27,7 @@ export async function loadIdentityPicture(
 export async function loadPublicImage(cid: string): Promise<string | null> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const content = await pigeonApplication.getPublicFile(cid);
+      const content = await applicationContainer.getPublicFile(cid);
 
       return publicFileObjectUrl(content);
     } catch {

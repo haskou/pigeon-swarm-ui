@@ -4,8 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 import {
   type EmojiSuggestion,
   searchEmojiSuggestions,

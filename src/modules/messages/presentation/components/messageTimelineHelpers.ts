@@ -4,7 +4,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { isBrowserPreviewImage } from '../../../../shared/presentation/browserPreview';
+import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { isSameDay } from '../../../../shared/presentation/formatting';
 
 export function startsMessageDay(

@@ -1,4 +1,4 @@
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { cx } from '../../../../shared/presentation/cx';
 
 export type CommunitySettingsSection =
   | 'banned-members'

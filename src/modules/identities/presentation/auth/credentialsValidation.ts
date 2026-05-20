@@ -1,4 +1,4 @@
-import { ProfileHandle } from '../../domain/profile/profileHandle';
+import { ProfileHandle } from '../../domain/profile/ProfileHandle';
 
 export function normalizeHandleInput(value: string): string {
   return value.trim().replace(/^@+/, '').toLowerCase();

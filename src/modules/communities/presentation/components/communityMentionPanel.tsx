@@ -1,6 +1,6 @@
 import type { CommunityMessageMention } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export type CommunityMentionSuggestion = {
   description: string;

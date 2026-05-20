@@ -3,8 +3,8 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { cx } from '../../../../shared/presentation/classNameHelper';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   stickerAssetUrl,
   useStickerPressPreview,

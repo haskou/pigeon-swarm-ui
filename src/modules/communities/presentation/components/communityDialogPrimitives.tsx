@@ -1,4 +1,4 @@
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function DialogHeader({
   onClose,

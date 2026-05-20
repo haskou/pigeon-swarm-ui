@@ -98,7 +98,7 @@ Use business terms from the project. Do not create generic modules like `utils`,
 
 ### Naming
 
-- Files: `lowerCamelCase`.
+- Files: exactly match the primary public export when a file has a single public export, including casing.
 - Folders: `kebab-case`.
 - Classes and types: `PascalCase`.
 - Variables, functions, methods, and properties: `lowerCamelCase`.

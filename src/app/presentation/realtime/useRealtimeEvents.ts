@@ -9,7 +9,7 @@ import type {
   RealtimeTypingMessage,
 } from '../../../shared/infrastructure/realtime/realtimeGateway';
 
-import { pigeonApplication } from '../../composition/applicationContainer';
+import { applicationContainer } from '../../composition/applicationContainer';
 
 type RealtimeHandlers = {
   onConnected?: () => void;
@@ -137,7 +137,7 @@ async function connectRealtime(
   connection: SharedRealtimeConnection,
 ): Promise<void> {
   try {
-    const nextSocket = await pigeonApplication.connectRealtime(
+    const nextSocket = await applicationContainer.connectRealtime(
       connection.session,
       (message) => {
         if (message.type === 'connection_ack') {
@@ -224,5 +224,5 @@ export function sendRealtimeTyping(
 
   if (!socket) return;
 
-  pigeonApplication.sendRealtimeTyping(socket, input);
+  applicationContainer.sendRealtimeTyping(socket, input);
 }

@@ -1,7 +1,10 @@
-import type { IdentityPresence, PresenceStatus } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  IdentityPresence,
+  PresenceStatus,
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 
 export function PresenceStatusDot({
   className,

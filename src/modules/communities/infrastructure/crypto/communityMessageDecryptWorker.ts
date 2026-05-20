@@ -13,7 +13,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { PollMessageProjection } from '../../../messages/domain/pollMessageProjection';
+import { PollMessageProjection } from '../../../messages/domain/PollMessageProjection';
 
 type CommunityMessageDecryptRequest = {
   communityId: string;

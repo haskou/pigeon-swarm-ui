@@ -82,7 +82,7 @@ export function replaceEmojiTrigger(
 }
 
 function loadEmojiSuggestions(): Promise<EmojiSuggestion[]> {
-  emojiSuggestionsPromise ??= import('./discordEmojiShortcodesGenerated').then(
+  emojiSuggestionsPromise ??= import('./DISCORD_EMOJI_SHORTCODES').then(
     ({ DISCORD_EMOJI_SHORTCODES }) =>
       DISCORD_EMOJI_SHORTCODES.map(({ emoji, shortcode }) => ({
         emoji,

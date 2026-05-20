@@ -13,8 +13,8 @@ import type {
   StickerMessageReference,
 } from '../../../shared/domain/pigeonResources.types';
 
-import { ConversationKeychain } from '../../conversations/domain/conversationKey';
-import { PollMessageProjection } from './pollMessageProjection';
+import { ConversationKeychain } from '../../conversations/domain/ConversationKeychain';
+import { PollMessageProjection } from './PollMessageProjection';
 
 type MessageListEnvelope = {
   cursor?: string | null;

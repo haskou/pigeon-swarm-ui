@@ -49,7 +49,7 @@ Validate:
 - Strict DDD folder layout.
 - Required/recommended layer subfolders.
 - Folder naming: `kebab-case`.
-- File naming: `lowerCamelCase`.
+- File naming: exactly match the primary public export when a file has a single public export, including casing.
 - Class/type naming: `PascalCase`.
 - Variables/functions/methods/properties: `lowerCamelCase`.
 - Constants: `SCREAMING_SNAKE_CASE` where necessary.

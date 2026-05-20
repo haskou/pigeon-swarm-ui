@@ -1,9 +1,9 @@
 import type { IdentityResource } from '../../../shared/domain/pigeonResources.types';
 
-import { ProfileBiography } from './profile/profileBiography';
-import { ProfileHandle } from './profile/profileHandle';
-import { ProfileName } from './profile/profileName';
-import { IdentityId } from './value-objects/identityId';
+import { ProfileBiography } from './profile/ProfileBiography';
+import { ProfileHandle } from './profile/ProfileHandle';
+import { ProfileName } from './profile/ProfileName';
+import { IdentityId } from './value-objects/IdentityId';
 
 function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];

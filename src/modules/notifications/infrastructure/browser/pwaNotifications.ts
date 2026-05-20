@@ -1,6 +1,6 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
 type PwaNotificationPayload = {
   body: string;
@@ -61,7 +61,7 @@ export async function ensurePwaPushSubscription(
 ): Promise<void> {
   if (!canUsePushSubscriptions()) return;
 
-  const vapid = await pigeonApplication.getPushVapidPublicKey();
+  const vapid = await applicationContainer.getPushVapidPublicKey();
 
   if (!vapid.enabled || !vapid.publicKey) return;
 
@@ -78,7 +78,7 @@ export async function ensurePwaPushSubscription(
       userVisibleOnly: true,
     }));
 
-  await pigeonApplication.registerPushSubscription(
+  await applicationContainer.registerPushSubscription(
     session,
     subscription.toJSON(),
   );
@@ -94,7 +94,7 @@ export async function deletePwaPushSubscription(
 
   if (!subscription) return;
 
-  await pigeonApplication.deletePushSubscription(
+  await applicationContainer.deletePushSubscription(
     session,
     subscription.toJSON(),
   );

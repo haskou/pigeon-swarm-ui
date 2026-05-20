@@ -1,6 +1,6 @@
 import type { AttachmentProgress } from '../../../../shared/domain/pigeonResources.types';
 
-import { AttachmentCipher } from './attachmentCipher';
+import { AttachmentCipher } from './AttachmentCipher';
 
 const cipher = new AttachmentCipher();
 const workerScope = self as unknown as {

@@ -3,7 +3,7 @@ import type { MouseEvent, PointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
 const STICKER_PREVIEW_DELAY_MS = 260;
 const STICKER_PREVIEW_SIZE = 336;
@@ -20,7 +20,7 @@ type StickerPressPreviewState = {
 };
 
 export function stickerAssetUrl(assetCid: string): string {
-  return pigeonApplication.stickerAssetUrl(assetCid);
+  return applicationContainer.stickerAssetUrl(assetCid);
 }
 
 export function useStickerPressPreview(assetCid: string) {

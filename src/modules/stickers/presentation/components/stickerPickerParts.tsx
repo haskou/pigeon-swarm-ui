@@ -1,10 +1,7 @@
 import type { StickerResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { cx } from '../../../../shared/presentation/classNameHelper';
-import {
-  stickerAssetUrl,
-  useStickerPressPreview,
-} from './stickerPressPreview';
+import { cx } from '../../../../shared/presentation/cx';
+import { stickerAssetUrl, useStickerPressPreview } from './stickerPressPreview';
 
 export type StickerGridItem = {
   packId: string;
@@ -157,7 +154,9 @@ export function StickerGrid({
             />
             <button
               type="button"
-              onClick={() => void onFavoriteToggle(packId, sticker.id, favorite)}
+              onClick={() =>
+                void onFavoriteToggle(packId, sticker.id, favorite)
+              }
               className={cx(
                 'absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full text-xs shadow opacity-0 transition group-hover:opacity-100',
                 favorite

@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { cx } from '../../../../shared/presentation/cx';
 
 export type ReactionGroup = {
   authors: string[];

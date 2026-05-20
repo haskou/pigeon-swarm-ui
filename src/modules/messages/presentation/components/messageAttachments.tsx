@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { AttachmentProgress, MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  AttachmentProgress,
+  MessageAttachment,
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/browserPreview';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
+import { cx } from '../../../../shared/presentation/cx';
 import type { LightboxImage } from './imageLightbox';
 
 export type IndexedAttachment = {

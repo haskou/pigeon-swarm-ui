@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 
 export function PollCard({
   currentIdentityId,
@@ -96,7 +96,8 @@ export function PollCard({
       <div className="mt-4 grid gap-2">
         {poll.options.map((option) => {
           const count = counts[option.id] ?? 0;
-          const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+          const percent =
+            totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
           const checked = selectedOptionIds.includes(option.id);
 
           return (

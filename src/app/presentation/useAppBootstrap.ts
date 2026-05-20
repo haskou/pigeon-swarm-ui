@@ -20,7 +20,7 @@ import {
 import { useNodeNetworks } from '../../modules/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../modules/networks/presentation/hooks/usePeers';
 import { requestPwaNotificationPermission } from '../../modules/notifications/infrastructure/browser/pwaNotifications';
-import { pigeonApplication } from '../composition/applicationContainer';
+import { applicationContainer } from '../composition/applicationContainer';
 
 type RestoreState = 'done' | 'loading';
 
@@ -82,7 +82,7 @@ export function useAppBootstrap(): {
       return;
     }
 
-    void pigeonApplication
+    void applicationContainer
       .login(savedCredentials.identityId, savedCredentials.password)
       .then((result) => {
         handleAuthenticated(result.session, result.conversations);

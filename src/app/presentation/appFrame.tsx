@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 
-import { BackgroundGlow } from '../../shared/presentation/components/backgroundGlow';
+import { BackgroundGlow } from '../../shared/presentation/components/BackgroundGlow';
 
 interface AppFrameProps {
   children: ReactNode;

@@ -8,8 +8,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { ConversationPeer } from '../../../../modules/conversations/domain/conversationPeer';
+import { applicationContainer } from '../../../composition/applicationContainer';
+import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
 import {
   readPresencePreference,
   writePresencePreference,
@@ -42,7 +42,7 @@ export function useWorkspacePresence({
     const preference = readPresencePreference(session.identity.id);
 
     presencePreferenceRef.current = preference;
-    pigeonApplication.setRealtimeHeartbeatActivityMode(
+    applicationContainer.setRealtimeHeartbeatActivityMode(
       session,
       !preference || preference === 'available' ? 'auto' : 'inactive',
     );
@@ -89,7 +89,7 @@ export function useWorkspacePresence({
     (status: SelectablePresenceStatus) => {
       presencePreferenceRef.current = status;
       writePresencePreference(sessionRef.current.identity.id, status);
-      pigeonApplication.setRealtimeHeartbeatActivityMode(
+      applicationContainer.setRealtimeHeartbeatActivityMode(
         sessionRef.current,
         status === 'available' ? 'auto' : 'inactive',
       );
@@ -102,7 +102,7 @@ export function useWorkspacePresence({
 
     let cancelled = false;
 
-    void pigeonApplication
+    void applicationContainer
       .getPresences(session, presenceIdentityIds)
       .then((presences) => {
         if (cancelled) return;
@@ -122,7 +122,7 @@ export function useWorkspacePresence({
         if (preferredStatus && preferredStatus !== 'available') {
           if (ownPresence?.status === preferredStatus) return;
 
-          void pigeonApplication
+          void applicationContainer
             .updatePresence(session, { status: preferredStatus })
             .then(mergePresence)
             .catch(() => undefined);
@@ -138,7 +138,7 @@ export function useWorkspacePresence({
           return;
         }
 
-        void pigeonApplication
+        void applicationContainer
           .updatePresence(session, { status: 'available' })
           .then(mergePresence)
           .catch(() => undefined);

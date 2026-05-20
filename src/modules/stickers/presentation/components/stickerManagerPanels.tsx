@@ -1,9 +1,12 @@
 import { ChangeEvent, useState } from 'react';
 
-import type { Session, StickerPackResource } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Session,
+  StickerPackResource,
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { cx } from '../../../../shared/presentation/cx';
 import { StickerGrid, type StickerGridItem } from './stickerPickerParts';
 import { stickerAssetUrl } from './stickerPressPreview';
 import { invalidateStickerCaches } from './stickerLibraryCache';
@@ -110,11 +113,13 @@ export function SavedPacksPanel({
           </div>
         </section>
       )}
-      {packSearch.trim() && !searchingPacks && packSearchResults.length === 0 && (
-        <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
-          No packs found.
-        </div>
-      )}
+      {packSearch.trim() &&
+        !searchingPacks &&
+        packSearchResults.length === 0 && (
+          <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+            No packs found.
+          </div>
+        )}
       <div className="grid gap-4 md:grid-cols-2">
         <section>
           <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -185,11 +190,14 @@ function ManagePackStickers({
         try {
           const preparedSticker = await prepareStickerFile(file);
           const [upload, dimensions] = await Promise.all([
-            pigeonApplication.uploadStickerAsset(session, preparedSticker.file),
+            applicationContainer.uploadStickerAsset(
+              session,
+              preparedSticker.file,
+            ),
             Promise.resolve(preparedSticker.dimensions),
           ]);
 
-          await pigeonApplication.addStickerToPack(session, pack.id, {
+          await applicationContainer.addStickerToPack(session, pack.id, {
             assetCid: upload.cid,
             contentType: upload.contentType,
             dimensions,

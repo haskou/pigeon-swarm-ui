@@ -2,10 +2,10 @@ import { UUID } from '@haskou/value-objects';
 
 import type { Session } from '../../domain/pigeonResources.types';
 
-import { API_SERVER_URL } from '../../../app/config';
-import { IdentityId } from '../../../modules/identities/domain/value-objects/identityId';
-import { ApiUrlBuilder } from '../http/apiUrlBuilder';
-import { RequestSigner } from '../http/requestSigner';
+import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
+import { IdentityId } from '../../../modules/identities/domain/value-objects/IdentityId';
+import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
+import { RequestSigner } from '../http/RequestSigner';
 
 export type RealtimeDomainEvent = {
   aggregate_id: string;

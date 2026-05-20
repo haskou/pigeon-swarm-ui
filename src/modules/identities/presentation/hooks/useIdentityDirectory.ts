@@ -7,9 +7,9 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { ConversationPeer } from '../../../conversations/domain/conversationPeer';
-import { IdentityId } from '../../domain/value-objects/identityId';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 import {
   identityName,
   identityPicture,
@@ -212,7 +212,7 @@ function isResolvableIdentityId(
 
 async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
   try {
-    const identity = await pigeonApplication.getIdentity(
+    const identity = await applicationContainer.getIdentity(
       IdentityId.normalize(identityId),
     );
     const picture = await loadIdentityPicture(identity).catch(() => null);
@@ -239,7 +239,7 @@ async function loadIdentityPicture(
 
   if (!pictureCid) return null;
 
-  const content = await pigeonApplication.getPublicFile(pictureCid);
+  const content = await applicationContainer.getPublicFile(pictureCid);
 
   return publicFileObjectUrl(content);
 }

@@ -11,8 +11,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 type CommunitiesState = {
@@ -39,7 +39,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     setError(null);
 
     try {
-      setCommunities(await pigeonApplication.listCommunities(session));
+      setCommunities(await applicationContainer.listCommunities(session));
     } catch (caught) {
       setError(
         new Error(toUserErrorMessage(caught, copy.communities.loadError)),

@@ -4,7 +4,7 @@ import type {
   StickerPackResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { stickerAssetUrl } from './stickerPressPreview';
 
 const STICKER_CACHE_TTL_MS = 30_000;
@@ -32,7 +32,7 @@ export async function cachedListStickerPacks(): Promise<StickerPackResource[]> {
     return stickerPacksCache.value;
   }
 
-  const packs = await pigeonApplication.listStickerPacks();
+  const packs = await applicationContainer.listStickerPacks();
   stickerPacksCache = {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: packs,
@@ -49,7 +49,7 @@ export async function cachedGetMyStickers(
 
   if (cached && cached.expiresAt > now) return cached.value;
 
-  const library = await pigeonApplication.getMyStickers(session);
+  const library = await applicationContainer.getMyStickers(session);
   myStickersCache.set(session.identity.id, {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: library,
@@ -66,7 +66,7 @@ export async function cachedGetStickerPack(
 
   if (cached && cached.expiresAt > now) return cached.value;
 
-  const pack = await pigeonApplication.getStickerPack(packId);
+  const pack = await applicationContainer.getStickerPack(packId);
   stickerPackCache.set(packId, {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: pack,

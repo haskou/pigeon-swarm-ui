@@ -13,9 +13,9 @@ import type {
 } from '../../../calls/domain/callSession.types';
 import type { CommunityMemberListItem } from './communityMembersPanel';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { IdentityId } from '../../../identities/domain/value-objects/identityId';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { loadIdentityPicture } from './communityImages';
 import { memberDisplayName } from './communityMemberNames';
@@ -76,7 +76,7 @@ export function useCommunityMembers({
           const identity =
             identityId === session.identity.id
               ? session.identity
-              : await pigeonApplication.getIdentity(
+              : await applicationContainer.getIdentity(
                   IdentityId.normalize(identityId),
                 );
           const pictureUrl = await loadIdentityPicture(identity);

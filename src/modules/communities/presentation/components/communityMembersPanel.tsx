@@ -6,8 +6,8 @@ import type {
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { MemberRow } from './memberRow';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { MemberRow } from './MemberRow';
 
 export type CommunityMemberListItem = {
   identity?: IdentityResource;

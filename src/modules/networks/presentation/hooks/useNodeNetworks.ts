@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-import type { NodeNetwork } from '../../application/list-node-networks/listNodeNetworks';
+import type { NodeNetwork } from '../../application/list-node-networks/ListNodeNetworks';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 type NodeNetworksState = {
@@ -28,12 +28,12 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
     setError(null);
 
     try {
-      const nodeInfo = await pigeonApplication.getNodeInfo();
+      const nodeInfo = await applicationContainer.getNodeInfo();
 
       setNode(nodeInfo);
       try {
         setNetworks(
-          await pigeonApplication.listNodeNetworks(session ?? undefined),
+          await applicationContainer.listNodeNetworks(session ?? undefined),
         );
       } catch {
         setNetworks([]);

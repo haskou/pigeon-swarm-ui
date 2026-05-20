@@ -1,5 +1,5 @@
-import { HttpJsonError } from '../infrastructure/http/httpJsonError';
-import { copy } from './i18n/en';
+import { HttpJsonError } from '../infrastructure/http/HttpJsonError';
+import { copy } from './i18n/copy';
 
 type BackendErrorBody = {
   code?: number | string;

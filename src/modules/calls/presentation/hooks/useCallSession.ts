@@ -15,7 +15,7 @@ import {
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
 import { CallPeerConnectionManager } from '../../infrastructure/media/callPeerConnectionManager';
-import { LocalMediaManager } from '../../infrastructure/media/localMediaManager';
+import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 
 type SignalSender = (
   recipientIdentityId: string,

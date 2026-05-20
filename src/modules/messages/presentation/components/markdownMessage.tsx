@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { cx } from '../../../../shared/presentation/classNameHelper';
+import { cx } from '../../../../shared/presentation/cx';
 
 type InlineToken =
   | { children: InlineToken[]; type: 'bold' | 'italic' | 'strike' }
@@ -37,7 +37,12 @@ export function MarkdownMessage({
   if (!hasMarkdownSyntax(content)) {
     return (
       <>
-        {renderInline(parseInline(content, mentions), mine, 'plain', onMentionClick)}
+        {renderInline(
+          parseInline(content, mentions),
+          mine,
+          'plain',
+          onMentionClick,
+        )}
       </>
     );
   }
@@ -278,7 +283,12 @@ function parseInlineSegment(
       delimiter.type === 'code'
         ? { text: innerText, type: 'code' }
         : {
-            children: parseInlineSegment(text, innerStart, closeIndex, mentions),
+            children: parseInlineSegment(
+              text,
+              innerStart,
+              closeIndex,
+              mentions,
+            ),
             type: delimiter.type,
           },
     );
@@ -318,11 +328,7 @@ function pushTextWithAutoLinks(
 
   while ((match = autoLinkPattern.exec(text))) {
     if (match.index > cursor) {
-      pushTextWithMentions(
-        tokens,
-        text.slice(cursor, match.index),
-        mentions,
-      );
+      pushTextWithMentions(tokens, text.slice(cursor, match.index), mentions);
     }
 
     tokens.push({
@@ -428,7 +434,12 @@ function renderBlock(
         >
           {block.items.map((item, itemIndex) => (
             <li key={itemIndex}>
-              {renderInline(item, mine, `${index}-${itemIndex}`, onMentionClick)}
+              {renderInline(
+                item,
+                mine,
+                `${index}-${itemIndex}`,
+                onMentionClick,
+              )}
             </li>
           ))}
         </ListTag>

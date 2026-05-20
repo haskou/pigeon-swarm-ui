@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react';
 
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { cx } from '../classNameHelper';
+import { cx } from '../cx';
 
 export type GlassSelectOption = {
   disabled?: boolean;

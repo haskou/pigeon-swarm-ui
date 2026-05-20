@@ -12,8 +12,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/en';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 type MembershipRequestAction = 'accept' | 'decline' | 'refresh';
@@ -52,7 +52,9 @@ export function useCommunityMembershipRequests({
     setError(null);
     try {
       setRequests(
-        await pigeonApplication.listCommunityMembershipRequests(currentSession),
+        await applicationContainer.listCommunityMembershipRequests(
+          currentSession,
+        ),
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.membershipError));
@@ -72,7 +74,7 @@ export function useCommunityMembershipRequests({
       setError(null);
       try {
         const updated =
-          await pigeonApplication.updateCommunityMembershipRequest(
+          await applicationContainer.updateCommunityMembershipRequest(
             currentSession,
             requestId,
             status,

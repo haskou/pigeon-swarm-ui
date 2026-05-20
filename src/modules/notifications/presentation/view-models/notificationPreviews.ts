@@ -5,9 +5,9 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/en';
-import { CommunityChannels } from '../../../communities/domain/communityChannels';
-import { ConversationPeer } from '../../../conversations/domain/conversationPeer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { CommunityChannels } from '../../../communities/domain/CommunityChannels';
+import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function communityNotificationPreview(

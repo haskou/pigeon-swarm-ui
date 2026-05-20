@@ -6,7 +6,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../app/composition/applicationContainer';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { loadPublicImage } from '../../../communities/presentation/components/communityImages';
 
 interface UseNotificationCommunityPreviewsInput {
@@ -46,7 +46,7 @@ export function useNotificationCommunityPreviews({
 
     void Promise.all(
       [...new Set(communityIds)].map((communityId) =>
-        pigeonApplication
+        applicationContainer
           .getCommunity(session, communityId)
           .then((community) => [communityId, community] as const)
           .catch(() => null),
