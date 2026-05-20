@@ -29,10 +29,8 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
-  IdentityPresence,
   IdentityResource,
   MessageResource,
-  SelectablePresenceStatus,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
@@ -84,10 +82,6 @@ import {
   communityNotificationPreview,
   conversationNotificationPreview,
 } from '../../presentation/workspace/notificationPreviews';
-import {
-  readPresencePreference,
-  writePresencePreference,
-} from '../../presentation/workspace/presencePreferenceStorage';
 import { presenceFromRealtimeEvent } from '../../presentation/workspace/presenceRealtimeEvents';
 import {
   activeTypingIdentityIds,
@@ -116,6 +110,7 @@ import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { Rail } from './Rail';
 import { useCommunitySelection } from './useCommunitySelection';
 import { useSidebarGesture } from './useSidebarGesture';
+import { useWorkspacePresence } from './useWorkspacePresence';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -262,11 +257,6 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [presenceByIdentityId, setPresenceByIdentityId] = useState<
-    Record<string, IdentityPresence>
-  >({});
-  const notificationsMutedByPresence =
-    presenceByIdentityId[session.identity.id]?.status === 'busy';
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -283,9 +273,6 @@ export function GlassWorkspace({
   >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const pendingCommunityInviteRef = useRef<string | null>(null);
-  const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
-    readPresencePreference(session.identity.id),
-  );
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -316,16 +303,6 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
-  }, [session]);
-
-  useEffect(() => {
-    const preference = readPresencePreference(session.identity.id);
-
-    presencePreferenceRef.current = preference;
-    pigeonApplication.setRealtimeHeartbeatActivityMode(
-      session,
-      !preference || preference === 'available' ? 'auto' : 'inactive',
-    );
   }, [session]);
 
   useEffect(() => {
@@ -624,54 +601,17 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
-  const presenceIdentityIdsKey = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          session.identity.id,
-          ...conversations.flatMap((conversation) => [
-            conversationPeerIdentityId(
-              conversation,
-              session.identity.id,
-              session.keychain,
-            ),
-            ...(conversation.participantIdentityIds ??
-              conversation.participantIds ??
-              conversation.participants ??
-              []),
-          ]),
-          ...communities.flatMap((community) => community.memberIds),
-          ...messageAuthorIdentityIdsKey.split('\u0000'),
-        ]),
-      )
-        .filter((identityId): identityId is string => !!identityId)
-        .join('\u0000'),
-    [communities, conversations, messageAuthorIdentityIdsKey, session],
-  );
-  const presenceIdentityIds = useMemo(
-    () =>
-      presenceIdentityIdsKey.length > 0
-        ? presenceIdentityIdsKey.split('\u0000')
-        : [],
-    [presenceIdentityIdsKey],
-  );
-  const mergePresence = useCallback((presence: IdentityPresence) => {
-    setPresenceByIdentityId((current) => ({
-      ...current,
-      [presence.identityId]: presence,
-    }));
-  }, []);
-  const rememberPresencePreference = useCallback(
-    (status: SelectablePresenceStatus) => {
-      presencePreferenceRef.current = status;
-      writePresencePreference(sessionRef.current.identity.id, status);
-      pigeonApplication.setRealtimeHeartbeatActivityMode(
-        sessionRef.current,
-        status === 'available' ? 'auto' : 'inactive',
-      );
-    },
-    [],
-  );
+  const {
+    mergePresence,
+    notificationsMutedByPresence,
+    presenceByIdentityId,
+    rememberPresencePreference,
+  } = useWorkspacePresence({
+    communities,
+    conversations,
+    messageAuthorIdentityIdsKey,
+    session,
+  });
   const playNotificationSoundIfAllowed = useCallback(() => {
     if (notificationsMutedByPresence) return;
 
@@ -698,58 +638,6 @@ export function GlassWorkspace({
     [identityNames, identityPictures, identityProfiles, session.identity],
   );
 
-  useEffect(() => {
-    if (presenceIdentityIds.length === 0) return;
-
-    let cancelled = false;
-
-    void pigeonApplication
-      .getPresences(session, presenceIdentityIds)
-      .then((presences) => {
-        if (cancelled) return;
-
-        setPresenceByIdentityId((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            presences.map((presence) => [presence.identityId, presence]),
-          ),
-        }));
-
-        const ownPresence = presences.find(
-          (presence) => presence.identityId === session.identity.id,
-        );
-        const preferredStatus = presencePreferenceRef.current;
-
-        if (preferredStatus && preferredStatus !== 'available') {
-          if (ownPresence?.status === preferredStatus) return;
-
-          void pigeonApplication
-            .updatePresence(session, { status: preferredStatus })
-            .then(mergePresence)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        if (
-          ownPresence &&
-          ownPresence.status !== 'away' &&
-          ownPresence.status !== 'disconnected'
-        ) {
-          return;
-        }
-
-        void pigeonApplication
-          .updatePresence(session, { status: 'available' })
-          .then(mergePresence)
-          .catch(() => undefined);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mergePresence, presenceIdentityIds, presenceIdentityIdsKey, session]);
   const callDetailsForResource = useCallback(
     (
       call: CallResource,
