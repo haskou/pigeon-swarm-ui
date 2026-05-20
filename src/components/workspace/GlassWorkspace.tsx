@@ -123,11 +123,8 @@ import {
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
-const ChatColumn = lazy(() =>
-  import('./ChatColumn').then((module) => ({
-    default: module.ChatColumn,
-  })),
-);
+import { ChatColumn } from './ChatColumn';
+
 const CommunityWorkspace = lazy(() =>
   import('../community/CommunityWorkspace').then((module) => ({
     default: module.CommunityWorkspace,
