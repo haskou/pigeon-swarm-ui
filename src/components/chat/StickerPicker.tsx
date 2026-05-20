@@ -18,11 +18,11 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { StickerEmojiPanel } from './StickerEmojiPanel';
+import { StickerExplorePack } from './StickerExplorePack';
 import { StickerManagerDialog } from './StickerManagerDialog';
-import { useStickerPressPreview } from './StickerPressPreview';
 import {
   PickerTab,
-  StickerGrid,
   type StickerGridItem,
   StickerSection,
   type StickerShortcut,
@@ -397,68 +397,30 @@ export function StickerPicker({
                   <div className="text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
                     Explore
                   </div>
-                  {explorePacks.map((pack) => {
-                    const saved = savedPackIds.has(pack.id);
-
-                    return (
-                      <div
-                        key={pack.id}
-                        className="rounded-xl border border-white/10 bg-white/5 p-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-black">
-                              {pack.name}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => void savePack(pack.id, saved)}
-                            className="rounded-lg bg-white/10 px-2 py-1 text-xs font-black text-white/70 transition hover:bg-white/15"
-                          >
-                            {saved ? 'Remove' : 'Save'}
-                          </button>
-                        </div>
-                        <StickerGrid
-                          favoriteIds={favoriteIds}
-                          items={pack.stickers.map((sticker) => ({
-                            packId: pack.id,
-                            sticker,
-                          }))}
-                          onFavoriteToggle={toggleFavorite}
-                          onSend={sendSticker}
-                        />
-                      </div>
-                    );
-                  })}
+                  {explorePacks.map((pack) => (
+                    <StickerExplorePack
+                      favoriteIds={favoriteIds}
+                      key={pack.id}
+                      onFavoriteToggle={toggleFavorite}
+                      onSavePack={savePack}
+                      onSend={sendSticker}
+                      pack={pack}
+                      saved={savedPackIds.has(pack.id)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
           ) : (
-            <div className="max-h-[24rem] overflow-y-auto p-3">
-              <input
-                value={emojiQuery}
-                onChange={(event) => setEmojiQuery(event.target.value)}
-                className="mb-3 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none placeholder:text-white/35"
-                placeholder="Search emojis"
-              />
-              <div className="grid grid-cols-7 gap-1">
-                {emojis.map((suggestion) => (
-                  <button
-                    type="button"
-                    key={suggestion.shortcode}
-                    onClick={() => {
-                      onEmojiInsert(suggestion.emoji);
-                      setOpen(false);
-                    }}
-                    className="grid aspect-square place-items-center rounded-xl text-2xl transition hover:bg-white/10"
-                    title={suggestion.shortcode}
-                  >
-                    {suggestion.emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <StickerEmojiPanel
+              emojiQuery={emojiQuery}
+              emojis={emojis}
+              onEmojiInsert={(emoji) => {
+                onEmojiInsert(emoji);
+                setOpen(false);
+              }}
+              onQueryChange={setEmojiQuery}
+            />
           )}
         </div>
       )}
