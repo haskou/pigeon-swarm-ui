@@ -1,6 +1,11 @@
 import { cx } from '../../utils/classNameHelper';
 
-export type CommunitySettingsSection = 'channels' | 'members' | 'profile' | 'roles';
+export type CommunitySettingsSection =
+  | 'channels'
+  | 'invitations'
+  | 'members'
+  | 'profile'
+  | 'roles';
 
 export function CommunitySettingsNavigation({
   activeSection,

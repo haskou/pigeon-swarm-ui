@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import type {
   Community,
   CommunityChannel,
+  CommunityMembershipRequest,
   CommunityPermission,
   CommunityRoleResource,
   IdentityResource,
@@ -21,6 +22,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import {
   DialogHeader,
   TrashIcon,
@@ -113,6 +115,10 @@ export function ManageCommunityDialog({
     ),
   );
   const [deletedChannelIds, setDeletedChannelIds] = useState<string[]>([]);
+  const [membershipRequests, setMembershipRequests] = useState<
+    CommunityMembershipRequest[]
+  >([]);
+  const [inviteIdentityInput, setInviteIdentityInput] = useState('');
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
@@ -136,6 +142,12 @@ export function ManageCommunityDialog({
   const canManageRoles = isOwner || currentPermissions.has('manage_roles');
   const canBanMembers = isOwner || currentPermissions.has('ban_members');
   const canManageMembers = isOwner || currentPermissions.has('manage_members');
+  const canCreateInvitations =
+    isOwner || currentPermissions.has('create_invites');
+  const canApproveRequests =
+    isOwner || currentPermissions.has('approve_members');
+  const canRejectRequests =
+    isOwner || currentPermissions.has('reject_members');
   const sections = [
     ...(isOwner ? ([['profile', copy.communities.profile]] as const) : []),
     ...(canManageChannels
@@ -144,6 +156,9 @@ export function ManageCommunityDialog({
     ...(canManageRoles ? ([['roles', copy.communities.roles]] as const) : []),
     ...(canManageRoles || canBanMembers || canManageMembers
       ? ([['members', copy.communities.members]] as const)
+      : []),
+    ...(canCreateInvitations || canApproveRequests || canRejectRequests
+      ? ([['invitations', copy.communities.invitations]] as const)
       : []),
   ];
 
@@ -245,6 +260,70 @@ export function ManageCommunityDialog({
       cancelled = true;
     };
   }, [community.memberIds, session.identity]);
+
+  useEffect(() => {
+    const availableSection = sections.some(
+      ([section]) => section === activeSection,
+    );
+
+    if (!availableSection && sections[0]) {
+      setActiveSection(sections[0][0]);
+    }
+  }, [activeSection, sections]);
+
+  useEffect(() => {
+    if (activeSection !== 'invitations') return;
+
+    void refreshMembershipRequests();
+  }, [activeSection, community.id, session.identity.id]);
+
+  useEffect(() => {
+    const knownIdentityIds = new Set(Object.keys(memberIdentities));
+    const requestIdentityIds = membershipRequests.flatMap((request) => [
+      request.creatorIdentityId,
+      request.identityId,
+    ]);
+    const missingIdentityIds = [...new Set(requestIdentityIds)].filter(
+      (identityId) => !knownIdentityIds.has(identityId),
+    );
+
+    if (missingIdentityIds.length === 0) return;
+
+    let cancelled = false;
+
+    void Promise.all(
+      missingIdentityIds.map(async (identityId) => {
+        try {
+          const identity =
+            identityId === session.identity.id
+              ? session.identity
+              : await pigeonApplication.getIdentity(
+                  normalizeIdentityId(identityId),
+                );
+
+          return [identityId, identity] as const;
+        } catch {
+          return [identityId, undefined] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+
+      setMemberIdentities((current) => {
+        const next = { ...current };
+
+        for (const [identityId, identity] of entries) {
+          if (identity) next[identityId] = identity;
+        }
+
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [memberIdentities, membershipRequests, session.identity]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -433,6 +512,78 @@ export function ManageCommunityDialog({
       await refreshCommunity();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.banMemberError));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const refreshMembershipRequests = async () => {
+    setState('loading');
+    setError(null);
+    try {
+      const requests = await pigeonApplication.listCommunityMembershipRequests(
+        session,
+      );
+
+      setMembershipRequests(
+        requests.filter((request) => request.communityId === community.id),
+      );
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.membershipError));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const inviteMember = async () => {
+    const identityId = normalizeIdentityId(inviteIdentityInput);
+
+    if (!identityId || state === 'loading') return;
+
+    setState('loading');
+    setError(null);
+    try {
+      const request = await pigeonApplication.addCommunityMember(
+        session,
+        community.id,
+        identityId,
+      );
+
+      setInviteIdentityInput('');
+      setMembershipRequests((current) => [
+        request,
+        ...current.filter((item) => item.id !== request.id),
+      ]);
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.memberError));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const updateMembershipRequest = async (
+    requestId: string,
+    status: 'accepted' | 'declined',
+  ) => {
+    setState('loading');
+    setError(null);
+    try {
+      const request =
+        await pigeonApplication.updateCommunityMembershipRequest(
+          session,
+          requestId,
+          status,
+        );
+
+      setMembershipRequests((current) =>
+        current.map((item) => (item.id === request.id ? request : item)),
+      );
+
+      if (status === 'accepted') {
+        await refreshCommunity();
+      }
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.membershipError));
     } finally {
       setState('idle');
     }
@@ -918,6 +1069,26 @@ export function ManageCommunityDialog({
               ownerIdentityId={community.ownerIdentityId}
               state={state}
             />
+              )}
+              {activeSection === 'invitations' && (
+                <CommunityInvitationsPanel
+                  canApproveRequests={canApproveRequests}
+                  canCreateInvitations={canCreateInvitations}
+                  canRejectRequests={canRejectRequests}
+                  community={community}
+                  identityInput={inviteIdentityInput}
+                  identityLookup={memberIdentities}
+                  onAccept={(requestId) =>
+                    void updateMembershipRequest(requestId, 'accepted')
+                  }
+                  onDecline={(requestId) =>
+                    void updateMembershipRequest(requestId, 'declined')
+                  }
+                  onIdentityInputChange={setInviteIdentityInput}
+                  onInvite={() => void inviteMember()}
+                  requests={membershipRequests}
+                  state={state}
+                />
               )}
               {error && (
                 <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
