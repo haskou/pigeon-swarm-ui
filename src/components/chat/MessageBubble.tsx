@@ -118,6 +118,7 @@ export function MessageBubble({
   );
   const linkPreview = message.linkPreview;
   const sticker = message.sticker;
+  const stickerWithReply = Boolean(sticker && hasReply);
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -242,11 +243,21 @@ export function MessageBubble({
                 </div>
               )}
               {sticker && (
-                <MessageStickerContent
-                  mine={mine}
-                  onStickerClick={onStickerClick}
-                  sticker={sticker}
-                />
+                <div
+                  className={cx(
+                    stickerWithReply && 'flex items-end gap-2',
+                    stickerWithReply && mine && 'flex-row-reverse',
+                  )}
+                >
+                  <MessageStickerContent
+                    mine={mine}
+                    onStickerClick={onStickerClick}
+                    sticker={sticker}
+                  />
+                  {stickerWithReply && (
+                    <MessageTimestamp timestamp={message.timestamp} />
+                  )}
+                </div>
               )}
               {message.attachmentProgress && (
                 <MessageAttachmentProgress
@@ -285,9 +296,9 @@ export function MessageBubble({
                 onRetryMessage={onRetryMessage}
               />
             </div>
-            <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
-              {formatTime(message.timestamp)}
-            </span>
+            {!stickerWithReply && (
+              <MessageTimestamp timestamp={message.timestamp} />
+            )}
           </div>
           {reactionGroups.length > 0 && (
             <MessageReactions
@@ -308,6 +319,14 @@ export function MessageBubble({
         />
       )}
     </>
+  );
+}
+
+function MessageTimestamp({ timestamp }: { timestamp: number }) {
+  return (
+    <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
+      {formatTime(timestamp)}
+    </span>
   );
 }
 
