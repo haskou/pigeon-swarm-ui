@@ -158,7 +158,7 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex items-center gap-3', mine && 'justify-end')}
+        className={cx('flex min-w-0 items-center gap-3', mine && 'justify-end')}
       >
         {!mine && (
           <MessageAvatarColumn
@@ -171,13 +171,13 @@ export function MessageBubble({
         )}
         <div
           className={cx(
-            'flex max-w-[96%] flex-col sm:max-w-[72%]',
+            'flex min-w-0 max-w-[96%] flex-col sm:max-w-[72%]',
             mine ? 'items-end' : 'items-start',
           )}
         >
           <div
             className={cx(
-              'flex max-w-full items-end gap-2',
+              'flex min-w-0 max-w-full items-end gap-2',
               mine && 'flex-row-reverse',
             )}
           >
