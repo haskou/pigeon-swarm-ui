@@ -545,20 +545,26 @@ function LinkPreviewCard({
   title,
   url,
 }: MessageLinkPreview & { mine: boolean }) {
-  const [imageVisible, setImageVisible] = useState(Boolean(image));
-  const previewUrl = finalUrl || url;
-  const displayUrl = displayLinkPreviewUrl(previewUrl);
-  const hostname = linkPreviewHostname(previewUrl);
-  const faviconUrl = linkPreviewFaviconUrl(previewUrl);
+  const safePreviewUrl =
+    safeLinkPreviewUrl(finalUrl) ?? safeLinkPreviewUrl(url);
+  const safeImageUrl = safeLinkPreviewUrl(image)?.toString() ?? null;
+  const [imageVisible, setImageVisible] = useState(Boolean(safeImageUrl));
+  const displayUrl = safePreviewUrl
+    ? displayLinkPreviewUrl(safePreviewUrl)
+    : '';
+  const hostname = safePreviewUrl ? linkPreviewHostname(safePreviewUrl) : '';
+  const faviconUrl = safePreviewUrl ? linkPreviewFaviconUrl(safePreviewUrl) : '';
   const label = siteName?.trim() || hostname;
 
   useEffect(() => {
-    setImageVisible(Boolean(image));
-  }, [image]);
+    setImageVisible(Boolean(safeImageUrl));
+  }, [safeImageUrl]);
+
+  if (!safePreviewUrl) return null;
 
   return (
     <a
-      href={url}
+      href={safePreviewUrl.toString()}
       target="_blank"
       rel="noreferrer"
       className={cx(
@@ -566,9 +572,9 @@ function LinkPreviewCard({
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
-      {image && imageVisible && (
+      {safeImageUrl && imageVisible && (
         <img
-          src={image}
+          src={safeImageUrl}
           alt=""
           className="-mx-3 -mt-3 mb-3 aspect-[1.91/1] w-[calc(100%+1.5rem)] object-cover"
           onError={() => setImageVisible(false)}
@@ -604,29 +610,27 @@ function LinkPreviewCard({
   );
 }
 
-function linkPreviewUrl(value: string): URL | null {
+function safeLinkPreviewUrl(value?: null | string): URL | null {
+  if (!value) return null;
+
   try {
-    return new URL(value);
+    const url = new URL(value);
+
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
   } catch {
     return null;
   }
 }
 
-function linkPreviewHostname(value: string): string {
-  return linkPreviewUrl(value)?.hostname ?? value;
+function linkPreviewHostname(url: URL): string {
+  return url.hostname;
 }
 
-function linkPreviewFaviconUrl(value: string): string {
-  const url = linkPreviewUrl(value);
-
-  return url ? `${url.origin}/favicon.ico` : '';
+function linkPreviewFaviconUrl(url: URL): string {
+  return `${url.origin}/favicon.ico`;
 }
 
-function displayLinkPreviewUrl(value: string): string {
-  const url = linkPreviewUrl(value);
-
-  if (!url) return value;
-
+function displayLinkPreviewUrl(url: URL): string {
   return `${url.hostname}${url.pathname}${url.search}`.replace(/\/$/, '');
 }
 
