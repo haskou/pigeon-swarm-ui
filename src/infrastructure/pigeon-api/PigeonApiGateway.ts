@@ -73,6 +73,7 @@ import { HttpJsonClient } from '../http/HttpJsonClient';
 import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
 import { PigeonCallsApi } from './PigeonCallsApi';
+import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
@@ -149,6 +150,8 @@ type ConversationInvitationType =
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsApi;
 
+  private readonly communities: PigeonCommunitiesApi;
+
   private readonly conversations: ConversationMapper;
 
   private readonly files: PigeonFilesApi;
@@ -193,6 +196,12 @@ export class PigeonApiGateway {
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
     this.calls = new PigeonCallsApi(http, signer);
+    this.communities = new PigeonCommunitiesApi(
+      http,
+      signer,
+      <T>(key: string, loader: () => Promise<T>) =>
+        this.cachedRequest(key, loader),
+    );
     this.conversations = conversations;
     this.files = new PigeonFilesApi(http, signer, attachmentCipher);
     this.http = http;
@@ -234,13 +243,7 @@ export class PigeonApiGateway {
   public async getIpfsReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatus> {
-    const path = '/ipfs/replication/status';
-    const body = {};
-
-    return await this.http.request<IpfsReplicationStatus>(path, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
-    });
+    return await this.node.getIpfsReplicationStatus(session);
   }
 
   public async getPresence(
@@ -357,55 +360,21 @@ export class PigeonApiGateway {
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
-    const path = '/communities/';
-    const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<{ communities: Community[] }>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-    );
-
-    return result.communities;
+    return await this.communities.list(session);
   }
 
   public async getCommunity(
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    const path = `/communities/${encodeURIComponent(communityId)}`;
-
-    return await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<Community>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-    );
+    return await this.communities.get(session, communityId);
   }
 
   public async discoverCommunities(
     session: Session,
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
-    const path = '/communities/discover';
-    const query = new URLSearchParams();
-    const body = {};
-
-    if (input.query?.trim()) query.set('query', input.query.trim());
-
-    if (input.networkId?.trim()) query.set('networkId', input.networkId.trim());
-
-    const result = await this.http.request<{
-      communities: CommunityDiscoveryResource[];
-    }>(`${path}${query.size > 0 ? `?${query.toString()}` : ''}`, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
-    });
-
-    return result.communities;
+    return await this.communities.discover(session, input);
   }
 
   public async createCommunity(
@@ -418,20 +387,7 @@ export class PigeonApiGateway {
       networkId: string;
     },
   ): Promise<Community> {
-    const path = '/communities/';
-    const body = {
-      ...(input.avatar ? { avatar: input.avatar } : {}),
-      ...(input.banner ? { banner: input.banner } : {}),
-      description: input.description,
-      name: input.name,
-      networkId: input.networkId,
-    };
-
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.communities.create(session, input);
   }
 
   public async updateCommunity(
@@ -444,21 +400,7 @@ export class PigeonApiGateway {
       name?: string;
     },
   ): Promise<Community> {
-    const path = `/communities/${encodeURIComponent(communityId)}`;
-    const body = {
-      ...(input.avatar ? { avatar: input.avatar } : {}),
-      ...(input.banner ? { banner: input.banner } : {}),
-      ...(input.description !== undefined
-        ? { description: input.description }
-        : {}),
-      ...(input.name !== undefined ? { name: input.name } : {}),
-    };
-
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+    return await this.communities.update(session, communityId, input);
   }
 
   public async addCommunityMember(
@@ -466,44 +408,24 @@ export class PigeonApiGateway {
     communityId: string,
     identityId: string,
   ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/${encodeURIComponent(communityId)}/members`;
-    const body = { identityId };
-
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.communities.inviteMember(
+      session,
+      communityId,
+      identityId,
+    );
   }
 
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
   ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/join-requests`;
-    const body = {};
-
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.communities.createJoinRequest(session, communityId);
   }
 
   public async listCommunityMembershipRequests(
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
-    const path = '/communities/membership-requests';
-    const result = await this.http.request<{
-      requests: CommunityMembershipRequest[];
-    }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.requests;
+    return await this.communities.listMembershipRequests(session);
   }
 
   public async updateCommunityMembershipRequest(
@@ -511,41 +433,25 @@ export class PigeonApiGateway {
     requestId: string,
     status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
   ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/membership-requests/${encodeURIComponent(
+    return await this.communities.updateMembershipRequest(
+      session,
       requestId,
-    )}`;
-    const body = { status };
-
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+      status,
+    );
   }
 
   public async leaveCommunity(
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    const path = `/communities/${encodeURIComponent(communityId)}/members/me`;
-
-    return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
+    return await this.communities.leave(session, communityId);
   }
 
   public async listCommunityMembers(
     session: Session,
     communityId: string,
   ): Promise<string[]> {
-    const path = `/communities/${encodeURIComponent(communityId)}/members`;
-    const result = await this.http.request<{ memberIds: string[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.memberIds;
+    return await this.communities.listMembers(session, communityId);
   }
 
   public async createCommunityTextChannel(
@@ -553,16 +459,7 @@ export class PigeonApiGateway {
     communityId: string,
     name: string,
   ): Promise<CommunityTextChannel> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/text`;
-    const body = { name };
-
-    return await this.http.request<CommunityTextChannel>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.communities.createTextChannel(session, communityId, name);
   }
 
   public async createCommunityVoiceChannel(
@@ -570,31 +467,18 @@ export class PigeonApiGateway {
     communityId: string,
     name: string,
   ): Promise<CommunityVoiceChannel> {
-    const path = `/communities/${encodeURIComponent(
+    return await this.communities.createVoiceChannel(
+      session,
       communityId,
-    )}/channels/voice`;
-    const body = { name };
-
-    return await this.http.request<CommunityVoiceChannel>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+      name,
+    );
   }
 
   public async listCommunityChannels(
     session: Session,
     communityId: string,
   ): Promise<CommunityChannel[]> {
-    const path = `/communities/${encodeURIComponent(communityId)}/channels`;
-    const result = await this.http.request<{
-      channels: CommunityChannel[];
-    }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.channels;
+    return await this.communities.listChannels(session, communityId);
   }
 
   public async renameCommunityChannel(
@@ -603,16 +487,12 @@ export class PigeonApiGateway {
     channelId: string,
     name: string,
   ): Promise<CommunityChannel> {
-    const path = `/communities/${encodeURIComponent(
+    return await this.communities.renameChannel(
+      session,
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}`;
-    const body = { name };
-
-    return await this.http.request<CommunityChannel>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+      channelId,
+      name,
+    );
   }
 
   public async deleteCommunityChannel(
@@ -620,14 +500,11 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): Promise<Community> {
-    const path = `/communities/${encodeURIComponent(
+    return await this.communities.deleteChannel(
+      session,
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}`;
-
-    return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
+      channelId,
+    );
   }
 
   public async createCommunityChannelMessage(
@@ -641,42 +518,12 @@ export class PigeonApiGateway {
       timestamp?: number;
     },
   ): Promise<MessageResource> {
-    const createdAt = input.timestamp ?? Date.now();
-    const id =
-      input.id ??
-      `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}`;
-    const attachmentExternalIdentifiers =
-      input.attachmentExternalIdentifiers ?? [];
-    const signaturePayload = {
-      attachmentExternalIdentifiers,
-      authorIdentityId: session.identity.id,
+    return await this.communities.createChannelMessage(
+      session,
+      communityId,
       channelId,
-      communityId,
-      createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id,
-      type: 'sent',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
+      input,
     );
-    const body = {
-      attachmentExternalIdentifiers,
-      createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id,
-      signature: signature.toString(),
-    };
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages`;
-
-    return await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
   }
 
   public async listCommunityChannelMessages(
@@ -688,38 +535,12 @@ export class PigeonApiGateway {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    const query = new URLSearchParams({
-      limit: String(options.limit ?? 50),
-    });
-
-    if (options.beforeMessageId) {
-      query.set('beforeMessageId', options.beforeMessageId);
-    }
-
-    const path = `/communities/${encodeURIComponent(
+    return await this.communities.listChannelMessages(
+      session,
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages?${query.toString()}`;
-    const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<
-          | MessageResource[]
-          | {
-              messages?: MessageResource[];
-              nextBeforeMessageId?: null | string;
-            }
-        >(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+      channelId,
+      options,
     );
-
-    return Array.isArray(result)
-      ? { messages: result, nextBeforeMessageId: null }
-      : {
-          messages: result.messages ?? [],
-          nextBeforeMessageId: result.nextBeforeMessageId ?? null,
-        };
   }
 
   public async deleteCommunityChannelMessage(
@@ -728,37 +549,12 @@ export class PigeonApiGateway {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    const createdAt = Date.now();
-    const id = `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signaturePayload = {
-      actorIdentityId: session.identity.id,
+    await this.communities.deleteChannelMessage(
+      session,
+      communityId,
       channelId,
-      communityId,
-      createdAt,
-      id,
-      targetMessageId: messageId,
-      type: 'deleted',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
-    );
-    const body = {
-      createdAt,
-      id,
-      signature: signature.toString(),
-    };
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
       messageId,
-    )}`;
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    );
   }
 
   public async addCommunityChannelMessageReaction(
@@ -768,18 +564,13 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = this.communityChannelMessageReactionsPath(
+    await this.communities.addChannelMessageReaction(
+      session,
       communityId,
       channelId,
       messageId,
+      emoji,
     );
-    const body = { emoji };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
   }
 
   public async removeCommunityChannelMessageReaction(
@@ -789,18 +580,13 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = this.communityChannelMessageReactionsPath(
+    await this.communities.removeChannelMessageReaction(
+      session,
       communityId,
       channelId,
       messageId,
+      emoji,
     );
-    const body = { emoji };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {

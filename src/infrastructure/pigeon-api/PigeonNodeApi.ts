@@ -1,5 +1,5 @@
 import type { Peer } from '../../application/peers/ListPeers';
-import type { Session } from '../../domain/types';
+import type { IpfsReplicationStatus, Session } from '../../domain/types';
 import type { HttpJsonClient } from '../http/HttpJsonClient';
 import type { RequestSigner } from './RequestSigner';
 
@@ -54,6 +54,18 @@ export class PigeonNodeApi {
     );
 
     return result.peers;
+  }
+
+  public async getIpfsReplicationStatus(
+    session: Session,
+  ): Promise<IpfsReplicationStatus> {
+    const path = '/ipfs/replication/status';
+    const body = {};
+
+    return await this.http.request<IpfsReplicationStatus>(path, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
   }
 
   private async cachedRequest<T>(
