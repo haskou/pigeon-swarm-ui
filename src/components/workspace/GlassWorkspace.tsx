@@ -48,7 +48,6 @@ import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import {
   communityChannels,
-  communityTextChannels,
 } from '../../domain/communities/communityChannels';
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import {
@@ -115,6 +114,7 @@ import {
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { Rail } from './Rail';
+import { useCommunitySelection } from './useCommunitySelection';
 import { useSidebarGesture } from './useSidebarGesture';
 import {
   callSignalTypeAttribute,
@@ -384,26 +384,11 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
-  const activeCommunity = useMemo(
-    () =>
-      communities.find((community) => community.id === activeCommunityId) ??
-      communities[0],
-    [activeCommunityId, communities],
-  );
-  const activeCommunityTextChannels = useMemo(
-    () => (activeCommunity ? communityTextChannels(activeCommunity) : []),
-    [activeCommunity],
-  );
-  const activeCommunityChannelId = useMemo(() => {
-    if (!activeCommunity) return null;
-
-    const storedId = communityChannelById[activeCommunity.id];
-
-    return storedId &&
-      activeCommunityTextChannels.some((channel) => channel.id === storedId)
-      ? storedId
-      : (activeCommunityTextChannels[0]?.id ?? null);
-  }, [activeCommunity, activeCommunityTextChannels, communityChannelById]);
+  const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
+    activeCommunityId,
+    communities,
+    communityChannelById,
+  });
 
   useWorkspacePreferences({
     activeCommunityId: activeCommunity?.id ?? activeCommunityId,
