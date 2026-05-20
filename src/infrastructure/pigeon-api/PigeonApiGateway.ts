@@ -37,6 +37,8 @@ import type {
   LocalKeychain,
   LoginResult,
   MessageAttachment,
+  MessageLinkPreview,
+  MessageReplyPreview,
   MessageResource,
   MyStickersResource,
   NotificationResource,
@@ -49,6 +51,7 @@ import type {
   Session,
   SelectablePresenceStatus,
   StickerInput,
+  StickerMessageReference,
   StickerPackInput,
   StickerPackResource,
   StickerResource,
@@ -60,6 +63,7 @@ import { ConversationIdFactory } from '../../domain/conversations/ConversationId
 import { conversationKeyEntry } from '../../domain/conversations/conversationKey';
 import { IdentitySignaturePayloadFactory } from '../../domain/identities/IdentitySignaturePayloadFactory';
 import { KeychainCipher } from '../../domain/keychains/KeychainCipher';
+import { firstMessageLinkPreviewUrl } from '../../domain/messages/linkPreviewUrls';
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { copy } from '../../i18n/en';
@@ -102,6 +106,18 @@ type MessageDecryptWorker = {
     },
     signal?: AbortSignal,
   ): Promise<ChatMessage[]>;
+};
+
+type EncryptMessagePayloadInput = {
+  content: string;
+  conversationId: string;
+  key: ConversationKeyEntry;
+  linkPreview?: MessageLinkPreview;
+  messageAttachments: MessageAttachment[];
+  replyPreview?: MessageReplyPreview;
+  session: Session;
+  sticker?: StickerMessageReference;
+  timestamp: number;
 };
 
 function throwIfMessageLoadAborted(signal?: AbortSignal): void {
@@ -1352,6 +1368,20 @@ export class PigeonApiGateway {
     return result.results;
   }
 
+  public async createLinkPreview(
+    session: Session,
+    url: string,
+  ): Promise<MessageLinkPreview> {
+    const path = '/link-previews';
+    const body = { url };
+
+    return await this.http.request<MessageLinkPreview>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
   public async loadMessages(
     session: Session,
     conversationId: string,
@@ -1558,18 +1588,22 @@ export class PigeonApiGateway {
     const attachmentExternalIdentifiers = messageAttachments.map(
       (attachment) => attachment.cid,
     );
-    const encryptedPayload = PublicKey.fromPEM(key.publicKey).encrypt(
-      JSON.stringify({
-        attachments: messageAttachments,
-        authorIdentityId: session.identity.id,
-        content: options.sticker ? '' : content,
-        conversationId,
-        ...(replyPreview ? { reply: replyPreview } : {}),
-        ...(options.sticker ? { sticker: options.sticker } : {}),
-        timestamp,
-        type: options.sticker ? 'StickerMessageSent' : 'MessageSent',
-      }),
+    const linkPreview = await this.createLinkPreviewForMessage(
+      session,
+      content,
+      options,
     );
+    const encryptedPayload = this.encryptMessagePayload({
+      content,
+      conversationId,
+      key,
+      linkPreview,
+      messageAttachments,
+      replyPreview,
+      session,
+      sticker: options.sticker,
+      timestamp,
+    });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
     const signature = await session.encryptedKeyPair.sign(
       JSON.stringify(
@@ -1578,7 +1612,7 @@ export class PigeonApiGateway {
           authorId: session.identity.id,
           conversationId,
           createdAt: timestamp,
-          encryptedPayload: encryptedPayload.toString(),
+          encryptedPayload,
           id,
           previousMessageIds,
           replyToMessageId,
@@ -1589,7 +1623,7 @@ export class PigeonApiGateway {
     const body = {
       attachmentExternalIdentifiers,
       createdAt: timestamp,
-      encryptedPayload: encryptedPayload.toString(),
+      encryptedPayload,
       id,
       previousMessageIds,
       ...(replyToMessageId ? { replyToMessageId } : {}),
@@ -1805,6 +1839,45 @@ export class PigeonApiGateway {
     }
 
     return decrypted;
+  }
+
+  private async createLinkPreviewForContent(
+    session: Session,
+    content: string,
+  ): Promise<MessageLinkPreview | undefined> {
+    const url = firstMessageLinkPreviewUrl(content);
+
+    if (!url) return undefined;
+
+    return await this.createLinkPreview(session, url).catch(() => undefined);
+  }
+
+  private async createLinkPreviewForMessage(
+    session: Session,
+    content: string,
+    options: SendMessageOptions,
+  ): Promise<MessageLinkPreview | undefined> {
+    if (options.linkPreview || options.sticker) return options.linkPreview;
+
+    return await this.createLinkPreviewForContent(session, content);
+  }
+
+  private encryptMessagePayload(input: EncryptMessagePayloadInput): string {
+    return PublicKey.fromPEM(input.key.publicKey)
+      .encrypt(
+        JSON.stringify({
+          attachments: input.messageAttachments,
+          authorIdentityId: input.session.identity.id,
+          content: input.sticker ? '' : input.content,
+          conversationId: input.conversationId,
+          ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
+          ...(input.replyPreview ? { reply: input.replyPreview } : {}),
+          ...(input.sticker ? { sticker: input.sticker } : {}),
+          timestamp: input.timestamp,
+          type: input.sticker ? 'StickerMessageSent' : 'MessageSent',
+        }),
+      )
+      .toString();
   }
 
   private async projectMessageDirect(

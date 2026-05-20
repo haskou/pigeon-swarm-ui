@@ -236,6 +236,15 @@ export type MessageReplyPreview = {
   sticker?: StickerMessageReference;
 };
 
+export type MessageLinkPreview = {
+  url: string;
+  finalUrl: string;
+  title?: string;
+  description?: string;
+  image?: string | null;
+  siteName?: string;
+};
+
 export type PendingMessageAttachment = {
   encryptedBytes: ArrayBuffer;
   metadata: Omit<MessageAttachment, 'cid' | 'encryptedSize'>;
@@ -259,6 +268,7 @@ export type SendMessageOptions = {
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
+  linkPreview?: MessageLinkPreview;
   sticker?: StickerMessageReference;
 };
 
@@ -420,6 +430,7 @@ export type ChatMessage = {
   replyToMessageId?: string;
   raw: MessageResource;
   reactions: MessageReaction[];
+  linkPreview?: MessageLinkPreview;
   sticker?: StickerMessageReference;
 };
 

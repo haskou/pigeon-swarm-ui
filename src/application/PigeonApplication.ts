@@ -25,6 +25,7 @@ import type {
   IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
+  MessageLinkPreview,
   MessageAttachment,
   MessageResource,
   MyStickersResource,
@@ -689,6 +690,13 @@ export class PigeonApplication {
       onProgress,
       options,
     );
+  }
+
+  public async createLinkPreview(
+    session: Session,
+    url: string,
+  ): Promise<MessageLinkPreview> {
+    return await this.gateway.createLinkPreview(session, url);
   }
 
   public async createNodeNetwork(

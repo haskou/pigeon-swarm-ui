@@ -52,6 +52,7 @@ import {
   communityTextChannels,
   communityVoiceChannels,
 } from '../../domain/communities/communityChannels';
+import { firstMessageLinkPreviewUrl } from '../../domain/messages/linkPreviewUrls';
 import { updateMessageReaction } from '../../domain/messages/updateMessageReaction';
 import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
@@ -194,6 +195,19 @@ function replyPreviewFromMessage(
     messageId: message.id,
     ...(message.sticker ? { sticker: message.sticker } : {}),
   };
+}
+
+async function createLinkPreviewForContent(
+  session: Session,
+  content: string,
+) {
+  const url = firstMessageLinkPreviewUrl(content);
+
+  if (!url) return undefined;
+
+  return await pigeonApplication.createLinkPreview(session, url).catch(
+    () => undefined,
+  );
 }
 
 export function CommunityWorkspace({
@@ -1112,6 +1126,9 @@ export function CommunityWorkspace({
             },
             payload.attachmentUpload,
           );
+        const linkPreview = payload.sticker
+          ? undefined
+          : await createLinkPreviewForContent(session, payload.content);
         const encryptedPayload = await encryptCommunityChannelPayload({
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
@@ -1119,6 +1136,7 @@ export function CommunityWorkspace({
           communityId: community.id,
           communityKey: session.keychain.conversations[community.id],
           content: payload.content,
+          linkPreview,
           replyPreview: replyPreviewFromMessage(payload.replyTarget),
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,

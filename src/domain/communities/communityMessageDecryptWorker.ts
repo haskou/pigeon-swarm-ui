@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   ConversationKeyEntry,
   MessageAttachment,
+  MessageLinkPreview,
   MessageReaction,
   MessageReplyPreview,
   MessageResource,
@@ -44,6 +45,7 @@ type CommunityChannelPlainPayload = {
   attachments?: MessageAttachment[];
   authorIdentityId?: string;
   content?: string;
+  linkPreview?: MessageLinkPreview;
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
@@ -65,7 +67,7 @@ const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
 const projectedMessageCacheDatabaseName =
   'pigeon-community-message-projection-cache';
-const projectedMessageCacheDatabaseVersion = 1;
+const projectedMessageCacheDatabaseVersion = 2;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
 let projectedMessageCacheDatabasePromise: Promise<CacheDatabase> | null = null;
@@ -197,6 +199,7 @@ async function decryptMessage(
       authorIdentityId,
       content: payload.sticker ? '' : (payload.content ?? ''),
       encrypted: false,
+      linkPreview: payload.linkPreview,
       mine: authorIdentityId === request.currentIdentityId,
       raw: message,
       replyPreview: payload.reply,
@@ -490,6 +493,7 @@ function cloneChatMessage(message: ChatMessage): ChatMessage {
   return {
     ...message,
     attachments: message.attachments.map((attachment) => ({ ...attachment })),
+    linkPreview: message.linkPreview ? { ...message.linkPreview } : undefined,
     raw: {
       ...message.raw,
       reactions: message.raw.reactions?.map((reaction) => ({ ...reaction })),

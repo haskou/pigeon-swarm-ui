@@ -3,6 +3,7 @@ import { PublicKey } from '@haskou/value-objects';
 import type {
   ConversationKeyEntry,
   MessageAttachment,
+  MessageLinkPreview,
   MessageReplyPreview,
   StickerMessageReference,
 } from '../types';
@@ -13,6 +14,7 @@ export type CommunityChannelPlainPayload = {
   channelId?: string;
   communityId?: string;
   content?: string;
+  linkPreview?: MessageLinkPreview;
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
@@ -27,6 +29,7 @@ type EncryptCommunityChannelPayloadInput = {
   communityKey?: ConversationKeyEntry;
   communityId: string;
   content: string;
+  linkPreview?: MessageLinkPreview;
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
@@ -46,6 +49,7 @@ export function encryptCommunityChannelPayload(
     channelId: input.channelId,
     communityId: input.communityId,
     content: input.content,
+    ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
     ...(input.replyPreview ? { reply: input.replyPreview } : {}),
     ...(input.replyToMessageId
       ? { replyToMessageId: input.replyToMessageId }

@@ -6,6 +6,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   MessageAttachment,
+  MessageLinkPreview,
   MessageResource,
   StickerMessageReference,
 } from '../../domain/types';
@@ -108,10 +109,7 @@ export function MessageBubble({
       ),
     [indexedAttachments],
   );
-  const linkPreview = useMemo(
-    () => firstLinkPreview(message.content),
-    [message.content],
-  );
+  const linkPreview = message.linkPreview;
   const sticker = message.sticker;
   const stickerPreview = useStickerPressPreview(sticker?.assetCid ?? '');
   const reactionGroups = useMemo(
@@ -360,10 +358,10 @@ export function MessageBubble({
             {linkPreview && (
               <LinkPreviewCard
                 description={linkPreview.description}
-                displayUrl={linkPreview.displayUrl}
-                faviconUrl={linkPreview.faviconUrl}
-                hostname={linkPreview.hostname}
+                finalUrl={linkPreview.finalUrl}
+                image={linkPreview.image}
                 mine={mine}
+                siteName={linkPreview.siteName}
                 title={linkPreview.title}
                 url={linkPreview.url}
               />
@@ -538,52 +536,25 @@ function groupMessageReactions(
   });
 }
 
-type LinkPreview = {
-  description: string;
-  displayUrl: string;
-  faviconUrl: string;
-  hostname: string;
-  title: string;
-  url: string;
-};
-
-const urlPattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
-
 function LinkPreviewCard({
   description,
-  displayUrl,
-  faviconUrl,
-  hostname,
+  finalUrl,
+  image,
   mine,
+  siteName,
   title,
   url,
-}: LinkPreview & { mine: boolean }) {
-  const [metaImageUrl, setMetaImageUrl] = useState<string | null>(() =>
-    directImagePreviewUrl(url),
-  );
+}: MessageLinkPreview & { mine: boolean }) {
+  const [imageVisible, setImageVisible] = useState(Boolean(image));
+  const previewUrl = finalUrl || url;
+  const displayUrl = displayLinkPreviewUrl(previewUrl);
+  const hostname = linkPreviewHostname(previewUrl);
+  const faviconUrl = linkPreviewFaviconUrl(previewUrl);
+  const label = siteName?.trim() || hostname;
 
   useEffect(() => {
-    if (directImagePreviewUrl(url)) {
-      setMetaImageUrl(directImagePreviewUrl(url));
-
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    setMetaImageUrl(null);
-    void loadMetaImageUrl(url, controller.signal)
-      .then((imageUrl) => {
-        if (!cancelled) setMetaImageUrl(imageUrl);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [url]);
+    setImageVisible(Boolean(image));
+  }, [image]);
 
   return (
     <a
@@ -595,31 +566,37 @@ function LinkPreviewCard({
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
-      {metaImageUrl && (
+      {image && imageVisible && (
         <img
-          src={metaImageUrl}
+          src={image}
           alt=""
           className="-mx-3 -mt-3 mb-3 aspect-[1.91/1] w-[calc(100%+1.5rem)] object-cover"
-          onError={() => setMetaImageUrl(null)}
+          onError={() => setImageVisible(false)}
         />
       )}
       <span className="flex items-center gap-2 text-xs font-black uppercase text-white/45">
-        <img
-          src={faviconUrl}
-          alt=""
-          className="h-4 w-4 shrink-0 rounded-sm"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
-          }}
-        />
-        <span className="truncate">{hostname}</span>
+        {faviconUrl && (
+          <img
+            src={faviconUrl}
+            alt=""
+            className="h-4 w-4 shrink-0 rounded-sm"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
+        <span className="truncate">{label}</span>
       </span>
-      <span className="mt-1 block truncate text-sm font-black text-white">
-        {title}
-      </span>
-      <span className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
-        {description}
-      </span>
+      {title && (
+        <span className="mt-1 block truncate text-sm font-black text-white">
+          {title}
+        </span>
+      )}
+      {description && (
+        <span className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
+          {description}
+        </span>
+      )}
       <span className="mt-2 block truncate text-[0.68rem] font-bold text-white/35">
         {displayUrl}
       </span>
@@ -627,101 +604,30 @@ function LinkPreviewCard({
   );
 }
 
-function firstLinkPreview(content: string): LinkPreview | null {
-  const match = content.match(urlPattern)?.[0];
-
-  if (!match) return null;
-
-  const cleaned = cleanTrailingUrlPunctuation(match);
-  const normalized = normalizePreviewUrl(cleaned);
-
+function linkPreviewUrl(value: string): URL | null {
   try {
-    const url = new URL(normalized);
-    const path = `${url.pathname}${url.search}`.replace(/^\/$/, '');
-
-    return {
-      description: path ? `${url.hostname}${path}` : url.origin,
-      displayUrl: displayPreviewUrl(url),
-      faviconUrl: `${url.origin}/favicon.ico`,
-      hostname: url.hostname,
-      title: readableLinkTitle(url),
-      url: url.toString(),
-    };
+    return new URL(value);
   } catch {
     return null;
   }
 }
 
-function cleanTrailingUrlPunctuation(value: string): string {
-  return value.replace(/[),.;:!?]+$/g, '');
+function linkPreviewHostname(value: string): string {
+  return linkPreviewUrl(value)?.hostname ?? value;
 }
 
-function normalizePreviewUrl(value: string): string {
-  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+function linkPreviewFaviconUrl(value: string): string {
+  const url = linkPreviewUrl(value);
+
+  return url ? `${url.origin}/favicon.ico` : '';
 }
 
-function displayPreviewUrl(url: URL): string {
+function displayLinkPreviewUrl(value: string): string {
+  const url = linkPreviewUrl(value);
+
+  if (!url) return value;
+
   return `${url.hostname}${url.pathname}${url.search}`.replace(/\/$/, '');
-}
-
-function readableLinkTitle(url: URL): string {
-  const pathnameTitle = url.pathname
-    .split('/')
-    .filter(Boolean)
-    .pop()
-    ?.replace(/[-_]+/g, ' ')
-    .trim();
-
-  if (pathnameTitle) return pathnameTitle;
-
-  return url.hostname.replace(/^www\./, '');
-}
-
-function directImagePreviewUrl(value: string): string | null {
-  try {
-    const url = new URL(value);
-    const extension = url.pathname.split('.').pop()?.toLowerCase();
-
-    return extension &&
-      ['avif', 'gif', 'jpeg', 'jpg', 'png', 'webp'].includes(extension)
-      ? url.toString()
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-async function loadMetaImageUrl(
-  value: string,
-  signal: AbortSignal,
-): Promise<null | string> {
-  const response = await fetch(value, { signal });
-  const contentType = response.headers.get('content-type') ?? '';
-
-  if (!response.ok || !contentType.includes('text/html')) return null;
-
-  const html = await response.text();
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  const image =
-    metaContent(document, 'property', 'og:image:secure_url') ??
-    metaContent(document, 'property', 'og:image') ??
-    metaContent(document, 'name', 'twitter:image') ??
-    metaContent(document, 'name', 'twitter:image:src');
-
-  return image ? new URL(image, value).toString() : null;
-}
-
-function metaContent(
-  document: Document,
-  attribute: 'name' | 'property',
-  value: string,
-): null | string {
-  const content = document
-    .querySelector(`meta[${attribute}="${value}"]`)
-    ?.getAttribute('content')
-    ?.trim();
-
-  return content || null;
 }
 
 function CallEventMessage({
