@@ -1,3 +1,4 @@
+/* eslint-disable complexity */
 import { Fragment, memo, type RefObject, useMemo } from 'react';
 
 import type {
@@ -5,22 +6,25 @@ import type {
   ChatMessage,
   IdentityResource,
   MessageAttachment,
+  PollResource,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
+import type { MarkdownMention } from '../chat/MarkdownMessage';
 
 import { copy } from '../../i18n/en';
 import { formatDateSeparator } from '../../utils/formatting';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { messagePollTimelineItems } from '../chat/messagePollTimelineItems';
 import {
   endsAuthorRun,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
-  startsMessageDay,
 } from '../chat/messageTimelineHelpers';
+import { PollCard } from '../chat/PollCard';
 import { LockIcon } from '../workspace/LockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
@@ -42,6 +46,7 @@ interface CommunityMessageTimelineProps {
   onAddCommunityKey: () => void;
   onAttachmentOpen: (attachment?: MessageAttachment) => void;
   onAuthorProfileOpen: (message: ChatMessage, target: HTMLElement) => void;
+  onIdentityProfileOpen?: (identityId: string, target: HTMLElement) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onReactionToggle: (
@@ -51,9 +56,13 @@ interface CommunityMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onPollClose?: (poll: PollResource) => Promise<void>;
+  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
+  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
+  polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
   session: Session;
   visibleMessages: ChatMessage[];
@@ -72,13 +81,18 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onAddCommunityKey,
   onAttachmentOpen,
   onAuthorProfileOpen,
+  onIdentityProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
-  onStickerClick,
   onScroll,
+  onStickerClick,
+  polls = [],
   reactionAuthorNames,
   scrollerRef,
   session,
@@ -87,6 +101,10 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   const messagesById = useMemo(
     () => new Map(visibleMessages.map((message) => [message.id, message])),
     [visibleMessages],
+  );
+  const timelineItems = useMemo(
+    () => messagePollTimelineItems(visibleMessages, polls),
+    [polls, visibleMessages],
   );
 
   return (
@@ -132,13 +150,46 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             </div>
           )}
           {!missingCommunityKey &&
-            visibleMessages.map((message, index) => {
-              const previousMessage = visibleMessages[index - 1];
-              const nextMessage = visibleMessages[index + 1];
+            timelineItems.map((item, index) => {
+              if (item.type === 'poll') {
+                return (
+                  <Fragment key={item.id}>
+                    {startsTimelineDay(
+                      timelineItems[index - 1]?.timestamp,
+                      item.poll.createdAt,
+                    ) && (
+                      <DateSeparator
+                        label={formatDateSeparator(item.poll.createdAt)}
+                      />
+                    )}
+                    <div className="mt-4">
+                      <PollCard
+                        currentIdentityId={session.identity.id}
+                        onClose={onPollClose}
+                        onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
+                        onVote={onPollVote ?? noopPollVote}
+                        poll={item.poll}
+                      />
+                    </div>
+                  </Fragment>
+                );
+              }
+
+              const message = item.message;
+              const previousMessage = timelineItems
+                .slice(0, index)
+                .reverse()
+                .find((candidate) => candidate.type === 'message')?.message;
+              const nextMessage = timelineItems
+                .slice(index + 1)
+                .find((candidate) => candidate.type === 'message')?.message;
               const replyMessage = message.replyToMessageId
                 ? messagesById.get(message.replyToMessageId)
                 : undefined;
-              const startsNewDay = startsMessageDay(previousMessage, message);
+              const startsNewDay = startsTimelineDay(
+                timelineItems[index - 1]?.timestamp,
+                message.timestamp,
+              );
               const startsNewAuthorRun = startsAuthorRun(
                 previousMessage,
                 message,
@@ -146,7 +197,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
               const showAvatar = endsAuthorRun(nextMessage, message);
 
               return (
-                <Fragment key={message.id}>
+                <Fragment key={item.id}>
                   {startsNewDay && (
                     <DateSeparator
                       label={formatDateSeparator(message.timestamp)}
@@ -181,11 +232,16 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         onAuthorProfileOpen(message, event.currentTarget)
                       }
                       onMessageMenuOpen={onMessageMenuOpen}
+                      onMentionClick={onIdentityProfileOpen}
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
                       onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
+                      mentionTokens={messageMentionTokens(
+                        message,
+                        memberIdentities,
+                      )}
                       replyImage={messageReplyImage(message, replyMessage)}
                       replySticker={messageReplySticker(message, replyMessage)}
                       replyAuthorName={
@@ -212,7 +268,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                 </Fragment>
               );
             })}
-          {visibleMessages.length === 0 && messageState !== 'loading' && (
+          {timelineItems.length === 0 && messageState !== 'loading' && (
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
               {copy.communities.emptyChannel}
             </div>
@@ -236,3 +292,45 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     </div>
   );
 });
+
+function startsTimelineDay(
+  previousTimestamp: number | undefined,
+  timestamp: number,
+): boolean {
+  if (!previousTimestamp) return true;
+
+  return (
+    new Date(previousTimestamp).toDateString() !==
+    new Date(timestamp).toDateString()
+  );
+}
+
+function noopPollUpdate(): Promise<void> {
+  return Promise.resolve();
+}
+
+function noopPollVote(): Promise<void> {
+  return Promise.resolve();
+}
+
+function messageMentionTokens(
+  message: ChatMessage,
+  memberIdentities: Record<string, IdentityResource>,
+): MarkdownMention[] {
+  return (message.mentions ?? []).flatMap((mention): MarkdownMention[] => {
+    if (mention.type !== 'identity') return [];
+
+    const identity = memberIdentities[mention.targetId];
+    const tokens = new Set<string>();
+    const handle = identity?.profile.handle?.trim();
+    const name = memberPrimaryName(identity, mention.targetId);
+
+    if (handle) tokens.add(`@${handle}`);
+    tokens.add(`@${name}`);
+
+    return [...tokens].map((token) => ({
+      identityId: mention.targetId,
+      token,
+    }));
+  });
+}

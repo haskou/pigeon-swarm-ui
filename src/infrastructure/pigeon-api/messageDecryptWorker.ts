@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
@@ -9,6 +10,8 @@ import type {
   MessageResource,
   StickerMessageReference,
 } from '../../domain/types';
+
+import { pollChatMessage } from '../../domain/messages/pollMessageProjection';
 
 type MessageDecryptRequest = {
   conversationId: string;
@@ -146,6 +149,10 @@ async function projectMessage(
   message: MessageResource,
   privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
+  const pollMessage = pollChatMessage(message, request.currentIdentityId);
+
+  if (pollMessage) return pollMessage;
+
   const cacheKey = projectedMessageCacheKey(request, message);
   const cachedMessage = await cachedProjectedMessage(cacheKey);
 

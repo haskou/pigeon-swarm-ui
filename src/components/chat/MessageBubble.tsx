@@ -15,7 +15,7 @@ import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
-import { MarkdownMessage } from './MarkdownMessage';
+import { MarkdownMessage, type MarkdownMention } from './MarkdownMessage';
 import {
   AttachmentCard,
   ImageAttachmentAlbum,
@@ -44,6 +44,7 @@ interface MessageBubbleProps {
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onMentionClick?: (identityId: string, target: HTMLElement) => void;
   onReactionToggle?: (
     message: ChatMessage,
     emoji: string,
@@ -53,6 +54,7 @@ interface MessageBubbleProps {
   onRetryMessage?: (message: ChatMessage) => void;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
+  mentionTokens?: MarkdownMention[];
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -70,11 +72,13 @@ export function MessageBubble({
   onAttachmentPreview,
   onAvatarClick,
   onMessageMenuOpen,
+  onMentionClick,
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
   reactionAuthorNames = {},
+  mentionTokens = [],
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -114,6 +118,7 @@ export function MessageBubble({
   );
   const linkPreview = message.linkPreview;
   const sticker = message.sticker;
+  const stickerWithReply = Boolean(sticker && hasReply);
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -238,11 +243,21 @@ export function MessageBubble({
                 </div>
               )}
               {sticker && (
-                <MessageStickerContent
-                  mine={mine}
-                  onStickerClick={onStickerClick}
-                  sticker={sticker}
-                />
+                <div
+                  className={cx(
+                    stickerWithReply && 'flex items-end gap-2',
+                    stickerWithReply && mine && 'flex-row-reverse',
+                  )}
+                >
+                  <MessageStickerContent
+                    mine={mine}
+                    onStickerClick={onStickerClick}
+                    sticker={sticker}
+                  />
+                  {stickerWithReply && (
+                    <MessageTimestamp timestamp={message.timestamp} />
+                  )}
+                </div>
               )}
               {message.attachmentProgress && (
                 <MessageAttachmentProgress
@@ -257,7 +272,12 @@ export function MessageBubble({
                     message.encrypted && 'text-white/55',
                   )}
                 >
-                  <MarkdownMessage content={message.content} mine={mine} />
+                  <MarkdownMessage
+                    content={message.content}
+                    mentions={mentionTokens}
+                    mine={mine}
+                    onMentionClick={onMentionClick}
+                  />
                 </div>
               )}
               {linkPreview && (
@@ -276,9 +296,9 @@ export function MessageBubble({
                 onRetryMessage={onRetryMessage}
               />
             </div>
-            <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
-              {formatTime(message.timestamp)}
-            </span>
+            {!stickerWithReply && (
+              <MessageTimestamp timestamp={message.timestamp} />
+            )}
           </div>
           {reactionGroups.length > 0 && (
             <MessageReactions
@@ -299,6 +319,14 @@ export function MessageBubble({
         />
       )}
     </>
+  );
+}
+
+function MessageTimestamp({ timestamp }: { timestamp: number }) {
+  return (
+    <span className="mb-1 shrink-0 px-0.5 text-[0.68rem] font-bold leading-none text-white/30">
+      {formatTime(timestamp)}
+    </span>
   );
 }
 

@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
+  CommunityMessageMention,
   MessageLinkPreview,
   MessageAttachment,
   MessageReaction,
@@ -12,6 +14,7 @@ import type {
 } from '../types';
 
 import { conversationKeyEntry } from '../conversations/conversationKey';
+import { pollChatMessage } from './pollMessageProjection';
 
 type MessageListEnvelope = {
   cursor?: string | null;
@@ -27,6 +30,7 @@ type PlainMessage = {
   authorIdentityId?: string;
   content?: string;
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
   timestamp?: number;
@@ -78,6 +82,10 @@ export class MessageProjector {
     conversationId: string,
     message: MessageResource,
   ): Promise<ChatMessage> {
+    const pollMessage = pollChatMessage(message, session.identity.id);
+
+    if (pollMessage) return pollMessage;
+
     const base = this.baseMessage(session, message);
 
     if (message.type === 'call_event') {
@@ -208,6 +216,7 @@ export class MessageProjector {
       attachments: [],
       content: message.content ?? '',
       encrypted: false,
+      mentions: message.mentions,
       raw: message,
     };
   }
@@ -242,6 +251,7 @@ export class MessageProjector {
       content: parsed.content ?? decryptedText,
       encrypted: false,
       linkPreview: parsed.linkPreview,
+      mentions: parsed.mentions ?? message.mentions,
       mine: authorIdentityId === currentIdentityId,
       raw: message,
       replyPreview: parsed.reply,

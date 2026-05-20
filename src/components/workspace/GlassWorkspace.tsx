@@ -31,6 +31,7 @@ import type {
   ConversationResource,
   IdentityResource,
   MessageResource,
+  PollResource,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
@@ -223,6 +224,8 @@ export function GlassWorkspace({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
+    useState<RealtimeDomainEvent | null>(null);
+  const [conversationRealtimeEvent, setConversationRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
@@ -2313,6 +2316,28 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type.startsWith('polls.v1.')) {
+        const poll = recordAttribute(event, 'poll') as PollResource | undefined;
+        const scopeType = poll?.scope.type;
+        const participantIds = event.attributes.participantIds;
+        const memberIds = event.attributes.memberIds;
+
+        if (
+          scopeType === 'group_conversation' ||
+          Array.isArray(participantIds)
+        ) {
+          setConversationRealtimeEvent(event);
+
+          return;
+        }
+
+        if (scopeType === 'community_channel' || Array.isArray(memberIds)) {
+          setCommunityRealtimeEvent(event);
+
+          return;
+        }
+      }
+
       if (event.type.startsWith('identities.')) {
         if (event.aggregate_id === session.identity.id) {
           void pigeonApplication
@@ -3008,6 +3033,7 @@ export function GlassWorkspace({
                 }
                 progress={attachmentProgress}
                 realtimeStatus={realtimeStatus}
+                realtimeEvent={conversationRealtimeEvent}
                 onRealtimeEventsOpen={openRealtimeEvents}
                 replyToMessage={replyTarget}
                 onCancelReply={() => setReplyTarget(null)}

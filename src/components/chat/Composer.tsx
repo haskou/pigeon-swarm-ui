@@ -3,6 +3,7 @@ import {
   ChangeEvent,
   FormEvent,
   KeyboardEvent,
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -29,6 +30,7 @@ import {
   searchEmojiSuggestions,
 } from '../../utils/emojiShortcodes';
 import { ImageLightbox, type LightboxImage } from './ImageLightbox';
+import { ComposerMentionOverlay } from './ComposerMentionOverlay';
 import { StickerPicker } from './StickerPicker';
 import { stickerAssetUrl } from './StickerPressPreview';
 import { useDesktopInputFocus } from '../common/useDesktopInputFocus';
@@ -50,6 +52,10 @@ interface ComposerProps {
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
   focusKey?: string | null;
+  mentionHelper?: ReactNode;
+  mentionTokens?: string[];
+  onMentionAutocomplete?: () => boolean;
+  onPollCreate?: () => void;
   placeholder?: string;
   progress?: AttachmentProgress | null;
   replyTo?: ChatMessage | null;
@@ -63,11 +69,15 @@ export function Composer({
   draft,
   error,
   focusKey,
+  mentionHelper,
+  mentionTokens = [],
   onCancelReply,
   onDraftChange,
   onEscape,
   onSend,
   onStickerSend,
+  onMentionAutocomplete,
+  onPollCreate,
   placeholder = copy.composer.placeholder,
   progress,
   replyTo,
@@ -340,6 +350,12 @@ export function Composer({
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && event.shiftKey) return;
 
+    if (event.key === 'Tab' && onMentionAutocomplete?.()) {
+      event.preventDefault();
+
+      return;
+    }
+
     if (emojiPanelOpen) {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -549,6 +565,7 @@ export function Composer({
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
+          {mentionHelper}
           {emojiPanelOpen && emojiTrigger && (
             <EmojiSuggestionPanel
               onSelect={insertEmoji}
@@ -565,6 +582,33 @@ export function Composer({
               onStickerSend={onStickerSend}
               session={session}
             />
+          )}
+          {onPollCreate && (
+            <button
+              type="button"
+              onClick={onPollCreate}
+              disabled={disabled}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
+              aria-label={copy.polls.create}
+              title={copy.polls.create}
+            >
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 19V5" />
+                <path d="M8 17V9" />
+                <path d="M12 15V7" />
+                <path d="M16 13v-3" />
+                <path d="M20 19V4" />
+              </svg>
+            </button>
           )}
           <button
             type="button"
@@ -593,21 +637,32 @@ export function Composer({
             onChange={handleFilesSelected}
             className="hidden"
           />
-          <textarea
-            ref={textInputRef}
-            value={draft}
-            onChange={handleContentChange}
-            onClick={syncCaret}
-            onKeyDown={handleKeyDown}
-            onKeyUp={syncCaret}
-            onPaste={handlePaste}
-            onSelect={syncCaret}
-            disabled={disabled}
-            maxLength={MESSAGE_MAX_LENGTH}
-            rows={1}
-            className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed"
-            placeholder={placeholder}
-          />
+          <div className="relative flex min-h-10 min-w-0 flex-1 items-center">
+            <ComposerMentionOverlay
+              mentionTokens={mentionTokens}
+              value={draft}
+            />
+            <textarea
+              ref={textInputRef}
+              value={draft}
+              onChange={handleContentChange}
+              onClick={syncCaret}
+              onKeyDown={handleKeyDown}
+              onKeyUp={syncCaret}
+              onPaste={handlePaste}
+              onSelect={syncCaret}
+              disabled={disabled}
+              maxLength={MESSAGE_MAX_LENGTH}
+              rows={1}
+              className={cx(
+                'relative block min-h-0 w-full resize-none bg-transparent px-2 py-0 text-sm leading-5 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
+                mentionTokens.length > 0
+                  ? 'text-transparent caret-white'
+                  : 'text-white',
+              )}
+              placeholder={placeholder}
+            />
+          </div>
           <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
             {draft.length}/{MESSAGE_MAX_LENGTH}
           </span>

@@ -264,6 +264,7 @@ export type AttachmentUploadOptions = {
 export type SendMessageOptions = {
   attachments?: File[];
   attachmentUpload?: AttachmentUploadOptions;
+  mentions?: CommunityMessageMention[];
   onAttachmentProgress?: (progress: AttachmentProgress) => void;
   previousMessageIds?: string[];
   replyPreview?: MessageReplyPreview;
@@ -298,6 +299,7 @@ export type CommunityTextChannel = {
   name: string;
   type: 'text';
   createdAt: number;
+  permissions?: CommunityChannelPermissions;
 };
 
 export type CommunityVoiceChannel = {
@@ -306,9 +308,46 @@ export type CommunityVoiceChannel = {
   name: string;
   type: 'voice';
   createdAt: number;
+  permissions?: CommunityChannelPermissions;
 };
 
 export type CommunityChannel = CommunityTextChannel | CommunityVoiceChannel;
+
+export type CommunityPermission =
+  | 'approve_members'
+  | 'attach_files'
+  | 'ban_members'
+  | 'connect_voice'
+  | 'create_invites'
+  | 'create_polls'
+  | 'embed_links'
+  | 'manage_channels'
+  | 'manage_members'
+  | 'manage_messages'
+  | 'manage_roles'
+  | 'mention_everyone'
+  | 'mention_here'
+  | 'mention_roles'
+  | 'reject_members'
+  | 'send_messages'
+  | 'send_stickers'
+  | 'view_channels';
+
+export type CommunityRoleResource = {
+  builtIn?: boolean;
+  id: string;
+  name: string;
+  permissions: CommunityPermission[];
+};
+
+export type CommunityMemberRolesResource = {
+  identityId: string;
+  roleIds: string[];
+};
+
+export type CommunityChannelPermissions = {
+  visibleRoleIds: string[];
+};
 
 export type Community = {
   id: string;
@@ -318,12 +357,122 @@ export type Community = {
   description: string;
   avatar?: string | null;
   banner?: string | null;
+  bannedMemberIds?: string[];
   memberIds: string[];
+  memberRoles?: CommunityMemberRolesResource[];
+  roles?: CommunityRoleResource[];
   textChannels: CommunityTextChannel[];
   visibility: 'private';
   voiceChannels?: CommunityVoiceChannel[];
   createdAt: number;
 };
+
+export type CommunityModerationAction =
+  | 'channel_created'
+  | 'channel_deleted'
+  | 'channel_permissions_updated'
+  | 'channel_renamed'
+  | 'community_updated'
+  | 'invitation_created'
+  | 'invite_link_created'
+  | 'member_banned'
+  | 'member_roles_updated'
+  | 'member_unbanned'
+  | 'membership_request_accepted'
+  | 'membership_request_declined'
+  | 'message_deleted'
+  | 'role_created'
+  | 'role_deleted'
+  | 'role_updated';
+
+export type CommunityModerationTargetType =
+  | 'channel'
+  | 'community'
+  | 'invite'
+  | 'member'
+  | 'membership_request'
+  | 'message'
+  | 'role';
+
+export type CommunityModerationLog = {
+  action: CommunityModerationAction;
+  actorIdentityId: string;
+  communityId: string;
+  createdAt: number;
+  details?: Record<string, unknown>;
+  id: string;
+  target: {
+    id: string;
+    type: CommunityModerationTargetType;
+  };
+};
+
+export type CommunityModerationLogPage = {
+  logs: CommunityModerationLog[];
+  nextBeforeLogId?: string;
+};
+
+export type CommunityMessageMention =
+  | { type: 'everyone' }
+  | { type: 'here' }
+  | { targetId: string; type: 'identity' }
+  | { targetId: string; type: 'role' };
+
+export type PollScope =
+  | {
+      channelId: string;
+      communityId: string;
+      networkId: string;
+      type: 'community_channel';
+    }
+  | {
+      conversationId: string;
+      networkId: string;
+      type: 'group_conversation';
+    };
+
+export type PollOption = {
+  id: string;
+  text: string;
+};
+
+export type PollVote = {
+  createdAt: number;
+  optionIds: string[];
+  voterIdentityId: string;
+};
+
+export type PollResource = {
+  allowsMultipleVotes: boolean;
+  createdAt: number;
+  creatorIdentityId: string;
+  expiresAt?: number | null;
+  id: string;
+  options: PollOption[];
+  question: string;
+  scope: PollScope;
+  status: 'closed' | 'open';
+  votes: PollVote[];
+};
+
+export type CreatePollInput =
+  | {
+      allowsMultipleVotes: boolean;
+      channelId: string;
+      communityId: string;
+      expiresAt?: null | number;
+      options: PollOption[];
+      question: string;
+      scopeType: 'community_channel';
+    }
+  | {
+      allowsMultipleVotes: boolean;
+      conversationId: string;
+      expiresAt?: null | number;
+      options: PollOption[];
+      question: string;
+      scopeType: 'group_conversation';
+    };
 
 export type CommunityMembershipRequestStatus =
   | 'accepted'
@@ -389,7 +538,17 @@ export type MessageResource = {
   callId?: string;
   actorIdentityId?: string;
   durationMs?: number;
+  mentions?: CommunityMessageMention[];
+  poll?: PollResource;
   previousMessageIds?: string[];
+  question?: string;
+  options?: PollOption[];
+  allowsMultipleVotes?: boolean;
+  status?: 'closed' | 'open';
+  votes?: PollVote[];
+  scope?: PollScope;
+  creatorIdentityId?: string;
+  expiresAt?: number;
   reactions?: MessageReaction[];
   replyToMessageId?: string;
   targetMessageId?: string;
@@ -421,7 +580,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
-  kind?: 'call-event' | 'message';
+  kind?: 'call-event' | 'message' | 'poll';
   deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;
@@ -431,6 +590,8 @@ export type ChatMessage = {
   raw: MessageResource;
   reactions: MessageReaction[];
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
+  poll?: PollResource;
   sticker?: StickerMessageReference;
 };
 

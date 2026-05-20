@@ -1,50 +1,67 @@
-# Naming conventions and ubiquitous language
+# Naming and ubiquitous language
 
-These conventions are part of the DDD boundary rules, not optional formatting.
+These conventions are mandatory unless the project has a documented language-specific exception.
 
-## Required naming conventions
+## Names
 
-- Files: `lowerCamelCase`, for example `order.ts`, `orderRepository.ts`, `placeOrder.ts`, `orderController.ts`.
-- Folders: `kebab-case`, for example `value-objects`, `use-cases`, `domain-services`, `browser-storage`.
-- Classes and types: `PascalCase`, for example `Order`, `Money`, `PlaceOrder`, `OrderRepository`.
-- Variables and function names: `lowerCamelCase`, for example `orderTotal`, `placeOrder`, `currentUser`.
-- Constants: `SCREAMING_SNAKE_CASE` only when the value is a true constant, for example `MAX_ORDER_ITEMS`.
+- Files: `lowerCamelCase`.
+- Folders: `kebab-case`.
+- Classes and types: `PascalCase`.
+- Variables, functions, methods, and properties: `lowerCamelCase`.
+- Constants: `SCREAMING_SNAKE_CASE` only when they are true constants. Local immutable values and ordinary configuration fields should still use `lowerCamelCase`.
 
-Do not use `PascalCase` filenames even when the file exports a `PascalCase` class or type. A file exporting `Order` should be named `order.ts`; a file exporting `PlaceOrder` should be named `placeOrder.ts`.
+Examples:
 
-## Ubiquitous language is the primary rule
-
-Prefer the project and business vocabulary over generic programming vocabulary. Module names, aggregate names, value objects, commands, queries, use cases, events, DTOs, repository ports, adapters, and presentation names should express the language used by the product and domain.
-
-Good names come from routes, API paths, UI labels, database concepts, test descriptions, event names, workflow names, and repeated business terms in the code.
-
-Avoid generic names when a business term exists:
-
-```text
-Bad: src/modules/data/
-Good: src/modules/billing/
-
-Bad: genericService.ts
-Good: calculateSubscriptionRenewal.ts
-
-Bad: item.ts when the business calls it line item
-Good: lineItem.ts
-
-Bad: process.ts
-Good: capturePayment.ts
+```txt
+src/modules/order/domain/aggregates/order/order.ts
+src/modules/order/domain/aggregates/order/order.types.ts
+src/modules/order/domain/value-objects/money.ts
+src/modules/order/application/use-cases/placeOrder.ts
+src/modules/order/infrastructure/postgres/postgresOrderRepository.ts
+src/modules/order/presentation/controllers/orderController.ts
 ```
 
-When names conflict, keep a visible glossary and use the term with the strongest public/domain evidence. Do not rename concepts casually. If a rename affects public API, persistence, user-facing copy, or external contracts, report it separately before making the change.
+Inside those files:
 
-## Deterministic naming decisions
+```ts
+export class Order {}
+export type OrderSnapshot = {}
+export interface OrderRepository {}
+export class PlaceOrder {}
+export class PostgresOrderRepository implements OrderRepository {}
+```
 
-Resolve naming conflicts in this order:
+## Ubiquitous language
 
-1. Public product language and user-facing UI labels.
-2. API route, GraphQL, command, or event language.
-3. Domain test descriptions and business rules.
-4. Existing module, package, or folder names.
-5. Database table/model names.
-6. Internal implementation names.
+Ubiquitous language is more important than cosmetic naming. Names must come from the business domain, not from technical implementation or arbitrary CRUD naming.
 
-If evidence is weak, keep the current name and mark the alternative as a candidate instead of renaming it.
+Prefer:
+
+```txt
+order
+subscription
+invoice
+payment-method
+folder
+thumbnail
+backup
+```
+
+Avoid generic module names unless the product domain actually uses those words:
+
+```txt
+models
+services
+helpers
+utils
+managers
+data
+common
+misc
+stuff
+handlers
+```
+
+If the code uses different names for the same concept, identify the conflict and choose one canonical term. Preserve the chosen term across modules, file names, class names, method names, DTO names, ports, adapters, tests, and user-facing route/controller names where applicable.
+
+Do not rename blindly. When a term is ambiguous, explain the ambiguity and propose the safest canonical term before changing code.

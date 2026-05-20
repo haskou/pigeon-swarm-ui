@@ -1,7 +1,7 @@
 import type { FormEvent, MouseEvent } from 'react';
 
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
 import type { CallParticipant } from '../../domain/calls/CallSession';
@@ -13,9 +13,11 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  PollResource,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
+import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { copy } from '../../i18n/en';
@@ -26,6 +28,7 @@ import {
   type IdentityPictures,
 } from '../../utils/identityDisplay';
 import { Composer } from '../chat/Composer';
+import { CreatePollDialog } from '../chat/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../chat/StickerPackPreviewDialog';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
 import { memberPrimaryName } from '../community/communityMemberNames';
@@ -105,6 +108,7 @@ interface ChatColumnProps {
     title: string;
   }) => void;
   onTypingActive?: (active: boolean) => void;
+  realtimeEvent?: RealtimeDomainEvent | null;
   typingIdentityIds?: string[];
 }
 
@@ -151,6 +155,7 @@ export function ChatColumn({
   peerIdentityId,
   peerPicture,
   progress,
+  realtimeEvent,
   realtimeStatus = 'connected',
   replyToMessage,
   scrollerRef,
@@ -176,6 +181,8 @@ export function ChatColumn({
   const [groupInviteInput, setGroupInviteInput] = useState('');
   const [groupInviteError, setGroupInviteError] = useState<string | null>(null);
   const [groupInviteLoading, setGroupInviteLoading] = useState(false);
+  const [polls, setPolls] = useState<PollResource[]>([]);
+  const [pollDialogOpen, setPollDialogOpen] = useState(false);
   const reactionAuthorNames = useMemo(
     () => ({
       ...identityNames,
@@ -212,6 +219,66 @@ export function ChatColumn({
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
   };
+  const upsertPoll = useCallback((poll: PollResource) => {
+    setPolls((current) =>
+      [...current.filter((item) => item.id !== poll.id), poll].sort(
+        (left, right) => left.createdAt - right.createdAt,
+      ),
+    );
+  }, []);
+  const handleCreatePoll = async (input: {
+    allowsMultipleVotes: boolean;
+    options: { id: string; text: string }[];
+    question: string;
+  }) => {
+    if (!activeConversation) return;
+
+    const poll = await pigeonApplication.createPoll(session, {
+      allowsMultipleVotes: input.allowsMultipleVotes,
+      conversationId: activeConversation.id,
+      options: input.options,
+      question: input.question,
+      scopeType: 'group_conversation',
+    });
+
+    upsertPoll(poll);
+  };
+  const votePoll = async (poll: PollResource, optionIds: string[]) => {
+    upsertPoll(await pigeonApplication.votePoll(session, poll.id, optionIds));
+  };
+  const removePollVote = async (poll: PollResource) => {
+    upsertPoll(await pigeonApplication.removePollVote(session, poll.id));
+  };
+  const closePoll = async (poll: PollResource) => {
+    upsertPoll(await pigeonApplication.closePoll(session, poll.id));
+  };
+
+  useEffect(() => {
+    if (!realtimeEvent?.type.startsWith('polls.v1.')) return;
+
+    const poll = realtimeEvent.attributes.poll as PollResource | undefined;
+    const pollId =
+      typeof realtimeEvent.attributes.pollId === 'string'
+        ? realtimeEvent.attributes.pollId
+        : undefined;
+
+    if (poll?.scope.type === 'group_conversation') {
+      upsertPoll(poll);
+
+      return;
+    }
+
+    if (!pollId) return;
+
+    void pigeonApplication
+      .getPoll(session, pollId)
+      .then((loadedPoll) => {
+        if (loadedPoll.scope.type === 'group_conversation') {
+          upsertPoll(loadedPoll);
+        }
+      })
+      .catch(() => undefined);
+  }, [realtimeEvent, session, upsertPoll]);
 
   useEffect(
     () => () => {
@@ -224,6 +291,21 @@ export function ChatColumn({
     (activeConversation.type === 'group' ||
       activeConversation.id.startsWith('group:'))
   );
+  const activeConversationPolls = useMemo(
+    () =>
+      activeConversation
+        ? polls.filter(
+            (poll) =>
+              poll.scope.type === 'group_conversation' &&
+              poll.scope.conversationId === activeConversation.id,
+          )
+        : [],
+    [activeConversation, polls],
+  );
+  const canCreatePoll =
+    isGroupConversation &&
+    !!activeConversation &&
+    conversationParticipantIds(activeConversation).includes(session.identity.id);
   const activeConversationName = isGroupConversation
     ? (activeConversation?.name ?? activeConversation?.title)
     : peerIdentityId
@@ -552,8 +634,12 @@ export function ChatColumn({
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
+            onPollClose={closePoll}
+            onPollRemoveVote={removePollVote}
+            onPollVote={votePoll}
             onStickerClick={handleStickerClick}
             onScroll={onScroll}
+            polls={activeConversationPolls}
             reactionAuthorNames={reactionAuthorNames}
             scrollerRef={scrollerRef}
           />
@@ -573,6 +659,9 @@ export function ChatColumn({
             onEscape={onEscape}
             onSend={handleSend}
             onStickerSend={onStickerSend}
+            onPollCreate={
+              canCreatePoll ? () => setPollDialogOpen(true) : undefined
+            }
             onCancelReply={onCancelReply}
             progress={downloadProgress ?? progress}
             placeholder={
@@ -597,6 +686,12 @@ export function ChatColumn({
               onStickerSend={onStickerSend}
               session={session}
               sticker={stickerPackPreview}
+            />
+          )}
+          {pollDialogOpen && (
+            <CreatePollDialog
+              onClose={() => setPollDialogOpen(false)}
+              onSubmit={handleCreatePoll}
             />
           )}
         </>

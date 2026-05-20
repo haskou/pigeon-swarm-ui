@@ -1,75 +1,17 @@
-# Layer-specific DDD rubrics
+# Layer analyst rubrics
 
-## Domain rubric
+## Domain analyst
 
-Domain code is pure business meaning. It must not depend on UI frameworks, HTTP frameworks, ORMs, database clients, browser APIs, external SDKs, queues, caches, or transport formatting.
+Look for aggregate roots, aggregates, entities, value objects, domain services, domain events, repository ports, invariants, policies, and ubiquitous language. Reject framework, persistence, and UI concerns in domain code.
 
-Expected strict folders:
+## Application analyst
 
-```text
-domain/entities/
-domain/value-objects/
-domain/aggregates/
-domain/domain-services/
-domain/events/
-domain/repositories/
-```
+Look for use cases, commands, queries, DTOs, application services, orchestration policies, transactions, authorization boundaries, and application ports. Prefer class-based use cases with constructor-injected ports.
 
-Repository files in domain should be ports/interfaces. Concrete implementations belong in infrastructure.
+## Infrastructure analyst
 
-## Application rubric
+Look for concrete adapters: database repositories, Prisma/Postgres/Redis/email/http implementations, SDK clients, mappers, local storage, filesystem access, browser APIs, platform APIs, and composition roots.
 
-Application code coordinates use cases. It depends on domain and ports. It does not own UI rendering, HTTP response formatting, ORM queries, SQL, fetch calls, or SDK calls.
+## Presentation analyst
 
-Expected strict folders:
-
-```text
-application/commands/
-application/queries/
-application/use-cases/
-application/dto/
-```
-
-Commands mutate state. Queries read state. Use cases orchestrate behavior. DTOs cross boundaries.
-
-## Infrastructure rubric
-
-Infrastructure code implements ports and talks to external systems. It may depend inward on domain/application abstractions. It must not define core business invariants.
-
-Expected strict folders include only what the module actually uses:
-
-```text
-infrastructure/prisma/
-infrastructure/postgres/
-infrastructure/redis/
-infrastructure/email/
-infrastructure/http/
-```
-
-Other valid adapter folders include `queue`, `storage`, `payments`, `auth`, `analytics`, `browser-storage`, and `mappers` when the project needs them.
-
-## Presentation rubric
-
-Presentation adapts delivery mechanisms to application use cases.
-
-Backend examples:
-
-```text
-presentation/controllers/
-presentation/routes/
-presentation/graphql/
-presentation/rest/
-```
-
-Frontend examples:
-
-```text
-presentation/pages/
-presentation/components/
-presentation/hooks/
-presentation/stores/
-presentation/forms/
-presentation/view-models/
-```
-
-Presentation may validate transport-level shape and format responses. It should not own business invariants or direct persistence behavior.
+Look for controllers, routes, REST, GraphQL, pages, forms, components, hooks, stores, server actions, loaders, request/response mapping, view models, and delivery-specific validation.

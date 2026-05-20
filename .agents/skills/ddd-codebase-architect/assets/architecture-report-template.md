@@ -1,64 +1,27 @@
-# DDD Architecture Analysis
+# DDD architecture report
 
-## Project classification
+## Executive summary
+
+## Frozen module inventory
 
 ## Ubiquitous language glossary
 
-| Context | Accepted term | Evidence | Rejected/alternate terms | Reason |
-| --- | --- | --- | --- | --- |
+## Naming conflicts
 
-## Main agent module inventory
+## Domain analysis
 
-| Module | Responsibility | Evidence | Confidence |
-| --- | --- | --- | --- |
+## Application analysis
 
-## Subagent findings summary
+## Infrastructure analysis
 
-| Subagent | Scope | Key findings | Conflicts or gaps |
-| --- | --- | --- | --- |
+## Presentation analysis
 
-## Tactical DDD map
+## Large-file decomposition plan
 
-### <module>
+## SRP and OO/SOLID refactoring plan
 
-#### Domain
-- Aggregate roots:
-- Aggregates:
-- Entities:
-- Value objects:
-- Domain services:
-- Domain events:
-- Repository ports:
-- Invariants:
-- Misplaced domain logic:
+## Dependency injection violations
 
-#### Application
-- Commands:
-- Queries:
-- Use cases:
-- DTOs:
-- Application ports:
-- Misplaced application logic:
+## Proposed strict DDD tree
 
-#### Infrastructure
-- Repository implementations:
-- External adapters:
-- Mappers/serializers:
-- Infrastructure risks:
-
-#### Presentation
-- Delivery files:
-- Request/response/view models:
-- Presentation risks:
-
-## Proposed strict structure
-
-```text
-src/modules/...
-```
-
-## Misplaced responsibilities and dependency risks
-
-## Migration readiness
-
-## Recommended next step
+## Recommended next action

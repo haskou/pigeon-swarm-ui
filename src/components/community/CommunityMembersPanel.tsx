@@ -16,6 +16,7 @@ export type CommunityMemberListItem = {
 };
 
 export function CommunityMembersPanel({
+  canInvite,
   community,
   members,
   onAddMember,
@@ -24,6 +25,7 @@ export function CommunityMembersPanel({
   openMobile,
   presenceByIdentityId,
 }: {
+  canInvite: boolean;
   community: Community;
   members: CommunityMemberListItem[];
   onAddMember: () => void;
@@ -38,6 +40,7 @@ export function CommunityMembersPanel({
   return (
     <>
       <MembersAside
+        canInvite={canInvite}
         community={community}
         members={members}
         onAddMember={onAddMember}
@@ -53,6 +56,7 @@ export function CommunityMembersPanel({
             aria-label={copy.dialog.close}
           />
           <MembersAside
+            canInvite={canInvite}
             community={community}
             members={members}
             onAddMember={onAddMember}
@@ -67,6 +71,7 @@ export function CommunityMembersPanel({
 }
 
 function MembersAside({
+  canInvite,
   community,
   members,
   onAddMember,
@@ -74,6 +79,7 @@ function MembersAside({
   presenceByIdentityId,
   variant,
 }: {
+  canInvite: boolean;
   community: Community;
   members: CommunityMemberListItem[];
   onAddMember: () => void;
@@ -91,13 +97,15 @@ function MembersAside({
 
   return (
     <aside className={className}>
-      <button
-        type="button"
-        onClick={onAddMember}
-        className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-      >
-        {copy.communities.addMember}
-      </button>
+      {canInvite && (
+        <button
+          type="button"
+          onClick={onAddMember}
+          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+        >
+          {copy.communities.addMember}
+        </button>
+      )}
       <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.members}
       </div>

@@ -1,177 +1,57 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "DDD Subagent Output Schema",
+  "title": "DDD Subagent Output",
   "type": "object",
   "required": [
-    "agent_role",
-    "analyzed_modules",
-    "new_module_candidates",
-    "global_risks"
+    "agent",
+    "modules",
+    "issues",
+    "confidence"
   ],
   "properties": {
-    "agent_role": {
+    "agent": {
+      "type": "string"
+    },
+    "confidence": {
       "enum": [
-        "domain",
-        "application",
-        "infrastructure",
-        "presentation"
+        "high",
+        "medium",
+        "low",
+        "uncertain"
       ]
     },
-    "analyzed_modules": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "module",
-          "confidence",
-          "summary",
-          "ubiquitous_language_terms",
-          "elements",
-          "misplaced_responsibilities",
-          "open_questions"
-        ],
-        "properties": {
-          "module": {
-            "type": "string"
-          },
-          "confidence": {
-            "enum": [
-              "high",
-              "medium",
-              "low"
-            ]
-          },
-          "summary": {
-            "type": "string"
-          },
-          "elements": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "kind",
-                "name",
-                "target_path",
-                "current_paths",
-                "evidence",
-                "confidence"
-              ],
-              "properties": {
-                "kind": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "target_path": {
-                  "type": "string"
-                },
-                "current_paths": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "evidence": {
-                  "type": "string"
-                },
-                "confidence": {
-                  "enum": [
-                    "high",
-                    "medium",
-                    "low"
-                  ]
-                }
-              }
-            }
-          },
-          "misplaced_responsibilities": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "current_path",
-                "issue",
-                "recommended_layer",
-                "confidence"
-              ],
-              "properties": {
-                "current_path": {
-                  "type": "string"
-                },
-                "issue": {
-                  "type": "string"
-                },
-                "recommended_layer": {
-                  "enum": [
-                    "domain",
-                    "application",
-                    "infrastructure",
-                    "presentation"
-                  ]
-                },
-                "confidence": {
-                  "enum": [
-                    "high",
-                    "medium",
-                    "low"
-                  ]
-                }
-              }
-            }
-          },
-          "open_questions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "ubiquitous_language_terms": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    "new_module_candidates": {
+    "modules": {
       "type": "array",
       "items": {
         "type": "object",
         "required": [
           "name",
-          "evidence",
-          "reason",
-          "confidence"
+          "files",
+          "elements"
         ],
         "properties": {
           "name": {
             "type": "string"
           },
-          "evidence": {
+          "files": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "reason": {
-            "type": "string"
-          },
-          "confidence": {
-            "enum": [
-              "high",
-              "medium",
-              "low"
-            ]
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         }
       }
     },
-    "global_risks": {
+    "issues": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "object"
       }
     }
   }

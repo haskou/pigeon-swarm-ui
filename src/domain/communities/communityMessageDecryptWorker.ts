@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
   ConversationKeyEntry,
+  CommunityMessageMention,
   MessageAttachment,
   MessageLinkPreview,
   MessageReaction,
@@ -10,6 +12,8 @@ import type {
   MessageResource,
   StickerMessageReference,
 } from '../types';
+
+import { pollChatMessage } from '../messages/pollMessageProjection';
 
 type CommunityMessageDecryptRequest = {
   communityId: string;
@@ -46,6 +50,7 @@ type CommunityChannelPlainPayload = {
   authorIdentityId?: string;
   content?: string;
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
@@ -67,7 +72,7 @@ const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
 const projectedMessageCacheDatabaseName =
   'pigeon-community-message-projection-cache';
-const projectedMessageCacheDatabaseVersion = 2;
+const projectedMessageCacheDatabaseVersion = 3;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;
 let projectedMessageCacheDatabasePromise: Promise<CacheDatabase> | null = null;
@@ -79,43 +84,6 @@ function isCancelRequest(
 ): request is CommunityMessageDecryptCancelRequest {
   return 'type' in request && request.type === 'cancel';
 }
-
-self.onmessage = async (
-  event: MessageEvent<
-    CommunityMessageDecryptCancelRequest | CommunityMessageDecryptRequest
-  >,
-) => {
-  const request = event.data;
-
-  if (isCancelRequest(request)) {
-    cancelledRequestIds.add(request.requestId);
-
-    return;
-  }
-
-  try {
-    const messages = await projectMessages(request);
-
-    if (cancelledRequestIds.delete(request.requestId)) return;
-
-    postResponse({
-      messages,
-      requestId: request.requestId,
-      type: 'success',
-    });
-  } catch (caught) {
-    if (cancelledRequestIds.delete(request.requestId)) return;
-
-    postResponse({
-      message:
-        caught instanceof Error
-          ? caught.message
-          : 'Community message decrypt failed',
-      requestId: request.requestId,
-      type: 'error',
-    });
-  }
-};
 
 async function projectMessages(
   request: CommunityMessageDecryptRequest,
@@ -150,6 +118,10 @@ async function projectMessage(
   request: CommunityMessageDecryptRequest,
   message: MessageResource,
 ): Promise<ChatMessage> {
+  const pollMessage = pollChatMessage(message, request.currentIdentityId);
+
+  if (pollMessage) return pollMessage;
+
   const cacheKey = projectedMessageCacheKey(request, message);
   const cachedMessage = await cachedProjectedMessage(cacheKey);
 
@@ -200,6 +172,7 @@ async function decryptMessage(
       content: payload.sticker ? '' : (payload.content ?? ''),
       encrypted: false,
       linkPreview: payload.linkPreview,
+      mentions: payload.mentions ?? message.mentions,
       mine: authorIdentityId === request.currentIdentityId,
       raw: message,
       replyPreview: payload.reply,
@@ -517,3 +490,40 @@ function cloneChatMessage(message: ChatMessage): ChatMessage {
 function postResponse(response: CommunityMessageDecryptResponse): void {
   self.postMessage(response);
 }
+
+self.onmessage = async (
+  event: MessageEvent<
+    CommunityMessageDecryptCancelRequest | CommunityMessageDecryptRequest
+  >,
+) => {
+  const request = event.data;
+
+  if (isCancelRequest(request)) {
+    cancelledRequestIds.add(request.requestId);
+
+    return;
+  }
+
+  try {
+    const messages = await projectMessages(request);
+
+    if (cancelledRequestIds.delete(request.requestId)) return;
+
+    postResponse({
+      messages,
+      requestId: request.requestId,
+      type: 'success',
+    });
+  } catch (caught) {
+    if (cancelledRequestIds.delete(request.requestId)) return;
+
+    postResponse({
+      message:
+        caught instanceof Error
+          ? caught.message
+          : 'Community message decrypt failed',
+      requestId: request.requestId,
+      type: 'error',
+    });
+  }
+};

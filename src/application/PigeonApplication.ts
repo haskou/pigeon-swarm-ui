@@ -14,12 +14,17 @@ import type {
   CommunityChannel,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
+  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
+  CommunityModerationLogPage,
+  CommunityPermission,
+  CommunityRoleResource,
   CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
+  CreatePollInput,
   IdentityResource,
   IdentityPresence,
   IpfsReplicationStatus,
@@ -30,6 +35,7 @@ import type {
   MessageResource,
   MyStickersResource,
   NotificationResource,
+  PollResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
@@ -76,6 +82,29 @@ import {
   UpdateNotification,
 } from './notifications';
 import { ListPeers, type Peer } from './peers/ListPeers';
+
+function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: { auth: string; p256dh: string };
+} {
+  if (
+    !subscription.endpoint ||
+    !subscription.keys?.auth ||
+    !subscription.keys.p256dh
+  ) {
+    throw new Error('Invalid push subscription.');
+  }
+
+  return {
+    endpoint: subscription.endpoint,
+    expirationTime: subscription.expirationTime,
+    keys: {
+      auth: subscription.keys.auth,
+      p256dh: subscription.keys.p256dh,
+    },
+  };
+}
 
 export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
@@ -348,6 +377,18 @@ export class PigeonApplication {
     return await this.gateway.getCommunity(session, communityId);
   }
 
+  public async listCommunityModerationLogs(
+    session: Session,
+    communityId: string,
+    input?: { beforeLogId?: string; limit?: number },
+  ): Promise<CommunityModerationLogPage> {
+    return await this.gateway.listCommunityModerationLogs(
+      session,
+      communityId,
+      input,
+    );
+  }
+
   public async discoverCommunities(
     session: Session,
     input: { networkId?: string; query?: string },
@@ -465,6 +506,42 @@ export class PigeonApplication {
     );
   }
 
+  public async banCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.banCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
+  public async unbanCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.unbanCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
+  public async kickCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.kickCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
@@ -571,6 +648,57 @@ export class PigeonApplication {
     return await this.gateway.listCommunityMembers(session, communityId);
   }
 
+  public async listCommunityRoles(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityRoleResource[]> {
+    return await this.gateway.listCommunityRoles(session, communityId);
+  }
+
+  public async createCommunityRole(
+    session: Session,
+    communityId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    return await this.gateway.createCommunityRole(session, communityId, input);
+  }
+
+  public async updateCommunityRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+    input: { name: string; permissions: CommunityPermission[] },
+  ): Promise<CommunityRoleResource> {
+    return await this.gateway.updateCommunityRole(
+      session,
+      communityId,
+      roleId,
+      input,
+    );
+  }
+
+  public async deleteCommunityRole(
+    session: Session,
+    communityId: string,
+    roleId: string,
+  ): Promise<void> {
+    await this.gateway.deleteCommunityRole(session, communityId, roleId);
+  }
+
+  public async assignCommunityMemberRoles(
+    session: Session,
+    communityId: string,
+    identityId: string,
+    roleIds: string[],
+  ): Promise<Community> {
+    return await this.gateway.assignCommunityMemberRoles(
+      session,
+      communityId,
+      identityId,
+      roleIds,
+    );
+  }
+
   public async createCommunityTextChannel(
     session: Session,
     communityId: string,
@@ -628,6 +756,20 @@ export class PigeonApplication {
     );
   }
 
+  public async updateCommunityChannelPermissions(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    visibleRoleIds: string[],
+  ): Promise<CommunityChannel> {
+    return await this.gateway.updateCommunityChannelPermissions(
+      session,
+      communityId,
+      channelId,
+      visibleRoleIds,
+    );
+  }
+
   public async createCommunityChannelMessage(
     session: Session,
     communityId: string,
@@ -636,6 +778,7 @@ export class PigeonApplication {
       attachmentExternalIdentifiers?: string[];
       encryptedPayload: string;
       id?: string;
+      mentions?: CommunityMessageMention[];
       timestamp?: number;
     },
   ): Promise<MessageResource> {
@@ -697,6 +840,42 @@ export class PigeonApplication {
     url: string,
   ): Promise<MessageLinkPreview> {
     return await this.gateway.createLinkPreview(session, url);
+  }
+
+  public async createPoll(
+    session: Session,
+    input: CreatePollInput,
+  ): Promise<PollResource> {
+    return await this.gateway.createPoll(session, input);
+  }
+
+  public async getPoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.getPoll(session, pollId);
+  }
+
+  public async votePoll(
+    session: Session,
+    pollId: string,
+    optionIds: string[],
+  ): Promise<PollResource> {
+    return await this.gateway.votePoll(session, pollId, optionIds);
+  }
+
+  public async removePollVote(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.removePollVote(session, pollId);
+  }
+
+  public async closePoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.closePoll(session, pollId);
   }
 
   public async createNodeNetwork(
@@ -1113,27 +1292,4 @@ export class PigeonApplication {
 
     return { textChannels, voiceChannels };
   }
-}
-
-function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: { auth: string; p256dh: string };
-} {
-  if (
-    !subscription.endpoint ||
-    !subscription.keys?.auth ||
-    !subscription.keys.p256dh
-  ) {
-    throw new Error('Invalid push subscription.');
-  }
-
-  return {
-    endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime,
-    keys: {
-      auth: subscription.keys.auth,
-      p256dh: subscription.keys.p256dh,
-    },
-  };
 }
