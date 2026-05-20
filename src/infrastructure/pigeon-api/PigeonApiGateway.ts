@@ -74,6 +74,7 @@ import { HttpJsonError } from '../http/HttpJsonError';
 import { ConversationMapper } from './ConversationMapper';
 import { PigeonCallsApi } from './PigeonCallsApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
+import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
 import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
@@ -160,6 +161,8 @@ export class PigeonApiGateway {
 
   private readonly keychains: KeychainCipher;
 
+  private readonly linkPreviews: PigeonLinkPreviewsApi;
+
   private readonly messages: MessageProjector;
 
   private messageDecryptWorker: MessageDecryptWorker | null = null;
@@ -196,6 +199,7 @@ export class PigeonApiGateway {
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.keychains = keychains;
+    this.linkPreviews = new PigeonLinkPreviewsApi(http, signer);
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.node = new PigeonNodeApi(http, signer);
@@ -1372,14 +1376,7 @@ export class PigeonApiGateway {
     session: Session,
     url: string,
   ): Promise<MessageLinkPreview> {
-    const path = '/link-previews';
-    const body = { url };
-
-    return await this.http.request<MessageLinkPreview>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.linkPreviews.create(session, url);
   }
 
   public async loadMessages(

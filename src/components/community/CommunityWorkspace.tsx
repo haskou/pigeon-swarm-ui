@@ -58,7 +58,6 @@ import { copy } from '../../i18n/en';
 import { isBrowserPreviewImage } from '../../utils/browserPreview';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
-import { identityName } from '../../utils/identityDisplay';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { HeadphonesIcon, MicrophoneIcon } from '../calls/CallIcons';
@@ -74,13 +73,14 @@ import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { VoiceIcon } from './communityDialogPrimitives';
 import { CommunityHeader } from './CommunityHeader';
-import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import { loadPublicImage } from './communityImages';
 import {
   CommunityMembersPanel,
   type CommunityMemberListItem,
 } from './CommunityMembersPanel';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import { useCommunityMembers } from './useCommunityMembers';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -273,12 +273,6 @@ export function CommunityWorkspace({
     useState<StickerMessageReference | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
-  const [memberIdentities, setMemberIdentities] = useState<
-    Record<string, IdentityResource>
-  >({});
-  const [memberPictures, setMemberPictures] = useState<Record<string, string>>(
-    {},
-  );
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
@@ -331,8 +325,42 @@ export function CommunityWorkspace({
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
-      ? activeCall.channelId
+      ? (activeCall.channelId ?? null)
       : null;
+  const visibleTextChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return textChannels;
+
+    return textChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, textChannels]);
+  const visibleVoiceChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+
+    if (!query) return voiceChannels;
+
+    return voiceChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [channelSearch, voiceChannels]);
+  const {
+    communityMemberIds,
+    memberIdentities,
+    memberPictures,
+    members,
+    ownIdentityPictures,
+    reactionAuthorNames,
+    voiceParticipantsByChannelId,
+  } = useCommunityMembers({
+    activeCall,
+    activeVoiceChannelId,
+    community,
+    session,
+    visibleVoiceChannels,
+    voiceChannels,
+  });
   const channelEncryptionReady =
     !!selectedChannel &&
     !!communityKey &&
@@ -382,38 +410,6 @@ export function CommunityWorkspace({
       (visibleMessages.length > 0 &&
         visibleMessages.every((message) => message.encrypted)));
 
-  const members = useMemo<MemberView[]>(
-    () =>
-      community.memberIds.map((identityId) => ({
-        identity: memberIdentities[identityId],
-        identityId,
-        pictureUrl: memberPictures[identityId] ?? null,
-      })),
-    [community.memberIds, memberIdentities, memberPictures],
-  );
-  const communityMemberIdsKey = useMemo(
-    () => community.memberIds.join('\u0000'),
-    [community.memberIds],
-  );
-  const communityMemberIds = useMemo(
-    () =>
-      communityMemberIdsKey.length > 0
-        ? communityMemberIdsKey.split('\u0000')
-        : [],
-    [communityMemberIdsKey],
-  );
-  const voiceConnectedIdentityIds = useMemo(
-    () =>
-      voiceChannels.flatMap((channel) => channel.connectedIdentityIds ?? []),
-    [voiceChannels],
-  );
-  const identityIdsToLoad = useMemo(
-    () =>
-      Array.from(
-        new Set([...communityMemberIds, ...voiceConnectedIdentityIds]),
-      ),
-    [communityMemberIds, voiceConnectedIdentityIds],
-  );
   const openMemberProfile = useCallback(
     (member: MemberView, anchor?: ProfilePopoverAnchor) =>
       setProfileViewer({ ...member, anchor }),
@@ -583,24 +579,6 @@ export function CommunityWorkspace({
       setCommunityLeaving(false);
     }
   };
-  const visibleTextChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-
-    if (!query) return textChannels;
-
-    return textChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [channelSearch, textChannels]);
-  const visibleVoiceChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-
-    if (!query) return voiceChannels;
-
-    return voiceChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [channelSearch, voiceChannels]);
   const isScrolledNearBottom = useCallback(() => {
     const scroller = scrollerRef.current;
 
@@ -637,109 +615,6 @@ export function CommunityWorkspace({
     },
     [onChannelSelected, onChannelViewed, onMobileSidebarClose],
   );
-  const ownIdentityPictures = useMemo(
-    () =>
-      memberPictures[session.identity.id]
-        ? { [session.identity.id]: memberPictures[session.identity.id] }
-        : {},
-    [memberPictures, session.identity.id],
-  );
-  const reactionAuthorNames = useMemo(
-    () =>
-      Object.fromEntries(
-        community.memberIds.map((identityId) => [
-          identityId,
-          memberDisplayName(memberIdentities[identityId], identityId),
-        ]),
-      ),
-    [community.memberIds, memberIdentities],
-  );
-  const callParticipantForIdentity = useCallback(
-    (identityId: string): CallParticipant => {
-      const identity =
-        identityId === session.identity.id
-          ? session.identity
-          : memberIdentities[identityId];
-
-      return {
-        identity,
-        identityId,
-        deafened: false,
-        muted: false,
-        name: identity
-          ? (identityName(identity) ?? shortId(identityId))
-          : shortId(identityId),
-        picture: memberPictures[identityId] ?? null,
-      };
-    },
-    [memberIdentities, memberPictures, session.identity],
-  );
-  const voiceParticipantViewForIdentity = useCallback(
-    (
-      identityId: string,
-      activeParticipant?: CallParticipant,
-    ): CallParticipant => {
-      const fallbackParticipant = callParticipantForIdentity(identityId);
-
-      if (!activeParticipant) return fallbackParticipant;
-
-      return {
-        ...activeParticipant,
-        identity: activeParticipant.identity ?? fallbackParticipant.identity,
-        name:
-          activeParticipant.name?.trim() &&
-          activeParticipant.name !== shortId(identityId)
-            ? activeParticipant.name
-            : fallbackParticipant.name,
-        picture: activeParticipant.picture ?? fallbackParticipant.picture,
-      };
-    },
-    [callParticipantForIdentity],
-  );
-  const voiceParticipantsForChannel = useCallback(
-    (channel: CommunityChannel): CallParticipant[] => {
-      if (channel.type !== 'voice') return [];
-
-      const activeParticipants =
-        activeVoiceChannelId === channel.id
-          ? (activeCall?.participants ?? [])
-          : [];
-      const activeByIdentityId = new Map(
-        activeParticipants.map((participant) => [
-          participant.identityId,
-          participant,
-        ]),
-      );
-      const identityIds = Array.from(
-        new Set([
-          ...(channel.connectedIdentityIds ?? []),
-          ...activeParticipants.map((participant) => participant.identityId),
-        ]),
-      );
-
-      return identityIds.map((identityId) =>
-        voiceParticipantViewForIdentity(
-          identityId,
-          activeByIdentityId.get(identityId),
-        ),
-      );
-    },
-    [
-      activeCall?.participants,
-      activeVoiceChannelId,
-      voiceParticipantViewForIdentity,
-    ],
-  );
-  const voiceParticipantsByChannelId = useMemo(
-    () =>
-      new Map(
-        visibleVoiceChannels.map((channel) => [
-          channel.id,
-          voiceParticipantsForChannel(channel),
-        ]),
-      ),
-    [visibleVoiceChannels, voiceParticipantsForChannel],
-  );
   const communityData = useMemo(
     () => ({
       frontendDerived: {
@@ -774,46 +649,6 @@ export function CommunityWorkspace({
 
     if (nextSelectedChannel) onChannelSelected(nextSelectedChannel);
   }, [activeChannelId, onChannelSelected, selectedChannelId, textChannels]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void Promise.all(
-      identityIdsToLoad.map(async (identityId) => {
-        try {
-          const identity =
-            identityId === session.identity.id
-              ? session.identity
-              : await pigeonApplication.getIdentity(
-                  normalizeIdentityId(identityId),
-                );
-          const pictureUrl = await loadIdentityPicture(identity);
-
-          return [identityId, identity, pictureUrl] as const;
-        } catch {
-          return [identityId, undefined, null] as const;
-        }
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-
-      const nextIdentities: Record<string, IdentityResource> = {};
-      const nextPictures: Record<string, string> = {};
-
-      for (const [identityId, identity, pictureUrl] of entries) {
-        if (identity) nextIdentities[identityId] = identity;
-
-        if (pictureUrl) nextPictures[identityId] = pictureUrl;
-      }
-
-      setMemberIdentities(nextIdentities);
-      setMemberPictures(nextPictures);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [identityIdsToLoad, session.identity]);
 
   useEffect(() => {
     let cancelled = false;
