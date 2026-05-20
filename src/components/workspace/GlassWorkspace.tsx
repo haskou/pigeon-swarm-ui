@@ -109,6 +109,7 @@ import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { CommunityWorkspace } from '../community/CommunityWorkspace';
 import { Rail } from './Rail';
 import { useCommunitySelection } from './useCommunitySelection';
+import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import {
@@ -272,7 +273,6 @@ export function GlassWorkspace({
     Record<string, Record<string, CallParticipantStatus>>
   >({});
   const callStartupSyncIdentityRef = useRef<string | null>(null);
-  const pendingCommunityInviteRef = useRef<string | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -523,53 +523,16 @@ export function GlassWorkspace({
     setSession(null);
   };
 
-  useEffect(() => {
-    if (!pendingCommunityInvite) return;
-
-    if (pendingCommunityInviteRef.current === pendingCommunityInvite.token) {
-      return;
-    }
-
-    pendingCommunityInviteRef.current = pendingCommunityInvite.token;
-    setSendError(null);
-    void (async () => {
-      if (!pendingCommunityInvite.keyEntry) {
-        throw new Error(copy.communities.linkKeyMissing);
-      }
-
-      let nextSession = sessionRef.current;
-
-      const accepted = await pigeonApplication.acceptCommunityInviteLinkWithKey(
-        nextSession,
-        pendingCommunityInvite.token,
-        pendingCommunityInvite.keyEntry,
-      );
-
-      const acceptedCommunity = accepted.community;
-      nextSession = {
-        ...nextSession,
-        keychain: accepted.keychain,
-        keychainExternalIdentifier: accepted.keychainExternalIdentifier,
-      };
-      setSession(nextSession);
-
-      setCommunities((current) => [
-        acceptedCommunity,
-        ...current.filter((community) => community.id !== acceptedCommunity.id),
-      ]);
-      setActiveCommunityId(acceptedCommunity.id);
-      setWorkspaceMode('community');
-      onPendingCommunityInviteHandled?.();
-    })().catch((caught) => {
-      pendingCommunityInviteRef.current = null;
-      setSendError(toUserErrorMessage(caught, copy.communities.memberError));
-    });
-  }, [
+  usePendingCommunityInvite({
     onPendingCommunityInviteHandled,
     pendingCommunityInvite,
+    session,
+    setActiveCommunityId,
     setCommunities,
+    setSendError,
     setSession,
-  ]);
+    setWorkspaceMode,
+  });
   const nodeUnclaimed = !node?.owner;
   const activeConversationKey = activeConversation
     ? conversationKeyEntry(
