@@ -70,12 +70,15 @@ import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../profile/profilePopoverAnchor';
-import { LockIcon } from '../workspace/LockIcon';
 import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { VoiceIcon } from './communityDialogPrimitives';
+import { CommunityHeader } from './CommunityHeader';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
-import { MemberRow } from './MemberRow';
+import {
+  CommunityMembersPanel,
+  type CommunityMemberListItem,
+} from './CommunityMembersPanel';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 
@@ -163,11 +166,8 @@ interface CommunityWorkspaceProps {
   typingIdentityIds?: string[];
 }
 
-type MemberView = {
+type MemberView = CommunityMemberListItem & {
   anchor?: ProfilePopoverAnchor;
-  identity?: IdentityResource;
-  identityId: string;
-  pictureUrl: null | string;
 };
 
 type CommunityPendingSend = {
@@ -1619,152 +1619,74 @@ export function CommunityWorkspace({
       </aside>
 
       <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
-        <header className="border-b border-white/10 p-4 sm:p-5">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onOpenMobileSidebar}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white lg:hidden"
-              aria-label={copy.chat.menu}
-            >
-              ☰
-            </button>
-            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
+        <CommunityHeader
+          avatarUrl={avatarUrl}
+          channelEncryptionReady={channelEncryptionReady}
+          channelEncryptionTooltip={channelEncryptionTooltip}
+          community={community}
+          communityLeaveError={communityLeaveError}
+          communityMenuOpen={communityMenuOpen}
+          menuContent={
+            communityMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-30 cursor-default"
+                  onClick={() => setCommunityMenuOpen(false)}
+                  aria-label={copy.dialog.close}
                 />
-              ) : (
-                community.name.slice(0, 1).toUpperCase()
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <h1 className="truncate text-2xl font-black">
-                  {selectedChannel
-                    ? `# ${selectedChannel.name}`
-                    : community.name}
-                </h1>
-                <span
-                  className={
-                    channelEncryptionReady
-                      ? 'shrink-0 text-emerald-300'
-                      : 'shrink-0 text-rose-300'
-                  }
-                  title={channelEncryptionTooltip}
-                  aria-label={channelEncryptionTooltip}
-                >
-                  <LockIcon locked={channelEncryptionReady} />
-                </span>
-              </div>
-              {selectedChannel ? (
-                <p className="truncate text-sm text-white/50">
-                  {copy.communities.channelMetadataOnly}{' '}
-                  <span title={community.networkId}>{networkName}</span>
-                </p>
-              ) : (
-                <p className="truncate text-sm text-white/50">
-                  {community.description}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onRealtimeEventsOpen}
-              className={cx(
-                'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
-                realtimeStatus === 'connected'
-                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
-                  : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
-              )}
-              title={
-                realtimeStatus === 'connected'
-                  ? copy.chat.realtimeConnected
-                  : copy.chat.realtimeReconnecting
-              }
-            >
-              <span
-                className={cx(
-                  'h-2 w-2 rounded-full',
-                  realtimeStatus === 'connected'
-                    ? 'bg-emerald-300'
-                    : 'bg-amber-300',
-                )}
-              />
-              {realtimeStatus === 'connected'
-                ? copy.chat.realtimeConnected
-                : copy.chat.realtimeReconnecting}
-            </button>
-            <div className="relative ml-auto shrink-0">
-              {communityLeaveError ? (
-                <div className="absolute bottom-[calc(100%+.5rem)] right-0 z-40 w-72 rounded-2xl border border-rose-300/20 bg-rose-500/15 p-3 text-xs font-black text-rose-100 shadow-2xl shadow-black/40">
-                  {communityLeaveError}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setCommunityMenuOpen((isOpen) => !isOpen)}
-                className="grid h-11 w-11 place-items-center rounded-2xl text-xl font-black text-white/70 transition hover:bg-white/15"
-                aria-label={copy.chat.conversationMenu}
-                aria-expanded={communityMenuOpen}
-              >
-                ⋮
-              </button>
-              {communityMenuOpen && (
-                <>
+                <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
                   <button
                     type="button"
-                    className="fixed inset-0 z-30 cursor-default"
-                    onClick={() => setCommunityMenuOpen(false)}
-                    aria-label={copy.dialog.close}
-                  />
-                  <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCommunityDataOpen(true);
-                        setCommunityMenuOpen(false);
-                      }}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {copy.chat.viewData}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (communityKey) {
-                          openCopyCommunityKeyDialog();
-                        } else {
-                          setCommunityKeyError(null);
-                          setCommunityKeyDialog('add');
-                        }
+                    onClick={() => {
+                      setCommunityDataOpen(true);
+                      setCommunityMenuOpen(false);
+                    }}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                  >
+                    {copy.chat.viewData}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (communityKey) {
+                        openCopyCommunityKeyDialog();
+                      } else {
+                        setCommunityKeyError(null);
+                        setCommunityKeyDialog('add');
+                      }
 
-                        setCommunityMenuOpen(false);
-                      }}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                    >
-                      {communityKey
-                        ? copy.chat.copyPrivateKey
-                        : copy.chat.addPrivateKey}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void leaveCommunity()}
-                      disabled={communityLeaving}
-                      className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
-                    >
-                      {communityLeaving
-                        ? copy.communities.leaving
-                        : copy.communities.leave}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </header>
+                      setCommunityMenuOpen(false);
+                    }}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+                  >
+                    {communityKey
+                      ? copy.chat.copyPrivateKey
+                      : copy.chat.addPrivateKey}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void leaveCommunity()}
+                    disabled={communityLeaving}
+                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
+                  >
+                    {communityLeaving
+                      ? copy.communities.leaving
+                      : copy.communities.leave}
+                  </button>
+                </div>
+              </>
+            )
+          }
+          networkName={networkName}
+          onCommunityMenuToggle={() =>
+            setCommunityMenuOpen((isOpen) => !isOpen)
+          }
+          onOpenMobileSidebar={onOpenMobileSidebar}
+          onRealtimeEventsOpen={onRealtimeEventsOpen}
+          realtimeStatus={realtimeStatus}
+          selectedChannel={selectedChannel}
+        />
 
         {!selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
@@ -1867,76 +1789,20 @@ export function CommunityWorkspace({
         )}
       </section>
 
-      <aside className="glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block">
-        <button
-          type="button"
-          onClick={() => setMemberOpen(true)}
-          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-        >
-          {copy.communities.addMember}
-        </button>
-        <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-          {copy.communities.members}
-        </div>
-        <div className="space-y-2">
-          {members.map((member) => (
-            <MemberRow
-              key={member.identityId}
-              identity={member.identity}
-              identityId={member.identityId}
-              onClick={(event) =>
-                openMemberProfile(
-                  member,
-                  profileAnchorFromTarget(event.currentTarget),
-                )
-              }
-              owner={member.identityId === community.ownerIdentityId}
-              pictureUrl={member.pictureUrl}
-              presence={presenceByIdentityId[member.identityId]}
-            />
-          ))}
-        </div>
-      </aside>
-
-      {mobileMembersOpen && (
-        <>
-          <button
-            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
-            onClick={onMobileMembersClose}
-            aria-label={copy.dialog.close}
-          />
-          <aside className="glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden">
-            <button
-              type="button"
-              onClick={() => setMemberOpen(true)}
-              className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              {copy.communities.addMember}
-            </button>
-            <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              {copy.communities.members}
-            </div>
-            <div className="space-y-2">
-              {members.map((member) => (
-                <MemberRow
-                  key={member.identityId}
-                  identity={member.identity}
-                  identityId={member.identityId}
-                  onClick={(event) =>
-                    openMemberProfile(
-                      member,
-                      profileAnchorFromTarget(event.currentTarget),
-                    )
-                  }
-                  owner={member.identityId === community.ownerIdentityId}
-                  pictureUrl={member.pictureUrl}
-                  presence={presenceByIdentityId[member.identityId]}
-                />
-              ))}
-            </div>
-          </aside>
-        </>
-      )}
+      <CommunityMembersPanel
+        community={community}
+        members={members}
+        onAddMember={() => setMemberOpen(true)}
+        onCloseMobile={onMobileMembersClose}
+        onMemberClick={(member, event) =>
+          openMemberProfile(
+            member,
+            profileAnchorFromTarget(event.currentTarget),
+          )
+        }
+        openMobile={mobileMembersOpen}
+        presenceByIdentityId={presenceByIdentityId}
+      />
 
       <Suspense fallback={null}>
         {bannerViewerOpen && bannerUrl && (
