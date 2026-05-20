@@ -7,6 +7,7 @@ import type {
   CommunityChannel,
   CommunityPermission,
   CommunityRoleResource,
+  IdentityResource,
   Session,
 } from '../../domain/types';
 
@@ -22,13 +23,15 @@ import {
 import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
+import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import {
   DialogHeader,
   TrashIcon,
   VoiceIcon,
 } from './communityDialogPrimitives';
-import { loadPublicImage } from './communityImages';
+import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import { MemberRow } from './MemberRow';
 
 const ImageCropEditor = lazy(() =>
   import('../common/ImageCropEditor').then((module) => ({
@@ -63,6 +66,12 @@ export function ManageCommunityDialog({
   } | null>(null);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [memberIdentities, setMemberIdentities] = useState<
+    Record<string, IdentityResource>
+  >({});
+  const [memberPictures, setMemberPictures] = useState<Record<string, string>>(
+    {},
+  );
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
@@ -129,7 +138,7 @@ export function ManageCommunityDialog({
   const sections = [
     ...(isOwner ? ([['profile', 'Profile']] as const) : []),
     ...(canManageChannels
-      ? ([[ 'channels', copy.communities.channels ]] as const)
+      ? ([['channels', copy.communities.channels]] as const)
       : []),
     ...(canManageRoles ? ([['roles', 'Roles']] as const) : []),
     ...(canManageRoles || canBanMembers
@@ -196,6 +205,45 @@ export function ManageCommunityDialog({
       cancelled = true;
     };
   }, [community.banner]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all(
+      community.memberIds.map(async (identityId) => {
+        try {
+          const identity =
+            identityId === session.identity.id
+              ? session.identity
+              : await pigeonApplication.getIdentity(
+                  normalizeIdentityId(identityId),
+                );
+          const pictureUrl = await loadIdentityPicture(identity);
+
+          return [identityId, identity, pictureUrl] as const;
+        } catch {
+          return [identityId, undefined, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+
+      const nextIdentities: Record<string, IdentityResource> = {};
+      const nextPictures: Record<string, string> = {};
+
+      for (const [identityId, identity, pictureUrl] of entries) {
+        if (identity) nextIdentities[identityId] = identity;
+        if (pictureUrl) nextPictures[identityId] = pictureUrl;
+      }
+
+      setMemberIdentities(nextIdentities);
+      setMemberPictures(nextPictures);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.memberIds, session.identity]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -594,25 +642,27 @@ export function ManageCommunityDialog({
       />
       <section className="glass-panel-strong relative z-10 flex max-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
-        <div className="mb-4 grid gap-2 rounded-2xl bg-black/20 p-1 sm:grid-cols-4">
-          {sections.map(([section, label]) => (
-            <button
-              key={section}
-              type="button"
-              onClick={() => setActiveSection(section)}
-              className={cx(
-                'rounded-2xl px-3 py-2 text-xs font-black transition',
-                activeSection === section
-                  ? 'bg-white text-slate-950'
-                  : 'text-white/55 hover:bg-white/10',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="grid gap-5 lg:items-start">
+        <div className="min-h-0 flex-1 gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
+          <nav className="mb-4 flex gap-2 overflow-x-auto rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1 sm:overflow-visible">
+            {sections.map(([section, label]) => (
+              <button
+                key={section}
+                type="button"
+                onClick={() => setActiveSection(section)}
+                className={cx(
+                  'shrink-0 rounded-xl px-3 py-2 text-left text-xs font-black transition sm:block sm:w-full',
+                  activeSection === section
+                    ? 'bg-white text-slate-950'
+                    : 'text-white/55 hover:bg-white/10',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div className="flex min-h-0 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid gap-5 lg:items-start">
             {activeSection === 'profile' && (
             <div className="overflow-hidden rounded-2xl bg-black/25">
               <button
@@ -826,8 +876,8 @@ export function ManageCommunityDialog({
               </div>
             </div>
             )}
-          </div>
-          {activeSection === 'roles' && (
+              </div>
+              {activeSection === 'roles' && (
             <RolesPanel
               editableRoles={editableRoles}
               onCreateRole={() => void createRole()}
@@ -842,12 +892,14 @@ export function ManageCommunityDialog({
               selectedRole={selectedRole}
               state={state}
             />
-          )}
-          {activeSection === 'members' && (
+              )}
+              {activeSection === 'members' && (
             <MembersAndBansPanel
               bannedMemberIds={community.bannedMemberIds ?? []}
               editableRoles={editableRoles}
+              memberIdentities={memberIdentities}
               memberIds={community.memberIds}
+              memberPictures={memberPictures}
               memberRoleDrafts={memberRoleDrafts}
               onBan={(identityId) => void banMember(identityId)}
               onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
@@ -856,23 +908,25 @@ export function ManageCommunityDialog({
               ownerIdentityId={community.ownerIdentityId}
               state={state}
             />
-          )}
-          {error && (
-            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-              {error}
+              )}
+              {error && (
+                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
+                  {error}
+                </div>
+              )}
             </div>
-          )}
+            {(activeSection === 'profile' || activeSection === 'channels') && (
+              <button
+                type="button"
+                onClick={() => void finishManage()}
+                disabled={!name.trim() || state === 'loading'}
+                className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {copy.profile.save}
+              </button>
+            )}
+          </div>
         </div>
-        {(activeSection === 'profile' || activeSection === 'channels') && (
-          <button
-            type="button"
-            onClick={() => void finishManage()}
-            disabled={!name.trim() || state === 'loading'}
-            className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {copy.profile.save}
-          </button>
-        )}
         {imageEditor && (
           <Suspense fallback={null}>
             <ImageCropEditor
@@ -926,18 +980,8 @@ function RolesPanel({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-        <button
-          type="button"
-          onClick={() => {
-            onRoleSelect('');
-            onRoleNameChange('');
-          }}
-          className="mb-3 w-full rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
-        >
-          + Role
-        </button>
-        <div className="space-y-2">
+      <div className="flex min-h-[24rem] flex-col rounded-2xl border border-white/10 bg-black/20 p-3">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {roles.map((role) => (
             <button
               key={role.id}
@@ -954,6 +998,16 @@ function RolesPanel({
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            onRoleSelect('');
+            onRoleNameChange('');
+          }}
+          className="mt-3 w-full rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
+        >
+          + Role
+        </button>
       </div>
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <input
@@ -1010,7 +1064,9 @@ function RolesPanel({
 function MembersAndBansPanel({
   bannedMemberIds,
   editableRoles,
+  memberIdentities,
   memberIds,
+  memberPictures,
   memberRoleDrafts,
   onBan,
   onSaveRoles,
@@ -1021,7 +1077,9 @@ function MembersAndBansPanel({
 }: {
   bannedMemberIds: string[];
   editableRoles: CommunityRoleResource[];
+  memberIdentities: Record<string, IdentityResource>;
   memberIds: string[];
+  memberPictures: Record<string, string>;
   memberRoleDrafts: Record<string, string[]>;
   onBan: (identityId: string) => void;
   onSaveRoles: (identityId: string) => void;
@@ -1043,22 +1101,13 @@ function MembersAndBansPanel({
             .filter((identityId) => !banned.has(identityId))
             .map((identityId) => (
               <div key={identityId} className="rounded-2xl bg-white/8 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0 truncate text-sm font-black text-white">
-                    {shortId(identityId)}
-                    {identityId === ownerIdentityId ? ' · owner' : ''}
-                  </div>
-                  {identityId !== ownerIdentityId && (
-                    <button
-                      type="button"
-                      onClick={() => onBan(identityId)}
-                      disabled={state === 'loading'}
-                      className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      Ban
-                    </button>
-                  )}
-                </div>
+                <MemberRow
+                  identity={memberIdentities[identityId]}
+                  identityId={identityId}
+                  onClick={() => undefined}
+                  owner={identityId === ownerIdentityId}
+                  pictureUrl={memberPictures[identityId] ?? null}
+                />
                 {editableRoles.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {editableRoles.map((role) => (
@@ -1085,6 +1134,16 @@ function MembersAndBansPanel({
                       Save roles
                     </button>
                   </div>
+                )}
+                {identityId !== ownerIdentityId && (
+                  <button
+                    type="button"
+                    onClick={() => onBan(identityId)}
+                    disabled={state === 'loading'}
+                    className="mt-3 rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Ban
+                  </button>
                 )}
               </div>
             ))}

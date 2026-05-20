@@ -19,16 +19,12 @@ import {
 } from 'react';
 
 import type { NodeNetwork } from '../../application/networks/ListNodeNetworks';
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../domain/calls/CallSession';
+import type { CallSession } from '../../domain/calls/CallSession';
 import type {
   Community,
   CommunityChannel,
   CommunityMessageMention,
   CommunityPermission,
-  CommunityTextChannel,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   AttachmentProgress,
@@ -36,7 +32,6 @@ import type {
   ChatMessage,
   IdentityPresence,
   IdentityResource,
-  MessageAttachment,
   MessageReplyPreview,
   MessageResource,
   SelectablePresenceStatus,
@@ -44,15 +39,16 @@ import type {
   StickerMessageReference,
 } from '../../domain/types';
 import type { RealtimeDomainEvent } from '../../infrastructure/realtime/RealtimeGateway';
+import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 
 import { pigeonApplication } from '../../application/applicationContainer';
 import { pendingFileAttachments } from '../../domain/attachments/pendingFileAttachments';
 import { encryptCommunityChannelPayload } from '../../domain/communities/communityChannelPayloadCipher';
-import { CommunityMessageDecryptWorkerClient } from '../../domain/communities/CommunityMessageDecryptWorkerClient';
 import {
   communityTextChannels,
   communityVoiceChannels,
 } from '../../domain/communities/communityChannels';
+import { CommunityMessageDecryptWorkerClient } from '../../domain/communities/CommunityMessageDecryptWorkerClient';
 import {
   canSeeCommunityChannel,
   communityMembersWithChannelAccess,
@@ -74,16 +70,15 @@ import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../profile/profilePopoverAnchor';
-import type { MessageContextMenuState } from '../workspace/MessageContextMenu';
 import { UserProfileDropdown } from '../workspace/SessionIdentityDropdown';
 import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
 import { loadPublicImage } from './communityImages';
+import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import {
   CommunityMembersPanel,
   type CommunityMemberListItem,
 } from './CommunityMembersPanel';
-import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 import {
   mergeChatMessages,
@@ -209,17 +204,14 @@ function replyPreviewFromMessage(
   };
 }
 
-async function createLinkPreviewForContent(
-  session: Session,
-  content: string,
-) {
+async function createLinkPreviewForContent(session: Session, content: string) {
   const url = firstMessageLinkPreviewUrl(content);
 
   if (!url) return undefined;
 
-  return await pigeonApplication.createLinkPreview(session, url).catch(
-    () => undefined,
-  );
+  return await pigeonApplication
+    .createLinkPreview(session, url)
+    .catch(() => undefined);
 }
 
 export function CommunityWorkspace({
@@ -231,7 +223,6 @@ export function CommunityWorkspace({
   mobileRail,
   mobileSidebarOpen,
   nodeNetworks,
-  presenceByIdentityId = {},
   onCallEnd,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
@@ -244,15 +235,16 @@ export function CommunityWorkspace({
   onCommunityUpdated,
   onJoinVoiceChannel,
   onLogout,
-  onPresenceChange,
-  onPresenceStatusSelected,
   onMobileMembersClose,
   onMobileSidebarClose,
   onOpenConversationWithIdentity,
   onOpenMobileSidebar,
+  onPresenceChange,
+  onPresenceStatusSelected,
   onRealtimeEventsOpen,
   onSessionUpdated,
   onTypingActive,
+  presenceByIdentityId = {},
   realtimeEvent,
   realtimeStatus = 'connected',
   session,
@@ -436,29 +428,30 @@ export function CommunityWorkspace({
               token: `@${role.name}`,
             }))
         : [];
-    const specialSuggestionCandidates: Array<CommunityMentionSuggestion | null> = [
-      currentPermissions.has('mention_everyone')
-        ? {
-            description: 'all members',
-            id: 'everyone',
-            label: 'everyone',
-            mention: { type: 'everyone' } as const,
-            token: '@everyone',
-          }
-        : null,
-      currentPermissions.has('mention_here')
-        ? {
-            description: 'active members',
-            id: 'here',
-            label: 'here',
-            mention: { type: 'here' } as const,
-            token: '@here',
-          }
-        : null,
-    ];
+    const specialSuggestionCandidates: Array<CommunityMentionSuggestion | null> =
+      [
+        currentPermissions.has('mention_everyone')
+          ? {
+              description: 'all members',
+              id: 'everyone',
+              label: 'everyone',
+              mention: { type: 'everyone' } as const,
+              token: '@everyone',
+            }
+          : null,
+        currentPermissions.has('mention_here')
+          ? {
+              description: 'channel members',
+              id: 'here',
+              label: 'here',
+              mention: { type: 'here' } as const,
+              token: '@here',
+            }
+          : null,
+      ];
     const specialSuggestions = specialSuggestionCandidates.filter(
       (suggestion): suggestion is CommunityMentionSuggestion =>
-      Boolean(suggestion && suggestion.label.includes(query)),
+        Boolean(suggestion && suggestion.label.includes(query)),
     );
 
     return [
@@ -881,7 +874,10 @@ export function CommunityWorkspace({
   );
 
   const projectChannelMessage = useCallback(
-    async (channelId: string, rawMessage: MessageResource): Promise<ChatMessage> => {
+    async (
+      channelId: string,
+      rawMessage: MessageResource,
+    ): Promise<ChatMessage> => {
       const [projected] = await projectChannelMessages(channelId, [rawMessage]);
 
       return projected;
@@ -985,8 +981,8 @@ export function CommunityWorkspace({
 
     onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
-      attachmentUpload,
       attachments,
+      attachmentUpload,
       channelId: selectedChannelId,
       content,
       mentions: selectedChannel
@@ -1011,8 +1007,8 @@ export function CommunityWorkspace({
 
     onTypingActive?.(selectedChannelId, false);
     sendPendingChannelMessage({
-      attachmentUpload: {},
       attachments: [],
+      attachmentUpload: {},
       channelId: selectedChannelId,
       content: '',
       mentions: [],
@@ -1130,7 +1126,10 @@ export function CommunityWorkspace({
             timestamp,
           },
         );
-        const projected = await projectChannelMessage(payload.channelId, created);
+        const projected = await projectChannelMessage(
+          payload.channelId,
+          created,
+        );
 
         if (payload.sticker) {
           void pigeonApplication.markStickerUsed(session, payload.sticker);
@@ -1933,7 +1932,10 @@ function communityMentionsForContent(
   const lowerContent = content.toLowerCase();
   const mentions: CommunityMessageMention[] = [];
 
-  if (permissions.has('mention_everyone') && lowerContent.includes('@everyone')) {
+  if (
+    permissions.has('mention_everyone') &&
+    lowerContent.includes('@everyone')
+  ) {
     mentions.push({ type: 'everyone' });
   }
 
