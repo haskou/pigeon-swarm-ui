@@ -35,15 +35,6 @@ export function endsAuthorRun(
   );
 }
 
-export function findReplyMessage(
-  messages: ChatMessage[],
-  message: ChatMessage,
-): ChatMessage | undefined {
-  if (!message.replyToMessageId) return undefined;
-
-  return messages.find((item) => item.id === message.replyToMessageId);
-}
-
 export function messageReplyImage(
   message: ChatMessage,
   replyMessage?: ChatMessage,
