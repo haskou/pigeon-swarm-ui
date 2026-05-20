@@ -1,7 +1,8 @@
-import type { NotificationResource, Session } from '../../domain/types';
-import type { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
+import type { NotificationResource, Session } from '../../../../domain/types';
+import type { ListNotificationsPort } from '../ports/listNotificationsPort';
 
-import { ListNotifications } from './ListNotifications';
+import { ListNotifications } from './listNotifications';
+import { ListNotificationsMessage } from './messages/listNotificationsMessage';
 
 describe(ListNotifications.name, () => {
   it('delegates notification listing to the pigeon API gateway', async () => {
@@ -9,10 +10,12 @@ describe(ListNotifications.name, () => {
     const expected = [{ id: 'notification-1' }] as NotificationResource[];
     const gateway = {
       listNotifications: jest.fn().mockResolvedValue(expected),
-    } as unknown as PigeonApiGateway;
+    } as unknown as ListNotificationsPort;
     const useCase = new ListNotifications(gateway);
 
-    await expect(useCase.execute(session)).resolves.toBe(expected);
+    await expect(
+      useCase.list(new ListNotificationsMessage(session)),
+    ).resolves.toBe(expected);
     expect(gateway.listNotifications).toHaveBeenCalledWith(session);
   });
 });

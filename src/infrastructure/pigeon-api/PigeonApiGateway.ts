@@ -72,6 +72,13 @@ import { firstMessageLinkPreviewUrl } from '../../domain/messages/linkPreviewUrl
 import { MessageProjector } from '../../domain/messages/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../domain/messages/MessageSignaturePayloadFactory';
 import { copy } from '../../i18n/en';
+import { NotificationDecision } from '../../modules/notifications/domain/notificationDecision';
+import { NotificationId } from '../../modules/notifications/domain/notificationId';
+import { PigeonNotificationsApi } from '../../modules/notifications/infrastructure/http/pigeonNotificationsApi';
+import {
+  PigeonPushApi,
+  type PushSubscriptionPayload,
+} from '../../modules/notifications/infrastructure/http/pigeonPushApi';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { HttpJsonClient } from '../http/HttpJsonClient';
@@ -82,10 +89,8 @@ import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
-import { PigeonNotificationsApi } from './PigeonNotificationsApi';
 import { PigeonPollsApi } from './PigeonPollsApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
-import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
 import { PigeonStickersApi } from './PigeonStickersApi';
 import { RequestSigner } from './RequestSigner';
 
@@ -1617,10 +1622,10 @@ export class PigeonApiGateway {
 
   public async updateNotification(
     session: Session,
-    notificationId: string,
-    state: 'accepted' | 'declined',
+    notificationId: NotificationId,
+    decision: NotificationDecision,
   ): Promise<NotificationResource> {
-    return await this.notifications.update(session, notificationId, state);
+    return await this.notifications.update(session, notificationId, decision);
   }
 
   public async acceptConversationInvitation(
@@ -1652,8 +1657,8 @@ export class PigeonApiGateway {
         keychain: published.keychain,
         keychainExternalIdentifier: published.keychainExternalIdentifier,
       },
-      notification.id,
-      'accepted',
+      NotificationId.fromString(notification.id),
+      NotificationDecision.accepted(),
     );
 
     return { ...published, notification: updated };

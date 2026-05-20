@@ -4,10 +4,10 @@ import type {
   Community,
   NotificationResource,
   Session,
-} from '../../domain/types';
+} from '../../../../domain/types';
 
-import { pigeonApplication } from '../../application/applicationContainer';
-import { loadPublicImage } from '../../components/community/communityImages';
+import { pigeonApplication } from '../../../../application/applicationContainer';
+import { loadPublicImage } from '../../../../components/community/communityImages';
 
 interface UseNotificationCommunityPreviewsInput {
   communities: Community[];

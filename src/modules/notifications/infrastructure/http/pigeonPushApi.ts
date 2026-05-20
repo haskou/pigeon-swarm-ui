@@ -1,6 +1,6 @@
-import type { Session } from '../../domain/types';
-import type { HttpJsonClient } from '../http/HttpJsonClient';
-import type { RequestSigner } from './RequestSigner';
+import type { Session } from '../../../../domain/types';
+import type { HttpJsonClient } from '../../../../infrastructure/http/HttpJsonClient';
+import type { RequestSigner } from '../../../../infrastructure/pigeon-api/RequestSigner';
 
 export type PushSubscriptionPayload = {
   endpoint: string;

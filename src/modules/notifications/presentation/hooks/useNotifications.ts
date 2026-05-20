@@ -5,12 +5,12 @@ import type {
   ConversationResource,
   NotificationResource,
   Session,
-} from '../../domain/types';
+} from '../../../../domain/types';
 
-import { pigeonApplication } from '../../application/applicationContainer';
-import { copy } from '../../i18n/en';
-import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
-import { ArchivedNotifications } from '../notifications/ArchivedNotifications';
+import { pigeonApplication } from '../../../../application/applicationContainer';
+import { copy } from '../../../../i18n/en';
+import { toUserErrorMessage } from '../../../../utils/toUserErrorMessage';
+import { ArchivedNotifications } from '../../infrastructure/storage/archivedNotifications';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 

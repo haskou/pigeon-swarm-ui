@@ -55,6 +55,12 @@ import {
   type RealtimeMessage,
   type RealtimeTypingInput,
 } from '../infrastructure/realtime/RealtimeGateway';
+import { AcceptConversationInvitation } from '../modules/notifications/application/accept-conversation-invitation/acceptConversationInvitation';
+import { AcceptConversationInvitationMessage } from '../modules/notifications/application/accept-conversation-invitation/messages/acceptConversationInvitationMessage';
+import { ListNotifications } from '../modules/notifications/application/list-notifications/listNotifications';
+import { ListNotificationsMessage } from '../modules/notifications/application/list-notifications/messages/listNotificationsMessage';
+import { UpdateNotificationMessage } from '../modules/notifications/application/update-notification/messages/updateNotificationMessage';
+import { UpdateNotification } from '../modules/notifications/application/update-notification/updateNotification';
 import { CreateConversation } from './conversations/CreateConversation';
 import {
   CreateGroupConversation,
@@ -76,11 +82,6 @@ import {
   ListNodeNetworks,
   type NodeNetwork,
 } from './networks/ListNodeNetworks';
-import {
-  AcceptInvitation,
-  ListNotifications,
-  UpdateNotification,
-} from './notifications';
 import { ListPeers, type Peer } from './peers/ListPeers';
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
@@ -111,7 +112,7 @@ export class PigeonApplication {
 
   private readonly realtime: RealtimeGateway;
 
-  private readonly acceptConversationInvitationUseCase: AcceptInvitation;
+  private readonly acceptInvitationUseCase: AcceptConversationInvitation;
 
   private readonly createConversationUseCase: CreateConversation;
 
@@ -155,7 +156,7 @@ export class PigeonApplication {
   ) {
     this.gateway = gateway;
     this.realtime = realtime;
-    this.acceptConversationInvitationUseCase = new AcceptInvitation(gateway);
+    this.acceptInvitationUseCase = new AcceptConversationInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork(gateway);
@@ -184,9 +185,8 @@ export class PigeonApplication {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
-    return await this.acceptConversationInvitationUseCase.execute(
-      session,
-      notification,
+    return await this.acceptInvitationUseCase.accept(
+      new AcceptConversationInvitationMessage({ notification, session }),
     );
   }
 
@@ -1141,7 +1141,9 @@ export class PigeonApplication {
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
-    return await this.listNotificationsUseCase.execute(session);
+    return await this.listNotificationsUseCase.list(
+      new ListNotificationsMessage(session),
+    );
   }
 
   public async listPeers(): Promise<Peer[]> {
@@ -1237,10 +1239,12 @@ export class PigeonApplication {
     notificationId: string,
     state: 'accepted' | 'declined',
   ): Promise<NotificationResource> {
-    return await this.updateNotificationUseCase.execute(
-      session,
-      notificationId,
-      state,
+    return await this.updateNotificationUseCase.update(
+      new UpdateNotificationMessage({
+        notificationId,
+        session,
+        state,
+      }),
     );
   }
 

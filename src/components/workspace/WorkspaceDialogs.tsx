@@ -51,7 +51,9 @@ const NodeSettingsDialog = lazy(() =>
   })),
 );
 const NotificationsPanel = lazy(() =>
-  import('./NotificationsPanel').then((module) => ({
+  import(
+    '../../modules/notifications/presentation/components/notificationsPanel'
+  ).then((module) => ({
     default: module.NotificationsPanel,
   })),
 );

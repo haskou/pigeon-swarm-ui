@@ -1,6 +1,8 @@
-import type { NotificationResource, Session } from '../../domain/types';
-import type { HttpJsonClient } from '../http/HttpJsonClient';
-import type { RequestSigner } from './RequestSigner';
+import type { NotificationResource, Session } from '../../../../domain/types';
+import type { HttpJsonClient } from '../../../../infrastructure/http/HttpJsonClient';
+import type { RequestSigner } from '../../../../infrastructure/pigeon-api/RequestSigner';
+import type { NotificationDecision } from '../../domain/notificationDecision';
+import type { NotificationId } from '../../domain/notificationId';
 
 type CachedRequest = <T>(key: string, loader: () => Promise<T>) => Promise<T>;
 
@@ -27,11 +29,11 @@ export class PigeonNotificationsApi {
 
   public async update(
     session: Session,
-    notificationId: string,
-    state: 'accepted' | 'declined',
+    notificationId: NotificationId,
+    decision: NotificationDecision,
   ): Promise<NotificationResource> {
-    const path = `/notifications/${encodeURIComponent(notificationId)}`;
-    const body = { state };
+    const path = `/notifications/${encodeURIComponent(notificationId.toString())}`;
+    const body = { state: decision.toString() };
 
     return await this.http.request<NotificationResource>(path, {
       body: JSON.stringify(body),

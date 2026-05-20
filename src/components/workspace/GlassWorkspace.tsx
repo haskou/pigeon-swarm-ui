@@ -67,7 +67,6 @@ import {
 import { useCallSession } from '../../presentation/hooks/useCallSession';
 import { useCommunityMembershipRequests } from '../../presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../presentation/hooks/useIdentityDirectory';
-import { useNotifications } from '../../presentation/hooks/useNotifications';
 import {
   sendRealtimeTyping,
   useRealtimeEvents,
@@ -78,11 +77,13 @@ import {
   ensurePwaPushSubscription,
   requestPwaNotificationPermission,
   showPwaNotification,
-} from '../../presentation/notifications/PwaNotifications';
+} from '../../modules/notifications/infrastructure/browser/pwaNotifications';
+import { useNotifications } from '../../modules/notifications/presentation/hooks/useNotifications';
+import { useNotificationCommunityPreviews } from '../../modules/notifications/presentation/hooks/useNotificationCommunityPreviews';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
-} from '../../presentation/workspace/notificationPreviews';
+} from '../../modules/notifications/presentation/view-models/notificationPreviews';
 import { presenceFromRealtimeEvent } from '../../presentation/workspace/presenceRealtimeEvents';
 import {
   activeTypingIdentityIds,
@@ -96,7 +97,6 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../../presentation/workspace/useWorkspacePreferences';
-import { useNotificationCommunityPreviews } from '../../presentation/workspace/useNotificationCommunityPreviews';
 import { cx } from '../../utils/classNameHelper';
 import { shortId } from '../../utils/formatting';
 import {

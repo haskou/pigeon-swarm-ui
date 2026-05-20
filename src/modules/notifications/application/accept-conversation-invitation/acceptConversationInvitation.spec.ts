@@ -2,12 +2,13 @@ import type {
   LocalKeychain,
   NotificationResource,
   Session,
-} from '../../domain/types';
-import type { PigeonApiGateway } from '../../infrastructure/pigeon-api/PigeonApiGateway';
+} from '../../../../domain/types';
+import type { AcceptConversationInvitationPort } from '../ports/acceptConversationInvitationPort';
 
-import { AcceptInvitation } from './AcceptConversationInvitation';
+import { AcceptConversationInvitation } from './acceptConversationInvitation';
+import { AcceptConversationInvitationMessage } from './messages/acceptConversationInvitationMessage';
 
-describe(AcceptInvitation.name, () => {
+describe(AcceptConversationInvitation.name, () => {
   it('delegates invitation acceptance to the pigeon API gateway', async () => {
     const session = { password: 'secret' } as Session;
     const notification = {
@@ -21,12 +22,14 @@ describe(AcceptInvitation.name, () => {
     };
     const gateway = {
       acceptConversationInvitation: jest.fn().mockResolvedValue(expected),
-    } as unknown as PigeonApiGateway;
-    const useCase = new AcceptInvitation(gateway);
+    } as unknown as AcceptConversationInvitationPort;
+    const useCase = new AcceptConversationInvitation(gateway);
 
-    await expect(useCase.execute(session, notification)).resolves.toBe(
-      expected,
-    );
+    await expect(
+      useCase.accept(
+        new AcceptConversationInvitationMessage({ notification, session }),
+      ),
+    ).resolves.toBe(expected);
     expect(gateway.acceptConversationInvitation).toHaveBeenCalledWith(
       session,
       notification,

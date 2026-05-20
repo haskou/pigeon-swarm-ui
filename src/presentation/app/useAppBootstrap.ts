@@ -17,7 +17,7 @@ import {
 import { useCommunities } from '../hooks/useCommunities';
 import { useNodeNetworks } from '../hooks/useNodeNetworks';
 import { usePeers } from '../hooks/usePeers';
-import { requestPwaNotificationPermission } from '../notifications/PwaNotifications';
+import { requestPwaNotificationPermission } from '../../modules/notifications/infrastructure/browser/pwaNotifications';
 
 type RestoreState = 'done' | 'loading';
 
