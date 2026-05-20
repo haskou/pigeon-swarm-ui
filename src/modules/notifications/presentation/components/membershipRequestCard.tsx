@@ -1,14 +1,14 @@
 import type {
   Community,
   CommunityMembershipRequest,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../i18n/en';
-import { formatTime, shortId } from '../../../../utils/formatting';
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { formatTime, shortId } from '../../../../shared/presentation/formatting';
 import {
   identityDisplayName,
   type IdentityNames,
-} from '../../../../utils/identityDisplay';
+} from '../../../identities/presentation/view-models/identityDisplay';
 
 interface MembershipRequestCardProps {
   communities: Community[];

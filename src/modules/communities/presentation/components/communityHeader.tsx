@@ -1,0 +1,97 @@
+import type { ReactNode } from 'react';
+
+import type { Community, CommunityTextChannel } from '../../../../shared/domain/pigeonResources.types';
+
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { cx } from '../../../../shared/presentation/classNameHelper';
+import { FallbackImage } from '../../../../shared/presentation/components/fallbackImage';
+import { WorkspaceHeader } from '../../../workspace/presentation/components/workspaceHeader';
+import { LockIcon } from '../../../workspace/presentation/components/lockIcon';
+
+export function CommunityHeader({
+  avatarUrl,
+  channelEncryptionReady,
+  channelEncryptionTooltip,
+  children,
+  community,
+  communityLeaveError,
+  communityMenuOpen,
+  menuContent,
+  networkName,
+  onCommunityMenuToggle,
+  onOpenMobileSidebar,
+  onRealtimeEventsOpen,
+  realtimeStatus,
+  selectedChannel,
+}: {
+  avatarUrl: null | string;
+  channelEncryptionReady: boolean;
+  channelEncryptionTooltip: string;
+  children?: ReactNode;
+  community: Community;
+  communityLeaveError?: null | string;
+  communityMenuOpen: boolean;
+  menuContent?: ReactNode;
+  networkName: string;
+  onCommunityMenuToggle: () => void;
+  onOpenMobileSidebar: () => void;
+  onRealtimeEventsOpen?: () => void;
+  realtimeStatus: 'connected' | 'reconnecting';
+  selectedChannel?: CommunityTextChannel;
+}) {
+  const title = selectedChannel ? `# ${selectedChannel.name}` : community.name;
+  const subtitle = selectedChannel ? (
+    <p className="truncate text-sm text-white/50">
+      {copy.communities.channelMetadataOnly}{' '}
+      <span title={community.networkId}>{networkName}</span>
+    </p>
+  ) : (
+    <p className="truncate text-sm text-white/50">{community.description}</p>
+  );
+
+  return (
+    <WorkspaceHeader
+      avatar={
+        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+          <FallbackImage
+            src={avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={community.name.slice(0, 1).toUpperCase()}
+          />
+        </div>
+      }
+      lock={
+        <span
+          className={cx(
+            'shrink-0',
+            channelEncryptionReady ? 'text-emerald-300' : 'text-rose-300',
+          )}
+          title={channelEncryptionTooltip}
+          aria-label={channelEncryptionTooltip}
+        >
+          <LockIcon locked={channelEncryptionReady} />
+        </span>
+      }
+      menuContent={
+        <>
+          {communityLeaveError ? (
+            <div className="absolute bottom-[calc(100%+.5rem)] right-0 z-40 w-72 rounded-2xl border border-rose-300/20 bg-rose-500/15 p-3 text-xs font-black text-rose-100 shadow-2xl shadow-black/40">
+              {communityLeaveError}
+            </div>
+          ) : null}
+          {menuContent}
+        </>
+      }
+      menuOpen={communityMenuOpen}
+      onMenuToggle={onCommunityMenuToggle}
+      onOpenSidebar={onOpenMobileSidebar}
+      onRealtimeEventsOpen={onRealtimeEventsOpen}
+      realtimeStatus={realtimeStatus}
+      subtitle={subtitle}
+      title={title}
+    >
+      {children}
+    </WorkspaceHeader>
+  );
+}

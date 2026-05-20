@@ -2,13 +2,13 @@ import type {
   Community,
   IdentityResource,
   NotificationResource,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../i18n/en';
-import { shortId } from '../../../../utils/formatting';
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { shortId } from '../../../../shared/presentation/formatting';
 import {
   identityDisplayName,
-} from '../../../../utils/identityDisplay';
+} from '../../../identities/presentation/view-models/identityDisplay';
 import type {
   NotificationPreview,
   NotificationPreviewContext,

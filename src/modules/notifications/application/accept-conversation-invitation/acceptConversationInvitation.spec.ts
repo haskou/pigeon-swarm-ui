@@ -2,7 +2,7 @@ import type {
   LocalKeychain,
   NotificationResource,
   Session,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 import type { AcceptConversationInvitationPort } from '../ports/acceptConversationInvitationPort';
 
 import { AcceptConversationInvitation } from './acceptConversationInvitation';

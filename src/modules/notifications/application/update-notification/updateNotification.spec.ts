@@ -1,4 +1,4 @@
-import type { NotificationResource, Session } from '../../../../domain/types';
+import type { NotificationResource, Session } from '../../../../shared/domain/pigeonResources.types';
 import { NotificationDecision } from '../../domain/notificationDecision';
 import { NotificationId } from '../../domain/notificationId';
 import type { UpdateNotificationPort } from '../ports/updateNotificationPort';

@@ -1,0 +1,107 @@
+import type { CallParticipant } from '../../../calls/domain/callSession.types';
+import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import { copy } from '../../../../shared/presentation/i18n/en';
+
+interface ConversationActionsMenuProps {
+  activeConversation: ConversationResource;
+  activeConversationName?: string;
+  activeConversationTitle?: string;
+  callParticipants: CallParticipant[];
+  canShareConversationKey: boolean;
+  hasConversationKey: boolean;
+  isGroupConversation: boolean;
+  onClose: () => void;
+  onConversationDataOpen: () => void;
+  onConversationKeyOpen: () => void;
+  onGroupInviteOpen: () => void;
+  onStartCall?: (input: {
+    conversationId: string;
+    kind: 'group' | 'one-to-one';
+    participants: CallParticipant[];
+    title: string;
+  }) => void;
+}
+
+export function ConversationActionsMenu({
+  activeConversation,
+  activeConversationName,
+  activeConversationTitle,
+  callParticipants,
+  canShareConversationKey,
+  hasConversationKey,
+  isGroupConversation,
+  onClose,
+  onConversationDataOpen,
+  onConversationKeyOpen,
+  onGroupInviteOpen,
+  onStartCall,
+}: ConversationActionsMenuProps) {
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-30 cursor-default"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+        {onStartCall && !isGroupConversation ? (
+          <button
+            type="button"
+            onClick={() => {
+              onStartCall({
+                conversationId: activeConversation.id,
+                kind: 'one-to-one',
+                participants: callParticipants,
+                title:
+                  activeConversationTitle ??
+                  activeConversationName ??
+                  activeConversation.id,
+              });
+              onClose();
+            }}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {copy.calls.startCall}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            onConversationDataOpen();
+            onClose();
+          }}
+          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+        >
+          {copy.chat.viewData}
+        </button>
+        {canShareConversationKey ? (
+          <button
+            type="button"
+            onClick={() => {
+              onConversationKeyOpen();
+              onClose();
+            }}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {hasConversationKey
+              ? copy.chat.copyPrivateKey
+              : copy.chat.addPrivateKey}
+          </button>
+        ) : null}
+        {isGroupConversation && hasConversationKey ? (
+          <button
+            type="button"
+            onClick={() => {
+              onGroupInviteOpen();
+              onClose();
+            }}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {copy.chat.invite}
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
+}

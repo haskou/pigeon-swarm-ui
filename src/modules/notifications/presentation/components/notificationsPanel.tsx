@@ -4,13 +4,13 @@ import type {
   ConversationResource,
   IdentityResource,
   NotificationResource,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../i18n/en';
+import { copy } from '../../../../shared/presentation/i18n/en';
 import type {
   IdentityNames,
   IdentityPictures,
-} from '../../../../utils/identityDisplay';
+} from '../../../identities/presentation/view-models/identityDisplay';
 import { MembershipRequestCard } from './membershipRequestCard';
 import { NotificationCard } from './notificationCard';
 import type { NotificationAction } from './notificationAction';

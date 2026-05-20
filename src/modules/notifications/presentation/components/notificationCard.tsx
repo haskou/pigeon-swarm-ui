@@ -1,9 +1,9 @@
-import type { NotificationResource } from '../../../../domain/types';
+import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../i18n/en';
-import { cx } from '../../../../utils/classNameHelper';
-import { formatTime, shortId } from '../../../../utils/formatting';
-import { identityDisplayName } from '../../../../utils/identityDisplay';
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { cx } from '../../../../shared/presentation/classNameHelper';
+import { formatTime, shortId } from '../../../../shared/presentation/formatting';
+import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 import { notificationPreview } from '../view-models/panelNotificationPreview';
 import type {
   NotificationPreview,

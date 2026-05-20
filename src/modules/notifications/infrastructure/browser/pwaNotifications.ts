@@ -1,6 +1,6 @@
-import type { Session } from '../../../../domain/types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
-import { pigeonApplication } from '../../../../application/applicationContainer';
+import { pigeonApplication } from '../../../../app/composition/applicationContainer';
 
 type PwaNotificationPayload = {
   body: string;

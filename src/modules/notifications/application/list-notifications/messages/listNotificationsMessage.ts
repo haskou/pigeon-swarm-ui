@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../domain/types';
+import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 export class ListNotificationsMessage {
   public constructor(private readonly session: Session) {}

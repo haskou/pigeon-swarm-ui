@@ -1,6 +1,6 @@
-import type { NotificationResource, Session } from '../../../../domain/types';
-import type { HttpJsonClient } from '../../../../infrastructure/http/HttpJsonClient';
-import type { RequestSigner } from '../../../../infrastructure/pigeon-api/RequestSigner';
+import type { NotificationResource, Session } from '../../../../shared/domain/pigeonResources.types';
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/httpJsonClient';
+import type { RequestSigner } from '../../../../shared/infrastructure/http/requestSigner';
 import type { NotificationDecision } from '../../domain/notificationDecision';
 import type { NotificationId } from '../../domain/notificationId';
 

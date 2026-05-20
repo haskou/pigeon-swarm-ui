@@ -3,12 +3,12 @@ import type {
   ConversationResource,
   IdentityResource,
   Session,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { communityChannels } from '../../../../domain/communities/communityChannels';
-import { conversationPeerIdentityId } from '../../../../domain/conversations/conversationPeer';
-import { copy } from '../../../../i18n/en';
-import { identityDisplayName } from '../../../../utils/identityDisplay';
+import { communityChannels } from '../../../communities/domain/communityChannels';
+import { conversationPeerIdentityId } from '../../../conversations/domain/conversationPeer';
+import { copy } from '../../../../shared/presentation/i18n/en';
+import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function communityNotificationPreview(
   communities: Community[],

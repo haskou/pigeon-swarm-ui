@@ -2,12 +2,12 @@ import type {
   Community,
   ConversationResource,
   IdentityResource,
-} from '../../../../domain/types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 import type {
   IdentityNames,
   IdentityPictures,
-} from '../../../../utils/identityDisplay';
+} from '../../../identities/presentation/view-models/identityDisplay';
 
 export type NotificationPreview = {
   avatarUrl?: string;

@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../domain/types';
+import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { NotificationDecision } from '../../../domain/notificationDecision';
 import { NotificationId } from '../../../domain/notificationId';
