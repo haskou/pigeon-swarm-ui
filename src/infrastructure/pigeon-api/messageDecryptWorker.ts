@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {

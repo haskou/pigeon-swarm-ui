@@ -7,6 +7,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   MessageAttachment,
+  PollResource,
   StickerMessageReference,
 } from '../../domain/types';
 import type {
@@ -23,11 +24,11 @@ import {
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { PollCard } from '../chat/PollCard';
 import {
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
-  startsMessageDay,
 } from '../chat/messageTimelineHelpers';
 import { LockIcon } from './LockIcon';
 
@@ -63,9 +64,13 @@ interface ChatMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onPollClose?: (poll: PollResource) => Promise<void>;
+  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
+  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
+  polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -89,9 +94,13 @@ export function ChatMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
   onStickerClick,
   onScroll,
   reactionAuthorNames,
+  polls = [],
   scrollerRef,
 }: ChatMessageTimelineProps) {
   const loadingInitialMessages =
@@ -126,7 +135,11 @@ export function ChatMessageTimeline({
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
+          onPollClose={onPollClose}
+          onPollRemoveVote={onPollRemoveVote}
+          onPollVote={onPollVote}
           onStickerClick={onStickerClick}
+          polls={polls}
           reactionAuthorNames={reactionAuthorNames}
         />
       )}
@@ -162,7 +175,11 @@ function MessageTimelineContent({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
   onStickerClick,
+  polls = [],
   reactionAuthorNames,
 }: Omit<
   ChatMessageTimelineProps,
@@ -172,6 +189,24 @@ function MessageTimelineContent({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+  const timelineItems = useMemo(
+    () =>
+      [
+        ...messages.map((message) => ({
+          id: `message:${message.id}`,
+          message,
+          timestamp: message.timestamp,
+          type: 'message' as const,
+        })),
+        ...polls.map((poll) => ({
+          id: `poll:${poll.id}`,
+          poll,
+          timestamp: poll.createdAt,
+          type: 'poll' as const,
+        })),
+      ].sort((left, right) => left.timestamp - right.timestamp),
+    [messages, polls],
+  );
 
   return (
     <>
@@ -180,33 +215,51 @@ function MessageTimelineContent({
         {hasReachedMessageStart &&
           messages.length > 0 &&
           messageState !== 'loading' && <ReachedMessageStart />}
-        {messages.map((message, index) => (
-          <MessageTimelineItem
-            key={message.id}
-            currentIdentityId={currentIdentityId}
-            currentIdentityName={currentIdentityName}
-            identityNames={identityNames}
-            identityPictures={identityPictures}
-            isGroupConversation={isGroupConversation}
-            loadAttachmentPreview={loadAttachmentPreview}
-            message={message}
-            onAttachmentOpen={onAttachmentOpen}
-            onAuthorProfileOpen={onAuthorProfileOpen}
-            onMessageMenuOpen={onMessageMenuOpen}
-            onReactionToggle={onReactionToggle}
-            onReplyReferenceClick={onReplyReferenceClick}
-            onRetryMessage={onRetryMessage}
-            onStickerClick={onStickerClick}
-            previousMessage={messages[index - 1]}
-            reactionAuthorNames={reactionAuthorNames}
-            replyMessage={
-              message.replyToMessageId
-                ? messagesById.get(message.replyToMessageId)
-                : undefined
-            }
-          />
-        ))}
-        {messages.length === 0 && messageState !== 'loading' && (
+        {timelineItems.map((item, index) =>
+          item.type === 'poll' ? (
+            <PollTimelineItem
+              key={item.id}
+              currentIdentityId={currentIdentityId}
+              onClose={onPollClose}
+              onRemoveVote={onPollRemoveVote}
+              onVote={onPollVote}
+              poll={item.poll}
+              previousTimestamp={timelineItems[index - 1]?.timestamp}
+            />
+          ) : (
+            <MessageTimelineItem
+              key={item.id}
+              currentIdentityId={currentIdentityId}
+              currentIdentityName={currentIdentityName}
+              identityNames={identityNames}
+              identityPictures={identityPictures}
+              isGroupConversation={isGroupConversation}
+              loadAttachmentPreview={loadAttachmentPreview}
+              message={item.message}
+              onAttachmentOpen={onAttachmentOpen}
+              onAuthorProfileOpen={onAuthorProfileOpen}
+              onMessageMenuOpen={onMessageMenuOpen}
+              onReactionToggle={onReactionToggle}
+              onReplyReferenceClick={onReplyReferenceClick}
+              onRetryMessage={onRetryMessage}
+              onStickerClick={onStickerClick}
+              previousMessage={
+                timelineItems
+                  .slice(0, index)
+                  .reverse()
+                  .find((candidate) => candidate.type === 'message')?.message
+              }
+              previousTimestamp={timelineItems[index - 1]?.timestamp}
+              reactionAuthorNames={reactionAuthorNames}
+              replyMessage={
+                item.message.replyToMessageId
+                  ? messagesById.get(item.message.replyToMessageId)
+                  : undefined
+              }
+            />
+          ),
+        )}
+        {timelineItems.length === 0 && messageState !== 'loading' && (
           <EmptyTimelineState hasConversationKey={hasConversationKey} />
         )}
         <div ref={bottomRef} />
@@ -231,6 +284,7 @@ function MessageTimelineItem({
   onRetryMessage,
   onStickerClick,
   previousMessage,
+  previousTimestamp,
   reactionAuthorNames,
   replyMessage,
 }: {
@@ -249,10 +303,11 @@ function MessageTimelineItem({
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];
   onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
   previousMessage?: ChatMessage;
+  previousTimestamp?: number;
   reactionAuthorNames: Record<string, string>;
   replyMessage?: ChatMessage;
 }) {
-  const startsNewDay = startsMessageDay(previousMessage, message);
+  const startsNewDay = startsTimelineDay(previousTimestamp, message.timestamp);
   const startsNewAuthorRun = startsAuthorRun(previousMessage, message);
 
   return (
@@ -301,6 +356,59 @@ function MessageTimelineItem({
       </div>
     </Fragment>
   );
+}
+
+function PollTimelineItem({
+  currentIdentityId,
+  onClose,
+  onRemoveVote,
+  onVote,
+  poll,
+  previousTimestamp,
+}: {
+  currentIdentityId: string;
+  onClose?: (poll: PollResource) => Promise<void>;
+  onRemoveVote?: (poll: PollResource) => Promise<void>;
+  onVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
+  poll: PollResource;
+  previousTimestamp?: number;
+}) {
+  return (
+    <Fragment>
+      {startsTimelineDay(previousTimestamp, poll.createdAt) && (
+        <DateSeparator label={formatDateSeparator(poll.createdAt)} />
+      )}
+      <div className="mt-4">
+        <PollCard
+          currentIdentityId={currentIdentityId}
+          onClose={onClose}
+          onRemoveVote={onRemoveVote ?? noopPollUpdate}
+          onVote={onVote ?? noopPollVote}
+          poll={poll}
+        />
+      </div>
+    </Fragment>
+  );
+}
+
+function startsTimelineDay(
+  previousTimestamp: number | undefined,
+  timestamp: number,
+): boolean {
+  if (!previousTimestamp) return true;
+
+  return (
+    new Date(previousTimestamp).toDateString() !==
+    new Date(timestamp).toDateString()
+  );
+}
+
+async function noopPollUpdate(): Promise<void> {
+  return undefined;
+}
+
+async function noopPollVote(): Promise<void> {
+  return undefined;
 }
 
 function LoadingOlderMessages() {

@@ -9,12 +9,16 @@ import { MemberRow } from './MemberRow';
 
 export function CommunityMembersRolesPanel({
   bannedMemberIds,
+  canBanMembers,
+  canKickMembers,
+  canManageRoles,
   editableRoles,
   memberIdentities,
   memberIds,
   memberPictures,
   memberRoleDrafts,
   onBan,
+  onKick,
   onSaveRoles,
   onToggleMemberRole,
   onUnban,
@@ -22,12 +26,16 @@ export function CommunityMembersRolesPanel({
   state,
 }: {
   bannedMemberIds: string[];
+  canBanMembers: boolean;
+  canKickMembers: boolean;
+  canManageRoles: boolean;
   editableRoles: CommunityRoleResource[];
   memberIdentities: Record<string, IdentityResource>;
   memberIds: string[];
   memberPictures: Record<string, string>;
   memberRoleDrafts: Record<string, string[]>;
   onBan: (identityId: string) => void;
+  onKick: (identityId: string) => void;
   onSaveRoles: (identityId: string) => void;
   onToggleMemberRole: (identityId: string, roleId: string) => void;
   onUnban: (identityId: string) => void;
@@ -54,7 +62,7 @@ export function CommunityMembersRolesPanel({
                   owner={identityId === ownerIdentityId}
                   pictureUrl={memberPictures[identityId] ?? null}
                 />
-                {editableRoles.length > 0 && (
+                {canManageRoles && editableRoles.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {editableRoles.map((role) => (
                       <label
@@ -82,14 +90,28 @@ export function CommunityMembersRolesPanel({
                   </div>
                 )}
                 {identityId !== ownerIdentityId && (
-                  <button
-                    type="button"
-                    onClick={() => onBan(identityId)}
-                    disabled={state === 'loading'}
-                    className="mt-3 rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {copy.communities.banMember}
-                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {canKickMembers && (
+                      <button
+                        type="button"
+                        onClick={() => onKick(identityId)}
+                        disabled={state === 'loading'}
+                        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {copy.communities.kickMember}
+                      </button>
+                    )}
+                    {canBanMembers && (
+                      <button
+                        type="button"
+                        onClick={() => onBan(identityId)}
+                        disabled={state === 'loading'}
+                        className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {copy.communities.banMember}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

@@ -34,6 +34,7 @@ import type {
   IdentityResource,
   MessageReplyPreview,
   MessageResource,
+  PollResource,
   SelectablePresenceStatus,
   Session,
   StickerMessageReference,
@@ -63,6 +64,7 @@ import { shortId } from '../../utils/formatting';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
 import { Composer } from '../chat/Composer';
+import { CreatePollDialog } from '../chat/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../chat/StickerPackPreviewDialog';
 import { TypingIndicator } from '../chat/TypingIndicator';
 import { useAttachmentDownload } from '../chat/useAttachmentDownload';
@@ -324,6 +326,8 @@ export function CommunityWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [polls, setPolls] = useState<PollResource[]>([]);
+  const [pollDialogOpen, setPollDialogOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>
@@ -346,6 +350,18 @@ export function CommunityWorkspace({
   const networkName = network?.name ?? shortId(community.networkId);
   const selectedChannel = textChannels.find(
     (channel) => channel.id === selectedChannelId,
+  );
+  const selectedChannelPolls = useMemo(
+    () =>
+      selectedChannelId
+        ? polls.filter(
+            (poll) =>
+              poll.scope.type === 'community_channel' &&
+              poll.scope.communityId === community.id &&
+              poll.scope.channelId === selectedChannelId,
+          )
+        : [],
+    [community.id, polls, selectedChannelId],
   );
   const communityKey = session.keychain.conversations[community.id];
   const activeVoiceChannelId =
@@ -1047,6 +1063,41 @@ export function CommunityWorkspace({
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
   };
+  const upsertPoll = useCallback((poll: PollResource) => {
+    setPolls((current) =>
+      [...current.filter((item) => item.id !== poll.id), poll].sort(
+        (left, right) => left.createdAt - right.createdAt,
+      ),
+    );
+  }, []);
+  const handleCreatePoll = async (input: {
+    allowsMultipleVotes: boolean;
+    options: { id: string; text: string }[];
+    question: string;
+  }) => {
+    if (!selectedChannel) return;
+
+    const poll = await pigeonApplication.createPoll(session, {
+      allowsMultipleVotes: input.allowsMultipleVotes,
+      channelId: selectedChannel.id,
+      communityId: community.id,
+      options: input.options,
+      question: input.question,
+      scopeType: 'community_channel',
+    });
+
+    upsertPoll(poll);
+    scrollChannelToBottom('smooth', true);
+  };
+  const votePoll = async (poll: PollResource, optionIds: string[]) => {
+    upsertPoll(await pigeonApplication.votePoll(session, poll.id, optionIds));
+  };
+  const removePollVote = async (poll: PollResource) => {
+    upsertPoll(await pigeonApplication.removePollVote(session, poll.id));
+  };
+  const closePoll = async (poll: PollResource) => {
+    upsertPoll(await pigeonApplication.closePoll(session, poll.id));
+  };
   const handleDraftChange = (value: string) => {
     setDraft(value);
 
@@ -1366,6 +1417,26 @@ export function CommunityWorkspace({
   useEffect(() => {
     if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
 
+    if (realtimeEvent.type.startsWith('polls.v1.')) {
+      const poll = realtimeEvent.attributes.poll as PollResource | undefined;
+      const pollId = realtimeStringAttribute(realtimeEvent, 'pollId');
+
+      if (poll) {
+        upsertPoll(poll);
+
+        return;
+      }
+
+      if (pollId) {
+        void pigeonApplication
+          .getPoll(session, pollId)
+          .then(upsertPoll)
+          .catch(() => undefined);
+      }
+
+      return;
+    }
+
     const channelId = realtimeStringAttribute(realtimeEvent, 'channelId');
 
     if (!channelId || channelId !== selectedChannelId) return;
@@ -1467,7 +1538,9 @@ export function CommunityWorkspace({
     realtimeEvent,
     selectedChannelId,
     session.identity.id,
+    session,
     scrollChannelToBottom,
+    upsertPoll,
   ]);
 
   return (
@@ -1705,9 +1778,13 @@ export function CommunityWorkspace({
               }
               onReplyReferenceClick={handleReplyReferenceClick}
               onRetryMessage={retryChannelMessage}
+              onPollClose={closePoll}
+              onPollRemoveVote={removePollVote}
+              onPollVote={votePoll}
               onScroll={handleMessagesScroll}
               onStickerClick={handleStickerClick}
               reactionAuthorNames={reactionAuthorNames}
+              polls={selectedChannelPolls}
               scrollerRef={scrollerRef}
               session={session}
               visibleMessages={visibleMessages}
@@ -1748,6 +1825,11 @@ export function CommunityWorkspace({
               }
               mentionTokens={mentionTokens}
               onMentionAutocomplete={autocompleteMention}
+              onPollCreate={
+                currentPermissions.has('create_polls')
+                  ? () => setPollDialogOpen(true)
+                  : undefined
+              }
               progress={attachmentProgress}
               replyTo={replyTarget}
               replyToAuthorName={
@@ -1766,6 +1848,12 @@ export function CommunityWorkspace({
                 onStickerSend={handleSendChannelSticker}
                 session={session}
                 sticker={stickerPackPreview}
+              />
+            )}
+            {pollDialogOpen && (
+              <CreatePollDialog
+                onClose={() => setPollDialogOpen(false)}
+                onSubmit={handleCreatePoll}
               />
             )}
           </>

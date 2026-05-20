@@ -180,6 +180,8 @@ export const copy = {
     initialChannels: 'Initial channels',
     initialChannelsBody:
       'Add the text or voice channels that should exist when the community opens.',
+    kickMember: 'Kick',
+    kickMemberError: 'The member could not be kicked.',
     leave: 'Leave community',
     leaveConfirm: 'Leave this community?',
     leaveError: 'The community could not be left.',
@@ -556,6 +558,29 @@ export const copy = {
       disconnected: 'Offline',
       invisible: 'Invisible',
     },
+  },
+  polls: {
+    close: 'Close poll',
+    closed: 'Closed',
+    create: 'Create poll',
+    createBody:
+      'Polls are visible in this timeline and are not encrypted messages.',
+    createError: 'The poll could not be created.',
+    creating: 'Creating poll...',
+    multipleVotes: 'Allow multiple votes',
+    open: 'Open',
+    option: 'Option',
+    optionInvalid: 'Each option must be 120 characters or fewer.',
+    options: 'Options',
+    optionsInvalid: 'Add 2 to 10 options.',
+    poll: 'Poll',
+    question: 'Question',
+    questionInvalid:
+      'Question is required and must be 200 characters or fewer.',
+    removeVote: 'Remove vote',
+    vote: 'vote',
+    voteAction: 'Vote',
+    votes: 'votes',
   },
   profile: {
     addNetwork: 'Add network',

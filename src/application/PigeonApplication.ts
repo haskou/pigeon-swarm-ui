@@ -23,6 +23,7 @@ import type {
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
+  CreatePollInput,
   IdentityResource,
   IdentityPresence,
   IpfsReplicationStatus,
@@ -33,6 +34,7 @@ import type {
   MessageResource,
   MyStickersResource,
   NotificationResource,
+  PollResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
@@ -79,6 +81,29 @@ import {
   UpdateNotification,
 } from './notifications';
 import { ListPeers, type Peer } from './peers/ListPeers';
+
+function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: { auth: string; p256dh: string };
+} {
+  if (
+    !subscription.endpoint ||
+    !subscription.keys?.auth ||
+    !subscription.keys.p256dh
+  ) {
+    throw new Error('Invalid push subscription.');
+  }
+
+  return {
+    endpoint: subscription.endpoint,
+    expirationTime: subscription.expirationTime,
+    keys: {
+      auth: subscription.keys.auth,
+      p256dh: subscription.keys.p256dh,
+    },
+  };
+}
 
 export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
@@ -492,6 +517,18 @@ export class PigeonApplication {
     );
   }
 
+  public async kickCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.gateway.kickCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
+  }
+
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
@@ -790,6 +827,42 @@ export class PigeonApplication {
     url: string,
   ): Promise<MessageLinkPreview> {
     return await this.gateway.createLinkPreview(session, url);
+  }
+
+  public async createPoll(
+    session: Session,
+    input: CreatePollInput,
+  ): Promise<PollResource> {
+    return await this.gateway.createPoll(session, input);
+  }
+
+  public async getPoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.getPoll(session, pollId);
+  }
+
+  public async votePoll(
+    session: Session,
+    pollId: string,
+    optionIds: string[],
+  ): Promise<PollResource> {
+    return await this.gateway.votePoll(session, pollId, optionIds);
+  }
+
+  public async removePollVote(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.removePollVote(session, pollId);
+  }
+
+  public async closePoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.gateway.closePoll(session, pollId);
   }
 
   public async createNodeNetwork(
@@ -1206,27 +1279,4 @@ export class PigeonApplication {
 
     return { textChannels, voiceChannels };
   }
-}
-
-function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: { auth: string; p256dh: string };
-} {
-  if (
-    !subscription.endpoint ||
-    !subscription.keys?.auth ||
-    !subscription.keys.p256dh
-  ) {
-    throw new Error('Invalid push subscription.');
-  }
-
-  return {
-    endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime,
-    keys: {
-      auth: subscription.keys.auth,
-      p256dh: subscription.keys.p256dh,
-    },
-  };
 }

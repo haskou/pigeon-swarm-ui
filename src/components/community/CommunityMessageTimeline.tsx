@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   IdentityResource,
   MessageAttachment,
+  PollResource,
   Session,
   StickerMessageReference,
 } from '../../domain/types';
@@ -15,12 +16,12 @@ import { formatDateSeparator } from '../../utils/formatting';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
+import { PollCard } from '../chat/PollCard';
 import {
   endsAuthorRun,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
-  startsMessageDay,
 } from '../chat/messageTimelineHelpers';
 import { LockIcon } from '../workspace/LockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
@@ -53,9 +54,13 @@ interface CommunityMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
+  onPollClose?: (poll: PollResource) => Promise<void>;
+  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
+  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   reactionAuthorNames: Record<string, string>;
+  polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
   session: Session;
   visibleMessages: ChatMessage[];
@@ -80,9 +85,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
   onStickerClick,
   onScroll,
   reactionAuthorNames,
+  polls = [],
   scrollerRef,
   session,
   visibleMessages,
@@ -90,6 +99,24 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   const messagesById = useMemo(
     () => new Map(visibleMessages.map((message) => [message.id, message])),
     [visibleMessages],
+  );
+  const timelineItems = useMemo(
+    () =>
+      [
+        ...visibleMessages.map((message) => ({
+          id: `message:${message.id}`,
+          message,
+          timestamp: message.timestamp,
+          type: 'message' as const,
+        })),
+        ...polls.map((poll) => ({
+          id: `poll:${poll.id}`,
+          poll,
+          timestamp: poll.createdAt,
+          type: 'poll' as const,
+        })),
+      ].sort((left, right) => left.timestamp - right.timestamp),
+    [polls, visibleMessages],
   );
 
   return (
@@ -135,13 +162,46 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             </div>
           )}
           {!missingCommunityKey &&
-            visibleMessages.map((message, index) => {
-              const previousMessage = visibleMessages[index - 1];
-              const nextMessage = visibleMessages[index + 1];
+            timelineItems.map((item, index) => {
+              if (item.type === 'poll') {
+                return (
+                  <Fragment key={item.id}>
+                    {startsTimelineDay(
+                      timelineItems[index - 1]?.timestamp,
+                      item.poll.createdAt,
+                    ) && (
+                      <DateSeparator
+                        label={formatDateSeparator(item.poll.createdAt)}
+                      />
+                    )}
+                    <div className="mt-4">
+                      <PollCard
+                        currentIdentityId={session.identity.id}
+                        onClose={onPollClose}
+                        onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
+                        onVote={onPollVote ?? noopPollVote}
+                        poll={item.poll}
+                      />
+                    </div>
+                  </Fragment>
+                );
+              }
+
+              const message = item.message;
+              const previousMessage = timelineItems
+                .slice(0, index)
+                .reverse()
+                .find((candidate) => candidate.type === 'message')?.message;
+              const nextMessage = timelineItems
+                .slice(index + 1)
+                .find((candidate) => candidate.type === 'message')?.message;
               const replyMessage = message.replyToMessageId
                 ? messagesById.get(message.replyToMessageId)
                 : undefined;
-              const startsNewDay = startsMessageDay(previousMessage, message);
+              const startsNewDay = startsTimelineDay(
+                timelineItems[index - 1]?.timestamp,
+                message.timestamp,
+              );
               const startsNewAuthorRun = startsAuthorRun(
                 previousMessage,
                 message,
@@ -149,7 +209,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
               const showAvatar = endsAuthorRun(nextMessage, message);
 
               return (
-                <Fragment key={message.id}>
+                <Fragment key={item.id}>
                   {startsNewDay && (
                     <DateSeparator
                       label={formatDateSeparator(message.timestamp)}
@@ -220,7 +280,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                 </Fragment>
               );
             })}
-          {visibleMessages.length === 0 && messageState !== 'loading' && (
+          {timelineItems.length === 0 && messageState !== 'loading' && (
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
               {copy.communities.emptyChannel}
             </div>
@@ -244,6 +304,26 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     </div>
   );
 });
+
+function startsTimelineDay(
+  previousTimestamp: number | undefined,
+  timestamp: number,
+): boolean {
+  if (!previousTimestamp) return true;
+
+  return (
+    new Date(previousTimestamp).toDateString() !==
+    new Date(timestamp).toDateString()
+  );
+}
+
+async function noopPollUpdate(): Promise<void> {
+  return undefined;
+}
+
+async function noopPollVote(): Promise<void> {
+  return undefined;
+}
 
 function messageMentionTokens(
   message: ChatMessage,

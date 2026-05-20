@@ -30,6 +30,7 @@ import type {
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
+  CreatePollInput,
   AttachmentProgress,
   AttachmentUploadOptions,
   IdentityResource,
@@ -47,6 +48,7 @@ import type {
   PendingMessageAttachment,
   PrivateFileContent,
   PrivateFileUpload,
+  PollResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
@@ -80,6 +82,7 @@ import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
 import { PigeonNotificationsApi } from './PigeonNotificationsApi';
+import { PigeonPollsApi } from './PigeonPollsApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
 import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
 import { PigeonStickersApi } from './PigeonStickersApi';
@@ -181,6 +184,8 @@ export class PigeonApiGateway {
 
   private readonly presence: PigeonPresenceApi;
 
+  private readonly polls: PigeonPollsApi;
+
   private readonly push: PigeonPushApi;
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -224,6 +229,7 @@ export class PigeonApiGateway {
         this.cachedRequest(key, loader),
     );
     this.presence = new PigeonPresenceApi(http, signer);
+    this.polls = new PigeonPollsApi(http, signer);
     this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
     this.stickers = new PigeonStickersApi(http, signer);
@@ -440,6 +446,14 @@ export class PigeonApiGateway {
     identityId: string,
   ): Promise<Community> {
     return await this.communities.unbanMember(session, communityId, identityId);
+  }
+
+  public async kickCommunityMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    return await this.communities.kickMember(session, communityId, identityId);
   }
 
   public async createCommunityJoinRequest(
@@ -680,6 +694,42 @@ export class PigeonApiGateway {
       messageId,
       emoji,
     );
+  }
+
+  public async createPoll(
+    session: Session,
+    input: CreatePollInput,
+  ): Promise<PollResource> {
+    return await this.polls.create(session, input);
+  }
+
+  public async getPoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.polls.get(session, pollId);
+  }
+
+  public async votePoll(
+    session: Session,
+    pollId: string,
+    optionIds: string[],
+  ): Promise<PollResource> {
+    return await this.polls.vote(session, pollId, optionIds);
+  }
+
+  public async removePollVote(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.polls.removeVote(session, pollId);
+  }
+
+  public async closePoll(
+    session: Session,
+    pollId: string,
+  ): Promise<PollResource> {
+    return await this.polls.close(session, pollId);
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {

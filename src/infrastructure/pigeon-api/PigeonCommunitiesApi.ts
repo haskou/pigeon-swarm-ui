@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { UUID } from '@haskou/value-objects';
 
 import type {
@@ -166,6 +167,21 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/bans/${encodeURIComponent(identityId)}`;
+
+    return await this.http.request<Community>(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async kickMember(
+    session: Session,
+    communityId: string,
+    identityId: string,
+  ): Promise<Community> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/members/${encodeURIComponent(identityId)}/kick`;
 
     return await this.http.request<Community>(path, {
       headers: await this.signer.headers(session, 'DELETE', path),

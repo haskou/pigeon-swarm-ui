@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
@@ -79,43 +80,6 @@ function isCancelRequest(
 ): request is CommunityMessageDecryptCancelRequest {
   return 'type' in request && request.type === 'cancel';
 }
-
-self.onmessage = async (
-  event: MessageEvent<
-    CommunityMessageDecryptCancelRequest | CommunityMessageDecryptRequest
-  >,
-) => {
-  const request = event.data;
-
-  if (isCancelRequest(request)) {
-    cancelledRequestIds.add(request.requestId);
-
-    return;
-  }
-
-  try {
-    const messages = await projectMessages(request);
-
-    if (cancelledRequestIds.delete(request.requestId)) return;
-
-    postResponse({
-      messages,
-      requestId: request.requestId,
-      type: 'success',
-    });
-  } catch (caught) {
-    if (cancelledRequestIds.delete(request.requestId)) return;
-
-    postResponse({
-      message:
-        caught instanceof Error
-          ? caught.message
-          : 'Community message decrypt failed',
-      requestId: request.requestId,
-      type: 'error',
-    });
-  }
-};
 
 async function projectMessages(
   request: CommunityMessageDecryptRequest,
@@ -517,3 +481,40 @@ function cloneChatMessage(message: ChatMessage): ChatMessage {
 function postResponse(response: CommunityMessageDecryptResponse): void {
   self.postMessage(response);
 }
+
+self.onmessage = async (
+  event: MessageEvent<
+    CommunityMessageDecryptCancelRequest | CommunityMessageDecryptRequest
+  >,
+) => {
+  const request = event.data;
+
+  if (isCancelRequest(request)) {
+    cancelledRequestIds.add(request.requestId);
+
+    return;
+  }
+
+  try {
+    const messages = await projectMessages(request);
+
+    if (cancelledRequestIds.delete(request.requestId)) return;
+
+    postResponse({
+      messages,
+      requestId: request.requestId,
+      type: 'success',
+    });
+  } catch (caught) {
+    if (cancelledRequestIds.delete(request.requestId)) return;
+
+    postResponse({
+      message:
+        caught instanceof Error
+          ? caught.message
+          : 'Community message decrypt failed',
+      requestId: request.requestId,
+      type: 'error',
+    });
+  }
+};

@@ -135,13 +135,14 @@ export function ManageCommunityDialog({
     isOwner || currentPermissions.has('manage_channels');
   const canManageRoles = isOwner || currentPermissions.has('manage_roles');
   const canBanMembers = isOwner || currentPermissions.has('ban_members');
+  const canManageMembers = isOwner || currentPermissions.has('manage_members');
   const sections = [
     ...(isOwner ? ([['profile', copy.communities.profile]] as const) : []),
     ...(canManageChannels
       ? ([['channels', copy.communities.channels]] as const)
       : []),
     ...(canManageRoles ? ([['roles', copy.communities.roles]] as const) : []),
-    ...(canManageRoles || canBanMembers
+    ...(canManageRoles || canBanMembers || canManageMembers
       ? ([['members', copy.communities.members]] as const)
       : []),
   ];
@@ -432,6 +433,23 @@ export function ManageCommunityDialog({
       await refreshCommunity();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.banMemberError));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const kickMember = async (identityId: string) => {
+    setState('loading');
+    setError(null);
+    try {
+      await pigeonApplication.kickCommunityMember(
+        session,
+        community.id,
+        identityId,
+      );
+      await refreshCommunity();
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.kickMemberError));
     } finally {
       setState('idle');
     }
@@ -884,12 +902,16 @@ export function ManageCommunityDialog({
               {activeSection === 'members' && (
             <CommunityMembersRolesPanel
               bannedMemberIds={community.bannedMemberIds ?? []}
+              canBanMembers={canBanMembers}
+              canKickMembers={canManageMembers}
+              canManageRoles={canManageRoles}
               editableRoles={editableRoles}
               memberIdentities={memberIdentities}
               memberIds={community.memberIds}
               memberPictures={memberPictures}
               memberRoleDrafts={memberRoleDrafts}
               onBan={(identityId) => void banMember(identityId)}
+              onKick={(identityId) => void kickMember(identityId)}
               onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
               onToggleMemberRole={toggleMemberRole}
               onUnban={(identityId) => void unbanMember(identityId)}
