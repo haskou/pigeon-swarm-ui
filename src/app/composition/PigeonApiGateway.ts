@@ -93,6 +93,9 @@ import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
+import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
+import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
+import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -160,13 +163,13 @@ type ConversationInvitationType =
   | 'group_conversation_invitation';
 
 export class PigeonApiGateway {
-  private readonly calls: PigeonCallsApi;
+  private readonly calls: PigeonCallsGateway;
 
   private readonly communities: PigeonCommunitiesApi;
 
   private readonly conversations: ConversationMapper;
 
-  private readonly files: PigeonFilesApi;
+  private readonly files: PigeonFilesGateway;
 
   private readonly http: HttpJsonClient;
 
@@ -198,7 +201,7 @@ export class PigeonApiGateway {
 
   private readonly signer: RequestSigner;
 
-  private readonly stickers: PigeonStickersApi;
+  private readonly stickers: PigeonStickersGateway;
 
   public constructor(
     http: HttpJsonClient = new HttpJsonClient(
@@ -211,7 +214,7 @@ export class PigeonApiGateway {
     ids: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
   ) {
-    this.calls = new PigeonCallsApi(http, signer);
+    this.calls = new PigeonCallsGateway(new PigeonCallsApi(http, signer));
     this.communities = new PigeonCommunitiesApi(
       http,
       signer,
@@ -219,7 +222,9 @@ export class PigeonApiGateway {
         this.cachedRequest(key, loader),
     );
     this.conversations = conversations;
-    this.files = new PigeonFilesApi(http, signer, attachmentCipher);
+    this.files = new PigeonFilesGateway(
+      new PigeonFilesApi(http, signer, attachmentCipher),
+    );
     this.http = http;
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
@@ -238,7 +243,9 @@ export class PigeonApiGateway {
     this.polls = new PigeonPollsApi(http, signer);
     this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
-    this.stickers = new PigeonStickersApi(http, signer);
+    this.stickers = new PigeonStickersGateway(
+      new PigeonStickersApi(http, signer),
+    );
   }
 
   public apiUrl(path: string): string {
@@ -1222,7 +1229,7 @@ export class PigeonApiGateway {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.stickers.markStickerUsed(session, packId, stickerId);
+    await this.stickers.markUsed(session, packId, stickerId);
   }
 
   public async uploadPrivateFile(

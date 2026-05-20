@@ -6,6 +6,15 @@ import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../modules/identities/domain/value-objects/IdentityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../http/RequestSigner';
+import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
+import {
+  RealtimeHeartbeat,
+  type RealtimeHeartbeatActivityMode,
+} from './RealtimeHeartbeat';
+import { RealtimeMessageParser } from './RealtimeMessageParser';
+import { RealtimeTypingPublisher } from './RealtimeTypingPublisher';
+
+export type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeat';
 
 export type RealtimeDomainEvent = {
   aggregate_id: string;
@@ -65,52 +74,43 @@ export type RealtimeTypingInput =
       scope: 'community_channel';
     };
 
-export type RealtimeHeartbeatActivityMode = 'auto' | 'inactive';
-
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
-const heartbeatIntervalMs = 10000;
-const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
-const heartbeatTimeoutCloseCode = 4000;
-const recentActivityWindowMs = 5 * 60 * 1000;
-const activeActivityRefreshMs = 1000;
-
-type ActivityTracker = {
-  isActive: () => boolean;
-  stop: () => void;
-};
 
 export class RealtimeGateway {
-  private readonly heartbeatAcks = new WeakMap<WebSocket, number>();
+  private readonly connection: RealtimeConnectionUrl;
 
-  private readonly heartbeatActivityModes = new Map<
-    string,
-    RealtimeHeartbeatActivityMode
-  >();
+  private readonly heartbeat = new RealtimeHeartbeat();
+
+  private readonly parser = new RealtimeMessageParser();
+
+  private readonly typing = new RealtimeTypingPublisher();
 
   public constructor(
-    private readonly urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
+    urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
     private readonly signer: RequestSigner = new RequestSigner(),
-  ) {}
+  ) {
+    this.connection = new RealtimeConnectionUrl(urls);
+  }
 
   public setHeartbeatActivityMode(
     session: Session,
     mode: RealtimeHeartbeatActivityMode,
   ): void {
-    this.heartbeatActivityModes.set(session.identity.id, mode);
+    this.heartbeat.setActivityMode(session, mode);
   }
 
   public async connect(
     session: Session,
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
-    const path = this.path('/ws');
+    const path = this.connection.path('/ws');
     const timestamp = `${Date.now()}`;
     const nonce = UUID.generate().toString();
     const signature = await session.encryptedKeyPair.sign(
       this.signer.payload('GET', path, timestamp, nonce, {}),
       session.password,
     );
-    const url = this.url('/ws');
+    const url = this.connection.websocket('/ws');
 
     url.searchParams.set(
       'identityId',
@@ -134,14 +134,19 @@ export class RealtimeGateway {
 
     socket.addEventListener('message', (event) => {
       this.debug('message', event.data);
-      const message = this.parseMessage(event.data);
+      const message = this.parser.parse(event.data);
 
       if (message?.type === 'connection_ack') {
-        stopHeartbeat ??= this.startHeartbeat(socket, url, session);
+        stopHeartbeat ??= this.heartbeat.start(
+          socket,
+          session,
+          (active) => this.sendIdentityHeartbeat(socket, active),
+          (data) => this.logError('heartbeat-timeout', url, data),
+        );
       }
 
       if (message?.type === 'heartbeat_ack') {
-        this.ackHeartbeat(socket);
+        this.heartbeat.acknowledge(socket);
       }
 
       if (message) onMessage(message);
@@ -170,123 +175,7 @@ export class RealtimeGateway {
   }
 
   public sendTyping(socket: WebSocket, input: RealtimeTypingInput): void {
-    if (socket.readyState !== 1) return;
-
-    socket.send(
-      JSON.stringify({
-        ...input,
-        type: 'typing',
-      }),
-    );
-    this.debug('typing', input);
-  }
-
-  private parseMessage(data: unknown): RealtimeMessage | null {
-    if (typeof data !== 'string') return null;
-
-    try {
-      const parsed = JSON.parse(data) as RealtimeMessage;
-
-      return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private path(path: string): string {
-    return this.url(path).pathname;
-  }
-
-  private startHeartbeat(
-    socket: WebSocket,
-    url: URL,
-    session: Session,
-  ): () => void {
-    this.ackHeartbeat(socket);
-    const activity = this.trackActivity(() => {
-      this.sendIdentityHeartbeat(
-        socket,
-        this.heartbeatActive(session.identity.id, activity),
-      );
-    });
-
-    const timer = globalThis.setInterval(() => {
-      if (Date.now() - this.lastHeartbeatAckAt(socket) >= heartbeatTimeoutMs) {
-        this.logError('heartbeat-timeout', url, {
-          intervalMs: heartbeatIntervalMs,
-          timeoutMs: heartbeatTimeoutMs,
-        });
-        socket.close(heartbeatTimeoutCloseCode, 'Realtime heartbeat timed out');
-
-        return;
-      }
-
-      this.sendIdentityHeartbeat(
-        socket,
-        this.heartbeatActive(session.identity.id, activity),
-      );
-    }, heartbeatIntervalMs);
-
-    return () => {
-      activity.stop();
-      globalThis.clearInterval(timer);
-    };
-  }
-
-  private heartbeatActive(
-    identityId: string,
-    activity: ActivityTracker,
-  ): boolean {
-    return (
-      (this.heartbeatActivityModes.get(identityId) ?? 'auto') === 'auto' &&
-      activity.isActive()
-    );
-  }
-
-  private trackActivity(onActiveAgain: () => void): ActivityTracker {
-    let lastActivityAt = Date.now();
-    const markActive = () => {
-      const now = Date.now();
-      const wasInactive =
-        now - lastActivityAt > recentActivityWindowMs ||
-        globalThis.document?.visibilityState === 'hidden';
-
-      if (!wasInactive && now - lastActivityAt < activeActivityRefreshMs) {
-        return;
-      }
-
-      lastActivityAt = now;
-
-      if (wasInactive) onActiveAgain();
-    };
-    const movementEvent =
-      'PointerEvent' in globalThis ? 'pointermove' : 'mousemove';
-    const activityEvents = [
-      'focus',
-      'keydown',
-      'mousedown',
-      'pointerdown',
-      'scroll',
-      'touchstart',
-      movementEvent,
-    ];
-
-    for (const eventName of activityEvents) {
-      globalThis.addEventListener?.(eventName, markActive, {
-        passive: true,
-      });
-    }
-
-    return {
-      isActive: () =>
-        globalThis.document?.visibilityState !== 'hidden' &&
-        Date.now() - lastActivityAt <= recentActivityWindowMs,
-      stop: () => {
-        for (const eventName of activityEvents) {
-          globalThis.removeEventListener?.(eventName, markActive);
-        }
-      },
-    };
+    this.typing.send(socket, input, (event, data) => this.debug(event, data));
   }
 
   private sendIdentityHeartbeat(socket: WebSocket, active: boolean): void {
@@ -299,26 +188,6 @@ export class RealtimeGateway {
       }),
     );
     this.debug('heartbeat', 'sent');
-  }
-
-  private ackHeartbeat(socket: WebSocket): void {
-    this.heartbeatAcks.set(socket, Date.now());
-  }
-
-  private lastHeartbeatAckAt(socket: WebSocket): number {
-    return this.heartbeatAcks.get(socket) ?? 0;
-  }
-
-  private url(path: string): URL {
-    const url = new URL(this.urls.build(path), this.currentOrigin());
-
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-
-    return url;
-  }
-
-  private currentOrigin(): string {
-    return globalThis.location?.origin ?? 'http://localhost';
   }
 
   private logError(event: string, url: URL, data: unknown): void {

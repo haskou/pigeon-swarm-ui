@@ -86,6 +86,7 @@ import {
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
+import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -1086,36 +1087,14 @@ export function CommunityWorkspace({
       ),
     );
   }, []);
-  const handleCreatePoll = async (input: {
-    allowsMultipleVotes: boolean;
-    options: { id: string; text: string }[];
-    question: string;
-  }) => {
-    if (!selectedChannel) return;
-
-    const poll = await applicationContainer.createPoll(session, {
-      allowsMultipleVotes: input.allowsMultipleVotes,
-      channelId: selectedChannel.id,
+  const { closePoll, handleCreatePoll, removePollVote, votePoll } =
+    useCommunityPollWorkflow({
       communityId: community.id,
-      options: input.options,
-      question: input.question,
-      scopeType: 'community_channel',
+      scrollToBottom: scrollChannelToBottom,
+      selectedChannelId: selectedChannel?.id ?? null,
+      session,
+      upsertPoll,
     });
-
-    upsertPoll(poll);
-    scrollChannelToBottom('smooth', true);
-  };
-  const votePoll = async (poll: PollResource, optionIds: string[]) => {
-    upsertPoll(
-      await applicationContainer.votePoll(session, poll.id, optionIds),
-    );
-  };
-  const removePollVote = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.removePollVote(session, poll.id));
-  };
-  const closePoll = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.closePoll(session, poll.id));
-  };
   const handleDraftChange = (value: string) => {
     setDraft(value);
 

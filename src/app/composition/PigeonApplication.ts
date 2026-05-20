@@ -1,5 +1,3 @@
-import { KeyPair } from '@haskou/value-objects';
-
 import type {
   CallIceServerConfig,
   CallResource,
@@ -50,10 +48,6 @@ import type {
 
 import { PublishMessageAttachmentsMessage } from '../../modules/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
 import { PublishMessageAttachments } from '../../modules/attachments/application/publish-message-attachments/PublishMessageAttachments';
-import { ListCalls } from '../../modules/calls/application/list-calls/ListCalls';
-import { ListCallsMessage } from '../../modules/calls/application/list-calls/messages/ListCallsMessage';
-import { ListCommunities } from '../../modules/communities/application/list-communities/ListCommunities';
-import { ListCommunitiesMessage } from '../../modules/communities/application/list-communities/messages/ListCommunitiesMessage';
 import { CreateConversation } from '../../modules/conversations/application/create-conversation/CreateConversation';
 import { CreateConversationMessage } from '../../modules/conversations/application/create-conversation/messages/CreateConversationMessage';
 import {
@@ -112,6 +106,9 @@ import {
   type RealtimeTypingInput,
 } from '../../shared/infrastructure/realtime/realtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonCallsApplication } from './PigeonCallsApplication';
+import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
   endpoint: string;
@@ -137,9 +134,13 @@ function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
 }
 
 export class PigeonApplication {
+  private readonly calls: PigeonCallsApplication;
+
+  private readonly communities: PigeonCommunitiesApplication;
+
   private readonly gateway: PigeonApiGateway;
 
-  private readonly realtime: RealtimeGateway;
+  private readonly realtimeApplication: PigeonRealtimeApplication;
 
   private readonly acceptInvitationUseCase: AcceptConversationInvitation;
 
@@ -150,10 +151,6 @@ export class PigeonApplication {
   private readonly createNetworkUseCase: CreateNetwork;
 
   private readonly joinNetworkUseCase: JoinNetwork;
-
-  private readonly listCallsUseCase: ListCalls;
-
-  private readonly listCommunitiesUseCase: ListCommunities;
 
   private readonly deleteMessageUseCase: DeleteMessage;
 
@@ -194,7 +191,9 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.gateway = gateway;
-    this.realtime = realtime;
+    this.calls = new PigeonCallsApplication(gateway);
+    this.communities = new PigeonCommunitiesApplication(gateway);
+    this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.acceptInvitationUseCase = new AcceptConversationInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
@@ -210,13 +209,6 @@ export class PigeonApplication {
           name.toString(),
           key.toString(),
         ),
-    });
-    this.listCallsUseCase = new ListCalls({
-      list: async (message) => await gateway.listCalls(message.getSession()),
-    });
-    this.listCommunitiesUseCase = new ListCommunities({
-      list: async (message) =>
-        await gateway.listCommunities(message.getSession()),
     });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
@@ -281,20 +273,20 @@ export class PigeonApplication {
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
-    return await this.listCallsUseCase.list(new ListCallsMessage(session));
+    return await this.calls.list(session);
   }
 
   public async getCall(
     session: Session,
     callId: string,
   ): Promise<CallResource> {
-    return await this.gateway.getCall(session, callId);
+    return await this.calls.get(session, callId);
   }
 
   public async getCallIceServers(
     session: Session,
   ): Promise<CallIceServerConfig> {
-    return await this.gateway.getCallIceServers(session);
+    return await this.calls.getIceServers(session);
   }
 
   public async getIpfsReplicationStatus(
@@ -328,7 +320,7 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startConversationCall(session, conversationId);
+    return await this.calls.startConversation(session, conversationId);
   }
 
   public async startCommunityChannelCall(
@@ -336,7 +328,7 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startCommunityChannelCall(
+    return await this.calls.startCommunityChannel(
       session,
       communityId,
       channelId,
@@ -347,22 +339,22 @@ export class PigeonApplication {
     session: Session,
     callId: string,
   ): Promise<CallResource> {
-    return await this.gateway.joinCall(session, callId);
+    return await this.calls.join(session, callId);
   }
 
   public async leaveCall(session: Session, callId: string): Promise<void> {
-    await this.gateway.leaveCall(session, callId);
+    await this.calls.leave(session, callId);
   }
 
   public async heartbeatCallParticipant(
     session: Session,
     callId: string,
   ): Promise<void> {
-    await this.gateway.heartbeatCallParticipant(session, callId);
+    await this.calls.heartbeatParticipant(session, callId);
   }
 
   public async endCall(session: Session, callId: string): Promise<void> {
-    await this.gateway.endCall(session, callId);
+    await this.calls.end(session, callId);
   }
 
   public async sendCallSignal(
@@ -370,28 +362,28 @@ export class PigeonApplication {
     callId: string,
     signal: CallSignalPayload,
   ): Promise<void> {
-    await this.gateway.sendCallSignal(session, callId, signal);
+    await this.calls.sendSignal(session, callId, signal);
   }
 
   public async connectRealtime(
     session: Session,
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
-    return await this.realtime.connect(session, onMessage);
+    return await this.realtimeApplication.connect(session, onMessage);
   }
 
   public setRealtimeHeartbeatActivityMode(
     session: Session,
     mode: RealtimeHeartbeatActivityMode,
   ): void {
-    this.realtime.setHeartbeatActivityMode(session, mode);
+    this.realtimeApplication.setHeartbeatActivityMode(session, mode);
   }
 
   public sendRealtimeTyping(
     socket: WebSocket,
     input: RealtimeTypingInput,
   ): void {
-    this.realtime.sendTyping(socket, input);
+    this.realtimeApplication.sendTyping(socket, input);
   }
 
   public async getPushVapidPublicKey(): Promise<{
@@ -453,16 +445,14 @@ export class PigeonApplication {
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
-    return await this.listCommunitiesUseCase.list(
-      new ListCommunitiesMessage(session),
-    );
+    return await this.communities.list(session);
   }
 
   public async getCommunity(
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    return await this.gateway.getCommunity(session, communityId);
+    return await this.communities.get(session, communityId);
   }
 
   public async listCommunityModerationLogs(
@@ -470,7 +460,7 @@ export class PigeonApplication {
     communityId: string,
     input?: { beforeLogId?: string; limit?: number },
   ): Promise<CommunityModerationLogPage> {
-    return await this.gateway.listCommunityModerationLogs(
+    return await this.communities.listModerationLogs(
       session,
       communityId,
       input,
@@ -481,7 +471,7 @@ export class PigeonApplication {
     session: Session,
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
-    return await this.gateway.discoverCommunities(session, input);
+    return await this.communities.discover(session, input);
   }
 
   public async createCommunity(
@@ -499,57 +489,7 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const avatarCid = input.avatar
-      ? (await this.uploadPublicFile(session, input.avatar)).cid
-      : undefined;
-    const bannerCid = input.banner
-      ? (await this.uploadPublicFile(session, input.banner)).cid
-      : undefined;
-
-    const community = await this.gateway.createCommunity(session, {
-      ...(avatarCid ? { avatar: avatarCid } : {}),
-      ...(bannerCid ? { banner: bannerCid } : {}),
-      description: input.description,
-      name: input.name,
-      networkId: input.networkId,
-    });
-    const keyEntry = await this.createCommunityKeyEntry(community.id);
-    const published = await this.publishKeychain(session, {
-      ...session.keychain,
-      conversations: {
-        ...session.keychain.conversations,
-        [community.id]: keyEntry,
-      },
-    });
-    const channelSession = {
-      ...session,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-    const initialChannels = await this.createInitialCommunityChannels(
-      channelSession,
-      community.id,
-      input.channels ?? [],
-    );
-
-    return {
-      community: {
-        ...community,
-        textChannels: [
-          ...community.textChannels,
-          ...initialChannels.textChannels,
-        ],
-        voiceChannels:
-          initialChannels.voiceChannels.length > 0
-            ? [
-                ...(community.voiceChannels ?? []),
-                ...initialChannels.voiceChannels,
-              ]
-            : community.voiceChannels,
-      },
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+    return await this.communities.create(session, input);
   }
 
   public async updateCommunity(
@@ -562,24 +502,7 @@ export class PigeonApplication {
       name?: string;
     },
   ): Promise<Community> {
-    const resolvePublicImageCid = async (
-      value: File | null | string | undefined,
-    ): Promise<string | undefined> => {
-      if (!value) return undefined;
-
-      if (typeof value === 'string') return value;
-
-      return (await this.uploadPublicFile(session, value)).cid;
-    };
-    const avatarCid = await resolvePublicImageCid(input.avatar);
-    const bannerCid = await resolvePublicImageCid(input.banner);
-
-    return await this.gateway.updateCommunity(session, communityId, {
-      ...(avatarCid ? { avatar: avatarCid } : {}),
-      ...(bannerCid ? { banner: bannerCid } : {}),
-      description: input.description,
-      name: input.name,
-    });
+    return await this.communities.update(session, communityId, input);
   }
 
   public async addCommunityMember(
@@ -587,11 +510,7 @@ export class PigeonApplication {
     communityId: string,
     identityId: string,
   ): Promise<CommunityMembershipRequest> {
-    return await this.gateway.addCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.communities.addMember(session, communityId, identityId);
   }
 
   public async banCommunityMember(
@@ -599,11 +518,7 @@ export class PigeonApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.gateway.banCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.communities.banMember(session, communityId, identityId);
   }
 
   public async unbanCommunityMember(
@@ -611,11 +526,7 @@ export class PigeonApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.gateway.unbanCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.communities.unbanMember(session, communityId, identityId);
   }
 
   public async kickCommunityMember(
@@ -623,24 +534,20 @@ export class PigeonApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.gateway.kickCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.communities.kickMember(session, communityId, identityId);
   }
 
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
   ): Promise<CommunityMembershipRequest> {
-    return await this.gateway.createCommunityJoinRequest(session, communityId);
+    return await this.communities.createJoinRequest(session, communityId);
   }
 
   public async listCommunityMembershipRequests(
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
-    return await this.gateway.listCommunityMembershipRequests(session);
+    return await this.communities.listMembershipRequests(session);
   }
 
   public async updateCommunityMembershipRequest(
@@ -648,7 +555,7 @@ export class PigeonApplication {
     requestId: string,
     status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
   ): Promise<CommunityMembershipRequest> {
-    return await this.gateway.updateCommunityMembershipRequest(
+    return await this.communities.updateMembershipRequest(
       session,
       requestId,
       status,
@@ -659,7 +566,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    return await this.gateway.leaveCommunity(session, communityId);
+    return await this.communities.leave(session, communityId);
   }
 
   public async createGroupConversationInvitation(
@@ -682,7 +589,7 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.createCommunityInvitation(
+    return await this.communities.createInvitation(
       session,
       communityId,
       recipientIdentityId,
@@ -699,18 +606,14 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.createCommunityInviteLink(
-      session,
-      communityId,
-      input,
-    );
+    return await this.communities.createInviteLink(session, communityId, input);
   }
 
   public async acceptCommunityInviteLink(
     session: Session,
     inviteToken: string,
   ): Promise<Community> {
-    return await this.gateway.acceptCommunityInviteLink(session, inviteToken);
+    return await this.communities.acceptInviteLink(session, inviteToken);
   }
 
   public async acceptCommunityInviteLinkWithKey(
@@ -722,7 +625,7 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.gateway.acceptCommunityInviteLinkWithKey(
+    return await this.communities.acceptInviteLinkWithKey(
       session,
       inviteToken,
       keyEntry,
@@ -733,14 +636,14 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
   ): Promise<string[]> {
-    return await this.gateway.listCommunityMembers(session, communityId);
+    return await this.communities.listMembers(session, communityId);
   }
 
   public async listCommunityRoles(
     session: Session,
     communityId: string,
   ): Promise<CommunityRoleResource[]> {
-    return await this.gateway.listCommunityRoles(session, communityId);
+    return await this.communities.listRoles(session, communityId);
   }
 
   public async createCommunityRole(
@@ -748,7 +651,7 @@ export class PigeonApplication {
     communityId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.gateway.createCommunityRole(session, communityId, input);
+    return await this.communities.createRole(session, communityId, input);
   }
 
   public async updateCommunityRole(
@@ -757,7 +660,7 @@ export class PigeonApplication {
     roleId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.gateway.updateCommunityRole(
+    return await this.communities.updateRole(
       session,
       communityId,
       roleId,
@@ -770,7 +673,7 @@ export class PigeonApplication {
     communityId: string,
     roleId: string,
   ): Promise<void> {
-    await this.gateway.deleteCommunityRole(session, communityId, roleId);
+    await this.communities.deleteRole(session, communityId, roleId);
   }
 
   public async assignCommunityMemberRoles(
@@ -779,7 +682,7 @@ export class PigeonApplication {
     identityId: string,
     roleIds: string[],
   ): Promise<Community> {
-    return await this.gateway.assignCommunityMemberRoles(
+    return await this.communities.assignMemberRoles(
       session,
       communityId,
       identityId,
@@ -792,11 +695,7 @@ export class PigeonApplication {
     communityId: string,
     name: string,
   ): Promise<CommunityTextChannel> {
-    return await this.gateway.createCommunityTextChannel(
-      session,
-      communityId,
-      name,
-    );
+    return await this.communities.createTextChannel(session, communityId, name);
   }
 
   public async createCommunityVoiceChannel(
@@ -804,7 +703,7 @@ export class PigeonApplication {
     communityId: string,
     name: string,
   ): Promise<CommunityVoiceChannel> {
-    return await this.gateway.createCommunityVoiceChannel(
+    return await this.communities.createVoiceChannel(
       session,
       communityId,
       name,
@@ -815,7 +714,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
   ): Promise<CommunityChannel[]> {
-    return await this.gateway.listCommunityChannels(session, communityId);
+    return await this.communities.listChannels(session, communityId);
   }
 
   public async renameCommunityChannel(
@@ -824,7 +723,7 @@ export class PigeonApplication {
     channelId: string,
     name: string,
   ): Promise<CommunityChannel> {
-    return await this.gateway.renameCommunityChannel(
+    return await this.communities.renameChannel(
       session,
       communityId,
       channelId,
@@ -837,7 +736,7 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
   ): Promise<Community> {
-    return await this.gateway.deleteCommunityChannel(
+    return await this.communities.deleteChannel(
       session,
       communityId,
       channelId,
@@ -850,7 +749,7 @@ export class PigeonApplication {
     channelId: string,
     visibleRoleIds: string[],
   ): Promise<CommunityChannel> {
-    return await this.gateway.updateCommunityChannelPermissions(
+    return await this.communities.updateChannelPermissions(
       session,
       communityId,
       channelId,
@@ -870,7 +769,7 @@ export class PigeonApplication {
       timestamp?: number;
     },
   ): Promise<MessageResource> {
-    return await this.gateway.createCommunityChannelMessage(
+    return await this.communities.createChannelMessage(
       session,
       communityId,
       channelId,
@@ -887,7 +786,7 @@ export class PigeonApplication {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.gateway.listCommunityChannelMessages(
+    return await this.communities.listChannelMessages(
       session,
       communityId,
       channelId,
@@ -901,7 +800,7 @@ export class PigeonApplication {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.gateway.deleteCommunityChannelMessage(
+    await this.communities.deleteChannelMessage(
       session,
       communityId,
       channelId,
@@ -1064,7 +963,7 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.gateway.addCommunityChannelMessageReaction(
+    await this.communities.addChannelMessageReaction(
       session,
       communityId,
       channelId,
@@ -1080,7 +979,7 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.gateway.removeCommunityChannelMessageReaction(
+    await this.communities.removeChannelMessageReaction(
       session,
       communityId,
       channelId,
@@ -1356,54 +1255,5 @@ export class PigeonApplication {
         state,
       }),
     );
-  }
-
-  private async createCommunityKeyEntry(
-    communityId: string,
-  ): Promise<ConversationKeyEntry> {
-    const keyPair = await KeyPair.generate();
-    const primitives = keyPair.toPrimitives();
-
-    return {
-      conversationId: communityId,
-      createdAt: Date.now(),
-      peerIdentityId: '',
-      privateKey: primitives.privateKey,
-      publicKey: primitives.publicKey,
-    };
-  }
-
-  private async createInitialCommunityChannels(
-    session: Session,
-    communityId: string,
-    channels: Array<{ name: string; type: 'text' | 'voice' }>,
-  ): Promise<{
-    textChannels: CommunityTextChannel[];
-    voiceChannels: CommunityVoiceChannel[];
-  }> {
-    const textChannels = [];
-    const voiceChannels = [];
-
-    for (const channel of channels) {
-      if (channel.type === 'voice') {
-        voiceChannels.push(
-          await this.createCommunityVoiceChannel(
-            session,
-            communityId,
-            channel.name,
-          ),
-        );
-      } else {
-        textChannels.push(
-          await this.createCommunityTextChannel(
-            session,
-            communityId,
-            channel.name,
-          ),
-        );
-      }
-    }
-
-    return { textChannels, voiceChannels };
   }
 }

@@ -107,6 +107,7 @@ import { Rail } from './Rail';
 import { useCommunitySelection } from './useCommunitySelection';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
+import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import {
   callSignalTypeAttribute,
@@ -1376,41 +1377,21 @@ export function GlassWorkspace({
     removeCurrentIdentityFromVoicePresence,
   ]);
 
-  useEffect(() => {
-    if (!activeCall || activeCall.status !== 'live') return undefined;
+  const heartbeatActiveCall = useCallback(
+    async (callId: string) => {
+      await applicationContainer.heartbeatCallParticipant(
+        sessionRef.current,
+        callId,
+      );
+    },
+    [],
+  );
 
-    let failedHeartbeats = 0;
-    let stopped = false;
-
-    const sendHeartbeat = () => {
-      void applicationContainer
-        .heartbeatCallParticipant(sessionRef.current, activeCall.id)
-        .then(() => {
-          failedHeartbeats = 0;
-        })
-        .catch((caught) => {
-          failedHeartbeats += 1;
-          logCallWarning('workspace:call-heartbeat:failed', {
-            callId: activeCall.id,
-            failedHeartbeats,
-            error: caught,
-          });
-
-          if (!stopped && failedHeartbeats >= 3) {
-            stopped = true;
-            leaveActiveCall();
-          }
-        });
-    };
-
-    sendHeartbeat();
-    const interval = window.setInterval(sendHeartbeat, 2000);
-
-    return () => {
-      stopped = true;
-      window.clearInterval(interval);
-    };
-  }, [activeCall?.id, activeCall?.status, leaveActiveCall]);
+  useWorkspaceCallHeartbeat({
+    activeCall,
+    heartbeat: heartbeatActiveCall,
+    onHeartbeatFailureLimit: leaveActiveCall,
+  });
 
   useEffect(() => {
     let cancelled = false;
