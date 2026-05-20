@@ -3,7 +3,6 @@ import {
   EncryptedKeyPair,
   EncryptedPrivateKey,
   KeyPair,
-  PrivateKey,
   PublicKey,
   StringValueObject,
   UUID,
@@ -77,6 +76,7 @@ import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 import { PigeonFilesApi } from './PigeonFilesApi';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from './PigeonNodeApi';
+import { PigeonNotificationsApi } from './PigeonNotificationsApi';
 import { PigeonPresenceApi } from './PigeonPresenceApi';
 import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
 import { PigeonStickersApi } from './PigeonStickersApi';
@@ -174,6 +174,8 @@ export class PigeonApiGateway {
 
   private readonly node: PigeonNodeApi;
 
+  private readonly notifications: PigeonNotificationsApi;
+
   private readonly presence: PigeonPresenceApi;
 
   private readonly push: PigeonPushApi;
@@ -212,6 +214,12 @@ export class PigeonApiGateway {
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.node = new PigeonNodeApi(http, signer);
+    this.notifications = new PigeonNotificationsApi(
+      http,
+      signer,
+      <T>(key: string, loader: () => Promise<T>) =>
+        this.cachedRequest(key, loader),
+    );
     this.presence = new PigeonPresenceApi(http, signer);
     this.push = new PigeonPushApi(http, signer);
     this.signer = signer;
@@ -1079,20 +1087,7 @@ export class PigeonApiGateway {
   }
 
   public async createNetwork(name: string, session?: Session): Promise<void> {
-    const path = '/node/networks/';
-    const body = {
-      id: UUID.generate().toString(),
-      key: PrivateKey.generate().toString(),
-      name,
-    };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: session
-        ? await this.signer.headers(session, 'POST', path, body)
-        : undefined,
-      method: 'POST',
-    });
+    await this.node.createNetwork(name, session);
   }
 
   public async joinNetwork(
@@ -1101,16 +1096,7 @@ export class PigeonApiGateway {
     key: string,
     session?: Session,
   ): Promise<void> {
-    const path = '/node/networks/';
-    const body = { id, key, name };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: session
-        ? await this.signer.headers(session, 'POST', path, body)
-        : undefined,
-      method: 'POST',
-    });
+    await this.node.joinNetwork(id, name, key, session);
   }
 
   public async listConversations(
@@ -1145,17 +1131,7 @@ export class PigeonApiGateway {
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
-    const path = '/notifications/?limit=30';
-    const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<{ results: NotificationResource[] }>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-    );
-
-    return result.results;
+    return await this.notifications.list(session);
   }
 
   public async createLinkPreview(
@@ -1496,14 +1472,7 @@ export class PigeonApiGateway {
     notificationId: string,
     state: 'accepted' | 'declined',
   ): Promise<NotificationResource> {
-    const path = `/notifications/${encodeURIComponent(notificationId)}`;
-    const body = { state };
-
-    return await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+    return await this.notifications.update(session, notificationId, state);
   }
 
   public async acceptConversationInvitation(

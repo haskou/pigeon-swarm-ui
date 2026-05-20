@@ -1,3 +1,5 @@
+import { PrivateKey, UUID } from '@haskou/value-objects';
+
 import type { Peer } from '../../application/peers/ListPeers';
 import type { IpfsReplicationStatus, Session } from '../../domain/types';
 import type { HttpJsonClient } from '../http/HttpJsonClient';
@@ -54,6 +56,41 @@ export class PigeonNodeApi {
     );
 
     return result.peers;
+  }
+
+  public async createNetwork(name: string, session?: Session): Promise<void> {
+    const path = '/node/networks/';
+    const body = {
+      id: UUID.generate().toString(),
+      key: PrivateKey.generate().toString(),
+      name,
+    };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
+      method: 'POST',
+    });
+  }
+
+  public async joinNetwork(
+    id: string,
+    name: string,
+    key: string,
+    session?: Session,
+  ): Promise<void> {
+    const path = '/node/networks/';
+    const body = { id, key, name };
+
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: session
+        ? await this.signer.headers(session, 'POST', path, body)
+        : undefined,
+      method: 'POST',
+    });
   }
 
   public async getIpfsReplicationStatus(
