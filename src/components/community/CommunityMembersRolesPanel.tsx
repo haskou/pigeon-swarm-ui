@@ -59,30 +59,46 @@ export function CommunityMembersRolesPanel({
                 pictureUrl={memberPictures[identityId] ?? null}
               />
               {canManageRoles && editableRoles.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {editableRoles.map((role) => (
-                    <label
-                      key={`${identityId}:${role.id}`}
-                      className="flex items-center gap-2 rounded-xl bg-black/25 px-3 py-2 text-xs font-black text-white/70"
+                <div className="mt-3 rounded-2xl bg-black/20 p-3">
+                  <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
+                    {copy.communities.assignRoles}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {editableRoles.map((role) => {
+                      const selected = (
+                        memberRoleDrafts[identityId] ?? []
+                      ).includes(role.id);
+
+                      return (
+                        <button
+                          key={`${identityId}:${role.id}`}
+                          type="button"
+                          onClick={() => onToggleMemberRole(identityId, role.id)}
+                          className={
+                            selected
+                              ? 'rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition'
+                              : 'rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/15 hover:text-white'
+                          }
+                          aria-pressed={selected}
+                        >
+                          {role.name}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => onSaveRoles(identityId)}
+                      disabled={state === 'loading'}
+                      className="rounded-xl bg-fuchsia-400 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <input
-                        type="checkbox"
-                        checked={(memberRoleDrafts[identityId] ?? []).includes(
-                          role.id,
-                        )}
-                        onChange={() => onToggleMemberRole(identityId, role.id)}
-                      />
-                      {role.name}
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => onSaveRoles(identityId)}
-                    disabled={state === 'loading'}
-                    className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {copy.communities.roleSave}
-                  </button>
+                      {copy.communities.saveMemberRoles}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {canManageRoles && editableRoles.length === 0 && (
+                <div className="mt-3 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
+                  {copy.communities.noCustomRoles}
                 </div>
               )}
               {identityId !== ownerIdentityId && (

@@ -637,7 +637,7 @@ export function Composer({
             onChange={handleFilesSelected}
             className="hidden"
           />
-          <div className="relative min-w-0 flex-1">
+          <div className="relative flex min-h-10 min-w-0 flex-1 items-center">
             <ComposerMentionOverlay
               mentionTokens={mentionTokens}
               value={draft}
@@ -655,7 +655,7 @@ export function Composer({
               maxLength={MESSAGE_MAX_LENGTH}
               rows={1}
               className={cx(
-                'relative min-h-10 w-full resize-none bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
+                'relative block min-h-0 w-full resize-none bg-transparent px-2 py-0 text-sm leading-5 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
                 mentionTokens.length > 0
                   ? 'text-transparent caret-white'
                   : 'text-white',
