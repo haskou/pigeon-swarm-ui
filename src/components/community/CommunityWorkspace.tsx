@@ -77,6 +77,12 @@ import {
 } from './CommunityMembersPanel';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import {
+  mergeChatMessages,
+  realtimeMessageAttribute,
+  realtimeStringAttribute,
+  resolveCommunityChannelId,
+} from './communityWorkspaceHelpers';
 import { VoiceChannelButton } from './CommunityVoiceChannelButton';
 import { useCommunityMembers } from './useCommunityMembers';
 
@@ -1745,50 +1751,4 @@ export function CommunityWorkspace({
       </Suspense>
     </>
   );
-}
-
-function resolveCommunityChannelId(
-  channelId: null | string | undefined,
-  channels: CommunityTextChannel[],
-): null | string {
-  if (channelId && channels.some((channel) => channel.id === channelId)) {
-    return channelId;
-  }
-
-  return channels[0]?.id ?? null;
-}
-
-function mergeChatMessages(
-  currentMessages: ChatMessage[],
-  incomingMessages: ChatMessage[],
-): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>();
-
-  for (const message of currentMessages) byId.set(message.id, message);
-  for (const message of incomingMessages) byId.set(message.id, message);
-
-  return [...byId.values()].sort(
-    (left, right) => left.timestamp - right.timestamp,
-  );
-}
-
-function realtimeStringAttribute(
-  event: RealtimeDomainEvent,
-  ...keys: string[]
-): string | undefined {
-  for (const key of keys) {
-    const value = event.attributes[key];
-
-    if (typeof value === 'string' && value.length > 0) return value;
-  }
-
-  return undefined;
-}
-
-function realtimeMessageAttribute(
-  event: RealtimeDomainEvent,
-): MessageResource | null {
-  const value = event.attributes.message;
-
-  return value && typeof value === 'object' ? (value as MessageResource) : null;
 }
