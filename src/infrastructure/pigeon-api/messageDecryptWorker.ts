@@ -11,6 +11,8 @@ import type {
   StickerMessageReference,
 } from '../../domain/types';
 
+import { pollChatMessage } from '../../domain/messages/pollMessageProjection';
+
 type MessageDecryptRequest = {
   conversationId: string;
   copy: {
@@ -147,6 +149,10 @@ async function projectMessage(
   message: MessageResource,
   privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
 ): Promise<ChatMessage> {
+  const pollMessage = pollChatMessage(message, request.currentIdentityId);
+
+  if (pollMessage) return pollMessage;
+
   const cacheKey = projectedMessageCacheKey(request, message);
   const cachedMessage = await cachedProjectedMessage(cacheKey);
 

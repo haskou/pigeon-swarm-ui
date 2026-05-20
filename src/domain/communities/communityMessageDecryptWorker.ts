@@ -13,6 +13,8 @@ import type {
   StickerMessageReference,
 } from '../types';
 
+import { pollChatMessage } from '../messages/pollMessageProjection';
+
 type CommunityMessageDecryptRequest = {
   communityId: string;
   channelId: string;
@@ -116,6 +118,10 @@ async function projectMessage(
   request: CommunityMessageDecryptRequest,
   message: MessageResource,
 ): Promise<ChatMessage> {
+  const pollMessage = pollChatMessage(message, request.currentIdentityId);
+
+  if (pollMessage) return pollMessage;
+
   const cacheKey = projectedMessageCacheKey(request, message);
   const cachedMessage = await cachedProjectedMessage(cacheKey);
 

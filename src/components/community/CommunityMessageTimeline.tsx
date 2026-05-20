@@ -1,3 +1,4 @@
+/* eslint-disable complexity */
 import { Fragment, memo, type RefObject, useMemo } from 'react';
 
 import type {
@@ -16,13 +17,14 @@ import { formatDateSeparator } from '../../utils/formatting';
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
-import { PollCard } from '../chat/PollCard';
+import { messagePollTimelineItems } from '../chat/messagePollTimelineItems';
 import {
   endsAuthorRun,
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
 } from '../chat/messageTimelineHelpers';
+import { PollCard } from '../chat/PollCard';
 import { LockIcon } from '../workspace/LockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
@@ -82,16 +84,16 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onIdentityProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
-  onReactionToggle,
-  onReplyReferenceClick,
-  onRetryMessage,
   onPollClose,
   onPollRemoveVote,
   onPollVote,
-  onStickerClick,
+  onReactionToggle,
+  onReplyReferenceClick,
+  onRetryMessage,
   onScroll,
-  reactionAuthorNames,
+  onStickerClick,
   polls = [],
+  reactionAuthorNames,
   scrollerRef,
   session,
   visibleMessages,
@@ -101,21 +103,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     [visibleMessages],
   );
   const timelineItems = useMemo(
-    () =>
-      [
-        ...visibleMessages.map((message) => ({
-          id: `message:${message.id}`,
-          message,
-          timestamp: message.timestamp,
-          type: 'message' as const,
-        })),
-        ...polls.map((poll) => ({
-          id: `poll:${poll.id}`,
-          poll,
-          timestamp: poll.createdAt,
-          type: 'poll' as const,
-        })),
-      ].sort((left, right) => left.timestamp - right.timestamp),
+    () => messagePollTimelineItems(visibleMessages, polls),
     [polls, visibleMessages],
   );
 
@@ -317,12 +305,12 @@ function startsTimelineDay(
   );
 }
 
-async function noopPollUpdate(): Promise<void> {
-  return undefined;
+function noopPollUpdate(): Promise<void> {
+  return Promise.resolve();
 }
 
-async function noopPollVote(): Promise<void> {
-  return undefined;
+function noopPollVote(): Promise<void> {
+  return Promise.resolve();
 }
 
 function messageMentionTokens(

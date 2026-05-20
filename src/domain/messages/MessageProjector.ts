@@ -14,6 +14,7 @@ import type {
 } from '../types';
 
 import { conversationKeyEntry } from '../conversations/conversationKey';
+import { pollChatMessage } from './pollMessageProjection';
 
 type MessageListEnvelope = {
   cursor?: string | null;
@@ -81,6 +82,10 @@ export class MessageProjector {
     conversationId: string,
     message: MessageResource,
   ): Promise<ChatMessage> {
+    const pollMessage = pollChatMessage(message, session.identity.id);
+
+    if (pollMessage) return pollMessage;
+
     const base = this.baseMessage(session, message);
 
     if (message.type === 'call_event') {

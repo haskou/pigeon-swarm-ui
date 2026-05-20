@@ -539,7 +539,16 @@ export type MessageResource = {
   actorIdentityId?: string;
   durationMs?: number;
   mentions?: CommunityMessageMention[];
+  poll?: PollResource;
   previousMessageIds?: string[];
+  question?: string;
+  options?: PollOption[];
+  allowsMultipleVotes?: boolean;
+  status?: 'closed' | 'open';
+  votes?: PollVote[];
+  scope?: PollScope;
+  creatorIdentityId?: string;
+  expiresAt?: number;
   reactions?: MessageReaction[];
   replyToMessageId?: string;
   targetMessageId?: string;
@@ -571,7 +580,7 @@ export type ChatMessage = {
   id: string;
   authorIdentityId: string;
   content: string;
-  kind?: 'call-event' | 'message';
+  kind?: 'call-event' | 'message' | 'poll';
   deliveryStatus?: 'failed' | 'pending';
   timestamp: number;
   mine: boolean;
@@ -582,6 +591,7 @@ export type ChatMessage = {
   reactions: MessageReaction[];
   linkPreview?: MessageLinkPreview;
   mentions?: CommunityMessageMention[];
+  poll?: PollResource;
   sticker?: StickerMessageReference;
 };
 

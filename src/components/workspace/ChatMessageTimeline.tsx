@@ -24,12 +24,13 @@ import {
 import { DateSeparator } from '../chat/DateSeparator';
 import { MessageBubble } from '../chat/MessageBubble';
 import { MessageListSkeleton } from '../chat/MessageListSkeleton';
-import { PollCard } from '../chat/PollCard';
+import { messagePollTimelineItems } from '../chat/messagePollTimelineItems';
 import {
   messageReplyImage,
   messageReplySticker,
   startsAuthorRun,
 } from '../chat/messageTimelineHelpers';
+import { PollCard } from '../chat/PollCard';
 import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -91,16 +92,16 @@ export function ChatMessageTimeline({
   onAuthorProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
-  onReactionToggle,
-  onReplyReferenceClick,
-  onRetryMessage,
   onPollClose,
   onPollRemoveVote,
   onPollVote,
-  onStickerClick,
+  onReactionToggle,
+  onReplyReferenceClick,
+  onRetryMessage,
   onScroll,
-  reactionAuthorNames,
+  onStickerClick,
   polls = [],
+  reactionAuthorNames,
   scrollerRef,
 }: ChatMessageTimelineProps) {
   const loadingInitialMessages =
@@ -172,12 +173,12 @@ function MessageTimelineContent({
   onAttachmentOpen,
   onAuthorProfileOpen,
   onMessageMenuOpen,
-  onReactionToggle,
-  onReplyReferenceClick,
-  onRetryMessage,
   onPollClose,
   onPollRemoveVote,
   onPollVote,
+  onReactionToggle,
+  onReplyReferenceClick,
+  onRetryMessage,
   onStickerClick,
   polls = [],
   reactionAuthorNames,
@@ -190,21 +191,7 @@ function MessageTimelineContent({
     [messages],
   );
   const timelineItems = useMemo(
-    () =>
-      [
-        ...messages.map((message) => ({
-          id: `message:${message.id}`,
-          message,
-          timestamp: message.timestamp,
-          type: 'message' as const,
-        })),
-        ...polls.map((poll) => ({
-          id: `poll:${poll.id}`,
-          poll,
-          timestamp: poll.createdAt,
-          type: 'poll' as const,
-        })),
-      ].sort((left, right) => left.timestamp - right.timestamp),
+    () => messagePollTimelineItems(messages, polls),
     [messages, polls],
   );
 
@@ -403,12 +390,12 @@ function startsTimelineDay(
   );
 }
 
-async function noopPollUpdate(): Promise<void> {
-  return undefined;
+function noopPollUpdate(): Promise<void> {
+  return Promise.resolve();
 }
 
-async function noopPollVote(): Promise<void> {
-  return undefined;
+function noopPollVote(): Promise<void> {
+  return Promise.resolve();
 }
 
 function LoadingOlderMessages() {
