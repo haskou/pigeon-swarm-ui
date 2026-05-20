@@ -193,6 +193,9 @@ export function Composer({
 
     if (!input) return;
 
+    const shouldKeepBottomVisible =
+      input.selectionStart >= input.value.length && input.selectionEnd >= input.value.length;
+
     input.style.height = 'auto';
 
     const style = window.getComputedStyle(input);
@@ -205,6 +208,21 @@ export function Composer({
 
     input.style.height = `${nextHeight}px`;
     input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
+
+    if (input.scrollHeight <= maxHeight || !shouldKeepBottomVisible) return;
+
+    input.scrollTop = input.scrollHeight;
+    requestAnimationFrame(() => {
+      if (
+        textInputRef.current !== input ||
+        input.selectionStart < input.value.length ||
+        input.selectionEnd < input.value.length
+      ) {
+        return;
+      }
+
+      input.scrollTop = input.scrollHeight;
+    });
   }, []);
 
   const insertEmoji = useCallback(
