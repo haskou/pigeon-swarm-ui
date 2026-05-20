@@ -1,6 +1,7 @@
 import { cx } from '../../utils/classNameHelper';
 
 export type CommunitySettingsSection =
+  | 'banned-members'
   | 'channels'
   | 'invitations'
   | 'members'

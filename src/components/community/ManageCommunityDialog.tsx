@@ -22,6 +22,7 @@ import { copy } from '../../i18n/en';
 import { cx } from '../../utils/classNameHelper';
 import { normalizeIdentityId } from '../../utils/identityId';
 import { toUserErrorMessage } from '../../utils/toUserErrorMessage';
+import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import {
   DialogHeader,
@@ -156,6 +157,9 @@ export function ManageCommunityDialog({
     ...(canManageRoles ? ([['roles', copy.communities.roles]] as const) : []),
     ...(canManageRoles || canBanMembers || canManageMembers
       ? ([['members', copy.communities.members]] as const)
+      : []),
+    ...(canBanMembers
+      ? ([['banned-members', copy.communities.bannedMembers]] as const)
       : []),
     ...(canCreateInvitations || canApproveRequests || canRejectRequests
       ? ([['invitations', copy.communities.invitations]] as const)
@@ -1065,10 +1069,16 @@ export function ManageCommunityDialog({
               onKick={(identityId) => void kickMember(identityId)}
               onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
               onToggleMemberRole={toggleMemberRole}
-              onUnban={(identityId) => void unbanMember(identityId)}
               ownerIdentityId={community.ownerIdentityId}
               state={state}
             />
+              )}
+              {activeSection === 'banned-members' && (
+                <CommunityBannedMembersPanel
+                  bannedMemberIds={community.bannedMemberIds ?? []}
+                  onUnban={(identityId) => void unbanMember(identityId)}
+                  state={state}
+                />
               )}
               {activeSection === 'invitations' && (
                 <CommunityInvitationsPanel
