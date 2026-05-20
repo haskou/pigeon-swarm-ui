@@ -221,7 +221,7 @@ export function MessageBubble({
               onPointerMove={clearLongPressTimer}
               onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-[calc(100%-3.25rem)] select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                 sticker
                   ? 'rounded-2xl bg-transparent p-0'
                   : cx(
