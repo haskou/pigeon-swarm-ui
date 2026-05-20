@@ -171,7 +171,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                           : 'justify-start',
                       )}
                     >
-                      <div className="w-full max-w-xl sm:max-w-[72%]">
+                      <div className="w-full max-w-xl">
                         <PollCard
                           currentIdentityId={session.identity.id}
                           onClose={onPollClose}

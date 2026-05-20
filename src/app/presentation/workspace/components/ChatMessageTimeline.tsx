@@ -369,7 +369,7 @@ function PollTimelineItem({
         <DateSeparator label={formatDateSeparator(poll.createdAt)} />
       )}
       <div className={cx('mt-4 flex', mine ? 'justify-end' : 'justify-start')}>
-        <div className="w-full max-w-xl sm:max-w-[72%]">
+        <div className="w-full max-w-xl">
           <PollCard
             currentIdentityId={currentIdentityId}
             onClose={onClose}
