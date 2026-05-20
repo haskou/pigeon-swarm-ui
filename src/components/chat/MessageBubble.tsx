@@ -187,7 +187,7 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex items-center gap-3', mine && 'justify-end')}
+        className={cx('flex min-w-0 items-center gap-3', mine && 'justify-end')}
       >
         {!mine && (
           <MessageAvatarColumn
@@ -200,13 +200,13 @@ export function MessageBubble({
         )}
         <div
           className={cx(
-            'flex max-w-[96%] flex-col sm:max-w-[72%]',
+            'flex min-w-0 max-w-[96%] flex-col sm:max-w-[72%]',
             mine ? 'items-end' : 'items-start',
           )}
         >
           <div
             className={cx(
-              'flex max-w-full items-end gap-2',
+              'flex min-w-0 max-w-full items-end gap-2',
               mine && 'flex-row-reverse',
             )}
           >
@@ -221,7 +221,7 @@ export function MessageBubble({
               onPointerMove={clearLongPressTimer}
               onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                'min-w-0 max-w-[calc(100%-3.25rem)] select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                 sticker
                   ? 'rounded-2xl bg-transparent p-0'
                   : cx(
@@ -237,13 +237,13 @@ export function MessageBubble({
                   type="button"
                   onClick={() => onReplyReferenceClick(replyMessageId)}
                   className={cx(
-                    'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+                    'mb-2 block w-full min-w-0 max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
                     mine
                       ? 'border-white/20 bg-white/10 hover:bg-white/15'
                       : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',
                   )}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     {replyImageUrl && (
                       <img
                         src={replyImageUrl}
@@ -258,7 +258,7 @@ export function MessageBubble({
                         className="h-10 w-10 shrink-0 rounded-xl object-contain"
                       />
                     )}
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block font-black text-white/75">
                         {copy.messages.replyTo}{' '}
                         {replyAuthorName ?? copy.messages.originalMessage}
