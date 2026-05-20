@@ -200,7 +200,7 @@ export function MessageBubble({
                   : cx(
                       'rounded-2xl px-3 py-1.5',
                       mine
-                        ? 'bg-fuchsia-500 text-left text-white shadow-xl shadow-fuchsia-950/20'
+                        ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
                         : 'border border-white/10 bg-black/25 text-white',
                     ),
               )}

@@ -21,6 +21,7 @@ export function PollCard({
   const currentVote = poll.votes.find(
     (vote) => vote.voterIdentityId === currentIdentityId,
   );
+  const mine = poll.creatorIdentityId === currentIdentityId;
   const counts = useMemo(() => countPollVotes(poll), [poll]);
   const totalVotes = poll.votes.length;
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>(
@@ -72,10 +73,22 @@ export function PollCard({
   };
 
   return (
-    <div className="max-w-xl rounded-2xl border border-white/10 bg-black/25 p-4 text-white shadow-xl shadow-black/20">
+    <div
+      className={cx(
+        'w-full max-w-xl rounded-2xl border p-4 text-white shadow-xl',
+        mine
+          ? 'border-[#6f99aa]/35 bg-[#274279] shadow-[#102938]/25'
+          : 'border-white/10 bg-black/25 shadow-black/20',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-fuchsia-200/70">
+          <div
+            className={cx(
+              'text-[0.65rem] font-black uppercase tracking-[0.16em]',
+              mine ? 'text-cyan-100/70' : 'text-fuchsia-200/70',
+            )}
+          >
             {copy.polls.poll}
           </div>
           <h3 className="mt-1 break-words text-base font-black">
@@ -107,7 +120,10 @@ export function PollCard({
             >
               <span
                 aria-hidden="true"
-                className="absolute bottom-0 left-0 top-0 bg-fuchsia-400/15"
+                className={cx(
+                  'absolute bottom-0 left-0 top-0',
+                  mine ? 'bg-white/12' : 'bg-fuchsia-400/15',
+                )}
                 style={{ width: `${percent}%` }}
               />
               <span className="relative flex items-center gap-3">
@@ -149,7 +165,10 @@ export function PollCard({
               type="button"
               onClick={() => void submitVote()}
               disabled={busy || selectedOptionIds.length === 0}
-              className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className={cx(
+                'rounded-xl bg-white px-3 py-2 text-xs font-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45',
+                mine ? 'text-[#163142]' : 'text-slate-950',
+              )}
             >
               {copy.polls.voteAction}
             </button>

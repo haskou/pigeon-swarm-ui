@@ -17,6 +17,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatDateSeparator } from '../../../../shared/presentation/formatting';
+import { cx } from '../../../../shared/presentation/cx';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
@@ -360,19 +361,23 @@ function PollTimelineItem({
   poll: PollResource;
   previousTimestamp?: number;
 }) {
+  const mine = poll.creatorIdentityId === currentIdentityId;
+
   return (
     <Fragment>
       {startsTimelineDay(previousTimestamp, poll.createdAt) && (
         <DateSeparator label={formatDateSeparator(poll.createdAt)} />
       )}
-      <div className="mt-4">
-        <PollCard
-          currentIdentityId={currentIdentityId}
-          onClose={onClose}
-          onRemoveVote={onRemoveVote ?? noopPollUpdate}
-          onVote={onVote ?? noopPollVote}
-          poll={poll}
-        />
+      <div className={cx('mt-4 flex', mine ? 'justify-end' : 'justify-start')}>
+        <div className="w-full max-w-xl sm:max-w-[72%]">
+          <PollCard
+            currentIdentityId={currentIdentityId}
+            onClose={onClose}
+            onRemoveVote={onRemoveVote ?? noopPollUpdate}
+            onVote={onVote ?? noopPollVote}
+            poll={poll}
+          />
+        </div>
       </div>
     </Fragment>
   );

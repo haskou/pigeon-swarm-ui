@@ -598,11 +598,11 @@ export function Composer({
                 strokeWidth="2"
                 viewBox="0 0 24 24"
               >
-                <path d="M4 19V5" />
-                <path d="M8 17V9" />
-                <path d="M12 15V7" />
-                <path d="M16 13v-3" />
-                <path d="M20 19V4" />
+                <rect height="16" rx="3" width="16" x="4" y="4" />
+                <path d="m8 9 1 1 2-2" />
+                <path d="M13 9h3" />
+                <path d="m8 14 1 1 2-2" />
+                <path d="M13 14h3" />
               </svg>
             </button>
           )}

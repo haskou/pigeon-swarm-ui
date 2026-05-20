@@ -14,6 +14,7 @@ import type { MarkdownMention } from '../../../messages/presentation/components/
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatDateSeparator } from '../../../../shared/presentation/formatting';
+import { cx } from '../../../../shared/presentation/cx';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
@@ -162,14 +163,23 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         label={formatDateSeparator(item.poll.createdAt)}
                       />
                     )}
-                    <div className="mt-4">
-                      <PollCard
-                        currentIdentityId={session.identity.id}
-                        onClose={onPollClose}
-                        onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
-                        onVote={onPollVote ?? noopPollVote}
-                        poll={item.poll}
-                      />
+                    <div
+                      className={cx(
+                        'mt-4 flex',
+                        item.poll.creatorIdentityId === session.identity.id
+                          ? 'justify-end'
+                          : 'justify-start',
+                      )}
+                    >
+                      <div className="w-full max-w-xl sm:max-w-[72%]">
+                        <PollCard
+                          currentIdentityId={session.identity.id}
+                          onClose={onPollClose}
+                          onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
+                          onVote={onPollVote ?? noopPollVote}
+                          poll={item.poll}
+                        />
+                      </div>
                     </div>
                   </Fragment>
                 );
