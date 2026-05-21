@@ -562,13 +562,15 @@ export class PigeonCommunitiesApi {
           method: 'GET',
         }),
     );
+    const messages = Array.isArray(result) ? result : (result.messages ?? []);
+    const responseLimit = options.limit ?? 50;
 
-    return Array.isArray(result)
-      ? { messages: result, nextBeforeMessageId: null }
-      : {
-          messages: result.messages ?? [],
-          nextBeforeMessageId: result.nextBeforeMessageId ?? null,
-        };
+    return {
+      messages,
+      nextBeforeMessageId: Array.isArray(result)
+        ? nextBeforeMessageIdFromTimeline(messages, responseLimit)
+        : responseNextBeforeMessageId(result, messages, responseLimit),
+    };
   }
 
   public async deleteChannelMessage(
@@ -716,4 +718,25 @@ function communityChannelMessageReactionsPath(
   )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
     messageId,
   )}/reactions`;
+}
+
+function responseNextBeforeMessageId(
+  result: { nextBeforeMessageId?: null | string },
+  messages: MessageResource[],
+  limit: number,
+): null | string {
+  if (Object.prototype.hasOwnProperty.call(result, 'nextBeforeMessageId')) {
+    return result.nextBeforeMessageId ?? null;
+  }
+
+  return nextBeforeMessageIdFromTimeline(messages, limit);
+}
+
+function nextBeforeMessageIdFromTimeline(
+  messages: MessageResource[],
+  limit: number,
+): null | string {
+  if (messages.length < limit) return null;
+
+  return messages[messages.length - 1]?.id ?? null;
 }

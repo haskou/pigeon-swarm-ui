@@ -69,6 +69,7 @@ export type MessageResource = {
   options?: PollOption[];
   payload?: string;
   poll?: PollResource;
+  pollId?: string;
   previousMessageIds?: string[];
   question?: string;
   reactions?: MessageReaction[];

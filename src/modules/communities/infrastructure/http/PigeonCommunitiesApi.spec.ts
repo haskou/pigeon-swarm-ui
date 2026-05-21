@@ -5,6 +5,94 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 describe(PigeonCommunitiesApi.name, () => {
+  it('uses the backend cursor when listing community channel messages', async () => {
+    const messages = [
+      { id: 'message-2', type: 'sent' },
+      { id: 'poll-1', pollId: 'poll-1', type: 'poll' },
+    ];
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        messages,
+        nextBeforeMessageId: 'backend-cursor',
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+
+    await expect(
+      api.listChannelMessages(session, 'community-1', 'channel-1'),
+    ).resolves.toEqual({
+      messages,
+      nextBeforeMessageId: 'backend-cursor',
+    });
+  });
+
+  it('uses the last returned timeline item as fallback pagination cursor', async () => {
+    const messages = [
+      { id: 'message-2', type: 'sent' },
+      { id: 'poll-1', pollId: 'poll-1', type: 'poll' },
+    ];
+    const http = {
+      request: jest.fn().mockResolvedValue({ messages }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+
+    await expect(
+      api.listChannelMessages(session, 'community-1', 'channel-1', {
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      messages,
+      nextBeforeMessageId: 'poll-1',
+    });
+  });
+
+  it('does not derive a fallback cursor from a partial channel message page', async () => {
+    const messages = [{ id: 'message-1', type: 'sent' }];
+    const http = {
+      request: jest.fn().mockResolvedValue(messages),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+
+    await expect(
+      api.listChannelMessages(session, 'community-1', 'channel-1', {
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      messages,
+      nextBeforeMessageId: null,
+    });
+  });
+
   it('signs community channel messages with the backend domain payload order', async () => {
     const created = {
       channelId: '6a073dc64d72b40039b156f8',

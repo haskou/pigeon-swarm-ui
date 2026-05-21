@@ -1,0 +1,68 @@
+import type {
+  ChatMessage,
+  PollResource,
+} from '../../../../shared/domain/pigeonResources.types';
+
+import { messagePollTimelineItems } from './messagePollTimelineItems';
+
+describe(messagePollTimelineItems.name, () => {
+  const poll: PollResource = {
+    allowsMultipleVotes: false,
+    createdAt: 20,
+    creatorIdentityId: 'identity-1',
+    id: 'poll-1',
+    options: [],
+    question: 'Question?',
+    scope: {
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      networkId: 'network-1',
+      type: 'community_channel',
+    },
+    status: 'open',
+    votes: [],
+  };
+  const pollMessage: ChatMessage = {
+    attachments: [],
+    authorIdentityId: 'identity-1',
+    content: '',
+    encrypted: false,
+    id: 'poll-1',
+    kind: 'poll',
+    mine: true,
+    poll,
+    raw: { id: 'poll-1', pollId: 'poll-1', type: 'poll' },
+    reactions: [],
+    timestamp: 20,
+  };
+  const textMessage: ChatMessage = {
+    attachments: [],
+    authorIdentityId: 'identity-2',
+    content: 'hello',
+    encrypted: false,
+    id: 'message-1',
+    mine: false,
+    raw: { id: 'message-1', type: 'sent' },
+    reactions: [],
+    timestamp: 10,
+  };
+
+  it('deduplicates a poll that arrives both as a channel timeline item and poll state', () => {
+    expect(
+      messagePollTimelineItems([textMessage, pollMessage], [poll]),
+    ).toEqual([
+      {
+        id: 'message:message-1',
+        message: textMessage,
+        timestamp: 10,
+        type: 'message',
+      },
+      {
+        id: 'poll:poll-1',
+        poll,
+        timestamp: 20,
+        type: 'poll',
+      },
+    ]);
+  });
+});
