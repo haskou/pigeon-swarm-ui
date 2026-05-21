@@ -106,6 +106,7 @@ export class PigeonCommunitiesApi {
       avatar?: string;
       banner?: string;
       description: string;
+      discoverable?: boolean | undefined;
       name: string;
       networkId: string;
     },
@@ -115,6 +116,9 @@ export class PigeonCommunitiesApi {
       ...(input.avatar ? { avatar: input.avatar } : {}),
       ...(input.banner ? { banner: input.banner } : {}),
       description: input.description,
+      ...(input.discoverable !== undefined
+        ? { discoverable: input.discoverable }
+        : {}),
       name: input.name,
       networkId: input.networkId,
     };
@@ -133,6 +137,7 @@ export class PigeonCommunitiesApi {
       avatar?: string;
       banner?: string;
       description?: string;
+      discoverable?: boolean | undefined;
       name?: string;
     },
   ): Promise<Community> {
@@ -142,6 +147,9 @@ export class PigeonCommunitiesApi {
       ...(input.banner ? { banner: input.banner } : {}),
       ...(input.description !== undefined
         ? { description: input.description }
+        : {}),
+      ...(input.discoverable !== undefined
+        ? { discoverable: input.discoverable }
         : {}),
       ...(input.name !== undefined ? { name: input.name } : {}),
     };

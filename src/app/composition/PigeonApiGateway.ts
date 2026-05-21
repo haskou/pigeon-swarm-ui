@@ -427,6 +427,7 @@ export class PigeonApiGateway {
       avatar?: string;
       banner?: string;
       description: string;
+      discoverable?: boolean | undefined;
       name: string;
       networkId: string;
     },
@@ -441,6 +442,7 @@ export class PigeonApiGateway {
       avatar?: string;
       banner?: string;
       description?: string;
+      discoverable?: boolean | undefined;
       name?: string;
     },
   ): Promise<Community> {

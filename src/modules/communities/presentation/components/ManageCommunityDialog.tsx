@@ -31,6 +31,7 @@ import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
+import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 import {
   CommunitySettingsNavigation,
   type CommunitySettingsSection,
@@ -65,6 +66,9 @@ export function ManageCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [discoverable, setDiscoverable] = useState(
+    community.discoverable ?? true,
+  );
   const [imageEditor, setImageEditor] = useState<{
     file: File;
     shape: 'avatar' | 'banner';
@@ -156,7 +160,9 @@ export function ManageCommunityDialog({
     isOwner || currentPermissions.has('approve_members');
   const canRejectRequests = isOwner || currentPermissions.has('reject_members');
   const sections = [
-    ...(isOwner ? ([['profile', copy.communities.profile]] as const) : []),
+    ...(isOwner
+      ? ([['profile', copy.communities.publicProfile]] as const)
+      : []),
     ...(canManageChannels
       ? ([['channels', copy.communities.channels]] as const)
       : []),
@@ -717,6 +723,7 @@ export function ManageCommunityDialog({
           avatar: avatar ?? community.avatar,
           banner: banner ?? community.banner,
           description: description.trim(),
+          discoverable,
           name: name.trim(),
         },
       );
@@ -948,6 +955,11 @@ export function ManageCommunityDialog({
                             setDescription(event.target.value)
                           }
                           className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        />
+                        <CommunityDiscoverySwitch
+                          checked={discoverable}
+                          disabled={state === 'loading'}
+                          onChange={setDiscoverable}
                         />
                       </div>
                     </div>

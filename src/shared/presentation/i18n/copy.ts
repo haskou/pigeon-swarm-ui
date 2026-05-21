@@ -135,6 +135,9 @@ export const copy = {
     addChannelPlaceholder: 'Add channel',
     addInitialChannel: 'Add channel',
     addMember: 'Add member',
+    appearInDiscovery: 'Appear in discovery',
+    appearInDiscoveryHelp:
+      'Shows this profile in discovery while keeping membership and channels private.',
     assignRoles: 'Assign roles',
     avatar: 'Community avatar',
     banMember: 'Ban',
@@ -250,6 +253,7 @@ export const copy = {
     owner: 'Owner',
     privateCommunity: 'Private community',
     profile: 'Profile',
+    publicProfile: 'Public profile',
     role: 'Role',
     roleDeleteError: 'The role could not be deleted.',
     roleName: 'Role name',
