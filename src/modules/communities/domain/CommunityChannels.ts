@@ -7,9 +7,28 @@ import type {
 
 export class CommunityChannels {
   public static all(community: Community): CommunityChannel[] {
-    if (community.channels) return community.channels;
+    const currentChannels = [
+      ...community.textChannels,
+      ...(community.voiceChannels ?? []),
+    ];
 
-    return [...community.textChannels, ...(community.voiceChannels ?? [])];
+    if (!community.channels) return currentChannels;
+
+    const channelsById = new Map(
+      currentChannels.map((channel) => [channel.id, channel]),
+    );
+    const orderedChannels: CommunityChannel[] = [];
+
+    for (const channel of community.channels) {
+      const currentChannel = channelsById.get(channel.id);
+
+      if (!currentChannel) continue;
+
+      orderedChannels.push(currentChannel);
+      channelsById.delete(channel.id);
+    }
+
+    return [...orderedChannels, ...channelsById.values()];
   }
 
   public static isText(
