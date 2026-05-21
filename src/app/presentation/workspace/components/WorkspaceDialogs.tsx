@@ -17,6 +17,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
 
+import { MessageEditPolicy } from '../../../../modules/messages/domain/MessageEditPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { Inspector } from './Inspector';
@@ -255,7 +256,10 @@ function MessageActionDialogs(
         }
         onEdit={
           contextMenuMessage &&
-          canEditMessage(contextMenuMessage, props.session.identity.id)
+          MessageEditPolicy.canEdit(
+            contextMenuMessage,
+            props.session.identity.id,
+          )
             ? () => props.onEditMessage(contextMenuMessage)
             : undefined
         }
@@ -276,18 +280,6 @@ function MessageActionDialogs(
         </Suspense>
       )}
     </>
-  );
-}
-
-function canEditMessage(message: ChatMessage, identityId: string): boolean {
-  return (
-    message.authorIdentityId === identityId &&
-    !message.deliveryStatus &&
-    !message.encrypted &&
-    message.kind !== 'call-event' &&
-    !message.poll &&
-    !message.sticker &&
-    message.content.trim().length > 0
   );
 }
 

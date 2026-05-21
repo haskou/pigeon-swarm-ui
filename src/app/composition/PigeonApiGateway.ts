@@ -691,6 +691,27 @@ export class PigeonApiGateway {
     );
   }
 
+  public async editCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    input: {
+      attachmentExternalIdentifiers?: string[];
+      encryptedPayload: string;
+      mentions?: CommunityMessageMention[];
+      timestamp?: number;
+    },
+  ): Promise<MessageResource> {
+    return await this.communities.editChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      input,
+    );
+  }
+
   public async addCommunityChannelMessageReaction(
     session: Session,
     communityId: string,

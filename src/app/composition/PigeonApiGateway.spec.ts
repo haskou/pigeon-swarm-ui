@@ -467,6 +467,81 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('edits community channel messages with the canonical domain signature', async () => {
+    const editedMessage = {
+      authorIdentityId: 'identity-1',
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      createdAt: 1234,
+      editedAt: 5678,
+      encryptedPayload: 'edited-encrypted-payload',
+      id: 'message-1',
+      mentions: [],
+      signature: 'domain-signature',
+      type: 'sent',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(editedMessage),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({
+          toString: () => 'domain-signature',
+        }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path =
+      '/communities/community-1/channels/channel-1/messages/message-1';
+    /* eslint-disable perfectionist/sort-objects */
+    const body = {
+      createdAt: 5678,
+      encryptedPayload: 'edited-encrypted-payload',
+      signature: 'domain-signature',
+      attachmentExternalIdentifiers: [],
+      mentions: [],
+    };
+    /* eslint-enable perfectionist/sort-objects */
+
+    await expect(
+      gateway.editCommunityChannelMessage(
+        session,
+        'community-1',
+        'channel-1',
+        'message-1',
+        {
+          encryptedPayload: 'edited-encrypted-payload',
+          timestamp: 5678,
+        },
+      ),
+    ).resolves.toBe(editedMessage);
+    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+      JSON.stringify({
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 5678,
+        encryptedPayload: 'edited-encrypted-payload',
+        id: 'message-1',
+        mentions: [],
+        type: 'edited',
+      }),
+      'secret',
+    );
+    expect(signer.headers).toHaveBeenCalledWith(session, 'PUT', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PUT',
+    });
+  });
+
   it('creates group conversations and stores the key under the server id', async () => {
     const recipientKeyPair = await KeyPair.generate();
     const recipientPublicKey = recipientKeyPair.toPrimitives().publicKey;

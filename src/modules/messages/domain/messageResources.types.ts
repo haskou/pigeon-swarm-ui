@@ -61,6 +61,7 @@ export type MessageResource = {
   creatorIdentityId?: string;
   durationMs?: number;
   encryptedPayload?: string;
+  editedAt?: number;
   expiresAt?: number;
   id?: string;
   mentions?: CommunityMessageMention[];
