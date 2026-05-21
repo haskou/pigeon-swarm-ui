@@ -118,13 +118,9 @@ export class PigeonFilesApi {
     const uploadedAttachments: MessageAttachment[] = [];
 
     for (const file of attachments) {
-      const shouldEncrypt =
-        file.size <= ipfsPrivateUploadLimitBytes ||
-        options.encryptLargeAttachments === true;
-
-      if (!shouldEncrypt) {
+      if (!this.shouldEncryptAttachment(file, options)) {
         uploadedAttachments.push(
-          await this.uploadPublicChunkedAttachment(session, file, onProgress),
+          await this.uploadPublicAttachment(session, file, onProgress),
         );
 
         continue;
@@ -148,6 +144,17 @@ export class PigeonFilesApi {
     }
 
     return uploadedAttachments;
+  }
+
+  private shouldEncryptAttachment(
+    file: File,
+    options: AttachmentUploadOptions,
+  ): boolean {
+    if (file.size <= ipfsPrivateUploadLimitBytes) {
+      return options.encryptSmallAttachments !== false;
+    }
+
+    return options.encryptLargeAttachments === true;
   }
 
   private async decryptAttachment(
@@ -267,6 +274,50 @@ export class PigeonFilesApi {
       size: file.size,
       storage: 'public',
       type: 'chunked_file',
+    };
+  }
+
+  private async uploadPublicAttachment(
+    session: Session,
+    file: File,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<MessageAttachment> {
+    if (file.size > ipfsPrivateUploadLimitBytes) {
+      return await this.uploadPublicChunkedAttachment(
+        session,
+        file,
+        onProgress,
+      );
+    }
+
+    return await this.uploadPublicDirectAttachment(session, file, onProgress);
+  }
+
+  private async uploadPublicDirectAttachment(
+    session: Session,
+    file: File,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<MessageAttachment> {
+    const bytes = await file.arrayBuffer();
+    const filename = file.name || 'attachment';
+    const contentType = file.type || 'application/octet-stream';
+
+    this.reportAttachmentProgress(onProgress, filename, 'upload', 0);
+    const upload = await this.publicFiles.upload(
+      session,
+      bytes,
+      filename,
+      contentType,
+    );
+    this.reportAttachmentProgress(onProgress, filename, 'upload', 100);
+
+    return {
+      cid: upload.cid,
+      contentType: upload.contentType,
+      encrypted: false,
+      filename: upload.filename,
+      size: upload.size,
+      storage: 'public',
     };
   }
 
