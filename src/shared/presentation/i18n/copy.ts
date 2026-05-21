@@ -242,6 +242,7 @@ export const copy = {
     noChannelSelectedBody:
       'Community channels are private spaces inside this community.',
     noCustomRoles: 'Create a custom role to assign it to members.',
+    noMatchingMembers: 'No members match that search.',
     noMatchingChannels: 'No channels match that search.',
     noMembershipRequests: 'No invitations or join requests yet.',
     noModerationLogs: 'No moderation logs yet.',
@@ -257,6 +258,7 @@ export const copy = {
     roleSaveError: 'The role could not be saved.',
     saveMemberRoles: 'Save member roles',
     searchChannels: 'Search channels',
+    searchMembers: 'Search members',
     sendInvitation: 'Send invitation',
     targetMember: 'Target member',
     textChannel: 'Text',

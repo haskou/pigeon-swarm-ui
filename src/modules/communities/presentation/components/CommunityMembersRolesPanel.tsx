@@ -3,8 +3,11 @@ import type {
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { useMemo, useState } from 'react';
+
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { MemberRow } from './MemberRow';
+import { memberPrimaryName } from './communityMemberNames';
 
 export function CommunityMembersRolesPanel({
   bannedMemberIds,
@@ -39,17 +42,46 @@ export function CommunityMembersRolesPanel({
   ownerIdentityId: string;
   state: 'idle' | 'loading';
 }) {
-  const banned = new Set(bannedMemberIds);
+  const [memberSearch, setMemberSearch] = useState('');
+  const visibleMemberIds = useMemo(
+    () => {
+      const banned = new Set(bannedMemberIds);
+
+      return memberIds
+        .filter((identityId) => !banned.has(identityId))
+        .filter((identityId) =>
+          matchesMemberSearch(
+            identityId,
+            memberIdentities[identityId],
+            memberSearch,
+          ),
+        );
+    },
+    [bannedMemberIds, memberIdentities, memberIds, memberSearch],
+  );
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-        {copy.communities.members}
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+          {copy.communities.members}
+        </div>
+        <input
+          type="search"
+          value={memberSearch}
+          onChange={(event) => setMemberSearch(event.target.value)}
+          className="min-w-0 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60 sm:w-64"
+          placeholder={copy.communities.searchMembers}
+          aria-label={copy.communities.searchMembers}
+        />
       </div>
       <div className="space-y-3">
-        {memberIds
-          .filter((identityId) => !banned.has(identityId))
-          .map((identityId) => (
+        {visibleMemberIds.length === 0 ? (
+          <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">
+            {copy.communities.noMatchingMembers}
+          </div>
+        ) : (
+          visibleMemberIds.map((identityId) => (
             <div key={identityId} className="rounded-2xl bg-white/8 p-3">
               <MemberRow
                 identity={memberIdentities[identityId]}
@@ -128,8 +160,26 @@ export function CommunityMembersRolesPanel({
                 </div>
               )}
             </div>
-          ))}
+          ))
+        )}
       </div>
     </div>
+  );
+}
+
+function matchesMemberSearch(
+  identityId: string,
+  identity: IdentityResource | undefined,
+  search: string,
+): boolean {
+  const normalizedSearch = search.trim().toLowerCase();
+
+  if (!normalizedSearch) return true;
+
+  const handle = identity?.profile.handle?.trim() ?? '';
+  const name = memberPrimaryName(identity, identityId);
+
+  return [identityId, handle, name].some((value) =>
+    value.toLowerCase().includes(normalizedSearch),
   );
 }
