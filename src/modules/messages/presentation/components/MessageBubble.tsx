@@ -1,6 +1,7 @@
 import type { MouseEvent, PointerEvent } from 'react';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type {
   AttachmentProgress,
@@ -94,6 +95,7 @@ export function MessageBubble({
     images: LightboxImage[];
     index: number;
   } | null>(null);
+  const [originalMessageOpen, setOriginalMessageOpen] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indexedAttachments = useMemo(
     () =>
@@ -117,6 +119,7 @@ export function MessageBubble({
   const linkPreview = message.linkPreview;
   const sticker = message.sticker;
   const stickerWithReply = Boolean(sticker && hasReply);
+  const canViewOriginalMessage = Boolean(message.originalContent && !sticker);
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -128,6 +131,9 @@ export function MessageBubble({
   );
 
   useEffect(() => clearLongPressTimer, []);
+  useEffect(() => {
+    setOriginalMessageOpen(false);
+  }, [message.editMessageId, message.id]);
 
   const clearLongPressTimer = () => {
     if (!longPressTimerRef.current) return;
@@ -278,11 +284,6 @@ export function MessageBubble({
                   />
                 </div>
               )}
-              {message.edited && !sticker && (
-                <div className="mt-1 text-[0.65rem] font-black uppercase text-white/45">
-                  {copy.messages.edited}
-                </div>
-              )}
               {linkPreview && (
                 <LinkPreviewCard
                   description={linkPreview.description}
@@ -293,6 +294,23 @@ export function MessageBubble({
                   title={linkPreview.title}
                   url={linkPreview.url}
                 />
+              )}
+              {message.edited && !sticker && (
+                <div className="mt-1 flex w-full justify-end">
+                  {canViewOriginalMessage ? (
+                    <button
+                      type="button"
+                      onClick={() => setOriginalMessageOpen(true)}
+                      className="text-[0.65rem] font-black uppercase text-white/45 transition hover:text-white/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                    >
+                      {copy.messages.edited}
+                    </button>
+                  ) : (
+                    <span className="text-[0.65rem] font-black uppercase text-white/45">
+                      {copy.messages.edited}
+                    </span>
+                  )}
+                </div>
               )}
               <MessageDeliveryStatus
                 message={message}
@@ -321,7 +339,56 @@ export function MessageBubble({
           onClose={() => setLightbox(null)}
         />
       )}
+      {originalMessageOpen && message.originalContent && (
+        <OriginalMessageDialog
+          content={message.originalContent}
+          onClose={() => setOriginalMessageOpen(false)}
+        />
+      )}
     </>
+  );
+}
+
+function OriginalMessageDialog({
+  content,
+  onClose,
+}: {
+  content: string;
+  onClose: () => void;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        aria-label={copy.messages.originalMessage}
+        aria-modal="true"
+        role="dialog"
+        className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-black">
+            {copy.messages.originalMessage}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            &times;
+          </button>
+        </div>
+        <div className="mt-4 min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/35 p-4 text-sm leading-6 text-white/80">
+          {content}
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 }
 

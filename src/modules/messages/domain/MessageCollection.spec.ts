@@ -53,8 +53,42 @@ describe(MessageCollection.name, () => {
         editMessageId: 'edit-message-1',
         linkPreview: undefined,
         mentions: undefined,
+        originalContent: 'original',
       },
     ]);
+  });
+
+  it('keeps the first original content when applying multiple edit events', () => {
+    const edited = MessageCollection.merge(
+      [message()],
+      [
+        message({
+          content: 'first edit',
+          id: 'edit-message-1',
+          raw: {
+            id: 'edit-message-1',
+            targetMessageId: 'message-1',
+            type: 'edited',
+          },
+          timestamp: 200,
+        }),
+      ],
+    );
+
+    expect(
+      MessageCollection.merge(edited, [
+        message({
+          content: 'second edit',
+          id: 'edit-message-2',
+          raw: {
+            id: 'edit-message-2',
+            targetMessageId: 'message-1',
+            type: 'edited',
+          },
+          timestamp: 300,
+        }),
+      ])[0]?.originalContent,
+    ).toBe('original');
   });
 
   it('keeps orphan edit events out of the rendered timeline', () => {

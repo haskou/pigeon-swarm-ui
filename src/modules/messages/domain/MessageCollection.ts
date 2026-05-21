@@ -43,6 +43,7 @@ export class MessageCollection {
       encrypted: edit.encrypted,
       linkPreview: edit.linkPreview,
       mentions: edit.mentions,
+      originalContent: target.originalContent ?? target.content,
     };
   }
 

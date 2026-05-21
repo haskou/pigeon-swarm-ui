@@ -117,6 +117,7 @@ export type ChatMessage = {
   linkPreview?: MessageLinkPreview;
   mentions?: CommunityMessageMention[];
   mine: boolean;
+  originalContent?: string;
   poll?: PollResource;
   raw: MessageResource;
   reactions: MessageReaction[];
