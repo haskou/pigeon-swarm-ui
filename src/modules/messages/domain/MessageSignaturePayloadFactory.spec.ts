@@ -75,4 +75,41 @@ describe(MessageSignaturePayloadFactory.name, () => {
     });
     expect(JSON.stringify(payload)).not.toContain('targetMessageId');
   });
+
+  it('builds the canonical edited-message payload expected by the backend', () => {
+    const payload = new MessageSignaturePayloadFactory().createEdited({
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: 123,
+      encryptedPayload: 'encrypted',
+      id: 'edit-message-1',
+      targetMessageId: 'message-1',
+    });
+
+    expect(Object.keys(payload)).toEqual([
+      'attachmentExternalIdentifiers',
+      'authorId',
+      'conversationId',
+      'createdAt',
+      'encryptedPayload',
+      'id',
+      'previousMessageIds',
+      'replyToMessageId',
+      'targetMessageId',
+      'type',
+    ]);
+    expect(payload).toEqual({
+      attachmentExternalIdentifiers: [],
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: 123,
+      encryptedPayload: 'encrypted',
+      id: 'edit-message-1',
+      previousMessageIds: ['message-1'],
+      replyToMessageId: undefined,
+      targetMessageId: 'message-1',
+      type: 'edited',
+    });
+    expect(JSON.stringify(payload)).not.toContain('replyToMessageId');
+  });
 });

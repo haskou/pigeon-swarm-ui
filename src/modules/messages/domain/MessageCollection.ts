@@ -6,12 +6,64 @@ export class MessageCollection {
     incomingMessages: ChatMessage[],
   ): ChatMessage[] {
     const byId = new Map<string, ChatMessage>();
+    const edits = [
+      ...this.indexMessages(byId, currentMessages),
+      ...this.indexMessages(byId, incomingMessages),
+    ];
 
-    for (const message of currentMessages) byId.set(message.id, message);
-    for (const message of incomingMessages) byId.set(message.id, message);
+    for (const edit of edits.sort(
+      (left, right) => left.timestamp - right.timestamp,
+    )) {
+      const targetMessageId = edit.raw.targetMessageId;
+
+      if (!targetMessageId) continue;
+
+      const target = byId.get(targetMessageId);
+
+      if (!target) continue;
+
+      byId.set(targetMessageId, this.applyEdit(target, edit));
+    }
 
     return [...byId.values()].sort(
       (left, right) => left.timestamp - right.timestamp,
     );
+  }
+
+  private static applyEdit(
+    target: ChatMessage,
+    edit: ChatMessage,
+  ): ChatMessage {
+    return {
+      ...target,
+      content: edit.content,
+      edited: true,
+      editedAt: edit.timestamp,
+      editMessageId: edit.id,
+      encrypted: edit.encrypted,
+      linkPreview: edit.linkPreview,
+      mentions: edit.mentions,
+    };
+  }
+
+  private static isEditMessage(message: ChatMessage): boolean {
+    return message.raw.type === 'edited' && !!message.raw.targetMessageId;
+  }
+
+  private static indexMessages(
+    byId: Map<string, ChatMessage>,
+    messages: ChatMessage[],
+  ): ChatMessage[] {
+    const edits: ChatMessage[] = [];
+
+    for (const message of messages) {
+      if (this.isEditMessage(message)) {
+        edits.push(message);
+      } else {
+        byId.set(message.id, message);
+      }
+    }
+
+    return edits;
   }
 }

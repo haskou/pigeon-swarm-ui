@@ -136,6 +136,7 @@ interface WorkspaceDialogsProps {
   onAcceptMembershipRequest: (requestId: string) => void;
   onDeclineNotification: (notificationId: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
@@ -252,6 +253,12 @@ function MessageActionDialogs(
             ? () => props.onDeleteMessage(contextMenuMessage)
             : undefined
         }
+        onEdit={
+          contextMenuMessage &&
+          canEditMessage(contextMenuMessage, props.session.identity.id)
+            ? () => props.onEditMessage(contextMenuMessage)
+            : undefined
+        }
         onReply={() => {
           if (contextMenuMessage) props.onReplyToMessage(contextMenuMessage);
         }}
@@ -269,6 +276,18 @@ function MessageActionDialogs(
         </Suspense>
       )}
     </>
+  );
+}
+
+function canEditMessage(message: ChatMessage, identityId: string): boolean {
+  return (
+    message.authorIdentityId === identityId &&
+    !message.deliveryStatus &&
+    !message.encrypted &&
+    message.kind !== 'call-event' &&
+    !message.poll &&
+    !message.sticker &&
+    message.content.trim().length > 0
   );
 }
 

@@ -11,6 +11,7 @@ import type {
 
 import { cx } from '../../../../shared/presentation/cx';
 import { formatTime } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
@@ -275,6 +276,11 @@ export function MessageBubble({
                     mine={mine}
                     onMentionClick={onMentionClick}
                   />
+                </div>
+              )}
+              {message.edited && !sticker && (
+                <div className="mt-1 text-[0.65rem] font-black uppercase text-white/45">
+                  {copy.messages.edited}
                 </div>
               )}
               {linkPreview && (

@@ -43,11 +43,13 @@ interface ComposerProps {
   disabled: boolean;
   error: string | null;
   draft: string;
+  editingMessage?: ChatMessage | null;
   onSend: (
     content: string,
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onEdit?: (content: string) => Promise<void>;
   onStickerSend?: (sticker: StickerMessageReference) => Promise<void>;
   onDraftChange: (value: string) => void;
   onEscape?: () => void;
@@ -61,18 +63,22 @@ interface ComposerProps {
   replyTo?: ChatMessage | null;
   replyToAuthorName?: string;
   session: Session;
+  onCancelEdit?: () => void;
   onCancelReply?: () => void;
 }
 
 export function Composer({
   disabled,
   draft,
+  editingMessage,
   error,
   focusKey,
   mentionHelper,
+  onCancelEdit,
   mentionTokens = [],
   onCancelReply,
   onDraftChange,
+  onEdit,
   onEscape,
   onSend,
   onStickerSend,
@@ -108,10 +114,15 @@ export function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
-  const canAttach = !disabled;
+  const isEditing = !!editingMessage;
+  const canAttach = !disabled && !isEditing;
+  const trimmedDraft = draft.trim();
   const canSend =
-    (draft.trim().length > 0 || attachments.length > 0) &&
-    draft.trim().length <= MESSAGE_MAX_LENGTH &&
+    (isEditing
+      ? trimmedDraft.length > 0 &&
+        trimmedDraft !== editingMessage.content.trim()
+      : trimmedDraft.length > 0 || attachments.length > 0) &&
+    trimmedDraft.length <= MESSAGE_MAX_LENGTH &&
     !disabled;
   const emojiTrigger = useMemo(
     () => findEmojiTrigger(draft, caretIndex),
@@ -173,6 +184,23 @@ export function Composer({
 
     requestAnimationFrame(() => textInputRef.current?.focus());
   }, [canAutoFocusInput, disabled, focusKey]);
+
+  useEffect(() => {
+    if (!editingMessage?.id) return;
+
+    attachmentsRef.current.forEach((attachment) =>
+      URL.revokeObjectURL(attachment.previewUrl),
+    );
+    setAttachments([]);
+    setAttachmentError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    requestAnimationFrame(() => {
+      const nextCaretIndex = textInputRef.current?.value.length ?? 0;
+
+      textInputRef.current?.focus();
+      textInputRef.current?.setSelectionRange(nextCaretIndex, nextCaretIndex);
+    });
+  }, [editingMessage?.id]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     setAttachmentError(null);
@@ -344,6 +372,12 @@ export function Composer({
 
     if (!canSend) return;
 
+    if (isEditing && onEdit) {
+      void onEdit(trimmed);
+
+      return;
+    }
+
     void onSend(
       trimmed,
       attachments.map((attachment) => attachment.file),
@@ -417,6 +451,12 @@ export function Composer({
     }
 
     if (event.key === 'Escape') {
+      if (isEditing) {
+        onCancelEdit?.();
+
+        return;
+      }
+
       onEscape?.();
 
       return;
@@ -479,7 +519,26 @@ export function Composer({
             {error ?? attachmentError}
           </div>
         )}
-        {replyTo && (
+        {editingMessage ? (
+          <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-sky-300/25 bg-sky-500/15 p-3 text-sm text-sky-50">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase text-sky-100/70">
+                {copy.messages.editing}
+              </div>
+              <div className="mt-1 truncate text-white/80">
+                {editingMessage.content}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
+              aria-label={copy.messages.cancelEdit}
+            >
+              ×
+            </button>
+          </div>
+        ) : replyTo ? (
           <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
             <div className="flex min-w-0 items-center gap-2">
               {replyTo.sticker && (
@@ -512,8 +571,8 @@ export function Composer({
               ×
             </button>
           </div>
-        )}
-        {attachments.length > 0 && (
+        ) : null}
+        {!isEditing && attachments.length > 0 && (
           <>
             <div className="mb-3 flex flex-wrap gap-2">
               {imageAttachments.length > 0 && (
@@ -601,7 +660,7 @@ export function Composer({
               suggestions={emojiSuggestions}
             />
           )}
-          {onStickerSend && (
+          {!isEditing && onStickerSend && (
             <StickerPicker
               disabled={disabled}
               onEmojiInsert={insertLooseEmoji}
@@ -609,7 +668,7 @@ export function Composer({
               session={session}
             />
           )}
-          {onPollCreate && (
+          {!isEditing && onPollCreate && (
             <button
               type="button"
               onClick={onPollCreate}
@@ -636,26 +695,28 @@ export function Composer({
               </svg>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
-            aria-label={copy.composer.attach}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
+              aria-label={copy.composer.attach}
             >
-              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" />
-            </svg>
-          </button>
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -705,7 +766,7 @@ export function Composer({
             disabled={!canSend}
             className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {copy.composer.send}
+            {isEditing ? copy.messages.saveEdit : copy.composer.send}
           </button>
         </div>
       </form>

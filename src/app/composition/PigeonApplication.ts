@@ -23,6 +23,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   CreatePollInput,
+  EditMessageOptions,
   IdentityResource,
   IdentityPresence,
   IpfsReplicationStatus,
@@ -65,6 +66,8 @@ import { AddMessageReaction } from '../../modules/messages/application/add-messa
 import { AddMessageReactionMessage } from '../../modules/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
 import { DeleteMessage } from '../../modules/messages/application/delete-message/DeleteMessage';
 import { DeleteMessageMessage } from '../../modules/messages/application/delete-message/messages/DeleteMessageMessage';
+import { EditMessage } from '../../modules/messages/application/edit-message/EditMessage';
+import { EditMessageMessage } from '../../modules/messages/application/edit-message/messages/EditMessageMessage';
 import { LoadMessage } from '../../modules/messages/application/load-message/LoadMessage';
 import { LoadMessageMessage } from '../../modules/messages/application/load-message/messages/LoadMessageMessage';
 import { LoadMessagesAround } from '../../modules/messages/application/load-messages-around/LoadMessagesAround';
@@ -154,6 +157,8 @@ export class PigeonApplication {
 
   private readonly deleteMessageUseCase: DeleteMessage;
 
+  private readonly editMessageUseCase: EditMessage;
+
   private readonly addMessageReactionUseCase: AddMessageReaction;
 
   private readonly listConversationsUseCase: ListConversations;
@@ -202,6 +207,7 @@ export class PigeonApplication {
     });
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
+    this.editMessageUseCase = new EditMessage(gateway);
     this.joinNetworkUseCase = new JoinNetwork({
       joinNetwork: async (id, name, key) =>
         await gateway.joinNetwork(
@@ -921,6 +927,24 @@ export class PigeonApplication {
   ): Promise<void> {
     await this.deleteMessageUseCase.delete(
       new DeleteMessageMessage({ conversationId, messageId, session }),
+    );
+  }
+
+  public async editMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    content: string,
+    options: EditMessageOptions = {},
+  ): Promise<ChatMessage> {
+    return await this.editMessageUseCase.edit(
+      new EditMessageMessage({
+        content,
+        conversationId,
+        messageId,
+        options,
+        session,
+      }),
     );
   }
 

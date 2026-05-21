@@ -62,6 +62,7 @@ interface ChatColumnProps {
   presenceByIdentityId?: Record<string, IdentityPresence>;
   conversationKey?: ConversationKeyEntry;
   draft: string;
+  editingMessage?: ChatMessage | null;
   hasConversationKey: boolean;
   hasReachedMessageStart: boolean;
   messages: ChatMessage[];
@@ -77,6 +78,7 @@ interface ChatColumnProps {
     attachments: File[],
     options: AttachmentUploadOptions,
   ) => Promise<void>;
+  onEditMessage: (content: string) => Promise<void>;
   onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
   onDraftChange: (value: string) => void;
@@ -99,6 +101,7 @@ interface ChatColumnProps {
   onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
+  onCancelEdit: () => void;
   replyToMessage?: ChatMessage | null;
   onCancelReply: () => void;
   onStartCall?: (input: {
@@ -123,6 +126,7 @@ export function ChatColumn({
   bottomRef,
   conversationKey,
   draft,
+  editingMessage,
   hasConversationKey,
   hasReachedMessageStart,
   identityNames,
@@ -134,6 +138,7 @@ export function ChatColumn({
   newMessageCount,
   nodeNetworks,
   onCancelReply,
+  onCancelEdit,
   onConversationKeyImported,
   onCreate,
   onDraftChange,
@@ -148,6 +153,7 @@ export function ChatColumn({
   onRetryMessage,
   onScroll,
   onSend,
+  onEditMessage,
   onStickerSend,
   onStartCall,
   onTypingActive,
@@ -215,6 +221,10 @@ export function ChatColumn({
   ) => {
     onTypingActive?.(false);
     await onSend(content, attachments, options);
+  };
+  const handleEditMessage = async (content: string) => {
+    onTypingActive?.(false);
+    await onEditMessage(content);
   };
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
@@ -657,9 +667,12 @@ export function ChatColumn({
           <Composer
             disabled={messageState === 'loading' || !hasConversationKey}
             draft={draft}
+            editingMessage={editingMessage}
             error={sendError ?? attachmentError}
-            focusKey={activeConversation.id}
+            focusKey={`${activeConversation.id}:${editingMessage?.id ?? 'send'}`}
+            onCancelEdit={onCancelEdit}
             onDraftChange={handleDraftChange}
+            onEdit={handleEditMessage}
             onEscape={onEscape}
             onSend={handleSend}
             onStickerSend={onStickerSend}

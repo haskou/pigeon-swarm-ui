@@ -41,6 +41,10 @@ export type SendMessageOptions = {
   sticker?: StickerMessageReference;
 };
 
+export type EditMessageOptions = {
+  linkPreview?: MessageLinkPreview;
+};
+
 export type MessageResource = {
   actorIdentityId?: string;
   allowsMultipleVotes?: boolean;
@@ -93,7 +97,7 @@ export type MessageSignaturePayload = {
   previousMessageIds: string[];
   replyToMessageId?: string;
   targetMessageId?: string;
-  type: 'deleted' | 'sent';
+  type: 'deleted' | 'edited' | 'sent';
 };
 
 export type ChatMessage = {
@@ -102,6 +106,9 @@ export type ChatMessage = {
   authorIdentityId: string;
   content: string;
   deliveryStatus?: 'failed' | 'pending';
+  edited?: boolean;
+  editedAt?: number;
+  editMessageId?: string;
   encrypted: boolean;
   id: string;
   kind?: 'call-event' | 'message' | 'poll';
