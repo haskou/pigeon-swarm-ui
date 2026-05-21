@@ -75,6 +75,7 @@ export type Community = {
   banner?: string | null;
   createdAt: number;
   description: string;
+  discoverable?: boolean;
   id: string;
   memberIds: string[];
   memberRoles?: CommunityMemberRolesResource[];
@@ -160,6 +161,7 @@ export type CommunityDiscoveryResource = {
   avatar?: string | null;
   banner?: string | null;
   description: string;
+  discoverable?: boolean;
   id: string;
   memberCount: number;
   membershipRequest?: CommunityMembershipRequest;

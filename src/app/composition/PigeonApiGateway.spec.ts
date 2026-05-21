@@ -72,6 +72,7 @@ describe(PigeonApiGateway.name, () => {
       banner: 'bafy-banner',
       createdAt: 1,
       description: 'Description',
+      discoverable: false,
       id: 'community-1',
       memberIds: ['identity-1'],
       name: 'Mi comunidad',
@@ -97,6 +98,7 @@ describe(PigeonApiGateway.name, () => {
         avatar: 'bafy-avatar',
         banner: 'bafy-banner',
         description: 'Description',
+        discoverable: false,
         name: 'Mi comunidad',
         networkId: 'network-1',
       }),
@@ -106,6 +108,7 @@ describe(PigeonApiGateway.name, () => {
       avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       description: 'Description',
+      discoverable: false,
       name: 'Mi comunidad',
       networkId: 'network-1',
     };
@@ -120,6 +123,58 @@ describe(PigeonApiGateway.name, () => {
       body: JSON.stringify(body),
       headers: { 'X-Signature': 'http-signature' },
       method: 'POST',
+    });
+  });
+
+  it('updates community discovery visibility with signed metadata payload', async () => {
+    const community = {
+      createdAt: 1,
+      description: 'Description',
+      discoverable: false,
+      id: 'community-1',
+      memberIds: ['identity-1'],
+      name: 'Mi comunidad',
+      networkId: 'network-1',
+      ownerIdentityId: 'identity-1',
+      textChannels: [],
+      visibility: 'private',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.updateCommunity(session, 'community-1', {
+        description: 'Description',
+        discoverable: false,
+        name: 'Mi comunidad',
+      }),
+    ).resolves.toBe(community);
+
+    const body = {
+      description: 'Description',
+      discoverable: false,
+      name: 'Mi comunidad',
+    };
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'PATCH',
+      '/communities/community-1',
+      body,
+    );
+    expect(http.request).toHaveBeenCalledWith('/communities/community-1', {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PATCH',
     });
   });
 

@@ -21,6 +21,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -59,6 +60,7 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [discoverable, setDiscoverable] = useState(true);
   const [imageEditor, setImageEditor] = useState<{
     file: File;
     shape: 'avatar' | 'banner';
@@ -169,6 +171,7 @@ export function CreateCommunityDialog({
           .map((channel) => ({ ...channel, name: channel.name.trim() }))
           .filter((channel) => channel.name.length > 0),
         description: description.trim(),
+        discoverable,
         name: name.trim(),
         networkId,
       });
@@ -312,6 +315,11 @@ export function CreateCommunityDialog({
                   {copy.communities.createBody}
                 </p>
               </div>
+              <CommunityDiscoverySwitch
+                checked={discoverable}
+                disabled={state === 'loading'}
+                onChange={setDiscoverable}
+              />
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">

@@ -487,6 +487,7 @@ export class PigeonApplication {
       banner?: File | null;
       channels?: Array<{ name: string; type: 'text' | 'voice' }>;
       description: string;
+      discoverable?: boolean | undefined;
       name: string;
       networkId: string;
     },
@@ -505,6 +506,7 @@ export class PigeonApplication {
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;
+      discoverable?: boolean | undefined;
       name?: string;
     },
   ): Promise<Community> {

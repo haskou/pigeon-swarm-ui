@@ -69,6 +69,7 @@ export class PigeonCommunitiesApplication {
       banner?: File | null;
       channels?: Array<{ name: string; type: 'text' | 'voice' }>;
       description: string;
+      discoverable?: boolean | undefined;
       name: string;
       networkId: string;
     },
@@ -88,6 +89,7 @@ export class PigeonCommunitiesApplication {
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
+      discoverable: input.discoverable,
       name: input.name,
       networkId: input.networkId,
     });
@@ -137,6 +139,7 @@ export class PigeonCommunitiesApplication {
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;
+      discoverable?: boolean | undefined;
       name?: string;
     },
   ): Promise<Community> {
@@ -147,6 +150,7 @@ export class PigeonCommunitiesApplication {
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
+      discoverable: input.discoverable,
       name: input.name,
     });
   }
