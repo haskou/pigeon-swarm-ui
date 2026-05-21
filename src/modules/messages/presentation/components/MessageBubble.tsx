@@ -54,6 +54,7 @@ interface MessageBubbleProps {
   onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
   mentionTokens?: MarkdownMention[];
+  mentionHighlighted?: boolean;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -78,6 +79,7 @@ export function MessageBubble({
   onStickerClick,
   reactionAuthorNames = {},
   mentionTokens = [],
+  mentionHighlighted = false,
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -208,6 +210,8 @@ export function MessageBubble({
                       'rounded-2xl px-3 py-1.5',
                       mine
                         ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
+                        : mentionHighlighted
+                          ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
                         : 'border border-white/10 bg-black/25 text-white',
                     ),
               )}

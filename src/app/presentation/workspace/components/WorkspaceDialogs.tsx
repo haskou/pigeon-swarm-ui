@@ -250,6 +250,7 @@ function MessageActionDialogs(
             : undefined
         }
         onDelete={
+          contextMenuMessage?.kind !== 'poll' &&
           contextMenuMessage?.authorIdentityId === props.session.identity.id
             ? () => props.onDeleteMessage(contextMenuMessage)
             : undefined

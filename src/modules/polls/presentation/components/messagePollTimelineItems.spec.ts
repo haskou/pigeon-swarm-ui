@@ -59,6 +59,10 @@ describe(messagePollTimelineItems.name, () => {
       },
       {
         id: 'poll:poll-1',
+        message: {
+          ...pollMessage,
+          content: poll.question,
+        },
         poll,
         timestamp: 20,
         type: 'poll',
@@ -85,6 +89,35 @@ describe(messagePollTimelineItems.name, () => {
         message: textMessage,
         timestamp: 10,
         type: 'message',
+      },
+    ]);
+  });
+
+  it('creates a replyable message for poll state entries without timeline messages', () => {
+    expect(messagePollTimelineItems([], [poll])).toEqual([
+      {
+        id: 'poll:poll-1',
+        message: {
+          attachments: [],
+          authorIdentityId: 'identity-1',
+          content: 'Question?',
+          encrypted: false,
+          id: 'poll-1',
+          kind: 'poll',
+          mine: false,
+          poll,
+          raw: {
+            id: 'poll-1',
+            poll,
+            pollId: 'poll-1',
+            type: 'poll',
+          },
+          reactions: [],
+          timestamp: 20,
+        },
+        poll,
+        timestamp: 20,
+        type: 'poll',
       },
     ]);
   });

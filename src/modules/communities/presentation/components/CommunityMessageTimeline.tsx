@@ -19,6 +19,7 @@ import { DateSeparator } from '../../../messages/presentation/components/DateSep
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
 import { messagePollTimelineItems } from '../../../polls/presentation/components/messagePollTimelineItems';
+import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
 import {
   endsAuthorRun,
   messageReplyImage,
@@ -63,6 +64,7 @@ interface CommunityMessageTimelineProps {
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
+  currentRoleIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -96,6 +98,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onScroll,
   onStickerClick,
   polls = [],
+  currentRoleIds,
   reactionAuthorNames,
   scrollerRef,
   session,
@@ -166,6 +169,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       />
                     )}
                     <div
+                      data-message-id={item.message.id}
                       className={cx(
                         'mt-4 flex',
                         item.poll.creatorIdentityId === session.identity.id
@@ -184,6 +188,18 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                             )
                               ? onPollClose
                               : undefined
+                          }
+                          onMenuOpen={(x, y) =>
+                            onMessageMenuOpen(
+                              {
+                                ...item.message,
+                                mine:
+                                  item.poll.creatorIdentityId ===
+                                  session.identity.id,
+                              },
+                              x,
+                              y,
+                            )
                           }
                           onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
                           onVote={onPollVote ?? noopPollVote}
@@ -258,6 +274,11 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       onRetryMessage={onRetryMessage}
                       onStickerClick={onStickerClick}
                       reactionAuthorNames={reactionAuthorNames}
+                      mentionHighlighted={CommunityMentionHighlightPolicy.mentionsIdentity(
+                        message,
+                        session.identity.id,
+                        currentRoleIds,
+                      )}
                       mentionTokens={messageMentionTokens(
                         message,
                         memberIdentities,

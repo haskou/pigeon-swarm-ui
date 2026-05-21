@@ -21,7 +21,6 @@ export function CommunityMembersRolesPanel({
   memberRoleDrafts,
   onBan,
   onKick,
-  onSaveRoles,
   onToggleMemberRole,
   ownerIdentityId,
   state,
@@ -37,7 +36,6 @@ export function CommunityMembersRolesPanel({
   memberRoleDrafts: Record<string, string[]>;
   onBan: (identityId: string) => void;
   onKick: (identityId: string) => void;
-  onSaveRoles: (identityId: string) => void;
   onToggleMemberRole: (identityId: string, roleId: string) => void;
   ownerIdentityId: string;
   state: 'idle' | 'loading';
@@ -108,10 +106,11 @@ export function CommunityMembersRolesPanel({
                           onClick={() =>
                             onToggleMemberRole(identityId, role.id)
                           }
+                          disabled={state === 'loading'}
                           className={
                             selected
                               ? 'rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition'
-                              : 'rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/15 hover:text-white'
+                              : 'rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-45'
                           }
                           aria-pressed={selected}
                         >
@@ -119,14 +118,6 @@ export function CommunityMembersRolesPanel({
                         </button>
                       );
                     })}
-                    <button
-                      type="button"
-                      onClick={() => onSaveRoles(identityId)}
-                      disabled={state === 'loading'}
-                      className="rounded-xl bg-fuchsia-400 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {copy.communities.saveMemberRoles}
-                    </button>
                   </div>
                 </div>
               )}

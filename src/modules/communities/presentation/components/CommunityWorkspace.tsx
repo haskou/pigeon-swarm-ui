@@ -279,6 +279,14 @@ export function CommunityWorkspace({
     () => CommunityAccessPolicy.permissionsFor(community, session.identity.id),
     [community, session.identity.id],
   );
+  const currentRoleIds = useMemo(
+    () =>
+      CommunityAccessPolicy.assignedRoleIdsFor(
+        community,
+        session.identity.id,
+      ),
+    [community, session.identity.id],
+  );
   const accessibleTextChannels = useMemo(
     () =>
       textChannels.filter((channel) =>
@@ -1354,7 +1362,10 @@ export function CommunityWorkspace({
   };
 
   const handleReplyReferenceClick = (messageId: string) => {
-    if (messages.some((message) => message.id === messageId)) {
+    if (
+      messages.some((message) => message.id === messageId) ||
+      selectedChannelPolls.some((poll) => poll.id === messageId)
+    ) {
       scrollToChannelMessage(messageId);
 
       return;
@@ -1898,6 +1909,7 @@ export function CommunityWorkspace({
               onPollVote={votePoll}
               onScroll={handleMessagesScroll}
               onStickerClick={handleStickerClick}
+              currentRoleIds={currentRoleIds}
               reactionAuthorNames={reactionAuthorNames}
               polls={selectedChannelPolls}
               scrollerRef={scrollerRef}
@@ -2059,9 +2071,10 @@ export function CommunityWorkspace({
             menu={messageContextMenu}
             onClose={() => setMessageContextMenu(null)}
             onDelete={
-              messageContextMenu.message.mine ||
-              owner ||
-              currentPermissions.has('manage_messages')
+              messageContextMenu.message.kind !== 'poll' &&
+              (messageContextMenu.message.mine ||
+                owner ||
+                currentPermissions.has('manage_messages'))
                 ? () =>
                     void handleDeleteChannelMessage(messageContextMenu.message)
                 : undefined

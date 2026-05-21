@@ -176,7 +176,9 @@ export function MessageContextMenu({
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
       >
-        {onReactionToggle && currentIdentityId ? (
+        {onReactionToggle &&
+        currentIdentityId &&
+        menu.message.kind !== 'poll' ? (
           <div className="border-b border-white/10 p-1">
             <div className="flex items-center gap-1">
               {quickReactions.map((emoji) => (

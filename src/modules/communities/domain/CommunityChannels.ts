@@ -7,6 +7,8 @@ import type {
 
 export class CommunityChannels {
   public static all(community: Community): CommunityChannel[] {
+    if (community.channels) return community.channels;
+
     return [...community.textChannels, ...(community.voiceChannels ?? [])];
   }
 
@@ -23,10 +25,12 @@ export class CommunityChannels {
   }
 
   public static split(channels: CommunityChannel[]): {
+    channels: CommunityChannel[];
     textChannels: CommunityTextChannel[];
     voiceChannels: CommunityVoiceChannel[];
   } {
     return {
+      channels,
       textChannels: channels.filter(CommunityChannels.isText),
       voiceChannels: channels.filter(CommunityChannels.isVoice),
     };

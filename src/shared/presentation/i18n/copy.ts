@@ -260,7 +260,7 @@ export const copy = {
     roles: 'Roles',
     roleSave: 'Save role',
     roleSaveError: 'The role could not be saved.',
-    saveMemberRoles: 'Save member roles',
+    saveChannels: 'Save channels',
     searchChannels: 'Search channels',
     searchMembers: 'Search members',
     sendInvitation: 'Send invitation',
