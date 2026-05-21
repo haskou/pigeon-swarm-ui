@@ -1779,6 +1779,7 @@ export function CommunityWorkspace({
               }
               onReplyReferenceClick={handleReplyReferenceClick}
               onRetryMessage={retryChannelMessage}
+              canClosePolls={currentPermissions.has('create_polls')}
               onPollClose={closePoll}
               onPollRemoveVote={removePollVote}
               onPollVote={votePoll}

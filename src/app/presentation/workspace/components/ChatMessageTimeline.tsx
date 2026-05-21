@@ -372,7 +372,7 @@ function PollTimelineItem({
         <div className="w-full max-w-xl">
           <PollCard
             currentIdentityId={currentIdentityId}
-            onClose={onClose}
+            onClose={mine ? onClose : undefined}
             onRemoveVote={onRemoveVote ?? noopPollUpdate}
             onVote={onVote ?? noopPollVote}
             poll={poll}
