@@ -11,6 +11,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { MemberRow } from '../../../../modules/communities/presentation/components/MemberRow';
 
 type GroupParticipant = {
@@ -42,6 +43,8 @@ export function GroupProfileDialog({
   participants,
   presenceByIdentityId = {},
 }: GroupProfileDialogProps) {
+  useCloseOnEscape(onClose);
+
   const groupName = conversation.name ?? conversation.title ?? conversation.id;
   const networkName = networkId
     ? (nodeNetworks.find((network) => network.id === networkId)?.name ??

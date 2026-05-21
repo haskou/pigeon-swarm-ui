@@ -66,6 +66,7 @@ import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
 import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
@@ -279,6 +280,14 @@ export function CommunityWorkspace({
     () => CommunityAccessPolicy.permissionsFor(community, session.identity.id),
     [community, session.identity.id],
   );
+  const currentRoleIds = useMemo(
+    () =>
+      CommunityAccessPolicy.assignedRoleIdsFor(
+        community,
+        session.identity.id,
+      ),
+    [community, session.identity.id],
+  );
   const accessibleTextChannels = useMemo(
     () =>
       textChannels.filter((channel) =>
@@ -350,6 +359,9 @@ export function CommunityWorkspace({
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
+
+  useCloseOnEscape(() => setCommunityMenuOpen(false), communityMenuOpen);
+  useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>
@@ -1354,7 +1366,10 @@ export function CommunityWorkspace({
   };
 
   const handleReplyReferenceClick = (messageId: string) => {
-    if (messages.some((message) => message.id === messageId)) {
+    if (
+      messages.some((message) => message.id === messageId) ||
+      selectedChannelPolls.some((poll) => poll.id === messageId)
+    ) {
       scrollToChannelMessage(messageId);
 
       return;
@@ -1898,6 +1913,7 @@ export function CommunityWorkspace({
               onPollVote={votePoll}
               onScroll={handleMessagesScroll}
               onStickerClick={handleStickerClick}
+              currentRoleIds={currentRoleIds}
               reactionAuthorNames={reactionAuthorNames}
               polls={selectedChannelPolls}
               scrollerRef={scrollerRef}
@@ -2037,6 +2053,10 @@ export function CommunityWorkspace({
               profileViewer.identity,
               profileViewer.identityId,
             )}
+            communityRoles={communityRoleNamesForIdentity(
+              community,
+              profileViewer.identityId,
+            )}
             nodeNetworks={nodeNetworks}
             onClose={() => setProfileViewer(null)}
             onOpenConversation={
@@ -2059,9 +2079,10 @@ export function CommunityWorkspace({
             menu={messageContextMenu}
             onClose={() => setMessageContextMenu(null)}
             onDelete={
-              messageContextMenu.message.mine ||
-              owner ||
-              currentPermissions.has('manage_messages')
+              messageContextMenu.message.kind !== 'poll' &&
+              (messageContextMenu.message.mine ||
+                owner ||
+                currentPermissions.has('manage_messages'))
                 ? () =>
                     void handleDeleteChannelMessage(messageContextMenu.message)
                 : undefined
@@ -2117,6 +2138,26 @@ export function CommunityWorkspace({
       </Suspense>
     </>
   );
+}
+
+function communityRoleNamesForIdentity(
+  community: Community,
+  identityId: string,
+): string[] {
+  const roleNames = new Set<string>();
+
+  if (community.ownerIdentityId === identityId) {
+    roleNames.add(copy.communities.owner);
+  }
+
+  for (const role of CommunityAccessPolicy.assignedRolesFor(
+    community,
+    identityId,
+  )) {
+    roleNames.add(role.name);
+  }
+
+  return [...roleNames];
 }
 
 function findMentionTrigger(

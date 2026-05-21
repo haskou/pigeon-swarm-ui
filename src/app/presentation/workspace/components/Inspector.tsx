@@ -13,6 +13,7 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { Badge } from '../../../../shared/presentation/components/Badge';
 import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface InspectorProps {
   session: Session;
@@ -130,6 +131,8 @@ function PeersDialog({
   onClose: () => void;
   peers: Peer[];
 }) {
+  useCloseOnEscape(onClose);
+
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
       <button

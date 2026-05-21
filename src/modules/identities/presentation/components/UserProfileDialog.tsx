@@ -20,6 +20,7 @@ import {
   ImageLightbox,
   type LightboxImage,
 } from '../../../messages/presentation/components/imageLightbox';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { PresenceStatusDot } from './presenceStatusDot';
 
 type ProfilePopoverAnchor = {
@@ -33,6 +34,7 @@ type ProfilePopoverAnchor = {
 
 interface UserProfileDialogProps {
   anchor?: ProfilePopoverAnchor;
+  communityRoles?: string[];
   identity?: IdentityResource;
   identityId: string;
   name: string;
@@ -45,6 +47,7 @@ interface UserProfileDialogProps {
 
 export function UserProfileDialog({
   anchor,
+  communityRoles,
   identity,
   identityId,
   name,
@@ -54,6 +57,8 @@ export function UserProfileDialog({
   picture,
   presence,
 }: UserProfileDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [copied, setCopied] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(
     null,
@@ -288,6 +293,12 @@ export function UserProfileDialog({
                   : copy.profile.noNetworks
               }
             />
+            {communityRoles && (
+              <ProfileRoleField
+                label={copy.profile.communityRoles}
+                roles={communityRoles}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -368,6 +379,36 @@ function ProfileField({ label, value }: { label: string; value: string }) {
       </div>
       <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ProfileRoleField({
+  label,
+  roles,
+}: {
+  label: string;
+  roles: string[];
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+        {label}
+      </div>
+      <div className="flex max-h-24 min-w-0 flex-wrap gap-1.5 overflow-y-auto rounded-2xl bg-black/25 px-3 py-2 text-white/70">
+        {roles.length > 0 ? (
+          roles.map((role) => (
+            <span
+              key={role}
+              className="min-w-0 max-w-full truncate rounded-full bg-white/10 px-2.5 py-1 font-black text-white/75"
+            >
+              {role}
+            </span>
+          ))
+        ) : (
+          <span>{copy.profile.noCommunityRoles}</span>
+        )}
       </div>
     </div>
   );

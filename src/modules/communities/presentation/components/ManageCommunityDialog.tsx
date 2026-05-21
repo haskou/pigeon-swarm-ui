@@ -20,6 +20,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import {
@@ -33,6 +34,10 @@ import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 import {
+  ManagedCommunityChannels,
+  type ManagedCommunityChannel,
+} from './ManagedCommunityChannels';
+import {
   CommunitySettingsNavigation,
   type CommunitySettingsSection,
 } from './communitySettingsNavigation';
@@ -44,8 +49,6 @@ const ImageCropEditor = lazy(() =>
     }),
   ),
 );
-
-type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
 
 type ManageCommunityDialogProps = {
   community: Community;
@@ -60,6 +63,8 @@ export function ManageCommunityDialog({
   onCommunityUpdated,
   session,
 }: ManageCommunityDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
   const [avatar, setAvatar] = useState<File | null>(null);
@@ -85,6 +90,9 @@ export function ManageCommunityDialog({
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
     CommunityChannels.all(community),
+  );
+  const originalChannelIdsRef = useRef(
+    CommunityChannels.all(community).map((channel) => channel.id),
   );
   const [activeSection, setActiveSection] =
     useState<CommunitySettingsSection>('profile');
@@ -409,18 +417,35 @@ export function ManageCommunityDialog({
     );
   };
 
-  const toggleMemberRole = (identityId: string, roleId: string) => {
-    setMemberRoleDrafts((current) => {
-      const roleIds = new Set(current[identityId] ?? []);
+  const toggleMemberRole = async (identityId: string, roleId: string) => {
+    if (state === 'loading') return;
 
-      if (roleIds.has(roleId)) {
-        roleIds.delete(roleId);
-      } else {
-        roleIds.add(roleId);
-      }
+    const previousRoleIds = memberRoleDrafts[identityId] ?? [];
+    const nextRoleIds = toggleRoleId(previousRoleIds, roleId);
 
-      return { ...current, [identityId]: [...roleIds] };
-    });
+    setMemberRoleDrafts((current) => ({
+      ...current,
+      [identityId]: nextRoleIds,
+    }));
+    setState('loading');
+    setError(null);
+    try {
+      await applicationContainer.assignCommunityMemberRoles(
+        session,
+        community.id,
+        identityId,
+        nextRoleIds,
+      );
+      await refreshCommunity();
+    } catch (caught) {
+      setMemberRoleDrafts((current) => ({
+        ...current,
+        [identityId]: previousRoleIds,
+      }));
+      setError(toUserErrorMessage(caught, copy.communities.memberRolesError));
+    } finally {
+      setState('idle');
+    }
   };
 
   const toggleChannelRole = (channelId: string, roleId: string) => {
@@ -474,7 +499,7 @@ export function ManageCommunityDialog({
   };
 
   const updateRole = async () => {
-    if (!selectedRole || selectedRole.builtIn || state === 'loading') return;
+    if (!selectedRole || state === 'loading') return;
 
     setState('loading');
     setError(null);
@@ -511,24 +536,6 @@ export function ManageCommunityDialog({
       await refreshCommunity();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.roleDeleteError));
-    } finally {
-      setState('idle');
-    }
-  };
-
-  const saveMemberRoles = async (identityId: string) => {
-    setState('loading');
-    setError(null);
-    try {
-      await applicationContainer.assignCommunityMemberRoles(
-        session,
-        community.id,
-        identityId,
-        memberRoleDrafts[identityId] ?? [],
-      );
-      await refreshCommunity();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.memberRolesError));
     } finally {
       setState('idle');
     }
@@ -700,14 +707,97 @@ export function ManageCommunityDialog({
     }
   };
 
+  const channelDraftInput = {
+    channelDrafts,
+    channelOrder,
+    channelPermissionDrafts,
+    deletedChannelIds,
+    originalChannelIds: originalChannelIdsRef.current,
+  };
+  const hasProfileChanges =
+    avatar !== null ||
+    banner !== null ||
+    name.trim() !== community.name ||
+    description.trim() !== community.description ||
+    discoverable !== (community.discoverable ?? true);
+
+  const saveManagedChannels = async (
+    currentCommunity: Community,
+  ): Promise<{
+    channels: CommunityChannel[];
+    community: Community;
+  }> => {
+    let updatedCommunity = currentCommunity;
+
+    for (const channelId of deletedChannelIds) {
+      updatedCommunity = await applicationContainer.deleteCommunityChannel(
+        session,
+        community.id,
+        channelId,
+      );
+    }
+
+    for (const channel of channelOrder) {
+      const nextName = ManagedCommunityChannels.nameFor(
+        channel,
+        channelDraftInput,
+      );
+
+      if (channel.pending) {
+        if (channel.type === 'text') {
+          await applicationContainer.createCommunityTextChannel(
+            session,
+            community.id,
+            nextName,
+          );
+        } else {
+          await applicationContainer.createCommunityVoiceChannel(
+            session,
+            community.id,
+            nextName,
+          );
+        }
+      } else if (nextName !== channel.name) {
+        await applicationContainer.renameCommunityChannel(
+          session,
+          community.id,
+          channel.id,
+          nextName,
+        );
+      }
+
+      if (
+        !channel.pending &&
+        ManagedCommunityChannels.hasVisibleRoleChanges(
+          channel,
+          channelDraftInput,
+        )
+      ) {
+        await applicationContainer.updateCommunityChannelPermissions(
+          session,
+          community.id,
+          channel.id,
+          ManagedCommunityChannels.visibleRoleIdsFor(
+            channel,
+            channelDraftInput,
+          ),
+        );
+      }
+    }
+
+    return {
+      channels: ManagedCommunityChannels.orderSavedChannels(
+        await applicationContainer.listCommunityChannels(session, community.id),
+        channelDraftInput,
+      ),
+      community: updatedCommunity,
+    };
+  };
+
   const saveChanges = async (): Promise<boolean> => {
     if (state === 'loading') return false;
 
-    if (
-      channelOrder.some(
-        (channel) => !(channelDrafts[channel.id] ?? channel.name).trim(),
-      )
-    ) {
+    if (ManagedCommunityChannels.hasBlankName(channelDraftInput)) {
       setError(copy.communities.channelError);
 
       return false;
@@ -716,76 +806,43 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      let updatedCommunity = await applicationContainer.updateCommunity(
-        session,
-        community.id,
-        {
-          avatar: avatar ?? community.avatar,
-          banner: banner ?? community.banner,
-          description: description.trim(),
-          discoverable,
-          name: name.trim(),
-        },
-      );
+      const hasChannelChanges =
+        ManagedCommunityChannels.hasChanges(channelDraftInput);
 
-      for (const channelId of deletedChannelIds) {
-        updatedCommunity = await applicationContainer.deleteCommunityChannel(
+      if (!hasProfileChanges && !hasChannelChanges) return true;
+
+      let updatedCommunity = community;
+
+      if (hasProfileChanges) {
+        updatedCommunity = await applicationContainer.updateCommunity(
           session,
           community.id,
-          channelId,
+          {
+            avatar: avatar ?? community.avatar,
+            banner: banner ?? community.banner,
+            description: description.trim(),
+            discoverable,
+            name: name.trim(),
+          },
         );
       }
 
-      const updatedChannels: CommunityChannel[] = [];
+      if (!hasChannelChanges) {
+        onCommunityUpdated({
+          ...community,
+          ...updatedCommunity,
+          ...CommunityChannels.split(CommunityChannels.all(community)),
+        });
 
-      for (const channel of channelOrder) {
-        const nextName = (channelDrafts[channel.id] ?? channel.name).trim();
-        let nextChannel: CommunityChannel;
-
-        if (channel.pending) {
-          nextChannel =
-            channel.type === 'text'
-              ? await applicationContainer.createCommunityTextChannel(
-                  session,
-                  community.id,
-                  nextName,
-                )
-              : await applicationContainer.createCommunityVoiceChannel(
-                  session,
-                  community.id,
-                  nextName,
-                );
-        } else if (nextName === channel.name) {
-          nextChannel = channel;
-        } else {
-          nextChannel = await applicationContainer.renameCommunityChannel(
-            session,
-            community.id,
-            channel.id,
-            nextName,
-          );
-        }
-
-        const visibleRoleIds = channelPermissionDrafts[channel.id] ?? [
-          'everyone',
-        ];
-
-        if (!channel.pending) {
-          nextChannel =
-            await applicationContainer.updateCommunityChannelPermissions(
-              session,
-              community.id,
-              nextChannel.id,
-              visibleRoleIds,
-            );
-        }
-
-        updatedChannels.push(nextChannel);
+        return true;
       }
 
+      const savedChannels = await saveManagedChannels(updatedCommunity);
+
       onCommunityUpdated({
-        ...updatedCommunity,
-        ...CommunityChannels.split(updatedChannels),
+        ...community,
+        ...savedChannels.community,
+        ...CommunityChannels.split(savedChannels.channels),
       });
 
       return true;
@@ -1148,8 +1205,9 @@ export function ManageCommunityDialog({
                   memberRoleDrafts={memberRoleDrafts}
                   onBan={(identityId) => void banMember(identityId)}
                   onKick={(identityId) => void kickMember(identityId)}
-                  onSaveRoles={(identityId) => void saveMemberRoles(identityId)}
-                  onToggleMemberRole={toggleMemberRole}
+                  onToggleMemberRole={(identityId, roleId) =>
+                    void toggleMemberRole(identityId, roleId)
+                  }
                   ownerIdentityId={community.ownerIdentityId}
                   state={state}
                 />
@@ -1205,7 +1263,9 @@ export function ManageCommunityDialog({
                 disabled={!name.trim() || state === 'loading'}
                 className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                {copy.profile.save}
+                {activeSection === 'channels'
+                  ? copy.communities.saveChannels
+                  : copy.profile.save}
               </button>
             )}
           </div>
@@ -1235,4 +1295,10 @@ export function ManageCommunityDialog({
 }
 function draftChannelId(): string {
   return `draft:${UUID.generate().toString()}`;
+}
+
+function toggleRoleId(roleIds: string[], roleId: string): string[] {
+  return roleIds.includes(roleId)
+    ? roleIds.filter((candidate) => candidate !== roleId)
+    : [...roleIds, roleId];
 }

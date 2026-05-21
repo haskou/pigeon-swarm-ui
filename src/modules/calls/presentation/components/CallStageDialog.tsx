@@ -4,6 +4,7 @@ import type { CallSession } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CallButton } from './CallButton';
 import { CallDataPanel } from './CallDataPanel';
 import {
@@ -45,6 +46,8 @@ export function CallStageDialog({
   onToggleScreenShare: () => void;
   subtitle: string;
 }) {
+  useCloseOnEscape(onClose);
+
   const [expandedScreen, setExpandedScreen] = useState<
     CallSession['participants'][number] | null
   >(null);

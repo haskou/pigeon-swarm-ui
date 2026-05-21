@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import type { MouseEvent, PointerEvent } from 'react';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
 
@@ -8,12 +10,14 @@ import { cx } from '../../../../shared/presentation/cx';
 export function PollCard({
   currentIdentityId,
   onClose,
+  onMenuOpen,
   onRemoveVote,
   onVote,
   poll,
 }: {
   currentIdentityId: string;
   onClose?: (poll: PollResource) => Promise<void>;
+  onMenuOpen?: (x: number, y: number) => void;
   onRemoveVote: (poll: PollResource) => Promise<void>;
   onVote: (poll: PollResource, optionIds: string[]) => Promise<void>;
   poll: PollResource;
@@ -28,10 +32,12 @@ export function PollCard({
     currentVote?.optionIds ?? [],
   );
   const [busy, setBusy] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSelectedOptionIds(currentVote?.optionIds ?? []);
   }, [currentVote?.optionIds]);
+  useEffect(() => clearLongPressTimer, []);
 
   const toggleOption = (optionId: string) => {
     setSelectedOptionIds((current) =>
@@ -71,11 +77,45 @@ export function PollCard({
       setBusy(false);
     }
   };
+  const clearLongPressTimer = () => {
+    if (!longPressTimerRef.current) return;
+
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+  const openContextMenu = (x: number, y: number) => {
+    if (!onMenuOpen) return;
+
+    onMenuOpen(x, y);
+  };
+  const handleContextMenu = (event: MouseEvent) => {
+    if (!onMenuOpen) return;
+
+    event.preventDefault();
+    openContextMenu(event.clientX, event.clientY);
+  };
+  const handlePointerDown = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch' || !onMenuOpen) return;
+
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      openContextMenu(event.clientX, event.clientY);
+    }, 550);
+  };
 
   return (
     <div
+      onContextMenu={handleContextMenu}
+      onPointerCancel={clearLongPressTimer}
+      onPointerDown={handlePointerDown}
+      onPointerLeave={clearLongPressTimer}
+      onPointerMove={clearLongPressTimer}
+      onPointerUp={clearLongPressTimer}
+      style={{
+        WebkitTouchCallout: 'none',
+      }}
       className={cx(
-        'w-full max-w-xl rounded-2xl border p-4 text-white shadow-xl',
+        'w-full max-w-xl rounded-2xl border p-4 text-white shadow-xl [@media(pointer:coarse)]:select-none',
         mine
           ? 'border-[#6f99aa]/35 bg-[#274279] shadow-[#102938]/25'
           : 'border-white/10 bg-black/25 shadow-black/20',

@@ -7,6 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import type {
   IdentityNames,
   IdentityPictures,
@@ -60,6 +61,8 @@ export function NotificationsPanel({
   onDecline,
   onDeclineMembershipRequest,
 }: NotificationsPanelProps) {
+  useCloseOnEscape(onClose);
+
   const pendingMembershipRequests = membershipRequests.filter(
     (request) => request.status === 'pending',
   );

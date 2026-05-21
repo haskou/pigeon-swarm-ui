@@ -208,7 +208,9 @@ function MessageTimelineContent({
             <PollTimelineItem
               key={item.id}
               currentIdentityId={currentIdentityId}
+              message={item.message}
               onClose={onPollClose}
+              onMessageMenuOpen={onMessageMenuOpen}
               onRemoveVote={onPollRemoveVote}
               onVote={onPollVote}
               poll={item.poll}
@@ -348,14 +350,18 @@ function MessageTimelineItem({
 
 function PollTimelineItem({
   currentIdentityId,
+  message,
   onClose,
+  onMessageMenuOpen,
   onRemoveVote,
   onVote,
   poll,
   previousTimestamp,
 }: {
   currentIdentityId: string;
+  message: ChatMessage;
   onClose?: (poll: PollResource) => Promise<void>;
+  onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
   onRemoveVote?: (poll: PollResource) => Promise<void>;
   onVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   poll: PollResource;
@@ -368,11 +374,24 @@ function PollTimelineItem({
       {startsTimelineDay(previousTimestamp, poll.createdAt) && (
         <DateSeparator label={formatDateSeparator(poll.createdAt)} />
       )}
-      <div className={cx('mt-4 flex', mine ? 'justify-end' : 'justify-start')}>
+      <div
+        data-message-id={message.id}
+        className={cx('mt-4 flex', mine ? 'justify-end' : 'justify-start')}
+      >
         <div className="w-full max-w-xl">
           <PollCard
             currentIdentityId={currentIdentityId}
             onClose={mine ? onClose : undefined}
+            onMenuOpen={(x, y) =>
+              onMessageMenuOpen(
+                {
+                  ...message,
+                  mine,
+                },
+                x,
+                y,
+              )
+            }
             onRemoveVote={onRemoveVote ?? noopPollUpdate}
             onVote={onVote ?? noopPollVote}
             poll={poll}

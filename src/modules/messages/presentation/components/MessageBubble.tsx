@@ -13,6 +13,7 @@ import type {
 import { cx } from '../../../../shared/presentation/cx';
 import { formatTime } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
@@ -54,6 +55,7 @@ interface MessageBubbleProps {
   onStickerClick?: (sticker: StickerMessageReference) => void;
   reactionAuthorNames?: Record<string, string>;
   mentionTokens?: MarkdownMention[];
+  mentionHighlighted?: boolean;
   replyImage?: MessageAttachment;
   replyAuthorName?: string;
   replyPreview?: string;
@@ -78,6 +80,7 @@ export function MessageBubble({
   onStickerClick,
   reactionAuthorNames = {},
   mentionTokens = [],
+  mentionHighlighted = false,
   replyAuthorName,
   replyImage,
   replyPreview,
@@ -208,6 +211,8 @@ export function MessageBubble({
                       'rounded-2xl px-3 py-1.5',
                       mine
                         ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
+                        : mentionHighlighted
+                          ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
                         : 'border border-white/10 bg-black/25 text-white',
                     ),
               )}
@@ -356,6 +361,8 @@ function OriginalMessageDialog({
   content: string;
   onClose: () => void;
 }) {
+  useCloseOnEscape(onClose);
+
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
       <button

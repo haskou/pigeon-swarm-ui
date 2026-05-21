@@ -20,6 +20,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import { MessageEditPolicy } from '../../../../modules/messages/domain/MessageEditPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { Inspector } from './Inspector';
 import {
   MessageContextMenu,
@@ -199,6 +200,8 @@ function CommunityEntryModeControl({
 function MobileInspectorDialog(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
+  useCloseOnEscape(props.onCloseInspector, props.inspectorOpen);
+
   if (!props.inspectorOpen) return null;
 
   return (
@@ -250,6 +253,7 @@ function MessageActionDialogs(
             : undefined
         }
         onDelete={
+          contextMenuMessage?.kind !== 'poll' &&
           contextMenuMessage?.authorIdentityId === props.session.identity.id
             ? () => props.onDeleteMessage(contextMenuMessage)
             : undefined

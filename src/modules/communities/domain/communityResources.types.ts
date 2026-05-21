@@ -73,6 +73,7 @@ export type Community = {
   avatar?: string | null;
   bannedMemberIds?: string[];
   banner?: string | null;
+  channels?: CommunityChannel[];
   createdAt: number;
   description: string;
   discoverable?: boolean;

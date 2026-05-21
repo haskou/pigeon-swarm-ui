@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 export function ConversationDataDialog({
   data,
@@ -11,6 +12,8 @@ export function ConversationDataDialog({
   onClose: () => void;
   title?: string;
 }) {
+  useCloseOnEscape(onClose);
+
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
       <button

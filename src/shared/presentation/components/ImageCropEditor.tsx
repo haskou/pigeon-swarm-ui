@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { copy } from '../i18n/copy';
+import { useCloseOnEscape } from '../hooks/useCloseOnEscape';
 
 type ImageCropShape = 'avatar' | 'banner';
 
@@ -59,6 +60,8 @@ export function ImageCropEditor({
   onClose,
   shape,
 }: ImageCropEditorProps) {
+  useCloseOnEscape(onClose);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropFrameRef = useRef<HTMLDivElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);

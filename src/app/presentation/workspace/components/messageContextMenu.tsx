@@ -15,6 +15,7 @@ import {
   saveRecentReactionEmoji,
 } from '../../../../modules/messages/presentation/emoji/recentReactionEmojis';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -47,6 +48,8 @@ export function MessageContextMenu({
   onReply?: () => void;
   onViewRaw: () => void;
 }) {
+  useCloseOnEscape(onClose);
+
   const menuRef = useRef<HTMLDivElement | null>(null);
   const emojiSearchRef = useRef<HTMLDivElement | null>(null);
   const [emojiSearchOpen, setEmojiSearchOpen] = useState(false);
@@ -176,7 +179,9 @@ export function MessageContextMenu({
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
       >
-        {onReactionToggle && currentIdentityId ? (
+        {onReactionToggle &&
+        currentIdentityId &&
+        menu.message.kind !== 'poll' ? (
           <div className="border-b border-white/10 p-1">
             <div className="flex items-center gap-1">
               {quickReactions.map((emoji) => (

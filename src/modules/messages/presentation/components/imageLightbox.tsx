@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 export type LightboxImage = {
   alt: string;
@@ -23,6 +24,8 @@ export function ImageLightbox({
   initialIndex,
   onClose,
 }: ImageLightboxProps) {
+  useCloseOnEscape(onClose);
+
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
   const swipeRef = useRef<{

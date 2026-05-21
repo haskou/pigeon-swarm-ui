@@ -14,6 +14,7 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture } from './communityImages';
 
@@ -32,6 +33,8 @@ export function AddCommunityMemberDialog({
   onSessionUpdated,
   session,
 }: AddCommunityMemberDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [identityInput, setIdentityInput] = useState('');
   const [mode, setMode] = useState<AddMemberMode>('identity');
   const [error, setError] = useState<string | null>(null);

@@ -15,6 +15,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface NodeSettingsDialogProps {
   node: { id: string; owner: null | string } | null;
@@ -31,6 +32,8 @@ export function NodeSettingsDialog({
   onNetworksUpdated,
   session,
 }: NodeSettingsDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [joinCode, setJoinCode] = useState('');
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networks[0]?.id ?? '',
