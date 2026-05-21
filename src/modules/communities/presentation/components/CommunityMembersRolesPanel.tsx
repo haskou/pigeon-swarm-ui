@@ -177,9 +177,14 @@ function matchesMemberSearch(
   if (!normalizedSearch) return true;
 
   const handle = identity?.profile.handle?.trim() ?? '';
+  const visibleHandle = handle
+    ? handle.startsWith('@')
+      ? handle
+      : `@${handle}`
+    : '';
   const name = memberPrimaryName(identity, identityId);
 
-  return [identityId, handle, name].some((value) =>
+  return [identityId, handle, visibleHandle, name].some((value) =>
     value.toLowerCase().includes(normalizedSearch),
   );
 }
