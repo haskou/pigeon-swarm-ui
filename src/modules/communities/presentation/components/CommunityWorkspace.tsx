@@ -2049,6 +2049,10 @@ export function CommunityWorkspace({
               profileViewer.identity,
               profileViewer.identityId,
             )}
+            communityRoles={communityRoleNamesForIdentity(
+              community,
+              profileViewer.identityId,
+            )}
             nodeNetworks={nodeNetworks}
             onClose={() => setProfileViewer(null)}
             onOpenConversation={
@@ -2130,6 +2134,26 @@ export function CommunityWorkspace({
       </Suspense>
     </>
   );
+}
+
+function communityRoleNamesForIdentity(
+  community: Community,
+  identityId: string,
+): string[] {
+  const roleNames = new Set<string>();
+
+  if (community.ownerIdentityId === identityId) {
+    roleNames.add(copy.communities.owner);
+  }
+
+  for (const role of CommunityAccessPolicy.assignedRolesFor(
+    community,
+    identityId,
+  )) {
+    roleNames.add(role.name);
+  }
+
+  return [...roleNames];
 }
 
 function findMentionTrigger(
