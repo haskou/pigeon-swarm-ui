@@ -18,6 +18,7 @@ import {
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState = 'idle' | 'loading' | 'ready';
@@ -40,6 +41,8 @@ export function CreateConversationDialog({
   onCreated,
   session,
 }: CreateConversationDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [mode, setMode] = useState<ConversationMode>('direct');
   const [peerIdentityId, setPeerIdentityId] = useState('');
   const [peerIdentity, setPeerIdentity] = useState<IdentityResource | null>(

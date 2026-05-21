@@ -20,6 +20,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import {
@@ -62,6 +63,8 @@ export function ManageCommunityDialog({
   onCommunityUpdated,
   session,
 }: ManageCommunityDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
   const [avatar, setAvatar] = useState<File | null>(null);

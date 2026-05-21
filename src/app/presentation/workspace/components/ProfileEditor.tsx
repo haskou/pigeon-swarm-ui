@@ -33,6 +33,7 @@ import {
 } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -55,6 +56,8 @@ export function ProfileEditor({
   onClose: () => void;
   onUpdated: (session: Session) => void;
 }) {
+  useCloseOnEscape(onClose);
+
   const [name, setName] = useState(session.identity.profile.name);
   const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
   const [biography, setBiography] = useState(

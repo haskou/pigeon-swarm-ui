@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 export function ConversationKeyDialog({
   encryptedConversationKey,
@@ -24,6 +25,8 @@ export function ConversationKeyDialog({
   saving: boolean;
 }) {
   const isCopy = mode === 'copy';
+
+  useCloseOnEscape(onClose);
 
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">

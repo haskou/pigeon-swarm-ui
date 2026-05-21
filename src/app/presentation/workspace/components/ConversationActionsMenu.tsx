@@ -1,6 +1,7 @@
 import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
 import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface ConversationActionsMenuProps {
   activeConversation: ConversationResource;
@@ -36,6 +37,8 @@ export function ConversationActionsMenu({
   onGroupInviteOpen,
   onStartCall,
 }: ConversationActionsMenuProps) {
+  useCloseOnEscape(onClose);
+
   return (
     <>
       <button

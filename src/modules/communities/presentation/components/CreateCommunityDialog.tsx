@@ -21,6 +21,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 
 const ImageCropEditor = lazy(() =>
@@ -51,6 +52,8 @@ export function CreateCommunityDialog({
   onCreated,
   session,
 }: CreateCommunityDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [networkId, setNetworkId] = useState(

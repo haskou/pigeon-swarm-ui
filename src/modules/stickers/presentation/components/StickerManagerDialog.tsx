@@ -8,6 +8,7 @@ import type {
 
 import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { type StickerGridItem } from './stickerPickerParts';
 import { MyPacksPanel, SavedPacksPanel } from './stickerManagerPanels';
 import { cachedListStickerPacks } from './stickerLibraryCache';
@@ -45,6 +46,8 @@ export function StickerManagerDialog({
   savedPackIds,
   session,
 }: StickerManagerDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [packName, setPackName] = useState('');
   const [mode, setMode] = useState<'create' | 'mine' | 'saved'>('mine');
   const [packSearch, setPackSearch] = useState('');

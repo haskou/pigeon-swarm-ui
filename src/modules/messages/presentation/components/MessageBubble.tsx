@@ -13,6 +13,7 @@ import type {
 import { cx } from '../../../../shared/presentation/cx';
 import { formatTime } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
@@ -360,6 +361,8 @@ function OriginalMessageDialog({
   content: string;
   onClose: () => void;
 }) {
+  useCloseOnEscape(onClose);
+
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
       <button

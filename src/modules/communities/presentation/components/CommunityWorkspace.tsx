@@ -66,6 +66,7 @@ import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
 import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
@@ -358,6 +359,9 @@ export function CommunityWorkspace({
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
+
+  useCloseOnEscape(() => setCommunityMenuOpen(false), communityMenuOpen);
+  useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>

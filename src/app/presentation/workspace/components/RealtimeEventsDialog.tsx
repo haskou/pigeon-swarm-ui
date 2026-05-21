@@ -2,6 +2,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatTime } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface RealtimeEventsDialogProps {
   events: RealtimeDomainEvent[];
@@ -12,6 +13,8 @@ export function RealtimeEventsDialog({
   events,
   onClose,
 }: RealtimeEventsDialogProps) {
+  useCloseOnEscape(onClose);
+
   return (
     <div className="fixed inset-0 z-[95] bg-black/55 p-3 backdrop-blur-sm sm:p-5">
       <section className="glass-panel-strong mx-auto flex h-full w-full max-w-4xl flex-col rounded-2xl p-4 shadow-2xl shadow-black/45">

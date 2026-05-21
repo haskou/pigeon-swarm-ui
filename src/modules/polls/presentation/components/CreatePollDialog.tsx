@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import type { PollOption } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 10;
@@ -21,6 +22,8 @@ export function CreatePollDialog({
     question: string;
   }) => Promise<void>;
 }) {
+  useCloseOnEscape(onClose);
+
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [allowsMultipleVotes, setAllowsMultipleVotes] = useState(false);

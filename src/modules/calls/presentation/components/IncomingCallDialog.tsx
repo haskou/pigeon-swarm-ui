@@ -2,6 +2,7 @@ import type { CallParticipant } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface IncomingCallDialogProps {
   caller?: CallParticipant;
@@ -16,6 +17,8 @@ export function IncomingCallDialog({
   onDecline,
   title,
 }: IncomingCallDialogProps) {
+  useCloseOnEscape(onDecline);
+
   const handle = caller?.identity?.profile.handle?.trim();
   const fallbackName = caller?.name?.replace(/\s+\(@[^)]+\)$/, '').trim();
   const displayName =

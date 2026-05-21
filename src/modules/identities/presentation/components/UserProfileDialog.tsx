@@ -20,6 +20,7 @@ import {
   ImageLightbox,
   type LightboxImage,
 } from '../../../messages/presentation/components/imageLightbox';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { PresenceStatusDot } from './presenceStatusDot';
 
 type ProfilePopoverAnchor = {
@@ -56,6 +57,8 @@ export function UserProfileDialog({
   picture,
   presence,
 }: UserProfileDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [copied, setCopied] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(
     null,

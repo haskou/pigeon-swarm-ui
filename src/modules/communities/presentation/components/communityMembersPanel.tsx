@@ -7,6 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { MemberRow } from './MemberRow';
 
 export type CommunityMemberListItem = {
@@ -37,6 +38,8 @@ export function CommunityMembersPanel({
   openMobile: boolean;
   presenceByIdentityId: Record<string, IdentityPresence>;
 }) {
+  useCloseOnEscape(onCloseMobile, openMobile);
+
   return (
     <>
       <MembersAside

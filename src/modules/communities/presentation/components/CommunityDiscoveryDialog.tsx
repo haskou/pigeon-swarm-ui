@@ -20,6 +20,7 @@ import { publicFileObjectUrl } from '../../../identities/presentation/view-model
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 type CommunityDiscoveryDialogProps = {
   headerControl?: ReactElement;
@@ -36,6 +37,8 @@ export function CommunityDiscoveryDialog({
   onJoinRequested,
   session,
 }: CommunityDiscoveryDialogProps) {
+  useCloseOnEscape(onClose);
+
   const [query, setQuery] = useState('');
   const [networkId, setNetworkId] = useState(
     session.identity.networks[0] ?? '',

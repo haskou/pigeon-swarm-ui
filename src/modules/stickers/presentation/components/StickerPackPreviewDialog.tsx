@@ -9,6 +9,7 @@ import type {
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { stickerAssetUrl } from './stickerPressPreview';
 import {
   cachedGetMyStickers,
@@ -27,6 +28,8 @@ export function StickerPackPreviewDialog({
   session: Session;
   sticker: StickerMessageReference;
 }) {
+  useCloseOnEscape(onClose);
+
   const [pack, setPack] = useState<StickerPackResource | null>(null);
   const [savedPackIds, setSavedPackIds] = useState<Set<string>>(
     () => new Set(),

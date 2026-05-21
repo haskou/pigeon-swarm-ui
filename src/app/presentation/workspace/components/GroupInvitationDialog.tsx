@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 interface GroupInvitationDialogProps {
   autoFocus: boolean;
@@ -21,6 +22,8 @@ export function GroupInvitationDialog({
   onInputChange,
   onSubmit,
 }: GroupInvitationDialogProps) {
+  useCloseOnEscape(onClose);
+
   return (
     <div className="fixed inset-0 z-[80] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
       <button
