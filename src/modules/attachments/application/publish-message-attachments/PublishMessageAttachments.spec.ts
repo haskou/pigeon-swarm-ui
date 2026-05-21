@@ -24,7 +24,10 @@ describe(PublishMessageAttachments.name, () => {
     const message = new PublishMessageAttachmentsMessage({
       attachments: [file],
       onProgress: progress,
-      options: { encryptLargeAttachments: true },
+      options: {
+        encryptLargeAttachments: true,
+        encryptSmallAttachments: false,
+      },
       session,
     });
 
@@ -36,6 +39,9 @@ describe(PublishMessageAttachments.name, () => {
     expect(message.getSession()).toBe(session);
     expect(message.getAttachments()).toEqual([file]);
     expect(message.getProgressReporter()).toBe(progress);
-    expect(message.getOptions()).toEqual({ encryptLargeAttachments: true });
+    expect(message.getOptions()).toEqual({
+      encryptLargeAttachments: true,
+      encryptSmallAttachments: false,
+    });
   });
 });

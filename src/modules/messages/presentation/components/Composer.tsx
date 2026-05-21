@@ -93,7 +93,8 @@ export function Composer({
   const [attachments, setAttachments] = useState<
     { file: File; previewUrl: string }[]
   >([]);
-  const [encryptLargeAttachments, setEncryptLargeAttachments] = useState(false);
+  const [attachmentEncryptionPreference, setAttachmentEncryptionPreference] =
+    useState<boolean | null>(null);
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
@@ -137,6 +138,8 @@ export function Composer({
   const hasLargeAttachments = attachments.some(
     (attachment) => attachment.file.size > LARGE_ATTACHMENT_BYTES,
   );
+  const encryptAttachments =
+    attachmentEncryptionPreference ?? !hasLargeAttachments;
 
   useEffect(() => {
     setSelectedEmojiIndex(0);
@@ -201,6 +204,9 @@ export function Composer({
       textInputRef.current?.setSelectionRange(nextCaretIndex, nextCaretIndex);
     });
   }, [editingMessage?.id]);
+  useEffect(() => {
+    if (attachments.length === 0) setAttachmentEncryptionPreference(null);
+  }, [attachments.length]);
 
   const addFiles = useCallback((selectedFiles: File[]) => {
     setAttachmentError(null);
@@ -381,7 +387,10 @@ export function Composer({
     void onSend(
       trimmed,
       attachments.map((attachment) => attachment.file),
-      { encryptLargeAttachments },
+      {
+        encryptLargeAttachments: encryptAttachments,
+        encryptSmallAttachments: encryptAttachments,
+      },
     );
     onDraftChange('');
     attachments.forEach((attachment) =>
@@ -614,10 +623,12 @@ export function Composer({
               ))}
             </div>
             <AttachmentEncryptionControl
-              disabled={disabled || !hasLargeAttachments}
-              enabled={!hasLargeAttachments || encryptLargeAttachments}
-              largeAttachments={hasLargeAttachments}
-              onChange={setEncryptLargeAttachments}
+              disabled={disabled}
+              enabled={encryptAttachments}
+              encryptedDescription={copy.composer.attachmentsEncrypted}
+              onChange={setAttachmentEncryptionPreference}
+              publicDescription={copy.composer.publicAttachments}
+              title={copy.composer.encryptAttachments}
             />
           </>
         )}
@@ -881,50 +892,46 @@ function ComposerImageAlbum({
 function AttachmentEncryptionControl({
   disabled,
   enabled,
-  largeAttachments,
+  encryptedDescription,
   onChange,
+  publicDescription,
+  title,
 }: {
   disabled: boolean;
   enabled: boolean;
-  largeAttachments: boolean;
+  encryptedDescription: string;
   onChange: (enabled: boolean) => void;
+  publicDescription: string;
+  title: string;
 }) {
-  const effectiveEnabled = !largeAttachments || enabled;
-
   return (
     <div className="mb-3">
       <label
         className={cx(
           'flex min-h-10 max-w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-xs font-black transition',
-          effectiveEnabled
+          enabled
             ? 'border-emerald-300/35 bg-emerald-400/15 text-emerald-50'
             : 'border-cyan-300/35 bg-cyan-400/15 text-cyan-50',
           disabled && 'cursor-not-allowed opacity-70',
         )}
       >
         <span className="min-w-0">
-          <span className="block truncate">
-            {copy.composer.encryptAttachments}
+          <span className="block truncate">{title}</span>
+          <span className="block truncate text-[0.65rem] text-white/45">
+            {enabled ? encryptedDescription : publicDescription}
           </span>
-          {largeAttachments && (
-            <span className="block truncate text-[0.65rem] text-white/45">
-              {effectiveEnabled
-                ? copy.composer.largeAttachmentsEncrypted
-                : copy.composer.publicLargeAttachments}
-            </span>
-          )}
         </span>
         <span
           className={cx(
             'relative h-6 w-11 shrink-0 rounded-full border transition',
-            effectiveEnabled
+            enabled
               ? 'border-emerald-200/60 bg-emerald-300'
               : 'border-white/15 bg-white/10',
           )}
         >
           <input
             type="checkbox"
-            checked={effectiveEnabled}
+            checked={enabled}
             disabled={disabled}
             onChange={(event) => onChange(event.target.checked)}
             className="peer sr-only"
@@ -932,7 +939,7 @@ function AttachmentEncryptionControl({
           <span
             className={cx(
               'absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition',
-              effectiveEnabled ? 'left-6' : 'left-1',
+              enabled ? 'left-6' : 'left-1',
             )}
           />
         </span>

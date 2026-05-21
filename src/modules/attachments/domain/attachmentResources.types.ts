@@ -61,4 +61,5 @@ export type AttachmentProgress = {
 
 export type AttachmentUploadOptions = {
   encryptLargeAttachments?: boolean;
+  encryptSmallAttachments?: boolean;
 };
