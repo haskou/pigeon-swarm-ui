@@ -65,4 +65,27 @@ describe(messagePollTimelineItems.name, () => {
       },
     ]);
   });
+
+  it('keeps hidden edit events out of rendered timeline items', () => {
+    const editEvent: ChatMessage = {
+      ...textMessage,
+      content: 'edited',
+      id: 'edit-message-1',
+      raw: {
+        id: 'edit-message-1',
+        targetMessageId: 'message-1',
+        type: 'edited',
+      },
+      timestamp: 20,
+    };
+
+    expect(messagePollTimelineItems([editEvent, textMessage], [])).toEqual([
+      {
+        id: 'message:message-1',
+        message: textMessage,
+        timestamp: 10,
+        type: 'message',
+      },
+    ]);
+  });
 });

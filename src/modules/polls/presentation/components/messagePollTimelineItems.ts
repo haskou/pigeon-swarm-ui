@@ -25,6 +25,8 @@ export function messagePollTimelineItems(
   const timelineItems: MessagePollTimelineItem[] = [];
 
   for (const message of messages) {
+    if (message.raw.type === 'edited') continue;
+
     if (message.kind === 'poll' && message.poll) {
       pollItems.set(message.poll.id, message.poll);
     } else {

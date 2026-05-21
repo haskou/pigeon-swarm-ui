@@ -91,18 +91,31 @@ describe(MessageCollection.name, () => {
     ).toBe('original');
   });
 
-  it('keeps orphan edit events out of the rendered timeline', () => {
+  it('preserves orphan edit events until their target message loads', () => {
     const edit = message({
       content: 'edited',
       id: 'edit-message-1',
       raw: {
         id: 'edit-message-1',
-        targetMessageId: 'missing-message',
+        targetMessageId: 'message-1',
         type: 'edited',
       },
       timestamp: 200,
     });
 
-    expect(MessageCollection.merge([], [edit])).toEqual([]);
+    expect(MessageCollection.merge([], [edit])).toEqual([edit]);
+    expect(MessageCollection.merge([edit], [message()])).toEqual([
+      {
+        ...message(),
+        content: 'edited',
+        edited: true,
+        editedAt: 200,
+        editMessageId: 'edit-message-1',
+        encrypted: false,
+        linkPreview: undefined,
+        mentions: undefined,
+        originalContent: 'original',
+      },
+    ]);
   });
 });

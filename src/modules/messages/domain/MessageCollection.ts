@@ -10,6 +10,7 @@ export class MessageCollection {
       ...this.indexMessages(byId, currentMessages),
       ...this.indexMessages(byId, incomingMessages),
     ];
+    const appliedEditIds = new Set<string>();
 
     for (const edit of edits.sort(
       (left, right) => left.timestamp - right.timestamp,
@@ -23,6 +24,11 @@ export class MessageCollection {
       if (!target) continue;
 
       byId.set(targetMessageId, this.applyEdit(target, edit));
+      appliedEditIds.add(edit.id);
+    }
+
+    for (const edit of edits) {
+      if (!appliedEditIds.has(edit.id)) byId.set(edit.id, edit);
     }
 
     return [...byId.values()].sort(
