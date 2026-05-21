@@ -144,6 +144,10 @@ type PendingSend = {
   sticker?: StickerMessageReference;
 };
 type FailedSends = Record<string, PendingSend>;
+type EditingMessage = {
+  message: ChatMessage;
+  previousDraft: string;
+};
 
 function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
@@ -244,6 +248,8 @@ export function GlassWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] =
+    useState<EditingMessage | null>(null);
   const [failedSends, setFailedSends] = useState<FailedSends>({});
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -428,6 +434,21 @@ export function GlassWorkspace({
     },
     [activeConversation?.id],
   );
+  const cancelMessageEdit = useCallback(() => {
+    if (!activeConversation?.id) {
+      setEditingMessage(null);
+
+      return;
+    }
+
+    const previousDraft = editingMessage?.previousDraft ?? '';
+
+    setEditingMessage(null);
+    setDrafts((current) => ({
+      ...current,
+      [activeConversation.id]: previousDraft,
+    }));
+  }, [activeConversation?.id, editingMessage?.previousDraft, setDrafts]);
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
     useUnreadMessages(conversations);
   const unreadMessageCount = useMemo(
@@ -1548,6 +1569,7 @@ export function GlassWorkspace({
     setMessageContextMenu(null);
     setRawMessage(null);
     setReplyTarget(null);
+    cancelMessageEdit();
     setIsCreateOpen(false);
     setIsCreateCommunityOpen(false);
     closeNotificationsPanel();
@@ -1556,7 +1578,7 @@ export function GlassWorkspace({
     setInspectorOpen(false);
     setCommunityMembersOpen(false);
     setSidebarOpen(false);
-  }, [closeNotificationsPanel]);
+  }, [cancelMessageEdit, closeNotificationsPanel]);
 
   const markConversationReadUntil = useCallback(
     (conversationId: string, loadedMessages: ChatMessage[]) => {
@@ -1618,7 +1640,7 @@ export function GlassWorkspace({
         if (messageRequestRef.current !== requestId) return;
 
         startTransition(() => {
-          setMessages(result.messages);
+          setMessages(MessageCollection.merge([], result.messages));
           updateMessageCursor(result.nextCursor ?? null);
           setMessageLoadState('idle');
         });
@@ -1657,6 +1679,7 @@ export function GlassWorkspace({
 
     if (!activeConversation?.id) return;
     setReplyTarget(null);
+    setEditingMessage(null);
     setNewMessageCount(0);
     lastScrollTopRef.current = 0;
 
@@ -1706,7 +1729,9 @@ export function GlassWorkspace({
 
       if (messageRequestRef.current !== requestId) return;
 
-      setMessages((current) => [...result.messages, ...current]);
+      setMessages((current) =>
+        MessageCollection.merge(current, result.messages),
+      );
       updateMessageCursor(result.nextCursor ?? null);
       requestAnimationFrame(() => {
         if (!scrollerRef.current) return;
@@ -1992,6 +2017,38 @@ export function GlassWorkspace({
     }
   };
 
+  const startEditingMessage = (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setReplyTarget(null);
+    setEditingMessage({
+      message,
+      previousDraft: activeConversationDraft,
+    });
+    updateActiveConversationDraft(message.content);
+  };
+
+  const handleEditMessage = async (content: string) => {
+    if (!activeConversation?.id || !editingMessage) return;
+
+    setSendError(null);
+    try {
+      const editEvent = await applicationContainer.editMessage(
+        session,
+        activeConversation.id,
+        editingMessage.message.id,
+        content,
+      );
+
+      setMessages((current) => MessageCollection.merge(current, [editEvent]));
+      setEditingMessage(null);
+      updateActiveConversationDraft('');
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.editError));
+    }
+  };
+
   const handleToggleMessageReaction = async (
     message: ChatMessage,
     emoji: string,
@@ -2169,10 +2226,12 @@ export function GlassWorkspace({
 
         setMessages((current) => MessageCollection.merge(current, [message]));
 
+        const isEditMessage = message.raw.type === 'edited';
+
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
           scrollMessagesToBottom('smooth', true);
-        } else {
+        } else if (!isEditMessage) {
           setNewMessageCount((current) => current + 1);
         }
       } catch (caught) {
@@ -2565,6 +2624,8 @@ export function GlassWorkspace({
         const isReactionEvent =
           event.type === 'conversations.v1.message.reaction.was_added' ||
           event.type === 'conversations.v1.message.reaction.was_removed';
+        const isEditEvent =
+          event.type === 'conversations.v1.message.was_edited';
         const isActiveConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
@@ -2583,6 +2644,7 @@ export function GlassWorkspace({
         if (
           !isActiveConversation &&
           !isReactionEvent &&
+          !isEditEvent &&
           authorId !== session.identity.id &&
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
@@ -2981,6 +3043,7 @@ export function GlassWorkspace({
                 activeConversation={activeConversation}
                 conversationKey={activeConversationKey}
                 draft={activeConversationDraft}
+                editingMessage={editingMessage?.message ?? null}
                 hasConversationKey={!!activeConversationKey}
                 hasReachedMessageStart={!messageCursor}
                 peerIdentityId={activeConversationPeerIdentityId}
@@ -3006,6 +3069,8 @@ export function GlassWorkspace({
                 scrollerRef={scrollerRef}
                 bottomRef={bottomRef}
                 onScroll={handleScroll}
+                onCancelEdit={cancelMessageEdit}
+                onEditMessage={handleEditMessage}
                 onSend={handleSend}
                 onStickerSend={handleSendSticker}
                 onConversationKeyImported={handleConversationKeyImported}
@@ -3226,10 +3291,12 @@ export function GlassWorkspace({
               void declineNotification(notificationId)
             }
             onDeleteMessage={(message) => void handleDeleteMessage(message)}
+            onEditMessage={startEditingMessage}
             onCopyMessage={copyMessageContent}
             onNetworksUpdated={onNodeNetworksReload}
             onReplyToMessage={(message) => {
               setReplyTarget(message);
+              setEditingMessage(null);
               setMessageContextMenu(null);
             }}
             onToggleReaction={(message, emoji, reacted) =>

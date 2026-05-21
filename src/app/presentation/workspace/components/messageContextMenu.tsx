@@ -28,6 +28,7 @@ export function MessageContextMenu({
   onClose,
   onCopy,
   onDelete,
+  onEdit,
   onReactionToggle,
   onReply,
   onViewRaw,
@@ -37,6 +38,7 @@ export function MessageContextMenu({
   onClose: () => void;
   onCopy?: () => void;
   onDelete?: () => void;
+  onEdit?: () => void;
   onReactionToggle?: (
     message: ChatMessage,
     emoji: string,
@@ -245,6 +247,15 @@ export function MessageContextMenu({
             className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
           >
             {copy.messages.copy}
+          </button>
+        ) : null}
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
+          >
+            {copy.messages.edit}
           </button>
         ) : null}
         <button

@@ -467,6 +467,81 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('edits community channel messages with the canonical domain signature', async () => {
+    const editedMessage = {
+      authorIdentityId: 'identity-1',
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      createdAt: 1234,
+      editedAt: 5678,
+      encryptedPayload: 'edited-encrypted-payload',
+      id: 'message-1',
+      mentions: [],
+      signature: 'domain-signature',
+      type: 'sent',
+    } as const;
+    const http = {
+      request: jest.fn().mockResolvedValue(editedMessage),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({
+          toString: () => 'domain-signature',
+        }),
+      },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path =
+      '/communities/community-1/channels/channel-1/messages/message-1';
+    /* eslint-disable perfectionist/sort-objects */
+    const body = {
+      createdAt: 5678,
+      encryptedPayload: 'edited-encrypted-payload',
+      signature: 'domain-signature',
+      attachmentExternalIdentifiers: [],
+      mentions: [],
+    };
+    /* eslint-enable perfectionist/sort-objects */
+
+    await expect(
+      gateway.editCommunityChannelMessage(
+        session,
+        'community-1',
+        'channel-1',
+        'message-1',
+        {
+          encryptedPayload: 'edited-encrypted-payload',
+          timestamp: 5678,
+        },
+      ),
+    ).resolves.toBe(editedMessage);
+    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+      JSON.stringify({
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 5678,
+        encryptedPayload: 'edited-encrypted-payload',
+        id: 'message-1',
+        mentions: [],
+        type: 'edited',
+      }),
+      'secret',
+    );
+    expect(signer.headers).toHaveBeenCalledWith(session, 'PUT', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PUT',
+    });
+  });
+
   it('creates group conversations and stores the key under the server id', async () => {
     const recipientKeyPair = await KeyPair.generate();
     const recipientPublicKey = recipientKeyPair.toPrimitives().publicKey;
@@ -1637,6 +1712,124 @@ describe(PigeonApiGateway.name, () => {
       content: '',
       sticker,
       type: 'StickerMessageSent',
+    });
+  });
+
+  it('edits messages with a signed edit event body', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        authorIdentityId: 'identity-1',
+        content: 'edited',
+        id: 'edit-message-1',
+        targetMessageId: 'message/to-edit',
+        timestamp: 20,
+        type: 'edited',
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'edit-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          'one-to-one:conversation': {
+            conversationId: 'one-to-one:conversation',
+            createdAt: 1,
+            peerIdentityId: 'identity-2',
+            privateKey: 'private-key',
+            publicKey: 'public-key',
+          },
+        },
+        version: 1,
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.editMessage(
+        session,
+        'one-to-one:conversation',
+        'message/to-edit',
+        'edited',
+      ),
+    ).resolves.toMatchObject({
+      content: 'edited',
+      raw: { targetMessageId: 'message/to-edit', type: 'edited' },
+    });
+
+    const path =
+      '/conversations/one-to-one%3Aconversation/messages/message%2Fto-edit';
+    const [, request] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(request.body as string) as {
+      createdAt: number;
+      encryptedPayload: string;
+      id: string;
+      previousMessageIds: string[];
+      signature: string;
+    };
+    const [signaturePayload, signaturePassword] = sign.mock.calls[0] as [
+      string,
+      string,
+    ];
+    const parsedSignaturePayload = JSON.parse(signaturePayload) as Record<
+      string,
+      unknown
+    >;
+
+    expect(Object.keys(body)).toEqual([
+      'id',
+      'createdAt',
+      'encryptedPayload',
+      'previousMessageIds',
+      'signature',
+    ]);
+    expect(body.id).toEqual(expect.stringMatching(/:edited$/));
+    expect(body.createdAt).toEqual(expect.any(Number));
+    expect(body.encryptedPayload).toEqual(expect.any(String));
+    expect(body.previousMessageIds).toEqual(['message/to-edit']);
+    expect(body.signature).toBe('edit-signature');
+    expect(Object.keys(parsedSignaturePayload)).toEqual([
+      'attachmentExternalIdentifiers',
+      'authorId',
+      'conversationId',
+      'createdAt',
+      'encryptedPayload',
+      'id',
+      'previousMessageIds',
+      'targetMessageId',
+      'type',
+    ]);
+    expect(parsedSignaturePayload).toEqual({
+      attachmentExternalIdentifiers: [],
+      authorId: 'identity-1',
+      conversationId: 'one-to-one:conversation',
+      createdAt: body.createdAt,
+      encryptedPayload: body.encryptedPayload,
+      id: body.id,
+      previousMessageIds: ['message/to-edit'],
+      targetMessageId: 'message/to-edit',
+      type: 'edited',
+    });
+    expect(signaturePassword).toBe('secret');
+    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+      attachments: [],
+      content: 'edited',
+      type: 'MessageEdited',
+    });
+    expect(signer.headers).toHaveBeenCalledWith(session, 'PUT', path, body);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      body: JSON.stringify(body),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PUT',
     });
   });
 

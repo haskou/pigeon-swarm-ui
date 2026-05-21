@@ -50,4 +50,36 @@ describe('communityChannelPayloadCipher', () => {
       }),
     ).toThrow('Community key is required');
   });
+
+  it('marks edited channel message payloads with the edition event type', async () => {
+    const communityId = 'community-1';
+    const communityKeyPair = await KeyPair.generate();
+    const communityKeyPairPrimitives = communityKeyPair.toPrimitives();
+    const communityKey: ConversationKeyEntry = {
+      conversationId: communityId,
+      createdAt: 1,
+      peerIdentityId: communityId,
+      privateKey: communityKeyPairPrimitives.privateKey,
+      publicKey: communityKeyPairPrimitives.publicKey,
+    };
+    const encryptedPayload = encryptCommunityChannelPayload({
+      attachments: [],
+      authorIdentityId: 'identity-1',
+      channelId: 'channel-1',
+      communityId,
+      communityKey,
+      content: 'edited text',
+      eventType: 'CommunityChannelMessageEdited',
+      timestamp: 5678,
+    });
+    const payload = JSON.parse(encryptedPayload) as {
+      content?: string;
+      timestamp?: number;
+      type?: string;
+    };
+
+    expect(payload.content).toBe('edited text');
+    expect(payload.timestamp).toBe(5678);
+    expect(payload.type).toBe('CommunityChannelMessageEdited');
+  });
 });

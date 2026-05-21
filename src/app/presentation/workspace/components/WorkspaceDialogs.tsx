@@ -17,6 +17,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
 
+import { MessageEditPolicy } from '../../../../modules/messages/domain/MessageEditPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { Inspector } from './Inspector';
@@ -136,6 +137,7 @@ interface WorkspaceDialogsProps {
   onAcceptMembershipRequest: (requestId: string) => void;
   onDeclineNotification: (notificationId: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
@@ -250,6 +252,15 @@ function MessageActionDialogs(
         onDelete={
           contextMenuMessage?.authorIdentityId === props.session.identity.id
             ? () => props.onDeleteMessage(contextMenuMessage)
+            : undefined
+        }
+        onEdit={
+          contextMenuMessage &&
+          MessageEditPolicy.canEdit(
+            contextMenuMessage,
+            props.session.identity.id,
+          )
+            ? () => props.onEditMessage(contextMenuMessage)
             : undefined
         }
         onReply={() => {

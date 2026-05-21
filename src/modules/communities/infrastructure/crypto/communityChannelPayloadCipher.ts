@@ -31,6 +31,7 @@ type EncryptCommunityChannelPayloadInput = {
   communityKey?: ConversationKeyEntry;
   communityId: string;
   content: string;
+  eventType?: 'CommunityChannelMessageEdited';
   linkPreview?: MessageLinkPreview;
   mentions?: CommunityMessageMention[];
   replyPreview?: MessageReplyPreview;
@@ -38,6 +39,16 @@ type EncryptCommunityChannelPayloadInput = {
   sticker?: StickerMessageReference;
   timestamp: number;
 };
+
+function communityChannelPayloadType(
+  input: EncryptCommunityChannelPayloadInput,
+): string {
+  if (input.eventType) return input.eventType;
+
+  if (input.sticker) return 'CommunityChannelStickerMessageSent';
+
+  return 'CommunityChannelMessageSent';
+}
 
 export function encryptCommunityChannelPayload(
   input: EncryptCommunityChannelPayloadInput,
@@ -60,9 +71,7 @@ export function encryptCommunityChannelPayload(
       : {}),
     ...(input.sticker ? { sticker: input.sticker } : {}),
     timestamp: input.timestamp,
-    type: input.sticker
-      ? 'CommunityChannelStickerMessageSent'
-      : 'CommunityChannelMessageSent',
+    type: communityChannelPayloadType(input),
   });
 
   return PublicKey.fromPEM(input.communityKey.publicKey)

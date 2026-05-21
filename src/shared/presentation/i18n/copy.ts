@@ -389,7 +389,7 @@ export const copy = {
       MessageTargetAlreadyDeletedError:
         'That message has already been deleted.',
       MessageTargetAuthorMismatchError:
-        'Only the original author can delete that message.',
+        'Only the original author can change that message.',
       MessageTargetNotFoundError:
         'The message you are trying to reference could not be found.',
       MissingSignedRequestHeaderError:
@@ -439,12 +439,17 @@ export const copy = {
   },
   messages: {
     addReaction: 'Add reaction',
+    cancelEdit: 'Cancel edit',
     cancelReply: 'Cancel reply',
     copy: 'Copy',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
     deleteConfirm: 'Delete this message?',
     deleteError: 'The message could not be deleted.',
+    edit: 'Edit',
+    edited: 'Edited',
+    editing: 'Editing message',
+    editError: 'The message could not be edited.',
     missingCommunityKey:
       'This community key is missing from the keychain, so channel messages cannot be decrypted.',
     missingConversationKey:
@@ -459,6 +464,7 @@ export const copy = {
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
     retrySend: 'Retry',
+    saveEdit: 'Save',
     searchReaction: 'Search emoji',
     sendFailed: 'Failed',
     sending: 'Sending',

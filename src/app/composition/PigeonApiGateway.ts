@@ -32,6 +32,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   CreatePollInput,
+  EditMessageOptions,
   AttachmentProgress,
   AttachmentUploadOptions,
   IdentityResource,
@@ -128,6 +129,7 @@ type MessageDecryptWorker = {
 type EncryptMessagePayloadInput = {
   content: string;
   conversationId: string;
+  eventType?: 'MessageEdited' | 'MessageSent' | 'StickerMessageSent';
   key: ConversationKeyEntry;
   linkPreview?: MessageLinkPreview;
   messageAttachments: MessageAttachment[];
@@ -686,6 +688,27 @@ export class PigeonApiGateway {
       communityId,
       channelId,
       messageId,
+    );
+  }
+
+  public async editCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    input: {
+      attachmentExternalIdentifiers?: string[];
+      encryptedPayload: string;
+      mentions?: CommunityMessageMention[];
+      timestamp?: number;
+    },
+  ): Promise<MessageResource> {
+    return await this.communities.editChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      input,
     );
   }
 
@@ -1560,6 +1583,73 @@ export class PigeonApiGateway {
     return await this.decryptMessage(session, conversationId, created);
   }
 
+  public async editMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    content: string,
+    options: EditMessageOptions = {},
+  ): Promise<ChatMessage> {
+    const key = ConversationKeychain.entry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+    );
+
+    if (!key) {
+      throw new Error(copy.messages.missingConversationKey);
+    }
+
+    const timestamp = Date.now();
+    const linkPreview =
+      options.linkPreview ??
+      (await this.createLinkPreviewForContent(session, content));
+    const encryptedPayload = this.encryptMessagePayload({
+      content,
+      conversationId,
+      eventType: 'MessageEdited',
+      key,
+      linkPreview,
+      messageAttachments: [],
+      session,
+      timestamp,
+    });
+    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
+    const previousMessageIds = [messageId];
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(
+        this.messageSignatures.createEdited({
+          authorId: session.identity.id,
+          conversationId,
+          createdAt: timestamp,
+          encryptedPayload,
+          id,
+          targetMessageId: messageId,
+        }),
+      ),
+      session.password,
+    );
+    /* eslint-disable perfectionist/sort-objects */
+    const body = {
+      id,
+      createdAt: timestamp,
+      encryptedPayload,
+      previousMessageIds,
+      signature: signature.toString(),
+    };
+    /* eslint-enable perfectionist/sort-objects */
+    const path = `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages/${encodeURIComponent(messageId)}`;
+    const edited = await this.http.request<MessageResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+
+    return await this.decryptMessage(session, conversationId, edited);
+  }
+
   public async deleteMessage(
     session: Session,
     conversationId: string,
@@ -1786,7 +1876,9 @@ export class PigeonApiGateway {
           ...(input.replyPreview ? { reply: input.replyPreview } : {}),
           ...(input.sticker ? { sticker: input.sticker } : {}),
           timestamp: input.timestamp,
-          type: input.sticker ? 'StickerMessageSent' : 'MessageSent',
+          type:
+            input.eventType ??
+            (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
         }),
       )
       .toString();

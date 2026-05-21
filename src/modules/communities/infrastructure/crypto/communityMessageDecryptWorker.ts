@@ -55,6 +55,7 @@ type CommunityChannelPlainPayload = {
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
   timestamp?: number;
+  type?: string;
 };
 
 type MessageReactionRecord = {
@@ -167,12 +168,15 @@ async function decryptMessage(
       communityKey,
     );
     const authorIdentityId = payload.authorIdentityId ?? base.authorIdentityId;
+    const isEdited = isEditedCommunityChannelMessage(payload, message);
 
     return {
       ...base,
       attachments: payload.attachments ?? [],
       authorIdentityId,
-      content: payload.sticker ? '' : (payload.content ?? ''),
+      content: communityChannelMessageContent(payload),
+      edited: base.edited || isEdited,
+      editedAt: communityChannelMessageEditedAt(base, payload, isEdited),
       encrypted: false,
       linkPreview: payload.linkPreview,
       mentions: payload.mentions ?? message.mentions,
@@ -181,11 +185,52 @@ async function decryptMessage(
       replyPreview: payload.reply,
       replyToMessageId: payload.replyToMessageId,
       sticker: payload.sticker,
-      timestamp: payload.timestamp ?? base.timestamp,
+      timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
     };
   } catch {
     return encryptedError(base, message, request.copy.decryptFailed);
   }
+}
+
+function isEditedCommunityChannelMessage(
+  payload: CommunityChannelPlainPayload,
+  message: MessageResource,
+): boolean {
+  if (payload.type === 'CommunityChannelMessageEdited') return true;
+
+  if (message.type === 'edited') return true;
+
+  return typeof message.editedAt === 'number';
+}
+
+function communityChannelMessageContent(
+  payload: CommunityChannelPlainPayload,
+): string {
+  if (payload.sticker) return '';
+
+  return payload.content ?? '';
+}
+
+function communityChannelMessageEditedAt(
+  base: Omit<ChatMessage, 'content' | 'encrypted'>,
+  payload: CommunityChannelPlainPayload,
+  isEdited: boolean,
+): number | undefined {
+  if (typeof base.editedAt === 'number') return base.editedAt;
+
+  if (!isEdited) return undefined;
+
+  return payload.timestamp;
+}
+
+function communityChannelMessageTimestamp(
+  base: Omit<ChatMessage, 'content' | 'encrypted'>,
+  payload: CommunityChannelPlainPayload,
+  isEdited: boolean,
+): number {
+  if (isEdited) return base.timestamp;
+
+  return payload.timestamp ?? base.timestamp;
 }
 
 async function decryptCommunityChannelPayload(
@@ -210,6 +255,8 @@ function baseMessage(
   return {
     attachments: [],
     authorIdentityId,
+    edited: typeof message.editedAt === 'number',
+    editedAt: message.editedAt,
     id: message.id ?? `${message.createdAt ?? Date.now()}`,
     mine: authorIdentityId === currentIdentityId,
     raw: { ...message, reactions },

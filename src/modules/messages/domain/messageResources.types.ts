@@ -41,6 +41,10 @@ export type SendMessageOptions = {
   sticker?: StickerMessageReference;
 };
 
+export type EditMessageOptions = {
+  linkPreview?: MessageLinkPreview;
+};
+
 export type MessageResource = {
   actorIdentityId?: string;
   allowsMultipleVotes?: boolean;
@@ -57,6 +61,7 @@ export type MessageResource = {
   creatorIdentityId?: string;
   durationMs?: number;
   encryptedPayload?: string;
+  editedAt?: number;
   expiresAt?: number;
   id?: string;
   mentions?: CommunityMessageMention[];
@@ -64,6 +69,7 @@ export type MessageResource = {
   options?: PollOption[];
   payload?: string;
   poll?: PollResource;
+  pollId?: string;
   previousMessageIds?: string[];
   question?: string;
   reactions?: MessageReaction[];
@@ -93,7 +99,7 @@ export type MessageSignaturePayload = {
   previousMessageIds: string[];
   replyToMessageId?: string;
   targetMessageId?: string;
-  type: 'deleted' | 'sent';
+  type: 'deleted' | 'edited' | 'sent';
 };
 
 export type ChatMessage = {
@@ -102,12 +108,16 @@ export type ChatMessage = {
   authorIdentityId: string;
   content: string;
   deliveryStatus?: 'failed' | 'pending';
+  edited?: boolean;
+  editedAt?: number;
+  editMessageId?: string;
   encrypted: boolean;
   id: string;
   kind?: 'call-event' | 'message' | 'poll';
   linkPreview?: MessageLinkPreview;
   mentions?: CommunityMessageMention[];
   mine: boolean;
+  originalContent?: string;
   poll?: PollResource;
   raw: MessageResource;
   reactions: MessageReaction[];

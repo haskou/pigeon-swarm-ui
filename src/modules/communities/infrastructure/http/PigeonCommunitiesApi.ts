@@ -562,13 +562,15 @@ export class PigeonCommunitiesApi {
           method: 'GET',
         }),
     );
+    const messages = Array.isArray(result) ? result : (result.messages ?? []);
+    const responseLimit = options.limit ?? 50;
 
-    return Array.isArray(result)
-      ? { messages: result, nextBeforeMessageId: null }
-      : {
-          messages: result.messages ?? [],
-          nextBeforeMessageId: result.nextBeforeMessageId ?? null,
-        };
+    return {
+      messages,
+      nextBeforeMessageId: Array.isArray(result)
+        ? nextBeforeMessageIdFromTimeline(messages, responseLimit)
+        : responseNextBeforeMessageId(result, messages, responseLimit),
+    };
   }
 
   public async deleteChannelMessage(
@@ -607,6 +609,59 @@ export class PigeonCommunitiesApi {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
+    });
+  }
+
+  public async editChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    input: {
+      attachmentExternalIdentifiers?: string[];
+      encryptedPayload: string;
+      mentions?: CommunityMessageMention[];
+      timestamp?: number;
+    },
+  ): Promise<MessageResource> {
+    const createdAt = input.timestamp ?? Date.now();
+    const attachmentExternalIdentifiers =
+      input.attachmentExternalIdentifiers ?? [];
+    const mentions = input.mentions ?? [];
+    const signaturePayload = {
+      attachmentExternalIdentifiers,
+      authorIdentityId: session.identity.id,
+      channelId,
+      communityId,
+      createdAt,
+      encryptedPayload: input.encryptedPayload,
+      id: messageId,
+      mentions,
+      type: 'edited',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+    /* eslint-disable perfectionist/sort-objects */
+    const body = {
+      createdAt,
+      encryptedPayload: input.encryptedPayload,
+      signature: signature.toString(),
+      attachmentExternalIdentifiers,
+      mentions,
+    };
+    /* eslint-enable perfectionist/sort-objects */
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}`;
+
+    return await this.http.request<MessageResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
     });
   }
 
@@ -663,4 +718,25 @@ function communityChannelMessageReactionsPath(
   )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
     messageId,
   )}/reactions`;
+}
+
+function responseNextBeforeMessageId(
+  result: { nextBeforeMessageId?: null | string },
+  messages: MessageResource[],
+  limit: number,
+): null | string {
+  if (Object.prototype.hasOwnProperty.call(result, 'nextBeforeMessageId')) {
+    return result.nextBeforeMessageId ?? null;
+  }
+
+  return nextBeforeMessageIdFromTimeline(messages, limit);
+}
+
+function nextBeforeMessageIdFromTimeline(
+  messages: MessageResource[],
+  limit: number,
+): null | string {
+  if (messages.length < limit) return null;
+
+  return messages[messages.length - 1]?.id ?? null;
 }

@@ -49,6 +49,7 @@ import { CommunityChannels } from '../../domain/CommunityChannels';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
+import { MessageEditPolicy } from '../../../messages/domain/MessageEditPolicy';
 import { MessageReactions } from '../../../messages/domain/MessageReactions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
@@ -197,6 +198,10 @@ type CommunityPendingSend = {
   replyTarget: ChatMessage | null;
   sticker?: StickerMessageReference;
 };
+type EditingMessage = {
+  message: ChatMessage;
+  previousDraft: string;
+};
 
 function replyPreviewFromMessage(
   message?: ChatMessage | null,
@@ -338,6 +343,9 @@ export function CommunityWorkspace({
   const [memberOpen, setMemberOpen] = useState(false);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
+  const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
+    null,
+  );
   const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
@@ -1103,6 +1111,86 @@ export function CommunityWorkspace({
     }
   };
 
+  const startEditingChannelMessage = (message: ChatMessage) => {
+    if (!selectedChannelId) return;
+
+    setMessageContextMenu(null);
+    setReplyTarget(null);
+    setEditingMessage({
+      message,
+      previousDraft: draft,
+    });
+    setDraft(message.content);
+  };
+
+  const cancelEditingChannelMessage = () => {
+    const previousDraft = editingMessage?.previousDraft ?? '';
+
+    setEditingMessage(null);
+    setDraft(previousDraft);
+
+    if (selectedChannelId) {
+      onTypingActive?.(selectedChannelId, previousDraft.trim().length > 0);
+    }
+  };
+
+  const handleEditChannelMessage = async (content: string) => {
+    if (!selectedChannelId || !editingMessage) return;
+
+    const channelId = selectedChannelId;
+    const targetMessage = editingMessage.message;
+    const mentions = selectedChannel
+      ? communityMentionsForContent(
+          content,
+          community,
+          selectedChannel,
+          memberIdentities,
+          currentPermissions,
+        )
+      : [];
+
+    setSendError(null);
+
+    try {
+      const timestamp = Date.now();
+      const linkPreview = await createLinkPreviewForContent(session, content);
+      const encryptedPayload = await encryptCommunityChannelPayload({
+        attachments: targetMessage.attachments,
+        authorIdentityId: session.identity.id,
+        channelId,
+        communityId: community.id,
+        communityKey: session.keychain.conversations[community.id],
+        content,
+        eventType: 'CommunityChannelMessageEdited',
+        linkPreview,
+        mentions,
+        timestamp,
+      });
+      const edited = await applicationContainer.editCommunityChannelMessage(
+        session,
+        community.id,
+        channelId,
+        targetMessage.id,
+        {
+          attachmentExternalIdentifiers: targetMessage.attachments.map(
+            (attachment) => attachment.cid,
+          ),
+          encryptedPayload,
+          mentions,
+          timestamp,
+        },
+      );
+      const projected = await projectChannelMessage(channelId, edited);
+
+      setMessages((current) => mergeChatMessages(current, [projected]));
+      setEditingMessage(null);
+      setDraft('');
+      onTypingActive?.(channelId, false);
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.editError));
+    }
+  };
+
   useEffect(
     () => () => {
       if (selectedChannelId) onTypingActive?.(selectedChannelId, false);
@@ -1368,6 +1456,7 @@ export function CommunityWorkspace({
   useEffect(() => {
     setSelectedChannelId(resolvedChannelId);
     setReplyTarget(null);
+    setEditingMessage(null);
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
@@ -1390,6 +1479,7 @@ export function CommunityWorkspace({
     setMessages([]);
     setMessageCursor(null);
     setReplyTarget(null);
+    setEditingMessage(null);
     setNewChannelMessageCount(0);
     setMessageLoadState('loading');
     setSendError(null);
@@ -1488,6 +1578,29 @@ export function CommunityWorkspace({
             : message,
         ),
       );
+
+      return;
+    }
+
+    if (realtimeEvent.type === 'communities.v1.channel.message.was_edited') {
+      const message = realtimeMessageAttribute(realtimeEvent);
+
+      if (message) {
+        void projectChannelMessage(channelId, message)
+          .then((projected) => {
+            setMessages((current) => mergeChatMessages(current, [projected]));
+          })
+          .catch(() => undefined);
+
+        return;
+      }
+
+      void loadChannelMessagesRef
+        .current(channelId)
+        .then(({ loadedMessages }) => {
+          setMessages((current) => mergeChatMessages(current, loadedMessages));
+        })
+        .catch(() => undefined);
 
       return;
     }
@@ -1806,11 +1919,18 @@ export function CommunityWorkspace({
                 !currentPermissions.has('send_messages')
               }
               draft={draft}
+              editingMessage={editingMessage?.message ?? null}
               error={sendError}
-              focusKey={selectedChannelId}
+              focusKey={`${selectedChannelId ?? 'no-channel'}:${
+                editingMessage?.message.id ?? 'send'
+              }`}
+              onCancelEdit={cancelEditingChannelMessage}
               onCancelReply={() => setReplyTarget(null)}
               onDraftChange={handleDraftChange}
-              onEscape={() => undefined}
+              onEdit={handleEditChannelMessage}
+              onEscape={
+                editingMessage ? cancelEditingChannelMessage : () => undefined
+              }
               onSend={handleSendChannelMessage}
               onStickerSend={
                 currentPermissions.has('send_stickers')
@@ -1946,8 +2066,17 @@ export function CommunityWorkspace({
                     void handleDeleteChannelMessage(messageContextMenu.message)
                 : undefined
             }
+            onEdit={
+              MessageEditPolicy.canEdit(
+                messageContextMenu.message,
+                session.identity.id,
+              )
+                ? () => startEditingChannelMessage(messageContextMenu.message)
+                : undefined
+            }
             onReply={() => {
               setReplyTarget(messageContextMenu.message);
+              setEditingMessage(null);
               setMessageContextMenu(null);
             }}
             onReactionToggle={(message, emoji, reacted) =>

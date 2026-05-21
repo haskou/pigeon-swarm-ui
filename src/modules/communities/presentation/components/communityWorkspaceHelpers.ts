@@ -23,11 +23,31 @@ export function mergeChatMessages(
   const byId = new Map<string, ChatMessage>();
 
   for (const message of currentMessages) byId.set(message.id, message);
-  for (const message of incomingMessages) byId.set(message.id, message);
+  for (const message of incomingMessages) {
+    byId.set(message.id, mergeChatMessage(byId.get(message.id), message));
+  }
 
   return [...byId.values()].sort(
     (left, right) => left.timestamp - right.timestamp,
   );
+}
+
+function mergeChatMessage(
+  currentMessage: ChatMessage | undefined,
+  incomingMessage: ChatMessage,
+): ChatMessage {
+  if (!currentMessage || !incomingMessage.edited) return incomingMessage;
+
+  const originalContent =
+    incomingMessage.originalContent ??
+    currentMessage.originalContent ??
+    (currentMessage.content !== incomingMessage.content
+      ? currentMessage.content
+      : undefined);
+
+  return originalContent
+    ? { ...incomingMessage, originalContent }
+    : incomingMessage;
 }
 
 export function realtimeStringAttribute(

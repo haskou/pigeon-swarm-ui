@@ -22,6 +22,28 @@ export class MessageSignaturePayloadFactory {
     };
   }
 
+  public createEdited(input: {
+    authorId: string;
+    conversationId: string;
+    createdAt: number;
+    encryptedPayload: string;
+    id: string;
+    targetMessageId: string;
+  }): MessageSignaturePayload {
+    return {
+      attachmentExternalIdentifiers: [],
+      authorId: input.authorId,
+      conversationId: input.conversationId,
+      createdAt: input.createdAt,
+      encryptedPayload: input.encryptedPayload,
+      id: input.id,
+      previousMessageIds: [input.targetMessageId],
+      replyToMessageId: undefined,
+      targetMessageId: input.targetMessageId,
+      type: 'edited',
+    };
+  }
+
   public createSent(input: {
     attachmentExternalIdentifiers: string[];
     authorId: string;
