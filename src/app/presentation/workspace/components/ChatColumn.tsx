@@ -563,7 +563,7 @@ export function ChatColumn({
     onProgressChange: setDownloadProgress,
   });
   return (
-    <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
+    <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <ChatConversationHeader
         activeConversation={activeConversation}
         activeConversationName={activeConversationName}

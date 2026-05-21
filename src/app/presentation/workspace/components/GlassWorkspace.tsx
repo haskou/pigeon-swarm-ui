@@ -2902,7 +2902,7 @@ export function GlassWorkspace({
           <>
             <div
               className={cx(
-                'fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+                'app-safe-area-drawer-until-lg fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
                 sidebarOpen ? 'block' : 'hidden lg:block',
               )}
             >

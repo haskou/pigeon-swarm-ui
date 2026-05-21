@@ -206,7 +206,7 @@ function MobileInspectorDialog(
         onClick={props.onCloseInspector}
         aria-label={copy.dialog.close}
       />
-      <div className="fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden">
+      <div className="app-safe-area-drawer-until-xl fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden">
         <Inspector
           className="h-full overflow-y-auto"
           session={props.session}
