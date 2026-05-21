@@ -1555,7 +1555,7 @@ export function CommunityWorkspace({
       )}
       <aside
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
+          'app-safe-area-drawer-until-lg fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
@@ -1644,7 +1644,7 @@ export function CommunityWorkspace({
         </div>
       </aside>
 
-      <section className="glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
+      <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
         <CommunityHeader
           avatarUrl={avatarUrl}
           channelEncryptionReady={channelEncryptionReady}
@@ -1779,6 +1779,7 @@ export function CommunityWorkspace({
               }
               onReplyReferenceClick={handleReplyReferenceClick}
               onRetryMessage={retryChannelMessage}
+              canClosePolls={currentPermissions.has('create_polls')}
               onPollClose={closePoll}
               onPollRemoveVote={removePollVote}
               onPollVote={votePoll}

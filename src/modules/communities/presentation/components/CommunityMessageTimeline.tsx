@@ -58,6 +58,7 @@ interface CommunityMessageTimelineProps {
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onPollClose?: (poll: PollResource) => Promise<void>;
+  canClosePolls: boolean;
   onPollRemoveVote?: (poll: PollResource) => Promise<void>;
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
@@ -86,6 +87,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onJumpToLatest,
   onMessageMenuOpen,
   onPollClose,
+  canClosePolls,
   onPollRemoveVote,
   onPollVote,
   onReactionToggle,
@@ -174,7 +176,15 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       <div className="w-full max-w-xl">
                         <PollCard
                           currentIdentityId={session.identity.id}
-                          onClose={onPollClose}
+                          onClose={
+                            canCloseCommunityPoll(
+                              item.poll,
+                              session.identity.id,
+                              canClosePolls,
+                            )
+                              ? onPollClose
+                              : undefined
+                          }
                           onRemoveVote={onPollRemoveVote ?? noopPollUpdate}
                           onVote={onPollVote ?? noopPollVote}
                           poll={item.poll}
@@ -302,6 +312,14 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     </div>
   );
 });
+
+function canCloseCommunityPoll(
+  poll: PollResource,
+  currentIdentityId: string,
+  canClosePolls: boolean,
+): boolean {
+  return canClosePolls || poll.creatorIdentityId === currentIdentityId;
+}
 
 function startsTimelineDay(
   previousTimestamp: number | undefined,

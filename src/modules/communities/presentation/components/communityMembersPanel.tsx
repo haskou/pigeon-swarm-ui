@@ -93,7 +93,7 @@ function MembersAside({
   const className =
     variant === 'desktop'
       ? 'glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block'
-      : 'glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden';
+      : 'app-safe-area-drawer-until-xl app-safe-area-drawer-py-4 glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden';
 
   return (
     <aside className={className}>

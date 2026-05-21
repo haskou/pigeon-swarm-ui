@@ -95,12 +95,15 @@ input[type='submit'] {
 
 .app-viewport {
   min-height: 100vh;
+  min-height: calc(100vh + env(safe-area-inset-bottom));
   min-height: 100dvh;
+  min-height: calc(100dvh + env(safe-area-inset-bottom));
   height: 100vh;
+  height: calc(100vh + env(safe-area-inset-bottom));
   height: 100dvh;
+  height: calc(100dvh + env(safe-area-inset-bottom));
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  padding-top: env(safe-area-inset-top);
 }
 
 .app-compact {
@@ -116,10 +119,68 @@ input[type='submit'] {
 }
 
 .app-workspace {
-  height: calc(100vh - env(safe-area-inset-top));
-  height: calc(100dvh - env(safe-area-inset-top));
+  height: 100vh;
+  height: calc(100vh + env(safe-area-inset-bottom));
+  height: 100dvh;
+  height: calc(100dvh + env(safe-area-inset-bottom));
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+.app-safe-area-panel {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: env(safe-area-inset-top);
+}
+
+.app-safe-area-drawer-until-lg,
+.app-safe-area-drawer-until-xl {
+  --app-safe-area-drawer-padding-y: 0.75rem;
+  padding-bottom: calc(
+    var(--app-safe-area-drawer-padding-y) + env(safe-area-inset-bottom)
+  );
+  padding-top: calc(
+    var(--app-safe-area-drawer-padding-y) + env(safe-area-inset-top)
+  );
+}
+
+.app-safe-area-drawer-py-4 {
+  --app-safe-area-drawer-padding-y: 1rem;
+}
+
+.app-safe-area-popup {
+  --app-safe-area-popup-padding: 0.75rem;
+  padding-bottom: calc(
+    var(--app-safe-area-popup-padding) + env(safe-area-inset-bottom)
+  );
+  padding-left: calc(
+    var(--app-safe-area-popup-padding) + env(safe-area-inset-left)
+  );
+  padding-right: calc(
+    var(--app-safe-area-popup-padding) + env(safe-area-inset-right)
+  );
+  padding-top: calc(
+    var(--app-safe-area-popup-padding) + env(safe-area-inset-top)
+  );
+}
+
+@media (min-width: 640px) {
+  .app-safe-area-popup {
+    --app-safe-area-popup-padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-safe-area-drawer-until-lg {
+    padding-bottom: 0;
+    padding-top: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-safe-area-drawer-until-xl {
+    padding-bottom: 0;
+    padding-top: 0;
+  }
 }
 
 button:not(:disabled),

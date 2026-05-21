@@ -75,7 +75,7 @@ export function NotificationsPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
+      className="app-safe-area-popup fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
       onClick={onClose}
     >
       <section

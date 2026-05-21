@@ -679,11 +679,18 @@ export function Composer({
               onPaste={handlePaste}
               onScroll={syncTextInputScroll}
               onSelect={syncCaret}
+              autoCapitalize="off"
+              autoComplete="off"
+              autoCorrect="off"
+              data-enable-grammarly="false"
+              data-gramm="false"
+              data-gramm_editor="false"
               disabled={disabled}
               maxLength={MESSAGE_MAX_LENGTH}
               rows={1}
+              spellCheck={false}
               className={cx(
-                'relative block min-h-0 w-full resize-none bg-transparent px-2 py-0 text-sm leading-5 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
+                'relative block min-h-0 w-full resize-none bg-transparent px-2 py-2 text-base leading-6 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
                 mentionTokens.length > 0
                   ? 'text-transparent caret-white'
                   : 'text-white',
