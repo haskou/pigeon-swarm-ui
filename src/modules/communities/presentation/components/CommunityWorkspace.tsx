@@ -42,7 +42,6 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/Composer';
-import { MessageReactions } from '../../../messages/domain/MessageReactions';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
@@ -71,13 +70,12 @@ import {
   type CommunityMentionSuggestion,
 } from './communityMentionPanel';
 import {
-  mergeChatMessages,
-  realtimeMessageAttribute,
-  realtimeStringAttribute,
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
+import { useCommunityChannelMessages } from './useCommunityChannelMessages';
+import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 
@@ -206,15 +204,6 @@ export function CommunityWorkspace({
     () => resolveCommunityChannelId(activeChannelId, accessibleTextChannels),
     [accessibleTextChannels, activeChannelId],
   );
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
-    resolvedChannelId,
-  );
-  const [newChannelMessageCount, setNewChannelMessageCount] = useState(0);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [messageCursor, setMessageCursor] = useState<null | string>(null);
-  const [messageState, setMessageState] = useState<
-    'error' | 'idle' | 'loading'
-  >('idle');
   const [draft, setDraft] = useState('');
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
@@ -248,17 +237,84 @@ export function CommunityWorkspace({
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
-  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
-  const keepChannelBottomUntilRef = useRef(0);
-  const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const communityMessageDecryptWorkerRef =
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
-  const onChannelSelectedRef = useRef(onChannelSelected);
-  const onChannelViewedRef = useRef(onChannelViewed);
+  const communityKey = session.keychain.conversations[community.id];
+  const projectChannelMessages = useCallback(
+    async (channelId: string, rawMessages: MessageResource[]) => {
+      communityMessageDecryptWorkerRef.current ??=
+        new CommunityMessageDecryptWorkerClient();
+
+      return await communityMessageDecryptWorkerRef.current.decrypt({
+        channelId,
+        communityId: community.id,
+        communityKey,
+        copy: copy.messages,
+        currentIdentityId: session.identity.id,
+        messages: rawMessages,
+      });
+    },
+    [community.id, communityKey, session.identity.id],
+  );
+  const projectChannelMessage = useCallback(
+    async (
+      channelId: string,
+      rawMessage: MessageResource,
+    ): Promise<ChatMessage> => {
+      const [projected] = await projectChannelMessages(channelId, [rawMessage]);
+
+      return projected;
+    },
+    [projectChannelMessages],
+  );
+  const loadChannelMessages = useCallback(
+    async (channelId: string, beforeMessageId?: string) => {
+      const result = await applicationContainer.listCommunityChannelMessages(
+        session,
+        community.id,
+        channelId,
+        { beforeMessageId },
+      );
+      const loadedMessages = await projectChannelMessages(
+        channelId,
+        result.messages,
+      );
+
+      return {
+        cursor: result.nextBeforeMessageId ?? null,
+        loadedMessages,
+      };
+    },
+    [community.id, projectChannelMessages, session],
+  );
+  const {
+    bottomRef,
+    handleChannelSelected,
+    handleMessagesScroll,
+    incrementNewChannelMessageCount,
+    isAwayFromBottom,
+    isScrolledNearBottom,
+    jumpToLatest,
+    messageCursor,
+    messages,
+    messageState,
+    newChannelMessageCount,
+    resetNewChannelMessageCount,
+    scrollChannelToBottom,
+    scrollerRef,
+    selectedChannelId,
+    setSelectedChannelId,
+    setMessages,
+    visibleMessages,
+  } = useCommunityChannelMessages({
+    loadChannelMessages,
+    onChannelSelected,
+    onChannelViewed,
+    onMobileSidebarClose,
+    resolvedChannelId,
+  });
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -278,7 +334,6 @@ export function CommunityWorkspace({
         : [],
     [community.id, polls, selectedChannelId],
   );
-  const communityKey = session.keychain.conversations[community.id];
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
@@ -439,14 +494,6 @@ export function CommunityWorkspace({
         identityId === session.identity.id || memberIdentities[identityId],
     );
 
-  const setMessageLoadState = useCallback(
-    (state: 'error' | 'idle' | 'loading') => {
-      messageStateRef.current = state;
-      setMessageState(state);
-    },
-    [],
-  );
-
   useEffect(
     () => () => {
       communityMessageDecryptWorkerRef.current?.terminate();
@@ -461,19 +508,10 @@ export function CommunityWorkspace({
 
   useEffect(() => {
     onCommunityUpdatedRef.current = onCommunityUpdated;
-    onChannelSelectedRef.current = onChannelSelected;
-    onChannelViewedRef.current = onChannelViewed;
-  }, [onChannelSelected, onChannelViewed, onCommunityUpdated]);
+  }, [onCommunityUpdated]);
   const channelEncryptionTooltip = channelEncryptionReady
     ? copy.chat.e2eReady
     : copy.chat.e2eMissing;
-  const visibleMessages = useMemo(
-    () =>
-      messages.filter(
-        (message) => message.deliveryStatus || message.raw.type !== 'deleted',
-      ),
-    [messages],
-  );
   const missingCommunityKey =
     !communityKey &&
     (!owner ||
@@ -653,42 +691,6 @@ export function CommunityWorkspace({
       setCommunityLeaving(false);
     }
   };
-  const isScrolledNearBottom = useCallback(() => {
-    const scroller = scrollerRef.current;
-
-    if (!scroller) return true;
-
-    return (
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140
-    );
-  }, []);
-  const scrollChannelToBottom = useCallback(
-    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
-      const scroll = () => bottomRef.current?.scrollIntoView({ behavior });
-
-      if (keepPinned) {
-        keepChannelBottomUntilRef.current = Date.now() + 5000;
-      }
-
-      requestAnimationFrame(() => {
-        scroll();
-        requestAnimationFrame(scroll);
-        window.setTimeout(scroll, 120);
-        window.setTimeout(scroll, 450);
-      });
-    },
-    [],
-  );
-  const handleChannelSelected = useCallback(
-    (channelId: string) => {
-      setSelectedChannelId(channelId);
-      setNewChannelMessageCount(0);
-      onChannelViewed?.(channelId);
-      onChannelSelected(channelId);
-      onMobileSidebarClose();
-    },
-    [onChannelSelected, onChannelViewed, onMobileSidebarClose],
-  );
   const communityData = useMemo(
     () => ({
       frontendDerived: {
@@ -815,122 +817,6 @@ export function CommunityWorkspace({
     return nextIdentities;
   }, [communityMemberIds, session.identity]);
 
-  const projectChannelMessages = useCallback(
-    async (channelId: string, rawMessages: MessageResource[]) => {
-      communityMessageDecryptWorkerRef.current ??=
-        new CommunityMessageDecryptWorkerClient();
-
-      return await communityMessageDecryptWorkerRef.current.decrypt({
-        channelId,
-        communityId: community.id,
-        communityKey,
-        copy: copy.messages,
-        currentIdentityId: session.identity.id,
-        messages: rawMessages,
-      });
-    },
-    [community.id, communityKey, session.identity.id],
-  );
-
-  const projectChannelMessage = useCallback(
-    async (
-      channelId: string,
-      rawMessage: MessageResource,
-    ): Promise<ChatMessage> => {
-      const [projected] = await projectChannelMessages(channelId, [rawMessage]);
-
-      return projected;
-    },
-    [projectChannelMessages],
-  );
-
-  const loadChannelMessages = useCallback(
-    async (channelId: string, beforeMessageId?: string) => {
-      const result = await applicationContainer.listCommunityChannelMessages(
-        session,
-        community.id,
-        channelId,
-        { beforeMessageId },
-      );
-      const loadedMessages = await projectChannelMessages(
-        channelId,
-        result.messages,
-      );
-
-      return {
-        cursor: result.nextBeforeMessageId ?? null,
-        loadedMessages,
-      };
-    },
-    [community.id, projectChannelMessages, session],
-  );
-  const loadChannelMessagesRef = useRef(loadChannelMessages);
-
-  useEffect(() => {
-    loadChannelMessagesRef.current = loadChannelMessages;
-  }, [loadChannelMessages]);
-
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-
-    if (!scroller) return undefined;
-
-    const handleMediaLayoutChange = () => {
-      if (Date.now() > keepChannelBottomUntilRef.current) return;
-
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ block: 'end' });
-      });
-    };
-
-    scroller.addEventListener('load', handleMediaLayoutChange, true);
-    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
-    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
-
-    return () => {
-      scroller.removeEventListener('load', handleMediaLayoutChange, true);
-      scroller.removeEventListener(
-        'loadedmetadata',
-        handleMediaLayoutChange,
-        true,
-      );
-      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
-    };
-  }, []);
-
-  const handleMessagesScroll = () => {
-    const scroller = scrollerRef.current;
-    const nearBottom = isScrolledNearBottom();
-
-    setIsAwayFromBottom(!nearBottom);
-
-    if (nearBottom) {
-      setNewChannelMessageCount(0);
-
-      if (selectedChannelId) onChannelViewed?.(selectedChannelId);
-    }
-
-    if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
-
-    if (messageStateRef.current === 'loading' || !selectedChannelId) return;
-
-    const previousHeight = scroller.scrollHeight;
-
-    setMessageLoadState('loading');
-    void loadChannelMessages(selectedChannelId, messageCursor)
-      .then(({ cursor, loadedMessages }) => {
-        setMessages((current) => [...loadedMessages, ...current]);
-        setMessageCursor(cursor);
-        requestAnimationFrame(() => {
-          if (!scrollerRef.current) return;
-          scrollerRef.current.scrollTop =
-            scrollerRef.current.scrollHeight - previousHeight;
-        });
-      })
-      .catch(() => setMessageLoadState('error'))
-      .finally(() => setMessageLoadState('idle'));
-  };
-
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
   };
@@ -969,205 +855,24 @@ export function CommunityWorkspace({
   });
 
   useEffect(() => {
-    setSelectedChannelId(resolvedChannelId);
     messageComposer.resetForChannelChange();
-    setNewChannelMessageCount(0);
+  }, [selectedChannelId]);
 
-    if (resolvedChannelId) {
-      onChannelViewedRef.current?.(resolvedChannelId);
-      onChannelSelectedRef.current(resolvedChannelId);
-    }
-  }, [resolvedChannelId]);
-
-  useEffect(() => {
-    if (!selectedChannelId) {
-      setMessages([]);
-      setMessageCursor(null);
-      setMessageLoadState('idle');
-
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    setMessages([]);
-    setMessageCursor(null);
-    messageComposer.resetForChannelChange();
-    setNewChannelMessageCount(0);
-    setMessageLoadState('loading');
-    void loadChannelMessagesRef
-      .current(selectedChannelId)
-      .then(({ cursor, loadedMessages }) => {
-        if (cancelled) return;
-        setMessages(loadedMessages);
-        setMessageCursor(cursor);
-        setNewChannelMessageCount(0);
-        onChannelViewedRef.current?.(selectedChannelId);
-        scrollChannelToBottom('auto', true);
-      })
-      .catch(() => {
-        if (!cancelled) setMessageLoadState('error');
-      })
-      .finally(() => {
-        if (!cancelled) setMessageLoadState('idle');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [scrollChannelToBottom, selectedChannelId, setMessageLoadState]);
-
-  useEffect(() => {
-    if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
-
-    if (realtimeEvent.type.startsWith('polls.v1.')) {
-      const poll = realtimeEvent.attributes.poll as PollResource | undefined;
-      const pollId = realtimeStringAttribute(realtimeEvent, 'pollId');
-
-      if (poll) {
-        upsertPoll(poll);
-
-        return;
-      }
-
-      if (pollId) {
-        void applicationContainer
-          .getPoll(session, pollId)
-          .then(upsertPoll)
-          .catch(() => undefined);
-      }
-
-      return;
-    }
-
-    const channelId = realtimeStringAttribute(realtimeEvent, 'channelId');
-
-    if (!channelId || channelId !== selectedChannelId) return;
-
-    if (realtimeEvent.type === 'communities.v1.channel.message.was_deleted') {
-      const targetMessageId = realtimeStringAttribute(
-        realtimeEvent,
-        'targetMessageId',
-      );
-
-      if (!targetMessageId) return;
-
-      setMessages((current) =>
-        current.filter((message) => message.id !== targetMessageId),
-      );
-
-      return;
-    }
-
-    if (
-      realtimeEvent.type ===
-        'communities.v1.channel.message.reaction.was_added' ||
-      realtimeEvent.type ===
-        'communities.v1.channel.message.reaction.was_removed'
-    ) {
-      const messageId = realtimeStringAttribute(realtimeEvent, 'messageId');
-      const authorIdentityId = realtimeStringAttribute(
-        realtimeEvent,
-        'authorId',
-        'authorIdentityId',
-      );
-      const emoji = realtimeStringAttribute(realtimeEvent, 'emoji');
-
-      if (!messageId || !authorIdentityId || !emoji) return;
-
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === messageId
-            ? MessageReactions.update(
-                message,
-                authorIdentityId,
-                emoji,
-                realtimeEvent.type.endsWith('.was_added') ? 'add' : 'remove',
-                typeof realtimeEvent.attributes.createdAt === 'number'
-                  ? realtimeEvent.attributes.createdAt
-                  : realtimeEvent.occurred_on,
-              )
-            : message,
-        ),
-      );
-
-      return;
-    }
-
-    if (realtimeEvent.type === 'communities.v1.channel.message.was_edited') {
-      const message = realtimeMessageAttribute(realtimeEvent);
-
-      if (message) {
-        void projectChannelMessage(channelId, message)
-          .then((projected) => {
-            setMessages((current) => mergeChatMessages(current, [projected]));
-          })
-          .catch(() => undefined);
-
-        return;
-      }
-
-      void loadChannelMessagesRef
-        .current(channelId)
-        .then(({ loadedMessages }) => {
-          setMessages((current) => mergeChatMessages(current, loadedMessages));
-        })
-        .catch(() => undefined);
-
-      return;
-    }
-
-    if (
-      realtimeEvent.type !== 'communities.v1.channel.message.was_sent' &&
-      realtimeEvent.type !== 'communities.v1.call.event.was_recorded'
-    ) {
-      return;
-    }
-
-    const message = realtimeMessageAttribute(realtimeEvent);
-
-    if (!message) return;
-
-    const shouldStickToBottom = isScrolledNearBottom();
-    let cancelled = false;
-
-    void projectChannelMessage(channelId, message)
-      .then((projected) => {
-        if (cancelled) return;
-
-        setMessages((current) => {
-          if (current.some((item) => item.id === projected.id)) return current;
-
-          return [...current, projected].sort(
-            (left, right) => left.timestamp - right.timestamp,
-          );
-        });
-
-        if (shouldStickToBottom) {
-          setNewChannelMessageCount(0);
-          onChannelViewed?.(channelId);
-          scrollChannelToBottom('smooth', true);
-        } else {
-          setNewChannelMessageCount((current) => current + 1);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    community.id,
+  useCommunityChannelRealtime({
+    communityId: community.id,
+    incrementNewChannelMessageCount,
     isScrolledNearBottom,
+    loadChannelMessages,
     onChannelViewed,
     projectChannelMessage,
     realtimeEvent,
-    selectedChannelId,
-    session.identity.id,
-    session,
+    resetNewChannelMessageCount,
     scrollChannelToBottom,
+    selectedChannelId,
+    session,
+    setMessages,
     upsertPoll,
-  ]);
+  });
 
   return (
     <>
@@ -1362,13 +1067,7 @@ export function CommunityWorkspace({
                   profileAnchorFromTarget(target),
                 )
               }
-              onJumpToLatest={() => {
-                setNewChannelMessageCount(0);
-                setIsAwayFromBottom(false);
-
-                if (selectedChannelId) onChannelViewed?.(selectedChannelId);
-                bottomRef.current?.scrollIntoView({ block: 'end' });
-              }}
+              onJumpToLatest={jumpToLatest}
               onMessageMenuOpen={(message, x, y) =>
                 setMessageContextMenu({ message, x, y })
               }
