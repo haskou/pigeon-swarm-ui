@@ -503,11 +503,21 @@ export class PigeonApiGateway {
     requestId: string,
     status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
   ): Promise<CommunityMembershipRequest> {
-    return await this.communities.updateMembershipRequest(
+    const request = await this.communities.updateMembershipRequest(
       session,
       requestId,
       status,
     );
+
+    if (status === 'accepted' && request.type === 'request') {
+      await this.createCommunityInvitationNotification(
+        session,
+        request.communityId,
+        request.identityId,
+      );
+    }
+
+    return request;
   }
 
   public async leaveCommunity(
@@ -931,6 +941,17 @@ export class PigeonApiGateway {
           );
 
     await this.addCommunityMember(
+      {
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier:
+          published.keychainExternalIdentifier ||
+          session.keychainExternalIdentifier,
+      },
+      communityId,
+      normalizedRecipientIdentityId,
+    );
+    await this.createCommunityInvitationNotification(
       {
         ...session,
         keychain: published.keychain,
@@ -1945,6 +1966,66 @@ export class PigeonApiGateway {
       inviterSignature: inviterSignature.toString(),
       recipientIdentityId: peerIdentity.id,
       type,
+    };
+
+    await this.http.request<NotificationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  private async createCommunityInvitationNotification(
+    session: Session,
+    communityId: string,
+    recipientIdentityId: string,
+  ): Promise<void> {
+    const keyEntry = session.keychain.conversations[communityId];
+
+    if (!keyEntry) {
+      throw new Error(copy.messages.missingConversationKey);
+    }
+
+    const recipientIdentity = await this.getIdentity(recipientIdentityId);
+
+    await this.createEncryptedCommunityInvitation(
+      session,
+      recipientIdentity,
+      keyEntry,
+    );
+  }
+
+  private async createEncryptedCommunityInvitation(
+    session: Session,
+    recipientIdentity: IdentityResource,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<void> {
+    const path = '/notifications/';
+    const recipientKeyEntry = {
+      ...keyEntry,
+      peerIdentityId: session.identity.id,
+    };
+    const encryptedCommunityKey = PublicKey.fromPEM(
+      recipientIdentity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(JSON.stringify(recipientKeyEntry))
+      .toString();
+    const inviterSignature = await session.encryptedKeyPair.sign(
+      JSON.stringify({
+        communityId: keyEntry.conversationId,
+        encryptedCommunityKey,
+        inviterIdentityId: session.identity.id,
+        recipientIdentityId: recipientIdentity.id,
+      }),
+      session.password,
+    );
+    const body = {
+      communityId: keyEntry.conversationId,
+      encryptedCommunityKey,
+      inviterIdentityId: session.identity.id,
+      inviterSignature: inviterSignature.toString(),
+      recipientIdentityId: recipientIdentity.id,
+      type: 'community_invitation',
     };
 
     await this.http.request<NotificationResource>(path, {

@@ -704,6 +704,241 @@ describe(PigeonApiGateway.name, () => {
     expect(result.keychainExternalIdentifier).toBe('keychain-next');
   });
 
+  it('sends the community key invitation when accepting a join request', async () => {
+    const recipientKeyPair = await KeyPair.generate();
+    const recipientPublicKey = recipientKeyPair.toPrimitives().publicKey;
+    const acceptedRequest = {
+      communityId: 'community-1',
+      createdAt: 1,
+      creatorIdentityId: 'identity-2',
+      id: 'request-1',
+      identityId: 'identity-2',
+      status: 'accepted',
+      type: 'request',
+      updatedAt: 2,
+    } as const;
+    const recipientIdentity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: recipientPublicKey,
+      },
+      id: 'identity-2',
+      networks: ['network-1'],
+      profile: { name: 'Bob' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce(acceptedRequest)
+        .mockResolvedValueOnce(recipientIdentity)
+        .mockResolvedValueOnce({
+          createdAt: '2026-01-01',
+          id: 'notification-1',
+          payload: {},
+          recipientIdentityId: 'identity-2',
+          state: 'pending',
+          status: 'unread',
+          type: 'community_invitation',
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      encryptedKeyPair: {
+        sign: jest
+          .fn()
+          .mockResolvedValue({ toString: () => 'inviter-signature' }),
+      },
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          'community-1': {
+            conversationId: 'community-1',
+            createdAt: 1,
+            peerIdentityId: '',
+            privateKey: 'private-key',
+            publicKey: 'public-key',
+          },
+        },
+        version: 1,
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.updateCommunityMembershipRequest(
+        session,
+        'request-1',
+        'accepted',
+      ),
+    ).resolves.toBe(acceptedRequest);
+
+    const requestPath = '/communities/membership-requests/request-1';
+    const requestBody = { status: 'accepted' };
+
+    expect(http.request).toHaveBeenNthCalledWith(1, requestPath, {
+      body: JSON.stringify(requestBody),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PATCH',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(2, '/identities/identity-2');
+
+    const notificationCall = (http.request as jest.Mock).mock.calls[2] as [
+      string,
+      { body: string; headers: Record<string, string>; method: string },
+    ];
+    const notificationBody = JSON.parse(notificationCall[1].body) as {
+      communityId: string;
+      encryptedCommunityKey: string;
+      inviterIdentityId: string;
+      inviterSignature: string;
+      recipientIdentityId: string;
+      type: string;
+    };
+
+    expect(notificationCall[0]).toBe('/notifications/');
+    expect(notificationBody).toEqual({
+      communityId: 'community-1',
+      encryptedCommunityKey: expect.any(String),
+      inviterIdentityId: 'identity-1',
+      inviterSignature: 'inviter-signature',
+      recipientIdentityId: 'identity-2',
+      type: 'community_invitation',
+    });
+    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+      JSON.stringify({
+        communityId: 'community-1',
+        encryptedCommunityKey: notificationBody.encryptedCommunityKey,
+        inviterIdentityId: 'identity-1',
+        recipientIdentityId: 'identity-2',
+      }),
+      'secret',
+    );
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      2,
+      session,
+      'POST',
+      '/notifications/',
+      notificationBody,
+    );
+  });
+
+  it('sends the encrypted community key when inviting a member', async () => {
+    const recipientKeyPair = await KeyPair.generate();
+    const recipientPublicKey = recipientKeyPair.toPrimitives().publicKey;
+    const membershipRequest = {
+      communityId: 'community-1',
+      createdAt: 1,
+      creatorIdentityId: 'identity-1',
+      id: 'request-1',
+      identityId: 'identity-2',
+      status: 'pending',
+      type: 'invitation',
+      updatedAt: 1,
+    } as const;
+    const recipientIdentity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: recipientPublicKey,
+      },
+      id: 'identity-2',
+      networks: ['network-1'],
+      profile: { name: 'Bob' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce(membershipRequest)
+        .mockResolvedValueOnce(recipientIdentity)
+        .mockResolvedValueOnce({
+          createdAt: '2026-01-01',
+          id: 'notification-1',
+          payload: {},
+          recipientIdentityId: 'identity-2',
+          state: 'pending',
+          status: 'unread',
+          type: 'community_invitation',
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keyEntry = {
+      conversationId: 'community-1',
+      createdAt: 1,
+      peerIdentityId: '',
+      privateKey: 'private-key',
+      publicKey: 'public-key',
+    };
+    const session = {
+      encryptedKeyPair: {
+        sign: jest
+          .fn()
+          .mockResolvedValue({ toString: () => 'inviter-signature' }),
+      },
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          'community-1': keyEntry,
+        },
+        version: 1,
+      },
+      keychainExternalIdentifier: 'keychain-current',
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    const result = await gateway.createCommunityInvitation(
+      session,
+      'community-1',
+      'identity-2',
+    );
+
+    expect(result).toEqual({
+      keychain: session.keychain,
+      keychainExternalIdentifier: 'keychain-current',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(
+      1,
+      '/communities/community-1/members',
+      {
+        body: JSON.stringify({ identityId: 'identity-2' }),
+        headers: { 'X-Signature': 'http-signature' },
+        method: 'POST',
+      },
+    );
+
+    const notificationCall = (http.request as jest.Mock).mock.calls[2] as [
+      string,
+      { body: string; headers: Record<string, string>; method: string },
+    ];
+    const notificationBody = JSON.parse(notificationCall[1].body) as {
+      communityId: string;
+      encryptedCommunityKey: string;
+      inviterIdentityId: string;
+      inviterSignature: string;
+      recipientIdentityId: string;
+      type: string;
+    };
+
+    expect(notificationBody).toEqual({
+      communityId: 'community-1',
+      encryptedCommunityKey: expect.any(String),
+      inviterIdentityId: 'identity-1',
+      inviterSignature: 'inviter-signature',
+      recipientIdentityId: 'identity-2',
+      type: 'community_invitation',
+    });
+  });
+
   it('accepts group invitations by publishing the decrypted keychain entry', async () => {
     const keyEntry = {
       conversationId: 'group:conversation',
