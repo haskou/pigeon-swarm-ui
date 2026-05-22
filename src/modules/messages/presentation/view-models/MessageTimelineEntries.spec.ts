@@ -3,7 +3,7 @@ import type {
   PollResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { CommunityMessageTimelineEntries } from './CommunityMessageTimelineEntries';
+import { MessageTimelineEntries } from './MessageTimelineEntries';
 
 const timestamp = Date.UTC(2026, 4, 22, 10, 0, 0);
 
@@ -28,19 +28,18 @@ const poll = (overrides: Partial<PollResource> = {}): PollResource => ({
   options: [{ id: 'option-a', text: 'Yes' }],
   question: 'Poll?',
   scope: {
-    channelId: 'channel-a',
-    communityId: 'community-a',
+    conversationId: 'conversation-a',
     networkId: 'network-a',
-    type: 'community_channel',
+    type: 'group_conversation',
   },
   status: 'open',
   votes: [],
   ...overrides,
 });
 
-describe(CommunityMessageTimelineEntries.name, () => {
-  it('builds author run metadata in one timeline pass while ignoring poll gaps', () => {
-    const entries = CommunityMessageTimelineEntries.build(
+describe(MessageTimelineEntries.name, () => {
+  it('builds author run metadata in one pass while ignoring poll gaps', () => {
+    const entries = MessageTimelineEntries.build(
       [
         message({ id: 'message-a', timestamp, authorIdentityId: 'identity-a' }),
         message({
@@ -64,17 +63,17 @@ describe(CommunityMessageTimelineEntries.name, () => {
       'message:message-c',
     ]);
     expect(entries[0]).toMatchObject({
-      showAvatar: false,
+      endsAuthorRun: false,
       startsNewAuthorRun: true,
       type: 'message',
     });
     expect(entries[1]).toMatchObject({
-      showAvatar: true,
+      endsAuthorRun: true,
       startsNewAuthorRun: false,
       type: 'message',
     });
     expect(entries[3]).toMatchObject({
-      showAvatar: true,
+      endsAuthorRun: true,
       startsNewAuthorRun: true,
       type: 'message',
     });
@@ -82,7 +81,7 @@ describe(CommunityMessageTimelineEntries.name, () => {
 
   it('links reply targets and starts new day after poll separators', () => {
     const nextDay = Date.UTC(2026, 4, 23, 8, 0, 0);
-    const entries = CommunityMessageTimelineEntries.build(
+    const entries = MessageTimelineEntries.build(
       [
         message({ id: 'message-a', timestamp }),
         message({

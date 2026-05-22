@@ -23,10 +23,10 @@ import {
   messageReplyImage,
   messageReplySticker,
 } from '../../../messages/presentation/components/messageTimelineHelpers';
+import { MessageTimelineEntries } from '../../../messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../polls/presentation/components/pollCard';
 import { LockIcon } from '../../../../app/presentation/workspace/components/LockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
-import { CommunityMessageTimelineEntries } from './CommunityMessageTimelineEntries';
 
 type LoadState = 'error' | 'idle' | 'loading';
 
@@ -103,7 +103,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   visibleMessages,
 }: CommunityMessageTimelineProps) {
   const timelineEntries = useMemo(
-    () => CommunityMessageTimelineEntries.build(visibleMessages, polls),
+    () => MessageTimelineEntries.build(visibleMessages, polls),
     [polls, visibleMessages],
   );
 
@@ -280,7 +280,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       replyPreview={
                         replyMessage?.content ?? message.replyPreview?.content
                       }
-                      showAvatar={entry.showAvatar}
+                      showAvatar={entry.endsAuthorRun}
                     />
                   </div>
                 </Fragment>

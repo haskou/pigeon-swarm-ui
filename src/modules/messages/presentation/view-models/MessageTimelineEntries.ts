@@ -8,9 +8,9 @@ import { messagePollTimelineItems } from '../../../polls/presentation/components
 import {
   endsAuthorRun,
   startsAuthorRun,
-} from '../../../messages/presentation/components/messageTimelineHelpers';
+} from '../components/messageTimelineHelpers';
 
-export type CommunityMessageTimelineEntry =
+export type MessageTimelineEntry =
   | {
       id: string;
       item: Extract<MessagePollTimelineItem, { type: 'poll' }>;
@@ -18,30 +18,30 @@ export type CommunityMessageTimelineEntry =
       type: 'poll';
     }
   | {
+      endsAuthorRun: boolean;
       id: string;
       item: Extract<MessagePollTimelineItem, { type: 'message' }>;
       previousMessage?: ChatMessage;
       replyMessage?: ChatMessage;
-      showAvatar: boolean;
       startsNewAuthorRun: boolean;
       startsNewDay: boolean;
       type: 'message';
     };
 
-export class CommunityMessageTimelineEntries {
+export class MessageTimelineEntries {
   public static build(
-    visibleMessages: ChatMessage[],
+    messages: ChatMessage[],
     polls: PollResource[],
-  ): CommunityMessageTimelineEntry[] {
-    const items = messagePollTimelineItems(visibleMessages, polls);
+  ): MessageTimelineEntry[] {
+    const items = messagePollTimelineItems(messages, polls);
     const messagesById = new Map(
-      visibleMessages.map((message) => [message.id, message]),
+      messages.map((message) => [message.id, message]),
     );
-    const entries: CommunityMessageTimelineEntry[] = [];
+    const entries: MessageTimelineEntry[] = [];
     let previousMessage: ChatMessage | undefined;
 
     for (const [index, item] of items.entries()) {
-      const startsNewDay = CommunityMessageTimelineEntries.startsTimelineDay(
+      const startsNewDay = MessageTimelineEntries.startsTimelineDay(
         items[index - 1]?.timestamp,
         item.timestamp,
       );
@@ -58,13 +58,13 @@ export class CommunityMessageTimelineEntries {
       }
 
       entries.push({
+        endsAuthorRun: true,
         id: item.id,
         item,
         previousMessage,
         replyMessage: item.message.replyToMessageId
           ? messagesById.get(item.message.replyToMessageId)
           : undefined,
-        showAvatar: true,
         startsNewAuthorRun: startsAuthorRun(previousMessage, item.message),
         startsNewDay,
         type: 'message',
@@ -82,7 +82,7 @@ export class CommunityMessageTimelineEntries {
 
       entries[index] = {
         ...entry,
-        showAvatar: endsAuthorRun(nextMessage, entry.item.message),
+        endsAuthorRun: endsAuthorRun(nextMessage, entry.item.message),
       };
       nextMessage = entry.item.message;
     }
