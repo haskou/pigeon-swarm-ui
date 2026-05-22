@@ -54,8 +54,6 @@ export function ImageLightbox({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-
       if (event.key === 'ArrowLeft' && hasPrevious) goToPrevious();
 
       if (event.key === 'ArrowRight' && hasNext) goToNext();
@@ -64,7 +62,7 @@ export function ImageLightbox({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasNext, hasPrevious, onClose]);
+  }, [hasNext, hasPrevious]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch' || zoom > 1 || images.length < 2) return;

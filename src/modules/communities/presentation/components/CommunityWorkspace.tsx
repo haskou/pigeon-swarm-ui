@@ -3,14 +3,10 @@ import {
   PrivateKey,
   PublicKey,
   StringValueObject,
-  UUID,
 } from '@haskou/value-objects';
 import {
-  lazy,
   type MouseEvent,
   type ReactNode,
-  Suspense,
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -22,17 +18,11 @@ import type { NodeNetwork } from '../../../networks/application/list-node-networ
 import type { CallSession } from '../../../calls/domain/callSession.types';
 import type {
   Community,
-  CommunityChannel,
-  CommunityMessageMention,
-  CommunityPermission,
   CommunityVoiceChannel,
   ConversationKeyEntry,
-  AttachmentProgress,
-  AttachmentUploadOptions,
   ChatMessage,
   IdentityPresence,
   IdentityResource,
-  MessageReplyPreview,
   MessageResource,
   PollResource,
   SelectablePresenceStatus,
@@ -43,25 +33,19 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../attachments/domain/PendingMessageAttachments';
-import { encryptCommunityChannelPayload } from '../../infrastructure/crypto/communityChannelPayloadCipher';
 import { CommunityChannels } from '../../domain/CommunityChannels';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
-import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
-import { MessageEditPolicy } from '../../../messages/domain/MessageEditPolicy';
-import { MessageReactions } from '../../../messages/domain/MessageReactions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/Composer';
+import { MessageReactions } from '../../../messages/domain/MessageReactions';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
-import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
@@ -70,6 +54,7 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
 import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
+import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
 import { loadPublicImage } from './communityImages';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import {
@@ -77,6 +62,10 @@ import {
   type CommunityMemberListItem,
 } from './communityMembersPanel';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import {
+  CommunityWorkspaceDialogs,
+  type CommunityProfileView,
+} from './CommunityWorkspaceDialogs';
 import {
   CommunityMentionPanel,
   type CommunityMentionSuggestion,
@@ -88,60 +77,9 @@ import {
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
+import { CommunityMessageMentions } from './CommunityMessageMentions';
+import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
-
-const AddCommunityMemberDialog = lazy(() =>
-  import('./AddCommunityMemberDialog').then((module) => ({
-    default: module.AddCommunityMemberDialog,
-  })),
-);
-const ConversationDataDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/ConversationDataDialog').then(
-    (module) => ({
-      default: module.ConversationDataDialog,
-    }),
-  ),
-);
-const ConversationKeyDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/ConversationKeyDialog').then(
-    (module) => ({
-      default: module.ConversationKeyDialog,
-    }),
-  ),
-);
-const ImageLightbox = lazy(() =>
-  import('../../../messages/presentation/components/imageLightbox').then(
-    (module) => ({
-      default: module.ImageLightbox,
-    }),
-  ),
-);
-const ManageCommunityDialog = lazy(() =>
-  import('./ManageCommunityDialog').then((module) => ({
-    default: module.ManageCommunityDialog,
-  })),
-);
-const MessageContextMenu = lazy(() =>
-  import('../../../../app/presentation/workspace/components/messageContextMenu').then(
-    (module) => ({
-      default: module.MessageContextMenu,
-    }),
-  ),
-);
-const RawMessageDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/RawMessageDialog').then(
-    (module) => ({
-      default: module.RawMessageDialog,
-    }),
-  ),
-);
-const UserProfileDialog = lazy(() =>
-  import('../../../identities/presentation/components/UserProfileDialog').then(
-    (module) => ({
-      default: module.UserProfileDialog,
-    }),
-  ),
-);
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -184,52 +122,6 @@ interface CommunityWorkspaceProps {
   realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
   typingIdentityIds?: string[];
-}
-
-type MemberView = CommunityMemberListItem & {
-  anchor?: ProfilePopoverAnchor;
-};
-
-type CommunityPendingSend = {
-  attachmentUpload: AttachmentUploadOptions;
-  attachments: File[];
-  channelId: string;
-  content: string;
-  mentions?: CommunityMessageMention[];
-  replyTarget: ChatMessage | null;
-  sticker?: StickerMessageReference;
-};
-type EditingMessage = {
-  message: ChatMessage;
-  previousDraft: string;
-};
-
-function replyPreviewFromMessage(
-  message?: ChatMessage | null,
-): MessageReplyPreview | undefined {
-  if (!message) return undefined;
-
-  const image = message.attachments.find((attachment) =>
-    isBrowserPreviewImage(attachment.contentType),
-  );
-
-  return {
-    authorIdentityId: message.authorIdentityId,
-    ...(message.content ? { content: message.content.slice(0, 180) } : {}),
-    ...(image ? { image } : {}),
-    messageId: message.id,
-    ...(message.sticker ? { sticker: message.sticker } : {}),
-  };
-}
-
-async function createLinkPreviewForContent(session: Session, content: string) {
-  const url = MessageLinkPreviews.firstUrl(content);
-
-  if (!url) return undefined;
-
-  return await applicationContainer
-    .createLinkPreview(session, url)
-    .catch(() => undefined);
 }
 
 export function CommunityWorkspace({
@@ -324,11 +216,8 @@ export function CommunityWorkspace({
     'error' | 'idle' | 'loading'
   >('idle');
   const [draft, setDraft] = useState('');
-  const [sendError, setSendError] = useState<string | null>(null);
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
-  const [attachmentProgress, setAttachmentProgress] =
-    useState<AttachmentProgress | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
@@ -352,20 +241,13 @@ export function CommunityWorkspace({
   const [memberOpen, setMemberOpen] = useState(false);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
-  const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
-    null,
-  );
-  const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
+  const [profileViewer, setProfileViewer] =
+    useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
-  useCloseOnEscape(() => setCommunityMenuOpen(false), communityMenuOpen);
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
-  const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
-  const [failedSends, setFailedSends] = useState<
-    Record<string, CommunityPendingSend>
-  >({});
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -373,7 +255,6 @@ export function CommunityWorkspace({
   const messageStateRef = useRef<'error' | 'idle' | 'loading'>('idle');
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
-  const sendQueueRef = useRef(Promise.resolve());
   const communityMessageDecryptWorkerRef =
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
   const onChannelSelectedRef = useRef(onChannelSelected);
@@ -532,12 +413,12 @@ export function CommunityWorkspace({
   const mentionTokens = useMemo(
     () =>
       selectedChannel
-        ? communityMentionTokens(
+        ? CommunityMessageMentions.tokens({
+            channel: selectedChannel,
             community,
-            selectedChannel,
-            memberIdentities,
-            currentPermissions,
-          )
+            identities: memberIdentities,
+            permissions: currentPermissions,
+          })
         : [],
     [community, currentPermissions, memberIdentities, selectedChannel],
   );
@@ -600,7 +481,7 @@ export function CommunityWorkspace({
         visibleMessages.every((message) => message.encrypted)));
 
   const openMemberProfile = useCallback(
-    (member: MemberView, anchor?: ProfilePopoverAnchor) =>
+    (member: CommunityProfileView, anchor?: ProfilePopoverAnchor) =>
       setProfileViewer({ ...member, anchor }),
     [],
   );
@@ -1050,53 +931,6 @@ export function CommunityWorkspace({
       .finally(() => setMessageLoadState('idle'));
   };
 
-  const handleSendChannelMessage = (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ): Promise<void> => {
-    if (!selectedChannelId) return Promise.resolve();
-
-    onTypingActive?.(selectedChannelId, false);
-    sendPendingChannelMessage({
-      attachments,
-      attachmentUpload,
-      channelId: selectedChannelId,
-      content,
-      mentions: selectedChannel
-        ? communityMentionsForContent(
-            content,
-            community,
-            selectedChannel,
-            memberIdentities,
-            currentPermissions,
-          )
-        : [],
-      replyTarget,
-    });
-    setReplyTarget(null);
-
-    return Promise.resolve();
-  };
-  const handleSendChannelSticker = (
-    sticker: StickerMessageReference,
-  ): Promise<void> => {
-    if (!selectedChannelId) return Promise.resolve();
-
-    onTypingActive?.(selectedChannelId, false);
-    sendPendingChannelMessage({
-      attachments: [],
-      attachmentUpload: {},
-      channelId: selectedChannelId,
-      content: '',
-      mentions: [],
-      replyTarget,
-      sticker,
-    });
-    setReplyTarget(null);
-
-    return Promise.resolve();
-  };
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
   };
@@ -1115,363 +949,28 @@ export function CommunityWorkspace({
       session,
       upsertPoll,
     });
-  const handleDraftChange = (value: string) => {
-    setDraft(value);
-
-    if (selectedChannelId) {
-      onTypingActive?.(selectedChannelId, value.trim().length > 0);
-    }
-  };
-
-  const startEditingChannelMessage = (message: ChatMessage) => {
-    if (!selectedChannelId) return;
-
-    setMessageContextMenu(null);
-    setReplyTarget(null);
-    setEditingMessage({
-      message,
-      previousDraft: draft,
-    });
-    setDraft(message.content);
-  };
-
-  const cancelEditingChannelMessage = () => {
-    const previousDraft = editingMessage?.previousDraft ?? '';
-
-    setEditingMessage(null);
-    setDraft(previousDraft);
-
-    if (selectedChannelId) {
-      onTypingActive?.(selectedChannelId, previousDraft.trim().length > 0);
-    }
-  };
-
-  const handleEditChannelMessage = async (content: string) => {
-    if (!selectedChannelId || !editingMessage) return;
-
-    const channelId = selectedChannelId;
-    const targetMessage = editingMessage.message;
-    const mentions = selectedChannel
-      ? communityMentionsForContent(
-          content,
-          community,
-          selectedChannel,
-          memberIdentities,
-          currentPermissions,
-        )
-      : [];
-
-    setSendError(null);
-
-    try {
-      const timestamp = Date.now();
-      const linkPreview = await createLinkPreviewForContent(session, content);
-      const encryptedPayload = await encryptCommunityChannelPayload({
-        attachments: targetMessage.attachments,
-        authorIdentityId: session.identity.id,
-        channelId,
-        communityId: community.id,
-        communityKey: session.keychain.conversations[community.id],
-        content,
-        eventType: 'CommunityChannelMessageEdited',
-        linkPreview,
-        mentions,
-        timestamp,
-      });
-      const edited = await applicationContainer.editCommunityChannelMessage(
-        session,
-        community.id,
-        channelId,
-        targetMessage.id,
-        {
-          attachmentExternalIdentifiers: targetMessage.attachments.map(
-            (attachment) => attachment.cid,
-          ),
-          encryptedPayload,
-          mentions,
-          timestamp,
-        },
-      );
-      const projected = await projectChannelMessage(channelId, edited);
-
-      setMessages((current) => mergeChatMessages(current, [projected]));
-      setEditingMessage(null);
-      setDraft('');
-      onTypingActive?.(channelId, false);
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.editError));
-    }
-  };
-
-  useEffect(
-    () => () => {
-      if (selectedChannelId) onTypingActive?.(selectedChannelId, false);
-    },
-    [onTypingActive, selectedChannelId],
-  );
-
-  const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
-    setSendError(null);
-    const timestamp = Date.now();
-    const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${UUID.generate().toString()}`;
-
-    setFailedSends((current) => {
-      const next = { ...current };
-
-      delete next[optimisticId];
-
-      return next;
-    });
-    setMessages((current) => [
-      ...current,
-      {
-        attachments: PendingMessageAttachments.fromFiles(
-          payload.attachments,
-          optimisticId,
-        ),
-        authorIdentityId: session.identity.id,
-        content: payload.sticker
-          ? ''
-          : payload.content ||
-            payload.attachments.map((attachment) => attachment.name).join(', '),
-        deliveryStatus: 'pending',
-        encrypted: false,
-        id: optimisticId,
-        mentions: payload.mentions,
-        mine: true,
-        raw: {
-          channelId: payload.channelId,
-          communityId: community.id,
-          id: optimisticId,
-          mentions: payload.mentions,
-          type: 'sent',
-        },
-        reactions: [],
-        replyPreview: replyPreviewFromMessage(payload.replyTarget),
-        replyToMessageId: payload.replyTarget?.id,
-        sticker: payload.sticker,
-        timestamp,
-      },
-    ]);
-    scrollChannelToBottom('smooth');
-
-    sendQueueRef.current = sendQueueRef.current.then(async () => {
-      try {
-        const messageAttachments =
-          await applicationContainer.publishMessageAttachments(
-            session,
-            payload.attachments,
-            (progress) => {
-              startTransition(() => {
-                setMessages((current) =>
-                  current.map((message) =>
-                    message.id === optimisticId
-                      ? { ...message, attachmentProgress: progress }
-                      : message,
-                  ),
-                );
-              });
-            },
-            payload.attachmentUpload,
-          );
-        const linkPreview = payload.sticker
-          ? undefined
-          : await createLinkPreviewForContent(session, payload.content);
-        const encryptedPayload = await encryptCommunityChannelPayload({
-          attachments: messageAttachments,
-          authorIdentityId: session.identity.id,
-          channelId: payload.channelId,
-          communityId: community.id,
-          communityKey: session.keychain.conversations[community.id],
-          content: payload.content,
-          linkPreview,
-          mentions: payload.mentions,
-          replyPreview: replyPreviewFromMessage(payload.replyTarget),
-          replyToMessageId: payload.replyTarget?.id,
-          sticker: payload.sticker,
-          timestamp,
-        });
-        const created =
-          await applicationContainer.createCommunityChannelMessage(
-            session,
-            community.id,
-            payload.channelId,
-            {
-              attachmentExternalIdentifiers: messageAttachments.map(
-                (attachment) => attachment.cid,
-              ),
-              encryptedPayload,
-              mentions: payload.mentions,
-              timestamp,
-            },
-          );
-        const projected = await projectChannelMessage(
-          payload.channelId,
-          created,
-        );
-
-        if (payload.sticker) {
-          void applicationContainer.markStickerUsed(session, payload.sticker);
-        }
-
-        setMessages((current) =>
-          mergeChatMessages(
-            current.filter((message) => message.id !== optimisticId),
-            [projected],
-          ),
-        );
-        scrollChannelToBottom('smooth', true);
-      } catch (caught) {
-        setSendError(toUserErrorMessage(caught, copy.communities.messageError));
-        setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === optimisticId
-              ? {
-                  ...message,
-                  attachmentProgress: undefined,
-                  deliveryStatus: 'failed',
-                }
-              : message,
-          ),
-        );
-      }
-    });
-  };
-
-  const retryChannelMessage = (message: ChatMessage) => {
-    const pending = failedSends[message.id];
-
-    if (!pending) return;
-
-    setMessages((current) => current.filter((item) => item.id !== message.id));
-    void sendPendingChannelMessage(pending);
-  };
-
-  const scrollToChannelMessage = (messageId: string) => {
-    requestAnimationFrame(() => {
-      const element = scrollerRef.current?.querySelector<HTMLElement>(
-        `[data-message-id="${CSS.escape(messageId)}"]`,
-      );
-
-      if (!element) return;
-
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('message-focus-ring');
-      window.setTimeout(
-        () => element.classList.remove('message-focus-ring'),
-        1600,
-      );
-    });
-  };
-
-  const handleReplyReferenceClick = (messageId: string) => {
-    if (
-      messages.some((message) => message.id === messageId) ||
-      selectedChannelPolls.some((poll) => poll.id === messageId)
-    ) {
-      scrollToChannelMessage(messageId);
-
-      return;
-    }
-
-    setSendError(copy.messages.replyTargetNotFound);
-  };
-
-  const handleDeleteChannelMessage = async (message: ChatMessage) => {
-    if (
-      !selectedChannelId ||
-      (!message.mine && !owner && !currentPermissions.has('manage_messages'))
-    )
-      return;
-
-    if (!window.confirm(copy.messages.deleteConfirm)) return;
-
-    setMessageContextMenu(null);
-    setSendError(null);
-    try {
-      await applicationContainer.deleteCommunityChannelMessage(
-        session,
-        community.id,
-        selectedChannelId,
-        message.id,
-      );
-      setMessages((current) =>
-        current.filter((item) => item.id !== message.id),
-      );
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
-    }
-  };
-
-  const handleToggleChannelMessageReaction = async (
-    message: ChatMessage,
-    emoji: string,
-    reacted: boolean,
-  ) => {
-    if (!selectedChannelId) return;
-
-    const channelId = selectedChannelId;
-
-    setSendError(null);
-    setMessages((current) =>
-      current.map((item) =>
-        item.id === message.id
-          ? MessageReactions.update(
-              item,
-              session.identity.id,
-              emoji,
-              reacted ? 'remove' : 'add',
-            )
-          : item,
-      ),
-    );
-
-    try {
-      if (reacted) {
-        await applicationContainer.removeCommunityChannelMessageReaction(
-          session,
-          community.id,
-          channelId,
-          message.id,
-          emoji,
-        );
-      } else {
-        await applicationContainer.addCommunityChannelMessageReaction(
-          session,
-          community.id,
-          channelId,
-          message.id,
-          emoji,
-        );
-      }
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === message.id
-            ? MessageReactions.update(
-                item,
-                session.identity.id,
-                emoji,
-                reacted ? 'add' : 'remove',
-              )
-            : item,
-        ),
-      );
-    }
-  };
-
-  const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
-    errorMessage: copy.composer.attachmentDownloadError,
-    onErrorChange: setSendError,
-    onProgressChange: setAttachmentProgress,
+  const messageComposer = useCommunityMessageComposer({
+    community,
+    currentPermissions,
+    draft,
+    memberIdentities,
+    messages,
+    onTypingActive,
+    owner,
+    projectChannelMessage,
+    scrollChannelToBottom,
+    scrollerRef,
+    selectedChannel,
+    selectedChannelId,
+    selectedChannelPolls,
+    session,
+    setDraft,
+    setMessages,
   });
 
   useEffect(() => {
     setSelectedChannelId(resolvedChannelId);
-    setReplyTarget(null);
-    setEditingMessage(null);
+    messageComposer.resetForChannelChange();
     setNewChannelMessageCount(0);
 
     if (resolvedChannelId) {
@@ -1493,11 +992,9 @@ export function CommunityWorkspace({
 
     setMessages([]);
     setMessageCursor(null);
-    setReplyTarget(null);
-    setEditingMessage(null);
+    messageComposer.resetForChannelChange();
     setNewChannelMessageCount(0);
     setMessageLoadState('loading');
-    setSendError(null);
     void loadChannelMessagesRef
       .current(selectedChannelId)
       .then(({ cursor, loadedMessages }) => {
@@ -1781,56 +1278,27 @@ export function CommunityWorkspace({
           communityLeaveError={communityLeaveError}
           communityMenuOpen={communityMenuOpen}
           menuContent={
-            communityMenuOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default"
-                  onClick={() => setCommunityMenuOpen(false)}
-                  aria-label={copy.dialog.close}
-                />
-                <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCommunityDataOpen(true);
-                      setCommunityMenuOpen(false);
-                    }}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                  >
-                    {copy.chat.viewData}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (communityKey) {
-                        openCopyCommunityKeyDialog();
-                      } else {
-                        setCommunityKeyError(null);
-                        setCommunityKeyDialog('add');
-                      }
+            <CommunityHeaderActionsMenu
+              communityLeaving={communityLeaving}
+              hasCommunityKey={!!communityKey}
+              onClose={() => setCommunityMenuOpen(false)}
+              onCommunityDataOpen={() => {
+                setCommunityDataOpen(true);
+                setCommunityMenuOpen(false);
+              }}
+              onCommunityKeyOpen={() => {
+                if (communityKey) {
+                  openCopyCommunityKeyDialog();
+                } else {
+                  setCommunityKeyError(null);
+                  setCommunityKeyDialog('add');
+                }
 
-                      setCommunityMenuOpen(false);
-                    }}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                  >
-                    {communityKey
-                      ? copy.chat.copyPrivateKey
-                      : copy.chat.addPrivateKey}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void leaveCommunity()}
-                    disabled={communityLeaving}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
-                  >
-                    {communityLeaving
-                      ? copy.communities.leaving
-                      : copy.communities.leave}
-                  </button>
-                </div>
-              </>
-            )
+                setCommunityMenuOpen(false);
+              }}
+              onLeaveCommunity={() => void leaveCommunity()}
+              open={communityMenuOpen}
+            />
           }
           networkName={networkName}
           onCommunityMenuToggle={() =>
@@ -1861,7 +1329,7 @@ export function CommunityWorkspace({
             <CommunityMessageTimeline
               bottomRef={bottomRef}
               isAwayFromBottom={isAwayFromBottom}
-              loadAttachmentPreview={loadAttachmentPreview}
+              loadAttachmentPreview={messageComposer.loadAttachmentPreview}
               memberIdentities={memberIdentities}
               memberPictures={memberPictures}
               messageCursor={messageCursor}
@@ -1872,7 +1340,9 @@ export function CommunityWorkspace({
                 setCommunityKeyError(null);
                 setCommunityKeyDialog('add');
               }}
-              onAttachmentOpen={(attachment) => void openAttachment(attachment)}
+              onAttachmentOpen={(attachment) =>
+                void messageComposer.openAttachment(attachment)
+              }
               onAuthorProfileOpen={(message, target) =>
                 openMessageAuthorProfile(
                   message,
@@ -1903,10 +1373,14 @@ export function CommunityWorkspace({
                 setMessageContextMenu({ message, x, y })
               }
               onReactionToggle={(message, emoji, reacted) =>
-                void handleToggleChannelMessageReaction(message, emoji, reacted)
+                void messageComposer.handleToggleChannelMessageReaction(
+                  message,
+                  emoji,
+                  reacted,
+                )
               }
-              onReplyReferenceClick={handleReplyReferenceClick}
-              onRetryMessage={retryChannelMessage}
+              onReplyReferenceClick={messageComposer.handleReplyReferenceClick}
+              onRetryMessage={messageComposer.retryChannelMessage}
               canClosePolls={currentPermissions.has('create_polls')}
               onPollClose={closePoll}
               onPollRemoveVote={removePollVote}
@@ -1935,22 +1409,24 @@ export function CommunityWorkspace({
                 !currentPermissions.has('send_messages')
               }
               draft={draft}
-              editingMessage={editingMessage?.message ?? null}
-              error={sendError}
+              editingMessage={messageComposer.editingMessage}
+              error={messageComposer.error}
               focusKey={`${selectedChannelId ?? 'no-channel'}:${
-                editingMessage?.message.id ?? 'send'
+                messageComposer.editingMessage?.id ?? 'send'
               }`}
-              onCancelEdit={cancelEditingChannelMessage}
-              onCancelReply={() => setReplyTarget(null)}
-              onDraftChange={handleDraftChange}
-              onEdit={handleEditChannelMessage}
+              onCancelEdit={messageComposer.cancelEditingChannelMessage}
+              onCancelReply={messageComposer.clearReplyTarget}
+              onDraftChange={messageComposer.handleDraftChange}
+              onEdit={messageComposer.handleEditChannelMessage}
               onEscape={
-                editingMessage ? cancelEditingChannelMessage : () => undefined
+                messageComposer.editingMessage
+                  ? messageComposer.cancelEditingChannelMessage
+                  : () => undefined
               }
-              onSend={handleSendChannelMessage}
+              onSend={messageComposer.handleSendChannelMessage}
               onStickerSend={
                 currentPermissions.has('send_stickers')
-                  ? handleSendChannelSticker
+                  ? messageComposer.handleSendChannelSticker
                   : undefined
               }
               mentionHelper={
@@ -1968,13 +1444,15 @@ export function CommunityWorkspace({
                   ? () => setPollDialogOpen(true)
                   : undefined
               }
-              progress={attachmentProgress}
-              replyTo={replyTarget}
+              progress={messageComposer.attachmentProgress}
+              replyTo={messageComposer.replyTarget}
               replyToAuthorName={
-                replyTarget
+                messageComposer.replyTarget
                   ? memberDisplayName(
-                      memberIdentities[replyTarget.authorIdentityId],
-                      replyTarget.authorIdentityId,
+                      memberIdentities[
+                        messageComposer.replyTarget.authorIdentityId
+                      ],
+                      messageComposer.replyTarget.authorIdentityId,
                     )
                   : undefined
               }
@@ -1983,7 +1461,7 @@ export function CommunityWorkspace({
             {stickerPackPreview && (
               <StickerPackPreviewDialog
                 onClose={() => setStickerPackPreview(null)}
-                onStickerSend={handleSendChannelSticker}
+                onStickerSend={messageComposer.handleSendChannelSticker}
                 session={session}
                 sticker={stickerPackPreview}
               />
@@ -2014,150 +1492,64 @@ export function CommunityWorkspace({
         presenceByIdentityId={presenceByIdentityId}
       />
 
-      <Suspense fallback={null}>
-        {bannerViewerOpen && bannerUrl && (
-          <ImageLightbox
-            images={[
-              {
-                alt: community.name,
-                filename: community.banner ?? community.name,
-                url: bannerUrl,
-              },
-            ]}
-            initialIndex={0}
-            onClose={() => setBannerViewerOpen(false)}
-          />
-        )}
-        {manageOpen && (
-          <ManageCommunityDialog
-            community={community}
-            onClose={() => setManageOpen(false)}
-            onCommunityUpdated={onCommunityUpdated}
-            session={session}
-          />
-        )}
-        {memberOpen && (
-          <AddCommunityMemberDialog
-            communityId={community.id}
-            onClose={() => setMemberOpen(false)}
-            onSessionUpdated={onSessionUpdated}
-            session={session}
-          />
-        )}
-        {profileViewer && (
-          <UserProfileDialog
-            anchor={profileViewer.anchor}
-            identity={profileViewer.identity}
-            identityId={profileViewer.identityId}
-            name={memberPrimaryName(
-              profileViewer.identity,
-              profileViewer.identityId,
-            )}
-            communityRoles={communityRoleNamesForIdentity(
-              community,
-              profileViewer.identityId,
-            )}
-            nodeNetworks={nodeNetworks}
-            onClose={() => setProfileViewer(null)}
-            onOpenConversation={
-              profileViewer.identityId === session.identity.id ||
-              !onOpenConversationWithIdentity
-                ? undefined
-                : () =>
-                    onOpenConversationWithIdentity(
-                      profileViewer.identityId,
-                      profileViewer.identity,
-                    )
-            }
-            picture={profileViewer.pictureUrl}
-            presence={presenceByIdentityId[profileViewer.identityId]}
-          />
-        )}
-        {messageContextMenu && (
-          <MessageContextMenu
-            currentIdentityId={session.identity.id}
-            menu={messageContextMenu}
-            onClose={() => setMessageContextMenu(null)}
-            onDelete={
-              messageContextMenu.message.kind !== 'poll' &&
-              (messageContextMenu.message.mine ||
-                owner ||
-                currentPermissions.has('manage_messages'))
-                ? () =>
-                    void handleDeleteChannelMessage(messageContextMenu.message)
-                : undefined
-            }
-            onEdit={
-              MessageEditPolicy.canEdit(
-                messageContextMenu.message,
-                session.identity.id,
-              )
-                ? () => startEditingChannelMessage(messageContextMenu.message)
-                : undefined
-            }
-            onReply={() => {
-              setReplyTarget(messageContextMenu.message);
-              setEditingMessage(null);
-              setMessageContextMenu(null);
-            }}
-            onReactionToggle={(message, emoji, reacted) =>
-              void handleToggleChannelMessageReaction(message, emoji, reacted)
-            }
-            onViewRaw={() => {
-              setRawMessage(messageContextMenu.message);
-              setMessageContextMenu(null);
-            }}
-          />
-        )}
-        {rawMessage && (
-          <RawMessageDialog
-            message={rawMessage}
-            onClose={() => setRawMessage(null)}
-          />
-        )}
-        {communityDataOpen && (
-          <ConversationDataDialog
-            data={communityData}
-            onClose={() => setCommunityDataOpen(false)}
-            title={copy.communities.communityDataTitle}
-          />
-        )}
-        {communityKeyDialog && (
-          <ConversationKeyDialog
-            encryptedConversationKey={communityKeyEncrypted}
-            error={communityKeyError}
-            input={communityKeyInput}
-            mode={communityKeyDialog}
-            onClose={closeCommunityKeyDialog}
-            onCopy={() => void copyCommunityKey()}
-            onImport={() => void importCommunityKey()}
-            onInputChange={setCommunityKeyInput}
-            saving={communityKeySaving}
-          />
-        )}
-      </Suspense>
+      <CommunityWorkspaceDialogs
+        bannerUrl={bannerUrl}
+        bannerViewerOpen={bannerViewerOpen}
+        community={community}
+        communityData={communityData}
+        communityDataOpen={communityDataOpen}
+        communityKeyDialog={communityKeyDialog}
+        communityKeyEncrypted={communityKeyEncrypted}
+        communityKeyError={communityKeyError}
+        communityKeyInput={communityKeyInput}
+        communityKeySaving={communityKeySaving}
+        currentIdentityId={session.identity.id}
+        currentPermissions={currentPermissions}
+        manageOpen={manageOpen}
+        memberOpen={memberOpen}
+        messageContextMenu={messageContextMenu}
+        nodeNetworks={nodeNetworks}
+        onCloseBannerViewer={() => setBannerViewerOpen(false)}
+        onCloseCommunityData={() => setCommunityDataOpen(false)}
+        onCloseCommunityKey={closeCommunityKeyDialog}
+        onCloseManage={() => setManageOpen(false)}
+        onCloseMember={() => setMemberOpen(false)}
+        onCloseMessageContextMenu={() => setMessageContextMenu(null)}
+        onCloseProfile={() => setProfileViewer(null)}
+        onCloseRawMessage={() => setRawMessage(null)}
+        onCommunityKeyCopy={() => void copyCommunityKey()}
+        onCommunityKeyImport={() => void importCommunityKey()}
+        onCommunityKeyInputChange={setCommunityKeyInput}
+        onCommunityUpdated={onCommunityUpdated}
+        onDeleteMessage={(message) =>
+          void messageComposer.handleDeleteChannelMessage(message)
+        }
+        onEditMessage={messageComposer.startEditingChannelMessage}
+        onOpenConversationWithIdentity={onOpenConversationWithIdentity}
+        onReplyToMessage={(message) => {
+          messageComposer.startReplyToMessage(message);
+          setMessageContextMenu(null);
+        }}
+        onSessionUpdated={onSessionUpdated}
+        onToggleReaction={(message, emoji, reacted) =>
+          void messageComposer.handleToggleChannelMessageReaction(
+            message,
+            emoji,
+            reacted,
+          )
+        }
+        onViewRawMessage={(message) => {
+          setRawMessage(message);
+          setMessageContextMenu(null);
+        }}
+        owner={owner}
+        presenceByIdentityId={presenceByIdentityId}
+        profileViewer={profileViewer}
+        rawMessage={rawMessage}
+        session={session}
+      />
     </>
   );
-}
-
-function communityRoleNamesForIdentity(
-  community: Community,
-  identityId: string,
-): string[] {
-  const roleNames = new Set<string>();
-
-  if (community.ownerIdentityId === identityId) {
-    roleNames.add(copy.communities.owner);
-  }
-
-  for (const role of CommunityAccessPolicy.assignedRolesFor(
-    community,
-    identityId,
-  )) {
-    roleNames.add(role.name);
-  }
-
-  return [...roleNames];
 }
 
 function findMentionTrigger(
@@ -2175,105 +1567,4 @@ function findMentionTrigger(
     query: match[2] ?? '',
     start,
   };
-}
-
-function communityMentionsForContent(
-  content: string,
-  community: Community,
-  channel: CommunityChannel,
-  identities: Record<string, IdentityResource>,
-  permissions: Set<CommunityPermission>,
-): CommunityMessageMention[] {
-  const lowerContent = content.toLowerCase();
-  const mentions: CommunityMessageMention[] = [];
-
-  if (
-    permissions.has('mention_everyone') &&
-    lowerContent.includes('@everyone')
-  ) {
-    mentions.push({ type: 'everyone' });
-  }
-
-  if (permissions.has('mention_here') && lowerContent.includes('@here')) {
-    mentions.push({ type: 'here' });
-  }
-
-  if (permissions.has('mention_roles')) {
-    for (const role of community.roles ?? []) {
-      if (role.builtIn) continue;
-
-      if (lowerContent.includes(`@${role.name.toLowerCase()}`)) {
-        mentions.push({ targetId: role.id, type: 'role' });
-      }
-    }
-  }
-
-  for (const identityId of CommunityAccessPolicy.membersWithChannelAccess(
-    community,
-    channel,
-  )) {
-    const identity = identities[identityId];
-    const handle = identity?.profile.handle?.trim();
-    const name = memberDisplayName(identity, identityId);
-    const tokens = [handle ? `@${handle}` : null, `@${name}`]
-      .filter((token): token is string => !!token)
-      .map((token) => token.toLowerCase());
-
-    if (tokens.some((token) => lowerContent.includes(token))) {
-      mentions.push({ targetId: identityId, type: 'identity' });
-    }
-  }
-
-  return dedupeCommunityMentions(mentions);
-}
-
-function communityMentionTokens(
-  community: Community,
-  channel: CommunityChannel,
-  identities: Record<string, IdentityResource>,
-  permissions: Set<CommunityPermission>,
-): string[] {
-  const tokens = new Set<string>();
-
-  if (permissions.has('mention_everyone')) tokens.add('@everyone');
-  if (permissions.has('mention_here')) tokens.add('@here');
-
-  if (permissions.has('mention_roles')) {
-    for (const role of community.roles ?? []) {
-      if (!role.builtIn) tokens.add(`@${role.name}`);
-    }
-  }
-
-  for (const identityId of CommunityAccessPolicy.membersWithChannelAccess(
-    community,
-    channel,
-  )) {
-    const identity = identities[identityId];
-    const handle = identity?.profile.handle?.trim();
-    const name = memberDisplayName(identity, identityId);
-
-    if (handle) tokens.add(`@${handle}`);
-    tokens.add(`@${name}`);
-  }
-
-  return [...tokens];
-}
-
-function dedupeCommunityMentions(
-  mentions: CommunityMessageMention[],
-): CommunityMessageMention[] {
-  const seen = new Set<string>();
-
-  return mentions.filter((mention) => {
-    const key =
-      mention.type === 'identity' || mention.type === 'role'
-        ? `${mention.type}:${mention.targetId}`
-        : mention.type;
-
-    if (seen.has(key)) return false;
-
-    seen.add(key);
-
-    return true;
-  });
 }

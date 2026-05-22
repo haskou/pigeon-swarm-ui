@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import type { CallSession } from '../../domain/callSession.types';
 
@@ -51,16 +51,6 @@ export function CallStageDialog({
   const [expandedScreen, setExpandedScreen] = useState<
     CallSession['participants'][number] | null
   >(null);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
 
   return (
     <div

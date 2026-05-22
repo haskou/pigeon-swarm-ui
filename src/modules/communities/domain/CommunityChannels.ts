@@ -5,30 +5,26 @@ import type {
   CommunityVoiceChannel,
 } from '../../../shared/domain/pigeonResources.types';
 
+import { CommunityChannelCollection } from './CommunityChannelCollection';
+
 export class CommunityChannels {
+  public static collection(community: Community): CommunityChannelCollection {
+    return CommunityChannelCollection.fromCommunity(community);
+  }
+
   public static all(community: Community): CommunityChannel[] {
-    const currentChannels = [
-      ...community.textChannels,
-      ...(community.voiceChannels ?? []),
-    ];
+    return CommunityChannels.collection(community).all();
+  }
 
-    if (!community.channels) return currentChannels;
+  public static find(
+    community: Community,
+    channelId: string,
+  ): CommunityChannel | undefined {
+    return CommunityChannels.collection(community).findById(channelId);
+  }
 
-    const channelsById = new Map(
-      currentChannels.map((channel) => [channel.id, channel]),
-    );
-    const orderedChannels: CommunityChannel[] = [];
-
-    for (const channel of community.channels) {
-      const currentChannel = channelsById.get(channel.id);
-
-      if (!currentChannel) continue;
-
-      orderedChannels.push(currentChannel);
-      channelsById.delete(channel.id);
-    }
-
-    return [...orderedChannels, ...channelsById.values()];
+  public static has(community: Community, channelId: string): boolean {
+    return CommunityChannels.collection(community).has(channelId);
   }
 
   public static isText(
@@ -48,18 +44,14 @@ export class CommunityChannels {
     textChannels: CommunityTextChannel[];
     voiceChannels: CommunityVoiceChannel[];
   } {
-    return {
-      channels,
-      textChannels: channels.filter(CommunityChannels.isText),
-      voiceChannels: channels.filter(CommunityChannels.isVoice),
-    };
+    return CommunityChannelCollection.fromChannels(channels).split();
   }
 
   public static text(community: Community): CommunityTextChannel[] {
-    return CommunityChannels.all(community).filter(CommunityChannels.isText);
+    return CommunityChannels.collection(community).text();
   }
 
   public static voice(community: Community): CommunityVoiceChannel[] {
-    return CommunityChannels.all(community).filter(CommunityChannels.isVoice);
+    return CommunityChannels.collection(community).voice();
   }
 }

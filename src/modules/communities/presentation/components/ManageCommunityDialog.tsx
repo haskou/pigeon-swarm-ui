@@ -359,16 +359,6 @@ export function ManageCommunityDialog({
   }, [memberIdentities, membershipRequests, session.identity]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
     const role = roles.find((candidate) => candidate.id === selectedRoleId);
 
     if (!role) return;

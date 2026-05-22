@@ -92,16 +92,6 @@ export function CreateCommunityDialog({
     state !== 'loading';
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', closeOnEscape);
-
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
-  useEffect(() => {
     if (!avatar) {
       setAvatarPreview(null);
 
