@@ -16,6 +16,30 @@ const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
 });
 
 describe(MessageCollection.name, () => {
+  it('finds the last delivered message without returning pending failures', () => {
+    expect(
+      MessageCollection.lastDelivered([
+        message({ id: 'message-1', timestamp: 100 }),
+        message({
+          deliveryStatus: 'pending',
+          id: 'message-2',
+          timestamp: 200,
+        }),
+        message({
+          deliveryStatus: 'failed',
+          id: 'message-3',
+          timestamp: 300,
+        }),
+      ])?.id,
+    ).toBe('message-1');
+
+    expect(
+      MessageCollection.lastDelivered([
+        message({ deliveryStatus: 'pending', id: 'message-1' }),
+      ]),
+    ).toBeUndefined();
+  });
+
   it('applies edit events to their target message without rendering the edit event', () => {
     const original = message({
       attachments: [

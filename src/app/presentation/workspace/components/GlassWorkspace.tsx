@@ -1580,9 +1580,7 @@ export function GlassWorkspace({
 
   const markConversationReadUntil = useCallback(
     (conversationId: string, loadedMessages: ChatMessage[]) => {
-      const lastMessage = [...loadedMessages]
-        .reverse()
-        .find((message) => !message.deliveryStatus);
+      const lastMessage = MessageCollection.lastDelivered(loadedMessages);
 
       if (!lastMessage) return;
 
@@ -1814,9 +1812,9 @@ export function GlassWorkspace({
 
     sendQueueRef.current = sendQueueRef.current.then(async () => {
       try {
-        const lastMessageId = [...messagesRef.current]
-          .reverse()
-          .find((message) => !message.deliveryStatus)?.id;
+        const lastMessageId = MessageCollection.lastDelivered(
+          messagesRef.current,
+        )?.id;
         const sent = await applicationContainer.sendMessage(
           session,
           conversationId,
