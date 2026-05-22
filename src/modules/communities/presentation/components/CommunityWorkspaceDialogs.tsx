@@ -12,11 +12,10 @@ import type {
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type { ProfilePopoverAnchor } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 
-import { MessageEditPolicy } from '../../../messages/domain/MessageEditPolicy';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { memberPrimaryName } from './communityMemberNames';
 import type { CommunityMemberListItem } from './communityMembersPanel';
+import { CommunityWorkspaceDialogActions } from './CommunityWorkspaceDialogActions';
 
 const AddCommunityMemberDialog = lazy(() =>
   import('./AddCommunityMemberDialog').then((module) => ({
@@ -201,7 +200,7 @@ export function CommunityWorkspaceDialogs({
       {profileViewer && (
         <UserProfileDialog
           anchor={profileViewer.anchor}
-          communityRoles={communityRoleNamesForIdentity(
+          communityRoles={CommunityWorkspaceDialogActions.profileRoleNames(
             community,
             profileViewer.identityId,
           )}
@@ -214,11 +213,14 @@ export function CommunityWorkspaceDialogs({
           nodeNetworks={nodeNetworks}
           onClose={onCloseProfile}
           onOpenConversation={
-            profileViewer.identityId === currentIdentityId ||
-            !onOpenConversationWithIdentity
+            !CommunityWorkspaceDialogActions.canOpenConversation({
+              currentIdentityId,
+              hasConversationHandler: !!onOpenConversationWithIdentity,
+              profileIdentityId: profileViewer.identityId,
+            })
               ? undefined
               : () =>
-                  onOpenConversationWithIdentity(
+                  onOpenConversationWithIdentity?.(
                     profileViewer.identityId,
                     profileViewer.identity,
                   )
@@ -233,15 +235,19 @@ export function CommunityWorkspaceDialogs({
           menu={messageContextMenu}
           onClose={onCloseMessageContextMenu}
           onDelete={
-            messageContextMenu.message.kind !== 'poll' &&
-            (messageContextMenu.message.mine ||
-              owner ||
-              currentPermissions.has('manage_messages'))
+            CommunityWorkspaceDialogActions.canDeleteMessage({
+              currentPermissions,
+              message: messageContextMenu.message,
+              owner,
+            })
               ? () => onDeleteMessage(messageContextMenu.message)
               : undefined
           }
           onEdit={
-            MessageEditPolicy.canEdit(messageContextMenu.message, currentIdentityId)
+            CommunityWorkspaceDialogActions.canEditMessage(
+              messageContextMenu.message,
+              currentIdentityId,
+            )
               ? () => onEditMessage(messageContextMenu.message)
               : undefined
           }
@@ -275,24 +281,4 @@ export function CommunityWorkspaceDialogs({
       )}
     </Suspense>
   );
-}
-
-function communityRoleNamesForIdentity(
-  community: Community,
-  identityId: string,
-): string[] {
-  const roleNames = new Set<string>();
-
-  if (community.ownerIdentityId === identityId) {
-    roleNames.add(copy.communities.owner);
-  }
-
-  for (const role of CommunityAccessPolicy.assignedRolesFor(
-    community,
-    identityId,
-  )) {
-    roleNames.add(role.name);
-  }
-
-  return [...roleNames];
 }
