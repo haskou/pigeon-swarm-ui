@@ -25,12 +25,12 @@ import {
 import { DateSeparator } from '../../../../modules/messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../../modules/messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../../modules/messages/presentation/components/MessageListSkeleton';
-import { messagePollTimelineItems } from '../../../../modules/polls/presentation/components/messagePollTimelineItems';
+import { TimelineJumpButton } from '../../../../modules/messages/presentation/components/TimelineJumpButton';
 import {
   messageReplyImage,
   messageReplySticker,
-  startsAuthorRun,
 } from '../../../../modules/messages/presentation/components/messageTimelineHelpers';
+import { MessageTimelineEntries } from '../../../../modules/messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../../modules/polls/presentation/components/pollCard';
 import { LockIcon } from './LockIcon';
 
@@ -146,14 +146,10 @@ export function ChatMessageTimeline({
         />
       )}
       {newMessageCount > 0 && (
-        <button
-          type="button"
-          onClick={onJumpToLatest}
-          className="sticky bottom-3 left-1/2 z-20 mt-3 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-        >
+        <TimelineJumpButton mode="sticky" onClick={onJumpToLatest}>
           {copy.workspace.newMessages}
           {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
-        </button>
+        </TimelineJumpButton>
       )}
     </div>
   );
@@ -187,12 +183,8 @@ function MessageTimelineContent({
   ChatMessageTimelineProps,
   'newMessageCount' | 'onJumpToLatest' | 'onScroll' | 'scrollerRef'
 >) {
-  const messagesById = useMemo(
-    () => new Map(messages.map((message) => [message.id, message])),
-    [messages],
-  );
-  const timelineItems = useMemo(
-    () => messagePollTimelineItems(messages, polls),
+  const timelineEntries = useMemo(
+    () => MessageTimelineEntries.build(messages, polls),
     [messages, polls],
   );
 
@@ -203,29 +195,29 @@ function MessageTimelineContent({
         {hasReachedMessageStart &&
           messages.length > 0 &&
           messageState !== 'loading' && <ReachedMessageStart />}
-        {timelineItems.map((item, index) =>
-          item.type === 'poll' ? (
+        {timelineEntries.map((entry) =>
+          entry.type === 'poll' ? (
             <PollTimelineItem
-              key={item.id}
+              key={entry.id}
               currentIdentityId={currentIdentityId}
-              message={item.message}
+              message={entry.item.message}
               onClose={onPollClose}
               onMessageMenuOpen={onMessageMenuOpen}
               onRemoveVote={onPollRemoveVote}
               onVote={onPollVote}
-              poll={item.poll}
-              previousTimestamp={timelineItems[index - 1]?.timestamp}
+              poll={entry.item.poll}
+              startsNewDay={entry.startsNewDay}
             />
           ) : (
             <MessageTimelineItem
-              key={item.id}
+              key={entry.id}
               currentIdentityId={currentIdentityId}
               currentIdentityName={currentIdentityName}
               identityNames={identityNames}
               identityPictures={identityPictures}
               isGroupConversation={isGroupConversation}
               loadAttachmentPreview={loadAttachmentPreview}
-              message={item.message}
+              message={entry.item.message}
               onAttachmentOpen={onAttachmentOpen}
               onAuthorProfileOpen={onAuthorProfileOpen}
               onMessageMenuOpen={onMessageMenuOpen}
@@ -233,23 +225,14 @@ function MessageTimelineContent({
               onReplyReferenceClick={onReplyReferenceClick}
               onRetryMessage={onRetryMessage}
               onStickerClick={onStickerClick}
-              previousMessage={
-                timelineItems
-                  .slice(0, index)
-                  .reverse()
-                  .find((candidate) => candidate.type === 'message')?.message
-              }
-              previousTimestamp={timelineItems[index - 1]?.timestamp}
               reactionAuthorNames={reactionAuthorNames}
-              replyMessage={
-                item.message.replyToMessageId
-                  ? messagesById.get(item.message.replyToMessageId)
-                  : undefined
-              }
+              replyMessage={entry.replyMessage}
+              startsNewAuthorRun={entry.startsNewAuthorRun}
+              startsNewDay={entry.startsNewDay}
             />
           ),
         )}
-        {timelineItems.length === 0 && messageState !== 'loading' && (
+        {timelineEntries.length === 0 && messageState !== 'loading' && (
           <EmptyTimelineState hasConversationKey={hasConversationKey} />
         )}
         <div ref={bottomRef} />
@@ -273,10 +256,10 @@ function MessageTimelineItem({
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
-  previousMessage,
-  previousTimestamp,
   reactionAuthorNames,
   replyMessage,
+  startsNewAuthorRun,
+  startsNewDay,
 }: {
   currentIdentityId: string;
   currentIdentityName: string;
@@ -292,14 +275,11 @@ function MessageTimelineItem({
   onReplyReferenceClick: ChatMessageTimelineProps['onReplyReferenceClick'];
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];
   onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
-  previousMessage?: ChatMessage;
-  previousTimestamp?: number;
   reactionAuthorNames: Record<string, string>;
   replyMessage?: ChatMessage;
+  startsNewAuthorRun: boolean;
+  startsNewDay: boolean;
 }) {
-  const startsNewDay = startsTimelineDay(previousTimestamp, message.timestamp);
-  const startsNewAuthorRun = startsAuthorRun(previousMessage, message);
-
   return (
     <Fragment>
       {startsNewDay && (
@@ -356,7 +336,7 @@ function PollTimelineItem({
   onRemoveVote,
   onVote,
   poll,
-  previousTimestamp,
+  startsNewDay,
 }: {
   currentIdentityId: string;
   message: ChatMessage;
@@ -365,13 +345,13 @@ function PollTimelineItem({
   onRemoveVote?: (poll: PollResource) => Promise<void>;
   onVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   poll: PollResource;
-  previousTimestamp?: number;
+  startsNewDay: boolean;
 }) {
   const mine = poll.creatorIdentityId === currentIdentityId;
 
   return (
     <Fragment>
-      {startsTimelineDay(previousTimestamp, poll.createdAt) && (
+      {startsNewDay && (
         <DateSeparator label={formatDateSeparator(poll.createdAt)} />
       )}
       <div
@@ -399,18 +379,6 @@ function PollTimelineItem({
         </div>
       </div>
     </Fragment>
-  );
-}
-
-function startsTimelineDay(
-  previousTimestamp: number | undefined,
-  timestamp: number,
-): boolean {
-  if (!previousTimestamp) return true;
-
-  return (
-    new Date(previousTimestamp).toDateString() !==
-    new Date(timestamp).toDateString()
   );
 }
 

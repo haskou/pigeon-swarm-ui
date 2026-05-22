@@ -18,14 +18,13 @@ import { cx } from '../../../../shared/presentation/cx';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
-import { messagePollTimelineItems } from '../../../polls/presentation/components/messagePollTimelineItems';
+import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
 import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
 import {
-  endsAuthorRun,
   messageReplyImage,
   messageReplySticker,
-  startsAuthorRun,
 } from '../../../messages/presentation/components/messageTimelineHelpers';
+import { MessageTimelineEntries } from '../../../messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../polls/presentation/components/pollCard';
 import { LockIcon } from '../../../../app/presentation/workspace/components/LockIcon';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
@@ -104,12 +103,8 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   session,
   visibleMessages,
 }: CommunityMessageTimelineProps) {
-  const messagesById = useMemo(
-    () => new Map(visibleMessages.map((message) => [message.id, message])),
-    [visibleMessages],
-  );
-  const timelineItems = useMemo(
-    () => messagePollTimelineItems(visibleMessages, polls),
+  const timelineEntries = useMemo(
+    () => MessageTimelineEntries.build(visibleMessages, polls),
     [polls, visibleMessages],
   );
 
@@ -156,14 +151,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             </div>
           )}
           {!missingCommunityKey &&
-            timelineItems.map((item, index) => {
-              if (item.type === 'poll') {
+            timelineEntries.map((entry) => {
+              if (entry.type === 'poll') {
+                const { item } = entry;
+
                 return (
-                  <Fragment key={item.id}>
-                    {startsTimelineDay(
-                      timelineItems[index - 1]?.timestamp,
-                      item.poll.createdAt,
-                    ) && (
+                  <Fragment key={entry.id}>
+                    {entry.startsNewDay && (
                       <DateSeparator
                         label={formatDateSeparator(item.poll.createdAt)}
                       />
@@ -211,37 +205,21 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                 );
               }
 
-              const message = item.message;
-              const previousMessage = timelineItems
-                .slice(0, index)
-                .reverse()
-                .find((candidate) => candidate.type === 'message')?.message;
-              const nextMessage = timelineItems
-                .slice(index + 1)
-                .find((candidate) => candidate.type === 'message')?.message;
-              const replyMessage = message.replyToMessageId
-                ? messagesById.get(message.replyToMessageId)
-                : undefined;
-              const startsNewDay = startsTimelineDay(
-                timelineItems[index - 1]?.timestamp,
-                message.timestamp,
-              );
-              const startsNewAuthorRun = startsAuthorRun(
-                previousMessage,
-                message,
-              );
-              const showAvatar = endsAuthorRun(nextMessage, message);
+              const message = entry.item.message;
+              const replyMessage = entry.replyMessage;
 
               return (
-                <Fragment key={item.id}>
-                  {startsNewDay && (
+                <Fragment key={entry.id}>
+                  {entry.startsNewDay && (
                     <DateSeparator
                       label={formatDateSeparator(message.timestamp)}
                     />
                   )}
                   <div
                     className={
-                      startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'
+                      entry.startsNewDay || entry.startsNewAuthorRun
+                        ? 'mt-4'
+                        : 'mt-1'
                     }
                   >
                     <MessageBubble
@@ -303,13 +281,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       replyPreview={
                         replyMessage?.content ?? message.replyPreview?.content
                       }
-                      showAvatar={showAvatar}
+                      showAvatar={entry.endsAuthorRun}
                     />
                   </div>
                 </Fragment>
               );
             })}
-          {timelineItems.length === 0 && messageState !== 'loading' && (
+          {timelineEntries.length === 0 && messageState !== 'loading' && (
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
               {copy.communities.emptyChannel}
             </div>
@@ -318,17 +296,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
         </div>
       </div>
       {(newChannelMessageCount > 0 || isAwayFromBottom) && (
-        <button
-          type="button"
-          onClick={onJumpToLatest}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-        >
+        <TimelineJumpButton mode="absolute" onClick={onJumpToLatest}>
           {newChannelMessageCount > 0
             ? newChannelMessageCount > 1
               ? copy.chat.newMessages
               : copy.chat.newMessage
             : copy.chat.jumpToLatest}
-        </button>
+        </TimelineJumpButton>
       )}
     </div>
   );
@@ -340,18 +314,6 @@ function canCloseCommunityPoll(
   canClosePolls: boolean,
 ): boolean {
   return canClosePolls || poll.creatorIdentityId === currentIdentityId;
-}
-
-function startsTimelineDay(
-  previousTimestamp: number | undefined,
-  timestamp: number,
-): boolean {
-  if (!previousTimestamp) return true;
-
-  return (
-    new Date(previousTimestamp).toDateString() !==
-    new Date(timestamp).toDateString()
-  );
 }
 
 function noopPollUpdate(): Promise<void> {
