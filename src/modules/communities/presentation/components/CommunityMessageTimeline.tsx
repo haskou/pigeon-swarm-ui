@@ -18,6 +18,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
+import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
 import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
 import {
   messageReplyImage,
@@ -295,17 +296,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
         </div>
       </div>
       {(newChannelMessageCount > 0 || isAwayFromBottom) && (
-        <button
-          type="button"
-          onClick={onJumpToLatest}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-        >
+        <TimelineJumpButton mode="absolute" onClick={onJumpToLatest}>
           {newChannelMessageCount > 0
             ? newChannelMessageCount > 1
               ? copy.chat.newMessages
               : copy.chat.newMessage
             : copy.chat.jumpToLatest}
-        </button>
+        </TimelineJumpButton>
       )}
     </div>
   );

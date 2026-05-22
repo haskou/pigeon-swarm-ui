@@ -25,6 +25,7 @@ import {
 import { DateSeparator } from '../../../../modules/messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../../modules/messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../../modules/messages/presentation/components/MessageListSkeleton';
+import { TimelineJumpButton } from '../../../../modules/messages/presentation/components/TimelineJumpButton';
 import {
   messageReplyImage,
   messageReplySticker,
@@ -145,14 +146,10 @@ export function ChatMessageTimeline({
         />
       )}
       {newMessageCount > 0 && (
-        <button
-          type="button"
-          onClick={onJumpToLatest}
-          className="sticky bottom-3 left-1/2 z-20 mt-3 -translate-x-1/2 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:bg-fuchsia-400"
-        >
+        <TimelineJumpButton mode="sticky" onClick={onJumpToLatest}>
           {copy.workspace.newMessages}
           {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
-        </button>
+        </TimelineJumpButton>
       )}
     </div>
   );
