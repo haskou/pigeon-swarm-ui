@@ -59,16 +59,6 @@ export function CommunityDiscoveryDialog({
   );
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', closeOnEscape);
-
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
-  useEffect(() => {
     let cancelled = false;
     const timeout = window.setTimeout(() => {
       setState('loading');

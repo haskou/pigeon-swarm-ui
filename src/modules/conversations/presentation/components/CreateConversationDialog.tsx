@@ -202,18 +202,6 @@ export function CreateConversationDialog({
     setGroupNetworkId(groupSharedNetworkIds[0] ?? '');
   }, [groupNetworkId, groupSharedNetworkIds]);
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', closeOnEscape);
-
-    return () => {
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [onClose]);
-
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 

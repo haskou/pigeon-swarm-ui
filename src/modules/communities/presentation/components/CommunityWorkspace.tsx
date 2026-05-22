@@ -6,10 +6,8 @@ import {
   UUID,
 } from '@haskou/value-objects';
 import {
-  lazy,
   type MouseEvent,
   type ReactNode,
-  Suspense,
   startTransition,
   useCallback,
   useEffect,
@@ -70,6 +68,7 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
 import { CommunityChannelList } from './CommunityChannelList';
 import { CommunityHeader } from './CommunityHeader';
+import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
 import { loadPublicImage } from './communityImages';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import {
@@ -77,6 +76,10 @@ import {
   type CommunityMemberListItem,
 } from './communityMembersPanel';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import {
+  CommunityWorkspaceDialogs,
+  type CommunityProfileView,
+} from './CommunityWorkspaceDialogs';
 import {
   CommunityMentionPanel,
   type CommunityMentionSuggestion,
@@ -89,59 +92,6 @@ import {
 } from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
-
-const AddCommunityMemberDialog = lazy(() =>
-  import('./AddCommunityMemberDialog').then((module) => ({
-    default: module.AddCommunityMemberDialog,
-  })),
-);
-const ConversationDataDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/ConversationDataDialog').then(
-    (module) => ({
-      default: module.ConversationDataDialog,
-    }),
-  ),
-);
-const ConversationKeyDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/ConversationKeyDialog').then(
-    (module) => ({
-      default: module.ConversationKeyDialog,
-    }),
-  ),
-);
-const ImageLightbox = lazy(() =>
-  import('../../../messages/presentation/components/imageLightbox').then(
-    (module) => ({
-      default: module.ImageLightbox,
-    }),
-  ),
-);
-const ManageCommunityDialog = lazy(() =>
-  import('./ManageCommunityDialog').then((module) => ({
-    default: module.ManageCommunityDialog,
-  })),
-);
-const MessageContextMenu = lazy(() =>
-  import('../../../../app/presentation/workspace/components/messageContextMenu').then(
-    (module) => ({
-      default: module.MessageContextMenu,
-    }),
-  ),
-);
-const RawMessageDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/RawMessageDialog').then(
-    (module) => ({
-      default: module.RawMessageDialog,
-    }),
-  ),
-);
-const UserProfileDialog = lazy(() =>
-  import('../../../identities/presentation/components/UserProfileDialog').then(
-    (module) => ({
-      default: module.UserProfileDialog,
-    }),
-  ),
-);
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -185,10 +135,6 @@ interface CommunityWorkspaceProps {
   session: Session;
   typingIdentityIds?: string[];
 }
-
-type MemberView = CommunityMemberListItem & {
-  anchor?: ProfilePopoverAnchor;
-};
 
 type CommunityPendingSend = {
   attachmentUpload: AttachmentUploadOptions;
@@ -355,12 +301,12 @@ export function CommunityWorkspace({
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
   );
-  const [profileViewer, setProfileViewer] = useState<MemberView | null>(null);
+  const [profileViewer, setProfileViewer] =
+    useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
-  useCloseOnEscape(() => setCommunityMenuOpen(false), communityMenuOpen);
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
@@ -600,7 +546,7 @@ export function CommunityWorkspace({
         visibleMessages.every((message) => message.encrypted)));
 
   const openMemberProfile = useCallback(
-    (member: MemberView, anchor?: ProfilePopoverAnchor) =>
+    (member: CommunityProfileView, anchor?: ProfilePopoverAnchor) =>
       setProfileViewer({ ...member, anchor }),
     [],
   );
@@ -1781,56 +1727,27 @@ export function CommunityWorkspace({
           communityLeaveError={communityLeaveError}
           communityMenuOpen={communityMenuOpen}
           menuContent={
-            communityMenuOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default"
-                  onClick={() => setCommunityMenuOpen(false)}
-                  aria-label={copy.dialog.close}
-                />
-                <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCommunityDataOpen(true);
-                      setCommunityMenuOpen(false);
-                    }}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                  >
-                    {copy.chat.viewData}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (communityKey) {
-                        openCopyCommunityKeyDialog();
-                      } else {
-                        setCommunityKeyError(null);
-                        setCommunityKeyDialog('add');
-                      }
+            <CommunityHeaderActionsMenu
+              communityLeaving={communityLeaving}
+              hasCommunityKey={!!communityKey}
+              onClose={() => setCommunityMenuOpen(false)}
+              onCommunityDataOpen={() => {
+                setCommunityDataOpen(true);
+                setCommunityMenuOpen(false);
+              }}
+              onCommunityKeyOpen={() => {
+                if (communityKey) {
+                  openCopyCommunityKeyDialog();
+                } else {
+                  setCommunityKeyError(null);
+                  setCommunityKeyDialog('add');
+                }
 
-                      setCommunityMenuOpen(false);
-                    }}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-                  >
-                    {communityKey
-                      ? copy.chat.copyPrivateKey
-                      : copy.chat.addPrivateKey}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void leaveCommunity()}
-                    disabled={communityLeaving}
-                    className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-100 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:text-white/30 disabled:hover:bg-transparent"
-                  >
-                    {communityLeaving
-                      ? copy.communities.leaving
-                      : copy.communities.leave}
-                  </button>
-                </div>
-              </>
-            )
+                setCommunityMenuOpen(false);
+              }}
+              onLeaveCommunity={() => void leaveCommunity()}
+              open={communityMenuOpen}
+            />
           }
           networkName={networkName}
           onCommunityMenuToggle={() =>
@@ -2014,150 +1931,59 @@ export function CommunityWorkspace({
         presenceByIdentityId={presenceByIdentityId}
       />
 
-      <Suspense fallback={null}>
-        {bannerViewerOpen && bannerUrl && (
-          <ImageLightbox
-            images={[
-              {
-                alt: community.name,
-                filename: community.banner ?? community.name,
-                url: bannerUrl,
-              },
-            ]}
-            initialIndex={0}
-            onClose={() => setBannerViewerOpen(false)}
-          />
-        )}
-        {manageOpen && (
-          <ManageCommunityDialog
-            community={community}
-            onClose={() => setManageOpen(false)}
-            onCommunityUpdated={onCommunityUpdated}
-            session={session}
-          />
-        )}
-        {memberOpen && (
-          <AddCommunityMemberDialog
-            communityId={community.id}
-            onClose={() => setMemberOpen(false)}
-            onSessionUpdated={onSessionUpdated}
-            session={session}
-          />
-        )}
-        {profileViewer && (
-          <UserProfileDialog
-            anchor={profileViewer.anchor}
-            identity={profileViewer.identity}
-            identityId={profileViewer.identityId}
-            name={memberPrimaryName(
-              profileViewer.identity,
-              profileViewer.identityId,
-            )}
-            communityRoles={communityRoleNamesForIdentity(
-              community,
-              profileViewer.identityId,
-            )}
-            nodeNetworks={nodeNetworks}
-            onClose={() => setProfileViewer(null)}
-            onOpenConversation={
-              profileViewer.identityId === session.identity.id ||
-              !onOpenConversationWithIdentity
-                ? undefined
-                : () =>
-                    onOpenConversationWithIdentity(
-                      profileViewer.identityId,
-                      profileViewer.identity,
-                    )
-            }
-            picture={profileViewer.pictureUrl}
-            presence={presenceByIdentityId[profileViewer.identityId]}
-          />
-        )}
-        {messageContextMenu && (
-          <MessageContextMenu
-            currentIdentityId={session.identity.id}
-            menu={messageContextMenu}
-            onClose={() => setMessageContextMenu(null)}
-            onDelete={
-              messageContextMenu.message.kind !== 'poll' &&
-              (messageContextMenu.message.mine ||
-                owner ||
-                currentPermissions.has('manage_messages'))
-                ? () =>
-                    void handleDeleteChannelMessage(messageContextMenu.message)
-                : undefined
-            }
-            onEdit={
-              MessageEditPolicy.canEdit(
-                messageContextMenu.message,
-                session.identity.id,
-              )
-                ? () => startEditingChannelMessage(messageContextMenu.message)
-                : undefined
-            }
-            onReply={() => {
-              setReplyTarget(messageContextMenu.message);
-              setEditingMessage(null);
-              setMessageContextMenu(null);
-            }}
-            onReactionToggle={(message, emoji, reacted) =>
-              void handleToggleChannelMessageReaction(message, emoji, reacted)
-            }
-            onViewRaw={() => {
-              setRawMessage(messageContextMenu.message);
-              setMessageContextMenu(null);
-            }}
-          />
-        )}
-        {rawMessage && (
-          <RawMessageDialog
-            message={rawMessage}
-            onClose={() => setRawMessage(null)}
-          />
-        )}
-        {communityDataOpen && (
-          <ConversationDataDialog
-            data={communityData}
-            onClose={() => setCommunityDataOpen(false)}
-            title={copy.communities.communityDataTitle}
-          />
-        )}
-        {communityKeyDialog && (
-          <ConversationKeyDialog
-            encryptedConversationKey={communityKeyEncrypted}
-            error={communityKeyError}
-            input={communityKeyInput}
-            mode={communityKeyDialog}
-            onClose={closeCommunityKeyDialog}
-            onCopy={() => void copyCommunityKey()}
-            onImport={() => void importCommunityKey()}
-            onInputChange={setCommunityKeyInput}
-            saving={communityKeySaving}
-          />
-        )}
-      </Suspense>
+      <CommunityWorkspaceDialogs
+        bannerUrl={bannerUrl}
+        bannerViewerOpen={bannerViewerOpen}
+        community={community}
+        communityData={communityData}
+        communityDataOpen={communityDataOpen}
+        communityKeyDialog={communityKeyDialog}
+        communityKeyEncrypted={communityKeyEncrypted}
+        communityKeyError={communityKeyError}
+        communityKeyInput={communityKeyInput}
+        communityKeySaving={communityKeySaving}
+        currentIdentityId={session.identity.id}
+        currentPermissions={currentPermissions}
+        manageOpen={manageOpen}
+        memberOpen={memberOpen}
+        messageContextMenu={messageContextMenu}
+        nodeNetworks={nodeNetworks}
+        onCloseBannerViewer={() => setBannerViewerOpen(false)}
+        onCloseCommunityData={() => setCommunityDataOpen(false)}
+        onCloseCommunityKey={closeCommunityKeyDialog}
+        onCloseManage={() => setManageOpen(false)}
+        onCloseMember={() => setMemberOpen(false)}
+        onCloseMessageContextMenu={() => setMessageContextMenu(null)}
+        onCloseProfile={() => setProfileViewer(null)}
+        onCloseRawMessage={() => setRawMessage(null)}
+        onCommunityKeyCopy={() => void copyCommunityKey()}
+        onCommunityKeyImport={() => void importCommunityKey()}
+        onCommunityKeyInputChange={setCommunityKeyInput}
+        onCommunityUpdated={onCommunityUpdated}
+        onDeleteMessage={(message) => void handleDeleteChannelMessage(message)}
+        onEditMessage={startEditingChannelMessage}
+        onOpenConversationWithIdentity={onOpenConversationWithIdentity}
+        onReplyToMessage={(message) => {
+          setReplyTarget(message);
+          setEditingMessage(null);
+          setMessageContextMenu(null);
+        }}
+        onSessionUpdated={onSessionUpdated}
+        onToggleReaction={(message, emoji, reacted) =>
+          void handleToggleChannelMessageReaction(message, emoji, reacted)
+        }
+        onViewRawMessage={(message) => {
+          setRawMessage(message);
+          setMessageContextMenu(null);
+        }}
+        owner={owner}
+        presenceByIdentityId={presenceByIdentityId}
+        profileViewer={profileViewer}
+        rawMessage={rawMessage}
+        session={session}
+      />
     </>
   );
-}
-
-function communityRoleNamesForIdentity(
-  community: Community,
-  identityId: string,
-): string[] {
-  const roleNames = new Set<string>();
-
-  if (community.ownerIdentityId === identityId) {
-    roleNames.add(copy.communities.owner);
-  }
-
-  for (const role of CommunityAccessPolicy.assignedRolesFor(
-    community,
-    identityId,
-  )) {
-    roleNames.add(role.name);
-  }
-
-  return [...roleNames];
 }
 
 function findMentionTrigger(

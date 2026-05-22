@@ -655,9 +655,7 @@ export function GlassWorkspace({
           (item) => item.id === scope.communityId,
         );
         const channel = community
-          ? CommunityChannels.all(community).find(
-              (item) => item.id === scope.channelId,
-            )
+          ? CommunityChannels.find(community, scope.channelId)
           : undefined;
 
         return {
@@ -2465,9 +2463,7 @@ export function GlassWorkspace({
 
         if (communityId && channel) {
           updateCommunityState(communityId, (community) => {
-            const channels = CommunityChannels.all(community);
-
-            if (channels.some((item) => item.id === channel.id)) {
+            if (CommunityChannels.has(community, channel.id)) {
               return community;
             }
 

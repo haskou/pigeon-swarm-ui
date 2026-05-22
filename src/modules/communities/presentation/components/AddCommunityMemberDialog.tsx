@@ -56,16 +56,6 @@ export function AddCommunityMemberDialog({
   ] satisfies Array<{ label: string; value: AddMemberMode }>;
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
     const identityId = normalizeIdentityLookup(identityInput);
 
     setError(null);

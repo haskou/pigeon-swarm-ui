@@ -119,16 +119,6 @@ export function UserProfileDialog({
     };
   }, [directBanner, identity?.profile.banner]);
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', closeOnEscape);
-
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
   const copyIdentityId = async () => {
     if (navigator.clipboard) {
       await navigator.clipboard.writeText(identityId);

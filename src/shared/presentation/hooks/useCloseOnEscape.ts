@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const closeOnEscapeStack: symbol[] = [];
+import { closeOnEscapeStack } from './CloseOnEscapeStack';
 
 export function useCloseOnEscape(onClose: () => void, active = true): void {
   const onCloseRef = useRef(onClose);
@@ -12,13 +12,12 @@ export function useCloseOnEscape(onClose: () => void, active = true): void {
   useEffect(() => {
     if (!active) return undefined;
 
-    const token = Symbol('close-on-escape');
-    closeOnEscapeStack.push(token);
+    const token = closeOnEscapeStack.add();
 
     const closeTopmostOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
 
-      if (closeOnEscapeStack[closeOnEscapeStack.length - 1] !== token) return;
+      if (!closeOnEscapeStack.isTopmost(token)) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -29,9 +28,7 @@ export function useCloseOnEscape(onClose: () => void, active = true): void {
     window.addEventListener('keydown', closeTopmostOnEscape, true);
 
     return () => {
-      const index = closeOnEscapeStack.indexOf(token);
-      if (index >= 0) closeOnEscapeStack.splice(index, 1);
-
+      closeOnEscapeStack.remove(token);
       window.removeEventListener('keydown', closeTopmostOnEscape, true);
     };
   }, [active]);
