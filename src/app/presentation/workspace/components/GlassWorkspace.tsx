@@ -68,8 +68,10 @@ import {
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useUnreadMessages } from '../../../../modules/messages/presentation/hooks/useUnreadMessages';
 import {
+  currentPwaNotificationPermission,
   deletePwaPushSubscription,
   ensurePwaPushSubscription,
+  type PwaNotificationPermission,
   showPwaNotification,
 } from '../../../../modules/notifications/infrastructure/browser/pwaNotifications';
 import { useNotifications } from '../../../../modules/notifications/presentation/hooks/useNotifications';
@@ -135,6 +137,7 @@ const WorkspaceDialogs = lazy(() =>
 );
 
 type LoadState = 'idle' | 'loading' | 'error';
+type PushEnableState = 'error' | 'idle' | 'loading';
 type PendingSend = {
   attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
@@ -167,6 +170,88 @@ function canActOnMembershipRequest(
     (community) =>
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
+  );
+}
+
+function PushNotificationPrompt({
+  enableState,
+  error,
+  onDismiss,
+  onEnable,
+}: {
+  enableState: PushEnableState;
+  error: null | string;
+  onDismiss: () => void;
+  onEnable: () => void;
+}) {
+  const loading = enableState === 'loading';
+
+  return (
+    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center lg:bottom-5">
+      <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-cyan-200/25 bg-[#171827]/95 p-3 shadow-2xl shadow-black/35 backdrop-blur">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/15 text-cyan-100">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5"
+            >
+              <path
+                d="M18 9.5a6 6 0 0 0-12 0v3.2L4.7 15a1 1 0 0 0 .9 1.5h12.8a1 1 0 0 0 .9-1.5L18 12.7V9.5Z"
+                stroke="currentColor"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M9.6 19a2.6 2.6 0 0 0 4.8 0"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black leading-tight text-white">
+              {copy.notifications.enablePushTitle}
+            </p>
+            <p className="mt-1 text-xs leading-snug text-white/60">
+              {error ?? copy.notifications.enablePushBody}
+            </p>
+            <button
+              type="button"
+              onClick={onEnable}
+              disabled={loading}
+              className="mt-3 min-h-10 w-full rounded-xl bg-cyan-100 px-4 text-sm font-black text-[#111827] transition hover:bg-white disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+            >
+              {loading
+                ? copy.notifications.enablePushLoading
+                : copy.notifications.enablePush}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
+            aria-label={copy.notifications.enablePushDismiss}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-4 w-4"
+            >
+              <path
+                d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -262,6 +347,14 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [pushPermission, setPushPermission] =
+    useState<PwaNotificationPermission>(() =>
+      currentPwaNotificationPermission(),
+    );
+  const [pushEnableState, setPushEnableState] =
+    useState<PushEnableState>('idle');
+  const [pushEnableError, setPushEnableError] = useState<string | null>(null);
+  const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -276,6 +369,7 @@ export function GlassWorkspace({
   const callParticipantStatusesRef = useRef<
     Record<string, Record<string, CallParticipantStatus>>
   >({});
+  const notifiedIncomingCallIdsRef = useRef(new Set<string>());
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
@@ -329,6 +423,36 @@ export function GlassWorkspace({
     messageStateRef.current = state;
     setMessageState(state);
   }, []);
+  const refreshPushPermission = useCallback(() => {
+    setPushPermission(currentPwaNotificationPermission());
+  }, []);
+  const enablePushNotifications = useCallback(async () => {
+    setPushEnableState('loading');
+    setPushEnableError(null);
+
+    try {
+      await ensurePwaPushSubscription(session, { requestPermission: true });
+      const nextPermission = currentPwaNotificationPermission();
+
+      setPushPermission(nextPermission);
+
+      if (nextPermission === 'denied') {
+        setPushEnableState('error');
+        setPushEnableError(copy.notifications.enablePushDenied);
+
+        return;
+      }
+
+      setPushEnableState('idle');
+      setPushEnableError(null);
+    } catch (caught) {
+      refreshPushPermission();
+      setPushEnableState('error');
+      setPushEnableError(
+        toUserErrorMessage(caught, copy.notifications.enablePushError),
+      );
+    }
+  }, [refreshPushPermission, session]);
 
   const suppressMessageLoadsBriefly = useCallback(() => {
     suppressMessageLoadsUntilRef.current = Date.now() + 800;
@@ -336,11 +460,9 @@ export function GlassWorkspace({
 
   const openNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
-    void ensurePwaPushSubscription(session, { requestPermission: true }).catch(
-      () => undefined,
-    );
+    void enablePushNotifications();
     setNotificationsOpen(true);
-  }, [session, suppressMessageLoadsBriefly]);
+  }, [enablePushNotifications, suppressMessageLoadsBriefly]);
 
   const closeNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
@@ -536,8 +658,10 @@ export function GlassWorkspace({
   });
 
   useEffect(() => {
-    void ensurePwaPushSubscription(session).catch(() => undefined);
-  }, [session]);
+    void ensurePwaPushSubscription(session)
+      .catch(() => undefined)
+      .finally(refreshPushPermission);
+  }, [refreshPushPermission, session]);
 
   const logout = () => {
     void deletePwaPushSubscription(session).catch(() => undefined);
@@ -849,6 +973,17 @@ export function GlassWorkspace({
         const caller = details.participants.find(
           (participant) => participant.identityId === call.creatorIdentityId,
         );
+
+        if (!notifiedIncomingCallIdsRef.current.has(call.id)) {
+          notifiedIncomingCallIdsRef.current.add(call.id);
+          void showPwaNotification({
+            body: details.subtitle
+              ? `${details.title} · ${details.subtitle}`
+              : details.title,
+            tag: `call-${call.id}`,
+            title: copy.calls.incoming,
+          });
+        }
 
         setIncomingCall({
           call,
@@ -2920,6 +3055,8 @@ export function GlassWorkspace({
     notificationsOpen ||
     !!rawMessage ||
     realtimeEventsOpen;
+  const showPushEnablePrompt =
+    pushPermission === 'default' && !pushPromptDismissed;
 
   return (
     <section
@@ -3214,6 +3351,15 @@ export function GlassWorkspace({
           </div>
         )}
       </div>
+
+      {showPushEnablePrompt && !hasWorkspaceDialogOpen ? (
+        <PushNotificationPrompt
+          enableState={pushEnableState}
+          error={pushEnableError}
+          onDismiss={() => setPushPromptDismissed(true)}
+          onEnable={() => void enablePushNotifications()}
+        />
+      ) : null}
 
       {hasWorkspaceDialogOpen ? (
         <Suspense fallback={null}>

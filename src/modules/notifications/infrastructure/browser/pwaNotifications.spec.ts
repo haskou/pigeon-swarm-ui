@@ -1,7 +1,10 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { ensurePwaPushSubscription } from './pwaNotifications';
+import {
+  currentPwaNotificationPermission,
+  ensurePwaPushSubscription,
+} from './pwaNotifications';
 
 jest.mock('../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
@@ -200,6 +203,33 @@ describe(ensurePwaPushSubscription.name, () => {
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('does not register a subscription when the explicit permission request is denied', async () => {
+    const { requestPermission } = installPushBrowser({
+      permission: 'default',
+      requestedPermission: 'denied',
+    });
+
+    await ensurePwaPushSubscription(session(), { requestPermission: true });
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(
+      mockedApplicationContainer.getPushVapidPublicKey,
+    ).not.toHaveBeenCalled();
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('reports the current permission only when push subscriptions are supported', () => {
+    installPushBrowser({ permission: 'default' });
+
+    expect(currentPwaNotificationPermission()).toBe('default');
+
+    Reflect.deleteProperty(globalThis, 'PushManager');
+
+    expect(currentPwaNotificationPermission()).toBe('unsupported');
   });
 
   it('replaces an existing subscription created with a different VAPID key', async () => {

@@ -577,6 +577,15 @@ export const copy = {
     createdAt: 'Created',
     decline: 'Decline',
     empty: 'No notifications right now.',
+    enablePush: 'Enable notifications',
+    enablePushBody:
+      'Turn on notifications for messages and incoming calls.',
+    enablePushDenied:
+      'Notifications are blocked in this browser. Enable them in browser settings to receive messages and calls.',
+    enablePushDismiss: 'Dismiss notification prompt',
+    enablePushError: 'Notifications could not be enabled.',
+    enablePushLoading: 'Enabling notifications...',
+    enablePushTitle: 'Messages and calls',
     error: 'Notifications could not be loaded.',
     groupInvitationTitle: 'Group invitation',
     invitationTitle: 'Conversation invitation',

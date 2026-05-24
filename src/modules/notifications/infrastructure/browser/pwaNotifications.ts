@@ -15,6 +15,7 @@ type Permission = NotificationPermission;
 type PermissionRequester = () => Promise<Permission>;
 type ApplicationServerKey = Uint8Array<ArrayBuffer>;
 type OptionalApplicationServerKey = ApplicationServerKey | null;
+export type PwaNotificationPermission = NotificationPermission | 'unsupported';
 type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
   endpoint: string;
   keys: {
@@ -31,8 +32,14 @@ export function canUsePwaNotifications(): boolean {
   );
 }
 
-function canUsePushSubscriptions(): boolean {
+export function canUsePwaPushSubscriptions(): boolean {
   return canUsePwaNotifications() && 'PushManager' in globalThis;
+}
+
+export function currentPwaNotificationPermission(): PwaNotificationPermission {
+  if (!canUsePwaPushSubscriptions()) return 'unsupported';
+
+  return Notification.permission;
 }
 
 export const requestPwaNotificationPermission: PermissionRequester =
@@ -196,7 +203,7 @@ export async function ensurePwaPushSubscription(
   session: Session,
   options: EnsurePwaPushSubscriptionOptions = {},
 ): Promise<void> {
-  if (!canUsePushSubscriptions()) return;
+  if (!canUsePwaPushSubscriptions()) return;
 
   if ((await currentPushPermission(options)) !== 'granted') return;
 
@@ -220,7 +227,7 @@ export async function ensurePwaPushSubscription(
 export async function deletePwaPushSubscription(
   session: Session,
 ): Promise<void> {
-  if (!canUsePushSubscriptions()) return;
+  if (!canUsePwaPushSubscriptions()) return;
 
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
