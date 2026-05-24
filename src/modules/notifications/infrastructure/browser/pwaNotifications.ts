@@ -8,11 +8,18 @@ type PwaNotificationPayload = {
   title: string;
   url?: string;
 };
+type EnsurePwaPushSubscriptionOptions = {
+  requestPermission?: boolean;
+};
 type Permission = NotificationPermission;
 type PermissionRequester = () => Promise<Permission>;
 
 export function canUsePwaNotifications(): boolean {
-  return 'Notification' in globalThis && 'serviceWorker' in navigator;
+  return (
+    'Notification' in globalThis &&
+    'navigator' in globalThis &&
+    'serviceWorker' in navigator
+  );
 }
 
 function canUsePushSubscriptions(): boolean {
@@ -32,12 +39,6 @@ export async function showPwaNotification(
   payload: PwaNotificationPayload,
 ): Promise<void> {
   if (!canUsePwaNotifications()) return;
-
-  if (Notification.permission === 'default') {
-    const permission = await requestPwaNotificationPermission();
-
-    if (permission !== 'granted') return;
-  }
 
   if (Notification.permission !== 'granted') return;
 
@@ -71,16 +72,19 @@ function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
 
 export async function ensurePwaPushSubscription(
   session: Session,
+  options: EnsurePwaPushSubscriptionOptions = {},
 ): Promise<void> {
   if (!canUsePushSubscriptions()) return;
+
+  const permission = options.requestPermission
+    ? await requestPwaNotificationPermission()
+    : Notification.permission;
+
+  if (permission !== 'granted') return;
 
   const vapid = await applicationContainer.getPushVapidPublicKey();
 
   if (!vapid.enabled || !vapid.publicKey) return;
-
-  const permission = await requestPwaNotificationPermission();
-
-  if (permission !== 'granted') return;
 
   const registration = await navigator.serviceWorker.ready;
   const existingSubscription = await registration.pushManager.getSubscription();

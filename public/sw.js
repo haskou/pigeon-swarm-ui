@@ -137,7 +137,13 @@ self.addEventListener('push', (event) => {
 });
 
 function pushPayload(data) {
-  if (!data) return null;
+  if (!data) {
+    return {
+      body: '',
+      title: 'Pigeon Swarm',
+      url: '/',
+    };
+  }
 
   try {
     const payload = data.json();

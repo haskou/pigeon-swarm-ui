@@ -19,7 +19,6 @@ import {
 } from '../../modules/identities/infrastructure/storage/savedCredentials';
 import { useNodeNetworks } from '../../modules/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../modules/networks/presentation/hooks/usePeers';
-import { requestPwaNotificationPermission } from '../../modules/notifications/infrastructure/browser/pwaNotifications';
 import { applicationContainer } from '../composition/applicationContainer';
 
 type RestoreState = 'done' | 'loading';
@@ -92,10 +91,6 @@ export function useAppBootstrap(): {
         setRestoreState('done');
       });
   }, [handleAuthenticated, nodeNetworks, restoreState, session]);
-
-  useEffect(() => {
-    void requestPwaNotificationPermission();
-  }, []);
 
   const clearSession = useCallback(() => {
     clearSavedCredentials();

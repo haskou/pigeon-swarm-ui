@@ -70,7 +70,6 @@ import { useUnreadMessages } from '../../../../modules/messages/presentation/hoo
 import {
   deletePwaPushSubscription,
   ensurePwaPushSubscription,
-  requestPwaNotificationPermission,
   showPwaNotification,
 } from '../../../../modules/notifications/infrastructure/browser/pwaNotifications';
 import { useNotifications } from '../../../../modules/notifications/presentation/hooks/useNotifications';
@@ -337,9 +336,11 @@ export function GlassWorkspace({
 
   const openNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
-    void requestPwaNotificationPermission();
+    void ensurePwaPushSubscription(session, { requestPermission: true }).catch(
+      () => undefined,
+    );
     setNotificationsOpen(true);
-  }, [suppressMessageLoadsBriefly]);
+  }, [session, suppressMessageLoadsBriefly]);
 
   const closeNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
