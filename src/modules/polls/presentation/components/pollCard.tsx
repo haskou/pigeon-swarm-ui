@@ -115,7 +115,7 @@ export function PollCard({
         WebkitTouchCallout: 'none',
       }}
       className={cx(
-        'w-full max-w-xl rounded-2xl border p-4 text-white shadow-xl [@media(pointer:coarse)]:select-none',
+        'w-full max-w-xl rounded-2xl border p-3 text-white shadow-xl [@media(pointer:coarse)]:select-none sm:p-4',
         mine
           ? 'border-[#6f99aa]/35 bg-[#274279] shadow-[#102938]/25'
           : 'border-white/10 bg-black/25 shadow-black/20',
@@ -131,7 +131,7 @@ export function PollCard({
           >
             {copy.polls.poll}
           </div>
-          <h3 className="mt-1 break-words text-base font-black">
+          <h3 className="mt-1 break-words text-sm font-black sm:text-base">
             {poll.question}
           </h3>
         </div>
@@ -146,7 +146,7 @@ export function PollCard({
           {poll.status === 'open' ? copy.polls.open : copy.polls.closed}
         </span>
       </div>
-      <div className="mt-4 grid gap-2">
+      <div className="mt-3 grid gap-2 sm:mt-4">
         {poll.options.map((option) => {
           const count = counts[option.id] ?? 0;
           const percent =
@@ -156,7 +156,7 @@ export function PollCard({
           return (
             <label
               key={option.id}
-              className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/8 p-3"
+              className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/8 p-2.5 sm:p-3"
             >
               <span
                 aria-hidden="true"
@@ -185,11 +185,11 @@ export function PollCard({
           );
         })}
       </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 sm:mt-4">
         <span className="text-xs font-bold text-white/45">
           {totalVotes} {totalVotes === 1 ? copy.polls.vote : copy.polls.votes}
         </span>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
           {currentVote && poll.status === 'open' && (
             <button
               type="button"

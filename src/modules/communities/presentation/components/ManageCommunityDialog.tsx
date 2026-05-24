@@ -91,6 +91,11 @@ export function ManageCommunityDialog({
   const [channelOrder, setChannelOrder] = useState<ManagedCommunityChannel[]>(
     CommunityChannels.all(community),
   );
+  const [pendingChannelDeleteId, setPendingChannelDeleteId] = useState<
+    string | null
+  >(null);
+  const [lastSavedSection, setLastSavedSection] =
+    useState<CommunitySettingsSection | null>(null);
   const originalChannelIdsRef = useRef(
     CommunityChannels.all(community).map((channel) => channel.id),
   );
@@ -710,6 +715,26 @@ export function ManageCommunityDialog({
     name.trim() !== community.name ||
     description.trim() !== community.description ||
     discoverable !== (community.discoverable ?? true);
+  const hasChannelChanges = ManagedCommunityChannels.hasChanges(
+    channelDraftInput,
+  );
+  const hasManageCommunityChanges = hasProfileChanges || hasChannelChanges;
+  const activeSectionHasChanges =
+    activeSection === 'profile'
+      ? hasProfileChanges
+      : activeSection === 'channels'
+        ? hasChannelChanges
+        : false;
+  const activeSectionHasExternalChanges =
+    activeSection === 'profile'
+      ? hasChannelChanges
+      : activeSection === 'channels'
+        ? hasProfileChanges
+        : hasManageCommunityChanges;
+
+  useEffect(() => {
+    if (hasManageCommunityChanges) setLastSavedSection(null);
+  }, [hasManageCommunityChanges]);
 
   const saveManagedChannels = async (
     currentCommunity: Community,
@@ -796,9 +821,6 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const hasChannelChanges =
-        ManagedCommunityChannels.hasChanges(channelDraftInput);
-
       if (!hasProfileChanges && !hasChannelChanges) return true;
 
       let updatedCommunity = community;
@@ -823,17 +845,35 @@ export function ManageCommunityDialog({
           ...updatedCommunity,
           ...CommunityChannels.split(CommunityChannels.all(community)),
         });
+        setLastSavedSection('profile');
 
         return true;
       }
 
       const savedChannels = await saveManagedChannels(updatedCommunity);
+      const savedChannelDrafts = Object.fromEntries(
+        savedChannels.channels.map((channel) => [channel.id, channel.name]),
+      );
+      const savedChannelPermissionDrafts = Object.fromEntries(
+        savedChannels.channels.map((channel) => [
+          channel.id,
+          channel.permissions?.visibleRoleIds ?? ['everyone'],
+        ]),
+      );
 
       onCommunityUpdated({
         ...community,
         ...savedChannels.community,
         ...CommunityChannels.split(savedChannels.channels),
       });
+      originalChannelIdsRef.current = savedChannels.channels.map(
+        (channel) => channel.id,
+      );
+      setChannelOrder(savedChannels.channels);
+      setChannelDrafts(savedChannelDrafts);
+      setChannelPermissionDrafts(savedChannelPermissionDrafts);
+      setDeletedChannelIds([]);
+      setLastSavedSection('channels');
 
       return true;
     } catch (caught) {
@@ -843,13 +883,6 @@ export function ManageCommunityDialog({
     } finally {
       setState('idle');
     }
-  };
-
-  const finishManage = async () => {
-    const saved = await saveChanges();
-
-    if (!saved) return;
-    onClose();
   };
 
   const createChannel = () => {
@@ -902,12 +935,7 @@ export function ManageCommunityDialog({
   };
 
   const deleteChannel = (channel: ManagedCommunityChannel) => {
-    if (
-      channel.type === 'text' &&
-      !window.confirm(copy.communities.deleteChannelConfirm)
-    )
-      return;
-
+    setPendingChannelDeleteId(null);
     setChannelOrder((current) =>
       current.filter((candidate) => candidate.id !== channel.id),
     );
@@ -1042,84 +1070,198 @@ export function ManageCommunityDialog({
                     <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                       {copy.communities.channels}
                     </div>
-                    <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1">
+                    <div className="max-h-[34vh] space-y-3 overflow-y-auto pr-1 sm:max-h-[48vh]">
                       {channelOrder.map((channel, index) => (
                         <div
                           key={channel.id}
-                          className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/8 p-2"
+                          className="rounded-2xl border border-white/10 bg-white/8 p-3"
                         >
-                          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-white/8 text-white/55">
-                            {channel.type === 'voice' ? <VoiceIcon /> : '#'}
-                          </span>
-                          <input
-                            value={channelDrafts[channel.id] ?? channel.name}
-                            onChange={(event) =>
-                              setChannelDrafts((current) => ({
-                                ...current,
-                                [channel.id]: event.target.value,
-                              }))
-                            }
-                            className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/60"
-                          />
-                          <span className="hidden rounded-2xl bg-black/25 px-2 py-2 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35 sm:block">
-                            {channel.type === 'voice'
-                              ? copy.communities.voiceChannel
-                              : copy.communities.textChannel}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => moveChannel(channel.id, -1)}
-                            disabled={index === 0}
-                            className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                            aria-label={copy.communities.moveChannelUp}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveChannel(channel.id, 1)}
-                            disabled={index === channelOrder.length - 1}
-                            className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 font-black disabled:cursor-not-allowed disabled:opacity-35"
-                            aria-label={copy.communities.moveChannelDown}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteChannel(channel)}
-                            disabled={state === 'loading'}
-                            className="grid h-9 w-9 place-items-center rounded-2xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
-                            aria-label={copy.communities.deleteChannel}
-                            title={copy.communities.deleteChannel}
-                          >
-                            <TrashIcon />
-                          </button>
-                          <div className="w-full rounded-2xl bg-black/20 p-2">
+                          <div className="flex items-start gap-3">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/65">
+                              {channel.type === 'voice' ? <VoiceIcon /> : '#'}
+                            </span>
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <input
+                                value={
+                                  channelDrafts[channel.id] ?? channel.name
+                                }
+                                onChange={(event) =>
+                                  setChannelDrafts((current) => ({
+                                    ...current,
+                                    [channel.id]: event.target.value,
+                                  }))
+                                }
+                                className="h-10 w-full min-w-0 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-white outline-none focus:border-cyan-300/60"
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full bg-black/25 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/40">
+                                  {channel.type === 'voice'
+                                    ? copy.communities.voiceChannel
+                                    : copy.communities.textChannel}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => moveChannel(channel.id, -1)}
+                                  disabled={index === 0}
+                                  className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+                                  aria-label={copy.communities.moveChannelUp}
+                                  title={copy.communities.moveChannelUp}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveChannel(channel.id, 1)}
+                                  disabled={index === channelOrder.length - 1}
+                                  className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+                                  aria-label={
+                                    copy.communities.moveChannelDown
+                                  }
+                                  title={copy.communities.moveChannelDown}
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPendingChannelDeleteId(channel.id)
+                                  }
+                                  disabled={state === 'loading'}
+                                  className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
+                                  aria-label={copy.communities.deleteChannel}
+                                  title={copy.communities.deleteChannel}
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 rounded-2xl bg-black/20 p-3">
                             <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
                               {copy.communities.visibleRoles}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {roles.map((role) => (
-                                <label
-                                  key={`${channel.id}:${role.id}`}
-                                  className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-2 text-xs font-black text-white/70"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={(
-                                      channelPermissionDrafts[channel.id] ?? [
-                                        'everyone',
-                                      ]
-                                    ).includes(role.id)}
-                                    onChange={() =>
-                                      toggleChannelRole(channel.id, role.id)
-                                    }
-                                  />
-                                  {role.name}
-                                </label>
-                              ))}
+                              {roles
+                                .filter((role) => role.id === 'everyone')
+                                .map((role) => {
+                                  const selected = (
+                                    channelPermissionDrafts[channel.id] ?? [
+                                      'everyone',
+                                    ]
+                                  ).includes(role.id);
+
+                                  return (
+                                    <label
+                                      key={`${channel.id}:${role.id}`}
+                                      className={cx(
+                                        'inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition',
+                                        selected
+                                          ? 'border-cyan-200/70 bg-cyan-200 text-slate-950'
+                                          : 'border-white/10 bg-white/8 text-white/70 hover:bg-white/12 hover:text-white',
+                                      )}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={() =>
+                                          toggleChannelRole(channel.id, role.id)
+                                        }
+                                        className="sr-only"
+                                      />
+                                      <span
+                                        aria-hidden="true"
+                                        className={cx(
+                                          'grid h-4 w-4 place-items-center rounded border text-[0.6rem]',
+                                          selected
+                                            ? 'border-slate-950 bg-slate-950 text-white'
+                                            : 'border-white/35',
+                                        )}
+                                      >
+                                        {selected ? '✓' : ''}
+                                      </span>
+                                      {copy.communities.visibleToEveryone}
+                                    </label>
+                                  );
+                                })}
+                              {roles.some((role) => role.id !== 'everyone') && (
+                                <div className="mt-1 w-full border-t border-white/10 pt-3">
+                                  <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
+                                    {copy.communities.visibleToSelectedRoles}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {roles
+                                      .filter((role) => role.id !== 'everyone')
+                                      .map((role) => {
+                                        const selected = (
+                                          channelPermissionDrafts[channel.id] ??
+                                          ['everyone']
+                                        ).includes(role.id);
+
+                                        return (
+                                          <label
+                                            key={`${channel.id}:${role.id}`}
+                                            className={cx(
+                                              'inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition',
+                                              selected
+                                                ? 'border-cyan-200/70 bg-cyan-200 text-slate-950'
+                                                : 'border-white/10 bg-white/8 text-white/70 hover:bg-white/12 hover:text-white',
+                                            )}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={selected}
+                                              onChange={() =>
+                                                toggleChannelRole(
+                                                  channel.id,
+                                                  role.id,
+                                                )
+                                              }
+                                              className="sr-only"
+                                            />
+                                            <span
+                                              aria-hidden="true"
+                                              className={cx(
+                                                'grid h-4 w-4 place-items-center rounded border text-[0.6rem]',
+                                                selected
+                                                  ? 'border-slate-950 bg-slate-950 text-white'
+                                                  : 'border-white/35',
+                                              )}
+                                            >
+                                              {selected ? '✓' : ''}
+                                            </span>
+                                            {role.name}
+                                          </label>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
+                          {pendingChannelDeleteId === channel.id && (
+                            <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3">
+                              <div className="text-xs font-bold text-rose-50/85">
+                                {copy.communities.deleteChannelConfirm}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteChannel(channel)}
+                                  disabled={state === 'loading'}
+                                  className="rounded-xl bg-rose-100 px-3 py-2 text-xs font-black text-rose-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                                >
+                                  {copy.communities.confirmDeleteChannel}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingChannelDeleteId(null)}
+                                  className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"
+                                >
+                                  {copy.dialog.cancel}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1158,7 +1300,8 @@ export function ManageCommunityDialog({
                         type="button"
                         onClick={() => void createChannel()}
                         disabled={!channelName.trim() || state === 'loading'}
-                        className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="grid h-11 w-12 shrink-0 place-items-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label={copy.communities.addInitialChannel}
                       >
                         +
                       </button>
@@ -1247,16 +1390,35 @@ export function ManageCommunityDialog({
               )}
             </div>
             {(activeSection === 'profile' || activeSection === 'channels') && (
-              <button
-                type="button"
-                onClick={() => void finishManage()}
-                disabled={!name.trim() || state === 'loading'}
-                className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {activeSection === 'channels'
-                  ? copy.communities.saveChannels
-                  : copy.profile.save}
-              </button>
+              <div className="mt-4 grid gap-2">
+                <div className="min-h-4 text-right text-[0.7rem] font-black uppercase tracking-[0.14em] text-white/35">
+                  {lastSavedSection === activeSection
+                    ? copy.communities.saved
+                    : hasManageCommunityChanges
+                      ? copy.communities.unsavedChanges
+                      : ''}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void saveChanges()}
+                  disabled={
+                    !name.trim() ||
+                    state === 'loading' ||
+                    !hasManageCommunityChanges
+                  }
+                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {state === 'loading'
+                    ? copy.profile.saving
+                    : lastSavedSection === activeSection
+                      ? copy.communities.saved
+                      : activeSectionHasExternalChanges
+                        ? copy.communities.saveChanges
+                        : activeSection === 'channels'
+                          ? copy.communities.saveChannels
+                          : copy.profile.save}
+                </button>
+              </div>
             )}
           </div>
         </div>

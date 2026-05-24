@@ -521,7 +521,7 @@ export function Composer({
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="shrink-0 touch-pan-x border-t border-white/10 p-4 sm:p-5"
+        className="shrink-0 touch-pan-x border-t border-white/10 px-3 py-3 sm:p-5"
       >
         {(error || attachmentError) && (
           <div className="mb-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
@@ -657,7 +657,7 @@ export function Composer({
         )}
         <div
           className={cx(
-            'relative flex items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-2 transition',
+            'relative flex items-end gap-1.5 rounded-2xl border border-white/10 bg-black/20 p-1.5 transition sm:gap-2 sm:p-2',
             disabled && 'cursor-not-allowed opacity-45',
           )}
         >
@@ -684,7 +684,7 @@ export function Composer({
               type="button"
               onClick={onPollCreate}
               disabled={disabled}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
               aria-label={copy.polls.create}
               title={copy.polls.create}
             >
@@ -711,7 +711,7 @@ export function Composer({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
               aria-label={copy.composer.attach}
             >
               <svg
@@ -735,7 +735,7 @@ export function Composer({
             onChange={handleFilesSelected}
             className="hidden"
           />
-          <div className="relative flex min-h-10 min-w-0 flex-1 items-center">
+          <div className="relative flex min-h-10 min-w-0 flex-1 basis-0 items-center">
             <ComposerMentionOverlay
               mentionTokens={mentionTokens}
               scrollTop={textInputScrollTop}
@@ -762,7 +762,7 @@ export function Composer({
               rows={1}
               spellCheck={false}
               className={cx(
-                'relative block min-h-0 w-full resize-none bg-transparent px-2 py-2 text-base leading-6 outline-none placeholder:text-white/35 disabled:cursor-not-allowed',
+                'relative block min-h-0 w-full resize-none bg-transparent px-1.5 py-2 text-[16px] leading-6 outline-none placeholder:text-white/35 disabled:cursor-not-allowed sm:px-2',
                 mentionTokens.length > 0
                   ? 'text-transparent caret-white'
                   : 'text-white',
@@ -775,7 +775,7 @@ export function Composer({
           </span>
           <button
             disabled={!canSend}
-            className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+            className="shrink-0 rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4"
           >
             {isEditing ? copy.messages.saveEdit : copy.composer.send}
           </button>
