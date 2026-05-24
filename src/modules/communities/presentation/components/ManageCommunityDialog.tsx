@@ -718,16 +718,23 @@ export function ManageCommunityDialog({
   const hasChannelChanges = ManagedCommunityChannels.hasChanges(
     channelDraftInput,
   );
+  const hasManageCommunityChanges = hasProfileChanges || hasChannelChanges;
   const activeSectionHasChanges =
     activeSection === 'profile'
       ? hasProfileChanges
       : activeSection === 'channels'
         ? hasChannelChanges
         : false;
+  const activeSectionHasExternalChanges =
+    activeSection === 'profile'
+      ? hasChannelChanges
+      : activeSection === 'channels'
+        ? hasProfileChanges
+        : hasManageCommunityChanges;
 
   useEffect(() => {
-    if (activeSectionHasChanges) setLastSavedSection(null);
-  }, [activeSectionHasChanges]);
+    if (hasManageCommunityChanges) setLastSavedSection(null);
+  }, [hasManageCommunityChanges]);
 
   const saveManagedChannels = async (
     currentCommunity: Community,
@@ -1387,7 +1394,7 @@ export function ManageCommunityDialog({
                 <div className="min-h-4 text-right text-[0.7rem] font-black uppercase tracking-[0.14em] text-white/35">
                   {lastSavedSection === activeSection
                     ? copy.communities.saved
-                    : activeSectionHasChanges
+                    : hasManageCommunityChanges
                       ? copy.communities.unsavedChanges
                       : ''}
                 </div>
@@ -1395,7 +1402,9 @@ export function ManageCommunityDialog({
                   type="button"
                   onClick={() => void saveChanges()}
                   disabled={
-                    !name.trim() || state === 'loading' || !activeSectionHasChanges
+                    !name.trim() ||
+                    state === 'loading' ||
+                    !hasManageCommunityChanges
                   }
                   className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
                 >
@@ -1403,9 +1412,11 @@ export function ManageCommunityDialog({
                     ? copy.profile.saving
                     : lastSavedSection === activeSection
                       ? copy.communities.saved
-                      : activeSection === 'channels'
-                        ? copy.communities.saveChannels
-                        : copy.profile.save}
+                      : activeSectionHasExternalChanges
+                        ? copy.communities.saveChanges
+                        : activeSection === 'channels'
+                          ? copy.communities.saveChannels
+                          : copy.profile.save}
                 </button>
               </div>
             )}

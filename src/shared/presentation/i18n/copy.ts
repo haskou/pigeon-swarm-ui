@@ -277,6 +277,7 @@ export const copy = {
     roleSaveError: 'The role could not be saved.',
     saved: 'Saved',
     saveChannels: 'Save channels',
+    saveChanges: 'Save changes',
     searchChannels: 'Search channels',
     searchMembers: 'Search members',
     sendInvitation: 'Send invitation',
