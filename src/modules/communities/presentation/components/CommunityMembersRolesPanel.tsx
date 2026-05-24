@@ -6,8 +6,14 @@ import type {
 import { useMemo, useState } from 'react';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 import { MemberRow } from './MemberRow';
 import { memberPrimaryName } from './communityMemberNames';
+
+type PendingMemberAction = {
+  action: 'ban' | 'kick';
+  identityId: string;
+} | null;
 
 export function CommunityMembersRolesPanel({
   bannedMemberIds,
@@ -41,6 +47,8 @@ export function CommunityMembersRolesPanel({
   state: 'idle' | 'loading';
 }) {
   const [memberSearch, setMemberSearch] = useState('');
+  const [pendingAction, setPendingAction] =
+    useState<PendingMemberAction>(null);
   const visibleMemberIds = useMemo(
     () => {
       const banned = new Set(bannedMemberIds);
@@ -79,79 +87,131 @@ export function CommunityMembersRolesPanel({
             {copy.communities.noMatchingMembers}
           </div>
         ) : (
-          visibleMemberIds.map((identityId) => (
-            <div key={identityId} className="rounded-2xl bg-white/8 p-3">
-              <MemberRow
-                identity={memberIdentities[identityId]}
-                identityId={identityId}
-                onClick={() => undefined}
-                owner={identityId === ownerIdentityId}
-                pictureUrl={memberPictures[identityId] ?? null}
-              />
-              {canManageRoles && editableRoles.length > 0 && (
-                <div className="mt-3 rounded-2xl bg-black/20 p-3">
-                  <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
-                    {copy.communities.assignRoles}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {editableRoles.map((role) => {
-                      const selected = (
-                        memberRoleDrafts[identityId] ?? []
-                      ).includes(role.id);
+          visibleMemberIds.map((identityId) => {
+            const memberName = memberPrimaryName(
+              memberIdentities[identityId],
+              identityId,
+            );
+            const actionPendingForMember =
+              pendingAction?.identityId === identityId;
 
-                      return (
-                        <button
-                          key={`${identityId}:${role.id}`}
-                          type="button"
-                          onClick={() =>
-                            onToggleMemberRole(identityId, role.id)
-                          }
-                          disabled={state === 'loading'}
-                          className={
-                            selected
-                              ? 'rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition'
-                              : 'rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-45'
-                          }
-                          aria-pressed={selected}
-                        >
-                          {role.name}
-                        </button>
-                      );
-                    })}
+            return (
+              <div
+                key={identityId}
+                className="rounded-2xl border border-white/10 bg-white/8 p-3"
+              >
+                <MemberRow
+                  identity={memberIdentities[identityId]}
+                  identityId={identityId}
+                  onClick={() => undefined}
+                  owner={identityId === ownerIdentityId}
+                  pictureUrl={memberPictures[identityId] ?? null}
+                />
+                {canManageRoles && editableRoles.length > 0 && (
+                  <div className="mt-3 rounded-2xl bg-black/20 p-3">
+                    <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
+                      {copy.communities.assignRoles}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {editableRoles.map((role) => {
+                        const selected = (
+                          memberRoleDrafts[identityId] ?? []
+                        ).includes(role.id);
+
+                        return (
+                          <button
+                            key={`${identityId}:${role.id}`}
+                            type="button"
+                            onClick={() =>
+                              onToggleMemberRole(identityId, role.id)
+                            }
+                            disabled={state === 'loading'}
+                            className={cx(
+                              'rounded-full border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                              selected
+                                ? 'border-cyan-200/70 bg-cyan-200 text-slate-950 shadow-lg shadow-cyan-950/20'
+                                : 'border-white/10 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white',
+                            )}
+                            aria-pressed={selected}
+                          >
+                            {role.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-              {canManageRoles && editableRoles.length === 0 && (
-                <div className="mt-3 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
-                  {copy.communities.noCustomRoles}
-                </div>
-              )}
-              {identityId !== ownerIdentityId && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {canKickMembers && (
-                    <button
-                      type="button"
-                      onClick={() => onKick(identityId)}
-                      disabled={state === 'loading'}
-                      className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {copy.communities.kickMember}
-                    </button>
-                  )}
-                  {canBanMembers && (
-                    <button
-                      type="button"
-                      onClick={() => onBan(identityId)}
-                      disabled={state === 'loading'}
-                      className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {copy.communities.banMember}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
+                )}
+                {canManageRoles && editableRoles.length === 0 && (
+                  <div className="mt-3 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
+                    {copy.communities.noCustomRoles}
+                  </div>
+                )}
+                {identityId !== ownerIdentityId && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {canKickMembers && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingAction({ action: 'kick', identityId })
+                        }
+                        disabled={state === 'loading'}
+                        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {copy.communities.kickMember}
+                      </button>
+                    )}
+                    {canBanMembers && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingAction({ action: 'ban', identityId })
+                        }
+                        disabled={state === 'loading'}
+                        className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {copy.communities.banMember}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {pendingAction && actionPendingForMember && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="min-w-0 text-xs font-bold text-rose-50/85">
+                      {pendingAction.action === 'kick'
+                        ? copy.communities.kickMember
+                        : copy.communities.banMember}{' '}
+                      {memberName}?
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const action = pendingAction;
+
+                          setPendingAction(null);
+                          if (action?.action === 'kick') onKick(identityId);
+                          if (action?.action === 'ban') onBan(identityId);
+                        }}
+                        disabled={state === 'loading'}
+                        className="rounded-xl bg-rose-100 px-3 py-2 text-xs font-black text-rose-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {pendingAction.action === 'kick'
+                          ? copy.communities.confirmKickMember
+                          : copy.communities.confirmBanMember}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingAction(null)}
+                        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15"
+                      >
+                        {copy.dialog.cancel}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

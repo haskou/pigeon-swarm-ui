@@ -13,6 +13,15 @@ type EnsurePwaPushSubscriptionOptions = {
 };
 type Permission = NotificationPermission;
 type PermissionRequester = () => Promise<Permission>;
+type ApplicationServerKey = Uint8Array<ArrayBuffer>;
+type OptionalApplicationServerKey = ApplicationServerKey | null;
+type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
+  endpoint: string;
+  keys: {
+    auth: string;
+    p256dh: string;
+  };
+};
 
 export function canUsePwaNotifications(): boolean {
   return (
@@ -57,7 +66,7 @@ export async function showPwaNotification(
   });
 }
 
-function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
+function urlBase64ToUint8Array(value: string): ApplicationServerKey {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
@@ -70,30 +79,137 @@ function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   return output;
 }
 
+function bufferSourceBytes(source: BufferSource): Uint8Array {
+  if (source instanceof ArrayBuffer) {
+    return new Uint8Array(source);
+  }
+
+  return new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+}
+
+function bufferSourcesAreEqual(
+  left: BufferSource | null | undefined,
+  right: Uint8Array,
+): boolean {
+  if (!left) return false;
+
+  const leftBytes = bufferSourceBytes(left);
+
+  if (leftBytes.byteLength !== right.byteLength) return false;
+
+  for (let index = 0; index < leftBytes.byteLength; index += 1) {
+    if (leftBytes[index] !== right[index]) return false;
+  }
+
+  return true;
+}
+
+function hasDeliverableSubscriptionJson(
+  subscription: PushSubscriptionJSON,
+): subscription is DeliverablePushSubscriptionJson {
+  return (
+    typeof subscription.endpoint === 'string' &&
+    subscription.endpoint.length > 0 &&
+    typeof subscription.keys?.auth === 'string' &&
+    subscription.keys.auth.length > 0 &&
+    typeof subscription.keys.p256dh === 'string' &&
+    subscription.keys.p256dh.length > 0
+  );
+}
+
+function canReuseSubscription(
+  subscription: PushSubscription,
+  applicationServerKey: Uint8Array,
+): boolean {
+  return (
+    hasDeliverableSubscriptionJson(subscription.toJSON()) &&
+    bufferSourcesAreEqual(
+      subscription.options.applicationServerKey,
+      applicationServerKey,
+    )
+  );
+}
+
+async function replaceBrowserSubscription(
+  session: Session,
+  subscription: PushSubscription,
+): Promise<void> {
+  const subscriptionJson = subscription.toJSON();
+
+  if (hasDeliverableSubscriptionJson(subscriptionJson)) {
+    try {
+      await applicationContainer.deletePushSubscription(
+        session,
+        subscriptionJson,
+      );
+    } catch {
+      // The local browser subscription still needs to be replaced.
+    }
+  }
+
+  await subscription.unsubscribe();
+}
+
+async function currentPushPermission(
+  options: EnsurePwaPushSubscriptionOptions,
+): Promise<Permission> {
+  return options.requestPermission
+    ? await requestPwaNotificationPermission()
+    : Notification.permission;
+}
+
+async function enabledServerKey(): Promise<OptionalApplicationServerKey> {
+  const vapid = await applicationContainer.getPushVapidPublicKey();
+
+  if (!vapid.enabled || !vapid.publicKey) return null;
+
+  return urlBase64ToUint8Array(vapid.publicKey);
+}
+
+async function subscriptionForRegistration(
+  session: Session,
+  registration: ServiceWorkerRegistration,
+  applicationServerKey: ApplicationServerKey,
+): Promise<PushSubscription> {
+  const existingSubscription = await registration.pushManager.getSubscription();
+
+  if (!existingSubscription) {
+    return await registration.pushManager.subscribe({
+      applicationServerKey,
+      userVisibleOnly: true,
+    });
+  }
+
+  if (canReuseSubscription(existingSubscription, applicationServerKey)) {
+    return existingSubscription;
+  }
+
+  await replaceBrowserSubscription(session, existingSubscription);
+
+  return await registration.pushManager.subscribe({
+    applicationServerKey,
+    userVisibleOnly: true,
+  });
+}
+
 export async function ensurePwaPushSubscription(
   session: Session,
   options: EnsurePwaPushSubscriptionOptions = {},
 ): Promise<void> {
   if (!canUsePushSubscriptions()) return;
 
-  const permission = options.requestPermission
-    ? await requestPwaNotificationPermission()
-    : Notification.permission;
+  if ((await currentPushPermission(options)) !== 'granted') return;
 
-  if (permission !== 'granted') return;
+  const applicationServerKey = await enabledServerKey();
 
-  const vapid = await applicationContainer.getPushVapidPublicKey();
-
-  if (!vapid.enabled || !vapid.publicKey) return;
+  if (!applicationServerKey) return;
 
   const registration = await navigator.serviceWorker.ready;
-  const existingSubscription = await registration.pushManager.getSubscription();
-  const subscription =
-    existingSubscription ??
-    (await registration.pushManager.subscribe({
-      applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
-      userVisibleOnly: true,
-    }));
+  const subscription = await subscriptionForRegistration(
+    session,
+    registration,
+    applicationServerKey,
+  );
 
   await applicationContainer.registerPushSubscription(
     session,

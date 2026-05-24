@@ -12,6 +12,25 @@ jest.mock('../../../../app/composition/applicationContainer', () => ({
 }));
 
 const mockedApplicationContainer = jest.mocked(applicationContainer);
+const currentVapidPublicKey =
+  'BCWL2DKOOVa23vOI4hzvPv7I5ckKuUybPqzoFt0xb4DrcpV4OUasxryIsfvebrxmNzbR5gJTMN6sVojhPWAiPpE';
+
+function base64UrlBytes(value: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = `${value}${padding}`.replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(new ArrayBuffer(rawData.length));
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    output[index] = rawData.charCodeAt(index);
+  }
+
+  return output;
+}
+
+function currentApplicationServerKey(): Uint8Array<ArrayBuffer> {
+  return base64UrlBytes(currentVapidPublicKey);
+}
 
 function restoreGlobalProperty(
   property: string,
@@ -28,10 +47,17 @@ function restoreGlobalProperty(
 
 function installPushBrowser(input: {
   calls?: string[];
+  existingSubscription?: {
+    applicationServerKey: BufferSource | null;
+    json: PushSubscriptionJSON;
+  };
   permission: NotificationPermission;
   requestedPermission?: NotificationPermission;
 }): {
+  existingUnsubscribe: jest.Mock<Promise<boolean>, []>;
+  getSubscription: jest.Mock<Promise<PushSubscription | null>, []>;
   requestPermission: jest.Mock<Promise<NotificationPermission>, []>;
+  subscribe: jest.Mock<Promise<PushSubscription>, []>;
   subscriptionJson: PushSubscriptionJSON;
 } {
   let permission = input.permission;
@@ -52,9 +78,19 @@ function installPushBrowser(input: {
   const subscribe = jest.fn(() =>
     Promise.resolve({
       toJSON: () => subscriptionJson,
-    }),
+    } as unknown as PushSubscription),
   );
-  const getSubscription = jest.fn(() => Promise.resolve(null));
+  const existingUnsubscribe = jest.fn(() => Promise.resolve(true));
+  const existingSubscription = input.existingSubscription
+    ? ({
+        options: {
+          applicationServerKey: input.existingSubscription.applicationServerKey,
+        },
+        toJSON: () => input.existingSubscription?.json ?? {},
+        unsubscribe: existingUnsubscribe,
+      } as unknown as PushSubscription)
+    : null;
+  const getSubscription = jest.fn(() => Promise.resolve(existingSubscription));
 
   Object.defineProperty(globalThis, 'Notification', {
     configurable: true,
@@ -84,9 +120,19 @@ function installPushBrowser(input: {
   });
 
   return {
+    existingUnsubscribe,
+    getSubscription,
     requestPermission,
+    subscribe,
     subscriptionJson,
   };
+}
+
+function mockCurrentVapidPublicKey(): void {
+  mockedApplicationContainer.getPushVapidPublicKey.mockResolvedValue({
+    enabled: true,
+    publicKey: currentVapidPublicKey,
+  });
 }
 
 function session(): Session {
@@ -144,14 +190,75 @@ describe(ensurePwaPushSubscription.name, () => {
 
       return Promise.resolve({
         enabled: true,
-        publicKey:
-          'BCWL2DKOOVa23vOI4hzvPv7I5ckKuUybPqzoFt0xb4DrcpV4OUasxryIsfvebrxmNzbR5gJTMN6sVojhPWAiPpE',
+        publicKey: currentVapidPublicKey,
       });
     });
 
     await ensurePwaPushSubscription(session(), { requestPermission: true });
 
     expect(calls).toEqual(['permission', 'vapid']);
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('replaces an existing subscription created with a different VAPID key', async () => {
+    const oldSubscriptionJson = {
+      endpoint: 'https://push.example/old-subscription',
+      expirationTime: null,
+      keys: {
+        auth: 'old-auth-key',
+        p256dh: 'old-p256dh-key',
+      },
+    };
+    const { existingUnsubscribe, subscribe, subscriptionJson } =
+      installPushBrowser({
+        existingSubscription: {
+          applicationServerKey: base64UrlBytes('ZGlmZmVyZW50'),
+          json: oldSubscriptionJson,
+        },
+        permission: 'granted',
+      });
+    mockCurrentVapidPublicKey();
+
+    await ensurePwaPushSubscription(session());
+
+    expect(
+      mockedApplicationContainer.deletePushSubscription,
+    ).toHaveBeenCalledWith(session(), oldSubscriptionJson);
+    expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledWith({
+      applicationServerKey: currentApplicationServerKey(),
+      userVisibleOnly: true,
+    });
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('replaces an existing subscription whose browser JSON is not deliverable', async () => {
+    const { existingUnsubscribe, subscribe, subscriptionJson } =
+      installPushBrowser({
+        existingSubscription: {
+          applicationServerKey: currentApplicationServerKey(),
+          json: {
+            endpoint: 'https://push.example/broken-subscription',
+          } as PushSubscriptionJSON,
+        },
+        permission: 'granted',
+      });
+    mockCurrentVapidPublicKey();
+
+    await ensurePwaPushSubscription(session());
+
+    expect(
+      mockedApplicationContainer.deletePushSubscription,
+    ).not.toHaveBeenCalled();
+    expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledWith({
+      applicationServerKey: currentApplicationServerKey(),
+      userVisibleOnly: true,
+    });
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).toHaveBeenCalledWith(session(), subscriptionJson);

@@ -38,6 +38,12 @@ type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
+type InstallState =
+  | 'checking'
+  | 'fallback'
+  | 'installed'
+  | 'prompting'
+  | 'ready';
 
 interface AuthScreenProps {
   onAuthenticated: (
@@ -63,7 +69,8 @@ export function AuthScreen({
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [canInstallApp, setCanInstallApp] = useState(false);
+  const [installState, setInstallState] =
+    useState<InstallState>('checking');
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { networks: availableNetworks } = useNodeNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -89,29 +96,34 @@ export function AuthScreen({
   }, []);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (isPwaStandalone()) {
+      setInstallState('installed');
 
-    if (standalone) return;
-
-    setCanInstallApp(true);
+      return undefined;
+    }
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
+      setInstallState('ready');
       setShowInstallHelp(false);
     };
     const handleAppInstalled = () => {
-      setCanInstallApp(false);
+      setInstallState('installed');
       setInstallPrompt(null);
       setShowInstallHelp(false);
     };
+    const fallbackTimer = window.setTimeout(() => {
+      setInstallState((current) =>
+        current === 'checking' ? 'fallback' : current,
+      );
+    }, 1600);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      window.clearTimeout(fallbackTimer);
       window.removeEventListener(
         'beforeinstallprompt',
         handleBeforeInstallPrompt,
@@ -131,6 +143,23 @@ export function AuthScreen({
     selectedNetwork,
   });
   const passwordChecks = passwordValidationChecks(password);
+  const canShowInstallButton = installState !== 'installed';
+  const installButtonDisabled =
+    installState === 'checking' || installState === 'prompting';
+  const installHelp =
+    installState === 'ready'
+      ? copy.auth.installAppReadyHelp
+      : installState === 'fallback'
+        ? installFallbackHelp()
+        : null;
+  const installButtonLabel =
+    installState === 'checking'
+      ? copy.auth.installAppChecking
+      : installState === 'prompting'
+        ? copy.auth.installAppPrompting
+        : installState === 'ready'
+          ? copy.auth.installApp
+          : copy.auth.installAppInstructions;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -180,16 +209,34 @@ export function AuthScreen({
 
   const handleInstallApp = async () => {
     if (!installPrompt) {
-      setShowInstallHelp(true);
+      setInstallState('fallback');
+      setShowInstallHelp((current) => !current);
 
       return;
     }
 
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
+    setInstallState('prompting');
 
-    setInstallPrompt(null);
-    setCanInstallApp(choice.outcome !== 'accepted');
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+
+      setInstallPrompt(null);
+
+      if (choice.outcome === 'accepted') {
+        setInstallState('installed');
+        setShowInstallHelp(false);
+
+        return;
+      }
+
+      setInstallState('fallback');
+      setShowInstallHelp(true);
+    } catch {
+      setInstallPrompt(null);
+      setInstallState('fallback');
+      setShowInstallHelp(true);
+    }
   };
 
   return (
@@ -346,18 +393,24 @@ export function AuthScreen({
                 : copy.auth.createIdentity}
           </button>
 
-          {canInstallApp && (
+          {canShowInstallButton && (
             <div className="mt-3">
               <button
                 type="button"
                 onClick={handleInstallApp}
-                className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white/85 transition hover:border-cyan-200/40 hover:bg-white/15"
+                disabled={installButtonDisabled}
+                className={cx(
+                  'w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                  installState === 'ready'
+                    ? 'border-cyan-200/40 bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
+                    : 'border-white/10 bg-white/10 text-white/85 hover:border-cyan-200/40 hover:bg-white/15',
+                )}
               >
-                {copy.auth.installApp}
+                {installButtonLabel}
               </button>
-              {showInstallHelp && (
+              {(showInstallHelp || installState === 'fallback') && installHelp && (
                 <p className="mt-2 text-center text-xs leading-snug text-white/45">
-                  {copy.auth.installAppHelp}
+                  {installHelp}
                 </p>
               )}
             </div>
@@ -366,4 +419,22 @@ export function AuthScreen({
       </div>
     </section>
   );
+}
+
+function isPwaStandalone(): boolean {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function isIosBrowser(): boolean {
+  return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
+}
+
+function installFallbackHelp(): string {
+  if (import.meta.env.DEV) return copy.auth.installAppDevHelp;
+  if (isIosBrowser()) return copy.auth.installAppIosHelp;
+
+  return copy.auth.installAppHelp;
 }
