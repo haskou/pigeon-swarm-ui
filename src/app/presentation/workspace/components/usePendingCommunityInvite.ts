@@ -48,12 +48,10 @@ export function usePendingCommunityInvite({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      const keyEntry =
-        pendingCommunityInvite.keyEntry ??
-        (await communityInviteKeyEntry(
-          pendingCommunityInvite.token,
-          pendingCommunityInvite.inviteSecret,
-        ));
+      const keyEntry = await communityInviteKeyEntry(
+        pendingCommunityInvite.token,
+        pendingCommunityInvite.inviteSecret,
+      );
 
       if (!keyEntry) {
         throw new Error(copy.communities.linkKeyMissing);
