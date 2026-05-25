@@ -1,0 +1,54 @@
+import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
+
+import {
+  decryptCommunityInviteKey,
+  encryptCommunityInviteKey,
+} from './communityInviteKeyEnvelope';
+
+describe('community invite key envelope', () => {
+  const keyEntry: ConversationKeyEntry = {
+    conversationId: 'community-1',
+    createdAt: 1770000000000,
+    peerIdentityId: '',
+    privateKey:
+      '-----BEGIN PRIVATE KEY-----\\nprivate\\n-----END PRIVATE KEY-----',
+    publicKey: '-----BEGIN PUBLIC KEY-----\\npublic\\n-----END PUBLIC KEY-----',
+  };
+
+  it('encrypts the community key entry behind a short fragment secret', async () => {
+    const envelope = await encryptCommunityInviteKey(keyEntry);
+
+    expect(envelope.secret).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(envelope.secret).toHaveLength(43);
+    expect(envelope.encryptedCommunityKey).toMatchObject({
+      algorithm: 'AES-GCM',
+      version: 1,
+    });
+    expect(envelope.encryptedCommunityKey.ciphertext).not.toContain(
+      'PRIVATE KEY',
+    );
+  });
+
+  it('decrypts the encrypted community key entry with the fragment secret', async () => {
+    const envelope = await encryptCommunityInviteKey(keyEntry);
+
+    await expect(
+      decryptCommunityInviteKey(
+        envelope.encryptedCommunityKey,
+        envelope.secret,
+      ),
+    ).resolves.toEqual(keyEntry);
+  });
+
+  it('rejects a different fragment secret', async () => {
+    const envelope = await encryptCommunityInviteKey(keyEntry);
+    const otherEnvelope = await encryptCommunityInviteKey(keyEntry);
+
+    await expect(
+      decryptCommunityInviteKey(
+        envelope.encryptedCommunityKey,
+        otherEnvelope.secret,
+      ),
+    ).rejects.toThrow();
+  });
+});

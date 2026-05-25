@@ -607,14 +607,21 @@ export class PigeonApplication {
   public async createCommunityInviteLink(
     session: Session,
     communityId: string,
-    input: { expiresAt?: string; maxUses?: number } = {},
+    input: { expiresAt?: number; maxUses?: number } = {},
   ): Promise<{
     invite: CommunityInviteLinkResource;
+    inviteSecret: string;
     keyEntry: ConversationKeyEntry;
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
     return await this.communities.createInviteLink(session, communityId, input);
+  }
+
+  public async getCommunityInviteLink(
+    inviteToken: string,
+  ): Promise<CommunityInviteLinkResource> {
+    return await this.communities.getInviteLink(inviteToken);
   }
 
   public async acceptCommunityInviteLink(

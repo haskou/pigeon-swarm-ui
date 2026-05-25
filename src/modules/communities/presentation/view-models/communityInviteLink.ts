@@ -1,47 +1,71 @@
 import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
 
 export type PendingCommunityInviteLink = {
+  inviteSecret?: string;
   keyEntry?: ConversationKeyEntry;
   token: string;
 };
 
 const inviteParam = 'communityInvite';
 const keyFragmentPrefix = 'communityKey=';
+const inviteSecretFragmentParam = 'k';
+const communityInvitePathPattern = /^\/invite\/community\/([^/]+)\/?$/;
 
 export function createCommunityInviteUrl(input: {
-  keyEntry: ConversationKeyEntry;
+  inviteSecret: string;
   token: string;
 }): string {
   const url = new URL(window.location.href);
 
-  url.searchParams.set(inviteParam, input.token);
-  url.hash = `${keyFragmentPrefix}${encodeBase64Url(
-    JSON.stringify(input.keyEntry),
-  )}`;
+  url.pathname = `/invite/community/${encodeURIComponent(input.token)}`;
+  url.search = '';
+  url.hash = `${inviteSecretFragmentParam}=${input.inviteSecret}`;
 
   return url.toString();
 }
 
 export function parseCommunityInviteUrl(): PendingCommunityInviteLink | null {
   const url = new URL(window.location.href);
-  const token = url.searchParams.get(inviteParam)?.trim();
+  const pathToken = communityInvitePathToken(url);
+  const token = pathToken ?? url.searchParams.get(inviteParam)?.trim();
 
   if (!token) return null;
 
   const fragment = window.location.hash.replace(/^#/, '');
+  const inviteSecret = pathToken
+    ? new URLSearchParams(fragment).get(inviteSecretFragmentParam)?.trim()
+    : undefined;
   const keyEntry = fragment.startsWith(keyFragmentPrefix)
     ? parseKeyEntry(fragment.slice(keyFragmentPrefix.length))
     : undefined;
 
-  return { keyEntry, token };
+  return {
+    ...(inviteSecret ? { inviteSecret } : {}),
+    ...(keyEntry ? { keyEntry } : {}),
+    token,
+  };
 }
 
 export function clearCommunityInviteUrl(): void {
   const url = new URL(window.location.href);
 
+  if (communityInvitePathToken(url)) url.pathname = '/';
   url.searchParams.delete(inviteParam);
   url.hash = '';
   window.history.replaceState({}, document.title, url.toString());
+}
+
+function communityInvitePathToken(url: URL): string | undefined {
+  const match = communityInvitePathPattern.exec(url.pathname);
+  let value = '';
+
+  try {
+    value = match?.[1] ? decodeURIComponent(match[1]).trim() : '';
+  } catch {
+    return undefined;
+  }
+
+  return value || undefined;
 }
 
 function parseKeyEntry(value: string): ConversationKeyEntry | undefined {
@@ -50,18 +74,6 @@ function parseKeyEntry(value: string): ConversationKeyEntry | undefined {
   } catch {
     return undefined;
   }
-}
-
-function encodeBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
 }
 
 function decodeBase64Url(value: string): string {

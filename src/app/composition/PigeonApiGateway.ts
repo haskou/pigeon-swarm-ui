@@ -66,6 +66,7 @@ import type {
 import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../modules/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../modules/calls/infrastructure/http/PigeonCallsApi';
+import { encryptCommunityInviteKey } from '../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonCommunitiesApi } from '../../modules/communities/infrastructure/http/PigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../modules/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../modules/conversations/domain/ConversationKeychain';
@@ -969,9 +970,10 @@ export class PigeonApiGateway {
   public async createCommunityInviteLink(
     session: Session,
     communityId: string,
-    input: { expiresAt?: string; maxUses?: number } = {},
+    input: { expiresAt?: number; maxUses?: number } = {},
   ): Promise<{
     invite: CommunityInviteLinkResource;
+    inviteSecret: string;
     keyEntry: ConversationKeyEntry;
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
@@ -990,10 +992,12 @@ export class PigeonApiGateway {
             session,
             this.withConversationKey(session.keychain, keyEntry),
           );
+    const encryptedKey = await encryptCommunityInviteKey(keyEntry);
     const path = `/communities/${encodeURIComponent(communityId)}/invites`;
     const body = {
-      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
-      ...(input.maxUses ? { maxUses: input.maxUses } : {}),
+      encryptedCommunityKey: encryptedKey.encryptedCommunityKey,
+      ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+      ...(input.maxUses !== undefined ? { maxUses: input.maxUses } : {}),
     };
     const invite = await this.http.request<CommunityInviteLinkResource>(path, {
       body: JSON.stringify(body),
@@ -1003,10 +1007,19 @@ export class PigeonApiGateway {
 
     return {
       invite,
+      inviteSecret: encryptedKey.secret,
       keychain: published.keychain,
       keychainExternalIdentifier: published.keychainExternalIdentifier,
       keyEntry,
     };
+  }
+
+  public async getCommunityInviteLink(
+    inviteToken: string,
+  ): Promise<CommunityInviteLinkResource> {
+    return await this.http.request<CommunityInviteLinkResource>(
+      `/communities/invites/${encodeURIComponent(inviteToken)}`,
+    );
   }
 
   public async acceptCommunityInviteLink(
