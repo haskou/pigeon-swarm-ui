@@ -11,6 +11,8 @@ import {
 
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
+import { mergeChatMessages } from './communityWorkspaceHelpers';
+
 export type CommunityChannelMessageLoadState = 'error' | 'idle' | 'loading';
 
 export type LoadedCommunityChannelMessages = {
@@ -55,6 +57,12 @@ type UseCommunityChannelMessagesResult = {
   visibleMessages: ChatMessage[];
 };
 
+function isBrowserPageVisible(): boolean {
+  return (
+    typeof document === 'undefined' || document.visibilityState !== 'hidden'
+  );
+}
+
 export function useCommunityChannelMessages({
   loadChannelMessages,
   onChannelSelected,
@@ -79,12 +87,19 @@ export function useCommunityChannelMessages({
   const loadChannelMessagesRef = useRef(loadChannelMessages);
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
+  const selectedChannelIdRef = useRef(selectedChannelId);
+  const channelWasHiddenRef = useRef(!isBrowserPageVisible());
+  const channelResumeSyncAtRef = useRef(0);
 
   useEffect(() => {
     loadChannelMessagesRef.current = loadChannelMessages;
     onChannelSelectedRef.current = onChannelSelected;
     onChannelViewedRef.current = onChannelViewed;
   }, [loadChannelMessages, onChannelSelected, onChannelViewed]);
+
+  useEffect(() => {
+    selectedChannelIdRef.current = selectedChannelId;
+  }, [selectedChannelId]);
 
   const setMessageLoadState = useCallback(
     (state: CommunityChannelMessageLoadState) => {
@@ -258,6 +273,59 @@ export function useCommunityChannelMessages({
       cancelled = true;
     };
   }, [scrollChannelToBottom, selectedChannelId, setMessageLoadState]);
+
+  const syncVisibleChannel = useCallback(() => {
+    if (!isBrowserPageVisible()) {
+      channelWasHiddenRef.current = true;
+
+      return;
+    }
+
+    const channelId = selectedChannelId;
+
+    if (!channelWasHiddenRef.current || !channelId) return;
+
+    const now = Date.now();
+
+    if (now - channelResumeSyncAtRef.current < 1500) return;
+
+    const shouldStickToBottom = isScrolledNearBottom();
+
+    channelWasHiddenRef.current = false;
+    channelResumeSyncAtRef.current = now;
+    void loadChannelMessagesRef
+      .current(channelId)
+      .then(({ cursor, loadedMessages }) => {
+        if (selectedChannelIdRef.current !== channelId) return;
+
+        setMessages((current) => mergeChatMessages(current, loadedMessages));
+        setMessageCursor(cursor);
+
+        if (shouldStickToBottom) {
+          setNewChannelMessageCount(0);
+          onChannelViewedRef.current?.(channelId);
+          scrollChannelToBottom('auto', true);
+        }
+      })
+      .catch(() => undefined);
+  }, [isScrolledNearBottom, scrollChannelToBottom, selectedChannelId]);
+  const markChannelHidden = useCallback(() => {
+    channelWasHiddenRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('visibilitychange', syncVisibleChannel);
+    window.addEventListener('pagehide', markChannelHidden);
+    window.addEventListener('focus', syncVisibleChannel);
+    window.addEventListener('pageshow', syncVisibleChannel);
+
+    return () => {
+      document.removeEventListener('visibilitychange', syncVisibleChannel);
+      window.removeEventListener('pagehide', markChannelHidden);
+      window.removeEventListener('focus', syncVisibleChannel);
+      window.removeEventListener('pageshow', syncVisibleChannel);
+    };
+  }, [markChannelHidden, syncVisibleChannel]);
 
   return {
     bottomRef,

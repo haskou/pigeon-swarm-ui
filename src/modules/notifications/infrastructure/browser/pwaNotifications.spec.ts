@@ -52,6 +52,7 @@ function installPushBrowser(input: {
   calls?: string[];
   existingSubscription?: {
     applicationServerKey: BufferSource | null;
+    exposeOptions?: boolean;
     json: PushSubscriptionJSON;
   };
   permission: NotificationPermission;
@@ -86,9 +87,14 @@ function installPushBrowser(input: {
   const existingUnsubscribe = jest.fn(() => Promise.resolve(true));
   const existingSubscription = input.existingSubscription
     ? ({
-        options: {
-          applicationServerKey: input.existingSubscription.applicationServerKey,
-        },
+        ...(input.existingSubscription.exposeOptions === false
+          ? {}
+          : {
+              options: {
+                applicationServerKey:
+                  input.existingSubscription.applicationServerKey,
+              },
+            }),
         toJSON: () => input.existingSubscription?.json ?? {},
         unsubscribe: existingUnsubscribe,
       } as unknown as PushSubscription)
@@ -284,6 +290,41 @@ describe(ensurePwaPushSubscription.name, () => {
     expect(
       mockedApplicationContainer.deletePushSubscription,
     ).not.toHaveBeenCalled();
+    expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledWith({
+      applicationServerKey: currentApplicationServerKey(),
+      userVisibleOnly: true,
+    });
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('replaces an existing subscription when the browser hides the subscribed VAPID key', async () => {
+    const oldSubscriptionJson = {
+      endpoint: 'https://push.example/old-subscription',
+      expirationTime: null,
+      keys: {
+        auth: 'old-auth-key',
+        p256dh: 'old-p256dh-key',
+      },
+    };
+    const { existingUnsubscribe, subscribe, subscriptionJson } =
+      installPushBrowser({
+        existingSubscription: {
+          applicationServerKey: currentApplicationServerKey(),
+          exposeOptions: false,
+          json: oldSubscriptionJson,
+        },
+        permission: 'granted',
+      });
+    mockCurrentVapidPublicKey();
+
+    await ensurePwaPushSubscription(session());
+
+    expect(
+      mockedApplicationContainer.deletePushSubscription,
+    ).toHaveBeenCalledWith(session(), oldSubscriptionJson);
     expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith({
       applicationServerKey: currentApplicationServerKey(),

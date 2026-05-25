@@ -43,6 +43,12 @@ type UseCommunityChannelRealtimeInput = {
   upsertPoll: (poll: PollResource) => void;
 };
 
+function isBrowserPageVisible(): boolean {
+  return (
+    typeof document === 'undefined' || document.visibilityState !== 'hidden'
+  );
+}
+
 export function useCommunityChannelRealtime({
   communityId,
   incrementNewChannelMessageCount,
@@ -154,14 +160,20 @@ export function useCommunityChannelRealtime({
         return;
       }
 
+      let cancelled = false;
+
       void loadChannelMessagesRef
         .current(channelId)
         .then(({ loadedMessages }) => {
+          if (cancelled) return;
+
           setMessages((current) => mergeChatMessages(current, loadedMessages));
         })
         .catch(() => undefined);
 
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (
@@ -173,9 +185,35 @@ export function useCommunityChannelRealtime({
 
     const message = realtimeMessageAttribute(realtimeEvent);
 
-    if (!message) return;
+    if (!message) {
+      const shouldStickToBottom = isScrolledNearBottom();
+      const shouldMarkViewed = shouldStickToBottom && isBrowserPageVisible();
+      let cancelled = false;
+
+      void loadChannelMessagesRef
+        .current(channelId)
+        .then(({ loadedMessages }) => {
+          if (cancelled) return;
+
+          setMessages((current) => mergeChatMessages(current, loadedMessages));
+
+          if (shouldMarkViewed) {
+            resetNewChannelMessageCount();
+            onChannelViewed?.(channelId);
+            scrollChannelToBottom('smooth', true);
+          } else {
+            incrementNewChannelMessageCount();
+          }
+        })
+        .catch(() => undefined);
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const shouldStickToBottom = isScrolledNearBottom();
+    const shouldMarkViewed = shouldStickToBottom && isBrowserPageVisible();
     let cancelled = false;
 
     void projectChannelMessage(channelId, message)
@@ -190,7 +228,7 @@ export function useCommunityChannelRealtime({
           );
         });
 
-        if (shouldStickToBottom) {
+        if (shouldMarkViewed) {
           resetNewChannelMessageCount();
           onChannelViewed?.(channelId);
           scrollChannelToBottom('smooth', true);
