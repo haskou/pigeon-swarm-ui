@@ -77,26 +77,19 @@ describe('community invite links', () => {
   });
 
   it('ignores short invite links with malformed path encoding', () => {
-    installLocation('https://pigeon.example/invite/community/%E0%A4%A#k=secret');
+    installLocation(
+      'https://pigeon.example/invite/community/%E0%A4%A#k=secret',
+    );
 
     expect(parseCommunityInviteUrl()).toBeNull();
   });
 
-  it('keeps parsing legacy invite links with embedded key entries', () => {
+  it('ignores legacy invite links with embedded key entries', () => {
     installLocation(
       'https://pigeon.example/?communityInvite=legacy-token#communityKey=eyJjb252ZXJzYXRpb25JZCI6ImNvbW11bml0eS0xIiwiY3JlYXRlZEF0IjoxNzcsInBlZXJJZGVudGl0eUlkIjoiIiwicHJpdmF0ZUtleSI6InByaXZhdGUiLCJwdWJsaWNLZXkiOiJwdWJsaWMifQ',
     );
 
-    expect(parseCommunityInviteUrl()).toEqual({
-      keyEntry: {
-        conversationId: 'community-1',
-        createdAt: 177,
-        peerIdentityId: '',
-        privateKey: 'private',
-        publicKey: 'public',
-      },
-      token: 'legacy-token',
-    });
+    expect(parseCommunityInviteUrl()).toBeNull();
   });
 
   it('clears short invite links back to the app root', () => {
