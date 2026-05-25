@@ -76,12 +76,29 @@ export class RealtimeHeartbeat {
     );
   }
 
-  private trackActivity(onActiveAgain: () => void): ActivityTracker {
+  private trackActivity(onActivityStateChanged: () => void): ActivityTracker {
     let lastActivityAt = Date.now();
+    let pageHidden = globalThis.document?.visibilityState === 'hidden';
+    const refreshVisibilityActivity = () => {
+      pageHidden = globalThis.document?.visibilityState === 'hidden';
+      lastActivityAt = Date.now();
+      onActivityStateChanged();
+    };
+    const markPageHidden = () => {
+      pageHidden = true;
+      lastActivityAt = Date.now();
+      onActivityStateChanged();
+    };
+    const markPageVisible = () => {
+      pageHidden = false;
+      lastActivityAt = Date.now();
+      onActivityStateChanged();
+    };
     const markActive = () => {
       const now = Date.now();
       const wasInactive =
         now - lastActivityAt > recentActivityWindowMs ||
+        pageHidden ||
         globalThis.document?.visibilityState === 'hidden';
 
       if (!wasInactive && now - lastActivityAt < activeActivityRefreshMs) {
@@ -90,7 +107,7 @@ export class RealtimeHeartbeat {
 
       lastActivityAt = now;
 
-      if (wasInactive) onActiveAgain();
+      if (wasInactive) onActivityStateChanged();
     };
     const movementEvent =
       'PointerEvent' in globalThis ? 'pointermove' : 'mousemove';
@@ -109,15 +126,33 @@ export class RealtimeHeartbeat {
         passive: true,
       });
     }
+    globalThis.document?.addEventListener?.(
+      'visibilitychange',
+      refreshVisibilityActivity,
+      { passive: true },
+    );
+    globalThis.addEventListener?.('pagehide', markPageHidden, {
+      passive: true,
+    });
+    globalThis.addEventListener?.('pageshow', markPageVisible, {
+      passive: true,
+    });
 
     return {
       isActive: () =>
+        !pageHidden &&
         globalThis.document?.visibilityState !== 'hidden' &&
         Date.now() - lastActivityAt <= recentActivityWindowMs,
       stop: () => {
         for (const eventName of activityEvents) {
           globalThis.removeEventListener?.(eventName, markActive);
         }
+        globalThis.document?.removeEventListener?.(
+          'visibilitychange',
+          refreshVisibilityActivity,
+        );
+        globalThis.removeEventListener?.('pagehide', markPageHidden);
+        globalThis.removeEventListener?.('pageshow', markPageVisible);
       },
     };
   }

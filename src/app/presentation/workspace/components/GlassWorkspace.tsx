@@ -155,6 +155,12 @@ function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
 }
 
+function isBrowserPageVisible(): boolean {
+  return (
+    typeof document === 'undefined' || document.visibilityState !== 'hidden'
+  );
+}
+
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
   communities: Community[],
@@ -364,6 +370,8 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const workspaceWasHiddenRef = useRef(!isBrowserPageVisible());
+  const workspaceResumeSyncAtRef = useRef(0);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -1834,6 +1842,61 @@ export function GlassWorkspace({
     workspaceMode,
   ]);
 
+  const syncVisibleWorkspace = useCallback(() => {
+    if (!isBrowserPageVisible()) {
+      workspaceWasHiddenRef.current = true;
+
+      return;
+    }
+
+    if (!workspaceWasHiddenRef.current) return;
+
+    const now = Date.now();
+
+    if (now - workspaceResumeSyncAtRef.current < 1500) return;
+
+    workspaceWasHiddenRef.current = false;
+    workspaceResumeSyncAtRef.current = now;
+
+    void refreshConversations().catch(() => undefined);
+
+    if (
+      workspaceMode === 'messages' &&
+      activeConversation?.id &&
+      activeConversationKeyId
+    ) {
+      void loadActiveMessages(activeConversation.id);
+    }
+
+    if (workspaceMode === 'community') {
+      void onCommunitiesReload().catch(() => undefined);
+    }
+  }, [
+    activeConversation?.id,
+    activeConversationKeyId,
+    loadActiveMessages,
+    onCommunitiesReload,
+    refreshConversations,
+    workspaceMode,
+  ]);
+  const markWorkspaceHidden = useCallback(() => {
+    workspaceWasHiddenRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('visibilitychange', syncVisibleWorkspace);
+    window.addEventListener('pagehide', markWorkspaceHidden);
+    window.addEventListener('focus', syncVisibleWorkspace);
+    window.addEventListener('pageshow', syncVisibleWorkspace);
+
+    return () => {
+      document.removeEventListener('visibilitychange', syncVisibleWorkspace);
+      window.removeEventListener('pagehide', markWorkspaceHidden);
+      window.removeEventListener('focus', syncVisibleWorkspace);
+      window.removeEventListener('pageshow', syncVisibleWorkspace);
+    };
+  }, [markWorkspaceHidden, syncVisibleWorkspace]);
+
   const handleLoadOlder = async () => {
     if (
       workspaceMode !== 'messages' ||
@@ -2546,7 +2609,9 @@ export function GlassWorkspace({
           eventAggregateId(event) ?? stringAttribute(event, 'communityId');
         const channelId = stringAttribute(event, 'channelId');
         const authorIdentityId = stringAttribute(event, 'authorIdentityId');
+        const pageVisible = isBrowserPageVisible();
         const isActiveChannel =
+          pageVisible &&
           workspaceMode === 'community' &&
           communityId === activeCommunity?.id &&
           channelId === activeCommunityChannelId;
@@ -2756,10 +2821,12 @@ export function GlassWorkspace({
           event.type === 'conversations.v1.message.reaction.was_removed';
         const isEditEvent =
           event.type === 'conversations.v1.message.was_edited';
-        const isActiveConversation =
+        const isSelectedConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
           conversationId === activeConversation?.id;
+        const isActiveConversation =
+          isSelectedConversation && isBrowserPageVisible();
 
         if ((!messageId && !timelineMessage) || !conversationId) return;
 
@@ -2798,8 +2865,10 @@ export function GlassWorkspace({
             markUnreadMessage(conversationId, unreadMessageId);
         }
 
-        if (isActiveConversation) {
-          clearUnreadMessages(conversationId);
+        if (isSelectedConversation) {
+          if (isActiveConversation) {
+            clearUnreadMessages(conversationId);
+          }
 
           if (event.type.endsWith('.was_deleted')) {
             const targetMessageId = stringAttribute(

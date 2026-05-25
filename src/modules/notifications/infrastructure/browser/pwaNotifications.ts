@@ -131,7 +131,7 @@ function canReuseSubscription(
   return (
     hasDeliverableSubscriptionJson(subscription.toJSON()) &&
     bufferSourcesAreEqual(
-      subscription.options.applicationServerKey,
+      subscription.options?.applicationServerKey,
       applicationServerKey,
     )
   );
