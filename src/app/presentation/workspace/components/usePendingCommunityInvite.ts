@@ -3,10 +3,12 @@ import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
 import type {
   Community,
+  ConversationKeyEntry,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { decryptCommunityInviteKey } from '../../../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
@@ -46,7 +48,14 @@ export function usePendingCommunityInvite({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      if (!pendingCommunityInvite.keyEntry) {
+      const keyEntry =
+        pendingCommunityInvite.keyEntry ??
+        (await communityInviteKeyEntry(
+          pendingCommunityInvite.token,
+          pendingCommunityInvite.inviteSecret,
+        ));
+
+      if (!keyEntry) {
         throw new Error(copy.communities.linkKeyMissing);
       }
 
@@ -56,7 +65,7 @@ export function usePendingCommunityInvite({
         await applicationContainer.acceptCommunityInviteLinkWithKey(
           nextSession,
           pendingCommunityInvite.token,
-          pendingCommunityInvite.keyEntry,
+          keyEntry,
         );
 
       const acceptedCommunity = accepted.community;
@@ -87,4 +96,20 @@ export function usePendingCommunityInvite({
     setSession,
     setWorkspaceMode,
   ]);
+}
+
+async function communityInviteKeyEntry(
+  inviteToken: string,
+  inviteSecret?: string,
+): Promise<ConversationKeyEntry | undefined> {
+  if (!inviteSecret) return undefined;
+
+  const invite = await applicationContainer.getCommunityInviteLink(inviteToken);
+
+  if (!invite.encryptedCommunityKey) return undefined;
+
+  return await decryptCommunityInviteKey(
+    invite.encryptedCommunityKey,
+    inviteSecret,
+  );
 }

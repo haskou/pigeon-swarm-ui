@@ -144,7 +144,7 @@ export function AddCommunityMemberDialog({
       if (!token) throw new Error(copy.communities.linkError);
 
       const link = createCommunityInviteUrl({
-        keyEntry: result.keyEntry,
+        inviteSecret: result.inviteSecret,
         token,
       });
 

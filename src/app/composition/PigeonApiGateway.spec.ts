@@ -1,6 +1,7 @@
 import { KeyPair } from '@haskou/value-objects';
 
 import type {
+  ConversationKeyEntry,
   IdentityResource,
   LocalKeychain,
   PendingMessageAttachment,
@@ -11,6 +12,7 @@ import type { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonCl
 import type { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 
 import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
+import { decryptCommunityInviteKey } from '../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
@@ -1125,6 +1127,88 @@ describe(PigeonApiGateway.name, () => {
     expect(result.community).toBe(community);
     expect(result.keychain.conversations['community-1']).toEqual(keyEntry);
     expect(result.keychainExternalIdentifier).toBe('keychain-next');
+  });
+
+  it('creates community invite links with encrypted key envelopes', async () => {
+    const keyEntry: ConversationKeyEntry = {
+      conversationId: 'community-1',
+      createdAt: 1770000000000,
+      peerIdentityId: '',
+      privateKey:
+        '-----BEGIN PRIVATE KEY-----\\nprivate\\n-----END PRIVATE KEY-----',
+      publicKey:
+        '-----BEGIN PUBLIC KEY-----\\npublic\\n-----END PUBLIC KEY-----',
+    };
+    const invite = {
+      communityId: 'community-1',
+      inviteToken: 'invite-token',
+      maxUses: 1,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(invite),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain: {
+        conversations: {
+          'community-1': keyEntry,
+        },
+        version: 1,
+      },
+      keychainExternalIdentifier: 'keychain-1',
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    const result = await gateway.createCommunityInviteLink(
+      session,
+      'community-1',
+      {
+        expiresAt: 1770000000000,
+        maxUses: 1,
+      },
+    );
+
+    expect(result.invite).toBe(invite);
+    expect(result.inviteSecret).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(http.request).toHaveBeenCalledTimes(1);
+    const [path, options] = (http.request as jest.Mock).mock.calls[0] as [
+      string,
+      { body: string; headers: Record<string, string>; method: string },
+    ];
+    const body = JSON.parse(options.body) as {
+      encryptedCommunityKey: Parameters<typeof decryptCommunityInviteKey>[0];
+      expiresAt: number;
+      keyEntry?: unknown;
+      maxUses: number;
+      privateKey?: string;
+      publicKey?: string;
+    };
+
+    expect(path).toBe('/communities/community-1/invites');
+    expect(options.method).toBe('POST');
+    expect(options.headers).toEqual({ 'X-Signature': 'http-signature' });
+    expect(body).toMatchObject({
+      encryptedCommunityKey: {
+        algorithm: 'AES-GCM',
+        version: 1,
+      },
+      expiresAt: 1770000000000,
+      maxUses: 1,
+    });
+    expect(body.keyEntry).toBeUndefined();
+    expect(body.privateKey).toBeUndefined();
+    expect(body.publicKey).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain('PRIVATE KEY');
+    await expect(
+      decryptCommunityInviteKey(
+        body.encryptedCommunityKey,
+        result.inviteSecret,
+      ),
+    ).resolves.toEqual(keyEntry);
   });
 
   it('does not project deleted messages when loading conversation messages', async () => {
