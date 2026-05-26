@@ -11,8 +11,8 @@ type CommunityPublicSettingsPanelProps = {
   framed?: boolean;
   onAutoJoinChange: (checked: boolean) => void;
   onDiscoverableChange: (checked: boolean) => void;
-  onVisibilityChange: (visibility: CommunityVisibility) => void;
-  visibility: CommunityVisibility;
+  onVisibilityChange?: (visibility: CommunityVisibility) => void;
+  visibility?: CommunityVisibility;
 };
 
 export function CommunityPublicSettingsPanel({
@@ -42,11 +42,13 @@ export function CommunityPublicSettingsPanel({
         disabled={disabled}
         onChange={onAutoJoinChange}
       />
-      <CommunityVisibilitySelector
-        disabled={disabled}
-        onChange={onVisibilityChange}
-        value={visibility}
-      />
+      {visibility && onVisibilityChange && (
+        <CommunityVisibilitySelector
+          disabled={disabled}
+          onChange={onVisibilityChange}
+          value={visibility}
+        />
+      )}
     </section>
   );
 }

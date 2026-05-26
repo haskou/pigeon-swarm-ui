@@ -535,7 +535,6 @@ export class PigeonApplication {
       description?: string;
       discoverable?: boolean | undefined;
       name?: string;
-      visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
     return await this.communities.update(session, communityId, input);

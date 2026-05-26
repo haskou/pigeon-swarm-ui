@@ -9,7 +9,6 @@ import type {
   CommunityModerationLog,
   CommunityPermission,
   CommunityRoleResource,
-  CommunityVisibility,
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -77,9 +76,6 @@ export function ManageCommunityDialog({
   );
   const [discoverable, setDiscoverable] = useState(
     community.discoverable ?? true,
-  );
-  const [visibility, setVisibility] = useState<CommunityVisibility>(
-    community.visibility ?? 'private',
   );
   const [imageEditor, setImageEditor] = useState<{
     file: File;
@@ -722,8 +718,7 @@ export function ManageCommunityDialog({
     name.trim() !== community.name ||
     autoJoinEnabled !== (community.autoJoinEnabled ?? false) ||
     description.trim() !== community.description ||
-    discoverable !== (community.discoverable ?? true) ||
-    visibility !== (community.visibility ?? 'private');
+    discoverable !== (community.discoverable ?? true);
   const hasChannelChanges = ManagedCommunityChannels.hasChanges(
     channelDraftInput,
   );
@@ -845,7 +840,6 @@ export function ManageCommunityDialog({
             description: description.trim(),
             discoverable,
             name: name.trim(),
-            visibility,
           },
         );
       }
@@ -1049,8 +1043,6 @@ export function ManageCommunityDialog({
                           framed={false}
                           onAutoJoinChange={setAutoJoinEnabled}
                           onDiscoverableChange={setDiscoverable}
-                          onVisibilityChange={setVisibility}
-                          visibility={visibility}
                         />
                       </div>
                     </div>

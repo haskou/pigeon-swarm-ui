@@ -186,7 +186,6 @@ export class PigeonCommunitiesApi {
       description?: string;
       discoverable?: boolean | undefined;
       name?: string;
-      visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}`;
@@ -203,7 +202,6 @@ export class PigeonCommunitiesApi {
         ? { discoverable: input.discoverable }
         : {}),
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.visibility ? { visibility: input.visibility } : {}),
     };
 
     return await this.http.request<Community>(path, {

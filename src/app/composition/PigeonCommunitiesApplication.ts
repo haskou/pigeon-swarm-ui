@@ -145,7 +145,6 @@ export class PigeonCommunitiesApplication {
       description?: string;
       discoverable?: boolean | undefined;
       name?: string;
-      visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
     const avatarCid = await this.resolvePublicImageCid(session, input.avatar);
@@ -158,7 +157,6 @@ export class PigeonCommunitiesApplication {
       description: input.description,
       discoverable: input.discoverable,
       name: input.name,
-      visibility: input.visibility,
     });
   }
 
