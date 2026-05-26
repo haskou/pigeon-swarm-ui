@@ -2573,6 +2573,35 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('nodes.')) {
+        if (event.type === 'nodes.v1.node.network.was_removed') {
+          const removedNetworkId = stringAttribute(event, 'networkId');
+
+          if (removedNetworkId) {
+            setConversations((current) =>
+              current.filter(
+                (conversation) => conversation.networkId !== removedNetworkId,
+              ),
+            );
+            setCommunities((current) =>
+              current.filter(
+                (community) => community.networkId !== removedNetworkId,
+              ),
+            );
+
+            if (activeConversation?.networkId === removedNetworkId) {
+              setActiveConversationId(null);
+              setMessages([]);
+              updateMessageCursor(null);
+            }
+
+            if (activeCommunity?.networkId === removedNetworkId) {
+              setActiveCommunityId(null);
+            }
+          }
+
+          void onNodeNetworksReload().catch(() => undefined);
+        }
+
         void onPeersReload().catch(() => undefined);
 
         return;
@@ -3016,8 +3045,10 @@ export function GlassWorkspace({
     },
     [
       activeCommunity?.id,
+      activeCommunity?.networkId,
       activeCommunityChannelId,
       activeConversation?.id,
+      activeConversation?.networkId,
       activeConversationKeyId,
       clearUnreadMessages,
       communities,
@@ -3030,6 +3061,7 @@ export function GlassWorkspace({
       markUnreadMessage,
       mergePresence,
       onCommunitiesReload,
+      onNodeNetworksReload,
       onPeersReload,
       playNotificationSoundIfAllowed,
       refreshConversations,

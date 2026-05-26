@@ -112,6 +112,61 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('removes a node network anonymously', async () => {
+    const response = {
+      networks: [{ id: 'network-2', key: null, name: 'public' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.removeNetwork('network-1')).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/network-1/', {
+      headers: undefined,
+      method: 'DELETE',
+    });
+  });
+
+  it('removes a node network with owner signature when a session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-2', key: 'key', name: 'private' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.removeNetwork('network-1', session)).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'DELETE',
+      '/node/networks/network-1/',
+      {},
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/network-1/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'DELETE',
+    });
+  });
+
   it('creates communities with signed metadata payload', async () => {
     const community = {
       autoJoinEnabled: true,

@@ -14,6 +14,7 @@ import type {
   CallSignalPayload,
 } from '../../modules/calls/domain/callSession.types';
 import type { IdentityUpdateProfileInput } from '../../modules/identities/domain/identitySignaturePayloadFactory';
+import type { NodeNetwork } from '../../modules/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../modules/networks/application/list-peers/ListPeers';
 import type {
   ChatMessage,
@@ -1507,6 +1508,13 @@ export class PigeonApiGateway {
     session?: Session,
   ): Promise<void> {
     await this.node.joinNetwork(id, name, key, session);
+  }
+
+  public async removeNetwork(
+    networkId: string,
+    session?: Session,
+  ): Promise<NodeNetwork[]> {
+    return await this.node.removeNetwork(networkId, session);
   }
 
   public async listConversations(

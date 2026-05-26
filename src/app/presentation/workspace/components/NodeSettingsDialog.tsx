@@ -39,9 +39,9 @@ export function NodeSettingsDialog({
   const [joinCode, setJoinCode] = useState('');
   const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<'claim' | 'join' | 'public' | null>(
-    null,
-  );
+  const [loading, setLoading] = useState<
+    'claim' | 'join' | 'public' | 'remove' | null
+  >(null);
   const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
     node?.owner === session.identity.id ? session.identity : null,
   );
@@ -53,6 +53,7 @@ export function NodeSettingsDialog({
   const hasPublicNetwork = networks.some(isPublicNodeNetwork);
   const canCreatePublicNetwork =
     !!node && !hasPublicNetwork && (!node.owner || isOwner);
+  const canRemoveNetworks = !!node && (!node.owner || isOwner);
   const ownerProfile = isOwner
     ? session.identity.profile
     : ownerIdentity?.profile;
@@ -177,6 +178,37 @@ export function NodeSettingsDialog({
       await onNetworksUpdated();
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
+    }
+    setLoading(null);
+  };
+
+  const handleRemoveNetwork = async (network: NodeNetwork) => {
+    if (!canRemoveNetworks || loading !== null) return;
+
+    const confirmed = window.confirm(
+      copy.nodeSettings.removeNetworkConfirm.replace(
+        '{name}',
+        networkDisplayName(network),
+      ),
+    );
+
+    if (!confirmed) return;
+
+    setError(null);
+    setLoading('remove');
+    try {
+      await applicationContainer.removeNodeNetwork(
+        network.id,
+        node?.owner ? session : undefined,
+      );
+      setCopiedNetworkId((current) =>
+        current === network.id ? null : current,
+      );
+      await onNetworksUpdated();
+    } catch (caught) {
+      setError(
+        toUserErrorMessage(caught, copy.nodeSettings.removeNetworkError),
+      );
     }
     setLoading(null);
   };
@@ -307,7 +339,7 @@ export function NodeSettingsDialog({
                         </div>
                       </div>
                     </div>
-                    {isOwner && (
+                    {canRemoveNetworks && (
                       <div className="flex shrink-0 items-center gap-2">
                         <button
                           type="button"
@@ -325,10 +357,11 @@ export function NodeSettingsDialog({
                         </button>
                         <button
                           type="button"
-                          disabled
-                          className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition disabled:cursor-not-allowed disabled:opacity-45"
-                          aria-label={copy.nodeSettings.removeUnavailable}
-                          title={copy.nodeSettings.removeUnavailable}
+                          onClick={() => void handleRemoveNetwork(network)}
+                          disabled={loading !== null}
+                          className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label={copy.nodeSettings.removeNetwork}
+                          title={copy.nodeSettings.removeNetwork}
                         >
                           <TrashIcon />
                         </button>

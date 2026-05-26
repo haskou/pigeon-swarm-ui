@@ -578,6 +578,10 @@ const englishCopy = {
     publicNetworkBody:
       'Adds the fixed public network required by public communities on this node.',
     publicNetworkName: 'Public network',
+    removeNetwork: 'Remove network',
+    removeNetworkConfirm:
+      'Remove {name} from this node? Local IPFS storage and metadata for this network will be deleted.',
+    removeNetworkError: 'The network could not be removed from this node.',
     removeUnavailable: 'Remove network unavailable in API',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',
@@ -1216,6 +1220,10 @@ const spanishCopy = mergeCopy(englishCopy, {
     publicNetworkBody:
       'Anade la red publica fija requerida por las comunidades publicas en este nodo.',
     publicNetworkName: 'Red publica',
+    removeNetwork: 'Eliminar red',
+    removeNetworkConfirm:
+      'Eliminar {name} de este nodo? Se borraran el storage IPFS local y la metadata de esta red.',
+    removeNetworkError: 'No se pudo eliminar la red de este nodo.',
     removeUnavailable: 'Eliminar red no disponible en la API',
     replication: 'Estado de replicacion',
     replicationBody: 'Diagnostico de replicacion del nodo.',

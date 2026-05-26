@@ -95,6 +95,8 @@ import {
   type Peer,
 } from '../../modules/networks/application/list-peers/ListPeers';
 import { ListPeersMessage } from '../../modules/networks/application/list-peers/messages/ListPeersMessage';
+import { RemoveNodeNetworkMessage } from '../../modules/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
+import { RemoveNodeNetwork } from '../../modules/networks/application/remove-node-network/RemoveNodeNetwork';
 import { AcceptConversationInvitation } from '../../modules/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
 import { AcceptConversationInvitationMessage } from '../../modules/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
 import { ListNotifications } from '../../modules/notifications/application/list-notifications/ListNotifications';
@@ -183,6 +185,8 @@ export class PigeonApplication {
 
   private readonly joinNetworkUseCase: JoinNetwork;
 
+  private readonly removeNodeNetworkUseCase: RemoveNodeNetwork;
+
   private readonly deleteMessageUseCase: DeleteMessage;
 
   private readonly editMessageUseCase: EditMessage;
@@ -247,6 +251,10 @@ export class PigeonApplication {
           name.toString(),
           key.toString(),
         ),
+    });
+    this.removeNodeNetworkUseCase = new RemoveNodeNetwork({
+      remove: async (networkId, session) =>
+        await gateway.removeNetwork(networkId.toString(), session),
     });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
@@ -989,6 +997,15 @@ export class PigeonApplication {
     key: string,
   ): Promise<void> {
     await this.gateway.joinNetwork(id, name, key, session);
+  }
+
+  public async removeNodeNetwork(
+    networkId: string,
+    session?: Session,
+  ): Promise<NodeNetwork[]> {
+    return await this.removeNodeNetworkUseCase.remove(
+      new RemoveNodeNetworkMessage({ networkId, session }),
+    );
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
