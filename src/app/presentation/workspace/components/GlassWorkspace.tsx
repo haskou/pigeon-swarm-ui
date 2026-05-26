@@ -59,6 +59,7 @@ import {
   logCallError,
   logCallWarning,
 } from '../../../../modules/calls/infrastructure/media/callDebugLogger';
+import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
@@ -93,6 +94,7 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
+import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
@@ -119,6 +121,10 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { ChatColumn } from './ChatColumn';
+import {
+  callAudioStorageKey,
+  loadCallNoiseCancellationEnabled,
+} from './workspacePersistence';
 
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
@@ -338,8 +344,9 @@ export function GlassWorkspace({
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
-  const [editingMessage, setEditingMessage] =
-    useState<EditingMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
+    null,
+  );
   const [failedSends, setFailedSends] = useState<FailedSends>({});
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -361,6 +368,8 @@ export function GlassWorkspace({
     useState<PushEnableState>('idle');
   const [pushEnableError, setPushEnableError] = useState<string | null>(null);
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
+  const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
+    useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -390,11 +399,14 @@ export function GlassWorkspace({
     endCall,
     receiveSignal,
     reconcileCall,
+    setParticipantScreenShareVolume,
     setParticipantVolume,
     startCall,
     toggleCamera,
     toggleDeafen,
     toggleMute,
+    toggleNoiseCancellation,
+    toggleScreenShareAudio,
     toggleScreenShare,
   } = useCallSession();
   const {
@@ -410,6 +422,18 @@ export function GlassWorkspace({
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    setCallNoiseCancellationEnabled(
+      loadCallNoiseCancellationEnabled(session.identity.id),
+    );
+  }, [session.identity.id]);
+
+  useEffect(() => {
+    writeJsonToLocalStorage(callAudioStorageKey(session.identity.id), {
+      noiseCancellationEnabled: callNoiseCancellationEnabled,
+    });
+  }, [callNoiseCancellationEnabled, session.identity.id]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -1076,17 +1100,25 @@ export function GlassWorkspace({
     }
 
     try {
-      return await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
+      return await CallMicrophoneCapture.capture(navigator.mediaDevices, {
+        noiseCancellationEnabled: callNoiseCancellationEnabled,
       });
     } catch {
       throw new Error(copy.calls.microphoneUnavailable);
     }
-  }, []);
+  }, [callNoiseCancellationEnabled]);
   const stopLocalAudio = (stream: MediaStream | null) => {
-    stream?.getTracks().forEach((track) => track.stop());
+    CallMicrophoneCapture.stop(stream);
   };
+  const toggleCallNoiseCancellation = useCallback(() => {
+    const enabled = !callNoiseCancellationEnabled;
+
+    setCallNoiseCancellationEnabled(enabled);
+    void toggleNoiseCancellation(enabled).catch((caught) => {
+      setCallNoiseCancellationEnabled(!enabled);
+      setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+    });
+  }, [callNoiseCancellationEnabled, toggleNoiseCancellation]);
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     const identityId = sessionRef.current.identity.id;
 
@@ -1230,6 +1262,7 @@ export function GlassWorkspace({
             iceConfig,
             id: call.id,
             localStream,
+            noiseCancellationEnabled: callNoiseCancellationEnabled,
             onSignal: callSignalSender(call.id),
             participants:
               details.participants.length > 0
@@ -1250,6 +1283,7 @@ export function GlassWorkspace({
       activeCall?.conversationId,
       activeCall?.id,
       activeCall?.kind,
+      callNoiseCancellationEnabled,
       callDetailsForResource,
       callSignalSender,
       cleanupJoinedCalls,
@@ -1354,6 +1388,7 @@ export function GlassWorkspace({
           iceConfig,
           id: call.id,
           localStream,
+          noiseCancellationEnabled: callNoiseCancellationEnabled,
           onSignal: callSignalSender(call.id),
         });
         logCallDebug('workspace:community-voice:start-local-session-complete', {
@@ -1378,6 +1413,7 @@ export function GlassWorkspace({
       activeCall?.channelId,
       activeCall?.communityId,
       activeCall?.kind,
+      callNoiseCancellationEnabled,
       callDetailsForResource,
       callSignalSender,
       cleanupJoinedCalls,
@@ -1474,6 +1510,7 @@ export function GlassWorkspace({
         iceConfig,
         id: call.id,
         localStream,
+        noiseCancellationEnabled: callNoiseCancellationEnabled,
         onSignal: callSignalSender(call.id),
       });
     })()
@@ -1485,6 +1522,7 @@ export function GlassWorkspace({
         callActionInProgressRef.current = false;
       });
   }, [
+    callNoiseCancellationEnabled,
     callDetailsForResource,
     callSignalSender,
     cleanupJoinedCalls,
@@ -1540,15 +1578,12 @@ export function GlassWorkspace({
     removeCurrentIdentityFromVoicePresence,
   ]);
 
-  const heartbeatActiveCall = useCallback(
-    async (callId: string) => {
-      await applicationContainer.heartbeatCallParticipant(
-        sessionRef.current,
-        callId,
-      );
-    },
-    [],
-  );
+  const heartbeatActiveCall = useCallback(async (callId: string) => {
+    await applicationContainer.heartbeatCallParticipant(
+      sessionRef.current,
+      callId,
+    );
+  }, []);
 
   useWorkspaceCallHeartbeat({
     activeCall,
@@ -3214,9 +3249,14 @@ export function GlassWorkspace({
                     onCreate={() => setIsCreateOpen(true)}
                     onCallEnd={leaveActiveCall}
                     onCallParticipantVolumeChange={setParticipantVolume}
+                    onCallParticipantScreenShareVolumeChange={
+                      setParticipantScreenShareVolume
+                    }
                     onCallToggleCamera={toggleCamera}
                     onCallToggleDeafen={toggleDeafen}
                     onCallToggleMute={toggleMute}
+                    onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
+                    onCallToggleScreenShareAudio={toggleScreenShareAudio}
                     onCallToggleScreenShare={toggleScreenShare}
                     onLogout={logout}
                     onSessionUpdated={(nextSession) => {
@@ -3358,9 +3398,14 @@ export function GlassWorkspace({
               activeCall={activeCall}
               onCallEnd={leaveActiveCall}
               onCallParticipantVolumeChange={setParticipantVolume}
+              onCallParticipantScreenShareVolumeChange={
+                setParticipantScreenShareVolume
+              }
               onCallToggleCamera={toggleCamera}
               onCallToggleDeafen={toggleDeafen}
               onCallToggleMute={toggleMute}
+              onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
+              onCallToggleScreenShareAudio={toggleScreenShareAudio}
               onCallToggleScreenShare={toggleScreenShare}
               realtimeEvent={communityRealtimeEvent}
               presenceByIdentityId={presenceByIdentityId}

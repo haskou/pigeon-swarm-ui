@@ -1220,7 +1220,7 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
     before?: null | string,
-    options?: { signal?: AbortSignal },
+    options?: { limit?: number; signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
     return await this.loadMessagesUseCase.load(
       new LoadMessagesMessage({

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@haskou/value-objects": "^2.6.0",
+    "@sapphi-red/web-noise-suppressor": "^0.3.5",
     "@tailwindcss/vite": "^4.1.17",
     "@vitejs/plugin-react": "^4.7.0",
     "gifenc": "^1.0.3",

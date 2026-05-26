@@ -73,13 +73,13 @@ describe(RealtimeHeartbeat.name, () => {
             listener,
           ];
         },
-        get visibilityState() {
-          return visibilityState;
-        },
         removeEventListener: (eventName: string, listener: Listener) => {
           documentListeners[eventName] = (
             documentListeners[eventName] ?? []
           ).filter((item) => item !== listener);
+        },
+        get visibilityState() {
+          return visibilityState;
         },
       },
     });

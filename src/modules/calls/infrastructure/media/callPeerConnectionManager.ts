@@ -45,14 +45,23 @@ type PeerNegotiationState = {
 };
 
 type DescriptionSignalPayload = RTCSessionDescriptionInit & {
+  screenAudioStreamIds?: string[];
+  screenAudioTrackIds?: string[];
+  screenStreamIds?: string[];
   screenTrackIds?: string[];
 };
 
 function descriptionPayload(
   description: RTCSessionDescriptionInit,
+  screenAudioTrackIds: string[],
+  screenAudioStreamIds: string[],
   screenTrackIds: string[],
+  screenStreamIds: string[],
 ): Record<string, unknown> {
   return {
+    screenAudioStreamIds,
+    screenAudioTrackIds,
+    screenStreamIds,
     screenTrackIds,
     sdp: description.sdp,
     type: description.type,
@@ -63,17 +72,92 @@ function isScreenShareTrack(track: MediaStreamTrack): boolean {
   return track.kind === 'video' && track.contentHint === 'detail';
 }
 
+function isScreenShareAudioTrack(track: MediaStreamTrack): boolean {
+  return track.kind === 'audio' && track.contentHint === 'music';
+}
+
+function localTrackSlot(
+  track: MediaStreamTrack,
+): 'camera' | 'microphone' | 'screen' | 'screen-audio' {
+  if (isScreenShareAudioTrack(track)) return 'screen-audio';
+
+  if (track.kind === 'audio') return 'microphone';
+
+  return isScreenShareTrack(track) ? 'screen' : 'camera';
+}
+
+function replacementLocalTrack(
+  currentTrack: MediaStreamTrack,
+  activeTracks: MediaStreamTrack[],
+): MediaStreamTrack | undefined {
+  const slot = localTrackSlot(currentTrack);
+
+  return activeTracks.find((track) => localTrackSlot(track) === slot);
+}
+
 function isRemoteScreenShareTrack(
   track: MediaStreamTrack,
+  streams: readonly MediaStream[],
   remoteScreenTrackIds: Set<string>,
+  remoteScreenStreamIds: Set<string>,
 ): boolean {
   if (track.kind !== 'video') return false;
 
   if (remoteScreenTrackIds.has(track.id)) return true;
 
+  if (streams.some((stream) => remoteScreenStreamIds.has(stream.id))) {
+    return true;
+  }
+
   if (isScreenShareTrack(track)) return true;
 
   return /screen|display|window|tab|monitor/i.test(track.label);
+}
+
+function isRemoteScreenShareAudioTrack(
+  track: MediaStreamTrack,
+  streams: readonly MediaStream[],
+  remoteScreenAudioTrackIds: Set<string>,
+  remoteScreenAudioStreamIds: Set<string>,
+): boolean {
+  if (track.kind !== 'audio') return false;
+
+  if (remoteScreenAudioTrackIds.has(track.id)) return true;
+
+  if (streams.some((stream) => remoteScreenAudioStreamIds.has(stream.id))) {
+    return true;
+  }
+
+  return isScreenShareAudioTrack(track);
+}
+
+function hasAudioTrack(track: MediaStreamTrack, stream: MediaStream): boolean {
+  return track.kind === 'audio' || stream.getAudioTracks().length > 0;
+}
+
+function nativeAudioVolume(volume: number): number {
+  return Math.min(1, volume);
+}
+
+function graphAudioVolume(volume: number, deafened: boolean): number {
+  return deafened ? 0 : volume;
+}
+
+function needsAudioGraph(volume: number): boolean {
+  return volume > 1;
+}
+
+function isMediaStreamSource(
+  source: MediaProvider | null,
+): source is MediaStream {
+  return Boolean(source && 'getAudioTracks' in source);
+}
+
+function remoteAudioKey(
+  peerIdentityId: string,
+  channel: 'screen' | 'voice',
+): string {
+  return channel === 'voice' ? peerIdentityId : `${peerIdentityId}:screen`;
 }
 
 export class CallPeerConnectionManager {
@@ -95,13 +179,30 @@ export class CallPeerConnectionManager {
 
   private readonly remoteAudioGains = new Map<string, GainNode>();
 
+  private readonly remoteAudioOutputSources = new Map<
+    string,
+    MediaStreamAudioSourceNode
+  >();
+
+  private readonly remoteAudioOutputStreams = new Map<string, MediaStream>();
+
+  private readonly remoteAudioStreams = new Map<string, MediaStream>();
+
   private readonly remoteAudioVolumes = new Map<string, number>();
 
   private readonly remoteStreams = new Map<string, MediaStream>();
 
   private readonly remoteScreenStreams = new Map<string, MediaStream>();
 
+  private readonly remoteScreenStreamIds = new Map<string, Set<string>>();
+
   private readonly remoteScreenTrackIds = new Map<string, Set<string>>();
+
+  private readonly remoteScreenAudioStreamIds = new Map<string, Set<string>>();
+
+  private readonly remoteScreenAudioTrackIds = new Map<string, Set<string>>();
+
+  private readonly localScreenStreams = new Map<string, MediaStream>();
 
   private localStream: MediaStream | null = null;
 
@@ -141,6 +242,14 @@ export class CallPeerConnectionManager {
     return Object.fromEntries(this.remoteScreenStreams.entries());
   }
 
+  public retainPeers(peerIdentityIds: Set<string>): void {
+    for (const peerIdentityId of this.peers.keys()) {
+      if (!peerIdentityIds.has(peerIdentityId)) {
+        this.removePeer(peerIdentityId);
+      }
+    }
+  }
+
   public setDeafened(deafened: boolean): void {
     this.deafened = deafened;
     logCallDebug('peer-manager:set-deafened', {
@@ -148,8 +257,16 @@ export class CallPeerConnectionManager {
       remoteAudioCount: this.remoteAudio.size,
     });
 
-    for (const audio of this.remoteAudio.values()) {
+    for (const [audioKey, audio] of this.remoteAudio.entries()) {
+      const hasAudioGraph = this.remoteAudioGains.has(audioKey);
+
       audio.muted = deafened;
+      this.applyRemoteAudioOutputVolume(
+        audioKey,
+        this.remoteAudioVolumes.get(audioKey) ?? 1,
+      );
+
+      if (hasAudioGraph) continue;
 
       if (deafened) {
         audio.pause();
@@ -160,30 +277,54 @@ export class CallPeerConnectionManager {
   }
 
   public setPeerVolume(peerIdentityId: string, volumePercent: number): void {
-    const volume = Math.min(2.5, Math.max(0, volumePercent / 100));
-
-    this.remoteAudioVolumes.set(peerIdentityId, volume);
-    this.remoteAudioGains
-      .get(peerIdentityId)
-      ?.gain.setValueAtTime(
-        volume,
-        this.remoteAudioContexts.get(peerIdentityId)?.currentTime ?? 0,
-      );
-    void this.remoteAudioContexts
-      .get(peerIdentityId)
-      ?.resume()
-      .catch(() => undefined);
-
-    const audio = this.remoteAudio.get(peerIdentityId);
-
-    if (audio && !this.remoteAudioGains.has(peerIdentityId)) {
-      audio.volume = Math.min(1, volume);
-    }
+    this.setRemoteAudioChannelVolume(
+      remoteAudioKey(peerIdentityId, 'voice'),
+      volumePercent,
+    );
 
     logCallDebug('peer-manager:set-peer-volume', {
       peerIdentityId,
       volumePercent,
     });
+  }
+
+  public setPeerScreenShareVolume(
+    peerIdentityId: string,
+    volumePercent: number,
+  ): void {
+    this.setRemoteAudioChannelVolume(
+      remoteAudioKey(peerIdentityId, 'screen'),
+      volumePercent,
+    );
+
+    logCallDebug('peer-manager:set-peer-screen-share-volume', {
+      peerIdentityId,
+      volumePercent,
+    });
+  }
+
+  private setRemoteAudioChannelVolume(
+    audioKey: string,
+    volumePercent: number,
+  ): void {
+    const volume = Math.min(3, Math.max(0, volumePercent / 100));
+
+    this.remoteAudioVolumes.set(audioKey, volume);
+    const audio = this.remoteAudio.get(audioKey);
+    const gain = this.remoteAudioGains.get(audioKey);
+
+    if (audio) {
+      if (isMediaStreamSource(audio.srcObject)) {
+        this.syncRemoteAudioOutput(audioKey, audio.srcObject, volume);
+      }
+
+      audio.volume =
+        gain || this.remoteAudioGains.has(audioKey)
+          ? 0
+          : nativeAudioVolume(volume);
+    }
+
+    this.applyRemoteAudioOutputVolume(audioKey, volume);
   }
 
   public async ensurePeer(
@@ -222,7 +363,13 @@ export class CallPeerConnectionManager {
       await sendSignal(
         peerIdentityId,
         'offer',
-        descriptionPayload(offer, this.localScreenTrackIds()),
+        descriptionPayload(
+          offer,
+          this.localScreenAudioTrackIds(),
+          this.localScreenAudioStreamIds(),
+          this.localScreenTrackIds(),
+          this.localScreenStreamIds(),
+        ),
       );
     } finally {
       state.makingOffer = false;
@@ -285,16 +432,26 @@ export class CallPeerConnectionManager {
       audio.srcObject = null;
       audio.remove();
     }
+    for (const source of this.remoteAudioOutputSources.values()) {
+      source.disconnect();
+    }
     for (const audioContext of this.remoteAudioContexts.values()) {
       void audioContext.close().catch(() => undefined);
     }
     this.remoteAudio.clear();
     this.remoteAudioContexts.clear();
     this.remoteAudioGains.clear();
+    this.remoteAudioOutputSources.clear();
+    this.remoteAudioOutputStreams.clear();
+    this.remoteAudioStreams.clear();
     this.remoteAudioVolumes.clear();
     this.remoteStreams.clear();
     this.remoteScreenStreams.clear();
+    this.remoteScreenStreamIds.clear();
     this.remoteScreenTrackIds.clear();
+    this.remoteScreenAudioStreamIds.clear();
+    this.remoteScreenAudioTrackIds.clear();
+    this.localScreenStreams.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
     this.deafened = false;
@@ -373,9 +530,10 @@ export class CallPeerConnectionManager {
       return;
     }
 
+    this.rememberRemoteScreenShareMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
-    this.rememberRemoteScreenTrackIds(senderIdentityId, payload.screenTrackIds);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
+      screenStreamCount: payload.screenStreamIds?.length ?? 0,
       screenTrackCount: payload.screenTrackIds?.length ?? 0,
       senderIdentityId,
       signalType: description.type,
@@ -393,7 +551,13 @@ export class CallPeerConnectionManager {
     await sendSignal(
       senderIdentityId,
       'answer',
-      descriptionPayload(answer, this.localScreenTrackIds()),
+      descriptionPayload(
+        answer,
+        this.localScreenAudioTrackIds(),
+        this.localScreenAudioStreamIds(),
+        this.localScreenTrackIds(),
+        this.localScreenStreamIds(),
+      ),
     );
   }
 
@@ -543,7 +707,17 @@ export class CallPeerConnectionManager {
   }
 
   private localTrackStream(track: MediaStreamTrack): MediaStream {
-    if (isScreenShareTrack(track)) return new MediaStream([track]);
+    if (isScreenShareTrack(track) || isScreenShareAudioTrack(track)) {
+      const currentStream = this.localScreenStreams.get(track.id);
+
+      if (currentStream) return currentStream;
+
+      const screenStream = new MediaStream([track]);
+
+      this.localScreenStreams.set(track.id, screenStream);
+
+      return screenStream;
+    }
 
     return this.localStream ?? new MediaStream([track]);
   }
@@ -557,14 +731,81 @@ export class CallPeerConnectionManager {
     );
   }
 
-  private rememberRemoteScreenTrackIds(
+  private localScreenAudioTrackIds(): string[] {
+    return (
+      this.localStream
+        ?.getAudioTracks()
+        .filter((track) => isScreenShareAudioTrack(track))
+        .map((track) => track.id) ?? []
+    );
+  }
+
+  private localScreenStreamIds(): string[] {
+    return this.localMediaStreamIdsFor(this.localScreenTrackIds());
+  }
+
+  private localScreenAudioStreamIds(): string[] {
+    return this.localMediaStreamIdsFor(this.localScreenAudioTrackIds());
+  }
+
+  private localMediaStreamIdsFor(trackIds: string[]): string[] {
+    const activeTrackIds = new Set(trackIds);
+    const streamIds: string[] = [];
+
+    for (const [trackId, stream] of this.localScreenStreams.entries()) {
+      if (!activeTrackIds.has(trackId)) continue;
+
+      streamIds.push(stream.id);
+    }
+
+    return streamIds;
+  }
+
+  private rememberRemoteScreenShareMetadata(
     peerIdentityId: string,
-    screenTrackIds?: string[],
+    payload: DescriptionSignalPayload,
+  ): void {
+    this.rememberRemoteScreenVideoMetadata(peerIdentityId, payload);
+    this.rememberRemoteScreenAudioMetadata(peerIdentityId, payload);
+  }
+
+  private rememberRemoteScreenVideoMetadata(
+    peerIdentityId: string,
+    payload: DescriptionSignalPayload,
   ): void {
     this.remoteScreenTrackIds.set(
       peerIdentityId,
-      new Set(screenTrackIds ?? []),
+      new Set(payload.screenTrackIds ?? []),
     );
+    this.remoteScreenStreamIds.set(
+      peerIdentityId,
+      new Set(payload.screenStreamIds ?? []),
+    );
+
+    if (!payload.screenTrackIds?.length && !payload.screenStreamIds?.length) {
+      this.remoteScreenStreams.delete(peerIdentityId);
+    }
+  }
+
+  private rememberRemoteScreenAudioMetadata(
+    peerIdentityId: string,
+    payload: DescriptionSignalPayload,
+  ): void {
+    this.remoteScreenAudioTrackIds.set(
+      peerIdentityId,
+      new Set(payload.screenAudioTrackIds ?? []),
+    );
+    this.remoteScreenAudioStreamIds.set(
+      peerIdentityId,
+      new Set(payload.screenAudioStreamIds ?? []),
+    );
+
+    if (
+      !payload.screenAudioTrackIds?.length &&
+      !payload.screenAudioStreamIds?.length
+    ) {
+      this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'screen'));
+    }
   }
 
   private configureNegotiationState(
@@ -599,53 +840,195 @@ export class CallPeerConnectionManager {
     const [receivedStream] = event.streams;
     const stream = receivedStream ?? new MediaStream([event.track]);
 
+    if (this.handleRemoteScreenVideoTrack(peerIdentityId, event)) return;
+
+    if (this.handleRemoteScreenAudioTrack(peerIdentityId, event)) return;
+
+    this.remoteStreams.set(peerIdentityId, stream);
+
+    if (event.track.kind === 'audio') {
+      this.playRemoteAudioTrack(peerIdentityId, event.track);
+    } else if (hasAudioTrack(event.track, stream)) {
+      this.playRemoteStream(peerIdentityId, stream);
+    }
+  }
+
+  private handleRemoteScreenVideoTrack(
+    peerIdentityId: string,
+    event: RTCTrackEvent,
+  ): boolean {
     if (
-      isRemoteScreenShareTrack(
+      !isRemoteScreenShareTrack(
         event.track,
+        event.streams,
         this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
+        this.remoteScreenStreamIds.get(peerIdentityId) ?? new Set(),
       )
     ) {
-      const screenStream = new MediaStream([event.track]);
+      return false;
+    }
 
-      this.remoteScreenStreams.set(peerIdentityId, screenStream);
-      event.track.addEventListener('ended', () => {
-        if (this.remoteScreenStreams.get(peerIdentityId) === screenStream) {
-          this.remoteScreenStreams.delete(peerIdentityId);
-        }
-      });
-      logCallDebug('peer-manager:screen-track-received', {
-        peerIdentityId,
-        trackId: event.track.id,
-      });
+    const screenStream = new MediaStream([event.track]);
+
+    this.remoteScreenStreams.set(peerIdentityId, screenStream);
+    event.track.addEventListener('ended', () => {
+      if (this.remoteScreenStreams.get(peerIdentityId) === screenStream) {
+        this.remoteScreenStreams.delete(peerIdentityId);
+      }
+    });
+    logCallDebug('peer-manager:screen-track-received', {
+      peerIdentityId,
+      trackId: event.track.id,
+    });
+
+    return true;
+  }
+
+  private handleRemoteScreenAudioTrack(
+    peerIdentityId: string,
+    event: RTCTrackEvent,
+  ): boolean {
+    if (
+      !isRemoteScreenShareAudioTrack(
+        event.track,
+        event.streams,
+        this.remoteScreenAudioTrackIds.get(peerIdentityId) ?? new Set(),
+        this.remoteScreenAudioStreamIds.get(peerIdentityId) ?? new Set(),
+      )
+    ) {
+      return false;
+    }
+
+    this.playRemoteScreenAudioTrack(peerIdentityId, event.track);
+
+    return true;
+  }
+
+  private playRemoteAudioTrack(
+    peerIdentityId: string,
+    track: MediaStreamTrack,
+  ): void {
+    const stream =
+      this.remoteAudioStreams.get(peerIdentityId) ?? new MediaStream();
+
+    if (
+      !stream.getAudioTracks().some((audioTrack) => audioTrack.id === track.id)
+    ) {
+      stream.addTrack(track);
+    }
+
+    this.remoteAudioStreams.set(peerIdentityId, stream);
+    track.addEventListener('ended', () => {
+      stream.removeTrack(track);
+
+      if (stream.getAudioTracks().length > 0) {
+        this.playRemoteStream(peerIdentityId, stream);
+
+        return;
+      }
+
+      this.remoteAudioStreams.delete(peerIdentityId);
+      this.resetRemoteAudioOutput(peerIdentityId);
+      this.removeRemoteAudio(peerIdentityId);
+    });
+    this.playRemoteStream(peerIdentityId, stream);
+  }
+
+  private playRemoteScreenAudioTrack(
+    peerIdentityId: string,
+    track: MediaStreamTrack,
+  ): void {
+    this.playRemoteAudioTrack(remoteAudioKey(peerIdentityId, 'screen'), track);
+  }
+
+  private syncLocalTracks(): void {
+    const activeTracks = this.localStream?.getTracks() ?? [];
+
+    for (const peer of this.peers.values()) {
+      this.syncPeerLocalTracks(peer, activeTracks);
+    }
+  }
+
+  private syncPeerLocalTracks(
+    peer: RTCPeerConnection,
+    activeTracks: MediaStreamTrack[],
+  ): void {
+    const activeTrackSet = new Set(activeTracks);
+    const syncedTracks = new Set<MediaStreamTrack>();
+
+    for (const sender of peer.getSenders()) {
+      this.syncLocalSender(
+        peer,
+        sender,
+        activeTracks,
+        activeTrackSet,
+        syncedTracks,
+      );
+    }
+
+    for (const track of activeTracks) {
+      this.addMissingLocalTrack(peer, track, syncedTracks);
+    }
+  }
+
+  private syncLocalSender(
+    peer: RTCPeerConnection,
+    sender: RTCRtpSender,
+    activeTracks: MediaStreamTrack[],
+    activeTrackSet: Set<MediaStreamTrack>,
+    syncedTracks: Set<MediaStreamTrack>,
+  ): void {
+    const track = sender.track;
+
+    if (!track) return;
+
+    if (activeTrackSet.has(track)) {
+      syncedTracks.add(track);
 
       return;
     }
 
-    this.remoteStreams.set(peerIdentityId, stream);
-    this.playRemoteStream(peerIdentityId, stream);
+    const replacement = replacementLocalTrack(track, activeTracks);
+
+    if (!replacement || syncedTracks.has(replacement)) {
+      peer.removeTrack(sender);
+
+      return;
+    }
+
+    syncedTracks.add(replacement);
+    void sender.replaceTrack(replacement).catch((error: unknown) => {
+      logCallError('peer-manager:replace-local-track-failed', error, {
+        kind: replacement.kind,
+      });
+    });
   }
 
-  private syncLocalTracks(): void {
-    for (const peer of this.peers.values()) {
-      const activeTracks = new Set(this.localStream?.getTracks() ?? []);
-
-      for (const sender of peer.getSenders()) {
-        const track = sender.track;
-
-        if (track && !activeTracks.has(track)) {
-          peer.removeTrack(sender);
-        }
-      }
-
-      this.localStream?.getTracks().forEach((track) => {
-        const existing = peer
-          .getSenders()
-          .some((sender) => sender.track?.id === track.id);
-
-        if (!existing && this.localStream)
-          peer.addTrack(track, this.localTrackStream(track));
-      });
+  private addMissingLocalTrack(
+    peer: RTCPeerConnection,
+    track: MediaStreamTrack,
+    syncedTracks: Set<MediaStreamTrack>,
+  ): void {
+    if (!this.localStream || this.hasLocalSender(peer, track, syncedTracks)) {
+      return;
     }
+
+    peer.addTrack(track, this.localTrackStream(track));
+  }
+
+  private hasLocalSender(
+    peer: RTCPeerConnection,
+    track: MediaStreamTrack,
+    syncedTracks: Set<MediaStreamTrack>,
+  ): boolean {
+    return (
+      syncedTracks.has(track) ||
+      peer
+        .getSenders()
+        .some(
+          (sender) => sender.track?.id === track.id || sender.track === track,
+        )
+    );
   }
 
   private async sendRenegotiationOffer(
@@ -665,7 +1048,13 @@ export class CallPeerConnectionManager {
       await sendSignal(
         peerIdentityId,
         'offer',
-        descriptionPayload(offer, this.localScreenTrackIds()),
+        descriptionPayload(
+          offer,
+          this.localScreenAudioTrackIds(),
+          this.localScreenAudioStreamIds(),
+          this.localScreenTrackIds(),
+          this.localScreenStreamIds(),
+        ),
       );
     } finally {
       state.makingOffer = false;
@@ -675,16 +1064,11 @@ export class CallPeerConnectionManager {
   private playRemoteStream(peerIdentityId: string, stream: MediaStream): void {
     const audio =
       this.remoteAudio.get(peerIdentityId) ?? document.createElement('audio');
+    const volume = this.remoteAudioVolumes.get(peerIdentityId) ?? 1;
 
     audio.autoplay = true;
     audio.muted = this.deafened;
     audio.srcObject = stream;
-    this.connectRemoteAudioOutput(peerIdentityId, audio);
-    logCallDebug('peer-manager:remote-audio:play-requested', {
-      deafened: this.deafened,
-      peerIdentityId,
-      trackCount: stream.getTracks().length,
-    });
 
     if (!this.remoteAudio.has(peerIdentityId)) {
       audio.dataset.peerIdentityId = peerIdentityId;
@@ -692,6 +1076,16 @@ export class CallPeerConnectionManager {
       document.body.append(audio);
       this.remoteAudio.set(peerIdentityId, audio);
     }
+
+    this.syncRemoteAudioOutput(peerIdentityId, stream, volume);
+    audio.volume = this.remoteAudioGains.has(peerIdentityId)
+      ? 0
+      : nativeAudioVolume(volume);
+    logCallDebug('peer-manager:remote-audio:play-requested', {
+      deafened: this.deafened,
+      peerIdentityId,
+      trackCount: stream.getTracks().length,
+    });
 
     if (this.deafened) {
       audio.pause();
@@ -706,53 +1100,121 @@ export class CallPeerConnectionManager {
     });
   }
 
-  private connectRemoteAudioOutput(
+  private syncRemoteAudioOutput(
     peerIdentityId: string,
-    audio: HTMLAudioElement,
+    stream: MediaStream,
+    volume: number,
   ): void {
-    const volume = this.remoteAudioVolumes.get(peerIdentityId) ?? 1;
+    if (this.remoteAudioOutputStreams.get(peerIdentityId) !== stream) {
+      this.resetRemoteAudioOutput(peerIdentityId);
+    }
 
     if (this.remoteAudioGains.has(peerIdentityId)) {
-      this.remoteAudioGains
-        .get(peerIdentityId)
-        ?.gain.setValueAtTime(
-          volume,
-          this.remoteAudioContexts.get(peerIdentityId)?.currentTime ?? 0,
-        );
+      this.applyRemoteAudioOutputVolume(peerIdentityId, volume);
 
       return;
     }
 
+    if (!needsAudioGraph(volume)) return;
+
+    this.createRemoteAudioOutput(peerIdentityId, stream, volume);
+  }
+
+  private createRemoteAudioOutput(
+    peerIdentityId: string,
+    stream: MediaStream,
+    volume: number,
+  ): void {
     const AudioContextConstructor =
-      window.AudioContext ??
-      (window as BrowserWindowWithWebkitAudioContext).webkitAudioContext;
+      typeof window === 'undefined'
+        ? undefined
+        : (window.AudioContext ??
+          (window as BrowserWindowWithWebkitAudioContext).webkitAudioContext);
 
     if (!AudioContextConstructor) {
-      const remoteAudio = audio;
-
-      remoteAudio.volume = Math.min(1, volume);
-
       return;
     }
 
     try {
       const audioContext = new AudioContextConstructor();
-      const source = audioContext.createMediaElementSource(audio);
+      const source = audioContext.createMediaStreamSource(stream);
       const gain = audioContext.createGain();
 
-      gain.gain.value = volume;
+      gain.gain.value = graphAudioVolume(volume, this.deafened);
       source.connect(gain).connect(audioContext.destination);
       this.remoteAudioContexts.set(peerIdentityId, audioContext);
       this.remoteAudioGains.set(peerIdentityId, gain);
+      this.remoteAudioOutputSources.set(peerIdentityId, source);
+      this.remoteAudioOutputStreams.set(peerIdentityId, stream);
       void audioContext.resume().catch(() => undefined);
     } catch (error) {
-      const remoteAudio = audio;
-
-      remoteAudio.volume = Math.min(1, volume);
       logCallError('peer-manager:remote-audio:gain-setup-failed', error, {
         peerIdentityId,
       });
     }
+  }
+
+  private applyRemoteAudioOutputVolume(
+    peerIdentityId: string,
+    volume: number,
+  ): void {
+    const gain = this.remoteAudioGains.get(peerIdentityId);
+
+    if (!gain) return;
+
+    gain.gain.setValueAtTime(
+      graphAudioVolume(volume, this.deafened),
+      this.remoteAudioContexts.get(peerIdentityId)?.currentTime ?? 0,
+    );
+    void this.remoteAudioContexts
+      .get(peerIdentityId)
+      ?.resume()
+      .catch(() => undefined);
+  }
+
+  private resetRemoteAudioOutput(peerIdentityId: string): void {
+    this.remoteAudioOutputSources.get(peerIdentityId)?.disconnect();
+    void this.remoteAudioContexts
+      .get(peerIdentityId)
+      ?.close()
+      .catch(() => undefined);
+    this.remoteAudioOutputSources.delete(peerIdentityId);
+    this.remoteAudioGains.delete(peerIdentityId);
+    this.remoteAudioContexts.delete(peerIdentityId);
+    this.remoteAudioOutputStreams.delete(peerIdentityId);
+  }
+
+  private removePeer(peerIdentityId: string): void {
+    this.peers.get(peerIdentityId)?.close();
+    this.peers.delete(peerIdentityId);
+    this.pendingIceCandidates.delete(peerIdentityId);
+    this.peerNegotiationStates.delete(peerIdentityId);
+    this.remoteStreams.delete(peerIdentityId);
+    this.remoteScreenStreams.delete(peerIdentityId);
+    this.remoteScreenStreamIds.delete(peerIdentityId);
+    this.remoteScreenTrackIds.delete(peerIdentityId);
+    this.remoteScreenAudioStreamIds.delete(peerIdentityId);
+    this.remoteScreenAudioTrackIds.delete(peerIdentityId);
+    this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'voice'));
+    this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'screen'));
+  }
+
+  private removeRemoteAudioChannel(audioKey: string): void {
+    this.remoteAudioStreams.delete(audioKey);
+    this.resetRemoteAudioOutput(audioKey);
+    this.removeRemoteAudio(audioKey);
+    this.remoteAudioVolumes.delete(audioKey);
+  }
+
+  private removeRemoteAudio(peerIdentityId: string): void {
+    const audio = this.remoteAudio.get(peerIdentityId);
+
+    if (!audio) return;
+
+    audio.pause();
+    audio.srcObject = null;
+    audio.remove();
+    this.remoteAudio.delete(peerIdentityId);
   }
 
   private async flushIceCandidates(

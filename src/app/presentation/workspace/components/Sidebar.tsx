@@ -49,9 +49,15 @@ interface SidebarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallParticipantScreenShareVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleNoiseCancellation?: () => void;
+  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
 }
 
@@ -65,10 +71,13 @@ export function Sidebar({
   presenceByIdentityId = {},
   nodeNetworks,
   onCallEnd,
+  onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleNoiseCancellation,
+  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onCreate,
   onLogout,
@@ -272,10 +281,15 @@ export function Sidebar({
         session={session}
         activeCall={activeCall}
         onCallEnd={onCallEnd}
+        onCallParticipantScreenShareVolumeChange={
+          onCallParticipantScreenShareVolumeChange
+        }
         onCallParticipantVolumeChange={onCallParticipantVolumeChange}
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
+        onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+        onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
         onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>
