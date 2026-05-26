@@ -159,6 +159,9 @@ export const copy = {
     appearInDiscoveryHelp:
       'Shows this profile in discovery while keeping membership and channels private.',
     assignRoles: 'Assign roles',
+    autoJoin: 'Allow instant join',
+    autoJoinHelp:
+      'People can join immediately from discovery without owner approval.',
     avatar: 'Community avatar',
     banMember: 'Ban',
     banMemberError: 'The member could not be banned.',
@@ -196,6 +199,7 @@ export const copy = {
     discoverHint: 'Search private communities visible on your networks.',
     discoverJoin: 'Request to join',
     discoverJoined: 'Already member',
+    discoverJoinInstantly: 'Join instantly',
     discoverLoading: 'Searching communities...',
     discoverPendingInvitation: 'Invited',
     discoverPendingRequest: 'Requested',

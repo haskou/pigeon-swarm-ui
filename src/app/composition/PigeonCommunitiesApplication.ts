@@ -48,6 +48,7 @@ type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
 };
 
 type CreateCommunityInput = {
+  autoJoinEnabled?: boolean | undefined;
   avatar?: File | null;
   banner?: File | null;
   channels?: Array<{ name: string; type: 'text' | 'voice' }>;
@@ -138,6 +139,7 @@ export class PigeonCommunitiesApplication {
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;
@@ -150,6 +152,7 @@ export class PigeonCommunitiesApplication {
     const bannerCid = await this.resolvePublicImageCid(session, input.banner);
 
     return await this.gateway.updateCommunity(session, communityId, {
+      autoJoinEnabled: input.autoJoinEnabled,
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
@@ -580,6 +583,7 @@ export class PigeonCommunitiesApplication {
     images: CommunityImageCids,
   ): Promise<Community> {
     return await this.gateway.createCommunity(session, {
+      autoJoinEnabled: input.autoJoinEnabled,
       ...(images.avatarCid ? { avatar: images.avatarCid } : {}),
       ...(images.bannerCid ? { banner: images.bannerCid } : {}),
       description: input.description,

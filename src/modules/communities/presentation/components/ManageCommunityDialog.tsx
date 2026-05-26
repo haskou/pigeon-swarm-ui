@@ -33,6 +33,7 @@ import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
+import { CommunityAutoJoinSwitch } from './CommunityAutoJoinSwitch';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
 import {
@@ -73,6 +74,9 @@ export function ManageCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [autoJoinEnabled, setAutoJoinEnabled] = useState(
+    community.autoJoinEnabled ?? false,
+  );
   const [discoverable, setDiscoverable] = useState(
     community.discoverable ?? true,
   );
@@ -718,6 +722,7 @@ export function ManageCommunityDialog({
     avatar !== null ||
     banner !== null ||
     name.trim() !== community.name ||
+    autoJoinEnabled !== (community.autoJoinEnabled ?? false) ||
     description.trim() !== community.description ||
     discoverable !== (community.discoverable ?? true) ||
     visibility !== (community.visibility ?? 'private');
@@ -836,6 +841,7 @@ export function ManageCommunityDialog({
           session,
           community.id,
           {
+            autoJoinEnabled,
             avatar: avatar ?? community.avatar,
             banner: banner ?? community.banner,
             description: description.trim(),
@@ -1042,6 +1048,11 @@ export function ManageCommunityDialog({
                           checked={discoverable}
                           disabled={state === 'loading'}
                           onChange={setDiscoverable}
+                        />
+                        <CommunityAutoJoinSwitch
+                          checked={autoJoinEnabled}
+                          disabled={state === 'loading'}
+                          onChange={setAutoJoinEnabled}
                         />
                         <CommunityVisibilitySelector
                           disabled={state === 'loading'}

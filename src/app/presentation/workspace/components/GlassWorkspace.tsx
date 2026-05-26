@@ -3532,6 +3532,28 @@ export function GlassWorkspace({
                 request,
                 ...current.filter((item) => item.id !== request.id),
               ]);
+
+              if (request.status === 'accepted') {
+                void applicationContainer
+                  .getCommunity(sessionRef.current, request.communityId)
+                  .then((community) => {
+                    setCommunities((current) => [
+                      community,
+                      ...current.filter((item) => item.id !== community.id),
+                    ]);
+                    setActiveCommunityId(community.id);
+                    setWorkspaceMode('community');
+                  })
+                  .catch((caught) =>
+                    setSendError(
+                      toUserErrorMessage(
+                        caught,
+                        copy.communities.membershipError,
+                      ),
+                    ),
+                  );
+              }
+
               setIsCreateCommunityOpen(false);
             }}
             onConversationCreated={handleConversationCreated}

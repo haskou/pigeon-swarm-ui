@@ -23,6 +23,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { CommunityAutoJoinSwitch } from './CommunityAutoJoinSwitch';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
 import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
 
@@ -65,6 +66,7 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [autoJoinEnabled, setAutoJoinEnabled] = useState(false);
   const [discoverable, setDiscoverable] = useState(true);
   const [visibility, setVisibility] =
     useState<CommunityVisibility>('private');
@@ -162,6 +164,7 @@ export function CreateCommunityDialog({
     setError(null);
     try {
       const created = await applicationContainer.createCommunity(session, {
+        autoJoinEnabled,
         avatar,
         banner,
         channels: channels
@@ -317,6 +320,11 @@ export function CreateCommunityDialog({
                 checked={discoverable}
                 disabled={state === 'loading'}
                 onChange={setDiscoverable}
+              />
+              <CommunityAutoJoinSwitch
+                checked={autoJoinEnabled}
+                disabled={state === 'loading'}
+                onChange={setAutoJoinEnabled}
               />
               <CommunityVisibilitySelector
                 disabled={state === 'loading'}

@@ -143,6 +143,7 @@ export class PigeonCommunitiesApi {
   public async create(
     session: Session,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: string;
       banner?: string;
       description: string;
@@ -154,6 +155,9 @@ export class PigeonCommunitiesApi {
   ): Promise<Community> {
     const path = '/communities/';
     const body = {
+      ...(input.autoJoinEnabled !== undefined
+        ? { autoJoinEnabled: input.autoJoinEnabled }
+        : {}),
       ...(input.avatar ? { avatar: input.avatar } : {}),
       ...(input.banner ? { banner: input.banner } : {}),
       description: input.description,
@@ -176,6 +180,7 @@ export class PigeonCommunitiesApi {
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: string;
       banner?: string;
       description?: string;
@@ -186,6 +191,9 @@ export class PigeonCommunitiesApi {
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}`;
     const body = {
+      ...(input.autoJoinEnabled !== undefined
+        ? { autoJoinEnabled: input.autoJoinEnabled }
+        : {}),
       ...(input.avatar ? { avatar: input.avatar } : {}),
       ...(input.banner ? { banner: input.banner } : {}),
       ...(input.description !== undefined

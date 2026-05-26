@@ -83,6 +83,7 @@ export type CommunityMemberRolesResource = {
 };
 
 export type Community = {
+  autoJoinEnabled?: boolean;
   avatar?: string | null;
   bannedMemberIds?: string[];
   banner?: string | null;
@@ -172,6 +173,7 @@ export type CommunityMembershipRequest = {
 };
 
 export type CommunityDiscoveryResource = {
+  autoJoinEnabled?: boolean;
   avatar?: string | null;
   banner?: string | null;
   description: string;

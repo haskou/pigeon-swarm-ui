@@ -507,6 +507,7 @@ export class PigeonApplication {
   public async createCommunity(
     session: Session,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null;
       banner?: File | null;
       channels?: Array<{ name: string; type: 'text' | 'voice' }>;
@@ -528,6 +529,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;

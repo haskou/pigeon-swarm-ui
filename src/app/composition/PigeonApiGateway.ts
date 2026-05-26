@@ -478,6 +478,7 @@ export class PigeonApiGateway {
   public async createCommunity(
     session: Session,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: string;
       banner?: string;
       description: string;
@@ -494,6 +495,7 @@ export class PigeonApiGateway {
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: string;
       banner?: string;
       description?: string;

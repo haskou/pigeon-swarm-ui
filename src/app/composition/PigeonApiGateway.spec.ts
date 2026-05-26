@@ -70,6 +70,7 @@ describe(PigeonApiGateway.name, () => {
 
   it('creates communities with signed metadata payload', async () => {
     const community = {
+      autoJoinEnabled: true,
       avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       createdAt: 1,
@@ -97,6 +98,7 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(
       gateway.createCommunity(session, {
+        autoJoinEnabled: true,
         avatar: 'bafy-avatar',
         banner: 'bafy-banner',
         description: 'Description',
@@ -107,6 +109,7 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(community);
 
     const body = {
+      autoJoinEnabled: true,
       avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       description: 'Description',
@@ -130,6 +133,7 @@ describe(PigeonApiGateway.name, () => {
 
   it('updates community discovery visibility with signed metadata payload', async () => {
     const community = {
+      autoJoinEnabled: true,
       createdAt: 1,
       description: 'Description',
       discoverable: false,
@@ -155,6 +159,7 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(
       gateway.updateCommunity(session, 'community-1', {
+        autoJoinEnabled: true,
         description: 'Description',
         discoverable: false,
         name: 'Mi comunidad',
@@ -162,6 +167,7 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(community);
 
     const body = {
+      autoJoinEnabled: true,
       description: 'Description',
       discoverable: false,
       name: 'Mi comunidad',
