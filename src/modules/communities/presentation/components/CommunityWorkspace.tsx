@@ -69,9 +69,7 @@ import {
   CommunityMentionPanel,
   type CommunityMentionSuggestion,
 } from './communityMentionPanel';
-import {
-  resolveCommunityChannelId,
-} from './communityWorkspaceHelpers';
+import { resolveCommunityChannelId } from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
@@ -98,9 +96,15 @@ interface CommunityWorkspaceProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallParticipantScreenShareVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleNoiseCancellation?: () => void;
+  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
@@ -132,10 +136,13 @@ export function CommunityWorkspace({
   mobileSidebarOpen,
   nodeNetworks,
   onCallEnd,
+  onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleNoiseCancellation,
+  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onChannelSelected,
   onChannelViewed,
@@ -172,10 +179,7 @@ export function CommunityWorkspace({
   );
   const currentRoleIds = useMemo(
     () =>
-      CommunityAccessPolicy.assignedRoleIdsFor(
-        community,
-        session.identity.id,
-      ),
+      CommunityAccessPolicy.assignedRoleIdsFor(community, session.identity.id),
     [community, session.identity.id],
   );
   const accessibleTextChannels = useMemo(
@@ -270,12 +274,16 @@ export function CommunityWorkspace({
     [projectChannelMessages],
   );
   const loadChannelMessages = useCallback(
-    async (channelId: string, beforeMessageId?: string) => {
+    async (
+      channelId: string,
+      beforeMessageId?: string,
+      options: { limit?: number } = {},
+    ) => {
       const result = await applicationContainer.listCommunityChannelMessages(
         session,
         community.id,
         channelId,
-        { beforeMessageId },
+        { beforeMessageId, limit: options.limit },
       );
       const loadedMessages = await projectChannelMessages(
         channelId,
@@ -960,10 +968,15 @@ export function CommunityWorkspace({
               onPresenceChange={onPresenceChange}
               onPresenceStatusSelected={onPresenceStatusSelected}
               onCallEnd={onCallEnd}
+              onCallParticipantScreenShareVolumeChange={
+                onCallParticipantScreenShareVolumeChange
+              }
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
               onCallToggleCamera={onCallToggleCamera}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
+              onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+              onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}

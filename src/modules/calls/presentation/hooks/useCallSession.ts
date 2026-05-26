@@ -40,6 +40,7 @@ type StartCallInput = {
   kind: CallSession['kind'];
   iceConfig: CallIceServerConfig;
   localStream?: MediaStream | null;
+  noiseCancellationEnabled: boolean;
   onSignal: SignalSender;
   participants: CallParticipant[];
   subtitle?: string;
@@ -48,7 +49,12 @@ type StartCallInput = {
 
 type ReconcileCallInput = Omit<
   StartCallInput,
-  'call' | 'currentIdentityId' | 'iceConfig' | 'id' | 'onSignal'
+  | 'call'
+  | 'currentIdentityId'
+  | 'iceConfig'
+  | 'id'
+  | 'noiseCancellationEnabled'
+  | 'onSignal'
 >;
 
 export function useCallSession(): {
@@ -58,9 +64,15 @@ export function useCallSession(): {
   reconcileCall: (call: CallResource, input: ReconcileCallInput) => void;
   startCall: (input: StartCallInput) => Promise<void>;
   setParticipantVolume: (identityId: string, volumePercent: number) => void;
+  setParticipantScreenShareVolume: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
   toggleMute: () => void;
+  toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
+  toggleScreenShareAudio: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalMediaManager(), []);
@@ -106,6 +118,12 @@ export function useCallSession(): {
         const nextCameraEnabled = mediaManager.hasCamera();
         const nextLocalPreviewStream = mediaManager.previewStream();
         const nextScreenSharing = mediaManager.hasScreenShare();
+
+        if (
+          localMediaFlagsChanged(current, nextCameraEnabled, nextScreenSharing)
+        ) {
+          peerManager.setLocalStream(nextLocalPreviewStream ?? null);
+        }
 
         if (
           current.cameraEnabled === nextCameraEnabled &&
@@ -172,8 +190,11 @@ export function useCallSession(): {
       id: input.id,
       kind: input.kind,
       muted: input.localStream === null,
+      noiseCancellationEnabled: input.noiseCancellationEnabled,
       participants: input.participants,
       participantVolumes: {},
+      screenShareAudioEnabled: true,
+      screenShareVolumes: {},
       screenSharing: false,
       startedAt: Date.now(),
       status: 'connecting',
@@ -198,15 +219,21 @@ export function useCallSession(): {
         input.localStream === null
           ? null
           : input.localStream
-            ? mediaManager.useStream(input.localStream)
-            : await mediaManager.startAudio().catch((error): null => {
-                logCallWarning('session:start-call:microphone-unavailable', {
-                  callId: nextCall.id,
-                  error,
-                });
+            ? mediaManager.useStream(input.localStream, {
+                noiseCancellationEnabled: input.noiseCancellationEnabled,
+              })
+            : await mediaManager
+                .startAudio({
+                  noiseCancellationEnabled: input.noiseCancellationEnabled,
+                })
+                .catch((error): null => {
+                  logCallWarning('session:start-call:microphone-unavailable', {
+                    callId: nextCall.id,
+                    error,
+                  });
 
-                return null;
-              });
+                  return null;
+                });
 
       if (!stream) {
         setActiveCall((current) =>
@@ -291,12 +318,19 @@ export function useCallSession(): {
         call,
         participants,
         participantVolumes: current.participantVolumes,
+        screenShareVolumes: current.screenShareVolumes,
         status: reconciledCallStatus(call, current),
       };
     });
 
     const currentIdentityId = currentIdentityIdRef.current;
     const sendSignal = sendSignalRef.current;
+
+    if (currentIdentityId) {
+      peerManager.retainPeers(
+        joinedRemotePeerIdentityIds(call, currentIdentityId),
+      );
+    }
 
     if (!currentIdentityId || !sendSignal || call.status !== 'active') return;
 
@@ -418,6 +452,60 @@ export function useCallSession(): {
     });
   };
 
+  const toggleNoiseCancellation = async (enabled: boolean) => {
+    const current = activeCallRef.current;
+
+    if (!current) {
+      logCallWarning(
+        'session:toggle-noise-cancellation:ignored-no-active-call',
+      );
+
+      return;
+    }
+
+    if (!current.hasMicrophone) {
+      logCallWarning(
+        'session:toggle-noise-cancellation:ignored-no-microphone',
+        {
+          callId: current.id,
+          status: current.status,
+        },
+      );
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? { ...active, noiseCancellationEnabled: enabled }
+          : active,
+      );
+
+      return;
+    }
+
+    try {
+      const stream = await mediaManager.setNoiseCancellationEnabled(enabled);
+
+      peerManager.setLocalStream(stream);
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? localMediaSession(active, {
+              cameraEnabled: mediaManager.hasCamera(),
+              localPreviewStream: stream ?? undefined,
+              noiseCancellationEnabled: enabled,
+              screenShareAudioEnabled: active.screenShareAudioEnabled,
+              screenSharing: mediaManager.hasScreenShare(),
+              screenStream: mediaManager.screenPreviewStream(),
+            })
+          : active,
+      );
+    } catch (error) {
+      logCallError('session:toggle-noise-cancellation:failed', error, {
+        callId: current.id,
+        enabled,
+      });
+
+      throw error;
+    }
+  };
+
   const toggleCamera = async () => {
     const current = activeCallRef.current;
 
@@ -439,6 +527,8 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled,
               localPreviewStream: stream ?? undefined,
+              noiseCancellationEnabled: active.noiseCancellationEnabled,
+              screenShareAudioEnabled: active.screenShareAudioEnabled,
               screenSharing: mediaManager.hasScreenShare(),
               screenStream: mediaManager.screenPreviewStream(),
             })
@@ -463,7 +553,9 @@ export function useCallSession(): {
     try {
       const screenSharing = !current.screenSharing;
       const stream = screenSharing
-        ? await mediaManager.enableScreenShare()
+        ? await mediaManager.enableScreenShare({
+            audioEnabled: current.screenShareAudioEnabled,
+          })
         : mediaManager.disableScreenShare();
 
       peerManager.setLocalStream(stream);
@@ -472,6 +564,8 @@ export function useCallSession(): {
           ? localMediaSession(active, {
               cameraEnabled: mediaManager.hasCamera(),
               localPreviewStream: stream ?? undefined,
+              noiseCancellationEnabled: active.noiseCancellationEnabled,
+              screenShareAudioEnabled: active.screenShareAudioEnabled,
               screenSharing,
               screenStream: mediaManager.screenPreviewStream(),
             })
@@ -480,6 +574,47 @@ export function useCallSession(): {
     } catch (error) {
       logCallError('session:toggle-screen-share:failed', error, {
         callId: current.id,
+      });
+    }
+  };
+
+  const toggleScreenShareAudio = async () => {
+    const current = activeCallRef.current;
+
+    if (!current) {
+      logCallWarning(
+        'session:toggle-screen-share-audio:ignored-no-active-call',
+      );
+
+      return;
+    }
+
+    const screenShareAudioEnabled = !current.screenShareAudioEnabled;
+
+    try {
+      const stream = current.screenSharing
+        ? await mediaManager.enableScreenShare({
+            audioEnabled: screenShareAudioEnabled,
+          })
+        : (mediaManager.previewStream() ?? null);
+
+      if (current.screenSharing) peerManager.setLocalStream(stream);
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? localMediaSession(active, {
+              cameraEnabled: mediaManager.hasCamera(),
+              localPreviewStream: stream ?? undefined,
+              noiseCancellationEnabled: active.noiseCancellationEnabled,
+              screenShareAudioEnabled,
+              screenSharing: mediaManager.hasScreenShare(),
+              screenStream: mediaManager.screenPreviewStream(),
+            })
+          : active,
+      );
+    } catch (error) {
+      logCallError('session:toggle-screen-share-audio:failed', error, {
+        callId: current.id,
+        screenShareAudioEnabled,
       });
     }
   };
@@ -499,16 +634,44 @@ export function useCallSession(): {
     });
   };
 
+  const setParticipantScreenShareVolume = (
+    identityId: string,
+    volumePercent: number,
+  ) => {
+    const current = activeCallRef.current;
+
+    if (current?.currentIdentityId === identityId) {
+      mediaManager.setScreenShareAudioVolume(volumePercent);
+    } else {
+      peerManager.setPeerScreenShareVolume(identityId, volumePercent);
+    }
+
+    setActiveCall((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        screenShareVolumes: {
+          ...current.screenShareVolumes,
+          [identityId]: volumePercent,
+        },
+      };
+    });
+  };
+
   return {
     activeCall,
     endCall,
     receiveSignal,
     reconcileCall,
+    setParticipantScreenShareVolume,
     setParticipantVolume,
     startCall,
     toggleCamera,
     toggleDeafen,
     toggleMute,
+    toggleNoiseCancellation,
+    toggleScreenShareAudio,
     toggleScreenShare,
   };
 
@@ -607,6 +770,28 @@ function reconciledCallStatus(
   return call.status === 'missed' ? 'missed' : 'ended';
 }
 
+function joinedRemotePeerIdentityIds(
+  call: CallResource,
+  currentIdentityId: string,
+): Set<string> {
+  return new Set(
+    call.participants
+      .filter((participant) => participant.status === 'joined')
+      .filter((participant) => participant.identityId !== currentIdentityId)
+      .map((participant) => participant.identityId),
+  );
+}
+
+function localMediaFlagsChanged(
+  call: CallSession,
+  cameraEnabled: boolean,
+  screenSharing: boolean,
+): boolean {
+  return (
+    call.cameraEnabled !== cameraEnabled || call.screenSharing !== screenSharing
+  );
+}
+
 function callSessionForJoinedPeerConnection(
   call: CallResource,
   currentIdentityId: string,
@@ -624,8 +809,11 @@ function callSessionForJoinedPeerConnection(
     id: call.id,
     localPreviewStream: activeCall?.localPreviewStream,
     muted: activeCall?.muted ?? false,
+    noiseCancellationEnabled: activeCall?.noiseCancellationEnabled ?? true,
     participants,
     participantVolumes: activeCall?.participantVolumes ?? {},
+    screenShareAudioEnabled: activeCall?.screenShareAudioEnabled ?? true,
+    screenShareVolumes: activeCall?.screenShareVolumes ?? {},
     screenSharing: activeCall?.screenSharing ?? false,
     startedAt: activeCall?.startedAt ?? Date.now(),
     status: activeCall?.status ?? 'live',
@@ -704,7 +892,11 @@ function localMediaSession(
   call: CallSession,
   media: Pick<
     CallSession,
-    'cameraEnabled' | 'localPreviewStream' | 'screenSharing'
+    | 'cameraEnabled'
+    | 'localPreviewStream'
+    | 'noiseCancellationEnabled'
+    | 'screenShareAudioEnabled'
+    | 'screenSharing'
   > & { screenStream?: MediaStream },
 ): CallSession {
   return {

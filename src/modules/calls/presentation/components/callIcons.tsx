@@ -104,6 +104,60 @@ export function ScreenShareIcon({ active }: { active: boolean }) {
   );
 }
 
+export function ScreenSoundIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v6A2.5 2.5 0 0 1 17.5 15h-11A2.5 2.5 0 0 1 4 12.5v-6Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 20h8M12 15v5M7 9.5h2.5L13 7v6l-3.5-2.5H7v-1Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M16 8.5a2.5 2.5 0 0 1 0 4M18 7a4.5 4.5 0 0 1 0 7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.7"
+      />
+      {!active && <Slash />}
+    </svg>
+  );
+}
+
+export function NoiseCancellationIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M4 13c2.3-5.5 4.7 5.5 7 0s4.7 5.5 9 0"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M4 8c1.4-2.8 2.9 2.8 4.3 0s2.9 2.8 4.3 0"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M16.5 7.5 18 9l2.5-3"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+      {!active && <Slash />}
+    </svg>
+  );
+}
+
 export function HangUpIcon() {
   return (
     <svg

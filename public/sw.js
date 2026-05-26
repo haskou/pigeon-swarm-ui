@@ -123,18 +123,33 @@ self.addEventListener('push', (event) => {
 
   if (!payload) return;
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      badge: payload.badge || '/favicon/favicon-32x32.png',
-      body: payload.body,
-      data: {
-        url: payload.url || '/',
-      },
-      icon: payload.icon || '/favicon/android-chrome-192x192.png',
-      tag: payload.tag,
-    }),
-  );
+  event.waitUntil(showPushNotification(payload));
 });
+
+async function showPushNotification(payload) {
+  if (await hasVisibleWindowClient()) return;
+
+  await self.registration.showNotification(payload.title, {
+    badge: payload.badge || '/favicon/favicon-32x32.png',
+    body: payload.body,
+    data: {
+      url: payload.url || '/',
+    },
+    icon: payload.icon || '/favicon/android-chrome-192x192.png',
+    tag: payload.tag,
+  });
+}
+
+async function hasVisibleWindowClient() {
+  const windowClients = await self.clients.matchAll({
+    includeUncontrolled: true,
+    type: 'window',
+  });
+
+  return windowClients.some(
+    (client) => client.focused || client.visibilityState === 'visible',
+  );
+}
 
 function pushPayload(data) {
   if (!data) {

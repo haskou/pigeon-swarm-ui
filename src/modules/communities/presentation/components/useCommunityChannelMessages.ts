@@ -23,6 +23,7 @@ export type LoadedCommunityChannelMessages = {
 export type LoadCommunityChannelMessages = (
   channelId: string,
   beforeMessageId?: string,
+  options?: { limit?: number },
 ) => Promise<LoadedCommunityChannelMessages>;
 
 type UseCommunityChannelMessagesInput = {
@@ -82,8 +83,7 @@ export function useCommunityChannelMessages({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const keepChannelBottomUntilRef = useRef(0);
-  const messageStateRef =
-    useRef<CommunityChannelMessageLoadState>('idle');
+  const messageStateRef = useRef<CommunityChannelMessageLoadState>('idle');
   const loadChannelMessagesRef = useRef(loadChannelMessages);
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
@@ -206,7 +206,12 @@ export function useCommunityChannelMessages({
       })
       .catch(() => setMessageLoadState('error'))
       .finally(() => setMessageLoadState('idle'));
-  }, [isScrolledNearBottom, messageCursor, selectedChannelId, setMessageLoadState]);
+  }, [
+    isScrolledNearBottom,
+    messageCursor,
+    selectedChannelId,
+    setMessageLoadState,
+  ]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;

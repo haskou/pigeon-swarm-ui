@@ -4,12 +4,14 @@ import { cx } from '../../../../shared/presentation/cx';
 
 export function CallButton({
   active,
+  badge,
   children,
   disabled = false,
   label,
   onClick,
 }: {
   active: boolean;
+  badge?: string;
   children: ReactNode;
   disabled?: boolean;
   label: string;
@@ -21,7 +23,7 @@ export function CallButton({
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
       className={cx(
-        'grid h-9 w-9 place-items-center rounded-2xl transition',
+        'relative grid h-11 w-11 place-items-center rounded-[1.15rem] transition',
         disabled
           ? 'cursor-not-allowed bg-white/5 text-white/30'
           : active
@@ -31,7 +33,12 @@ export function CallButton({
       aria-label={label}
       title={label}
     >
-      {children}
+      <span className="[&>svg]:h-6 [&>svg]:w-6">{children}</span>
+      {badge && (
+        <span className="absolute -bottom-1 -right-1 rounded-full border border-[#151722] bg-emerald-300 px-1.5 text-[0.55rem] font-black leading-4 text-slate-950">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }

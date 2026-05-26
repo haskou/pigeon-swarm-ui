@@ -47,10 +47,13 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   identityPictures = {},
   nodeNetworks,
   onCallEnd,
+  onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleNoiseCancellation,
+  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onLogout,
   onPresenceChange,
@@ -74,9 +77,15 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallParticipantScreenShareVolumeChange?: (
+    identityId: string,
+    volumePercent: number,
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleNoiseCancellation?: () => void;
+  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -165,20 +174,28 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     <div ref={profileRef} className="relative mt-4 shrink-0">
       {activeCall &&
         onCallEnd &&
+        onCallParticipantScreenShareVolumeChange &&
         onCallParticipantVolumeChange &&
         onCallToggleCamera &&
         onCallToggleDeafen &&
         onCallToggleMute &&
+        onCallToggleNoiseCancellation &&
+        onCallToggleScreenShareAudio &&
         onCallToggleScreenShare && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
             <Suspense fallback={null}>
               <GlobalCallBar
                 call={activeCall}
                 onEnd={onCallEnd}
+                onParticipantScreenShareVolumeChange={
+                  onCallParticipantScreenShareVolumeChange
+                }
                 onParticipantVolumeChange={onCallParticipantVolumeChange}
                 onToggleCamera={onCallToggleCamera}
                 onToggleDeafen={onCallToggleDeafen}
                 onToggleMute={onCallToggleMute}
+                onToggleNoiseCancellation={onCallToggleNoiseCancellation}
+                onToggleScreenShareAudio={onCallToggleScreenShareAudio}
                 onToggleScreenShare={onCallToggleScreenShare}
               />
             </Suspense>

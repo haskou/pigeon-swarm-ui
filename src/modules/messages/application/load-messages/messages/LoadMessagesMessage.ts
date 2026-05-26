@@ -5,7 +5,7 @@ export class LoadMessagesMessage {
     private readonly input: {
       before?: null | string;
       conversationId: string;
-      options?: { signal?: AbortSignal };
+      options?: { limit?: number; signal?: AbortSignal };
       session: Session;
     },
   ) {}
@@ -18,7 +18,7 @@ export class LoadMessagesMessage {
     return this.input.conversationId;
   }
 
-  public getOptions(): { signal?: AbortSignal } | undefined {
+  public getOptions(): { limit?: number; signal?: AbortSignal } | undefined {
     return this.input.options;
   }
 

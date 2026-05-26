@@ -82,12 +82,15 @@ export type CallSession = {
   conversationId?: string;
   kind: CallKind;
   muted: boolean;
+  noiseCancellationEnabled: boolean;
   hasMicrophone: boolean;
   cameraEnabled: boolean;
   deafened: boolean;
   localPreviewStream?: MediaStream;
   participants: CallParticipant[];
   participantVolumes: Record<string, number>;
+  screenShareAudioEnabled: boolean;
+  screenShareVolumes: Record<string, number>;
   screenSharing: boolean;
   startedAt: number;
   status:

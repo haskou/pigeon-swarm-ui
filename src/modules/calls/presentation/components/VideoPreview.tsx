@@ -18,11 +18,11 @@ export function VideoPreview({
 
     if (!video) return;
 
-    video.srcObject = stream;
+    if (video.srcObject !== stream) video.srcObject = stream;
     void video.play().catch(() => undefined);
 
     return () => {
-      video.srcObject = null;
+      if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
 
