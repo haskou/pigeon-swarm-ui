@@ -1,10 +1,11 @@
 import type { CopyOverrides } from './en';
 
-import { enCopy } from './en';
-import { esCopy } from './es';
+import { en } from './en';
+import { es } from './es';
 import { getInitialLanguage } from './language';
 
-export const copy = getInitialLanguage() === 'es' ? mergeCopy(enCopy, esCopy) : enCopy;
+export const copy =
+  getInitialLanguage() === 'es' ? mergeCopy(en, es) : en;
 
 function mergeCopy<T extends Record<string, unknown>>(
   base: T,

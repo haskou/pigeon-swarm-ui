@@ -1,6 +1,6 @@
 import type { Copy, CopyOverrides } from './en';
 
-export const esCopy = {
+export const es = {
   app: {
     loading: 'Cargando...',
   },

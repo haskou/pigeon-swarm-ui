@@ -1,4 +1,4 @@
-export const enCopy = {
+export const en = {
   app: {
     loading: 'Loading...',
   },
@@ -762,7 +762,7 @@ export const enCopy = {
   },
 } as const;
 
-export type Copy = typeof enCopy;
+export type Copy = typeof en;
 export type CopyOverrides<T> = {
   [K in keyof T]?: T[K] extends string ? string : CopyOverrides<T[K]>;
 };
