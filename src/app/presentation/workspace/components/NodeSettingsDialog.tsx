@@ -96,22 +96,15 @@ export function NodeSettingsDialog({
     };
   }, [node?.owner, session.identity]);
 
-  const loadReplicationStatus = async () => {
-    setReplicationError(null);
-    setReplicationLoading(true);
-    try {
-      setReplicationStatus(
-        await applicationContainer.getIpfsReplicationStatus(session),
-      );
-    } catch (caught) {
-      setReplicationError(
-        toUserErrorMessage(caught, copy.nodeSettings.replicationError),
-      );
-    }
-    setReplicationLoading(false);
-  };
-
   useEffect(() => {
+    if (!isOwner) {
+      setReplicationError(null);
+      setReplicationLoading(false);
+      setReplicationStatus(null);
+
+      return undefined;
+    }
+
     let cancelled = false;
 
     const load = async () => {
@@ -137,7 +130,7 @@ export function NodeSettingsDialog({
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [isOwner, session]);
 
   const handleClaim = async () => {
     setError(null);
@@ -391,11 +384,13 @@ export function NodeSettingsDialog({
           )}
         </div>
 
-        <ReplicationStatusPanel
-          error={replicationError}
-          loading={replicationLoading}
-          status={replicationStatus}
-        />
+        {isOwner && (
+          <ReplicationStatusPanel
+            error={replicationError}
+            loading={replicationLoading}
+            status={replicationStatus}
+          />
+        )}
       </section>
     </div>,
     document.body,
