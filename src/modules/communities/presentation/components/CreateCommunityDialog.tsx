@@ -23,9 +23,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { CommunityAutoJoinSwitch } from './CommunityAutoJoinSwitch';
-import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
-import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
+import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -316,20 +314,14 @@ export function CreateCommunityDialog({
                   {copy.communities.createBody}
                 </p>
               </div>
-              <CommunityDiscoverySwitch
-                checked={discoverable}
+              <CommunityPublicSettingsPanel
+                autoJoinEnabled={autoJoinEnabled}
+                discoverable={discoverable}
                 disabled={state === 'loading'}
-                onChange={setDiscoverable}
-              />
-              <CommunityAutoJoinSwitch
-                checked={autoJoinEnabled}
-                disabled={state === 'loading'}
-                onChange={setAutoJoinEnabled}
-              />
-              <CommunityVisibilitySelector
-                disabled={state === 'loading'}
-                onChange={setVisibility}
-                value={visibility}
+                onAutoJoinChange={setAutoJoinEnabled}
+                onDiscoverableChange={setDiscoverable}
+                onVisibilityChange={setVisibility}
+                visibility={visibility}
               />
             </div>
 

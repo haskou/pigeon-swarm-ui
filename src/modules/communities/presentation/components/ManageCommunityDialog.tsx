@@ -33,9 +33,7 @@ import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
-import { CommunityAutoJoinSwitch } from './CommunityAutoJoinSwitch';
-import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
-import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
+import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 import {
   ManagedCommunityChannels,
   type ManagedCommunityChannel,
@@ -1044,20 +1042,15 @@ export function ManageCommunityDialog({
                           }
                           className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                         />
-                        <CommunityDiscoverySwitch
-                          checked={discoverable}
+                        <CommunityPublicSettingsPanel
+                          autoJoinEnabled={autoJoinEnabled}
+                          discoverable={discoverable}
                           disabled={state === 'loading'}
-                          onChange={setDiscoverable}
-                        />
-                        <CommunityAutoJoinSwitch
-                          checked={autoJoinEnabled}
-                          disabled={state === 'loading'}
-                          onChange={setAutoJoinEnabled}
-                        />
-                        <CommunityVisibilitySelector
-                          disabled={state === 'loading'}
-                          onChange={setVisibility}
-                          value={visibility}
+                          framed={false}
+                          onAutoJoinChange={setAutoJoinEnabled}
+                          onDiscoverableChange={setDiscoverable}
+                          onVisibilityChange={setVisibility}
+                          visibility={visibility}
                         />
                       </div>
                     </div>
