@@ -566,17 +566,16 @@ export const copy = {
     error: 'Node settings could not be updated.',
     join: 'Join network',
     joinLabel: 'Join with network code',
-    missingNetworkKey:
-      'This network cannot be shared because the API did not return its private key.',
     networks: 'Node networks',
     nodeId: 'Node ID',
     open: 'Open node settings',
     owner: 'Owner',
     ownerOnly:
       'Only the node owner can manage networks and share network codes.',
+    privateNetwork: 'Private network',
     publicNetworkBody:
       'Adds the fixed public network required by public communities on this node.',
-    publicNetworkReady: 'Public network already available on this node.',
+    publicNetworkName: 'public network',
     removeUnavailable: 'Remove network unavailable in API',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',
@@ -598,7 +597,6 @@ export const copy = {
     replicationTotalSize: 'Total size',
     saving: 'Saving...',
     server: 'Server',
-    shareLabel: 'Share selected network',
     title: 'Node settings',
     unclaimed: 'Unclaimed node',
   },

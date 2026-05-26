@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
@@ -25,6 +25,8 @@ interface NodeSettingsDialogProps {
   session: Session;
 }
 
+const PUBLIC_NETWORK_NAMES = new Set(['public', 'public network']);
+
 export function NodeSettingsDialog({
   networks,
   node,
@@ -35,10 +37,7 @@ export function NodeSettingsDialog({
   useCloseOnEscape(onClose);
 
   const [joinCode, setJoinCode] = useState('');
-  const [selectedNetworkId, setSelectedNetworkId] = useState(
-    networks[0]?.id ?? '',
-  );
-  const [copied, setCopied] = useState(false);
+  const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<'claim' | 'join' | 'public' | null>(
     null,
@@ -51,9 +50,7 @@ export function NodeSettingsDialog({
   const [replicationStatus, setReplicationStatus] =
     useState<IpfsReplicationStatus | null>(null);
   const isOwner = node?.owner === session.identity.id;
-  const hasPublicNetwork = networks.some(
-    (network) => network.name.trim().toLowerCase() === 'public',
-  );
+  const hasPublicNetwork = networks.some(isPublicNodeNetwork);
   const canCreatePublicNetwork =
     !!node && !hasPublicNetwork && (!node.owner || isOwner);
   const ownerProfile = isOwner
@@ -69,19 +66,6 @@ export function NodeSettingsDialog({
       : node?.owner
         ? shortId(node.owner)
         : copy.nodeSettings.claimAvailable;
-  const selectedNetwork = useMemo(
-    () =>
-      networks.find((network) => network.id === selectedNetworkId) ??
-      networks[0],
-    [networks, selectedNetworkId],
-  );
-  const selectedNetworkCode = selectedNetwork?.key?.trim()
-    ? NetworkInviteCode.encode({
-        id: selectedNetwork.id,
-        key: selectedNetwork.key,
-        name: selectedNetwork.name,
-      })
-    : '';
 
   useEffect(() => {
     if (!node?.owner) {
@@ -204,12 +188,18 @@ export function NodeSettingsDialog({
     setLoading(null);
   };
 
-  const copyNetworkCode = async () => {
-    if (!selectedNetworkCode || !navigator.clipboard) return;
+  const copyNetworkCode = async (network: NodeNetwork) => {
+    const code = networkInviteCode(network);
 
-    await navigator.clipboard.writeText(selectedNetworkCode);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    if (!code || !navigator.clipboard) return;
+
+    await navigator.clipboard.writeText(code);
+    setCopiedNetworkId(network.id);
+    window.setTimeout(() => {
+      setCopiedNetworkId((current) =>
+        current === network.id ? null : current,
+      );
+    }, 1800);
   };
 
   return createPortal(
@@ -278,13 +268,14 @@ export function NodeSettingsDialog({
             <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
               {copy.nodeSettings.networks}
             </div>
-            <div className="mb-3 rounded-2xl bg-black/20 p-3">
-              <p className="text-xs leading-relaxed text-white/50">
-                {hasPublicNetwork
-                  ? copy.nodeSettings.publicNetworkReady
-                  : copy.nodeSettings.publicNetworkBody}
-              </p>
-              {canCreatePublicNetwork && (
+            {canCreatePublicNetwork && (
+              <div className="mb-3 rounded-2xl border border-amber-200/20 bg-amber-300/10 p-3">
+                <div className="flex items-start gap-3">
+                  <NetworkLockBadge publicNetwork />
+                  <p className="min-w-0 text-xs leading-relaxed text-amber-50/70">
+                    {copy.nodeSettings.publicNetworkBody}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => void handleCreatePublicNetwork()}
@@ -295,76 +286,64 @@ export function NodeSettingsDialog({
                     ? copy.nodeSettings.saving
                     : copy.nodeSettings.createPublicNetwork}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             <div className="space-y-2">
-              {networks.map((network) => (
-                <div
-                  key={network.id}
-                  className={cx(
-                    'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl p-3 text-left transition',
-                    selectedNetwork?.id === network.id
-                      ? 'bg-white text-slate-950'
-                      : isOwner
-                        ? 'bg-black/25 text-white hover:bg-white/10'
-                        : 'bg-black/25 text-white',
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isOwner) return;
-                      setSelectedNetworkId(network.id);
-                      setCopied(false);
-                    }}
+              {networks.map((network) => {
+                const publicNetwork = isPublicNodeNetwork(network);
+                const inviteCode = networkInviteCode(network);
+
+                return (
+                  <div
+                    key={network.id}
                     className={cx(
-                      'min-w-0 text-left',
-                      !isOwner && 'cursor-default',
+                      'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border p-3 text-left transition',
+                      publicNetwork
+                        ? 'border-amber-200/20 bg-amber-300/10 text-amber-50'
+                        : 'border-emerald-200/15 bg-emerald-300/10 text-white',
                     )}
                   >
-                    <div className="truncate font-black">{network.name}</div>
-                    <div
-                      className={cx(
-                        'truncate text-xs',
-                        selectedNetwork?.id === network.id
-                          ? 'text-slate-500'
-                          : 'text-white/45',
-                      )}
-                    >
-                      {network.id}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <NetworkLockBadge publicNetwork={publicNetwork} />
+                      <div className="min-w-0">
+                        <div className="truncate font-black">
+                          {networkDisplayName(network)}
+                        </div>
+                        <div className="truncate text-xs text-white/45">
+                          {network.id}
+                        </div>
+                      </div>
                     </div>
-                  </button>
-                  {isOwner && (
-                    <button
-                      type="button"
-                      disabled
-                      className={cx(
-                        'grid h-9 w-9 place-items-center rounded-2xl transition disabled:cursor-not-allowed disabled:opacity-55',
-                        selectedNetwork?.id === network.id
-                          ? 'bg-slate-950/10 text-slate-700'
-                          : 'bg-rose-500/10 text-rose-100',
-                      )}
-                      aria-label={copy.nodeSettings.removeUnavailable}
-                      title={copy.nodeSettings.removeUnavailable}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className="h-4 w-4"
-                      >
-                        <path
-                          d="M6 7h12M10 7V5h4v2m-6 3 .5 8h7l.5-8"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="1.8"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
+                    {isOwner && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyNetworkCode(network)}
+                          disabled={!inviteCode}
+                          className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={copy.nodeSettings.copyCode}
+                          title={
+                            copiedNetworkId === network.id
+                              ? copy.profile.copied
+                              : copy.nodeSettings.copyCode
+                          }
+                        >
+                          <CopyIcon copied={copiedNetworkId === network.id} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled
+                          className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label={copy.nodeSettings.removeUnavailable}
+                          title={copy.nodeSettings.removeUnavailable}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -397,23 +376,6 @@ export function NodeSettingsDialog({
                 </button>
               </form>
 
-              <div className="min-w-0 rounded-2xl bg-black/20 p-4">
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                  {copy.nodeSettings.shareLabel}
-                </div>
-                <div className="block max-w-full truncate rounded-2xl bg-black/25 p-3 text-xs text-white/60">
-                  {selectedNetworkCode || copy.nodeSettings.missingNetworkKey}
-                </div>
-                <button
-                  type="button"
-                  onClick={copyNetworkCode}
-                  disabled={!selectedNetworkCode}
-                  className="mt-3 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {copied ? copy.profile.copied : copy.nodeSettings.copyCode}
-                </button>
-              </div>
-
               {error && (
                 <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
                   {error}
@@ -437,6 +399,123 @@ export function NodeSettingsDialog({
       </section>
     </div>,
     document.body,
+  );
+}
+
+function isPublicNodeNetwork(network: NodeNetwork): boolean {
+  return PUBLIC_NETWORK_NAMES.has(network.name.trim().toLowerCase());
+}
+
+function networkDisplayName(network: NodeNetwork): string {
+  return isPublicNodeNetwork(network)
+    ? copy.nodeSettings.publicNetworkName
+    : network.name;
+}
+
+function networkInviteCode(network: NodeNetwork): string {
+  const key = network.key?.trim();
+
+  if (!key) return '';
+
+  return NetworkInviteCode.encode({
+    id: network.id,
+    key,
+    name: network.name,
+  });
+}
+
+function NetworkLockBadge({ publicNetwork }: { publicNetwork: boolean }) {
+  return (
+    <span
+      className={cx(
+        'grid h-9 w-9 shrink-0 place-items-center rounded-2xl border',
+        publicNetwork
+          ? 'border-amber-200/35 bg-amber-300/20 text-amber-200'
+          : 'border-emerald-200/30 bg-emerald-300/15 text-emerald-200',
+      )}
+      aria-label={
+        publicNetwork
+          ? copy.nodeSettings.publicNetworkName
+          : copy.nodeSettings.privateNetwork
+      }
+      title={
+        publicNetwork
+          ? copy.nodeSettings.publicNetworkName
+          : copy.nodeSettings.privateNetwork
+      }
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="h-4 w-4"
+      >
+        <path
+          d="M7.75 10V8.25a4.25 4.25 0 0 1 8.5 0V10m-9 0h9.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5Z"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function CopyIcon({ copied }: { copied: boolean }) {
+  if (copied) {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="h-4 w-4 text-emerald-200"
+      >
+        <path
+          d="m5 12 4 4 10-10"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d="M9 8.5h8.5v10H9zM6.5 15.5V5.5H15"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d="M6 7h12M10 7V5h4v2m-6 3 .5 8h7l.5-8"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
