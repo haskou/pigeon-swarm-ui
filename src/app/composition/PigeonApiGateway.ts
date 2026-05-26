@@ -1496,6 +1496,10 @@ export class PigeonApiGateway {
     await this.node.createNetwork(name, session);
   }
 
+  public async createPublicNetwork(session?: Session): Promise<void> {
+    await this.node.createPublicNetwork(session);
+  }
+
   public async joinNetwork(
     id: string,
     name: string,

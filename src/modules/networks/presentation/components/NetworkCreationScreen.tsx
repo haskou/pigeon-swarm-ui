@@ -9,7 +9,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 
-type NetworkSetupMode = 'create' | 'join';
+type NetworkSetupMode = 'create' | 'join' | 'public';
 
 export function NetworkCreationScreen({
   onNetworkCreated,
@@ -24,6 +24,7 @@ export function NetworkCreationScreen({
   const modeOptions = [
     { label: copy.network.create, value: 'create' },
     { label: copy.network.join, value: 'join' },
+    { label: copy.network.public, value: 'public' },
   ] satisfies Array<{ label: string; value: NetworkSetupMode }>;
 
   const handleSubmit = async (event: FormEvent) => {
@@ -34,7 +35,7 @@ export function NetworkCreationScreen({
     try {
       if (mode === 'create') {
         await applicationContainer.createNetwork(name);
-      } else {
+      } else if (mode === 'join') {
         const invite = NetworkInviteCode.decode(inviteCode);
 
         await applicationContainer.joinNetwork(
@@ -42,6 +43,8 @@ export function NetworkCreationScreen({
           invite.name,
           invite.key,
         );
+      } else {
+        await applicationContainer.createPublicNodeNetwork();
       }
 
       onNetworkCreated();
@@ -101,7 +104,9 @@ export function NetworkCreationScreen({
               <div className="text-sm text-white/55">
                 {mode === 'create'
                   ? copy.network.createBody
-                  : copy.network.joinBody}
+                  : mode === 'join'
+                    ? copy.network.joinBody
+                    : copy.network.publicBody}
               </div>
             </div>
           </div>
@@ -125,7 +130,7 @@ export function NetworkCreationScreen({
                   required
                 />
               </Field>
-            ) : (
+            ) : mode === 'join' ? (
               <>
                 <Field label={copy.network.inviteCodeLabel}>
                   <textarea
@@ -138,6 +143,10 @@ export function NetworkCreationScreen({
                   />
                 </Field>
               </>
+            ) : (
+              <div className="rounded-2xl border border-cyan-200/20 bg-cyan-300/10 p-4 text-sm leading-relaxed text-cyan-50/75">
+                {copy.network.publicHelp}
+              </div>
             )}
           </div>
 
@@ -155,7 +164,9 @@ export function NetworkCreationScreen({
               ? copy.network.loadingSubmit
               : mode === 'create'
                 ? copy.network.createSubmit
-                : copy.network.joinSubmit}
+                : mode === 'join'
+                  ? copy.network.joinSubmit
+                  : copy.network.publicSubmit}
           </button>
         </form>
       </div>

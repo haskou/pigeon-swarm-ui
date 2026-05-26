@@ -76,6 +76,19 @@ export class PigeonNodeApi {
         : undefined,
       method: 'POST',
     });
+    this.invalidateNetworksCache();
+  }
+
+  public async createPublicNetwork(session?: Session): Promise<void> {
+    const path = '/node/networks/public/';
+
+    await this.http.request(path, {
+      headers: session
+        ? await this.signer.headers(session, 'POST', path)
+        : undefined,
+      method: 'POST',
+    });
+    this.invalidateNetworksCache();
   }
 
   public async joinNetwork(
@@ -94,6 +107,7 @@ export class PigeonNodeApi {
         : undefined,
       method: 'POST',
     });
+    this.invalidateNetworksCache();
   }
 
   public async getIpfsReplicationStatus(
@@ -125,5 +139,11 @@ export class PigeonNodeApi {
     this.requestCache.set(key, request);
 
     return await request;
+  }
+
+  private invalidateNetworksCache(): void {
+    for (const key of this.requestCache.keys()) {
+      if (key.startsWith('GET /node/networks/')) this.requestCache.delete(key);
+    }
   }
 }

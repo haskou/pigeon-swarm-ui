@@ -68,6 +68,50 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('creates a public node network anonymously', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.createPublicNetwork()).resolves.toBeUndefined();
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/public/', {
+      headers: undefined,
+      method: 'POST',
+    });
+  });
+
+  it('creates a public node network with owner signature when a session is available', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.createPublicNetwork(session)).resolves.toBeUndefined();
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/node/networks/public/',
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/public/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'POST',
+    });
+  });
+
   it('creates communities with signed metadata payload', async () => {
     const community = {
       autoJoinEnabled: true,

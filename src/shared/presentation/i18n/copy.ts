@@ -546,6 +546,12 @@ export const copy = {
     namePlaceholder: 'My Network',
     networkIdLabel: 'Network ID',
     networkIdPlaceholder: 'Network UUID',
+    public: 'Public network',
+    publicBody:
+      'Create the fixed public network used by public communities on this node.',
+    publicHelp:
+      'The backend generates the network ID and stores it as public. No network key is created or shared.',
+    publicSubmit: 'Create public network',
     title: 'Network configuration',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
@@ -556,6 +562,7 @@ export const copy = {
     copyCode: 'Copy network code',
     create: 'Create network',
     createLabel: 'New network name',
+    createPublicNetwork: 'Add public network',
     error: 'Node settings could not be updated.',
     join: 'Join network',
     joinLabel: 'Join with network code',
@@ -567,6 +574,9 @@ export const copy = {
     owner: 'Owner',
     ownerOnly:
       'Only the node owner can manage networks and share network codes.',
+    publicNetworkBody:
+      'Adds the fixed public network required by public communities on this node.',
+    publicNetworkReady: 'Public network already available on this node.',
     removeUnavailable: 'Remove network unavailable in API',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',

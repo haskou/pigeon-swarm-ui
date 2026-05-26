@@ -81,6 +81,8 @@ import { SendMessageMessage } from '../../modules/messages/application/send-mess
 import { SendMessage } from '../../modules/messages/application/send-message/SendMessage';
 import { CreateNetwork } from '../../modules/networks/application/create-network/CreateNetwork';
 import { CreateNetworkMessage } from '../../modules/networks/application/create-network/messages/CreateNetworkMessage';
+import { CreatePublicNetwork } from '../../modules/networks/application/create-public-network/CreatePublicNetwork';
+import { CreatePublicNetworkMessage } from '../../modules/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
 import { JoinNetwork } from '../../modules/networks/application/join-network/JoinNetwork';
 import { JoinNetworkMessage } from '../../modules/networks/application/join-network/messages/JoinNetworkMessage';
 import {
@@ -177,6 +179,8 @@ export class PigeonApplication {
 
   private readonly createNetworkUseCase: CreateNetwork;
 
+  private readonly createPublicNetworkUseCase: CreatePublicNetwork;
+
   private readonly joinNetworkUseCase: JoinNetwork;
 
   private readonly deleteMessageUseCase: DeleteMessage;
@@ -228,6 +232,10 @@ export class PigeonApplication {
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork({
       create: async (name) => await gateway.createNetwork(name.toString()),
+    });
+    this.createPublicNetworkUseCase = new CreatePublicNetwork({
+      createPublic: async (session) =>
+        await gateway.createPublicNetwork(session),
     });
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
@@ -956,6 +964,12 @@ export class PigeonApplication {
     name: string,
   ): Promise<void> {
     await this.gateway.createNetwork(name, session);
+  }
+
+  public async createPublicNodeNetwork(session?: Session): Promise<void> {
+    await this.createPublicNetworkUseCase.create(
+      new CreatePublicNetworkMessage(session),
+    );
   }
 
   public async joinNetwork(

@@ -40,7 +40,9 @@ export function NodeSettingsDialog({
   );
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<'claim' | 'join' | null>(null);
+  const [loading, setLoading] = useState<'claim' | 'join' | 'public' | null>(
+    null,
+  );
   const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
     node?.owner === session.identity.id ? session.identity : null,
   );
@@ -49,6 +51,11 @@ export function NodeSettingsDialog({
   const [replicationStatus, setReplicationStatus] =
     useState<IpfsReplicationStatus | null>(null);
   const isOwner = node?.owner === session.identity.id;
+  const hasPublicNetwork = networks.some(
+    (network) => network.name.trim().toLowerCase() === 'public',
+  );
+  const canCreatePublicNetwork =
+    !!node && !hasPublicNetwork && (!node.owner || isOwner);
   const ownerProfile = isOwner
     ? session.identity.profile
     : ownerIdentity?.profile;
@@ -181,6 +188,22 @@ export function NodeSettingsDialog({
     setLoading(null);
   };
 
+  const handleCreatePublicNetwork = async () => {
+    if (!canCreatePublicNetwork) return;
+
+    setError(null);
+    setLoading('public');
+    try {
+      await applicationContainer.createPublicNodeNetwork(
+        node?.owner ? session : undefined,
+      );
+      await onNetworksUpdated();
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
+    }
+    setLoading(null);
+  };
+
   const copyNetworkCode = async () => {
     if (!selectedNetworkCode || !navigator.clipboard) return;
 
@@ -254,6 +277,25 @@ export function NodeSettingsDialog({
 
             <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
               {copy.nodeSettings.networks}
+            </div>
+            <div className="mb-3 rounded-2xl bg-black/20 p-3">
+              <p className="text-xs leading-relaxed text-white/50">
+                {hasPublicNetwork
+                  ? copy.nodeSettings.publicNetworkReady
+                  : copy.nodeSettings.publicNetworkBody}
+              </p>
+              {canCreatePublicNetwork && (
+                <button
+                  type="button"
+                  onClick={() => void handleCreatePublicNetwork()}
+                  disabled={loading !== null}
+                  className="mt-3 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {loading === 'public'
+                    ? copy.nodeSettings.saving
+                    : copy.nodeSettings.createPublicNetwork}
+                </button>
+              )}
             </div>
             <div className="space-y-2">
               {networks.map((network) => (
