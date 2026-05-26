@@ -3,6 +3,7 @@ import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
 import type {
   Community,
+  CommunityInviteLinkResource,
   ConversationKeyEntry,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -48,30 +49,42 @@ export function usePendingCommunityInvite({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      const keyEntry = await communityInviteKeyEntry(
+      const invite = await applicationContainer.getCommunityInviteLink(
         pendingCommunityInvite.token,
+      );
+      const keyEntry = await communityInviteKeyEntry(
+        invite,
         pendingCommunityInvite.inviteSecret,
       );
 
-      if (!keyEntry) {
+      if (!keyEntry && invite.encryptedCommunityKey) {
         throw new Error(copy.communities.linkKeyMissing);
       }
 
       let nextSession = sessionRef.current;
+      let acceptedCommunity: Community;
 
-      const accepted =
-        await applicationContainer.acceptCommunityInviteLinkWithKey(
+      if (keyEntry) {
+        const accepted =
+          await applicationContainer.acceptCommunityInviteLinkWithKey(
+            nextSession,
+            pendingCommunityInvite.token,
+            keyEntry,
+          );
+
+        acceptedCommunity = accepted.community;
+        nextSession = {
+          ...nextSession,
+          keychain: accepted.keychain,
+          keychainExternalIdentifier: accepted.keychainExternalIdentifier,
+        };
+      } else {
+        acceptedCommunity = await applicationContainer.acceptCommunityInviteLink(
           nextSession,
           pendingCommunityInvite.token,
-          keyEntry,
         );
+      }
 
-      const acceptedCommunity = accepted.community;
-      nextSession = {
-        ...nextSession,
-        keychain: accepted.keychain,
-        keychainExternalIdentifier: accepted.keychainExternalIdentifier,
-      };
       setSession(nextSession);
 
       setCommunities((current) => [
@@ -97,12 +110,10 @@ export function usePendingCommunityInvite({
 }
 
 async function communityInviteKeyEntry(
-  inviteToken: string,
+  invite: CommunityInviteLinkResource,
   inviteSecret?: string,
 ): Promise<ConversationKeyEntry | undefined> {
   if (!inviteSecret) return undefined;
-
-  const invite = await applicationContainer.getCommunityInviteLink(inviteToken);
 
   if (!invite.encryptedCommunityKey) return undefined;
 

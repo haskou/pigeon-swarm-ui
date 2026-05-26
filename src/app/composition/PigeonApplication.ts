@@ -19,6 +19,7 @@ import type {
   CommunityPermission,
   CommunityRoleResource,
   CommunityTextChannel,
+  CommunityVisibility,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -112,6 +113,29 @@ import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+
+type CommunityChannelMessagePayloadInput =
+  | {
+      encryptedPayload: string;
+      plaintextPayload?: never;
+    }
+  | {
+      encryptedPayload?: never;
+      plaintextPayload: string;
+    };
+
+type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  id?: string;
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
+
+type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
   endpoint: string;
@@ -490,11 +514,12 @@ export class PigeonApplication {
       discoverable?: boolean | undefined;
       name: string;
       networkId: string;
+      visibility?: CommunityVisibility;
     },
   ): Promise<{
     community: Community;
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.create(session, input);
   }
@@ -508,6 +533,7 @@ export class PigeonApplication {
       description?: string;
       discoverable?: boolean | undefined;
       name?: string;
+      visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
     return await this.communities.update(session, communityId, input);
@@ -595,7 +621,7 @@ export class PigeonApplication {
     recipientIdentityId: string,
   ): Promise<{
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.createInvitation(
       session,
@@ -610,10 +636,10 @@ export class PigeonApplication {
     input: { expiresAt?: number; maxUses?: number } = {},
   ): Promise<{
     invite: CommunityInviteLinkResource;
-    inviteSecret: string;
-    keyEntry: ConversationKeyEntry;
+    inviteSecret?: string;
+    keyEntry?: ConversationKeyEntry;
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.createInviteLink(session, communityId, input);
   }
@@ -776,13 +802,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     channelId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      id?: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageInput,
   ): Promise<MessageResource> {
     return await this.communities.createChannelMessage(
       session,
@@ -809,6 +829,36 @@ export class PigeonApplication {
     );
   }
 
+  public async searchCommunityChannelMessages(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.searchChannelMessages(
+      session,
+      communityId,
+      channelId,
+      input,
+    );
+  }
+
+  public async searchCommunityMessages(
+    session: Session,
+    communityId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.searchMessages(session, communityId, input);
+  }
+
   public async deleteCommunityChannelMessage(
     session: Session,
     communityId: string,
@@ -828,12 +878,7 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
     messageId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
     return await this.communities.editChannelMessage(
       session,

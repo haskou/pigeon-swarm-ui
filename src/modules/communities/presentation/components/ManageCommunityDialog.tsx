@@ -9,6 +9,7 @@ import type {
   CommunityModerationLog,
   CommunityPermission,
   CommunityRoleResource,
+  CommunityVisibility,
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -33,6 +34,7 @@ import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
+import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
 import {
   ManagedCommunityChannels,
   type ManagedCommunityChannel,
@@ -73,6 +75,9 @@ export function ManageCommunityDialog({
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [discoverable, setDiscoverable] = useState(
     community.discoverable ?? true,
+  );
+  const [visibility, setVisibility] = useState<CommunityVisibility>(
+    community.visibility ?? 'private',
   );
   const [imageEditor, setImageEditor] = useState<{
     file: File;
@@ -714,7 +719,8 @@ export function ManageCommunityDialog({
     banner !== null ||
     name.trim() !== community.name ||
     description.trim() !== community.description ||
-    discoverable !== (community.discoverable ?? true);
+    discoverable !== (community.discoverable ?? true) ||
+    visibility !== (community.visibility ?? 'private');
   const hasChannelChanges = ManagedCommunityChannels.hasChanges(
     channelDraftInput,
   );
@@ -835,6 +841,7 @@ export function ManageCommunityDialog({
             description: description.trim(),
             discoverable,
             name: name.trim(),
+            visibility,
           },
         );
       }
@@ -1035,6 +1042,11 @@ export function ManageCommunityDialog({
                           checked={discoverable}
                           disabled={state === 'loading'}
                           onChange={setDiscoverable}
+                        />
+                        <CommunityVisibilitySelector
+                          disabled={state === 'loading'}
+                          onChange={setVisibility}
+                          value={visibility}
                         />
                       </div>
                     </div>

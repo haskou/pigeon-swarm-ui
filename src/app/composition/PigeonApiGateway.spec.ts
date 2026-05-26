@@ -1203,11 +1203,13 @@ describe(PigeonApiGateway.name, () => {
     expect(body.privateKey).toBeUndefined();
     expect(body.publicKey).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('PRIVATE KEY');
+    expect(result.inviteSecret).toBeDefined();
+    const inviteSecret = result.inviteSecret;
+
+    if (!inviteSecret) throw new Error('Expected invite secret.');
+
     await expect(
-      decryptCommunityInviteKey(
-        body.encryptedCommunityKey,
-        result.inviteSecret,
-      ),
+      decryptCommunityInviteKey(body.encryptedCommunityKey, inviteSecret),
     ).resolves.toEqual(keyEntry);
   });
 

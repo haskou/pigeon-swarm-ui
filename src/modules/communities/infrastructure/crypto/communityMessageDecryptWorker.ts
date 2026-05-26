@@ -136,6 +136,13 @@ async function projectMessage(
 
   if (message.type === 'call_event') {
     projectedMessage = callEventMessage(base, message);
+  } else if (message.plaintextPayload !== undefined) {
+    projectedMessage = plaintextMessage(
+      request,
+      base,
+      message,
+      message.plaintextPayload,
+    );
   } else if (!message.encryptedPayload) {
     projectedMessage = encryptedError(base, message, request.copy.missingKey);
   } else if (!request.communityKey) {
@@ -153,6 +160,35 @@ async function projectMessage(
   rememberProjectedMessage(cacheKey, projectedMessage);
 
   return projectedMessage;
+}
+
+function plaintextMessage(
+  request: CommunityMessageDecryptRequest,
+  base: Omit<ChatMessage, 'content' | 'encrypted'>,
+  message: MessageResource,
+  plaintextPayload: string,
+): ChatMessage {
+  const payload = parseCommunityChannelPlainPayload(plaintextPayload);
+  const authorIdentityId = payload.authorIdentityId ?? base.authorIdentityId;
+  const isEdited = isEditedCommunityChannelMessage(payload, message);
+
+  return {
+    ...base,
+    attachments: payload.attachments ?? [],
+    authorIdentityId,
+    content: communityChannelMessageContent(payload),
+    edited: base.edited || isEdited,
+    editedAt: communityChannelMessageEditedAt(base, payload, isEdited),
+    encrypted: false,
+    linkPreview: payload.linkPreview,
+    mentions: payload.mentions ?? message.mentions,
+    mine: authorIdentityId === request.currentIdentityId,
+    raw: message,
+    replyPreview: payload.reply,
+    replyToMessageId: payload.replyToMessageId,
+    sticker: payload.sticker,
+    timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
+  };
 }
 
 async function decryptMessage(
@@ -231,6 +267,24 @@ function communityChannelMessageTimestamp(
   if (isEdited) return base.timestamp;
 
   return payload.timestamp ?? base.timestamp;
+}
+
+function parseCommunityChannelPlainPayload(
+  plaintextPayload: string,
+): CommunityChannelPlainPayload {
+  try {
+    const parsed = JSON.parse(plaintextPayload) as unknown;
+
+    if (isRecord(parsed)) return parsed as CommunityChannelPlainPayload;
+  } catch {
+    return { content: plaintextPayload };
+  }
+
+  return { content: plaintextPayload };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 async function decryptCommunityChannelPayload(
@@ -374,7 +428,12 @@ function projectedMessageCacheKey(
     request.channelId,
     request.communityKey?.conversationId ?? 'no-key',
     firstCachePart(message.id, message.messageId),
-    firstCachePart(message.encryptedPayload, message.payload, message.content),
+    firstCachePart(
+      message.encryptedPayload,
+      message.plaintextPayload,
+      message.payload,
+      message.content,
+    ),
     firstCachePart(message.timestamp, message.createdAt),
     firstCachePart(message.replyToMessageId),
     JSON.stringify(message.reactions ?? []),

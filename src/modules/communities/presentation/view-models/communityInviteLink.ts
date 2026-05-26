@@ -7,14 +7,16 @@ const inviteSecretFragmentParam = 'k';
 const communityInvitePathPattern = /^\/invite\/community\/([^/]+)\/?$/;
 
 export function createCommunityInviteUrl(input: {
-  inviteSecret: string;
+  inviteSecret?: string;
   token: string;
 }): string {
   const url = new URL(window.location.href);
 
   url.pathname = `/invite/community/${encodeURIComponent(input.token)}`;
   url.search = '';
-  url.hash = `${inviteSecretFragmentParam}=${input.inviteSecret}`;
+  url.hash = input.inviteSecret
+    ? `${inviteSecretFragmentParam}=${input.inviteSecret}`
+    : '';
 
   return url.toString();
 }

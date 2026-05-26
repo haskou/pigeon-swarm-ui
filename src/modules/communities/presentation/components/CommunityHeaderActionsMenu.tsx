@@ -7,6 +7,7 @@ type CommunityHeaderActionsMenuProps = {
   communityLeaving: boolean;
   hasCommunityKey: boolean;
   open: boolean;
+  showCommunityKeyAction?: boolean;
   onClose: () => void;
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
@@ -17,6 +18,7 @@ export function CommunityHeaderActionsMenu({
   communityLeaving,
   hasCommunityKey,
   open,
+  showCommunityKeyAction = true,
   onClose,
   onCommunityDataOpen,
   onCommunityKeyOpen,
@@ -42,15 +44,17 @@ export function CommunityHeaderActionsMenu({
         >
           {copy.chat.viewData}
         </button>
-        <button
-          type="button"
-          onClick={onCommunityKeyOpen}
-          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-        >
-          {hasCommunityKey
-            ? copy.chat.copyPrivateKey
-            : copy.chat.addPrivateKey}
-        </button>
+        {showCommunityKeyAction ? (
+          <button
+            type="button"
+            onClick={onCommunityKeyOpen}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          >
+            {hasCommunityKey
+              ? copy.chat.copyPrivateKey
+              : copy.chat.addPrivateKey}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onLeaveCommunity}

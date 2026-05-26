@@ -62,6 +62,11 @@ import {
 } from './communityMembersPanel';
 import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 import {
+  CommunityMessageSearchPanel,
+  type CommunityMessageSearchResultItem,
+  type CommunityMessageSearchScope,
+} from './CommunityMessageSearchPanel';
+import {
   CommunityWorkspaceDialogs,
   type CommunityProfileView,
 } from './CommunityWorkspaceDialogs';
@@ -69,7 +74,10 @@ import {
   CommunityMentionPanel,
   type CommunityMentionSuggestion,
 } from './communityMentionPanel';
-import { resolveCommunityChannelId } from './communityWorkspaceHelpers';
+import {
+  mergeChatMessages,
+  resolveCommunityChannelId,
+} from './communityWorkspaceHelpers';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
@@ -234,6 +242,20 @@ export function CommunityWorkspace({
   const [memberOpen, setMemberOpen] = useState(false);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
+  const [messageSearchError, setMessageSearchError] = useState<string | null>(
+    null,
+  );
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [messageSearchResults, setMessageSearchResults] = useState<
+    CommunityMessageSearchResultItem[]
+  >([]);
+  const [messageSearchSearched, setMessageSearchSearched] = useState(false);
+  const [messageSearchScope, setMessageSearchScope] =
+    useState<CommunityMessageSearchScope>('channel');
+  const [messageSearchState, setMessageSearchState] = useState<
+    'idle' | 'loading'
+  >('idle');
   const [profileViewer, setProfileViewer] =
     useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
@@ -245,7 +267,10 @@ export function CommunityWorkspace({
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const communityMessageDecryptWorkerRef =
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
+  const pendingSearchResultRef =
+    useRef<CommunityMessageSearchResultItem | null>(null);
   const communityKey = session.keychain.conversations[community.id];
+  const communityIsPublic = community.visibility === 'public';
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
@@ -341,6 +366,113 @@ export function CommunityWorkspace({
           )
         : [],
     [community.id, polls, selectedChannelId],
+  );
+  const channelNameFor = useCallback(
+    (channelId: string) =>
+      textChannels.find((channel) => channel.id === channelId)?.name ??
+      shortId(channelId),
+    [textChannels],
+  );
+  const scrollToChannelMessage = useCallback(
+    (messageId: string) => {
+      requestAnimationFrame(() => {
+        const element = scrollerRef.current?.querySelector<HTMLElement>(
+          `[data-message-id="${CSS.escape(messageId)}"]`,
+        );
+
+        if (!element) return;
+
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('message-focus-ring');
+        window.setTimeout(
+          () => element.classList.remove('message-focus-ring'),
+          1600,
+        );
+      });
+    },
+    [scrollerRef],
+  );
+  const runCommunityMessageSearch = useCallback(async () => {
+    const query = messageSearchQuery.trim();
+
+    if (!communityIsPublic || !query) return;
+
+    setMessageSearchState('loading');
+    setMessageSearchError(null);
+    setMessageSearchSearched(true);
+    try {
+      const result =
+        messageSearchScope === 'channel' && selectedChannelId
+          ? await applicationContainer.searchCommunityChannelMessages(
+              session,
+              community.id,
+              selectedChannelId,
+              { limit: 20, query },
+            )
+          : await applicationContainer.searchCommunityMessages(
+              session,
+              community.id,
+              { limit: 20, query },
+            );
+      const projectedResults = await Promise.all(
+        result.messages.map(async (message) => {
+          const channelId =
+            message.channelId ?? result.channelId ?? selectedChannelId;
+
+          if (!channelId) return null;
+
+          return {
+            channelId,
+            channelName: channelNameFor(channelId),
+            message: await projectChannelMessage(channelId, message),
+          };
+        }),
+      );
+
+      setMessageSearchResults(
+        projectedResults.filter(
+          (result): result is CommunityMessageSearchResultItem =>
+            Boolean(result),
+        ),
+      );
+    } catch (caught) {
+      setMessageSearchError(
+        toUserErrorMessage(caught, copy.communities.searchMessagesError),
+      );
+      setMessageSearchResults([]);
+    } finally {
+      setMessageSearchState('idle');
+    }
+  }, [
+    channelNameFor,
+    community.id,
+    communityIsPublic,
+    messageSearchQuery,
+    messageSearchScope,
+    projectChannelMessage,
+    selectedChannelId,
+    session,
+  ]);
+  const handleSearchResultClick = useCallback(
+    (result: CommunityMessageSearchResultItem) => {
+      pendingSearchResultRef.current = result;
+
+      if (result.channelId !== selectedChannelId) {
+        handleChannelSelected(result.channelId);
+
+        return;
+      }
+
+      setMessages((current) => mergeChatMessages(current, [result.message]));
+      scrollToChannelMessage(result.message.id);
+      pendingSearchResultRef.current = null;
+    },
+    [
+      handleChannelSelected,
+      scrollToChannelMessage,
+      selectedChannelId,
+      setMessages,
+    ],
   );
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
@@ -496,11 +628,12 @@ export function CommunityWorkspace({
   }, [insertMention, mentionSuggestions]);
   const channelEncryptionReady =
     !!selectedChannel &&
-    !!communityKey &&
-    communityMemberIds.every(
-      (identityId) =>
-        identityId === session.identity.id || memberIdentities[identityId],
-    );
+    (communityIsPublic ||
+      (!!communityKey &&
+        communityMemberIds.every(
+          (identityId) =>
+            identityId === session.identity.id || memberIdentities[identityId],
+        )));
 
   useEffect(
     () => () => {
@@ -517,10 +650,30 @@ export function CommunityWorkspace({
   useEffect(() => {
     onCommunityUpdatedRef.current = onCommunityUpdated;
   }, [onCommunityUpdated]);
-  const channelEncryptionTooltip = channelEncryptionReady
-    ? copy.chat.e2eReady
-    : copy.chat.e2eMissing;
+
+  useEffect(() => {
+    const pending = pendingSearchResultRef.current;
+
+    if (
+      !pending ||
+      selectedChannelId !== pending.channelId ||
+      messageState === 'loading'
+    ) {
+      return;
+    }
+
+    setMessages((current) => mergeChatMessages(current, [pending.message]));
+    scrollToChannelMessage(pending.message.id);
+    pendingSearchResultRef.current = null;
+  }, [messageState, scrollToChannelMessage, selectedChannelId, setMessages]);
+
+  const channelEncryptionTooltip = communityIsPublic
+    ? copy.chat.publicChannel
+    : channelEncryptionReady
+      ? copy.chat.e2eReady
+      : copy.chat.e2eMissing;
   const missingCommunityKey =
+    !communityIsPublic &&
     !communityKey &&
     (!owner ||
       (visibleMessages.length > 0 &&
@@ -902,7 +1055,9 @@ export function CommunityWorkspace({
           <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
             <div className="min-w-0">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.communities.privateCommunity}
+                {communityIsPublic
+                  ? copy.communities.publicCommunity
+                  : copy.communities.privateCommunity}
               </div>
               <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
                 {bannerUrl ? (
@@ -992,6 +1147,7 @@ export function CommunityWorkspace({
           avatarUrl={avatarUrl}
           channelEncryptionReady={channelEncryptionReady}
           channelEncryptionTooltip={channelEncryptionTooltip}
+          channelPublic={communityIsPublic}
           community={community}
           communityLeaveError={communityLeaveError}
           communityMenuOpen={communityMenuOpen}
@@ -999,6 +1155,7 @@ export function CommunityWorkspace({
             <CommunityHeaderActionsMenu
               communityLeaving={communityLeaving}
               hasCommunityKey={!!communityKey}
+              showCommunityKeyAction={!communityIsPublic}
               onClose={() => setCommunityMenuOpen(false)}
               onCommunityDataOpen={() => {
                 setCommunityDataOpen(true);
@@ -1026,7 +1183,40 @@ export function CommunityWorkspace({
           onRealtimeEventsOpen={onRealtimeEventsOpen}
           realtimeStatus={realtimeStatus}
           selectedChannel={selectedChannel}
-        />
+        >
+          {communityIsPublic ? (
+            <button
+              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/70 transition hover:bg-white/15"
+              onClick={() => setMessageSearchOpen((open) => !open)}
+              type="button"
+            >
+              {copy.communities.searchMessages}
+            </button>
+          ) : null}
+        </CommunityHeader>
+
+        {communityIsPublic && messageSearchOpen ? (
+          <CommunityMessageSearchPanel
+            disabled={!selectedChannel && messageSearchScope === 'channel'}
+            error={messageSearchError}
+            onClose={() => setMessageSearchOpen(false)}
+            onQueryChange={(query) => {
+              setMessageSearchQuery(query);
+              setMessageSearchSearched(false);
+            }}
+            onResultClick={handleSearchResultClick}
+            onScopeChange={(scope) => {
+              setMessageSearchScope(scope);
+              setMessageSearchSearched(false);
+            }}
+            onSubmit={() => void runCommunityMessageSearch()}
+            query={messageSearchQuery}
+            results={messageSearchResults}
+            searched={messageSearchSearched}
+            scope={messageSearchScope}
+            state={messageSearchState}
+          />
+        ) : null}
 
         {!selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
@@ -1117,9 +1307,10 @@ export function CommunityWorkspace({
             <Composer
               disabled={
                 messageState === 'loading' ||
-                !communityKey ||
+                (!communityIsPublic && !communityKey) ||
                 !currentPermissions.has('send_messages')
               }
+              defaultEncryptAttachments={!communityIsPublic}
               draft={draft}
               editingMessage={messageComposer.editingMessage}
               error={messageComposer.error}

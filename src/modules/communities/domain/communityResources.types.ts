@@ -25,6 +25,8 @@ export type CommunityInviteLinkResource = {
   uses?: number;
 };
 
+export type CommunityVisibility = 'private' | 'public';
+
 export type CommunityChannelPermissions = {
   visibleRoleIds: string[];
 };
@@ -96,7 +98,7 @@ export type Community = {
   ownerIdentityId: string;
   roles?: CommunityRoleResource[];
   textChannels: CommunityTextChannel[];
-  visibility: 'private';
+  visibility: CommunityVisibility;
   voiceChannels?: CommunityVoiceChannel[];
 };
 
@@ -181,5 +183,5 @@ export type CommunityDiscoveryResource = {
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: 'private';
+  visibility: CommunityVisibility;
 };

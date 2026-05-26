@@ -13,6 +13,7 @@ import {
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 import type {
   Community,
+  CommunityVisibility,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
@@ -23,6 +24,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
+import { CommunityVisibilitySelector } from './CommunityVisibilitySelector';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -64,6 +66,8 @@ export function CreateCommunityDialog({
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [discoverable, setDiscoverable] = useState(true);
+  const [visibility, setVisibility] =
+    useState<CommunityVisibility>('private');
   const [imageEditor, setImageEditor] = useState<{
     file: File;
     shape: 'avatar' | 'banner';
@@ -167,6 +171,7 @@ export function CreateCommunityDialog({
         discoverable,
         name: name.trim(),
         networkId,
+        visibility,
       });
 
       onCreated({
@@ -312,6 +317,11 @@ export function CreateCommunityDialog({
                 checked={discoverable}
                 disabled={state === 'loading'}
                 onChange={setDiscoverable}
+              />
+              <CommunityVisibilitySelector
+                disabled={state === 'loading'}
+                onChange={setVisibility}
+                value={visibility}
               />
             </div>
 
