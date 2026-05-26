@@ -15,13 +15,13 @@ export function CommunityDiscoverySwitch({
   return (
     <label
       className={cx(
-        'flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 p-4',
+        'flex items-start justify-between gap-6 px-0 py-2 text-left',
         disabled
           ? 'cursor-not-allowed opacity-55'
-          : 'cursor-pointer transition hover:bg-white/8',
+          : 'cursor-pointer transition hover:text-white',
       )}
     >
-      <span className="min-w-0">
+      <span className="min-w-0 pt-0.5">
         <span className="block text-sm font-black text-white">
           {copy.communities.appearInDiscovery}
         </span>
@@ -29,7 +29,7 @@ export function CommunityDiscoverySwitch({
           {copy.communities.appearInDiscoveryHelp}
         </span>
       </span>
-      <span className="relative shrink-0">
+      <span className="relative mt-0.5 shrink-0">
         <input
           type="checkbox"
           role="switch"
@@ -45,7 +45,7 @@ export function CommunityDiscoverySwitch({
             'block h-8 w-14 rounded-full border transition peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-200/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-slate-950',
             checked
               ? 'border-cyan-200/55 bg-cyan-300/85'
-              : 'border-white/10 bg-white/12',
+              : 'border-white/10 bg-white/10',
           )}
         >
           <span
