@@ -68,8 +68,108 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('creates a public node network anonymously', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.createPublicNetwork()).resolves.toBeUndefined();
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/public/', {
+      headers: undefined,
+      method: 'POST',
+    });
+  });
+
+  it('creates a public node network with owner signature when a session is available', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.createPublicNetwork(session)).resolves.toBeUndefined();
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/node/networks/public/',
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/public/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'POST',
+    });
+  });
+
+  it('removes a node network anonymously', async () => {
+    const response = {
+      networks: [{ id: 'network-2', key: null, name: 'public' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn(),
+    } as unknown as RequestSigner;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.removeNetwork('network-1')).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledWith('/node/networks/network-1/', {
+      headers: undefined,
+      method: 'DELETE',
+    });
+  });
+
+  it('removes a node network with owner signature when a session is available', async () => {
+    const response = {
+      networks: [{ id: 'network-2', key: 'key', name: 'private' }],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.removeNetwork('network-1', session)).resolves.toBe(
+      response.networks,
+    );
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'DELETE',
+      '/node/networks/network-1/',
+      {},
+    );
+    expect(http.request).toHaveBeenCalledWith('/node/networks/network-1/', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'DELETE',
+    });
+  });
+
   it('creates communities with signed metadata payload', async () => {
     const community = {
+      autoJoinEnabled: true,
       avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       createdAt: 1,
@@ -97,6 +197,7 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(
       gateway.createCommunity(session, {
+        autoJoinEnabled: true,
         avatar: 'bafy-avatar',
         banner: 'bafy-banner',
         description: 'Description',
@@ -107,6 +208,7 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(community);
 
     const body = {
+      autoJoinEnabled: true,
       avatar: 'bafy-avatar',
       banner: 'bafy-banner',
       description: 'Description',
@@ -130,6 +232,7 @@ describe(PigeonApiGateway.name, () => {
 
   it('updates community discovery visibility with signed metadata payload', async () => {
     const community = {
+      autoJoinEnabled: true,
       createdAt: 1,
       description: 'Description',
       discoverable: false,
@@ -155,6 +258,7 @@ describe(PigeonApiGateway.name, () => {
 
     await expect(
       gateway.updateCommunity(session, 'community-1', {
+        autoJoinEnabled: true,
         description: 'Description',
         discoverable: false,
         name: 'Mi comunidad',
@@ -162,6 +266,7 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(community);
 
     const body = {
+      autoJoinEnabled: true,
       description: 'Description',
       discoverable: false,
       name: 'Mi comunidad',
@@ -1203,11 +1308,13 @@ describe(PigeonApiGateway.name, () => {
     expect(body.privateKey).toBeUndefined();
     expect(body.publicKey).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('PRIVATE KEY');
+    expect(result.inviteSecret).toBeDefined();
+    const inviteSecret = result.inviteSecret;
+
+    if (!inviteSecret) throw new Error('Expected invite secret.');
+
     await expect(
-      decryptCommunityInviteKey(
-        body.encryptedCommunityKey,
-        result.inviteSecret,
-      ),
+      decryptCommunityInviteKey(body.encryptedCommunityKey, inviteSecret),
     ).resolves.toEqual(keyEntry);
   });
 

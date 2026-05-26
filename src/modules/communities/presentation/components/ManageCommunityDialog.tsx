@@ -32,7 +32,7 @@ import { loadIdentityPicture, loadPublicImage } from './communityImages';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
-import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
+import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 import {
   ManagedCommunityChannels,
   type ManagedCommunityChannel,
@@ -71,6 +71,9 @@ export function ManageCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [autoJoinEnabled, setAutoJoinEnabled] = useState(
+    community.autoJoinEnabled ?? false,
+  );
   const [discoverable, setDiscoverable] = useState(
     community.discoverable ?? true,
   );
@@ -713,6 +716,7 @@ export function ManageCommunityDialog({
     avatar !== null ||
     banner !== null ||
     name.trim() !== community.name ||
+    autoJoinEnabled !== (community.autoJoinEnabled ?? false) ||
     description.trim() !== community.description ||
     discoverable !== (community.discoverable ?? true);
   const hasChannelChanges = ManagedCommunityChannels.hasChanges(
@@ -830,6 +834,7 @@ export function ManageCommunityDialog({
           session,
           community.id,
           {
+            autoJoinEnabled,
             avatar: avatar ?? community.avatar,
             banner: banner ?? community.banner,
             description: description.trim(),
@@ -1031,10 +1036,13 @@ export function ManageCommunityDialog({
                           }
                           className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                         />
-                        <CommunityDiscoverySwitch
-                          checked={discoverable}
+                        <CommunityPublicSettingsPanel
+                          autoJoinEnabled={autoJoinEnabled}
+                          discoverable={discoverable}
                           disabled={state === 'loading'}
-                          onChange={setDiscoverable}
+                          framed={false}
+                          onAutoJoinChange={setAutoJoinEnabled}
+                          onDiscoverableChange={setDiscoverable}
                         />
                       </div>
                     </div>

@@ -107,8 +107,9 @@ export function CommunityDiscoveryDialog({
           item.id === community.id
             ? {
                 ...item,
-                membershipRequest: request,
-                membershipStatus: 'requested',
+              membershipRequest: request,
+                membershipStatus:
+                  request.status === 'accepted' ? 'member' : 'requested',
               }
             : item,
         ),
@@ -251,6 +252,11 @@ function CommunityDiscoveryRow({
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-black text-white/55">
               {community.memberCount} {copy.communities.members}
             </span>
+            {community.autoJoinEnabled && community.membershipStatus === 'none' ? (
+              <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-xs font-black text-amber-100">
+                {copy.communities.discoverJoinInstantly}
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-white/55">
             {community.description}
@@ -285,6 +291,10 @@ function membershipStatusLabel(community: CommunityDiscoveryResource): string {
 
   if (community.membershipStatus === 'invited') {
     return copy.communities.discoverPendingInvitation;
+  }
+
+  if (community.autoJoinEnabled) {
+    return copy.communities.discoverJoinInstantly;
   }
 
   return copy.communities.discoverJoin;

@@ -12,6 +12,7 @@ import type {
   CommunityPermission,
   CommunityRoleResource,
   CommunityTextChannel,
+  CommunityVisibility,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   LocalKeychain,
@@ -22,6 +23,52 @@ import type {
 import { ListCommunities } from '../../modules/communities/application/list-communities/ListCommunities';
 import { ListCommunitiesMessage } from '../../modules/communities/application/list-communities/messages/ListCommunitiesMessage';
 import { PigeonApiGateway } from './PigeonApiGateway';
+
+type CommunityChannelMessagePayloadInput =
+  | {
+      encryptedPayload: string;
+      plaintextPayload?: never;
+    }
+  | {
+      encryptedPayload?: never;
+      plaintextPayload: string;
+    };
+
+type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  id?: string;
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
+
+type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
+
+type CreateCommunityInput = {
+  autoJoinEnabled?: boolean | undefined;
+  avatar?: File | null;
+  banner?: File | null;
+  channels?: Array<{ name: string; type: 'text' | 'voice' }>;
+  description: string;
+  discoverable?: boolean | undefined;
+  name: string;
+  networkId: string;
+  visibility?: CommunityVisibility;
+};
+
+type CreateCommunityResult = {
+  community: Community;
+  keychain: LocalKeychain;
+  keychainExternalIdentifier: null | string;
+};
+
+type CommunityImageCids = {
+  avatarCid?: string;
+  bannerCid?: string;
+};
 
 export class PigeonCommunitiesApplication {
   private readonly listCommunitiesUseCase: ListCommunities;
@@ -64,78 +111,35 @@ export class PigeonCommunitiesApplication {
 
   public async create(
     session: Session,
-    input: {
-      avatar?: File | null;
-      banner?: File | null;
-      channels?: Array<{ name: string; type: 'text' | 'voice' }>;
-      description: string;
-      discoverable?: boolean | undefined;
-      name: string;
-      networkId: string;
-    },
-  ): Promise<{
-    community: Community;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    const avatarCid = input.avatar
-      ? (await this.gateway.uploadPublicFile(session, input.avatar)).cid
-      : undefined;
-    const bannerCid = input.banner
-      ? (await this.gateway.uploadPublicFile(session, input.banner)).cid
-      : undefined;
-
-    const community = await this.gateway.createCommunity(session, {
-      ...(avatarCid ? { avatar: avatarCid } : {}),
-      ...(bannerCid ? { banner: bannerCid } : {}),
-      description: input.description,
-      discoverable: input.discoverable,
-      name: input.name,
-      networkId: input.networkId,
-    });
-    const keyEntry = await this.createCommunityKeyEntry(community.id);
-    const published = await this.gateway.publishKeychain(session, {
-      ...session.keychain,
-      conversations: {
-        ...session.keychain.conversations,
-        [community.id]: keyEntry,
-      },
-    });
-    const channelSession = {
-      ...session,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-    const initialChannels = await this.createInitialChannels(
-      channelSession,
-      community.id,
-      input.channels ?? [],
+    input: CreateCommunityInput,
+  ): Promise<CreateCommunityResult> {
+    const images = await this.uploadCommunityImages(session, input);
+    const community = await this.createCommunityResource(
+      session,
+      input,
+      images,
     );
+    const visibility = community.visibility ?? input.visibility ?? 'private';
 
-    return {
-      community: {
-        ...community,
-        textChannels: [
-          ...community.textChannels,
-          ...initialChannels.textChannels,
-        ],
-        voiceChannels:
-          initialChannels.voiceChannels.length > 0
-            ? [
-                ...(community.voiceChannels ?? []),
-                ...initialChannels.voiceChannels,
-              ]
-            : community.voiceChannels,
-      },
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+    if (visibility === 'public')
+      return await this.createPublicCommunityResult(
+        session,
+        community,
+        input.channels,
+      );
+
+    return await this.createPrivateCommunityResult(
+      session,
+      community,
+      input.channels,
+    );
   }
 
   public async update(
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;
@@ -147,6 +151,7 @@ export class PigeonCommunitiesApplication {
     const bannerCid = await this.resolvePublicImageCid(session, input.banner);
 
     return await this.gateway.updateCommunity(session, communityId, {
+      autoJoinEnabled: input.autoJoinEnabled,
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),
       description: input.description,
@@ -241,7 +246,7 @@ export class PigeonCommunitiesApplication {
     recipientIdentityId: string,
   ): Promise<{
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.gateway.createCommunityInvitation(
       session,
@@ -256,10 +261,10 @@ export class PigeonCommunitiesApplication {
     input: { expiresAt?: number; maxUses?: number } = {},
   ): Promise<{
     invite: CommunityInviteLinkResource;
-    inviteSecret: string;
-    keyEntry: ConversationKeyEntry;
+    inviteSecret?: string;
+    keyEntry?: ConversationKeyEntry;
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.gateway.createCommunityInviteLink(
       session,
@@ -430,13 +435,7 @@ export class PigeonCommunitiesApplication {
     session: Session,
     communityId: string,
     channelId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      id?: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageInput,
   ): Promise<MessageResource> {
     return await this.gateway.createCommunityChannelMessage(
       session,
@@ -463,6 +462,40 @@ export class PigeonCommunitiesApplication {
     );
   }
 
+  public async searchChannelMessages(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.gateway.searchCommunityChannelMessages(
+      session,
+      communityId,
+      channelId,
+      input,
+    );
+  }
+
+  public async searchMessages(
+    session: Session,
+    communityId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.gateway.searchCommunityMessages(
+      session,
+      communityId,
+      input,
+    );
+  }
+
   public async deleteChannelMessage(
     session: Session,
     communityId: string,
@@ -482,12 +515,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     channelId: string,
     messageId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
     return await this.gateway.editCommunityChannelMessage(
       session,
@@ -528,6 +556,111 @@ export class PigeonCommunitiesApplication {
       messageId,
       emoji,
     );
+  }
+
+  private async uploadCommunityImages(
+    session: Session,
+    input: CreateCommunityInput,
+  ): Promise<CommunityImageCids> {
+    const avatarCid = input.avatar
+      ? (await this.gateway.uploadPublicFile(session, input.avatar)).cid
+      : undefined;
+    const bannerCid = input.banner
+      ? (await this.gateway.uploadPublicFile(session, input.banner)).cid
+      : undefined;
+
+    return {
+      ...(avatarCid ? { avatarCid } : {}),
+      ...(bannerCid ? { bannerCid } : {}),
+    };
+  }
+
+  private async createCommunityResource(
+    session: Session,
+    input: CreateCommunityInput,
+    images: CommunityImageCids,
+  ): Promise<Community> {
+    return await this.gateway.createCommunity(session, {
+      autoJoinEnabled: input.autoJoinEnabled,
+      ...(images.avatarCid ? { avatar: images.avatarCid } : {}),
+      ...(images.bannerCid ? { banner: images.bannerCid } : {}),
+      description: input.description,
+      discoverable: input.discoverable,
+      name: input.name,
+      networkId: input.networkId,
+      visibility: input.visibility,
+    });
+  }
+
+  private async createPublicCommunityResult(
+    session: Session,
+    community: Community,
+    channels: CreateCommunityInput['channels'],
+  ): Promise<CreateCommunityResult> {
+    const initialChannels = await this.createInitialChannels(
+      session,
+      community.id,
+      channels ?? [],
+    );
+
+    return {
+      community: this.communityWithInitialChannels(community, initialChannels),
+      keychain: session.keychain,
+      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
+    };
+  }
+
+  private async createPrivateCommunityResult(
+    session: Session,
+    community: Community,
+    channels: CreateCommunityInput['channels'],
+  ): Promise<CreateCommunityResult> {
+    const keyEntry = await this.createCommunityKeyEntry(community.id);
+    const published = await this.gateway.publishKeychain(session, {
+      ...session.keychain,
+      conversations: {
+        ...session.keychain.conversations,
+        [community.id]: keyEntry,
+      },
+    });
+    const initialChannels = await this.createInitialChannels(
+      {
+        ...session,
+        keychain: published.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      },
+      community.id,
+      channels ?? [],
+    );
+
+    return {
+      community: this.communityWithInitialChannels(community, initialChannels),
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
+  private communityWithInitialChannels(
+    community: Community,
+    initialChannels: {
+      textChannels: CommunityTextChannel[];
+      voiceChannels: CommunityVoiceChannel[];
+    },
+  ): Community {
+    return {
+      ...community,
+      textChannels: [
+        ...community.textChannels,
+        ...initialChannels.textChannels,
+      ],
+      voiceChannels:
+        initialChannels.voiceChannels.length > 0
+          ? [
+              ...(community.voiceChannels ?? []),
+              ...initialChannels.voiceChannels,
+            ]
+          : community.voiceChannels,
+    };
   }
 
   private async resolvePublicImageCid(

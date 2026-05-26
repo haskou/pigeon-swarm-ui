@@ -11,6 +11,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { ArchivedNotifications } from '../../infrastructure/storage/ArchivedNotifications';
+import { SeenNotifications } from '../../infrastructure/storage/SeenNotifications';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
@@ -27,6 +28,7 @@ type UseNotificationsInput = {
 };
 
 const archivedNotifications = new ArchivedNotifications();
+const seenNotifications = new SeenNotifications();
 
 export function useNotifications({
   onAccepted,
@@ -39,8 +41,9 @@ export function useNotifications({
   accept: (notification: NotificationResource) => Promise<void>;
   decline: (notificationId: string) => Promise<void>;
   list: NotificationResource[];
-  pendingCount: number;
+  markVisibleAsSeen: () => void;
   refresh: () => Promise<void>;
+  unreadCount: number;
   visible: NotificationResource[];
 } {
   const [notifications, setNotifications] = useState<NotificationResource[]>(
@@ -49,6 +52,9 @@ export function useNotifications({
   const [archivedNotificationIds, setArchivedNotificationIds] = useState<
     string[]
   >(() => archivedNotifications.get(session.identity.id));
+  const [seenNotificationIds, setSeenNotificationIds] = useState<string[]>(
+    () => seenNotifications.get(session.identity.id),
+  );
   const [action, setAction] = useState<NotificationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef(session);
@@ -64,8 +70,10 @@ export function useNotifications({
       ),
     [archivedNotificationIds, notifications],
   );
-  const pendingCount = visible.filter(
-    (notification) => notification.state === 'pending',
+  const unreadCount = visible.filter(
+    (notification) =>
+      notification.status === 'unread' &&
+      !seenNotificationIds.includes(notification.id),
   ).length;
 
   const replaceNotification = useCallback(
@@ -93,6 +101,7 @@ export function useNotifications({
       setArchivedNotificationIds(
         archivedNotifications.get(currentSession.identity.id),
       );
+      setSeenNotificationIds(seenNotifications.get(currentSession.identity.id));
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.notifications.error));
     }
@@ -101,8 +110,22 @@ export function useNotifications({
 
   useEffect(() => {
     setArchivedNotificationIds(archivedNotifications.get(session.identity.id));
+    setSeenNotificationIds(seenNotifications.get(session.identity.id));
     void refresh();
   }, [refresh, session.identity.id]);
+
+  const markVisibleAsSeen = useCallback(() => {
+    const currentSession = sessionRef.current;
+    const unreadIds = visible
+      .filter((notification) => notification.status === 'unread')
+      .map((notification) => notification.id);
+
+    if (unreadIds.length === 0) return;
+
+    setSeenNotificationIds(
+      seenNotifications.markSeen(currentSession.identity.id, unreadIds),
+    );
+  }, [visible]);
 
   const accept = useCallback(
     async (notification: NotificationResource) => {
@@ -196,8 +219,9 @@ export function useNotifications({
     decline,
     error,
     list: notifications,
-    pendingCount,
+    markVisibleAsSeen,
     refresh,
+    unreadCount,
     visible,
   };
 }

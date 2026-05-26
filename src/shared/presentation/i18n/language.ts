@@ -1,10 +1,11 @@
-export type AppLanguage = 'en';
+export type AppLanguage = 'en' | 'es';
 
 const storageKey = 'pigeon-swarm-language';
 const fallbackLanguage: AppLanguage = 'en';
 
 export const languageOptions: Array<{ label: string; value: AppLanguage }> = [
   { label: '🇬🇧 English', value: 'en' },
+  { label: '🇪🇸 Español', value: 'es' },
 ];
 
 export function getInitialLanguage(): AppLanguage {

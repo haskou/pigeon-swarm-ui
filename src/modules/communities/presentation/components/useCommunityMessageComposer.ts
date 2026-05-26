@@ -33,7 +33,10 @@ import { MessageReactions } from '../../../messages/domain/MessageReactions';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { encryptCommunityChannelPayload } from '../../infrastructure/crypto/communityChannelPayloadCipher';
+import {
+  encryptCommunityChannelPayload,
+  serializeCommunityChannelPayload,
+} from '../../infrastructure/crypto/communityChannelPayloadCipher';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 
@@ -92,6 +95,7 @@ export function useCommunityMessageComposer({
   setDraft,
   setMessages,
 }: UseCommunityMessageComposerInput) {
+  const communityIsPublic = community.visibility === 'public';
   const [error, setError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -210,18 +214,25 @@ export function useCommunityMessageComposer({
     try {
       const timestamp = Date.now();
       const linkPreview = await createLinkPreviewForContent(session, content);
-      const encryptedPayload = await encryptCommunityChannelPayload({
+      const payloadInput = {
         attachments: targetMessage.attachments,
         authorIdentityId: session.identity.id,
         channelId,
         communityId: community.id,
-        communityKey: session.keychain.conversations[community.id],
         content,
-        eventType: 'CommunityChannelMessageEdited',
+        eventType: 'CommunityChannelMessageEdited' as const,
         linkPreview,
         mentions,
         timestamp,
-      });
+      };
+      const messagePayload = communityIsPublic
+        ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
+        : {
+            encryptedPayload: await encryptCommunityChannelPayload({
+              ...payloadInput,
+              communityKey: session.keychain.conversations[community.id],
+            }),
+          };
       const edited = await applicationContainer.editCommunityChannelMessage(
         session,
         community.id,
@@ -231,7 +242,7 @@ export function useCommunityMessageComposer({
           attachmentExternalIdentifiers: targetMessage.attachments.map(
             (attachment) => attachment.cid,
           ),
-          encryptedPayload,
+          ...messagePayload,
           mentions,
           timestamp,
         },
@@ -434,12 +445,11 @@ export function useCommunityMessageComposer({
         const linkPreview = payload.sticker
           ? undefined
           : await createLinkPreviewForContent(session, payload.content);
-        const encryptedPayload = await encryptCommunityChannelPayload({
+        const payloadInput = {
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
           channelId: payload.channelId,
           communityId: community.id,
-          communityKey: session.keychain.conversations[community.id],
           content: payload.content,
           linkPreview,
           mentions: payload.mentions,
@@ -447,7 +457,15 @@ export function useCommunityMessageComposer({
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
           timestamp,
-        });
+        };
+        const messagePayload = communityIsPublic
+          ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
+          : {
+              encryptedPayload: await encryptCommunityChannelPayload({
+                ...payloadInput,
+                communityKey: session.keychain.conversations[community.id],
+              }),
+            };
         const created =
           await applicationContainer.createCommunityChannelMessage(
             session,
@@ -457,7 +475,7 @@ export function useCommunityMessageComposer({
               attachmentExternalIdentifiers: messageAttachments.map(
                 (attachment) => attachment.cid,
               ),
-              encryptedPayload,
+              ...messagePayload,
               mentions: payload.mentions,
               timestamp,
             },

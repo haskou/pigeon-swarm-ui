@@ -6,6 +6,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
 
 export class PigeonNodeApi {
@@ -33,15 +34,13 @@ export class PigeonNodeApi {
     });
   }
 
-  public async getNetworks(
-    session?: Session,
-  ): Promise<{ id: string; key?: null | string; name: string }[]> {
+  public async getNetworks(session?: Session): Promise<NodeNetwork[]> {
     const path = '/node/networks/';
     const result = await this.cachedRequest(
       `GET ${path} ${session?.identity.id ?? 'anonymous'}`,
       async () =>
         await this.http.request<{
-          networks: { id: string; key?: null | string; name: string }[];
+          networks: NodeNetwork[];
         }>(path, {
           headers: session
             ? await this.signer.headers(session, 'GET', path)
@@ -76,6 +75,19 @@ export class PigeonNodeApi {
         : undefined,
       method: 'POST',
     });
+    this.invalidateNetworksCache();
+  }
+
+  public async createPublicNetwork(session?: Session): Promise<void> {
+    const path = '/node/networks/public/';
+
+    await this.http.request(path, {
+      headers: session
+        ? await this.signer.headers(session, 'POST', path)
+        : undefined,
+      method: 'POST',
+    });
+    this.invalidateNetworksCache();
   }
 
   public async joinNetwork(
@@ -94,6 +106,25 @@ export class PigeonNodeApi {
         : undefined,
       method: 'POST',
     });
+    this.invalidateNetworksCache();
+  }
+
+  public async removeNetwork(
+    networkId: string,
+    session?: Session,
+  ): Promise<NodeNetwork[]> {
+    const path = `/node/networks/${encodeURIComponent(networkId)}/`;
+    const body = {};
+    const result = await this.http.request<{ networks: NodeNetwork[] }>(path, {
+      headers: session
+        ? await this.signer.headers(session, 'DELETE', path, body)
+        : undefined,
+      method: 'DELETE',
+    });
+
+    this.invalidateNetworksCache();
+
+    return result.networks;
   }
 
   public async getIpfsReplicationStatus(
@@ -125,5 +156,11 @@ export class PigeonNodeApi {
     this.requestCache.set(key, request);
 
     return await request;
+  }
+
+  private invalidateNetworksCache(): void {
+    for (const key of this.requestCache.keys()) {
+      if (key.startsWith('GET /node/networks/')) this.requestCache.delete(key);
+    }
   }
 }

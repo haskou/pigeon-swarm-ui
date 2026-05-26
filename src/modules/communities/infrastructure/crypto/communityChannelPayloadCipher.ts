@@ -24,7 +24,7 @@ export type CommunityChannelPlainPayload = {
   type?: string;
 };
 
-type EncryptCommunityChannelPayloadInput = {
+export type CommunityChannelPayloadInput = {
   attachments: MessageAttachment[];
   authorIdentityId: string;
   channelId: string;
@@ -41,7 +41,7 @@ type EncryptCommunityChannelPayloadInput = {
 };
 
 function communityChannelPayloadType(
-  input: EncryptCommunityChannelPayloadInput,
+  input: CommunityChannelPayloadInput,
 ): string {
   if (input.eventType) return input.eventType;
 
@@ -50,14 +50,10 @@ function communityChannelPayloadType(
   return 'CommunityChannelMessageSent';
 }
 
-export function encryptCommunityChannelPayload(
-  input: EncryptCommunityChannelPayloadInput,
+export function serializeCommunityChannelPayload(
+  input: CommunityChannelPayloadInput,
 ): string {
-  if (!input.communityKey) {
-    throw new Error('Community key is required to encrypt channel messages.');
-  }
-
-  const plaintext = JSON.stringify({
+  return JSON.stringify({
     attachments: input.attachments,
     authorIdentityId: input.authorIdentityId,
     channelId: input.channelId,
@@ -73,6 +69,16 @@ export function encryptCommunityChannelPayload(
     timestamp: input.timestamp,
     type: communityChannelPayloadType(input),
   });
+}
+
+export function encryptCommunityChannelPayload(
+  input: CommunityChannelPayloadInput,
+): string {
+  if (!input.communityKey) {
+    throw new Error('Community key is required to encrypt channel messages.');
+  }
+
+  const plaintext = serializeCommunityChannelPayload(input);
 
   return PublicKey.fromPEM(input.communityKey.publicKey)
     .encrypt(plaintext)

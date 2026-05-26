@@ -13,6 +13,30 @@ export type LightboxImage = {
   url: string;
 };
 
+type PointerPosition = {
+  x: number;
+  y: number;
+};
+
+type PanOffset = {
+  x: number;
+  y: number;
+};
+
+type PanGesture = {
+  pointerId: number;
+  startPan: PanOffset;
+  startX: number;
+  startY: number;
+};
+
+type PinchGesture = {
+  startCenter: PointerPosition;
+  startDistance: number;
+  startPan: PanOffset;
+  startZoom: number;
+};
+
 interface ImageLightboxProps {
   images: LightboxImage[];
   initialIndex: number;
@@ -28,6 +52,11 @@ export function ImageLightbox({
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState<PanOffset>({ x: 0, y: 0 });
+  const [touchGestureActive, setTouchGestureActive] = useState(false);
+  const pointerPositionsRef = useRef<Map<number, PointerPosition>>(new Map());
+  const panRef = useRef<PanGesture | null>(null);
+  const pinchRef = useRef<PinchGesture | null>(null);
   const swipeRef = useRef<{
     dragging: boolean;
     pointerId: number;
@@ -50,7 +79,17 @@ export function ImageLightbox({
 
   useEffect(() => {
     setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setTouchGestureActive(false);
+    pointerPositionsRef.current.clear();
+    panRef.current = null;
+    pinchRef.current = null;
+    swipeRef.current = null;
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (zoom <= 1) setPan({ x: 0, y: 0 });
+  }, [zoom]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -65,7 +104,46 @@ export function ImageLightbox({
   }, [hasNext, hasPrevious]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'touch' || zoom > 1 || images.length < 2) return;
+    if (event.pointerType !== 'touch') return;
+
+    pointerPositionsRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+    setTouchGestureActive(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (pointerPositionsRef.current.size >= 2) {
+      const [first, second] = getActivePointers(pointerPositionsRef.current);
+
+      pinchRef.current = {
+        startCenter: getPointerCenter(first, second),
+        startDistance: Math.max(getPointerDistance(first, second), 1),
+        startPan: pan,
+        startZoom: zoom,
+      };
+      panRef.current = null;
+      swipeRef.current = null;
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    if (zoom > 1) {
+      panRef.current = {
+        pointerId: event.pointerId,
+        startPan: pan,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    if (images.length < 2) return;
 
     swipeRef.current = {
       dragging: false,
@@ -73,9 +151,62 @@ export function ImageLightbox({
       startX: event.clientX,
       startY: event.clientY,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (
+      event.pointerType === 'touch' &&
+      pointerPositionsRef.current.has(event.pointerId)
+    ) {
+      pointerPositionsRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    }
+
+    if (pinchRef.current && pointerPositionsRef.current.size >= 2) {
+      const [first, second] = getActivePointers(pointerPositionsRef.current);
+      const center = getPointerCenter(first, second);
+      const nextZoom = clamp(
+        pinchRef.current.startZoom *
+          (getPointerDistance(first, second) / pinchRef.current.startDistance),
+        1,
+        4,
+      );
+
+      setZoom(nextZoom);
+      setPan(
+        nextZoom <= 1
+          ? { x: 0, y: 0 }
+          : {
+              x:
+                pinchRef.current.startPan.x +
+                center.x -
+                pinchRef.current.startCenter.x,
+              y:
+                pinchRef.current.startPan.y +
+                center.y -
+                pinchRef.current.startCenter.y,
+            },
+      );
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    const panGesture = panRef.current;
+
+    if (panGesture && panGesture.pointerId === event.pointerId && zoom > 1) {
+      setPan({
+        x: panGesture.startPan.x + event.clientX - panGesture.startX,
+        y: panGesture.startPan.y + event.clientY - panGesture.startY,
+      });
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
     const swipe = swipeRef.current;
 
     if (!swipe || swipe.pointerId !== event.pointerId) return;
@@ -90,6 +221,18 @@ export function ImageLightbox({
     }
   };
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      pointerPositionsRef.current.delete(event.pointerId);
+      if (pointerPositionsRef.current.size < 2) pinchRef.current = null;
+      if (pointerPositionsRef.current.size === 0) setTouchGestureActive(false);
+    }
+
+    if (panRef.current?.pointerId === event.pointerId) {
+      panRef.current = null;
+
+      return;
+    }
+
     const swipe = swipeRef.current;
 
     if (!swipe || swipe.pointerId !== event.pointerId) return;
@@ -109,6 +252,14 @@ export function ImageLightbox({
     if (deltaX >= swipeThreshold && hasPrevious) goToPrevious();
   };
   const handlePointerCancel = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      pointerPositionsRef.current.delete(event.pointerId);
+      if (pointerPositionsRef.current.size < 2) pinchRef.current = null;
+      if (pointerPositionsRef.current.size === 0) setTouchGestureActive(false);
+    }
+
+    if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+
     const swipe = swipeRef.current;
 
     if (swipe?.pointerId === event.pointerId) swipeRef.current = null;
@@ -124,7 +275,7 @@ export function ImageLightbox({
       onClick={onClose}
     >
       <div
-        className="relative z-10 flex h-full w-full touch-pan-y items-center justify-center overflow-hidden"
+        className="relative z-10 flex h-full w-full touch-none items-center justify-center overflow-hidden"
         onPointerCancel={handlePointerCancel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -151,15 +302,26 @@ export function ImageLightbox({
           onWheel={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            setZoom((current) =>
-              clamp(current + (event.deltaY < 0 ? 0.18 : -0.18), 1, 4),
-            );
+            setZoom((current) => {
+              const nextZoom = clamp(
+                current + (event.deltaY < 0 ? 0.18 : -0.18),
+                1,
+                4,
+              );
+
+              if (nextZoom <= 1) setPan({ x: 0, y: 0 });
+
+              return nextZoom;
+            });
           }}
           className={cx(
-            'max-h-full max-w-full touch-pan-y select-none object-contain transition-transform',
+            'max-h-full max-w-full touch-none select-none object-contain',
+            touchGestureActive ? '' : 'transition-transform',
             zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in',
           )}
-          style={{ transform: `scale(${zoom})` }}
+          style={{
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+          }}
         />
         {hasNext && (
           <button
@@ -208,4 +370,32 @@ export function ImageLightbox({
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function getActivePointers(
+  positions: Map<number, PointerPosition>,
+): [PointerPosition, PointerPosition] {
+  const pointers = Array.from(positions.values());
+
+  return [
+    pointers[0] ?? { x: 0, y: 0 },
+    pointers[1] ?? { x: 0, y: 0 },
+  ];
+}
+
+function getPointerCenter(
+  first: PointerPosition,
+  second: PointerPosition,
+): PointerPosition {
+  return {
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  };
+}
+
+function getPointerDistance(
+  first: PointerPosition,
+  second: PointerPosition,
+): number {
+  return Math.hypot(first.x - second.x, first.y - second.y);
 }

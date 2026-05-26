@@ -40,6 +40,7 @@ const COMPOSER_MAX_ROWS = 20;
 const LARGE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 interface ComposerProps {
+  defaultEncryptAttachments?: boolean;
   disabled: boolean;
   error: string | null;
   draft: string;
@@ -68,6 +69,7 @@ interface ComposerProps {
 }
 
 export function Composer({
+  defaultEncryptAttachments = true,
   disabled,
   draft,
   editingMessage,
@@ -139,7 +141,8 @@ export function Composer({
     (attachment) => attachment.file.size > LARGE_ATTACHMENT_BYTES,
   );
   const encryptAttachments =
-    attachmentEncryptionPreference ?? !hasLargeAttachments;
+    attachmentEncryptionPreference ??
+    (defaultEncryptAttachments && !hasLargeAttachments);
 
   useEffect(() => {
     setSelectedEmojiIndex(0);

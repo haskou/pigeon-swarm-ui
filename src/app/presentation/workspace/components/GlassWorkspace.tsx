@@ -61,6 +61,7 @@ import {
 } from '../../../../modules/calls/infrastructure/media/callDebugLogger';
 import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
+import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
 import {
@@ -141,6 +142,7 @@ const WorkspaceDialogs = lazy(() =>
     default: module.WorkspaceDialogs,
   })),
 );
+const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PushEnableState = 'error' | 'idle' | 'loading';
@@ -360,6 +362,9 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
+    string[]
+  >(() => seenCommunityMembershipRequests.get(session.identity.id));
   const [pushPermission, setPushPermission] =
     useState<PwaNotificationPermission>(() =>
       currentPwaNotificationPermission(),
@@ -422,6 +427,12 @@ export function GlassWorkspace({
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    setSeenMembershipRequestIds(
+      seenCommunityMembershipRequests.get(session.identity.id),
+    );
+  }, [session.identity.id]);
 
   useEffect(() => {
     setCallNoiseCancellationEnabled(
@@ -651,8 +662,9 @@ export function GlassWorkspace({
     decline: declineNotification,
     error: notificationError,
     list: notificationList,
-    pendingCount: pendingNotificationCount,
+    markVisibleAsSeen: markVisibleNotificationsAsSeen,
     refresh: refreshNotifications,
+    unreadCount: unreadNotificationCount,
     visible: visibleNotifications,
   } = useNotifications({
     onAccepted: handleNotificationAccepted,
@@ -671,15 +683,47 @@ export function GlassWorkspace({
     onCommunitiesReload,
     session,
   });
-  const pendingMembershipRequestCount = useMemo(
+  const actionableMembershipRequests = useMemo(
     () =>
       membershipRequests.filter((request) =>
         canActOnMembershipRequest(request, communities, session.identity.id),
-      ).length,
+      ),
     [communities, membershipRequests, session.identity.id],
   );
+  const unseenMembershipRequestCount = useMemo(
+    () =>
+      actionableMembershipRequests.filter(
+        (request) => !seenMembershipRequestIds.includes(request.id),
+      ).length,
+    [actionableMembershipRequests, seenMembershipRequestIds],
+  );
   const inboxNotificationCount =
-    pendingNotificationCount + pendingMembershipRequestCount;
+    unreadNotificationCount + unseenMembershipRequestCount;
+  const markVisibleMembershipRequestsAsSeen = useCallback(() => {
+    const requestIds = actionableMembershipRequests.map(
+      (request) => request.id,
+    );
+
+    if (requestIds.length === 0) return;
+
+    setSeenMembershipRequestIds(
+      seenCommunityMembershipRequests.markSeen(
+        session.identity.id,
+        requestIds,
+      ),
+    );
+  }, [actionableMembershipRequests, session.identity.id]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    markVisibleNotificationsAsSeen();
+    markVisibleMembershipRequestsAsSeen();
+  }, [
+    markVisibleMembershipRequestsAsSeen,
+    markVisibleNotificationsAsSeen,
+    notificationsOpen,
+  ]);
   const {
     communityAvatarUrls: notificationCommunityAvatarUrls,
     communityPreviews: notificationCommunityPreviews,
@@ -2573,6 +2617,35 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('nodes.')) {
+        if (event.type === 'nodes.v1.node.network.was_removed') {
+          const removedNetworkId = stringAttribute(event, 'networkId');
+
+          if (removedNetworkId) {
+            setConversations((current) =>
+              current.filter(
+                (conversation) => conversation.networkId !== removedNetworkId,
+              ),
+            );
+            setCommunities((current) =>
+              current.filter(
+                (community) => community.networkId !== removedNetworkId,
+              ),
+            );
+
+            if (activeConversation?.networkId === removedNetworkId) {
+              setActiveConversationId(null);
+              setMessages([]);
+              updateMessageCursor(null);
+            }
+
+            if (activeCommunity?.networkId === removedNetworkId) {
+              setActiveCommunityId(null);
+            }
+          }
+
+          void onNodeNetworksReload().catch(() => undefined);
+        }
+
         void onPeersReload().catch(() => undefined);
 
         return;
@@ -3016,8 +3089,10 @@ export function GlassWorkspace({
     },
     [
       activeCommunity?.id,
+      activeCommunity?.networkId,
       activeCommunityChannelId,
       activeConversation?.id,
+      activeConversation?.networkId,
       activeConversationKeyId,
       clearUnreadMessages,
       communities,
@@ -3030,6 +3105,7 @@ export function GlassWorkspace({
       markUnreadMessage,
       mergePresence,
       onCommunitiesReload,
+      onNodeNetworksReload,
       onPeersReload,
       playNotificationSoundIfAllowed,
       refreshConversations,
@@ -3532,6 +3608,28 @@ export function GlassWorkspace({
                 request,
                 ...current.filter((item) => item.id !== request.id),
               ]);
+
+              if (request.status === 'accepted') {
+                void applicationContainer
+                  .getCommunity(sessionRef.current, request.communityId)
+                  .then((community) => {
+                    setCommunities((current) => [
+                      community,
+                      ...current.filter((item) => item.id !== community.id),
+                    ]);
+                    setActiveCommunityId(community.id);
+                    setWorkspaceMode('community');
+                  })
+                  .catch((caught) =>
+                    setSendError(
+                      toUserErrorMessage(
+                        caught,
+                        copy.communities.membershipError,
+                      ),
+                    ),
+                  );
+              }
+
               setIsCreateCommunityOpen(false);
             }}
             onConversationCreated={handleConversationCreated}

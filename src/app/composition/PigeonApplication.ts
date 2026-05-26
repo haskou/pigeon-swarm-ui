@@ -19,6 +19,7 @@ import type {
   CommunityPermission,
   CommunityRoleResource,
   CommunityTextChannel,
+  CommunityVisibility,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ConversationResource,
@@ -80,6 +81,8 @@ import { SendMessageMessage } from '../../modules/messages/application/send-mess
 import { SendMessage } from '../../modules/messages/application/send-message/SendMessage';
 import { CreateNetwork } from '../../modules/networks/application/create-network/CreateNetwork';
 import { CreateNetworkMessage } from '../../modules/networks/application/create-network/messages/CreateNetworkMessage';
+import { CreatePublicNetwork } from '../../modules/networks/application/create-public-network/CreatePublicNetwork';
+import { CreatePublicNetworkMessage } from '../../modules/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
 import { JoinNetwork } from '../../modules/networks/application/join-network/JoinNetwork';
 import { JoinNetworkMessage } from '../../modules/networks/application/join-network/messages/JoinNetworkMessage';
 import {
@@ -92,6 +95,8 @@ import {
   type Peer,
 } from '../../modules/networks/application/list-peers/ListPeers';
 import { ListPeersMessage } from '../../modules/networks/application/list-peers/messages/ListPeersMessage';
+import { RemoveNodeNetworkMessage } from '../../modules/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
+import { RemoveNodeNetwork } from '../../modules/networks/application/remove-node-network/RemoveNodeNetwork';
 import { AcceptConversationInvitation } from '../../modules/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
 import { AcceptConversationInvitationMessage } from '../../modules/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
 import { ListNotifications } from '../../modules/notifications/application/list-notifications/ListNotifications';
@@ -112,6 +117,29 @@ import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+
+type CommunityChannelMessagePayloadInput =
+  | {
+      encryptedPayload: string;
+      plaintextPayload?: never;
+    }
+  | {
+      encryptedPayload?: never;
+      plaintextPayload: string;
+    };
+
+type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  id?: string;
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
+
+type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
+  attachmentExternalIdentifiers?: string[];
+  mentions?: CommunityMessageMention[];
+  timestamp?: number;
+};
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
   endpoint: string;
@@ -153,7 +181,11 @@ export class PigeonApplication {
 
   private readonly createNetworkUseCase: CreateNetwork;
 
+  private readonly createPublicNetworkUseCase: CreatePublicNetwork;
+
   private readonly joinNetworkUseCase: JoinNetwork;
+
+  private readonly removeNodeNetworkUseCase: RemoveNodeNetwork;
 
   private readonly deleteMessageUseCase: DeleteMessage;
 
@@ -205,6 +237,10 @@ export class PigeonApplication {
     this.createNetworkUseCase = new CreateNetwork({
       create: async (name) => await gateway.createNetwork(name.toString()),
     });
+    this.createPublicNetworkUseCase = new CreatePublicNetwork({
+      createPublic: async (session) =>
+        await gateway.createPublicNetwork(session),
+    });
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.editMessageUseCase = new EditMessage(gateway);
@@ -215,6 +251,10 @@ export class PigeonApplication {
           name.toString(),
           key.toString(),
         ),
+    });
+    this.removeNodeNetworkUseCase = new RemoveNodeNetwork({
+      remove: async (networkId, session) =>
+        await gateway.removeNetwork(networkId.toString(), session),
     });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
@@ -483,6 +523,7 @@ export class PigeonApplication {
   public async createCommunity(
     session: Session,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null;
       banner?: File | null;
       channels?: Array<{ name: string; type: 'text' | 'voice' }>;
@@ -490,11 +531,12 @@ export class PigeonApplication {
       discoverable?: boolean | undefined;
       name: string;
       networkId: string;
+      visibility?: CommunityVisibility;
     },
   ): Promise<{
     community: Community;
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.create(session, input);
   }
@@ -503,6 +545,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     input: {
+      autoJoinEnabled?: boolean | undefined;
       avatar?: File | null | string;
       banner?: File | null | string;
       description?: string;
@@ -595,7 +638,7 @@ export class PigeonApplication {
     recipientIdentityId: string,
   ): Promise<{
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.createInvitation(
       session,
@@ -610,10 +653,10 @@ export class PigeonApplication {
     input: { expiresAt?: number; maxUses?: number } = {},
   ): Promise<{
     invite: CommunityInviteLinkResource;
-    inviteSecret: string;
-    keyEntry: ConversationKeyEntry;
+    inviteSecret?: string;
+    keyEntry?: ConversationKeyEntry;
     keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
+    keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.createInviteLink(session, communityId, input);
   }
@@ -776,13 +819,7 @@ export class PigeonApplication {
     session: Session,
     communityId: string,
     channelId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      id?: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageInput,
   ): Promise<MessageResource> {
     return await this.communities.createChannelMessage(
       session,
@@ -809,6 +846,36 @@ export class PigeonApplication {
     );
   }
 
+  public async searchCommunityChannelMessages(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.searchChannelMessages(
+      session,
+      communityId,
+      channelId,
+      input,
+    );
+  }
+
+  public async searchCommunityMessages(
+    session: Session,
+    communityId: string,
+    input: { limit?: number; query: string },
+  ): Promise<{
+    channelId?: string;
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.searchMessages(session, communityId, input);
+  }
+
   public async deleteCommunityChannelMessage(
     session: Session,
     communityId: string,
@@ -828,12 +895,7 @@ export class PigeonApplication {
     communityId: string,
     channelId: string,
     messageId: string,
-    input: {
-      attachmentExternalIdentifiers?: string[];
-      encryptedPayload: string;
-      mentions?: CommunityMessageMention[];
-      timestamp?: number;
-    },
+    input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
     return await this.communities.editChannelMessage(
       session,
@@ -912,6 +974,12 @@ export class PigeonApplication {
     await this.gateway.createNetwork(name, session);
   }
 
+  public async createPublicNodeNetwork(session?: Session): Promise<void> {
+    await this.createPublicNetworkUseCase.create(
+      new CreatePublicNetworkMessage(session),
+    );
+  }
+
   public async joinNetwork(
     id: string,
     name: string,
@@ -929,6 +997,15 @@ export class PigeonApplication {
     key: string,
   ): Promise<void> {
     await this.gateway.joinNetwork(id, name, key, session);
+  }
+
+  public async removeNodeNetwork(
+    networkId: string,
+    session?: Session,
+  ): Promise<NodeNetwork[]> {
+    return await this.removeNodeNetworkUseCase.remove(
+      new RemoveNodeNetworkMessage({ networkId, session }),
+    );
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {

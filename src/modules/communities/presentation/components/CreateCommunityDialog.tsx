@@ -13,6 +13,7 @@ import {
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 import type {
   Community,
+  CommunityVisibility,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
@@ -22,7 +23,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';
+import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -63,7 +64,10 @@ export function CreateCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [autoJoinEnabled, setAutoJoinEnabled] = useState(false);
   const [discoverable, setDiscoverable] = useState(true);
+  const [visibility, setVisibility] =
+    useState<CommunityVisibility>('private');
   const [imageEditor, setImageEditor] = useState<{
     file: File;
     shape: 'avatar' | 'banner';
@@ -158,6 +162,7 @@ export function CreateCommunityDialog({
     setError(null);
     try {
       const created = await applicationContainer.createCommunity(session, {
+        autoJoinEnabled,
         avatar,
         banner,
         channels: channels
@@ -167,6 +172,7 @@ export function CreateCommunityDialog({
         discoverable,
         name: name.trim(),
         networkId,
+        visibility,
       });
 
       onCreated({
@@ -308,10 +314,14 @@ export function CreateCommunityDialog({
                   {copy.communities.createBody}
                 </p>
               </div>
-              <CommunityDiscoverySwitch
-                checked={discoverable}
+              <CommunityPublicSettingsPanel
+                autoJoinEnabled={autoJoinEnabled}
+                discoverable={discoverable}
                 disabled={state === 'loading'}
-                onChange={setDiscoverable}
+                onAutoJoinChange={setAutoJoinEnabled}
+                onDiscoverableChange={setDiscoverable}
+                onVisibilityChange={setVisibility}
+                visibility={visibility}
               />
             </div>
 

@@ -14,6 +14,7 @@ import { LockIcon } from '../../../../app/presentation/workspace/components/Lock
 export function CommunityHeader({
   avatarUrl,
   channelEncryptionReady,
+  channelPublic,
   channelEncryptionTooltip,
   children,
   community,
@@ -29,6 +30,7 @@ export function CommunityHeader({
 }: {
   avatarUrl: null | string;
   channelEncryptionReady: boolean;
+  channelPublic?: boolean;
   channelEncryptionTooltip: string;
   children?: ReactNode;
   community: Community;
@@ -68,12 +70,16 @@ export function CommunityHeader({
         <span
           className={cx(
             'shrink-0',
-            channelEncryptionReady ? 'text-emerald-300' : 'text-rose-300',
+            channelPublic
+              ? 'text-amber-300'
+              : channelEncryptionReady
+                ? 'text-emerald-300'
+                : 'text-rose-300',
           )}
           title={channelEncryptionTooltip}
           aria-label={channelEncryptionTooltip}
         >
-          <LockIcon locked={channelEncryptionReady} />
+          <LockIcon locked={!channelPublic && channelEncryptionReady} />
         </span>
       }
       menuContent={

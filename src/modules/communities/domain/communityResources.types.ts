@@ -25,6 +25,8 @@ export type CommunityInviteLinkResource = {
   uses?: number;
 };
 
+export type CommunityVisibility = 'private' | 'public';
+
 export type CommunityChannelPermissions = {
   visibleRoleIds: string[];
 };
@@ -81,6 +83,7 @@ export type CommunityMemberRolesResource = {
 };
 
 export type Community = {
+  autoJoinEnabled?: boolean;
   avatar?: string | null;
   bannedMemberIds?: string[];
   banner?: string | null;
@@ -96,7 +99,7 @@ export type Community = {
   ownerIdentityId: string;
   roles?: CommunityRoleResource[];
   textChannels: CommunityTextChannel[];
-  visibility: 'private';
+  visibility: CommunityVisibility;
   voiceChannels?: CommunityVoiceChannel[];
 };
 
@@ -170,6 +173,7 @@ export type CommunityMembershipRequest = {
 };
 
 export type CommunityDiscoveryResource = {
+  autoJoinEnabled?: boolean;
   avatar?: string | null;
   banner?: string | null;
   description: string;
@@ -181,5 +185,5 @@ export type CommunityDiscoveryResource = {
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: 'private';
+  visibility: CommunityVisibility;
 };
