@@ -122,7 +122,10 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   };
 
   const changeLanguage = (nextLanguage: string) => {
-    setLanguage(saveLanguage(nextLanguage));
+    const savedLanguage = saveLanguage(nextLanguage);
+
+    setLanguage(savedLanguage);
+    if (savedLanguage !== language) window.location.reload();
   };
 
   useEffect(() => {
