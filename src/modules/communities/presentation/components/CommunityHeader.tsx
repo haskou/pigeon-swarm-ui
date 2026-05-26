@@ -71,7 +71,7 @@ export function CommunityHeader({
           className={cx(
             'shrink-0',
             channelPublic
-              ? 'text-cyan-200'
+              ? 'text-amber-300'
               : channelEncryptionReady
                 ? 'text-emerald-300'
                 : 'text-rose-300',
