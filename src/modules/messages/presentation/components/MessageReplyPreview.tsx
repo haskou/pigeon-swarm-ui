@@ -93,7 +93,7 @@ export function MessageReplyPreview({
         )}
         <span className="min-w-0">
           <span className="block font-black text-white/75">
-            {copy.messages.replyTo}{' '}
+            {copy.messages.replyingTo}{' '}
             {replyAuthorName ?? copy.messages.originalMessage}
           </span>
           {replyPreview ? (
