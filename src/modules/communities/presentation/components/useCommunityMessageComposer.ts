@@ -219,6 +219,8 @@ export function useCommunityMessageComposer({
 
     const timestamp = Date.now();
     const linkPreview = await createLinkPreviewForContent(session, content);
+    const replyToMessageId =
+      message.replyToMessageId ?? message.raw.replyToMessageId;
     const payloadInput = {
       attachments: message.attachments,
       authorIdentityId: session.identity.id,
@@ -228,6 +230,8 @@ export function useCommunityMessageComposer({
       eventType: 'CommunityChannelMessageEdited' as const,
       linkPreview,
       mentions,
+      replyPreview: message.replyPreview,
+      replyToMessageId,
       timestamp,
     };
     const messagePayload = communityIsPublic

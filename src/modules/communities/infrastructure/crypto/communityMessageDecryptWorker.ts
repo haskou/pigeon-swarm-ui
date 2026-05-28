@@ -185,7 +185,7 @@ function plaintextMessage(
     mine: authorIdentityId === request.currentIdentityId,
     raw: message,
     replyPreview: payload.reply,
-    replyToMessageId: payload.replyToMessageId,
+    replyToMessageId: payload.replyToMessageId ?? base.replyToMessageId,
     sticker: payload.sticker,
     timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
   };
@@ -219,7 +219,7 @@ async function decryptMessage(
       mine: authorIdentityId === request.currentIdentityId,
       raw: message,
       replyPreview: payload.reply,
-      replyToMessageId: payload.replyToMessageId,
+      replyToMessageId: payload.replyToMessageId ?? base.replyToMessageId,
       sticker: payload.sticker,
       timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
     };

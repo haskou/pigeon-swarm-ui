@@ -42,7 +42,9 @@ export class MessageTimelineEntries {
   ): MessageTimelineEntry[] {
     const threadSummaries =
       MessageTimelineEntries.threadSummariesByRootMessageId(messages);
-    const rootMessages = messages.filter((message) => !message.replyToMessageId);
+    const rootMessages = messages.filter(
+      (message) => !MessageTimelineEntries.replyToMessageId(message),
+    );
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
       rootMessages.map((message) => [message.id, message]),
@@ -67,13 +69,17 @@ export class MessageTimelineEntries {
         continue;
       }
 
+      const replyToMessageId = MessageTimelineEntries.replyToMessageId(
+        item.message,
+      );
+
       entries.push({
         endsAuthorRun: true,
         id: item.id,
         item,
         previousMessage,
-        replyMessage: item.message.replyToMessageId
-          ? messagesById.get(item.message.replyToMessageId)
+        replyMessage: replyToMessageId
+          ? messagesById.get(replyToMessageId)
           : undefined,
         startsNewAuthorRun: startsAuthorRun(previousMessage, item.message),
         startsNewDay,
@@ -107,32 +113,38 @@ export class MessageTimelineEntries {
     const summaries = new Map<string, MessageThreadSummary>();
 
     for (const message of messages) {
-      if (!message.replyToMessageId) continue;
+      const replyToMessageId = MessageTimelineEntries.replyToMessageId(message);
 
-      const current = summaries.get(message.replyToMessageId);
+      if (!replyToMessageId) continue;
+
+      const current = summaries.get(replyToMessageId);
 
       if (!current) {
-        summaries.set(message.replyToMessageId, {
+        summaries.set(replyToMessageId, {
           count: 1,
           lastMessage: message,
-          rootMessageId: message.replyToMessageId,
+          rootMessageId: replyToMessageId,
         });
 
         continue;
       }
 
-      summaries.set(message.replyToMessageId, {
+      summaries.set(replyToMessageId, {
         count: current.count + 1,
         lastMessage:
           !current.lastMessage ||
           message.timestamp >= current.lastMessage.timestamp
             ? message
             : current.lastMessage,
-        rootMessageId: message.replyToMessageId,
+        rootMessageId: replyToMessageId,
       });
     }
 
     return summaries;
+  }
+
+  private static replyToMessageId(message: ChatMessage): string | undefined {
+    return message.replyToMessageId ?? message.raw.replyToMessageId;
   }
 
   private static startsTimelineDay(
