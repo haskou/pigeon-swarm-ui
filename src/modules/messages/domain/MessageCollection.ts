@@ -1,4 +1,7 @@
-import type { ChatMessage } from '../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  ConversationResource,
+} from '../../../shared/domain/pigeonResources.types';
 
 export class MessageCollection {
   public static lastDelivered(
@@ -23,6 +26,20 @@ export class MessageCollection {
         ? message.timestamp
         : Math.max(latestTimestamp, message.timestamp);
     }, undefined);
+  }
+
+  public static isCaughtUpWithConversation(
+    messages: readonly ChatMessage[],
+    conversation: ConversationResource,
+  ): boolean {
+    if (conversation.latestMessageAt === undefined) return true;
+
+    const latestDeliveredTimestamp = this.latestDeliveredTimestamp(messages);
+
+    return (
+      latestDeliveredTimestamp !== undefined &&
+      latestDeliveredTimestamp >= conversation.latestMessageAt
+    );
   }
 
   public static merge(

@@ -1709,7 +1709,10 @@ export function GlassWorkspace({
 
   const refreshConversations = useCallback(async () => {
     const next = await applicationContainer.listConversations(session);
+
     setConversations(next);
+
+    return next;
   }, [session, setConversations]);
 
   const refreshSession = useCallback(async () => {
@@ -1943,19 +1946,36 @@ export function GlassWorkspace({
     workspaceWasHiddenRef.current = false;
     workspaceResumeSyncAtRef.current = now;
 
-    void refreshConversations().catch(() => undefined);
+    void (async () => {
+      const nextConversations = await refreshConversations().catch(
+        () => null,
+      );
 
-    if (
-      workspaceMode === 'messages' &&
-      activeConversation?.id &&
-      activeConversationKeyId
-    ) {
-      void loadActiveMessages(activeConversation.id);
-    }
+      if (
+        workspaceMode === 'messages' &&
+        activeConversation?.id &&
+        activeConversationKeyId &&
+        nextConversations
+      ) {
+        const nextActiveConversation = nextConversations.find(
+          (conversation) => conversation.id === activeConversation.id,
+        );
 
-    if (workspaceMode === 'community') {
-      void onCommunitiesReload().catch(() => undefined);
-    }
+        if (
+          nextActiveConversation &&
+          !MessageCollection.isCaughtUpWithConversation(
+            messagesRef.current,
+            nextActiveConversation,
+          )
+        ) {
+          await loadActiveMessages(activeConversation.id);
+        }
+      }
+
+      if (workspaceMode === 'community') {
+        await onCommunitiesReload().catch(() => undefined);
+      }
+    })();
   }, [
     activeConversation?.id,
     activeConversationKeyId,
