@@ -9,6 +9,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import type { LightboxImage } from './imageLightbox';
 import { MessageAttachmentPreview } from './MessageAttachmentPreview';
+import { visibleImageAlbumItems } from './visibleImageAlbumItems';
 
 export type IndexedAttachment = {
   attachment: MessageAttachment;
@@ -33,10 +34,7 @@ export function ImageAttachmentAlbum({
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
   const albumRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoadPreviews, setShouldLoadPreviews] = useState(false);
-  const visibleItems = useMemo(
-    () => (items.length > 4 ? items.slice(0, 4) : items),
-    [items],
-  );
+  const visibleItems = useMemo(() => visibleImageAlbumItems(items), [items]);
   const extraCount = items.length > 4 ? items.length - 3 : 0;
   const lightboxImages = items.flatMap(({ attachment }, index) => {
     const url = previewUrls[index];
@@ -82,7 +80,7 @@ export function ImageAttachmentAlbum({
     let cancelled = false;
     const loadedUrls: string[] = [];
 
-    setPreviewUrls(Array(visibleItems.length).fill(null));
+    setPreviewUrls(Array(items.length).fill(null));
     setProgress(null);
 
     if (!shouldLoadPreviews) {
@@ -92,7 +90,7 @@ export function ImageAttachmentAlbum({
     }
 
     void Promise.all(
-      visibleItems.map(({ attachment }, index) =>
+      items.map(({ attachment }, index) =>
         onPreview(attachment, setProgress)
           .then((url) => {
             if (cancelled) {
@@ -120,7 +118,7 @@ export function ImageAttachmentAlbum({
       cancelled = true;
       loadedUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [items, onPreview, shouldLoadPreviews, visibleItems]);
+  }, [items, onPreview, shouldLoadPreviews]);
 
   return (
     <div
