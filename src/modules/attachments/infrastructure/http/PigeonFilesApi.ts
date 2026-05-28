@@ -16,6 +16,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
+import { PublicImageUploadPreparer } from '../media/PublicImageUploadPreparer';
 import { attachmentBlobCacheKey } from './attachmentBlobCacheKey';
 import { PigeonFileRequestCache } from './PigeonFileRequestCache';
 import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
@@ -44,6 +45,10 @@ export class PigeonFilesApi {
     http: HttpJsonClient,
     signer: RequestSigner,
     attachmentCipher: AttachmentCipher = new AttachmentCipher(),
+    private readonly publicImageUploadPreparer: Pick<
+      PublicImageUploadPreparer,
+      'prepare'
+    > = new PublicImageUploadPreparer(),
   ) {
     this.attachmentCipher = attachmentCipher;
     this.privateFiles = new PigeonPrivateFilesClient(http, signer);
@@ -73,13 +78,14 @@ export class PigeonFilesApi {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    const bytes = await file.arrayBuffer();
+    const preparedFile = await this.publicImageUploadPreparer.prepare(file);
+    const bytes = await preparedFile.arrayBuffer();
 
     return await this.publicFiles.upload(
       session,
       bytes,
-      file.name || 'upload',
-      file.type || 'application/octet-stream',
+      preparedFile.name || 'upload',
+      preparedFile.type || 'application/octet-stream',
     );
   }
 
@@ -282,15 +288,21 @@ export class PigeonFilesApi {
     file: File,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment> {
-    if (file.size > ipfsPrivateUploadLimitBytes) {
+    const preparedFile = await this.publicImageUploadPreparer.prepare(file);
+
+    if (preparedFile.size > ipfsPrivateUploadLimitBytes) {
       return await this.uploadPublicChunkedAttachment(
         session,
-        file,
+        preparedFile,
         onProgress,
       );
     }
 
-    return await this.uploadPublicDirectAttachment(session, file, onProgress);
+    return await this.uploadPublicDirectAttachment(
+      session,
+      preparedFile,
+      onProgress,
+    );
   }
 
   private async uploadPublicDirectAttachment(

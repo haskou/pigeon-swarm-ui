@@ -24,14 +24,14 @@ export async function prepareStickerFile(
 ): Promise<{ dimensions: StickerDimensions; file: File }> {
   const originalDimensions = await readMediaDimensions(file);
   const type = stickerTypeFromFile(file);
-  const scaledFile =
-    type === 'static' && dimensionsExceedStickerLimit(originalDimensions)
-      ? await scaleStaticStickerImage(file, originalDimensions)
+  const preparedFile =
+    type === 'static'
+      ? await prepareStaticStickerImage(file, originalDimensions)
       : file;
   const dimensions =
-    scaledFile === file
+    preparedFile === file
       ? originalDimensions
-      : await readMediaDimensions(scaledFile);
+      : await readMediaDimensions(preparedFile);
 
   if (dimensionsExceedStickerLimit(dimensions)) {
     throw new Error(
@@ -41,7 +41,7 @@ export async function prepareStickerFile(
 
   const maxSizeBytes = STICKER_SIZE_LIMITS[type];
 
-  if (scaledFile.size > maxSizeBytes) {
+  if (preparedFile.size > maxSizeBytes) {
     throw new Error(
       `Sticker is too large. ${stickerTypeLabel(type)} stickers can be up to ${formatBytes(maxSizeBytes)}.`,
     );
@@ -49,7 +49,7 @@ export async function prepareStickerFile(
 
   return {
     dimensions,
-    file: scaledFile,
+    file: preparedFile,
   };
 }
 
@@ -67,14 +67,21 @@ function dimensionsExceedStickerLimit(dimensions: StickerDimensions): boolean {
   );
 }
 
-async function scaleStaticStickerImage(
+async function prepareStaticStickerImage(
   file: File,
   dimensions: StickerDimensions,
 ): Promise<File> {
-  const scale = Math.min(
-    STICKER_MAX_EDGE / dimensions.width,
-    STICKER_MAX_EDGE / dimensions.height,
-  );
+  const shouldScale = dimensionsExceedStickerLimit(dimensions);
+  const shouldConvert = file.type !== 'image/webp';
+
+  if (!shouldScale && !shouldConvert) return file;
+
+  const scale = shouldScale
+    ? Math.min(
+        STICKER_MAX_EDGE / dimensions.width,
+        STICKER_MAX_EDGE / dimensions.height,
+      )
+    : 1;
   const width = Math.max(1, Math.round(dimensions.width * scale));
   const height = Math.max(1, Math.round(dimensions.height * scale));
   const image = await loadImage(file);
@@ -89,12 +96,11 @@ async function scaleStaticStickerImage(
   context.imageSmoothingQuality = 'high';
   context.drawImage(image, 0, 0, width, height);
 
-  const contentType = canvasOutputType(file);
-  const blob = await canvasToBlob(canvas, contentType);
+  const blob = await canvasToBlob(canvas, 'image/webp', 0.88);
 
-  return new File([blob], file.name, {
+  return new File([blob], webpFilename(file.name), {
     lastModified: file.lastModified,
-    type: blob.type || contentType,
+    type: 'image/webp',
   });
 }
 
@@ -115,31 +121,32 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-function canvasOutputType(file: File): string {
-  if (file.type === 'image/png') return 'image/png';
-
-  if (file.type === 'image/webp') return 'image/webp';
-
-  if (file.type === 'image/jpeg') return 'image/jpeg';
-
-  return 'image/png';
-}
-
 function canvasToBlob(
   canvas: HTMLCanvasElement,
   contentType: string,
+  quality?: number,
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
 
-        return;
-      }
+          return;
+        }
 
-      reject(new Error('Sticker could not be resized.'));
-    }, contentType);
+        reject(new Error('Sticker could not be resized.'));
+      },
+      contentType,
+      quality,
+    );
   });
+}
+
+function webpFilename(filename: string): string {
+  const basename = filename.replace(/\.[^.]+$/, '') || 'sticker';
+
+  return `${basename}.webp`;
 }
 
 function stickerTypeLabel(type: StickerType): string {
