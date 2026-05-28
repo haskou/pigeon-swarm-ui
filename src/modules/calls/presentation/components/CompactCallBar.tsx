@@ -104,6 +104,7 @@ function areCompactCallBarPropsEqual(
       next.call.screenShareAudioEnabled &&
     previous.call.screenSharing === next.call.screenSharing &&
     previous.call.status === next.call.status &&
+    previous.call.subtitle === next.call.subtitle &&
     previous.call.title === next.call.title &&
     previous.screenParticipant?.identityId ===
       next.screenParticipant?.identityId &&
