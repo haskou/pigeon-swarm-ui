@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AttachmentProgress,
@@ -6,9 +6,9 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { cx } from '../../../../shared/presentation/cx';
 import type { LightboxImage } from './imageLightbox';
+import { MessageAttachmentPreview } from './MessageAttachmentPreview';
 
 export type IndexedAttachment = {
   attachment: MessageAttachment;
@@ -33,7 +33,10 @@ export function ImageAttachmentAlbum({
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
   const albumRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoadPreviews, setShouldLoadPreviews] = useState(false);
-  const visibleItems = items.length > 4 ? items.slice(0, 4) : items;
+  const visibleItems = useMemo(
+    () => (items.length > 4 ? items.slice(0, 4) : items),
+    [items],
+  );
   const extraCount = items.length > 4 ? items.length - 3 : 0;
   const lightboxImages = items.flatMap(({ attachment }, index) => {
     const url = previewUrls[index];
@@ -79,7 +82,7 @@ export function ImageAttachmentAlbum({
     let cancelled = false;
     const loadedUrls: string[] = [];
 
-    setPreviewUrls(Array(items.length).fill(null));
+    setPreviewUrls(Array(visibleItems.length).fill(null));
     setProgress(null);
 
     if (!shouldLoadPreviews) {
@@ -89,7 +92,7 @@ export function ImageAttachmentAlbum({
     }
 
     void Promise.all(
-      items.map(({ attachment }, index) =>
+      visibleItems.map(({ attachment }, index) =>
         onPreview(attachment, setProgress)
           .then((url) => {
             if (cancelled) {
@@ -117,7 +120,7 @@ export function ImageAttachmentAlbum({
       cancelled = true;
       loadedUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [items, onPreview, shouldLoadPreviews]);
+  }, [items, onPreview, shouldLoadPreviews, visibleItems]);
 
   return (
     <div
@@ -207,13 +210,41 @@ export function AttachmentCard({
 }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
+  const [shouldLoadPreview, setShouldLoadPreview] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const hasPreview =
-    !isLargeOrChunkedAttachment(attachment) &&
+    !MessageAttachmentPreview.isLargeOrChunked(attachment) &&
     (attachment.contentType.startsWith('video/') ||
       attachment.contentType.startsWith('audio/'));
 
   useEffect(() => {
-    if (!hasPreview) return undefined;
+    const card = cardRef.current;
+
+    if (!card || shouldLoadPreview || !hasPreview) return undefined;
+
+    if (!('IntersectionObserver' in window)) {
+      setShouldLoadPreview(true);
+
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+
+        setShouldLoadPreview(true);
+        observer.disconnect();
+      },
+      { rootMargin: '360px 0px' },
+    );
+
+    observer.observe(card);
+
+    return () => observer.disconnect();
+  }, [hasPreview, shouldLoadPreview]);
+
+  useEffect(() => {
+    if (!hasPreview || !shouldLoadPreview) return undefined;
 
     let cancelled = false;
 
@@ -233,7 +264,7 @@ export function AttachmentCard({
     return () => {
       cancelled = true;
     };
-  }, [attachment, hasPreview, onPreview]);
+  }, [attachment, hasPreview, onPreview, shouldLoadPreview]);
 
   useEffect(
     () => () => {
@@ -244,6 +275,7 @@ export function AttachmentCard({
 
   return (
     <div
+      ref={cardRef}
       className={cx(
         'overflow-hidden rounded-2xl border text-left transition',
         mine
@@ -308,17 +340,7 @@ export function AttachmentCard({
 }
 
 export function isImageAttachment(attachment: MessageAttachment): boolean {
-  if (isLargeOrChunkedAttachment(attachment)) return false;
-
-  return isBrowserPreviewImage(attachment.contentType);
-}
-
-function isLargeOrChunkedAttachment(attachment: MessageAttachment): boolean {
-  return (
-    attachment.type === 'chunked_file' ||
-    !!attachment.chunks?.length ||
-    attachment.size > 50 * 1024 * 1024
-  );
+  return MessageAttachmentPreview.isImage(attachment);
 }
 
 function formatFileSize(bytes: number): string {
