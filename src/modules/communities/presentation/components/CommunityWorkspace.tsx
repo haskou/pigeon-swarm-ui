@@ -830,14 +830,14 @@ export function CommunityWorkspace({
             ? [threadPanel.root, ...threadPanel.messages]
             : []),
           ...(messageCollection?.messages ?? []),
-          ...messageSearchResults.map((result) => result.message),
+          ...messageSearch.results.map((result) => result.message),
         ],
         polls: selectedChannelPolls,
       }),
     [
       messageCollection?.messages,
       messages,
-      messageSearchResults,
+      messageSearch.results,
       selectedChannelPolls,
       threadPanel,
     ],
