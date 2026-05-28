@@ -96,6 +96,50 @@ describe(MessageCollection.name, () => {
     ).toBe(true);
   });
 
+  it('detects whether a latest-message probe matches the loaded timeline', () => {
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [
+          message({ id: 'message-1', timestamp: 100 }),
+          message({ id: 'message-2', timestamp: 200 }),
+        ],
+        [message({ id: 'message-2', timestamp: 200 })],
+      ),
+    ).toBe(true);
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [message({ id: 'message-1', timestamp: 100 })],
+        [message({ id: 'message-2', timestamp: 200 })],
+      ),
+    ).toBe(false);
+    expect(MessageCollection.hasSameLatestDeliveredMessage([], [])).toBe(true);
+  });
+
+  it('treats changed latest message content as not caught up', () => {
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [
+          message({
+            content: 'before',
+            edited: false,
+            id: 'message-1',
+            timestamp: 100,
+          }),
+        ],
+        [
+          message({
+            content: 'after',
+            edited: true,
+            editedAt: 120,
+            id: 'message-1',
+            raw: { editedAt: 120, id: 'message-1', type: 'sent' },
+            timestamp: 100,
+          }),
+        ],
+      ),
+    ).toBe(false);
+  });
+
   it('applies edit events to their target message without rendering the edit event', () => {
     const original = message({
       attachments: [
