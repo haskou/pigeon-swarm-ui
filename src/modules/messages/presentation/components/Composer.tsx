@@ -21,7 +21,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { cx } from '../../../../shared/presentation/cx';
 import {
   type EmojiSuggestion,
@@ -29,10 +28,10 @@ import {
   replaceEmojiTrigger,
   searchEmojiSuggestions,
 } from '../emoji/emojiShortcodes';
-import { ImageLightbox, type LightboxImage } from './imageLightbox';
 import { ComposerMentionOverlay } from './ComposerMentionOverlay';
+import { ComposerContextBanner } from './ComposerContextBanner';
+import { ComposerAttachmentTray } from './ComposerAttachmentTray';
 import { StickerPicker } from '../../../stickers/presentation/components/StickerPicker';
-import { stickerAssetUrl } from '../../../stickers/presentation/components/stickerPressPreview';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
@@ -97,10 +96,6 @@ export function Composer({
   >([]);
   const [attachmentEncryptionPreference, setAttachmentEncryptionPreference] =
     useState<boolean | null>(null);
-  const [lightbox, setLightbox] = useState<{
-    images: LightboxImage[];
-    index: number;
-  } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [caretIndex, setCaretIndex] = useState(0);
@@ -507,18 +502,6 @@ export function Composer({
       }),
     );
   };
-  const imageAttachments = attachments
-    .map((attachment, index) => ({ ...attachment, index }))
-    .filter(({ file }) => isBrowserPreviewImage(file.type));
-  const otherAttachments = attachments
-    .map((attachment, index) => ({ ...attachment, index }))
-    .filter(({ file }) => !isBrowserPreviewImage(file.type));
-  const lightboxImages = imageAttachments.map(({ file, previewUrl }) => ({
-    alt: file.name,
-    filename: file.name,
-    url: previewUrl,
-  }));
-
   return (
     <>
       <form
@@ -531,100 +514,20 @@ export function Composer({
             {error ?? attachmentError}
           </div>
         )}
-        {editingMessage ? (
-          <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-sky-300/25 bg-sky-500/15 p-3 text-sm text-sky-50">
-            <div className="min-w-0">
-              <div className="text-xs font-black uppercase text-sky-100/70">
-                {copy.messages.editing}
-              </div>
-              <div className="mt-1 truncate text-white/80">
-                {editingMessage.content}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
-              aria-label={copy.messages.cancelEdit}
-            >
-              ×
-            </button>
-          </div>
-        ) : replyTo ? (
-          <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
-            <div className="flex min-w-0 items-center gap-2">
-              {replyTo.sticker && (
-                <img
-                  src={stickerAssetUrl(replyTo.sticker.assetCid)}
-                  alt=""
-                  className="h-10 w-10 shrink-0 rounded-xl object-contain"
-                />
-              )}
-              <div className="min-w-0">
-                <div className="text-xs font-black uppercase text-fuchsia-100/70">
-                  {copy.messages.replyingTo}{' '}
-                  {replyToAuthorName ?? replyTo.authorIdentityId}
-                </div>
-                {replyTo.content ? (
-                  <div className="mt-1 truncate text-white/80">
-                    {replyTo.content}
-                  </div>
-                ) : replyTo.sticker ? (
-                  <div className="mt-1 truncate text-white/80">Sticker</div>
-                ) : null}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onCancelReply}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/80 transition hover:bg-white/15"
-              aria-label={copy.messages.cancelReply}
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
+        <ComposerContextBanner
+          editingMessage={editingMessage}
+          onCancelEdit={onCancelEdit}
+          onCancelReply={onCancelReply}
+          replyTo={replyTo}
+          replyToAuthorName={replyToAuthorName}
+        />
         {!isEditing && attachments.length > 0 && (
           <>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {imageAttachments.length > 0 && (
-                <ComposerImageAlbum
-                  attachments={imageAttachments}
-                  disabled={disabled}
-                  lightboxImages={lightboxImages}
-                  onOpen={(index) =>
-                    setLightbox({ images: lightboxImages, index })
-                  }
-                  onRemove={removeAttachment}
-                />
-              )}
-              {otherAttachments.map((attachment) => (
-                <div
-                  key={`${attachment.file.name}-${attachment.file.size}-${attachment.index}`}
-                  className="max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 text-xs text-white/70"
-                >
-                  <AttachmentPreview
-                    file={attachment.file}
-                    url={attachment.previewUrl}
-                  />
-                  <div className="flex max-w-56 items-center gap-2 px-3 py-2">
-                    <span className="truncate">{attachment.file.name}</span>
-                    <span className="shrink-0 text-white/35">
-                      {formatFileSize(attachment.file.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(attachment.index)}
-                      disabled={disabled}
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
-                      aria-label={copy.composer.removeAttachment}
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ComposerAttachmentTray
+              attachments={attachments}
+              disabled={disabled}
+              onRemove={removeAttachment}
+            />
             <AttachmentEncryptionControl
               disabled={disabled}
               enabled={encryptAttachments}
@@ -784,13 +687,6 @@ export function Composer({
           </button>
         </div>
       </form>
-      {lightbox && (
-        <ImageLightbox
-          images={lightbox.images}
-          initialIndex={lightbox.index}
-          onClose={() => setLightbox(null)}
-        />
-      )}
       {draggingFiles &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-[140] grid place-items-center bg-black/70 p-6 backdrop-blur-md">
@@ -806,89 +702,6 @@ export function Composer({
           document.body,
         )}
     </>
-  );
-}
-
-function ComposerImageAlbum({
-  attachments,
-  disabled,
-  lightboxImages,
-  onOpen,
-  onRemove,
-}: {
-  attachments: { file: File; index: number; previewUrl: string }[];
-  disabled: boolean;
-  lightboxImages: LightboxImage[];
-  onOpen: (index: number) => void;
-  onRemove: (index: number) => void;
-}) {
-  const visibleAttachments =
-    attachments.length > 4 ? attachments.slice(0, 4) : attachments;
-  const extraCount = attachments.length > 4 ? attachments.length - 3 : 0;
-
-  return (
-    <div className="max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/25 text-xs text-white/70">
-      <div
-        className={cx(
-          'grid w-56 gap-1',
-          visibleAttachments.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
-        )}
-      >
-        {visibleAttachments.map((attachment, visibleIndex) => {
-          const isOverflowTile = extraCount > 0 && visibleIndex === 3;
-
-          return (
-            <button
-              type="button"
-              key={`${attachment.file.name}-${attachment.file.size}-${attachment.index}`}
-              onClick={() =>
-                onOpen(Math.min(visibleIndex, lightboxImages.length - 1))
-              }
-              className={cx(
-                'relative overflow-hidden bg-black/25 hover:opacity-90',
-                visibleAttachments.length === 1
-                  ? 'h-28'
-                  : 'aspect-square min-h-24',
-              )}
-              aria-label={copy.attachments.openImage}
-            >
-              <img
-                src={attachment.previewUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-              {isOverflowTile && (
-                <div className="absolute inset-0 grid place-items-center bg-black/65 text-3xl font-black text-white">
-                  +{extraCount}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="grid gap-1 px-3 py-2">
-        {attachments.map((attachment) => (
-          <div
-            key={`${attachment.file.name}-${attachment.file.size}-${attachment.index}`}
-            className="flex max-w-56 items-center gap-2"
-          >
-            <span className="truncate">{attachment.file.name}</span>
-            <span className="shrink-0 text-white/35">
-              {formatFileSize(attachment.file.size)}
-            </span>
-            <button
-              type="button"
-              onClick={() => onRemove(attachment.index)}
-              disabled={disabled}
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/70 transition hover:bg-white/15 disabled:cursor-not-allowed"
-              aria-label={copy.composer.removeAttachment}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -951,32 +764,6 @@ function AttachmentEncryptionControl({
   );
 }
 
-function AttachmentPreview({ file, url }: { file: File; url: string }) {
-  if (isBrowserPreviewImage(file.type)) {
-    return <img src={url} alt="" className="h-28 w-56 object-cover" />;
-  }
-
-  if (file.type.startsWith('video/')) {
-    return (
-      <video src={url} className="h-28 w-56 object-cover" controls muted />
-    );
-  }
-
-  if (file.type.startsWith('audio/')) {
-    return <audio src={url} className="w-56 p-2" controls />;
-  }
-
-  return (
-    <div className="grid h-28 w-56 place-items-center bg-black/20 p-4">
-      <div className="relative h-16 w-12 rounded-2xl border border-white/20 bg-white/10">
-        <div className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg border-b border-l border-white/20 bg-white/20" />
-        <div className="absolute bottom-4 left-2 right-2 h-1 rounded-full bg-white/25" />
-        <div className="absolute bottom-7 left-2 right-2 h-1 rounded-full bg-white/20" />
-      </div>
-    </div>
-  );
-}
-
 function EmojiSuggestionPanel({
   onSelect,
   query,
@@ -1023,16 +810,6 @@ function EmojiSuggestionPanel({
       </div>
     </div>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-
-  const kilobytes = bytes / 1024;
-
-  if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
-
-  return `${(kilobytes / 1024).toFixed(1)} MB`;
 }
 
 function clipboardFile(
