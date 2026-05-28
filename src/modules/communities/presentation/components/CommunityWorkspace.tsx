@@ -150,6 +150,7 @@ type CommunityThreadState = MessageCollectionState & {
   channelId: string;
   draft: string;
   editingMessage: CommunityThreadEditingMessage | null;
+  replyTarget: ChatMessage | null;
   root: ChatMessage;
 };
 
@@ -562,6 +563,7 @@ export function CommunityWorkspace({
         editingMessage: null,
         error: null,
         messages: [],
+        replyTarget: null,
         root: message,
         state: 'loading',
       });
@@ -584,6 +586,7 @@ export function CommunityWorkspace({
           editingMessage: null,
           error: null,
           messages: threadMessages,
+          replyTarget: null,
           root: message,
           state: 'ready',
         });
@@ -604,6 +607,7 @@ export function CommunityWorkspace({
           editingMessage: null,
           error: toUserErrorMessage(caught, copy.messages.threadError),
           messages: [],
+          replyTarget: null,
           root: message,
           state: 'ready',
         });
@@ -1498,6 +1502,7 @@ export function CommunityWorkspace({
               message,
               previousDraft: current.draft,
             },
+            replyTarget: null,
           }
         : current,
     );
@@ -1511,6 +1516,23 @@ export function CommunityWorkspace({
             editingMessage: null,
           }
         : current,
+    );
+  }, []);
+  const startReplyingToThreadMessage = useCallback((message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            editingMessage: null,
+            replyTarget: message,
+          }
+        : current,
+    );
+  }, []);
+  const cancelThreadMessageReply = useCallback(() => {
+    setThreadPanel((current) =>
+      current ? { ...current, replyTarget: null } : current,
     );
   }, []);
   const editThreadMessage = useCallback(
@@ -1540,6 +1562,7 @@ export function CommunityWorkspace({
                 draft: '',
                 editingMessage: null,
                 error: null,
+                replyTarget: null,
               }
             : current,
         );
@@ -1603,7 +1626,10 @@ export function CommunityWorkspace({
         content,
         attachments,
         attachmentUpload,
-        { renderInChannel: false },
+        {
+          renderInChannel: false,
+          replyPreviewTarget: threadPanel.replyTarget,
+        },
       );
 
       if (!sent) return;
@@ -1614,6 +1640,7 @@ export function CommunityWorkspace({
               ...current,
               draft: '',
               messages: mergeChatMessages(current.messages, [sent]),
+              replyTarget: null,
             }
           : current,
       );
@@ -1637,7 +1664,10 @@ export function CommunityWorkspace({
       const sent = await messageComposer.sendStickerReplyToMessage(
         threadPanel.root,
         sticker,
-        { renderInChannel: false },
+        {
+          renderInChannel: false,
+          replyPreviewTarget: threadPanel.replyTarget,
+        },
       );
 
       if (!sent) return;
@@ -1648,6 +1678,7 @@ export function CommunityWorkspace({
               ...current,
               draft: '',
               messages: mergeChatMessages(current.messages, [sent]),
+              replyTarget: null,
             }
           : current,
       );
@@ -1939,6 +1970,7 @@ export function CommunityWorkspace({
             identityPictures={memberPictures}
             messages={threadPanel.messages}
             onCancelEdit={cancelThreadMessageEdit}
+            onCancelReply={cancelThreadMessageReply}
             onAuthorProfileOpen={(message, target) =>
               openMessageAuthorProfile(message, profileAnchorFromTarget(target))
             }
@@ -1960,6 +1992,15 @@ export function CommunityWorkspace({
                 : undefined
             }
             pinnedMessageIds={pinnedMessageIds}
+            replyTo={threadPanel.replyTarget}
+            replyToAuthorName={
+              threadPanel.replyTarget
+                ? memberDisplayName(
+                    memberIdentities[threadPanel.replyTarget.authorIdentityId],
+                    threadPanel.replyTarget.authorIdentityId,
+                  )
+                : undefined
+            }
             rootMessage={threadPanel.root}
             session={session}
             title={`# ${channelNameFor(threadPanel.channelId)}`}
@@ -2221,6 +2262,16 @@ export function CommunityWorkspace({
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
         onOpenMessageThread={(message) => void openMessageThread(message)}
         onPinMessage={(message) => void pinMessage(message)}
+        onReplyToMessage={(message) => {
+          if (messageContextMenu?.source === 'thread') {
+            startReplyingToThreadMessage(message);
+
+            return;
+          }
+
+          setMessageContextMenu(null);
+          messageComposer.startReplyToMessage(message);
+        }}
         onSessionUpdated={onSessionUpdated}
         onToggleReaction={(message, emoji, reacted) =>
           void messageComposer.handleToggleChannelMessageReaction(
@@ -2305,6 +2356,7 @@ function removeCommunityThreadMessage(
 
   const deletingEditedMessage =
     currentThread.editingMessage?.message.id === messageId;
+  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
 
   return {
     ...currentThread,
@@ -2312,6 +2364,7 @@ function removeCommunityThreadMessage(
       ? (currentThread.editingMessage?.previousDraft ?? '')
       : currentThread.draft,
     editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
     messages: currentThread.messages.filter((message) => message.id !== messageId),
   };
 }

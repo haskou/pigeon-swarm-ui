@@ -107,7 +107,7 @@ export function MessageBubble({
   const callEvent =
     message.raw.type === 'call_event' || message.kind === 'call-event';
   const replyMessageId =
-    message.replyToMessageId ?? message.replyPreview?.messageId;
+    message.replyPreview?.messageId ?? message.replyToMessageId;
   const hasReply = showReplyPreview && Boolean(replyMessageId);
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];

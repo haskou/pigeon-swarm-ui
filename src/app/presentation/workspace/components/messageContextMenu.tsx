@@ -19,6 +19,7 @@ import {
   DataIcon,
   EditIcon,
   PinIcon,
+  ReplyIcon,
   ThreadIcon,
   TrashIcon,
 } from '../../../../modules/messages/presentation/components/messageActionIcons';
@@ -41,6 +42,7 @@ export function MessageContextMenu({
   onEdit,
   onOpenThread,
   onPin,
+  onReply,
   onReactionToggle,
   onUnpin,
   onViewRaw,
@@ -54,6 +56,7 @@ export function MessageContextMenu({
   onEdit?: () => void;
   onOpenThread?: () => void;
   onPin?: () => void;
+  onReply?: () => void;
   onUnpin?: () => void;
   onReactionToggle?: (
     message: ChatMessage,
@@ -256,6 +259,13 @@ export function MessageContextMenu({
             icon={<ThreadIcon />}
             label={copy.messages.openThread}
             onClick={onOpenThread}
+          />
+        ) : null}
+        {onReply ? (
+          <MessageMenuAction
+            icon={<ReplyIcon />}
+            label={copy.messages.reply}
+            onClick={onReply}
           />
         ) : null}
         {onCopy ? (

@@ -143,6 +143,7 @@ interface WorkspaceDialogsProps {
   onCopyMessage: (message: ChatMessage) => void;
   onOpenMessageThread: (message: ChatMessage) => void;
   onPinMessage: (message: ChatMessage) => void;
+  onReplyToMessage: (message: ChatMessage) => void;
   onUnpinMessage: (message: ChatMessage) => void;
   pinnedMessageIds: ReadonlySet<string>;
   onToggleReaction: (
@@ -267,6 +268,7 @@ function MessageActionDialogs(
         }
         onEdit={
           contextMenuMessage &&
+          !contextMenuFromThread &&
           MessageEditPolicy.canEdit(
             contextMenuMessage,
             props.session.identity.id,
@@ -287,6 +289,11 @@ function MessageActionDialogs(
           !contextMenuFromThread &&
           !contextMenuMessagePinned
             ? () => props.onPinMessage(contextMenuMessage)
+            : undefined
+        }
+        onReply={
+          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+            ? () => props.onReplyToMessage(contextMenuMessage)
             : undefined
         }
         onUnpin={

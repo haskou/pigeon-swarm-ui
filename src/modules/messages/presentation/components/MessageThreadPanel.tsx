@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import type {
   AttachmentProgress,
@@ -12,6 +12,10 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
+import {
+  messageReplyImage,
+  messageReplySticker,
+} from './messageTimelineHelpers';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
@@ -31,6 +35,7 @@ export function MessageThreadPanel({
   messages,
   onAuthorProfileOpen,
   onCancelEdit,
+  onCancelReply,
   onClose,
   onDraftChange,
   onEdit,
@@ -39,6 +44,8 @@ export function MessageThreadPanel({
   onSend,
   onStickerSend,
   pinnedMessageIds = new Set(),
+  replyTo,
+  replyToAuthorName,
   rootMessage,
   session,
   title,
@@ -57,6 +64,7 @@ export function MessageThreadPanel({
     target: HTMLElement,
   ) => void;
   onCancelEdit?: () => void;
+  onCancelReply?: () => void;
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onEdit?: (content: string) => Promise<void>;
@@ -69,12 +77,15 @@ export function MessageThreadPanel({
   ) => Promise<void>;
   onStickerSend?: (sticker: StickerMessageReference) => Promise<void>;
   pinnedMessageIds?: ReadonlySet<string>;
+  replyTo?: ChatMessage | null;
+  replyToAuthorName?: string;
   rootMessage: ChatMessage;
   session: Session;
   title: string;
 }) {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [, setAttachmentProgress] = useState<AttachmentProgress | null>(null);
+  const threadScrollerRef = useRef<HTMLDivElement | null>(null);
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
     onErrorChange: setAttachmentError,
@@ -91,6 +102,31 @@ export function MessageThreadPanel({
     return (event: MouseEvent<HTMLElement>) => {
       onAuthorProfileOpen?.(message, event.currentTarget);
     };
+  };
+  const handleReplyReferenceClick = (messageId: string) => {
+    if (messageId === rootMessage.id) {
+      onRootMessageOpen(rootMessage);
+
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const element = threadScrollerRef.current?.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+
+      if (!element) return;
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const focusTarget =
+        element.querySelector<HTMLElement>('[data-message-bubble]') ?? element;
+
+      focusTarget.classList.add('message-focus-ring');
+      window.setTimeout(
+        () => focusTarget.classList.remove('message-focus-ring'),
+        1600,
+      );
+    });
   };
 
   return (
@@ -143,7 +179,10 @@ export function MessageThreadPanel({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        ref={threadScrollerRef}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      >
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm font-semibold text-white/45">
             {copy.messages.emptyThread}
@@ -163,10 +202,21 @@ export function MessageThreadPanel({
                 onAttachmentPreview={loadAttachmentPreview}
                 onAvatarClick={avatarClickFor(message)}
                 onMessageMenuOpen={onMessageMenuOpen}
-                onReplyReferenceClick={() => undefined}
+                onReplyReferenceClick={handleReplyReferenceClick}
                 pinned={pinnedMessageIds.has(message.id)}
+                replyAuthorName={
+                  message.replyPreview
+                    ? displayName(message.replyPreview.authorIdentityId)
+                    : undefined
+                }
+                replyImage={messageReplyImage(message)}
+                replyPreview={message.replyPreview?.content}
+                replySticker={messageReplySticker(message)}
                 reserveAvatarSpace={false}
-                showReplyPreview={false}
+                showReplyPreview={Boolean(
+                  message.replyPreview &&
+                    message.replyPreview.messageId !== rootMessage.id,
+                )}
                 showAvatar={message.authorIdentityId !== currentIdentityId}
                 onStickerClick={() => undefined}
               />
@@ -182,12 +232,15 @@ export function MessageThreadPanel({
         error={error ?? attachmentError}
         focusKey={`thread:${rootMessage.id}:${editingMessage?.id ?? 'send'}`}
         onCancelEdit={onCancelEdit}
+        onCancelReply={onCancelReply}
         onDraftChange={onDraftChange}
         onEdit={onEdit}
         onEscape={onClose}
         onSend={onSend}
         onStickerSend={onStickerSend}
         placeholder={copy.composer.placeholder}
+        replyTo={replyTo}
+        replyToAuthorName={replyToAuthorName}
         session={session}
       />
     </section>

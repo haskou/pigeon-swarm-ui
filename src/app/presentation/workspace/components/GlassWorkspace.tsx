@@ -65,6 +65,7 @@ import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
+import { identityDisplayName } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -169,6 +170,7 @@ type MessageCollectionState = {
 type ConversationThreadState = MessageCollectionState & {
   draft: string;
   editingMessage: EditingMessage | null;
+  replyTarget: ChatMessage | null;
   root: ChatMessage;
 };
 type EditingMessage = {
@@ -226,6 +228,7 @@ function removeConversationThreadMessage(
 
   const deletingEditedMessage =
     currentThread.editingMessage?.message.id === messageId;
+  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
 
   return {
     ...currentThread,
@@ -233,6 +236,7 @@ function removeConversationThreadMessage(
       ? (currentThread.editingMessage?.previousDraft ?? '')
       : currentThread.draft,
     editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
     messages: currentThread.messages.filter((message) => message.id !== messageId),
   };
 }
@@ -2242,6 +2246,7 @@ export function GlassWorkspace({
       editingMessage: null,
       error: null,
       messages: [],
+      replyTarget: null,
       root: message,
       state: 'loading',
     });
@@ -2257,6 +2262,7 @@ export function GlassWorkspace({
         editingMessage: null,
         error: null,
         messages: result.messages,
+        replyTarget: null,
         root: message,
         state: 'ready',
       });
@@ -2266,6 +2272,7 @@ export function GlassWorkspace({
         editingMessage: null,
         error: toUserErrorMessage(caught, copy.messages.threadError),
         messages: [],
+        replyTarget: null,
         root: message,
         state: 'ready',
       });
@@ -2378,6 +2385,7 @@ export function GlassWorkspace({
               message,
               previousDraft: current.draft,
             },
+            replyTarget: null,
           }
         : current,
     );
@@ -2392,6 +2400,23 @@ export function GlassWorkspace({
             editingMessage: null,
           }
         : current,
+    );
+  };
+  const startReplyingToConversationThreadMessage = (message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            editingMessage: null,
+            replyTarget: message,
+          }
+        : current,
+    );
+  };
+  const cancelConversationThreadReply = () => {
+    setConversationThread((current) =>
+      current ? { ...current, replyTarget: null } : current,
     );
   };
 
@@ -2421,6 +2446,7 @@ export function GlassWorkspace({
               draft: '',
               editingMessage: null,
               error: null,
+              replyTarget: null,
             }
           : current,
       );
@@ -2492,7 +2518,7 @@ export function GlassWorkspace({
                 ].id,
               ]
             : [rootMessage.id],
-        replyPreview: replyPreviewFromMessage(rootMessage),
+        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
       },
     );
@@ -2503,6 +2529,7 @@ export function GlassWorkspace({
             ...current,
             draft: '',
             messages: MessageCollection.merge(current.messages, [sent]),
+            replyTarget: null,
           }
         : current,
     );
@@ -2527,7 +2554,7 @@ export function GlassWorkspace({
                 ].id,
               ]
             : [rootMessage.id],
-        replyPreview: replyPreviewFromMessage(rootMessage),
+        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
         sticker,
       },
@@ -2540,6 +2567,7 @@ export function GlassWorkspace({
             ...current,
             draft: '',
             messages: MessageCollection.merge(current.messages, [sent]),
+            replyTarget: null,
           }
         : current,
     );
@@ -3679,6 +3707,7 @@ export function GlassWorkspace({
                 identityPictures={identityPictures}
                 messages={conversationThread.messages}
                 onCancelEdit={cancelConversationThreadEdit}
+                onCancelReply={cancelConversationThreadReply}
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
                 onEdit={handleEditConversationThreadMessage}
@@ -3695,6 +3724,15 @@ export function GlassWorkspace({
                 onSend={sendConversationThreadMessage}
                 onStickerSend={sendConversationThreadSticker}
                 pinnedMessageIds={pinnedMessageIds}
+                replyTo={conversationThread.replyTarget}
+                replyToAuthorName={
+                  conversationThread.replyTarget
+                    ? identityDisplayName(
+                        conversationThread.replyTarget.authorIdentityId,
+                        identityNames,
+                      )
+                    : undefined
+                }
                 rootMessage={conversationThread.root}
                 session={session}
                 title={
@@ -4042,6 +4080,17 @@ export function GlassWorkspace({
             onCopyMessage={copyMessageContent}
             onOpenMessageThread={(message) => void openMessageThread(message)}
             onPinMessage={(message) => void pinMessage(message)}
+            onReplyToMessage={(message) => {
+              if (messageContextMenu?.source === 'thread') {
+                startReplyingToConversationThreadMessage(message);
+
+                return;
+              }
+
+              setMessageContextMenu(null);
+              setEditingMessage(null);
+              setReplyTarget(message);
+            }}
             onNetworksUpdated={onNodeNetworksReload}
             onUnpinMessage={(message) => void unpinMessage(message)}
             pinnedMessageIds={pinnedMessageIds}

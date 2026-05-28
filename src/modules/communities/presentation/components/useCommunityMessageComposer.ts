@@ -46,6 +46,7 @@ type CommunityPendingSend = {
   channelId: string;
   content: string;
   mentions?: CommunityMessageMention[];
+  replyPreviewTarget?: ChatMessage | null;
   replyTarget: ChatMessage | null;
   renderInChannel?: boolean;
   sticker?: StickerMessageReference;
@@ -422,6 +423,10 @@ export function useCommunityMessageComposer({
     const timestamp = Date.now();
     const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${UUID.generate().toString()}`;
     const renderInChannel = payload.renderInChannel ?? true;
+    const replyPreview =
+      payload.replyPreviewTarget === undefined
+        ? replyPreviewFromMessage(payload.replyTarget)
+        : replyPreviewFromMessage(payload.replyPreviewTarget);
 
     setFailedSends((current) => {
       const next = { ...current };
@@ -456,7 +461,7 @@ export function useCommunityMessageComposer({
             type: 'sent',
           },
           reactions: [],
-          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
           timestamp,
@@ -495,7 +500,7 @@ export function useCommunityMessageComposer({
           content: payload.content,
           linkPreview,
           mentions: payload.mentions,
-          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
           timestamp,
@@ -573,7 +578,10 @@ export function useCommunityMessageComposer({
     content: string,
     attachments: File[],
     attachmentUpload: AttachmentUploadOptions,
-    options: { renderInChannel?: boolean } = {},
+    options: {
+      renderInChannel?: boolean;
+      replyPreviewTarget?: ChatMessage | null;
+    } = {},
   ): Promise<ChatMessage | null> => {
     const channelId = message.raw.channelId ?? selectedChannelId;
 
@@ -585,6 +593,7 @@ export function useCommunityMessageComposer({
       channelId,
       content,
       mentions: selectedChannel ? mentionsForContent(content) : [],
+      replyPreviewTarget: options.replyPreviewTarget,
       renderInChannel: options.renderInChannel,
       replyTarget: message,
     });
@@ -593,7 +602,10 @@ export function useCommunityMessageComposer({
   const sendStickerReplyToMessage = (
     message: ChatMessage,
     sticker: StickerMessageReference,
-    options: { renderInChannel?: boolean } = {},
+    options: {
+      renderInChannel?: boolean;
+      replyPreviewTarget?: ChatMessage | null;
+    } = {},
   ): Promise<ChatMessage | null> => {
     const channelId = message.raw.channelId ?? selectedChannelId;
 
@@ -605,6 +617,7 @@ export function useCommunityMessageComposer({
       channelId,
       content: '',
       mentions: [],
+      replyPreviewTarget: options.replyPreviewTarget,
       renderInChannel: options.renderInChannel,
       replyTarget: message,
       sticker,
