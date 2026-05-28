@@ -149,7 +149,13 @@ type MessageCollectionState = {
 type CommunityThreadState = MessageCollectionState & {
   channelId: string;
   draft: string;
+  editingMessage: CommunityThreadEditingMessage | null;
   root: ChatMessage;
+};
+
+type CommunityThreadEditingMessage = {
+  message: ChatMessage;
+  previousDraft: string;
 };
 
 export function CommunityWorkspace({
@@ -552,6 +558,7 @@ export function CommunityWorkspace({
       setThreadPanel({
         channelId,
         draft: '',
+        editingMessage: null,
         error: null,
         messages: [],
         root: message,
@@ -573,6 +580,7 @@ export function CommunityWorkspace({
         setThreadPanel({
           channelId,
           draft: '',
+          editingMessage: null,
           error: null,
           messages: threadMessages,
           root: message,
@@ -592,6 +600,7 @@ export function CommunityWorkspace({
         setThreadPanel({
           channelId,
           draft: '',
+          editingMessage: null,
           error: toUserErrorMessage(caught, copy.messages.threadError),
           messages: [],
           root: message,
@@ -1440,6 +1449,109 @@ export function CommunityWorkspace({
       current ? { ...current, draft: value } : current,
     );
   }, []);
+  const startEditingThreadMessage = useCallback((message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            draft: message.content,
+            editingMessage: {
+              message,
+              previousDraft: current.draft,
+            },
+          }
+        : current,
+    );
+  }, []);
+  const cancelThreadMessageEdit = useCallback(() => {
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            draft: current.editingMessage?.previousDraft ?? '',
+            editingMessage: null,
+          }
+        : current,
+    );
+  }, []);
+  const editThreadMessage = useCallback(
+    async (content: string) => {
+      if (!threadPanel?.editingMessage) return;
+
+      const targetMessage = threadPanel.editingMessage.message;
+
+      setThreadPanel((current) =>
+        current ? { ...current, error: null } : current,
+      );
+      try {
+        const projected = await messageComposer.editChannelMessage(
+          targetMessage,
+          content,
+        );
+
+        setMessages((current) =>
+          current.some((message) => message.id === projected.id)
+            ? mergeChatMessages(current, [projected])
+            : current,
+        );
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...mergeCommunityThreadMessage(current, projected),
+                draft: '',
+                editingMessage: null,
+                error: null,
+              }
+            : current,
+        );
+      } catch (caught) {
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.editError),
+              }
+            : current,
+        );
+      }
+    },
+    [messageComposer, setMessages, threadPanel],
+  );
+  const deleteThreadMessage = useCallback(
+    async (message: ChatMessage) => {
+      if (!window.confirm(copy.messages.deleteConfirm)) return;
+
+      setMessageContextMenu(null);
+      setThreadPanel((current) =>
+        current ? { ...current, error: null } : current,
+      );
+      try {
+        const deleted = await messageComposer.deleteChannelMessage(message);
+
+        if (!deleted) return;
+
+        setMessages((current) =>
+          current.filter((item) => item.id !== message.id),
+        );
+        setThreadPanel((current) => {
+          if (!current) return current;
+
+          return removeCommunityThreadMessage(current, message.id);
+        });
+      } catch (caught) {
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.deleteError),
+              }
+            : current,
+        );
+      }
+    },
+    [messageComposer, setMessages],
+  );
   const sendThreadMessage = useCallback(
     async (
       content: string,
@@ -1525,12 +1637,59 @@ export function CommunityWorkspace({
     setThreadPanel(null);
   }, [selectedChannelId, threadPanel]);
 
+  const handleRealtimeThreadMessage = useCallback(
+    (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+      const rootMessageId = message.replyToMessageId;
+
+      if (!channelId || !rootMessageId) return;
+
+      const currentSummary = channelThreadsByChannelId[channelId]?.find(
+        (thread) => thread.rootMessageId === rootMessageId,
+      );
+
+      setThreadPanel((current) =>
+        current?.channelId === channelId && current.root.id === rootMessageId
+          ? {
+              ...current,
+              messages: mergeChatMessages(current.messages, [message]),
+            }
+          : current,
+      );
+      upsertChannelThreadSummary(channelId, {
+        lastReplyAt: message.timestamp,
+        lastReplyMessageId: message.id,
+        replyCount: currentSummary
+          ? currentSummary.replyCount +
+            (currentSummary.lastReplyMessageId === message.id ? 0 : 1)
+          : 1,
+        rootMessageId,
+      });
+    },
+    [channelThreadsByChannelId, selectedChannelId, upsertChannelThreadSummary],
+  );
+
+  const handleRealtimeMessageEdited = useCallback((message: ChatMessage) => {
+    setThreadPanel((current) =>
+      current ? mergeCommunityThreadMessage(current, message) : current,
+    );
+  }, []);
+
+  const handleRealtimeMessageDeleted = useCallback((messageId: string) => {
+    setThreadPanel((current) =>
+      current ? removeCommunityThreadMessage(current, messageId) : current,
+    );
+  }, []);
+
   useCommunityChannelRealtime({
     communityId: community.id,
     incrementNewChannelMessageCount,
     isScrolledNearBottom,
     loadChannelMessages,
     onChannelViewed,
+    onMessageDeleted: handleRealtimeMessageDeleted,
+    onMessageEdited: handleRealtimeMessageEdited,
+    onThreadMessageReceived: handleRealtimeThreadMessage,
     projectChannelMessage,
     realtimeEvent,
     resetNewChannelMessageCount,
@@ -1735,16 +1894,19 @@ export function CommunityWorkspace({
               !currentPermissions.has('send_messages')
             }
             draft={threadPanel.draft}
+            editingMessage={threadPanel.editingMessage?.message ?? null}
             embedded
             error={threadPanel.error}
             identityNames={communityIdentityNames}
             identityPictures={memberPictures}
             messages={threadPanel.messages}
+            onCancelEdit={cancelThreadMessageEdit}
             onAuthorProfileOpen={(message, target) =>
               openMessageAuthorProfile(message, profileAnchorFromTarget(target))
             }
             onClose={() => setThreadPanel(null)}
             onDraftChange={updateThreadDraft}
+            onEdit={editThreadMessage}
             onMessageMenuOpen={(message, x, y) =>
               setMessageContextMenu({ message, source: 'thread', x, y })
             }
@@ -2004,9 +2166,15 @@ export function CommunityWorkspace({
         onCommunityKeyInputChange={setCommunityKeyInput}
         onCommunityUpdated={onCommunityUpdated}
         onDeleteMessage={(message) =>
-          void messageComposer.handleDeleteChannelMessage(message)
+          void (messageContextMenu?.source === 'thread'
+            ? deleteThreadMessage(message)
+            : messageComposer.handleDeleteChannelMessage(message))
         }
-        onEditMessage={messageComposer.startEditingChannelMessage}
+        onEditMessage={(message) =>
+          messageContextMenu?.source === 'thread'
+            ? startEditingThreadMessage(message)
+            : messageComposer.startEditingChannelMessage(message)
+        }
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
         onOpenMessageThread={(message) => void openMessageThread(message)}
         onPinMessage={(message) => void pinMessage(message)}
@@ -2060,6 +2228,48 @@ function placeholderThreadRootMessage({
     },
     reactions: [],
     timestamp: Date.now(),
+  };
+}
+
+function mergeCommunityThreadMessage(
+  currentThread: CommunityThreadState,
+  incomingMessage: ChatMessage,
+): CommunityThreadState {
+  const rootMessages =
+    currentThread.root.id === incomingMessage.id
+      ? mergeChatMessages([currentThread.root], [incomingMessage])
+      : [currentThread.root];
+  const threadMessages = currentThread.messages.some(
+    (message) => message.id === incomingMessage.id,
+  )
+    ? mergeChatMessages(currentThread.messages, [incomingMessage])
+    : currentThread.messages;
+
+  return {
+    ...currentThread,
+    messages: threadMessages,
+    root:
+      rootMessages.find((message) => message.id === currentThread.root.id) ??
+      currentThread.root,
+  };
+}
+
+function removeCommunityThreadMessage(
+  currentThread: CommunityThreadState,
+  messageId: string,
+): CommunityThreadState | null {
+  if (currentThread.root.id === messageId) return null;
+
+  const deletingEditedMessage =
+    currentThread.editingMessage?.message.id === messageId;
+
+  return {
+    ...currentThread,
+    draft: deletingEditedMessage
+      ? (currentThread.editingMessage?.previousDraft ?? '')
+      : currentThread.draft,
+    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    messages: currentThread.messages.filter((message) => message.id !== messageId),
   };
 }
 

@@ -23,14 +23,17 @@ export function MessageThreadPanel({
   currentIdentityId,
   disabled = false,
   draft,
+  editingMessage,
   embedded = false,
   error,
   identityNames,
   identityPictures = {},
   messages,
   onAuthorProfileOpen,
+  onCancelEdit,
   onClose,
   onDraftChange,
+  onEdit,
   onMessageMenuOpen,
   onRootMessageOpen,
   onSend,
@@ -43,6 +46,7 @@ export function MessageThreadPanel({
   currentIdentityId: string;
   disabled?: boolean;
   draft: string;
+  editingMessage?: ChatMessage | null;
   embedded?: boolean;
   error?: null | string;
   identityNames: Record<string, string>;
@@ -52,8 +56,10 @@ export function MessageThreadPanel({
     message: ChatMessage,
     target: HTMLElement,
   ) => void;
+  onCancelEdit?: () => void;
   onClose: () => void;
   onDraftChange: (value: string) => void;
+  onEdit?: (content: string) => Promise<void>;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onRootMessageOpen: (message: ChatMessage) => void;
   onSend: (
@@ -172,11 +178,12 @@ export function MessageThreadPanel({
       <Composer
         disabled={disabled}
         draft={draft}
+        editingMessage={editingMessage}
         error={error ?? attachmentError}
-        focusKey={`thread:${rootMessage.id}`}
-        onCancelEdit={() => undefined}
+        focusKey={`thread:${rootMessage.id}:${editingMessage?.id ?? 'send'}`}
+        onCancelEdit={onCancelEdit}
         onDraftChange={onDraftChange}
-        onEdit={async () => undefined}
+        onEdit={onEdit}
         onEscape={onClose}
         onSend={onSend}
         onStickerSend={onStickerSend}

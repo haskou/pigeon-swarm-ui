@@ -203,57 +203,71 @@ export function useCommunityMessageComposer({
     }
   };
 
-  const handleEditChannelMessage = async (content: string) => {
-    if (!selectedChannelId || !editingMessage) return;
+  const editChannelMessage = async (
+    message: ChatMessage,
+    content: string,
+  ): Promise<ChatMessage> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
 
-    const channelId = selectedChannelId;
-    const targetMessage = editingMessage.message;
+    if (!channelId) {
+      throw new Error(copy.messages.editError);
+    }
+
     const mentions = mentionsForContent(content);
 
     setError(null);
 
-    try {
-      const timestamp = Date.now();
-      const linkPreview = await createLinkPreviewForContent(session, content);
-      const payloadInput = {
-        attachments: targetMessage.attachments,
-        authorIdentityId: session.identity.id,
-        channelId,
-        communityId: community.id,
-        content,
-        eventType: 'CommunityChannelMessageEdited' as const,
-        linkPreview,
+    const timestamp = Date.now();
+    const linkPreview = await createLinkPreviewForContent(session, content);
+    const payloadInput = {
+      attachments: message.attachments,
+      authorIdentityId: session.identity.id,
+      channelId,
+      communityId: community.id,
+      content,
+      eventType: 'CommunityChannelMessageEdited' as const,
+      linkPreview,
+      mentions,
+      timestamp,
+    };
+    const messagePayload = communityIsPublic
+      ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
+      : {
+          encryptedPayload: await encryptCommunityChannelPayload({
+            ...payloadInput,
+            communityKey: session.keychain.conversations[community.id],
+          }),
+        };
+    const edited = await applicationContainer.editCommunityChannelMessage(
+      session,
+      community.id,
+      channelId,
+      message.id,
+      {
+        attachmentExternalIdentifiers: message.attachments.map(
+          (attachment) => attachment.cid,
+        ),
+        ...messagePayload,
         mentions,
         timestamp,
-      };
-      const messagePayload = communityIsPublic
-        ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
-        : {
-            encryptedPayload: await encryptCommunityChannelPayload({
-              ...payloadInput,
-              communityKey: session.keychain.conversations[community.id],
-            }),
-          };
-      const edited = await applicationContainer.editCommunityChannelMessage(
-        session,
-        community.id,
-        channelId,
-        targetMessage.id,
-        {
-          attachmentExternalIdentifiers: targetMessage.attachments.map(
-            (attachment) => attachment.cid,
-          ),
-          ...messagePayload,
-          mentions,
-          timestamp,
-        },
-      );
-      const projected = await projectChannelMessage(channelId, edited);
+      },
+    );
+
+    return await projectChannelMessage(channelId, edited);
+  };
+
+  const handleEditChannelMessage = async (content: string) => {
+    if (!selectedChannelId || !editingMessage) return;
+
+    const targetMessage = editingMessage.message;
+
+    try {
+      const projected = await editChannelMessage(targetMessage, content);
 
       setMessages((current) => mergeChatMessages(current, [projected]));
       setEditingMessage(null);
       setDraft('');
-      onTypingActive?.(channelId, false);
+      onTypingActive?.(targetMessage.raw.channelId ?? selectedChannelId, false);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.messages.editError));
     }
@@ -281,6 +295,27 @@ export function useCommunityMessageComposer({
     setError(copy.messages.replyTargetNotFound);
   };
 
+  const deleteChannelMessage = async (message: ChatMessage): Promise<boolean> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
+
+    if (
+      !channelId ||
+      (!message.mine && !owner && !currentPermissions.has('manage_messages'))
+    ) {
+      return false;
+    }
+
+    setError(null);
+    await applicationContainer.deleteCommunityChannelMessage(
+      session,
+      community.id,
+      channelId,
+      message.id,
+    );
+
+    return true;
+  };
+
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
     if (
       !selectedChannelId ||
@@ -290,14 +325,11 @@ export function useCommunityMessageComposer({
 
     if (!window.confirm(copy.messages.deleteConfirm)) return;
 
-    setError(null);
     try {
-      await applicationContainer.deleteCommunityChannelMessage(
-        session,
-        community.id,
-        selectedChannelId,
-        message.id,
-      );
+      const deleted = await deleteChannelMessage(message);
+
+      if (!deleted) return;
+
       setMessages((current) =>
         current.filter((item) => item.id !== message.id),
       );
@@ -599,7 +631,9 @@ export function useCommunityMessageComposer({
     attachmentProgress,
     cancelEditingChannelMessage,
     clearReplyTarget,
+    deleteChannelMessage,
     draft,
+    editChannelMessage,
     editingMessage: editingMessage?.message ?? null,
     error,
     handleDeleteChannelMessage,

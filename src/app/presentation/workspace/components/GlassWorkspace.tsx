@@ -168,6 +168,7 @@ type MessageCollectionState = {
 };
 type ConversationThreadState = MessageCollectionState & {
   draft: string;
+  editingMessage: EditingMessage | null;
   root: ChatMessage;
 };
 type EditingMessage = {
@@ -177,6 +178,63 @@ type EditingMessage = {
 
 function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
+}
+
+function mergeConversationMessageIfTargetExists(
+  currentMessages: ChatMessage[],
+  incomingMessage: ChatMessage,
+): ChatMessage[] {
+  const targetMessageId = incomingMessage.raw.targetMessageId;
+
+  if (
+    incomingMessage.raw.type === 'edited' &&
+    targetMessageId &&
+    !currentMessages.some((message) => message.id === targetMessageId)
+  ) {
+    return currentMessages;
+  }
+
+  return MessageCollection.merge(currentMessages, [incomingMessage]);
+}
+
+function mergeConversationThreadMessage(
+  currentThread: ConversationThreadState,
+  incomingMessage: ChatMessage,
+): ConversationThreadState {
+  const rootMessages = mergeConversationMessageIfTargetExists(
+    [currentThread.root],
+    incomingMessage,
+  );
+
+  return {
+    ...currentThread,
+    messages: mergeConversationMessageIfTargetExists(
+      currentThread.messages,
+      incomingMessage,
+    ),
+    root:
+      rootMessages.find((message) => message.id === currentThread.root.id) ??
+      currentThread.root,
+  };
+}
+
+function removeConversationThreadMessage(
+  currentThread: ConversationThreadState,
+  messageId: string,
+): ConversationThreadState | null {
+  if (currentThread.root.id === messageId) return null;
+
+  const deletingEditedMessage =
+    currentThread.editingMessage?.message.id === messageId;
+
+  return {
+    ...currentThread,
+    draft: deletingEditedMessage
+      ? (currentThread.editingMessage?.previousDraft ?? '')
+      : currentThread.draft,
+    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    messages: currentThread.messages.filter((message) => message.id !== messageId),
+  };
 }
 
 function canActOnMembershipRequest(
@@ -2181,6 +2239,7 @@ export function GlassWorkspace({
     setMessageContextMenu(null);
     setConversationThread({
       draft: '',
+      editingMessage: null,
       error: null,
       messages: [],
       root: message,
@@ -2195,6 +2254,7 @@ export function GlassWorkspace({
 
       setConversationThread({
         draft: '',
+        editingMessage: null,
         error: null,
         messages: result.messages,
         root: message,
@@ -2203,6 +2263,7 @@ export function GlassWorkspace({
     } catch (caught) {
       setConversationThread({
         draft: '',
+        editingMessage: null,
         error: toUserErrorMessage(caught, copy.messages.threadError),
         messages: [],
         root: message,
@@ -2302,6 +2363,110 @@ export function GlassWorkspace({
     setConversationThread((current) =>
       current ? { ...current, draft: value } : current,
     );
+  };
+
+  const startEditingConversationThreadMessage = (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: message.content,
+            editingMessage: {
+              message,
+              previousDraft: current.draft,
+            },
+          }
+        : current,
+    );
+  };
+
+  const cancelConversationThreadEdit = () => {
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: current.editingMessage?.previousDraft ?? '',
+            editingMessage: null,
+          }
+        : current,
+    );
+  };
+
+  const handleEditConversationThreadMessage = async (content: string) => {
+    if (!activeConversation?.id || !conversationThread?.editingMessage) return;
+
+    const targetMessage = conversationThread.editingMessage.message;
+
+    setConversationThread((current) =>
+      current ? { ...current, error: null } : current,
+    );
+    try {
+      const editEvent = await applicationContainer.editMessage(
+        session,
+        activeConversation.id,
+        targetMessage.id,
+        content,
+      );
+
+      setMessages((current) =>
+        mergeConversationMessageIfTargetExists(current, editEvent),
+      );
+      setConversationThread((current) =>
+        current
+          ? {
+              ...mergeConversationThreadMessage(current, editEvent),
+              draft: '',
+              editingMessage: null,
+              error: null,
+            }
+          : current,
+      );
+    } catch (caught) {
+      setConversationThread((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.editError),
+            }
+          : current,
+      );
+    }
+  };
+
+  const handleDeleteConversationThreadMessage = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current ? { ...current, error: null } : current,
+    );
+    try {
+      await applicationContainer.deleteMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setMessages((current) =>
+        current.filter((item) => item.id !== message.id),
+      );
+      setConversationThread((current) => {
+        if (!current) return current;
+
+        return removeConversationThreadMessage(current, message.id);
+      });
+    } catch (caught) {
+      setConversationThread((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.deleteError),
+            }
+          : current,
+      );
+    }
   };
 
   const sendConversationThreadMessage = async (
@@ -2606,13 +2771,26 @@ export function GlassWorkspace({
 
         if (!message) return;
 
-        setMessages((current) => MessageCollection.merge(current, [message]));
-
         const isEditMessage = message.raw.type === 'edited';
+        const isThreadReply = Boolean(message.replyToMessageId);
+
+        if (isThreadReply || isEditMessage) {
+          setConversationThread((current) =>
+            current ? mergeConversationThreadMessage(current, message) : current,
+          );
+        }
+
+        if (!isThreadReply) {
+          setMessages((current) =>
+            isEditMessage
+              ? mergeConversationMessageIfTargetExists(current, message)
+              : MessageCollection.merge(current, [message]),
+          );
+        }
 
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
-          scrollMessagesToBottom('smooth', true);
+          if (!isThreadReply) scrollMessagesToBottom('smooth', true);
         } else if (!isEditMessage) {
           setNewMessageCount((current) => current + 1);
         }
@@ -3103,6 +3281,11 @@ export function GlassWorkspace({
               setMessages((current) =>
                 current.filter((message) => message.id !== targetMessageId),
               );
+              setConversationThread((current) =>
+                current
+                  ? removeConversationThreadMessage(current, targetMessageId)
+                  : current,
+              );
             }
 
             return;
@@ -3490,12 +3673,15 @@ export function GlassWorkspace({
                 currentIdentityId={session.identity.id}
                 disabled={!activeConversationKey}
                 draft={conversationThread.draft}
+                editingMessage={conversationThread.editingMessage?.message ?? null}
                 error={conversationThread.error}
                 identityNames={identityNames}
                 identityPictures={identityPictures}
                 messages={conversationThread.messages}
+                onCancelEdit={cancelConversationThreadEdit}
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
+                onEdit={handleEditConversationThreadMessage}
                 onMessageMenuOpen={(message, x, y) =>
                   setMessageContextMenu({ message, source: 'thread', x, y })
                 }
@@ -3843,8 +4029,16 @@ export function GlassWorkspace({
             onDeclineNotification={(notificationId) =>
               void declineNotification(notificationId)
             }
-            onDeleteMessage={(message) => void handleDeleteMessage(message)}
-            onEditMessage={startEditingMessage}
+            onDeleteMessage={(message) =>
+              void (messageContextMenu?.source === 'thread'
+                ? handleDeleteConversationThreadMessage(message)
+                : handleDeleteMessage(message))
+            }
+            onEditMessage={(message) =>
+              messageContextMenu?.source === 'thread'
+                ? startEditingConversationThreadMessage(message)
+                : startEditingMessage(message)
+            }
             onCopyMessage={copyMessageContent}
             onOpenMessageThread={(message) => void openMessageThread(message)}
             onPinMessage={(message) => void pinMessage(message)}
