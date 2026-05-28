@@ -13,6 +13,18 @@ export class MessageCollection {
     return undefined;
   }
 
+  public static latestDeliveredTimestamp(
+    messages: readonly ChatMessage[],
+  ): number | undefined {
+    return messages.reduce<number | undefined>((latestTimestamp, message) => {
+      if (message.deliveryStatus) return latestTimestamp;
+
+      return latestTimestamp === undefined
+        ? message.timestamp
+        : Math.max(latestTimestamp, message.timestamp);
+    }, undefined);
+  }
+
   public static merge(
     currentMessages: ChatMessage[],
     incomingMessages: ChatMessage[],

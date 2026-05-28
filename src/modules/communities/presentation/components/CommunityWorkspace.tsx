@@ -220,6 +220,7 @@ export function CommunityWorkspace({
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [communityDataOpen, setCommunityDataOpen] = useState(false);
@@ -383,9 +384,13 @@ export function CommunityWorkspace({
         if (!element) return;
 
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        element.classList.add('message-focus-ring');
+        const focusTarget =
+          element.querySelector<HTMLElement>('[data-message-bubble]') ??
+          element;
+
+        focusTarget.classList.add('message-focus-ring');
         window.setTimeout(
-          () => element.classList.remove('message-focus-ring'),
+          () => focusTarget.classList.remove('message-focus-ring'),
           1600,
         );
       });
@@ -913,6 +918,7 @@ export function CommunityWorkspace({
     const avatar = community.avatar?.trim();
 
     setAvatarUrl(null);
+    setAvatarViewerOpen(false);
 
     if (!avatar) return undefined;
 
@@ -1046,7 +1052,7 @@ export function CommunityWorkspace({
       )}
       <aside
         className={cx(
-          'app-safe-area-drawer-until-lg fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:p-0',
+          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-full max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none',
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
@@ -1179,6 +1185,7 @@ export function CommunityWorkspace({
           onCommunityMenuToggle={() =>
             setCommunityMenuOpen((isOpen) => !isOpen)
           }
+          onOpenAvatar={avatarUrl ? () => setAvatarViewerOpen(true) : undefined}
           onOpenMobileSidebar={onOpenMobileSidebar}
           onRealtimeEventsOpen={onRealtimeEventsOpen}
           realtimeStatus={realtimeStatus}
@@ -1396,6 +1403,8 @@ export function CommunityWorkspace({
       />
 
       <CommunityWorkspaceDialogs
+        avatarUrl={avatarUrl}
+        avatarViewerOpen={avatarViewerOpen}
         bannerUrl={bannerUrl}
         bannerViewerOpen={bannerViewerOpen}
         community={community}
@@ -1412,6 +1421,7 @@ export function CommunityWorkspace({
         memberOpen={memberOpen}
         messageContextMenu={messageContextMenu}
         nodeNetworks={nodeNetworks}
+        onCloseAvatarViewer={() => setAvatarViewerOpen(false)}
         onCloseBannerViewer={() => setBannerViewerOpen(false)}
         onCloseCommunityData={() => setCommunityDataOpen(false)}
         onCloseCommunityKey={closeCommunityKeyDialog}

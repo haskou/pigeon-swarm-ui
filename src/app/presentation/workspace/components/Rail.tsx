@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
@@ -7,6 +8,10 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { publicFileObjectUrl } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
+import {
+  type InstallState,
+  useInstallPrompt,
+} from '../../../../shared/presentation/hooks/useInstallPrompt';
 
 interface RailProps {
   activeMessages?: boolean;
@@ -43,6 +48,30 @@ export function Rail({
   peerCount = 0,
   settingsAttention = false,
 }: RailProps) {
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  const { installState, requestInstall } = useInstallPrompt();
+
+  const handleInstallApp = async () => {
+    const installOutcome = await requestInstall();
+
+    if (installOutcome === 'accepted') {
+      setInstallHelpOpen(false);
+
+      return;
+    }
+
+    if (installState !== 'installed') {
+      setInstallHelpOpen(true);
+    }
+  };
+
+  const showInstallApp = installState !== 'installed';
+  const installButtonReady = installState === 'ready';
+  const installButtonPrompting = installState === 'prompting';
+  const installTitle = installButtonReady
+    ? copy.auth.installApp
+    : copy.auth.installAppInstructions;
+
   return (
     <aside
       className={cx(
@@ -104,6 +133,30 @@ export function Rail({
           +<span className="sr-only">{copy.communities.createTooltip}</span>
         </button>
       </div>
+      {showInstallApp && (
+        <button
+          type="button"
+          onClick={handleInstallApp}
+          aria-busy={installButtonPrompting}
+          className={cx(
+            'relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/12 hover:text-white',
+            installButtonReady &&
+              'border-cyan-200/30 bg-cyan-300/10 text-cyan-100',
+            installButtonPrompting && 'cursor-wait opacity-70',
+          )}
+          aria-label={installTitle}
+          title={installTitle}
+        >
+          <InstallIcon />
+        </button>
+      )}
+      {installHelpOpen && showInstallApp && (
+        <InstallHelpDialog
+          body={installFallbackHelp(installState)}
+          onClose={() => setInstallHelpOpen(false)}
+          title={copy.auth.installAppInstructions}
+        />
+      )}
       <button
         type="button"
         onClick={onNotificationsClick}
@@ -195,6 +248,85 @@ export function Rail({
         )}
       </button>
     </aside>
+  );
+}
+
+function isIosBrowser(): boolean {
+  return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
+}
+
+function installFallbackHelp(installState: InstallState): string {
+  if (installState === 'checking') return copy.auth.installAppChecking;
+  if (import.meta.env.DEV) return copy.auth.installAppDevHelp;
+  if (isIosBrowser()) return copy.auth.installAppIosHelp;
+
+  return copy.auth.installAppHelp;
+}
+
+function InstallHelpDialog({
+  body,
+  onClose,
+  title,
+}: {
+  body: string;
+  onClose: () => void;
+  title: string;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[120] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        className="glass-panel-strong relative w-full max-w-sm rounded-2xl p-5 text-left shadow-2xl shadow-black/40"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-black">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-white/60">{body}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
+            aria-label={copy.dialog.close}
+          >
+            ×
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function InstallIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-5 w-5"
+    >
+      <path
+        d="M8 4.75h8A1.75 1.75 0 0 1 17.75 6.5v11A1.75 1.75 0 0 1 16 19.25H8a1.75 1.75 0 0 1-1.75-1.75v-11A1.75 1.75 0 0 1 8 4.75Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 8v5.5m0 0 2-2m-2 2-2-2M10.75 16.25h2.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 

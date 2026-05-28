@@ -19,6 +19,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { ConversationPeer } from '../../domain/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState = 'idle' | 'loading' | 'ready';
@@ -29,6 +30,7 @@ type SelectedIdentity = {
 };
 
 interface CreateConversationDialogProps {
+  conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
@@ -36,6 +38,7 @@ interface CreateConversationDialogProps {
 }
 
 export function CreateConversationDialog({
+  conversations,
   nodeNetworks,
   onClose,
   onCreated,
@@ -98,8 +101,23 @@ export function CreateConversationDialog({
   const peerDisplayName = peerIdentity
     ? identityPrimaryName(peerIdentity)
     : null;
+  const existingDirectConversation = useMemo(() => {
+    if (!peerIdentity) return undefined;
+
+    return conversations.find(
+      (conversation) =>
+        ConversationPeer.identityId(
+          conversation,
+          session.identity.id,
+          session.keychain,
+        ) === peerIdentity.id,
+    );
+  }, [conversations, peerIdentity, session.identity.id, session.keychain]);
   const canSubmitDirect =
-    !!peerIdentity && !!selectedNetworkId && state !== 'loading';
+    !!peerIdentity &&
+    !!selectedNetworkId &&
+    !existingDirectConversation &&
+    state !== 'loading';
   const canSubmitGroup =
     groupName.trim().length > 0 &&
     groupParticipants.length > 0 &&
@@ -248,11 +266,21 @@ export function CreateConversationDialog({
 
     if (!identityLookup) return;
 
+    if (!peerIdentity) return;
+
+    if (existingDirectConversation) {
+      setError(copy.dialog.directConversationAlreadyExists);
+
+      return;
+    }
+
     if (!selectedNetworkId) {
       setError(copy.dialog.noSharedNetwork);
 
       return;
     }
+
+    if (!canSubmitDirect) return;
 
     setState('loading');
     setError(null);
@@ -406,6 +434,11 @@ export function CreateConversationDialog({
                 name={peerDisplayName}
                 pictureUrl={peerPictureUrl}
               />
+            )}
+            {existingDirectConversation && (
+              <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
+                {copy.dialog.directConversationAlreadyExists}
+              </div>
             )}
             {peerIdentity &&
               lookupState === 'ready' &&

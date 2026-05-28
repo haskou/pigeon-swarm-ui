@@ -4,6 +4,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { ListConversationsPort } from '../ports/ListConversationsPort';
 
+import { MessageCollection } from '../../../messages/domain/MessageCollection';
 import { ConversationTimeline } from '../../domain/ConversationTimeline';
 import { ListConversationsMessage } from './messages/ListConversationsMessage';
 
@@ -38,10 +39,11 @@ export class ListConversations {
             null,
             1,
           );
-          const latestMessage = messages[messages.length - 1];
+          const latestMessageAt =
+            MessageCollection.latestDeliveredTimestamp(messages);
 
-          return latestMessage
-            ? { ...conversation, latestMessageAt: latestMessage.timestamp }
+          return latestMessageAt !== undefined
+            ? { ...conversation, latestMessageAt }
             : conversation;
         } catch {
           return conversation;

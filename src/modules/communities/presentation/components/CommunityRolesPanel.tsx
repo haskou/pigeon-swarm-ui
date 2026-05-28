@@ -6,6 +6,7 @@ import type {
 import { useState } from 'react';
 
 import { ALL_COMMUNITY_PERMISSIONS } from '../../domain/CommunityAccessPolicy';
+import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 
@@ -39,10 +40,15 @@ export function CommunityRolesPanel({
   const [pendingDeleteRoleId, setPendingDeleteRoleId] = useState<
     string | null
   >(null);
+  const selectedRoleIsBuiltIn = selectedRole?.builtIn ?? false;
+  const displayedRoleName =
+    selectedRoleIsBuiltIn && selectedRole
+      ? communityRoleDisplayName(selectedRole)
+      : roleName;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <div className="flex min-h-[24rem] flex-col rounded-2xl border border-white/10 bg-black/20 p-3">
+    <div className="grid min-h-0 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-black/20 p-3">
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {roles.map((role) => (
             <button
@@ -56,7 +62,7 @@ export function CommunityRolesPanel({
                   : 'bg-white/8 text-white/75 hover:bg-white/12',
               )}
             >
-              {role.name}
+              {communityRoleDisplayName(role)}
             </button>
           ))}
         </div>
@@ -66,16 +72,24 @@ export function CommunityRolesPanel({
             onRoleSelect('');
             onRoleNameChange('');
           }}
-          className="mt-3 w-full rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
+          className="mt-3 w-full shrink-0 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
         >
           + {copy.communities.role}
         </button>
       </div>
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <input
-          value={roleName}
-          onChange={(event) => onRoleNameChange(event.target.value)}
-          className="mb-4 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none focus:border-cyan-300/60"
+          value={displayedRoleName}
+          onChange={(event) => {
+            if (selectedRoleIsBuiltIn) return;
+
+            onRoleNameChange(event.target.value);
+          }}
+          readOnly={selectedRoleIsBuiltIn}
+          className={cx(
+            'mb-4 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none focus:border-cyan-300/60',
+            selectedRoleIsBuiltIn && 'cursor-default',
+          )}
           placeholder={copy.communities.roleName}
         />
         <div className="grid gap-2 sm:grid-cols-2">
@@ -92,7 +106,7 @@ export function CommunityRolesPanel({
                     : 'border-white/10 bg-white/8 text-white/75 hover:bg-white/12 hover:text-white',
                 )}
               >
-                <span>{permission.replace(/_/g, ' ')}</span>
+                <span>{permissionLabel(permission)}</span>
                 <span
                   aria-hidden="true"
                   className={cx(
@@ -118,7 +132,9 @@ export function CommunityRolesPanel({
           <button
             type="button"
             onClick={selectedRole ? onUpdateRole : onCreateRole}
-            disabled={!roleName.trim() || state === 'loading'}
+            disabled={
+              selectedRoleIsBuiltIn || !roleName.trim() || state === 'loading'
+            }
             className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {state === 'loading'
@@ -173,4 +189,8 @@ export function CommunityRolesPanel({
       </div>
     </div>
   );
+}
+
+function permissionLabel(permission: CommunityPermission): string {
+  return copy.communities.permissions[permission];
 }

@@ -23,6 +23,7 @@ export function CommunityHeader({
   menuContent,
   networkName,
   onCommunityMenuToggle,
+  onOpenAvatar,
   onOpenMobileSidebar,
   onRealtimeEventsOpen,
   realtimeStatus,
@@ -39,6 +40,7 @@ export function CommunityHeader({
   menuContent?: ReactNode;
   networkName: string;
   onCommunityMenuToggle: () => void;
+  onOpenAvatar?: () => void;
   onOpenMobileSidebar: () => void;
   onRealtimeEventsOpen?: () => void;
   realtimeStatus: 'connected' | 'reconnecting';
@@ -57,14 +59,20 @@ export function CommunityHeader({
   return (
     <WorkspaceHeader
       avatar={
-        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
+        <button
+          type="button"
+          onClick={onOpenAvatar}
+          disabled={!onOpenAvatar}
+          className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-default"
+          aria-label={copy.communities.openAvatar}
+        >
           <FallbackImage
             src={avatarUrl}
             alt=""
             className="h-full w-full object-cover"
             fallback={community.name.slice(0, 1).toUpperCase()}
           />
-        </div>
+        </button>
       }
       lock={
         <span

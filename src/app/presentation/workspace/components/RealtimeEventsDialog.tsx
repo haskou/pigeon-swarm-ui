@@ -21,7 +21,7 @@ export function RealtimeEventsDialog({
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-              WebSocket
+              {copy.chat.realtimeEventsEyebrow}
             </div>
             <h2 className="mt-1 text-xl font-black text-white">
               {copy.chat.realtimeEventsTitle}

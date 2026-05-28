@@ -8,6 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { stickerAssetUrl } from './stickerPressPreview';
@@ -53,7 +54,7 @@ export function StickerPackPreviewDialog({
         new Set(library.savedPacks.map((savedPack) => savedPack.id)),
       );
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker pack could not be loaded.'));
+      setError(toUserErrorMessage(caught, copy.stickers.packLoadError));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export function StickerPackPreviewDialog({
         return next;
       });
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
+      setError(toUserErrorMessage(caught, copy.stickers.saveError));
     } finally {
       setSaving(false);
     }
@@ -108,15 +109,16 @@ export function StickerPackPreviewDialog({
         <div className="mb-4 flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              Sticker pack
+              {copy.stickers.stickerPack}
             </div>
             <h2 className="truncate text-xl font-black">
-              {pack?.name ?? 'Sticker pack'}
+              {pack?.name ?? copy.stickers.stickerPack}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={copy.dialog.close}
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15"
           >
             x
@@ -129,7 +131,7 @@ export function StickerPackPreviewDialog({
         )}
         {loading ? (
           <div className="grid min-h-40 place-items-center text-sm text-white/45">
-            Loading...
+            {copy.app.loading}
           </div>
         ) : (
           <>
@@ -137,11 +139,11 @@ export function StickerPackPreviewDialog({
               type="button"
               onClick={() => void sendSticker(sticker)}
               className="mb-4 flex w-full justify-center rounded-2xl bg-white/5 p-4 transition hover:bg-white/10"
-              title="Send sticker"
+              title={copy.stickers.sendSticker}
             >
               <img
                 src={stickerAssetUrl(sticker.assetCid)}
-                alt="Sticker"
+                alt={copy.stickers.stickerAlt}
                 className="max-h-48 max-w-full object-contain"
               />
             </button>
@@ -159,11 +161,11 @@ export function StickerPackPreviewDialog({
                       })
                     }
                     className="grid aspect-square place-items-center rounded-xl bg-black/20 p-1 transition hover:bg-white/10"
-                    title="Send sticker"
+                    title={copy.stickers.sendSticker}
                   >
                     <img
                       src={stickerAssetUrl(packSticker.assetCid)}
-                      alt="Sticker"
+                      alt={copy.stickers.stickerAlt}
                       className="max-h-full max-w-full object-contain"
                     />
                   </button>
@@ -176,7 +178,9 @@ export function StickerPackPreviewDialog({
               disabled={saving}
               className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-45"
             >
-              {saved ? 'Remove sticker pack' : 'Add sticker pack'}
+              {saved
+                ? copy.stickers.removeStickerPack
+                : copy.stickers.addStickerPack}
             </button>
           </>
         )}

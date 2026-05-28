@@ -118,10 +118,10 @@ describe(CommunityWorkspaceDialogActions.name, () => {
   it('builds profile role names including the owner badge and assigned roles', () => {
     expect(
       CommunityWorkspaceDialogActions.profileRoleNames(community(), 'owner-a'),
-    ).toEqual([copy.communities.owner, 'everyone']);
+    ).toEqual([copy.communities.owner, copy.communities.visibleToEveryone]);
 
     expect(
       CommunityWorkspaceDialogActions.profileRoleNames(community(), 'member-a'),
-    ).toEqual(['everyone', 'Ops']);
+    ).toEqual([copy.communities.visibleToEveryone, 'Ops']);
   });
 });

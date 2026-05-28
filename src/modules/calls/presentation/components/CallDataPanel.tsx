@@ -1,5 +1,7 @@
 import type { CallSession } from '../../domain/callSession.types';
 
+import { copy } from '../../../../shared/presentation/i18n/copy';
+
 export function CallDataPanel({ call }: { call: CallSession }) {
   const data = {
     call: call.call ?? null,
@@ -33,7 +35,7 @@ export function CallDataPanel({ call }: { call: CallSession }) {
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
       <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white/40">
-        Call data
+        {copy.calls.callData}
       </h3>
       <pre className="mt-3 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/35 p-3 text-xs leading-relaxed text-white/70">
         {JSON.stringify(data, null, 2)}

@@ -18,7 +18,7 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { loadIdentityPicture } from './communityImages';
-import { memberDisplayName } from './communityMemberNames';
+import { memberPrimaryName } from './communityMemberNames';
 
 export function useCommunityMembers({
   activeCall,
@@ -128,7 +128,7 @@ export function useCommunityMembers({
       Object.fromEntries(
         community.memberIds.map((identityId) => [
           identityId,
-          memberDisplayName(memberIdentities[identityId], identityId),
+          memberPrimaryName(memberIdentities[identityId], identityId),
         ]),
       ),
     [community.memberIds, memberIdentities],

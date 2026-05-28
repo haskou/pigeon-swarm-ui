@@ -39,25 +39,25 @@ export const VoiceChannelButton = memo(function VoiceChannelButton({
     <div
       className={cx(
         'overflow-hidden rounded-2xl',
-        active ? 'bg-white/10' : 'bg-white/5',
+        active ? 'bg-white/10' : 'bg-transparent',
       )}
     >
       <button
         type="button"
         onClick={() => onJoin(channel)}
         className={cx(
-          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-black transition',
-          active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/8',
+          'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-black transition',
+          active ? 'text-emerald-200' : 'text-white/75 hover:bg-white/12',
         )}
         title={copy.calls.joinVoice}
       >
-        <span className="text-emerald-300">
+        <span className="grid w-5 place-items-center text-emerald-300">
           <VoiceIcon />
         </span>
         <span className="min-w-0 flex-1 truncate">{channel.name}</span>
       </button>
       {participants.length > 0 && (
-        <div className="space-y-1 px-3 pb-3">
+        <div className="space-y-0.5 px-3 pb-2">
           {participants.map((participant) => (
             <VoiceParticipantButton
               active={active}

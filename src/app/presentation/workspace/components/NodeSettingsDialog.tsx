@@ -37,10 +37,11 @@ export function NodeSettingsDialog({
   useCloseOnEscape(onClose);
 
   const [joinCode, setJoinCode] = useState('');
+  const [createName, setCreateName] = useState('');
   const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<
-    'claim' | 'join' | 'public' | 'remove' | null
+    'claim' | 'create' | 'join' | 'public' | 'remove' | null
   >(null);
   const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
     node?.owner === session.identity.id ? session.identity : null,
@@ -166,6 +167,24 @@ export function NodeSettingsDialog({
     setLoading(null);
   };
 
+  const handleCreateNetwork = async (event: FormEvent) => {
+    event.preventDefault();
+    const name = createName.trim();
+
+    if (!name) return;
+
+    setError(null);
+    setLoading('create');
+    try {
+      await applicationContainer.createNodeNetwork(session, name);
+      setCreateName('');
+      await onNetworksUpdated();
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
+    }
+    setLoading(null);
+  };
+
   const handleCreatePublicNetwork = async () => {
     if (!canCreatePublicNetwork) return;
 
@@ -235,7 +254,7 @@ export function NodeSettingsDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
+      <section className="glass-panel-strong relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
           <div>
             <h2 className="text-xl font-black">{copy.nodeSettings.title}</h2>
@@ -253,177 +272,206 @@ export function NodeSettingsDialog({
           </button>
         </div>
 
-        <div className="grid min-h-0 gap-5 overflow-y-auto p-5 lg:grid-cols-[1fr_1.1fr]">
-          <div className="min-w-0">
-            <div className="mb-5 rounded-2xl bg-black/20 p-4">
-              <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                {copy.nodeSettings.server}
-              </div>
-              <ServerField
-                label={copy.nodeSettings.nodeId}
-                value={node?.id ?? '--'}
-              />
-              <div className="mt-3">
-                <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                  {copy.nodeSettings.owner}
+        <div className="min-h-0 overflow-y-auto">
+          <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.1fr]">
+            <div className="min-w-0">
+              <div className="mb-5 rounded-2xl bg-black/20 p-4">
+                <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                  {copy.nodeSettings.server}
                 </div>
-                <div className="rounded-2xl bg-black/25 px-3 py-2">
-                  <div className="truncate text-sm font-black text-white">
-                    {ownerLabel}
+                <ServerField
+                  label={copy.nodeSettings.nodeId}
+                  value={node?.id ?? '--'}
+                />
+                <div className="mt-3">
+                  <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    {copy.nodeSettings.owner}
                   </div>
-                  <div className="truncate text-xs text-white/50">
-                    {ownerHandle}
-                  </div>
-                </div>
-              </div>
-              {!node?.owner && (
-                <button
-                  type="button"
-                  onClick={() => void handleClaim()}
-                  disabled={loading !== null}
-                  className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {loading === 'claim'
-                    ? copy.nodeSettings.saving
-                    : copy.nodeSettings.claim}
-                </button>
-              )}
-            </div>
-
-            <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-              {copy.nodeSettings.networks}
-            </div>
-            {canCreatePublicNetwork && (
-              <div className="mb-3 rounded-2xl border border-amber-200/20 bg-amber-300/10 p-3">
-                <div className="flex items-start gap-3">
-                  <NetworkLockBadge publicNetwork />
-                  <p className="min-w-0 text-xs leading-relaxed text-amber-50/70">
-                    {copy.nodeSettings.publicNetworkBody}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleCreatePublicNetwork()}
-                  disabled={loading !== null}
-                  className="mt-3 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {loading === 'public'
-                    ? copy.nodeSettings.saving
-                    : copy.nodeSettings.createPublicNetwork}
-                </button>
-              </div>
-            )}
-            <div className="space-y-2">
-              {networks.map((network) => {
-                const publicNetwork = isPublicNodeNetwork(network);
-                const inviteCode = networkInviteCode(network);
-
-                return (
-                  <div
-                    key={network.id}
-                    className={cx(
-                      'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border p-3 text-left transition',
-                      publicNetwork
-                        ? 'border-amber-200/20 bg-amber-300/10 text-amber-50'
-                        : 'border-emerald-200/15 bg-emerald-300/10 text-white',
-                    )}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <NetworkLockBadge publicNetwork={publicNetwork} />
-                      <div className="min-w-0">
-                        <div className="truncate font-black">
-                          {networkDisplayName(network)}
-                        </div>
-                        <div className="truncate text-xs text-white/45">
-                          {network.id}
-                        </div>
-                      </div>
+                  <div className="rounded-2xl bg-black/25 px-3 py-2">
+                    <div className="truncate text-sm font-black text-white">
+                      {ownerLabel}
                     </div>
-                    {canRemoveNetworks && (
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void copyNetworkCode(network)}
-                          disabled={!inviteCode}
-                          className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
-                          aria-label={copy.nodeSettings.copyCode}
-                          title={
-                            copiedNetworkId === network.id
-                              ? copy.profile.copied
-                              : copy.nodeSettings.copyCode
-                          }
-                        >
-                          <CopyIcon copied={copiedNetworkId === network.id} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleRemoveNetwork(network)}
-                          disabled={loading !== null}
-                          className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
-                          aria-label={copy.nodeSettings.removeNetwork}
-                          title={copy.nodeSettings.removeNetwork}
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    )}
+                    <div className="truncate text-xs text-white/50">
+                      {ownerHandle}
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+                {!node?.owner && (
+                  <button
+                    type="button"
+                    onClick={() => void handleClaim()}
+                    disabled={loading !== null}
+                    className="mt-3 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {loading === 'claim'
+                      ? copy.nodeSettings.saving
+                      : copy.nodeSettings.claim}
+                  </button>
+                )}
+              </div>
+
+              <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                {copy.nodeSettings.networks}
+              </div>
+              {canCreatePublicNetwork && (
+                <div className="mb-3 rounded-2xl border border-amber-200/20 bg-amber-300/10 p-3">
+                  <div className="flex items-start gap-3">
+                    <NetworkLockBadge publicNetwork />
+                    <p className="min-w-0 text-xs leading-relaxed text-amber-50/70">
+                      {copy.nodeSettings.publicNetworkBody}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreatePublicNetwork()}
+                    disabled={loading !== null}
+                    className="mt-3 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {loading === 'public'
+                      ? copy.nodeSettings.saving
+                      : copy.nodeSettings.createPublicNetwork}
+                  </button>
+                </div>
+              )}
+              <div className="space-y-2">
+                {networks.map((network) => {
+                  const publicNetwork = isPublicNodeNetwork(network);
+                  const inviteCode = networkInviteCode(network);
+
+                  return (
+                    <div
+                      key={network.id}
+                      className={cx(
+                        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border p-3 text-left transition',
+                        publicNetwork
+                          ? 'border-amber-200/20 bg-amber-300/10 text-amber-50'
+                          : 'border-emerald-200/15 bg-emerald-300/10 text-white',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <NetworkLockBadge publicNetwork={publicNetwork} />
+                        <div className="min-w-0">
+                          <div className="truncate font-black">
+                            {networkDisplayName(network)}
+                          </div>
+                          <div className="truncate text-xs text-white/45">
+                            {network.id}
+                          </div>
+                        </div>
+                      </div>
+                      {canRemoveNetworks && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void copyNetworkCode(network)}
+                            disabled={!inviteCode}
+                            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+                            aria-label={copy.nodeSettings.copyCode}
+                            title={
+                              copiedNetworkId === network.id
+                                ? copy.profile.copied
+                                : copy.nodeSettings.copyCode
+                            }
+                          >
+                            <CopyIcon copied={copiedNetworkId === network.id} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveNetwork(network)}
+                            disabled={loading !== null}
+                            className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                            aria-label={copy.nodeSettings.removeNetwork}
+                            title={copy.nodeSettings.removeNetwork}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {isOwner ? (
-            <div className="min-w-0 space-y-5">
-              <form
-                onSubmit={handleJoin}
-                className="rounded-2xl bg-black/20 p-4"
-              >
-                <label className="block">
-                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                    {copy.nodeSettings.joinLabel}
-                  </span>
-                  <textarea
-                    value={joinCode}
-                    onChange={(event) => setJoinCode(event.target.value)}
-                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.inviteCodePlaceholder}
-                    required
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={loading !== null}
-                  className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+            {isOwner ? (
+              <div className="min-w-0 space-y-5">
+                <form
+                  onSubmit={handleCreateNetwork}
+                  className="rounded-2xl bg-black/20 p-4"
                 >
-                  {loading === 'join'
-                    ? copy.nodeSettings.saving
-                    : copy.nodeSettings.join}
-                </button>
-              </form>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                      {copy.nodeSettings.createLabel}
+                    </span>
+                    <input
+                      value={createName}
+                      onChange={(event) => setCreateName(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                      placeholder={copy.nodeSettings.createPlaceholder}
+                      required
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={loading !== null || !createName.trim()}
+                    className="mt-3 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {loading === 'create'
+                      ? copy.nodeSettings.saving
+                      : copy.nodeSettings.create}
+                  </button>
+                </form>
 
-              {error && (
-                <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                <form
+                  onSubmit={handleJoin}
+                  className="rounded-2xl bg-black/20 p-4"
+                >
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                      {copy.nodeSettings.joinLabel}
+                    </span>
+                    <textarea
+                      value={joinCode}
+                      onChange={(event) => setJoinCode(event.target.value)}
+                      className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                      placeholder={copy.network.inviteCodePlaceholder}
+                      required
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={loading !== null}
+                    className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {loading === 'join'
+                      ? copy.nodeSettings.saving
+                      : copy.nodeSettings.join}
+                  </button>
+                </form>
+
+                {error && (
+                  <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                    {error}
+                  </div>
+                )}
+              </div>
+            ) : (
+              error && (
+                <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
                   {error}
                 </div>
-              )}
-            </div>
-          ) : (
-            error && (
-              <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
-                {error}
-              </div>
-            )
+              )
+            )}
+          </div>
+
+          {isOwner && (
+            <ReplicationStatusPanel
+              error={replicationError}
+              loading={replicationLoading}
+              status={replicationStatus}
+            />
           )}
         </div>
-
-        {isOwner && (
-          <ReplicationStatusPanel
-            error={replicationError}
-            loading={replicationLoading}
-            status={replicationStatus}
-          />
-        )}
       </section>
     </div>,
     document.body,

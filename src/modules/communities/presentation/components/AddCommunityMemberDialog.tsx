@@ -51,8 +51,8 @@ export function AddCommunityMemberDialog({
   );
   const [inviteLink, setInviteLink] = useState('');
   const modeOptions = [
-    { label: 'Find identity', value: 'identity' },
-    { label: 'Create invite link', value: 'link' },
+    { label: copy.communities.addMemberFindIdentity, value: 'identity' },
+    { label: copy.communities.addMemberCreateInviteLink, value: 'link' },
   ] satisfies Array<{ label: string; value: AddMemberMode }>;
 
   useEffect(() => {
@@ -203,7 +203,7 @@ export function AddCommunityMemberDialog({
                     void addMember();
                   }}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="@ada or identity id"
+                  placeholder={copy.communities.memberIdentityPlaceholder}
                 />
               </Field>
             </div>

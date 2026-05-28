@@ -7,6 +7,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import {
   VoiceChannelButton,
   type VoiceParticipantView,
@@ -47,15 +48,17 @@ export function CommunityChannelList({
   return (
     <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
       <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-        {copy.communities.channels}
+        {copy.communities.textChannels}
       </div>
-      <input
-        value={channelSearch}
-        onChange={(event) => onChannelSearchChange(event.target.value)}
-        className="mb-3 w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+      <ClearableSearchInput
+        ariaLabel={copy.communities.searchChannels}
+        className="mb-3"
+        clearLabel={copy.communities.clearChannelSearch}
+        onChange={onChannelSearchChange}
         placeholder={copy.communities.searchChannels}
+        value={channelSearch}
       />
-      <div className="space-y-2">
+      <div className="space-y-0.5">
         {textChannels.length === 0 && voiceChannels.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
             {copy.communities.noChannels}
@@ -77,11 +80,11 @@ export function CommunityChannelList({
               />
             ))}
             {visibleVoiceChannels.length > 0 && (
-              <div className="pt-3">
+              <div className="pt-2">
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   {copy.calls.voiceChannels}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-0.5">
                   {visibleVoiceChannels.map((channel) => (
                     <VoiceChannelButton
                       key={channel.id}
@@ -120,10 +123,10 @@ function TextChannelButton({
       type="button"
       onClick={() => onSelect(channel.id)}
       className={cx(
-        'flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-black transition',
+        'flex w-full items-center gap-2 rounded-2xl px-3 py-1.5 text-left text-sm font-black transition',
         active
           ? 'bg-white text-slate-950'
-          : 'bg-white/8 text-white hover:bg-white/14',
+          : 'text-white hover:bg-white/12',
       )}
     >
       <span className="min-w-0 flex-1 truncate"># {channel.name}</span>

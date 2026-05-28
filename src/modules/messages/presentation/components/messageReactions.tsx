@@ -65,7 +65,9 @@ export function groupMessageReactions(
     };
 
     current.authors.push(
-      authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId,
+      reactionTitleAuthorName(
+        authorNames[reaction.authorIdentityId] ?? reaction.authorIdentityId,
+      ),
     );
     current.count += 1;
     current.lastCreatedAt = Math.max(current.lastCreatedAt, reaction.createdAt);
@@ -81,4 +83,8 @@ export function groupMessageReactions(
       ? left.emoji.localeCompare(right.emoji)
       : createdAtDiff;
   });
+}
+
+function reactionTitleAuthorName(authorName: string): string {
+  return authorName.replace(/\s+\(@[^)]+\)$/, '').trim() || authorName;
 }

@@ -687,7 +687,7 @@ export function Composer({
               type="button"
               onClick={onPollCreate}
               disabled={disabled}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
               aria-label={copy.polls.create}
               title={copy.polls.create}
             >
@@ -714,7 +714,7 @@ export function Composer({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
               aria-label={copy.composer.attach}
             >
               <svg
@@ -778,7 +778,7 @@ export function Composer({
           </span>
           <button
             disabled={!canSend}
-            className="shrink-0 rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4"
+            className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4"
           >
             {isEditing ? copy.messages.saveEdit : copy.composer.send}
           </button>

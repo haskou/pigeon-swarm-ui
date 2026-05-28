@@ -20,6 +20,7 @@ import {
   passwordValidationChecks,
 } from './credentialsValidation';
 import { cx } from '../../../../shared/presentation/cx';
+import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -33,17 +34,6 @@ import { HeroMetric } from './HeroMetric';
 import { PasswordChecklist } from './PasswordChecklist';
 
 type LoadState = 'idle' | 'loading' | 'error';
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-};
-type InstallState =
-  | 'checking'
-  | 'fallback'
-  | 'installed'
-  | 'prompting'
-  | 'ready';
 
 interface AuthScreenProps {
   onAuthenticated: (
@@ -67,11 +57,8 @@ export function AuthScreen({
   const [rememberMe, setRememberMe] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [installState, setInstallState] =
-    useState<InstallState>('checking');
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const { installState, requestInstall } = useInstallPrompt();
   const { networks: availableNetworks } = useNodeNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const modeOptions = [
@@ -93,43 +80,6 @@ export function AuthScreen({
       setPassword(savedCredentials.password);
       setRememberMe(true);
     }
-  }, []);
-
-  useEffect(() => {
-    if (isPwaStandalone()) {
-      setInstallState('installed');
-
-      return undefined;
-    }
-
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-      setInstallState('ready');
-      setShowInstallHelp(false);
-    };
-    const handleAppInstalled = () => {
-      setInstallState('installed');
-      setInstallPrompt(null);
-      setShowInstallHelp(false);
-    };
-    const fallbackTimer = window.setTimeout(() => {
-      setInstallState((current) =>
-        current === 'checking' ? 'fallback' : current,
-      );
-    }, 1600);
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.clearTimeout(fallbackTimer);
-      window.removeEventListener(
-        'beforeinstallprompt',
-        handleBeforeInstallPrompt,
-      );
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
   }, []);
 
   const canSubmit = canSubmitAuthForm({
@@ -208,35 +158,21 @@ export function AuthScreen({
   };
 
   const handleInstallApp = async () => {
-    if (!installPrompt) {
-      setInstallState('fallback');
+    const installOutcome = await requestInstall();
+
+    if (installOutcome === 'accepted') {
+      setShowInstallHelp(false);
+
+      return;
+    }
+
+    if (installState === 'fallback') {
       setShowInstallHelp((current) => !current);
 
       return;
     }
 
-    setInstallState('prompting');
-
-    try {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-
-      setInstallPrompt(null);
-
-      if (choice.outcome === 'accepted') {
-        setInstallState('installed');
-        setShowInstallHelp(false);
-
-        return;
-      }
-
-      setInstallState('fallback');
-      setShowInstallHelp(true);
-    } catch {
-      setInstallPrompt(null);
-      setInstallState('fallback');
-      setShowInstallHelp(true);
-    }
+    setShowInstallHelp(true);
   };
 
   return (
@@ -418,13 +354,6 @@ export function AuthScreen({
         </form>
       </div>
     </section>
-  );
-}
-
-function isPwaStandalone(): boolean {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }
 

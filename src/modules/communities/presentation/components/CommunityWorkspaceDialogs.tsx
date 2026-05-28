@@ -75,6 +75,8 @@ export type CommunityProfileView = CommunityMemberListItem & {
 };
 
 type CommunityWorkspaceDialogsProps = {
+  avatarUrl: string | null;
+  avatarViewerOpen: boolean;
   bannerUrl: string | null;
   bannerViewerOpen: boolean;
   community: Community;
@@ -96,6 +98,7 @@ type CommunityWorkspaceDialogsProps = {
   profileViewer: CommunityProfileView | null;
   rawMessage: ChatMessage | null;
   session: Session;
+  onCloseAvatarViewer: () => void;
   onCloseBannerViewer: () => void;
   onCloseCommunityData: () => void;
   onCloseCommunityKey: () => void;
@@ -125,6 +128,8 @@ type CommunityWorkspaceDialogsProps = {
 };
 
 export function CommunityWorkspaceDialogs({
+  avatarUrl,
+  avatarViewerOpen,
   bannerUrl,
   bannerViewerOpen,
   community,
@@ -146,6 +151,7 @@ export function CommunityWorkspaceDialogs({
   profileViewer,
   rawMessage,
   session,
+  onCloseAvatarViewer,
   onCloseBannerViewer,
   onCloseCommunityData,
   onCloseCommunityKey,
@@ -168,6 +174,19 @@ export function CommunityWorkspaceDialogs({
 }: CommunityWorkspaceDialogsProps) {
   return (
     <Suspense fallback={null}>
+      {avatarViewerOpen && avatarUrl && (
+        <ImageLightbox
+          images={[
+            {
+              alt: community.name,
+              filename: community.avatar ?? community.name,
+              url: avatarUrl,
+            },
+          ]}
+          initialIndex={0}
+          onClose={onCloseAvatarViewer}
+        />
+      )}
       {bannerViewerOpen && bannerUrl && (
         <ImageLightbox
           images={[

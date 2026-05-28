@@ -8,6 +8,7 @@ import {
   playAnsweredCallSound,
 } from '../../../../shared/presentation/sounds';
 import { callParticipantHasActiveScreenShare } from './callParticipantHasActiveScreenShare';
+import { callSessionSubtitle } from './callSessionDisplay';
 import { CompactCallBar } from './CompactCallBar';
 
 const CallStageDialog = lazy(() =>
@@ -49,9 +50,7 @@ export function GlobalCallBar({
 }: GlobalCallBarProps) {
   const [stageOpen, setStageOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
-  const subtitle =
-    call.subtitle ||
-    call.participants.map((participant) => participant.name).join(', ');
+  const subtitle = callSessionSubtitle(call);
   const screenParticipant =
     call.participants.find(
       (participant) =>

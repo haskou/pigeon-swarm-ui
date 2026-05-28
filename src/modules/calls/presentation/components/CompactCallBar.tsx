@@ -14,6 +14,7 @@ import {
   SpeakerIcon,
 } from './callIcons';
 import { VideoPreview } from './VideoPreview';
+import { callSessionTitle } from './callSessionDisplay';
 
 type CompactCallBarProps = {
   call: CallSession;
@@ -141,6 +142,7 @@ function CompactCallTitle({
   call: CallSession;
   subtitle: string;
 }) {
+  const title = callSessionTitle(call);
   const statusText =
     call.status === 'permission-denied'
       ? copy.calls.microphoneUnavailable
@@ -149,7 +151,7 @@ function CompactCallTitle({
   return (
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="truncate text-sm font-black text-white">{call.title}</h2>
+        <h2 className="truncate text-sm font-black text-white">{title}</h2>
       </div>
       <p className="mt-0.5 truncate text-[0.7rem] text-white/45">
         {statusText}

@@ -18,6 +18,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { publicFileObjectUrl } from '../../../identities/presentation/view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -154,12 +155,13 @@ export function CommunityDiscoveryDialog({
           onSubmit={submitSearch}
           className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]"
         >
-          <input
+          <ClearableSearchInput
+            ariaLabel={copy.communities.discoverSearch}
+            clearLabel={copy.communities.clearCommunitySearch}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-cyan-300/60"
+            onChange={setQuery}
+            inputClassName="py-3 placeholder:text-white/35"
             placeholder={copy.communities.discoverSearch}
-            autoFocus
           />
           <GlassSelect
             ariaLabel={copy.communities.network}
