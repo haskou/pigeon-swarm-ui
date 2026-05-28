@@ -2031,6 +2031,7 @@ export function CommunityWorkspace({
               onReplyReferenceClick={messageComposer.handleReplyReferenceClick}
               onRetryMessage={messageComposer.retryChannelMessage}
               canClosePolls={currentPermissions.has('create_polls')}
+              channelThreadSummaries={selectedChannel.threads ?? []}
               onPollClose={closePoll}
               onPollRemoveVote={removePollVote}
               onPollVote={votePoll}

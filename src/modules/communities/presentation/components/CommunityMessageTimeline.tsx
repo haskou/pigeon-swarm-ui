@@ -4,6 +4,7 @@ import { Fragment, memo, type RefObject, useMemo } from 'react';
 import type {
   AttachmentProgress,
   ChatMessage,
+  CommunityChannelThreadSummary,
   IdentityResource,
   MessageAttachment,
   PollResource,
@@ -60,6 +61,7 @@ interface CommunityMessageTimelineProps {
   onRetryMessage: (message: ChatMessage) => void;
   onPollClose?: (poll: PollResource) => Promise<void>;
   canClosePolls: boolean;
+  channelThreadSummaries?: CommunityChannelThreadSummary[];
   onPollRemoveVote?: (poll: PollResource) => Promise<void>;
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
@@ -99,6 +101,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onRetryMessage,
   onScroll,
   onStickerClick,
+  channelThreadSummaries = [],
   pinnedMessageIds,
   polls = [],
   currentRoleIds,
@@ -108,8 +111,19 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   visibleMessages,
 }: CommunityMessageTimelineProps) {
   const timelineEntries = useMemo(
-    () => MessageTimelineEntries.build(visibleMessages, polls),
-    [polls, visibleMessages],
+    () =>
+      MessageTimelineEntries.build(
+        visibleMessages,
+        polls,
+        channelThreadSummaries.map((summary) => ({
+          count: summary.replyCount,
+          lastMessage: visibleMessages.find(
+            (message) => message.id === summary.lastReplyMessageId,
+          ),
+          rootMessageId: summary.rootMessageId,
+        })),
+      ),
+    [channelThreadSummaries, polls, visibleMessages],
   );
 
   return (

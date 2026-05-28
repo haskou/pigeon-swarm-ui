@@ -39,12 +39,12 @@ export class MessageTimelineEntries {
   public static build(
     messages: ChatMessage[],
     polls: PollResource[],
+    threadSummaries: MessageThreadSummary[] = [],
   ): MessageTimelineEntry[] {
-    const threadSummaries =
-      MessageTimelineEntries.threadSummariesByRootMessageId(messages);
-    const rootMessages = messages.filter(
-      (message) => !MessageTimelineEntries.replyToMessageId(message),
+    const threadSummariesByRootMessageId = new Map(
+      threadSummaries.map((summary) => [summary.rootMessageId, summary]),
     );
+    const rootMessages = messages;
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
       rootMessages.map((message) => [message.id, message]),
@@ -83,7 +83,7 @@ export class MessageTimelineEntries {
           : undefined,
         startsNewAuthorRun: startsAuthorRun(previousMessage, item.message),
         startsNewDay,
-        threadSummary: threadSummaries.get(item.message.id),
+        threadSummary: threadSummariesByRootMessageId.get(item.message.id),
         type: 'message',
       });
 
@@ -105,42 +105,6 @@ export class MessageTimelineEntries {
     }
 
     return entries;
-  }
-
-  private static threadSummariesByRootMessageId(
-    messages: ChatMessage[],
-  ): Map<string, MessageThreadSummary> {
-    const summaries = new Map<string, MessageThreadSummary>();
-
-    for (const message of messages) {
-      const replyToMessageId = MessageTimelineEntries.replyToMessageId(message);
-
-      if (!replyToMessageId) continue;
-
-      const current = summaries.get(replyToMessageId);
-
-      if (!current) {
-        summaries.set(replyToMessageId, {
-          count: 1,
-          lastMessage: message,
-          rootMessageId: replyToMessageId,
-        });
-
-        continue;
-      }
-
-      summaries.set(replyToMessageId, {
-        count: current.count + 1,
-        lastMessage:
-          !current.lastMessage ||
-          message.timestamp >= current.lastMessage.timestamp
-            ? message
-            : current.lastMessage,
-        rootMessageId: replyToMessageId,
-      });
-    }
-
-    return summaries;
   }
 
   private static replyToMessageId(message: ChatMessage): string | undefined {
