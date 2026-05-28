@@ -289,7 +289,7 @@ export function CommunityWorkspaceDialogs({
           onPin={
             messageContextMenu.message.kind !== 'poll' &&
             !contextMenuFromThread &&
-            (owner || currentPermissions.has('manage_messages')) &&
+            currentPermissions.has('manage_messages') &&
             !contextMenuMessagePinned
               ? () => onPinMessage(messageContextMenu.message)
               : undefined
@@ -297,7 +297,7 @@ export function CommunityWorkspaceDialogs({
           onUnpin={
             messageContextMenu.message.kind !== 'poll' &&
             !contextMenuFromThread &&
-            (owner || currentPermissions.has('manage_messages')) &&
+            currentPermissions.has('manage_messages') &&
             contextMenuMessagePinned
               ? () => onUnpinMessage(messageContextMenu.message)
               : undefined

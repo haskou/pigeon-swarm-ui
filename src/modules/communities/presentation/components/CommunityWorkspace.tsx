@@ -455,6 +455,7 @@ export function CommunityWorkspace({
   const selectedChannel = textChannelsWithThreads.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const canManageMessages = currentPermissions.has('manage_messages');
   const selectedChannelPolls = useMemo(
     () =>
       selectedChannelId
@@ -550,7 +551,7 @@ export function CommunityWorkspace({
     async (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
 
-      if (!channelId) return;
+      if (!channelId || !canManageMessages) return;
 
       if (channelId !== selectedChannelId) handleChannelSelected(channelId);
 
@@ -750,13 +751,13 @@ export function CommunityWorkspace({
         });
       }
     },
-    [community.id, selectedChannelId, session],
+    [canManageMessages, community.id, selectedChannelId, session],
   );
   const unpinMessageFromDialog = useCallback(
     async (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
 
-      if (!channelId) return;
+      if (!channelId || !canManageMessages) return;
 
       try {
         await applicationContainer.unpinCommunityChannelMessage(
@@ -793,7 +794,7 @@ export function CommunityWorkspace({
         );
       }
     },
-    [community.id, selectedChannelId, session],
+    [canManageMessages, community.id, selectedChannelId, session],
   );
   const unpinMessage = useCallback(
     async (message: ChatMessage) => {
@@ -2107,13 +2108,17 @@ export function CommunityWorkspace({
 
       {messageCollection ? (
         <MessageCollectionDialog
-          actions={[
-            {
-              label: copy.messages.unpin,
-              onClick: (message) => void unpinMessageFromDialog(message),
-              tone: 'danger',
-            },
-          ]}
+          actions={
+            canManageMessages
+              ? [
+                  {
+                    label: copy.messages.unpin,
+                    onClick: (message) => void unpinMessageFromDialog(message),
+                    tone: 'danger',
+                  },
+                ]
+              : []
+          }
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading
