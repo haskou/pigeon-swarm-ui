@@ -107,12 +107,18 @@ import {
 } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { CommunityWorkspace } from '../../../../modules/communities/presentation/components/CommunityWorkspace';
+import {
+  PushNotificationPrompt,
+  type PushNotificationPromptState,
+} from './PushNotificationPrompt';
 import { Rail } from './Rail';
+import { isBrowserPageVisible } from './isBrowserPageVisible';
 import { useCommunitySelection } from './useCommunitySelection';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useWorkspacePresence } from './useWorkspacePresence';
+import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import {
   callSignalTypeAttribute,
   communityAttribute,
@@ -145,7 +151,6 @@ const WorkspaceDialogs = lazy(() =>
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 
 type LoadState = 'idle' | 'loading' | 'error';
-type PushEnableState = 'error' | 'idle' | 'loading';
 type PendingSend = {
   attachmentUpload: AttachmentUploadOptions;
   attachments: File[];
@@ -163,12 +168,6 @@ function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
 }
 
-function isBrowserPageVisible(): boolean {
-  return (
-    typeof document === 'undefined' || document.visibilityState !== 'hidden'
-  );
-}
-
 function canActOnMembershipRequest(
   request: CommunityMembershipRequest,
   communities: Community[],
@@ -184,88 +183,6 @@ function canActOnMembershipRequest(
     (community) =>
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
-  );
-}
-
-function PushNotificationPrompt({
-  enableState,
-  error,
-  onDismiss,
-  onEnable,
-}: {
-  enableState: PushEnableState;
-  error: null | string;
-  onDismiss: () => void;
-  onEnable: () => void;
-}) {
-  const loading = enableState === 'loading';
-
-  return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center lg:bottom-5">
-      <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-cyan-200/25 bg-[#171827]/95 p-3 shadow-2xl shadow-black/35 backdrop-blur">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/15 text-cyan-100">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-5 w-5"
-            >
-              <path
-                d="M18 9.5a6 6 0 0 0-12 0v3.2L4.7 15a1 1 0 0 0 .9 1.5h12.8a1 1 0 0 0 .9-1.5L18 12.7V9.5Z"
-                stroke="currentColor"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M9.6 19a2.6 2.6 0 0 0 4.8 0"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-black leading-tight text-white">
-              {copy.notifications.enablePushTitle}
-            </p>
-            <p className="mt-1 text-xs leading-snug text-white/60">
-              {error ?? copy.notifications.enablePushBody}
-            </p>
-            <button
-              type="button"
-              onClick={onEnable}
-              disabled={loading}
-              className="mt-3 min-h-10 w-full rounded-xl bg-cyan-100 px-4 text-sm font-black text-[#111827] transition hover:bg-white disabled:cursor-wait disabled:opacity-70 sm:w-auto"
-            >
-              {loading
-                ? copy.notifications.enablePushLoading
-                : copy.notifications.enablePush}
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
-            aria-label={copy.notifications.enablePushDismiss}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-4 w-4"
-            >
-              <path
-                d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -370,7 +287,7 @@ export function GlassWorkspace({
       currentPwaNotificationPermission(),
     );
   const [pushEnableState, setPushEnableState] =
-    useState<PushEnableState>('idle');
+    useState<PushNotificationPromptState>('idle');
   const [pushEnableError, setPushEnableError] = useState<string | null>(null);
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
@@ -384,8 +301,6 @@ export function GlassWorkspace({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<LoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
-  const workspaceWasHiddenRef = useRef(!isBrowserPageVisible());
-  const workspaceResumeSyncAtRef = useRef(0);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -1930,77 +1845,15 @@ export function GlassWorkspace({
     workspaceMode,
   ]);
 
-  const syncVisibleWorkspace = useCallback(() => {
-    if (!isBrowserPageVisible()) {
-      workspaceWasHiddenRef.current = true;
-
-      return;
-    }
-
-    if (!workspaceWasHiddenRef.current) return;
-
-    const now = Date.now();
-
-    if (now - workspaceResumeSyncAtRef.current < 1500) return;
-
-    workspaceWasHiddenRef.current = false;
-    workspaceResumeSyncAtRef.current = now;
-
-    void (async () => {
-      const nextConversations = await refreshConversations().catch(
-        () => null,
-      );
-
-      if (
-        workspaceMode === 'messages' &&
-        activeConversation?.id &&
-        activeConversationKeyId &&
-        nextConversations
-      ) {
-        const nextActiveConversation = nextConversations.find(
-          (conversation) => conversation.id === activeConversation.id,
-        );
-
-        if (
-          nextActiveConversation &&
-          !MessageCollection.isCaughtUpWithConversation(
-            messagesRef.current,
-            nextActiveConversation,
-          )
-        ) {
-          await loadActiveMessages(activeConversation.id);
-        }
-      }
-
-      if (workspaceMode === 'community') {
-        await onCommunitiesReload().catch(() => undefined);
-      }
-    })();
-  }, [
-    activeConversation?.id,
+  useWorkspaceResumeSync({
+    activeConversationId: activeConversation?.id,
     activeConversationKeyId,
     loadActiveMessages,
+    loadedMessages: messagesRef,
     onCommunitiesReload,
     refreshConversations,
     workspaceMode,
-  ]);
-  const markWorkspaceHidden = useCallback(() => {
-    workspaceWasHiddenRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener('visibilitychange', syncVisibleWorkspace);
-    window.addEventListener('pagehide', markWorkspaceHidden);
-    window.addEventListener('focus', syncVisibleWorkspace);
-    window.addEventListener('pageshow', syncVisibleWorkspace);
-
-    return () => {
-      document.removeEventListener('visibilitychange', syncVisibleWorkspace);
-      window.removeEventListener('pagehide', markWorkspaceHidden);
-      window.removeEventListener('focus', syncVisibleWorkspace);
-      window.removeEventListener('pageshow', syncVisibleWorkspace);
-    };
-  }, [markWorkspaceHidden, syncVisibleWorkspace]);
+  });
 
   const handleLoadOlder = async () => {
     if (
