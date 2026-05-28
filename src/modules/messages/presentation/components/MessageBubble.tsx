@@ -44,6 +44,7 @@ interface MessageBubbleProps {
   ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
   onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
+  onMessageClick?: (message: ChatMessage) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onMentionClick?: (identityId: string, target: HTMLElement) => void;
   onReactionToggle?: (
@@ -79,6 +80,7 @@ export function MessageBubble({
   onAttachmentOpen,
   onAttachmentPreview,
   onAvatarClick,
+  onMessageClick,
   onMessageMenuOpen,
   onMentionClick,
   onReactionToggle,
@@ -161,6 +163,21 @@ export function MessageBubble({
     event.preventDefault();
     onMessageMenuOpen(message, event.clientX, event.clientY);
   };
+  const handleMessageClick = (event: MouseEvent<HTMLElement>) => {
+    if (!onMessageClick) return;
+
+    const target = event.target;
+    const interactiveElement =
+      target instanceof HTMLElement
+        ? target.closest('a,button,input,textarea,select,[role="button"]')
+        : null;
+
+    if (interactiveElement && interactiveElement !== event.currentTarget) {
+      return;
+    }
+
+    onMessageClick(message);
+  };
   const handlePointerDown = (event: PointerEvent) => {
     if (event.pointerType !== 'touch') return;
 
@@ -214,6 +231,7 @@ export function MessageBubble({
             >
               <div
                 data-message-bubble
+                onClick={handleMessageClick}
                 onContextMenu={handleContextMenu}
                 style={{
                   WebkitTouchCallout: 'none',
@@ -225,6 +243,7 @@ export function MessageBubble({
                 onPointerUp={clearLongPressTimer}
                 className={cx(
                   'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                  onMessageClick && 'cursor-pointer',
                   sticker
                     ? 'rounded-2xl bg-transparent p-0'
                     : cx(

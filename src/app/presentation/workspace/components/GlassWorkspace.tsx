@@ -3503,6 +3503,7 @@ export function GlassWorkspace({
                 }}
                 onSend={sendConversationThreadMessage}
                 onStickerSend={sendConversationThreadSticker}
+                pinnedMessageIds={pinnedMessageIds}
                 rootMessage={conversationThread.root}
                 session={session}
                 title={

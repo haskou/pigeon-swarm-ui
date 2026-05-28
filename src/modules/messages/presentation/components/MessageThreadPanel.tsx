@@ -14,7 +14,6 @@ import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../identities/presentation/view-models/identityDisplay';
-import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { MessageBubble } from './MessageBubble';
 
@@ -33,6 +32,7 @@ export function MessageThreadPanel({
   onRootMessageOpen,
   onSend,
   onStickerSend,
+  pinnedMessageIds = new Set(),
   rootMessage,
   session,
   title,
@@ -55,6 +55,7 @@ export function MessageThreadPanel({
     options: AttachmentUploadOptions,
   ) => Promise<void>;
   onStickerSend?: (sticker: StickerMessageReference) => Promise<void>;
+  pinnedMessageIds?: ReadonlySet<string>;
   rootMessage: ChatMessage;
   session: Session;
   title: string;
@@ -68,6 +69,9 @@ export function MessageThreadPanel({
   });
   const displayName = (identityId: string) =>
     identityPrimaryDisplayName(identityDisplayName(identityId, identityNames));
+  const rootAuthorName = displayName(rootMessage.authorIdentityId);
+  const rootMine =
+    rootMessage.mine || rootMessage.authorIdentityId === currentIdentityId;
 
   return (
     <section
@@ -96,12 +100,27 @@ export function MessageThreadPanel({
             ×
           </button>
         </div>
-        <ThreadRootCard
-          authorName={displayName(rootMessage.authorIdentityId)}
-          authorPicture={identityPictures[rootMessage.authorIdentityId]}
-          message={rootMessage}
-          onOpen={() => onRootMessageOpen(rootMessage)}
-        />
+        <div className="mt-4">
+          <MessageBubble
+            authorName={rootAuthorName}
+            authorPicture={identityPictures[rootMessage.authorIdentityId]}
+            currentIdentityId={currentIdentityId}
+            message={rootMessage}
+            onAttachmentOpen={(attachmentIndex) =>
+              void openAttachment(rootMessage.attachments[attachmentIndex])
+            }
+            onAttachmentPreview={loadAttachmentPreview}
+            onAvatarClick={() => undefined}
+            onMessageClick={onRootMessageOpen}
+            onMessageMenuOpen={onMessageMenuOpen}
+            onReplyReferenceClick={() => undefined}
+            onStickerClick={() => undefined}
+            pinned={pinnedMessageIds.has(rootMessage.id)}
+            reserveAvatarSpace={false}
+            showReplyPreview={false}
+            showAvatar={!rootMine}
+          />
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -125,6 +144,7 @@ export function MessageThreadPanel({
                 onAvatarClick={() => undefined}
                 onMessageMenuOpen={onMessageMenuOpen}
                 onReplyReferenceClick={() => undefined}
+                pinned={pinnedMessageIds.has(message.id)}
                 reserveAvatarSpace={false}
                 showReplyPreview={false}
                 showAvatar={message.authorIdentityId !== currentIdentityId}
@@ -151,51 +171,4 @@ export function MessageThreadPanel({
       />
     </section>
   );
-}
-
-function ThreadRootCard({
-  authorName,
-  authorPicture,
-  message,
-  onOpen,
-}: {
-  authorName: string;
-  authorPicture?: string | null;
-  message: ChatMessage;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="mt-4 flex w-full items-end gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-      aria-label={copy.messages.originalMessage}
-    >
-      <Avatar label={authorName} picture={authorPicture} />
-      <div className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 transition hover:bg-white/12">
-        <div className="truncate text-xs font-black text-white/65">
-          {authorName}
-        </div>
-        <div className="mt-1 truncate text-sm font-black text-white">
-          {messageSummary(message)}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function messageSummary(message: ChatMessage): string {
-  if (message.kind === 'poll') return message.poll?.question ?? copy.polls.poll;
-
-  if (message.sticker) return copy.stickers.stickerAlt;
-
-  if (message.content.trim()) return message.content;
-
-  if (message.attachments.length > 0) {
-    return message.attachments
-      .map((attachment) => attachment.filename)
-      .join(', ');
-  }
-
-  return copy.messages.originalMessage;
 }

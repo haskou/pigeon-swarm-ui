@@ -1755,6 +1755,7 @@ export function CommunityWorkspace({
                 ? sendThreadSticker
                 : undefined
             }
+            pinnedMessageIds={pinnedMessageIds}
             rootMessage={threadPanel.root}
             session={session}
             title={`# ${channelNameFor(threadPanel.channelId)}`}
