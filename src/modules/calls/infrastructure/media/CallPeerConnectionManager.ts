@@ -1,164 +1,40 @@
 import type { CallSignalType } from '../../domain/callSession.types';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
+import {
+  hasAudioTrack,
+  isRemoteScreenShareAudioTrack,
+  isRemoteScreenShareTrack,
+  isScreenShareAudioTrack,
+  isScreenShareTrack,
+  replacementLocalTrack,
+} from './callMediaTrackClassification';
+import {
+  descriptionPayload,
+  type DescriptionSignalPayload,
+  type SignalSender,
+} from './callPeerConnectionSignals';
+import { collectPeerMediaStats, type PeerMediaStats } from './callPeerStats';
+import {
+  graphAudioVolume,
+  isMediaStreamSource,
+  nativeAudioVolume,
+  needsAudioGraph,
+  remoteAudioKey,
+} from './remoteAudioOutput';
 
-export type PeerMediaStats = {
-  audioLevel?: number;
-  connectionState: RTCPeerConnectionState;
-  latencyMs?: number;
-  packetsLost?: number;
-  speaking: boolean;
-};
-
-type AudioInboundStats = {
-  audioLevel?: number;
-  packetsLost?: number;
-};
-
-type CandidatePairStats = {
-  latencyMs?: number;
-};
-
-type BrowserRtcStats = RTCStats & {
-  audioLevel?: unknown;
-  currentRoundTripTime?: unknown;
-  kind?: unknown;
-  packetsLost?: unknown;
-  state?: unknown;
-};
+export type { PeerMediaStats } from './callPeerStats';
 
 type BrowserWindowWithWebkitAudioContext = Window &
   typeof globalThis & {
     webkitAudioContext?: typeof AudioContext;
   };
 
-type SignalSender = (
-  recipientIdentityId: string,
-  signalType: CallSignalType,
-  payload: Record<string, unknown>,
-) => Promise<void>;
-
 type PeerNegotiationState = {
   ignoreOffer: boolean;
   makingOffer: boolean;
   polite: boolean;
 };
-
-type DescriptionSignalPayload = RTCSessionDescriptionInit & {
-  screenAudioStreamIds?: string[];
-  screenAudioTrackIds?: string[];
-  screenStreamIds?: string[];
-  screenTrackIds?: string[];
-};
-
-function descriptionPayload(
-  description: RTCSessionDescriptionInit,
-  screenAudioTrackIds: string[],
-  screenAudioStreamIds: string[],
-  screenTrackIds: string[],
-  screenStreamIds: string[],
-): Record<string, unknown> {
-  return {
-    screenAudioStreamIds,
-    screenAudioTrackIds,
-    screenStreamIds,
-    screenTrackIds,
-    sdp: description.sdp,
-    type: description.type,
-  };
-}
-
-function isScreenShareTrack(track: MediaStreamTrack): boolean {
-  return track.kind === 'video' && track.contentHint === 'detail';
-}
-
-function isScreenShareAudioTrack(track: MediaStreamTrack): boolean {
-  return track.kind === 'audio' && track.contentHint === 'music';
-}
-
-function localTrackSlot(
-  track: MediaStreamTrack,
-): 'camera' | 'microphone' | 'screen' | 'screen-audio' {
-  if (isScreenShareAudioTrack(track)) return 'screen-audio';
-
-  if (track.kind === 'audio') return 'microphone';
-
-  return isScreenShareTrack(track) ? 'screen' : 'camera';
-}
-
-function replacementLocalTrack(
-  currentTrack: MediaStreamTrack,
-  activeTracks: MediaStreamTrack[],
-): MediaStreamTrack | undefined {
-  const slot = localTrackSlot(currentTrack);
-
-  return activeTracks.find((track) => localTrackSlot(track) === slot);
-}
-
-function isRemoteScreenShareTrack(
-  track: MediaStreamTrack,
-  streams: readonly MediaStream[],
-  remoteScreenTrackIds: Set<string>,
-  remoteScreenStreamIds: Set<string>,
-): boolean {
-  if (track.kind !== 'video') return false;
-
-  if (remoteScreenTrackIds.has(track.id)) return true;
-
-  if (streams.some((stream) => remoteScreenStreamIds.has(stream.id))) {
-    return true;
-  }
-
-  if (isScreenShareTrack(track)) return true;
-
-  return /screen|display|window|tab|monitor/i.test(track.label);
-}
-
-function isRemoteScreenShareAudioTrack(
-  track: MediaStreamTrack,
-  streams: readonly MediaStream[],
-  remoteScreenAudioTrackIds: Set<string>,
-  remoteScreenAudioStreamIds: Set<string>,
-): boolean {
-  if (track.kind !== 'audio') return false;
-
-  if (remoteScreenAudioTrackIds.has(track.id)) return true;
-
-  if (streams.some((stream) => remoteScreenAudioStreamIds.has(stream.id))) {
-    return true;
-  }
-
-  return isScreenShareAudioTrack(track);
-}
-
-function hasAudioTrack(track: MediaStreamTrack, stream: MediaStream): boolean {
-  return track.kind === 'audio' || stream.getAudioTracks().length > 0;
-}
-
-function nativeAudioVolume(volume: number): number {
-  return Math.min(1, volume);
-}
-
-function graphAudioVolume(volume: number, deafened: boolean): number {
-  return deafened ? 0 : volume;
-}
-
-function needsAudioGraph(volume: number): boolean {
-  return volume > 1;
-}
-
-function isMediaStreamSource(
-  source: MediaProvider | null,
-): source is MediaStream {
-  return Boolean(source && 'getAudioTracks' in source);
-}
-
-function remoteAudioKey(
-  peerIdentityId: string,
-  channel: 'screen' | 'voice',
-): string {
-  return channel === 'voice' ? peerIdentityId : `${peerIdentityId}:screen`;
-}
 
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
@@ -462,7 +338,7 @@ export class CallPeerConnectionManager {
       [...this.peers.entries()].map(
         async ([identityId, peer]): Promise<[string, PeerMediaStats]> => [
           identityId,
-          await this.collectPeerStats(peer),
+          await collectPeerMediaStats(peer),
         ],
       ),
     );
@@ -1248,67 +1124,5 @@ export class CallPeerConnectionManager {
       candidateCount: candidates.length,
       peerIdentityId,
     });
-  }
-
-  private async collectPeerStats(
-    peer: RTCPeerConnection,
-  ): Promise<PeerMediaStats> {
-    const reports = await peer.getStats();
-    let audioLevel: number | undefined;
-    let latencyMs: number | undefined;
-    let packetsLost: number | undefined;
-
-    reports.forEach((report) => {
-      const statsReport = report as unknown as RTCStats;
-      const inbound = this.audioInboundStats(statsReport);
-      const candidatePair = this.candidatePairStats(statsReport);
-
-      if (inbound.audioLevel !== undefined) {
-        audioLevel = Math.max(audioLevel ?? 0, inbound.audioLevel);
-      }
-
-      if (inbound.packetsLost !== undefined) packetsLost = inbound.packetsLost;
-
-      if (candidatePair.latencyMs !== undefined) {
-        latencyMs = candidatePair.latencyMs;
-      }
-    });
-
-    return {
-      audioLevel,
-      connectionState: peer.connectionState,
-      latencyMs,
-      packetsLost,
-      speaking: (audioLevel ?? 0) > 0.04,
-    };
-  }
-
-  private audioInboundStats(report: RTCStats): AudioInboundStats {
-    const stats = report as BrowserRtcStats;
-
-    if (stats.type !== 'inbound-rtp' || stats.kind !== 'audio') return {};
-
-    return {
-      audioLevel:
-        typeof stats.audioLevel === 'number' ? stats.audioLevel : undefined,
-      packetsLost:
-        typeof stats.packetsLost === 'number' ? stats.packetsLost : undefined,
-    };
-  }
-
-  private candidatePairStats(report: RTCStats): CandidatePairStats {
-    const stats = report as BrowserRtcStats;
-
-    if (
-      stats.type !== 'candidate-pair' ||
-      stats.state !== 'succeeded' ||
-      typeof stats.currentRoundTripTime !== 'number'
-    ) {
-      return {};
-    }
-
-    return {
-      latencyMs: Math.round(stats.currentRoundTripTime * 1000),
-    };
   }
 }

@@ -1,4 +1,4 @@
-import { CallPeerConnectionManager } from './callPeerConnectionManager';
+import { CallPeerConnectionManager } from './CallPeerConnectionManager';
 
 type FakeSender = Pick<RTCRtpSender, 'replaceTrack' | 'track'> & {
   replaceTrack: jest.MockedFunction<
