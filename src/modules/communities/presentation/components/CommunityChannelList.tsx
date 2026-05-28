@@ -1,12 +1,14 @@
 import type { MouseEvent } from 'react';
 
 import type {
+  CommunityChannelThreadSummary,
   CommunityTextChannel,
   CommunityVoiceChannel,
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import {
   VoiceChannelButton,
@@ -19,9 +21,12 @@ export function CommunityChannelList({
   channelUnreadCounts,
   onChannelSearchChange,
   onTextChannelSelected,
+  onThreadSelected,
   onVoiceChannelJoin,
   onVoiceParticipantClick,
   selectedChannelId,
+  selectedThreadRootMessageId,
+  threadLabelByRootMessageId,
   textChannels,
   visibleTextChannels,
   visibleVoiceChannels,
@@ -33,12 +38,18 @@ export function CommunityChannelList({
   channelUnreadCounts: Record<string, number>;
   onChannelSearchChange: (value: string) => void;
   onTextChannelSelected: (channelId: string) => void;
+  onThreadSelected: (
+    channel: CommunityTextChannel,
+    thread: CommunityChannelThreadSummary,
+  ) => void;
   onVoiceChannelJoin: (channel: CommunityVoiceChannel) => void;
   onVoiceParticipantClick: (
     participant: VoiceParticipantView,
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
   selectedChannelId: null | string;
+  selectedThreadRootMessageId?: null | string;
+  threadLabelByRootMessageId?: Record<string, string>;
   textChannels: CommunityTextChannel[];
   visibleTextChannels: CommunityTextChannel[];
   visibleVoiceChannels: CommunityVoiceChannel[];
@@ -71,13 +82,43 @@ export function CommunityChannelList({
         ) : (
           <>
             {visibleTextChannels.map((channel) => (
-              <TextChannelButton
-                key={channel.id}
-                active={selectedChannelId === channel.id}
-                channel={channel}
-                onSelect={onTextChannelSelected}
-                unreadCount={channelUnreadCounts[channel.id] ?? 0}
-              />
+              <div key={channel.id}>
+                <TextChannelButton
+                  active={
+                    selectedChannelId === channel.id &&
+                    !selectedThreadRootMessageId
+                  }
+                  channel={channel}
+                  onSelect={onTextChannelSelected}
+                  unreadCount={channelUnreadCounts[channel.id] ?? 0}
+                />
+                {channel.threads && channel.threads.length > 0 ? (
+                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-2">
+                    {channel.threads
+                      .slice()
+                      .sort(
+                        (left, right) => right.lastReplyAt - left.lastReplyAt,
+                      )
+                      .map((thread) => (
+                        <ThreadChannelButton
+                          key={thread.rootMessageId}
+                          active={
+                            selectedChannelId === channel.id &&
+                            selectedThreadRootMessageId ===
+                              thread.rootMessageId
+                          }
+                          label={
+                            threadLabelByRootMessageId?.[
+                              thread.rootMessageId
+                            ] ?? shortId(thread.rootMessageId)
+                          }
+                          onSelect={() => onThreadSelected(channel, thread)}
+                          replyCount={thread.replyCount}
+                        />
+                      ))}
+                  </div>
+                ) : null}
+              </div>
             ))}
             {visibleVoiceChannels.length > 0 && (
               <div className="pt-2">
@@ -104,6 +145,38 @@ export function CommunityChannelList({
         )}
       </div>
     </div>
+  );
+}
+
+function ThreadChannelButton({
+  active,
+  label,
+  onSelect,
+  replyCount,
+}: {
+  active: boolean;
+  label: string;
+  onSelect: () => void;
+  replyCount: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cx(
+        'flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-black transition',
+        active
+          ? 'bg-white/90 text-slate-950'
+          : 'text-white/60 hover:bg-white/10 hover:text-white',
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {replyCount > 0 && (
+        <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.6rem] leading-none">
+          {replyCount > 9 ? '9+' : replyCount}
+        </span>
+      )}
+    </button>
   );
 }
 

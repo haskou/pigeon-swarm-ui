@@ -18,6 +18,7 @@ export function MessageCollectionDialog({
   actions = [],
   emptyLabel,
   identityNames,
+  identityPictures = {},
   messages,
   onClose,
   onMessageOpen,
@@ -27,6 +28,7 @@ export function MessageCollectionDialog({
   actions?: MessageCollectionAction[];
   emptyLabel: string;
   identityNames: Record<string, string>;
+  identityPictures?: Record<string, string | undefined>;
   messages: ChatMessage[];
   onClose: () => void;
   onMessageOpen?: (message: ChatMessage) => void;
@@ -73,6 +75,7 @@ export function MessageCollectionDialog({
                 <MessageCollectionItem
                   actions={actions}
                   identityNames={identityNames}
+                  identityPictures={identityPictures}
                   key={message.id}
                   message={message}
                   onMessageOpen={onMessageOpen}
@@ -89,16 +92,19 @@ export function MessageCollectionDialog({
 function MessageCollectionItem({
   actions,
   identityNames,
+  identityPictures,
   message,
   onMessageOpen,
 }: {
   actions: MessageCollectionAction[];
   identityNames: Record<string, string>;
+  identityPictures: Record<string, string | undefined>;
   message: ChatMessage;
   onMessageOpen?: (message: ChatMessage) => void;
 }) {
   const content = messageSummary(message);
   const authorName = identityDisplayName(message.authorIdentityId, identityNames);
+  const authorPicture = identityPictures[message.authorIdentityId];
 
   return (
     <article className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -106,19 +112,32 @@ function MessageCollectionItem({
         type="button"
         disabled={!onMessageOpen}
         onClick={() => onMessageOpen?.(message)}
-        className="block w-full min-w-0 text-left disabled:cursor-default"
+        className="flex w-full min-w-0 gap-3 text-left disabled:cursor-default"
       >
-        <div className="flex items-center justify-between gap-3 text-xs text-white/45">
-          <span className="min-w-0 truncate font-black text-white/70">
-            {authorName}
+        <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+          {authorPicture ? (
+            <img
+              alt=""
+              src={authorPicture}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            authorName.slice(0, 1).toUpperCase()
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-3 text-xs text-white/45">
+            <span className="min-w-0 truncate font-black text-white/70">
+              {authorName}
+            </span>
+            <span className="shrink-0">
+              {new Date(message.timestamp).toLocaleString()}
+            </span>
           </span>
-          <span className="shrink-0">
-            {new Date(message.timestamp).toLocaleString()}
+          <span className="mt-2 block line-clamp-4 whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-white/80">
+            {content}
           </span>
-        </div>
-        <p className="mt-2 line-clamp-4 whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-white/80">
-          {content}
-        </p>
+        </span>
       </button>
       {actions.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">

@@ -15,7 +15,7 @@ interface ConversationActionsMenuProps {
   onConversationDataOpen: () => void;
   onConversationKeyOpen: () => void;
   onGroupInviteOpen: () => void;
-  onPinsOpen: () => void;
+  onOpenPins: () => void;
   onStartCall?: (input: {
     conversationId: string;
     kind: 'group' | 'one-to-one';
@@ -36,7 +36,7 @@ export function ConversationActionsMenu({
   onConversationDataOpen,
   onConversationKeyOpen,
   onGroupInviteOpen,
-  onPinsOpen,
+  onOpenPins,
   onStartCall,
 }: ConversationActionsMenuProps) {
   useCloseOnEscape(onClose);
@@ -73,10 +73,10 @@ export function ConversationActionsMenu({
         <button
           type="button"
           onClick={() => {
-            onPinsOpen();
+            onOpenPins();
             onClose();
           }}
-          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 sm:hidden"
         >
           {copy.messages.pinnedMessages}
         </button>

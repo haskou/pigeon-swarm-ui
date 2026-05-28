@@ -19,6 +19,7 @@ import { CallEventMessage } from './CallEventMessage';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
+import { PinIcon, ThreadIcon } from './messageActionIcons';
 import {
   AttachmentCard,
   ImageAttachmentAlbum,
@@ -53,6 +54,8 @@ interface MessageBubbleProps {
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
   onStickerClick?: (sticker: StickerMessageReference) => void;
+  onThreadOpen?: (message: ChatMessage) => void;
+  pinned?: boolean;
   reactionAuthorNames?: Record<string, string>;
   mentionTokens?: MarkdownMention[];
   mentionHighlighted?: boolean;
@@ -62,6 +65,9 @@ interface MessageBubbleProps {
   replySticker?: StickerMessageReference;
   reserveAvatarSpace?: boolean;
   showAvatar: boolean;
+  threadAuthorName?: string;
+  threadAuthorPicture?: string | null;
+  threadCount?: number;
 }
 
 export function MessageBubble({
@@ -78,6 +84,8 @@ export function MessageBubble({
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
+  onThreadOpen,
+  pinned = false,
   reactionAuthorNames = {},
   mentionTokens = [],
   mentionHighlighted = false,
@@ -87,6 +95,9 @@ export function MessageBubble({
   replySticker,
   reserveAvatarSpace = true,
   showAvatar,
+  threadAuthorName,
+  threadAuthorPicture,
+  threadCount = 0,
 }: MessageBubbleProps) {
   const mine = message.mine || message.authorIdentityId === currentIdentityId;
   const callEvent =
@@ -218,6 +229,7 @@ export function MessageBubble({
                     ),
               )}
             >
+              {pinned && !sticker && <PinnedMessageMarker />}
               {hasReply && replyMessageId && (
                 <MessageReplyPreview
                   mine={mine}
@@ -336,6 +348,15 @@ export function MessageBubble({
               }}
             />
           )}
+          {threadCount > 0 && onThreadOpen && (
+            <MessageThreadLink
+              authorName={threadAuthorName}
+              authorPicture={threadAuthorPicture}
+              count={threadCount}
+              mine={mine}
+              onClick={() => onThreadOpen(message)}
+            />
+          )}
         </div>
       </div>
       {lightbox && (
@@ -352,6 +373,62 @@ export function MessageBubble({
         />
       )}
     </>
+  );
+}
+
+function PinnedMessageMarker() {
+  return (
+    <div className="mb-1 flex justify-end">
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] font-black uppercase text-white/55"
+        title={copy.messages.pinned}
+      >
+        <PinIcon className="h-3 w-3" />
+        {copy.messages.pinned}
+      </span>
+    </div>
+  );
+}
+
+function MessageThreadLink({
+  authorName,
+  authorPicture,
+  count,
+  mine,
+  onClick,
+}: {
+  authorName?: string;
+  authorPicture?: string | null;
+  count: number;
+  mine: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'mt-2 flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-white/6 px-2.5 py-1.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white',
+        mine ? 'self-end' : 'self-start',
+      )}
+    >
+      {authorPicture ? (
+        <img
+          alt=""
+          src={authorPicture}
+          className="h-5 w-5 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/12 text-[0.6rem] font-black text-white/60">
+          {(authorName ?? copy.messages.thread).slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <span className="min-w-0 truncate">
+        {authorName ? `${authorName} ` : ''}
+        {count} {count === 1 ? copy.messages.threadMessage : copy.messages.threadMessages}
+      </span>
+      <ThreadIcon className="h-3.5 w-3.5 shrink-0" />
+    </button>
   );
 }
 

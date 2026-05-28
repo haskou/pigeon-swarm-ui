@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -14,6 +14,14 @@ import {
   loadRecentReactionEmojis,
   saveRecentReactionEmoji,
 } from '../../../../modules/messages/presentation/emoji/recentReactionEmojis';
+import {
+  CopyIcon,
+  DataIcon,
+  EditIcon,
+  PinIcon,
+  ThreadIcon,
+  TrashIcon,
+} from '../../../../modules/messages/presentation/components/messageActionIcons';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
@@ -33,8 +41,9 @@ export function MessageContextMenu({
   onOpenThread,
   onPin,
   onReactionToggle,
-  onReply,
+  onUnpin,
   onViewRaw,
+  pinned = false,
 }: {
   currentIdentityId?: string;
   menu: MessageContextMenuState;
@@ -44,13 +53,14 @@ export function MessageContextMenu({
   onEdit?: () => void;
   onOpenThread?: () => void;
   onPin?: () => void;
+  onUnpin?: () => void;
   onReactionToggle?: (
     message: ChatMessage,
     emoji: string,
     reacted: boolean,
   ) => void;
-  onReply?: () => void;
   onViewRaw: () => void;
+  pinned?: boolean;
 }) {
   useCloseOnEscape(onClose);
 
@@ -241,65 +251,51 @@ export function MessageContextMenu({
           </div>
         ) : null}
         {onOpenThread ? (
-          <button
-            type="button"
+          <MessageMenuAction
+            icon={<ThreadIcon />}
+            label={copy.messages.openThread}
             onClick={onOpenThread}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-          >
-            {copy.messages.openThread}
-          </button>
-        ) : null}
-        {onReply ? (
-          <button
-            type="button"
-            onClick={onReply}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-          >
-            {copy.messages.reply}
-          </button>
+          />
         ) : null}
         {onCopy ? (
-          <button
-            type="button"
+          <MessageMenuAction
+            icon={<CopyIcon />}
+            label={copy.messages.copy}
             onClick={onCopy}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-          >
-            {copy.messages.copy}
-          </button>
+          />
         ) : null}
         {onEdit ? (
-          <button
-            type="button"
+          <MessageMenuAction
+            icon={<EditIcon />}
+            label={copy.messages.edit}
             onClick={onEdit}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-          >
-            {copy.messages.edit}
-          </button>
+          />
         ) : null}
-        {onPin ? (
-          <button
-            type="button"
+        {onUnpin ? (
+          <MessageMenuAction
+            icon={<PinIcon />}
+            label={copy.messages.unpin}
+            onClick={onUnpin}
+          />
+        ) : onPin ? (
+          <MessageMenuAction
+            icon={<PinIcon />}
+            label={pinned ? copy.messages.unpin : copy.messages.pin}
             onClick={onPin}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-          >
-            {copy.messages.pin}
-          </button>
+          />
         ) : null}
-        <button
-          type="button"
+        <MessageMenuAction
+          icon={<DataIcon />}
+          label={copy.messages.viewRaw}
           onClick={onViewRaw}
-          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
-        >
-          {copy.messages.viewRaw}
-        </button>
+        />
         {onDelete ? (
-          <button
-            type="button"
+          <MessageMenuAction
+            icon={<TrashIcon />}
+            label={copy.messages.delete}
             onClick={onDelete}
-            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15 active:bg-rose-400/25 active:text-white"
-          >
-            {copy.messages.delete}
-          </button>
+            tone="danger"
+          />
         ) : null}
       </div>
     </>
@@ -307,6 +303,36 @@ export function MessageContextMenu({
 }
 
 const defaultReactionOptions = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
+function MessageMenuAction({
+  icon,
+  label,
+  onClick,
+  tone = 'neutral',
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  tone?: 'danger' | 'neutral';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left font-black transition active:bg-white/20 active:text-white',
+        tone === 'danger'
+          ? 'text-rose-200 hover:bg-rose-500/15 active:bg-rose-400/25'
+          : 'text-white/80 hover:bg-white/10',
+      )}
+    >
+      <span className="grid h-5 w-5 shrink-0 place-items-center text-white/55">
+        {icon}
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+    </button>
+  );
+}
 
 function EmojiSearchOption({
   onSelect,

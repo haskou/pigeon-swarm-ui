@@ -96,6 +96,7 @@ type CommunityWorkspaceDialogsProps = {
   owner: boolean;
   presenceByIdentityId: Record<string, IdentityPresence>;
   profileViewer: CommunityProfileView | null;
+  pinnedMessageIds: ReadonlySet<string>;
   rawMessage: ChatMessage | null;
   session: Session;
   onCloseAvatarViewer: () => void;
@@ -118,8 +119,8 @@ type CommunityWorkspaceDialogsProps = {
     identityId: string,
     identity?: IdentityResource,
   ) => Promise<void>;
-  onReplyToMessage: (message: ChatMessage) => void;
   onPinMessage: (message: ChatMessage) => void;
+  onUnpinMessage: (message: ChatMessage) => void;
   onSessionUpdated: (session: Session) => void;
   onToggleReaction: (
     message: ChatMessage,
@@ -150,6 +151,7 @@ export function CommunityWorkspaceDialogs({
   nodeNetworks,
   owner,
   presenceByIdentityId,
+  pinnedMessageIds,
   profileViewer,
   rawMessage,
   session,
@@ -171,9 +173,9 @@ export function CommunityWorkspaceDialogs({
   onOpenConversationWithIdentity,
   onOpenMessageThread,
   onPinMessage,
-  onReplyToMessage,
   onSessionUpdated,
   onToggleReaction,
+  onUnpinMessage,
   onViewRawMessage,
 }: CommunityWorkspaceDialogsProps) {
   return (
@@ -281,11 +283,19 @@ export function CommunityWorkspaceDialogs({
           }
           onPin={
             messageContextMenu.message.kind !== 'poll' &&
-            (owner || currentPermissions.has('manage_messages'))
+            (owner || currentPermissions.has('manage_messages')) &&
+            !pinnedMessageIds.has(messageContextMenu.message.id)
               ? () => onPinMessage(messageContextMenu.message)
               : undefined
           }
-          onReply={() => onReplyToMessage(messageContextMenu.message)}
+          onUnpin={
+            messageContextMenu.message.kind !== 'poll' &&
+            (owner || currentPermissions.has('manage_messages')) &&
+            pinnedMessageIds.has(messageContextMenu.message.id)
+              ? () => onUnpinMessage(messageContextMenu.message)
+              : undefined
+          }
+          pinned={pinnedMessageIds.has(messageContextMenu.message.id)}
           onReactionToggle={onToggleReaction}
           onViewRaw={() => onViewRawMessage(messageContextMenu.message)}
         />

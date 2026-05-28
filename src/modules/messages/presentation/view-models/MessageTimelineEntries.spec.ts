@@ -79,7 +79,7 @@ describe(MessageTimelineEntries.name, () => {
     });
   });
 
-  it('links reply targets and starts new day after poll separators', () => {
+  it('keeps thread messages out of the main timeline and summarizes them on the root', () => {
     const nextDay = Date.UTC(2026, 4, 23, 8, 0, 0);
     const entries = MessageTimelineEntries.build(
       [
@@ -89,21 +89,31 @@ describe(MessageTimelineEntries.name, () => {
           replyToMessageId: 'message-a',
           timestamp: nextDay + 1000,
         }),
+        message({
+          id: 'message-c',
+          replyToMessageId: 'message-a',
+          timestamp: nextDay + 2000,
+        }),
       ],
       [poll({ createdAt: nextDay })],
     );
-    const replyEntry = entries[2];
+    const rootEntry = entries[0];
 
     expect(entries[1]).toMatchObject({
       startsNewDay: true,
       type: 'poll',
     });
-    expect(replyEntry).toMatchObject({
-      startsNewDay: false,
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'message:message-a',
+      'poll:poll-a',
+    ]);
+    expect(rootEntry).toMatchObject({
+      threadSummary: {
+        count: 2,
+        lastMessage: expect.objectContaining({ id: 'message-c' }),
+        rootMessageId: 'message-a',
+      },
       type: 'message',
     });
-    expect(replyEntry.type === 'message' && replyEntry.replyMessage?.id).toBe(
-      'message-a',
-    );
   });
 });

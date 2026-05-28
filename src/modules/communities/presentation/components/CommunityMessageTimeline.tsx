@@ -50,6 +50,7 @@ interface CommunityMessageTimelineProps {
   onIdentityProfileOpen?: (identityId: string, target: HTMLElement) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onOpenThread: (message: ChatMessage) => void;
   onReactionToggle: (
     message: ChatMessage,
     emoji: string,
@@ -63,6 +64,7 @@ interface CommunityMessageTimelineProps {
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
+  pinnedMessageIds: ReadonlySet<string>;
   currentRoleIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   polls?: PollResource[];
@@ -87,6 +89,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onIdentityProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenThread,
   onPollClose,
   canClosePolls,
   onPollRemoveVote,
@@ -96,6 +99,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onRetryMessage,
   onScroll,
   onStickerClick,
+  pinnedMessageIds,
   polls = [],
   currentRoleIds,
   reactionAuthorNames,
@@ -247,10 +251,12 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       }
                       onMessageMenuOpen={onMessageMenuOpen}
                       onMentionClick={onIdentityProfileOpen}
+                      onThreadOpen={onOpenThread}
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
                       onStickerClick={onStickerClick}
+                      pinned={pinnedMessageIds.has(message.id)}
                       reactionAuthorNames={reactionAuthorNames}
                       mentionHighlighted={CommunityMentionHighlightPolicy.mentionsIdentity(
                         message,
@@ -282,6 +288,25 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         replyMessage?.content ?? message.replyPreview?.content
                       }
                       showAvatar={entry.endsAuthorRun}
+                      threadAuthorName={
+                        entry.threadSummary?.lastMessage
+                          ? memberDisplayName(
+                              memberIdentities[
+                                entry.threadSummary.lastMessage
+                                  .authorIdentityId
+                              ],
+                              entry.threadSummary.lastMessage.authorIdentityId,
+                            )
+                          : undefined
+                      }
+                      threadAuthorPicture={
+                        entry.threadSummary?.lastMessage
+                          ? memberPictures[
+                              entry.threadSummary.lastMessage.authorIdentityId
+                            ]
+                          : undefined
+                      }
+                      threadCount={entry.threadSummary?.count}
                     />
                   </div>
                 </Fragment>

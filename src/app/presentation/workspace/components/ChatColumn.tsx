@@ -68,6 +68,7 @@ interface ChatColumnProps {
   messages: ChatMessage[];
   messageState: LoadState;
   nodeNetworks: NodeNetwork[];
+  pinnedMessageIds: ReadonlySet<string>;
   sendError: string | null;
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
@@ -85,6 +86,7 @@ interface ChatColumnProps {
   onEscape: () => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onOpenMessageThread: (message: ChatMessage) => void;
   onReactionToggle: (
     message: ChatMessage,
     emoji: string,
@@ -146,6 +148,7 @@ export function ChatColumn({
   onEscape,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenMessageThread,
   onOpenConversationWithIdentity,
   onOpenPins,
   onOpenSidebar,
@@ -162,6 +165,7 @@ export function ChatColumn({
   peerIdentity,
   peerIdentityId,
   peerPicture,
+  pinnedMessageIds,
   progress,
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -589,6 +593,7 @@ export function ChatColumn({
         onConversationOpen={openConversationHeader}
         onMenuToggle={() => setConversationMenuOpen((isOpen) => !isOpen)}
         onOpenSidebar={onOpenSidebar}
+        onPinsOpen={onOpenPins}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
         peerPicture={peerPicture}
         peerPresence={
@@ -619,7 +624,7 @@ export function ChatColumn({
               setGroupInviteError(null);
               setGroupInviteOpen(true);
             }}
-            onPinsOpen={onOpenPins}
+            onOpenPins={onOpenPins}
             onStartCall={onStartCall}
           />
         )}
@@ -648,6 +653,7 @@ export function ChatColumn({
             }
             onJumpToLatest={onJumpToLatest}
             onMessageMenuOpen={onMessageMenuOpen}
+            onOpenThread={onOpenMessageThread}
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
@@ -656,6 +662,7 @@ export function ChatColumn({
             onPollVote={votePoll}
             onStickerClick={handleStickerClick}
             onScroll={onScroll}
+            pinnedMessageIds={pinnedMessageIds}
             polls={activeConversationPolls}
             reactionAuthorNames={reactionAuthorNames}
             scrollerRef={scrollerRef}

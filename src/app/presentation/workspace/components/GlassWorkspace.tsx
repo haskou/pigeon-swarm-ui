@@ -53,6 +53,7 @@ import { MessageCollection } from '../../../../modules/messages/domain/MessageCo
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
 import { MessageReactions } from '../../../../modules/messages/domain/MessageReactions';
 import { MessageCollectionDialog } from '../../../../modules/messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../../modules/messages/presentation/components/MessageThreadPanel';
 import { SharedNetworkSelection } from '../../../../modules/networks/domain/SharedNetworkSelection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
@@ -163,9 +164,11 @@ type FailedSends = Record<string, PendingSend>;
 type MessageCollectionState = {
   error: null | string;
   messages: ChatMessage[];
-  root?: ChatMessage;
   state: 'loading' | 'ready';
-  type: 'pins' | 'thread';
+};
+type ConversationThreadState = MessageCollectionState & {
+  draft: string;
+  root: ChatMessage;
 };
 type EditingMessage = {
   message: ChatMessage;
@@ -273,6 +276,11 @@ export function GlassWorkspace({
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [messageCollection, setMessageCollection] =
     useState<MessageCollectionState | null>(null);
+  const [conversationThread, setConversationThread] =
+    useState<ConversationThreadState | null>(null);
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
@@ -458,6 +466,36 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
+
+  useEffect(() => {
+    setConversationThread(null);
+  }, [activeConversation?.id]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setPinnedMessageIds(new Set());
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void applicationContainer
+      .listMessagePins(session, activeConversation.id)
+      .then((pins) => {
+        if (!cancelled) {
+          setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPinnedMessageIds(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation?.id, session]);
+
   const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
     activeCommunityId,
     communities,
@@ -2141,12 +2179,12 @@ export function GlassWorkspace({
     if (!activeConversation?.id) return;
 
     setMessageContextMenu(null);
-    setMessageCollection({
+    setConversationThread({
+      draft: '',
       error: null,
       messages: [],
       root: message,
       state: 'loading',
-      type: 'thread',
     });
     try {
       const result = await applicationContainer.loadMessageThread(
@@ -2155,20 +2193,20 @@ export function GlassWorkspace({
         message.id,
       );
 
-      setMessageCollection({
+      setConversationThread({
+        draft: '',
         error: null,
         messages: result.messages,
         root: message,
         state: 'ready',
-        type: 'thread',
       });
     } catch (caught) {
-      setMessageCollection({
+      setConversationThread({
+        draft: '',
         error: toUserErrorMessage(caught, copy.messages.threadError),
         messages: [],
         root: message,
         state: 'ready',
-        type: 'thread',
       });
     }
   };
@@ -2180,7 +2218,6 @@ export function GlassWorkspace({
       error: null,
       messages: [],
       state: 'loading',
-      type: 'pins',
     });
     try {
       const pins = await applicationContainer.listMessagePins(
@@ -2188,18 +2225,17 @@ export function GlassWorkspace({
         activeConversation.id,
       );
 
+      setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
       setMessageCollection({
         error: null,
         messages: pins.map((pin) => pin.message),
         state: 'ready',
-        type: 'pins',
       });
     } catch (caught) {
       setMessageCollection({
         error: toUserErrorMessage(caught, copy.messages.pinError),
         messages: [],
         state: 'ready',
-        type: 'pins',
       });
     }
   };
@@ -2215,6 +2251,7 @@ export function GlassWorkspace({
         activeConversation.id,
         message.id,
       );
+      setPinnedMessageIds((current) => new Set(current).add(message.id));
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.messages.pinError));
     }
@@ -2229,8 +2266,15 @@ export function GlassWorkspace({
         activeConversation.id,
         message.id,
       );
+      setPinnedMessageIds((current) => {
+        const next = new Set(current);
+
+        next.delete(message.id);
+
+        return next;
+      });
       setMessageCollection((current) =>
-        current?.type === 'pins'
+        current
           ? {
               ...current,
               messages: current.messages.filter((item) => item.id !== message.id),
@@ -2247,6 +2291,93 @@ export function GlassWorkspace({
           : current,
       );
     }
+  };
+
+  const unpinMessage = async (message: ChatMessage) => {
+    setMessageContextMenu(null);
+    await unpinMessageFromDialog(message);
+  };
+
+  const updateConversationThreadDraft = (value: string) => {
+    setConversationThread((current) =>
+      current ? { ...current, draft: value } : current,
+    );
+  };
+
+  const sendConversationThreadMessage = async (
+    content: string,
+    attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
+  ) => {
+    if (!activeConversation?.id || !conversationThread) return;
+
+    const rootMessage = conversationThread.root;
+    const sent = await applicationContainer.sendMessage(
+      session,
+      activeConversation.id,
+      content,
+      {
+        attachments,
+        attachmentUpload,
+        previousMessageIds:
+          conversationThread.messages.length > 0
+            ? [
+                conversationThread.messages[
+                  conversationThread.messages.length - 1
+                ].id,
+              ]
+            : [rootMessage.id],
+        replyPreview: replyPreviewFromMessage(rootMessage),
+        replyToMessageId: rootMessage.id,
+      },
+    );
+
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: '',
+            messages: MessageCollection.merge(current.messages, [sent]),
+          }
+        : current,
+    );
+  };
+
+  const sendConversationThreadSticker = async (
+    sticker: StickerMessageReference,
+  ) => {
+    if (!activeConversation?.id || !conversationThread) return;
+
+    const rootMessage = conversationThread.root;
+    const sent = await applicationContainer.sendMessage(
+      session,
+      activeConversation.id,
+      '',
+      {
+        previousMessageIds:
+          conversationThread.messages.length > 0
+            ? [
+                conversationThread.messages[
+                  conversationThread.messages.length - 1
+                ].id,
+              ]
+            : [rootMessage.id],
+        replyPreview: replyPreviewFromMessage(rootMessage),
+        replyToMessageId: rootMessage.id,
+        sticker,
+      },
+    );
+
+    void applicationContainer.markStickerUsed(session, sticker);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: '',
+            messages: MessageCollection.merge(current.messages, [sent]),
+          }
+        : current,
+    );
   };
 
   const handleDeleteMessage = async (message: ChatMessage) => {
@@ -2731,6 +2862,8 @@ export function GlassWorkspace({
 
       if (
         event.type === 'communities.v1.channel.message.was_deleted' ||
+        event.type === 'communities.v1.channel.message.was_pinned' ||
+        event.type === 'communities.v1.channel.message.was_unpinned' ||
         event.type === 'communities.v1.channel.message.reaction.was_added' ||
         event.type === 'communities.v1.channel.message.reaction.was_removed' ||
         event.type === 'communities.v1.call.event.was_recorded'
@@ -2906,6 +3039,9 @@ export function GlassWorkspace({
           event.type === 'conversations.v1.message.reaction.was_removed';
         const isEditEvent =
           event.type === 'conversations.v1.message.was_edited';
+        const isPinEvent =
+          event.type === 'conversations.v1.message.was_pinned' ||
+          event.type === 'conversations.v1.message.was_unpinned';
         const isSelectedConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
@@ -2927,6 +3063,7 @@ export function GlassWorkspace({
           !isActiveConversation &&
           !isReactionEvent &&
           !isEditEvent &&
+          !isPinEvent &&
           authorId !== session.identity.id &&
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
@@ -2997,6 +3134,22 @@ export function GlassWorkspace({
                   : message,
               ),
             );
+
+            return;
+          }
+
+          if (isPinEvent && messageId) {
+            setPinnedMessageIds((current) => {
+              const next = new Set(current);
+
+              if (event.type.endsWith('.was_pinned')) {
+                next.add(messageId);
+              } else {
+                next.delete(messageId);
+              }
+
+              return next;
+            });
 
             return;
           }
@@ -3332,75 +3485,104 @@ export function GlassWorkspace({
               />
             )}
 
-            <Suspense fallback={null}>
-              <ChatColumn
-                session={session}
-                activeConversation={activeConversation}
-                conversationKey={activeConversationKey}
-                draft={activeConversationDraft}
-                editingMessage={editingMessage?.message ?? null}
-                hasConversationKey={!!activeConversationKey}
-                hasReachedMessageStart={!messageCursor}
-                peerIdentityId={activeConversationPeerIdentityId}
-                peerIdentity={
-                  activeConversationPeerIdentityId
-                    ? identityProfiles[activeConversationPeerIdentityId]
-                    : undefined
-                }
-                peerPicture={
-                  activeConversationPeerIdentityId
-                    ? identityPictures[activeConversationPeerIdentityId]
-                    : undefined
-                }
+            {conversationThread && activeConversation ? (
+              <MessageThreadPanel
+                currentIdentityId={session.identity.id}
+                disabled={!activeConversationKey}
+                draft={conversationThread.draft}
+                error={conversationThread.error}
                 identityNames={identityNames}
-                identityPictures={identityPictures}
-                identityProfiles={identityProfiles}
-                presenceByIdentityId={presenceByIdentityId}
-                messages={messages}
-                messageState={messageState}
-                newMessageCount={newMessageCount}
-                nodeNetworks={nodeNetworks}
-                sendError={sendError}
-                scrollerRef={scrollerRef}
-                bottomRef={bottomRef}
-                onScroll={handleScroll}
-                onCancelEdit={cancelMessageEdit}
-                onEditMessage={handleEditMessage}
-                onSend={handleSend}
-                onStickerSend={handleSendSticker}
-                onConversationKeyImported={handleConversationKeyImported}
-                onDraftChange={updateActiveConversationDraft}
-                onEscape={closeTransientUi}
-                onJumpToLatest={jumpToLatestMessages}
-                onMessageMenuOpen={handleMessageMenuOpen}
-                onReactionToggle={(message, emoji, reacted) =>
-                  void handleToggleMessageReaction(message, emoji, reacted)
+                messages={conversationThread.messages}
+                onClose={() => setConversationThread(null)}
+                onDraftChange={updateConversationThreadDraft}
+                onSend={sendConversationThreadMessage}
+                onStickerSend={sendConversationThreadSticker}
+                rootMessage={conversationThread.root}
+                session={session}
+                title={
+                  activeConversation.title ??
+                  activeConversation.name ??
+                  (activeConversationPeerIdentityId
+                    ? identityNames[activeConversationPeerIdentityId]
+                    : undefined) ??
+                  activeConversation.id
                 }
-                onReplyReferenceClick={(messageId) =>
-                  void handleReplyReferenceClick(messageId)
-                }
-                onOpenPins={() => void openPinnedMessages()}
-                onOpenSidebar={() => setSidebarOpen(true)}
-                onCreate={() => setIsCreateOpen(true)}
-                onOpenConversationWithIdentity={(identityId, identity) =>
-                  openOrCreateConversationWithIdentity(
-                    identityId,
-                    identity,
-                    activeConversation?.networkId,
-                  )
-                }
-                progress={attachmentProgress}
-                realtimeStatus={realtimeStatus}
-                realtimeEvent={conversationRealtimeEvent}
-                onRealtimeEventsOpen={openRealtimeEvents}
-                replyToMessage={replyTarget}
-                onCancelReply={() => setReplyTarget(null)}
-                onRetryMessage={retryMessage}
-                onStartCall={startConversationCall}
-                onTypingActive={sendConversationTyping}
-                typingIdentityIds={conversationTypingIdentityIds}
               />
-            </Suspense>
+            ) : (
+              <Suspense fallback={null}>
+                <ChatColumn
+                  session={session}
+                  activeConversation={activeConversation}
+                  conversationKey={activeConversationKey}
+                  draft={activeConversationDraft}
+                  editingMessage={editingMessage?.message ?? null}
+                  hasConversationKey={!!activeConversationKey}
+                  hasReachedMessageStart={!messageCursor}
+                  peerIdentityId={activeConversationPeerIdentityId}
+                  peerIdentity={
+                    activeConversationPeerIdentityId
+                      ? identityProfiles[activeConversationPeerIdentityId]
+                      : undefined
+                  }
+                  peerPicture={
+                    activeConversationPeerIdentityId
+                      ? identityPictures[activeConversationPeerIdentityId]
+                      : undefined
+                  }
+                  identityNames={identityNames}
+                  identityPictures={identityPictures}
+                  identityProfiles={identityProfiles}
+                  presenceByIdentityId={presenceByIdentityId}
+                  messages={messages}
+                  messageState={messageState}
+                  newMessageCount={newMessageCount}
+                  nodeNetworks={nodeNetworks}
+                  pinnedMessageIds={pinnedMessageIds}
+                  sendError={sendError}
+                  scrollerRef={scrollerRef}
+                  bottomRef={bottomRef}
+                  onScroll={handleScroll}
+                  onCancelEdit={cancelMessageEdit}
+                  onEditMessage={handleEditMessage}
+                  onSend={handleSend}
+                  onStickerSend={handleSendSticker}
+                  onConversationKeyImported={handleConversationKeyImported}
+                  onDraftChange={updateActiveConversationDraft}
+                  onEscape={closeTransientUi}
+                  onJumpToLatest={jumpToLatestMessages}
+                  onMessageMenuOpen={handleMessageMenuOpen}
+                  onOpenMessageThread={(message) =>
+                    void openMessageThread(message)
+                  }
+                  onReactionToggle={(message, emoji, reacted) =>
+                    void handleToggleMessageReaction(message, emoji, reacted)
+                  }
+                  onReplyReferenceClick={(messageId) =>
+                    void handleReplyReferenceClick(messageId)
+                  }
+                  onOpenPins={() => void openPinnedMessages()}
+                  onOpenSidebar={() => setSidebarOpen(true)}
+                  onCreate={() => setIsCreateOpen(true)}
+                  onOpenConversationWithIdentity={(identityId, identity) =>
+                    openOrCreateConversationWithIdentity(
+                      identityId,
+                      identity,
+                      activeConversation?.networkId,
+                    )
+                  }
+                  progress={attachmentProgress}
+                  realtimeStatus={realtimeStatus}
+                  realtimeEvent={conversationRealtimeEvent}
+                  onRealtimeEventsOpen={openRealtimeEvents}
+                  replyToMessage={replyTarget}
+                  onCancelReply={() => setReplyTarget(null)}
+                  onRetryMessage={retryMessage}
+                  onStartCall={startConversationCall}
+                  onTypingActive={sendConversationTyping}
+                  typingIdentityIds={conversationTypingIdentityIds}
+                />
+              </Suspense>
+            )}
 
             <Suspense fallback={null}>
               <Inspector
@@ -3532,42 +3714,28 @@ export function GlassWorkspace({
 
       {messageCollection ? (
         <MessageCollectionDialog
-          actions={
-            messageCollection.type === 'pins'
-              ? [
-                  {
-                    label: copy.messages.unpin,
-                    onClick: (message) => void unpinMessageFromDialog(message),
-                    tone: 'danger',
-                  },
-                ]
-              : []
-          }
+          actions={[
+            {
+              label: copy.messages.unpin,
+              onClick: (message) => void unpinMessageFromDialog(message),
+              tone: 'danger',
+            },
+          ]}
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading
-              : messageCollection.error ??
-                (messageCollection.type === 'pins'
-                  ? copy.messages.emptyPins
-                  : copy.messages.emptyThread)
+              : messageCollection.error ?? copy.messages.emptyPins
           }
           identityNames={identityNames}
-          messages={
-            messageCollection.type === 'thread' && messageCollection.root
-              ? [messageCollection.root, ...messageCollection.messages]
-              : messageCollection.messages
-          }
+          identityPictures={identityPictures}
+          messages={messageCollection.messages}
           onClose={() => setMessageCollection(null)}
           onMessageOpen={(message) => {
             setMessageCollection(null);
             void handleReplyReferenceClick(message.id);
           }}
           subtitle={messageCollection.error}
-          title={
-            messageCollection.type === 'pins'
-              ? copy.messages.pinnedMessages
-              : copy.messages.thread
-          }
+          title={copy.messages.pinnedMessages}
         />
       ) : null}
 
@@ -3669,11 +3837,8 @@ export function GlassWorkspace({
             onOpenMessageThread={(message) => void openMessageThread(message)}
             onPinMessage={(message) => void pinMessage(message)}
             onNetworksUpdated={onNodeNetworksReload}
-            onReplyToMessage={(message) => {
-              setReplyTarget(message);
-              setEditingMessage(null);
-              setMessageContextMenu(null);
-            }}
+            onUnpinMessage={(message) => void unpinMessage(message)}
+            pinnedMessageIds={pinnedMessageIds}
             onToggleReaction={(message, emoji, reacted) =>
               void handleToggleMessageReaction(message, emoji, reacted)
             }

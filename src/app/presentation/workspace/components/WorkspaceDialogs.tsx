@@ -143,7 +143,8 @@ interface WorkspaceDialogsProps {
   onCopyMessage: (message: ChatMessage) => void;
   onOpenMessageThread: (message: ChatMessage) => void;
   onPinMessage: (message: ChatMessage) => void;
-  onReplyToMessage: (message: ChatMessage) => void;
+  onUnpinMessage: (message: ChatMessage) => void;
+  pinnedMessageIds: ReadonlySet<string>;
   onToggleReaction: (
     message: ChatMessage,
     emoji: string,
@@ -275,13 +276,24 @@ function MessageActionDialogs(
             : undefined
         }
         onPin={
-          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          !props.pinnedMessageIds.has(contextMenuMessage.id)
             ? () => props.onPinMessage(contextMenuMessage)
             : undefined
         }
-        onReply={() => {
-          if (contextMenuMessage) props.onReplyToMessage(contextMenuMessage);
-        }}
+        onUnpin={
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          props.pinnedMessageIds.has(contextMenuMessage.id)
+            ? () => props.onUnpinMessage(contextMenuMessage)
+            : undefined
+        }
+        pinned={
+          contextMenuMessage
+            ? props.pinnedMessageIds.has(contextMenuMessage.id)
+            : false
+        }
         onReactionToggle={props.onToggleReaction}
         onViewRaw={() => {
           if (contextMenuMessage) props.onViewRawMessage(contextMenuMessage);

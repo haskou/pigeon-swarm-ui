@@ -30,7 +30,10 @@ import {
   messageReplyImage,
   messageReplySticker,
 } from '../../../../modules/messages/presentation/components/messageTimelineHelpers';
-import { MessageTimelineEntries } from '../../../../modules/messages/presentation/view-models/MessageTimelineEntries';
+import {
+  MessageTimelineEntries,
+  type MessageThreadSummary,
+} from '../../../../modules/messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../../modules/polls/presentation/components/pollCard';
 import { LockIcon } from './LockIcon';
 
@@ -59,6 +62,7 @@ interface ChatMessageTimelineProps {
   ) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onOpenThread: (message: ChatMessage) => void;
   onReactionToggle: (
     message: ChatMessage,
     emoji: string,
@@ -71,6 +75,7 @@ interface ChatMessageTimelineProps {
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
+  pinnedMessageIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -93,6 +98,7 @@ export function ChatMessageTimeline({
   onAuthorProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenThread,
   onPollClose,
   onPollRemoveVote,
   onPollVote,
@@ -101,6 +107,7 @@ export function ChatMessageTimeline({
   onRetryMessage,
   onScroll,
   onStickerClick,
+  pinnedMessageIds,
   polls = [],
   reactionAuthorNames,
   scrollerRef,
@@ -132,6 +139,7 @@ export function ChatMessageTimeline({
           onAttachmentOpen={onAttachmentOpen}
           onAuthorProfileOpen={onAuthorProfileOpen}
           onMessageMenuOpen={onMessageMenuOpen}
+          onOpenThread={onOpenThread}
           onReactionToggle={onReactionToggle}
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
@@ -139,6 +147,7 @@ export function ChatMessageTimeline({
           onPollRemoveVote={onPollRemoveVote}
           onPollVote={onPollVote}
           onStickerClick={onStickerClick}
+          pinnedMessageIds={pinnedMessageIds}
           polls={polls}
           reactionAuthorNames={reactionAuthorNames}
         />
@@ -168,6 +177,7 @@ function MessageTimelineContent({
   onAttachmentOpen,
   onAuthorProfileOpen,
   onMessageMenuOpen,
+  onOpenThread,
   onPollClose,
   onPollRemoveVote,
   onPollVote,
@@ -175,6 +185,7 @@ function MessageTimelineContent({
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
+  pinnedMessageIds,
   polls = [],
   reactionAuthorNames,
 }: Omit<
@@ -219,14 +230,17 @@ function MessageTimelineContent({
               onAttachmentOpen={onAttachmentOpen}
               onAuthorProfileOpen={onAuthorProfileOpen}
               onMessageMenuOpen={onMessageMenuOpen}
+              onOpenThread={onOpenThread}
               onReactionToggle={onReactionToggle}
               onReplyReferenceClick={onReplyReferenceClick}
               onRetryMessage={onRetryMessage}
               onStickerClick={onStickerClick}
+              pinnedMessageIds={pinnedMessageIds}
               reactionAuthorNames={reactionAuthorNames}
               replyMessage={entry.replyMessage}
               startsNewAuthorRun={entry.startsNewAuthorRun}
               startsNewDay={entry.startsNewDay}
+              threadSummary={entry.threadSummary}
             />
           ),
         )}
@@ -250,14 +264,17 @@ function MessageTimelineItem({
   onAttachmentOpen,
   onAuthorProfileOpen,
   onMessageMenuOpen,
+  onOpenThread,
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
   onStickerClick,
+  pinnedMessageIds,
   reactionAuthorNames,
   replyMessage,
   startsNewAuthorRun,
   startsNewDay,
+  threadSummary,
 }: {
   currentIdentityId: string;
   currentIdentityName: string;
@@ -269,14 +286,17 @@ function MessageTimelineItem({
   onAttachmentOpen: ChatMessageTimelineProps['onAttachmentOpen'];
   onAuthorProfileOpen: ChatMessageTimelineProps['onAuthorProfileOpen'];
   onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
+  onOpenThread: ChatMessageTimelineProps['onOpenThread'];
   onReactionToggle: ChatMessageTimelineProps['onReactionToggle'];
   onReplyReferenceClick: ChatMessageTimelineProps['onReplyReferenceClick'];
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];
   onStickerClick?: ChatMessageTimelineProps['onStickerClick'];
+  pinnedMessageIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   replyMessage?: ChatMessage;
   startsNewAuthorRun: boolean;
   startsNewDay: boolean;
+  threadSummary?: MessageThreadSummary;
 }) {
   return (
     <Fragment>
@@ -309,6 +329,8 @@ function MessageTimelineItem({
           onReplyReferenceClick={onReplyReferenceClick}
           onRetryMessage={onRetryMessage}
           onStickerClick={onStickerClick}
+          onThreadOpen={onOpenThread}
+          pinned={pinnedMessageIds.has(message.id)}
           reactionAuthorNames={reactionAuthorNames}
           replyImage={messageReplyImage(message, replyMessage)}
           replySticker={messageReplySticker(message, replyMessage)}
@@ -320,6 +342,25 @@ function MessageTimelineItem({
           replyPreview={replyMessage?.content ?? message.replyPreview?.content}
           reserveAvatarSpace={false}
           showAvatar={isGroupConversation && startsNewAuthorRun}
+          threadAuthorName={
+            threadSummary?.lastMessage
+              ? messageAuthorName(
+                  threadSummary.lastMessage,
+                  currentIdentityName,
+                  identityNames,
+                )
+              : undefined
+          }
+          threadAuthorPicture={
+            threadSummary?.lastMessage
+              ? messageAuthorPicture(
+                  threadSummary.lastMessage,
+                  currentIdentityId,
+                  identityPictures,
+                )
+              : undefined
+          }
+          threadCount={threadSummary?.count}
         />
       </div>
     </Fragment>

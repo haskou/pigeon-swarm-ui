@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { PinIcon } from '../../../../modules/messages/presentation/components/messageActionIcons';
 
 export function WorkspaceHeader({
   avatar,
@@ -10,6 +11,7 @@ export function WorkspaceHeader({
   menuOpen,
   onMenuToggle,
   onOpenSidebar,
+  onPinsOpen,
   onRealtimeEventsOpen,
   realtimeStatus,
   title,
@@ -24,6 +26,7 @@ export function WorkspaceHeader({
   menuOpen?: boolean;
   onMenuToggle?: () => void;
   onOpenSidebar: () => void;
+  onPinsOpen?: () => void;
   onRealtimeEventsOpen?: () => void;
   realtimeStatus: 'connected' | 'reconnecting';
   subtitle: ReactNode;
@@ -57,6 +60,7 @@ export function WorkspaceHeader({
           onRealtimeEventsOpen={onRealtimeEventsOpen}
           realtimeStatus={realtimeStatus}
         />
+        {onPinsOpen ? <PinnedMessagesButton onPinsOpen={onPinsOpen} /> : null}
         {onMenuToggle && (
           <div className="relative ml-auto flex shrink-0 items-center gap-1">
             {children}
@@ -74,6 +78,20 @@ export function WorkspaceHeader({
         )}
       </div>
     </header>
+  );
+}
+
+function PinnedMessagesButton({ onPinsOpen }: { onPinsOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPinsOpen}
+      className="hidden h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/8 text-white/65 transition hover:bg-white/12 hover:text-white sm:grid"
+      title={copy.messages.pinnedMessages}
+      aria-label={copy.messages.pinnedMessages}
+    >
+      <PinIcon className="h-4 w-4" />
+    </button>
   );
 }
 
