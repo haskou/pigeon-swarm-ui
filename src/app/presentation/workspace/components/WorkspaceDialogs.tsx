@@ -297,6 +297,7 @@ function CreateDialogs(
     return (
       <Suspense fallback={null}>
         <CreateConversationDialog
+          conversations={props.conversations}
           nodeNetworks={props.nodeNetworks}
           session={props.session}
           onClose={props.onCloseCreateConversation}

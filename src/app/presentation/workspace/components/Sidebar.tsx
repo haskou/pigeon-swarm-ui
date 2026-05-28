@@ -24,6 +24,7 @@ import {
   type IdentityPictures,
 } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { PresenceStatusDot } from '../../../../modules/identities/presentation/components/presenceStatusDot';
+import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
 import { loadPublicImage } from '../../../../modules/communities/presentation/components/communityImages';
 import { UserProfileDropdown } from './UserProfileDropdown';
@@ -179,10 +180,12 @@ export function Sidebar({
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
         <SectionTitle title={copy.sidebar.oneToOneTitle} />
-        <input
+        <ClearableSearchInput
+          ariaLabel={copy.sidebar.searchConversations}
+          className="mb-3"
+          clearLabel={copy.sidebar.clearConversationSearch}
           value={conversationSearch}
-          onChange={(event) => setConversationSearch(event.target.value)}
-          className="mb-3 w-full rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-fuchsia-300/60"
+          onChange={setConversationSearch}
           placeholder={copy.sidebar.searchConversations}
         />
         <div className="space-y-2">

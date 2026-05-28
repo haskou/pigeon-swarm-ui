@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -13,6 +19,8 @@ import type {
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import {
   type EmojiSuggestion,
   searchEmojiSuggestions,
@@ -82,7 +90,7 @@ export function StickerPicker({
     try {
       setLibrary(await cachedGetMyStickers(session));
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Stickers could not be loaded.'));
+      setError(toUserErrorMessage(caught, copy.stickers.loadError));
     } finally {
       setLoading(false);
     }
@@ -143,10 +151,16 @@ export function StickerPicker({
           : packs,
       );
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker packs could not be found.'));
+      setError(toUserErrorMessage(caught, copy.stickers.searchError));
     } finally {
       setLoading(false);
     }
+  };
+  const searchPacksOnEnter = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter') return;
+
+    event.preventDefault();
+    void searchPacks();
   };
 
   const sendSticker = async (packId: string, sticker: StickerResource) => {
@@ -196,8 +210,8 @@ export function StickerPicker({
     .filter((pack) => !savedPackIds.has(pack.id))
     .slice(0, 2);
   const stickerShortcuts: StickerShortcut[] = [
-    { id: 'favorites', label: 'Favorites', type: 'favorites' },
-    { id: 'recent', label: 'Recent', type: 'recent' },
+    { id: 'favorites', label: copy.stickers.favorites, type: 'favorites' },
+    { id: 'recent', label: copy.stickers.recent, type: 'recent' },
     ...savedPacks
       .filter((pack) => pack.stickers.length > 0)
       .map((pack) => ({
@@ -265,8 +279,8 @@ export function StickerPicker({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-10"
-        aria-label="Open stickers"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-10"
+        aria-label={copy.stickers.openPicker}
       >
         <svg
           aria-hidden="true"
@@ -285,16 +299,16 @@ export function StickerPicker({
         </svg>
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40">
+        <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(25.625rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40 sm:w-[min(25.625rem,calc(100vw-3rem))]">
           <div className="flex items-center gap-1 border-b border-white/10 bg-white/5 p-2">
             <PickerTab
               active={tab === 'stickers'}
-              label="Stickers"
+              label={copy.stickers.title}
               onClick={() => setTab('stickers')}
             />
             <PickerTab
               active={tab === 'emoji'}
-              label="Emoji"
+              label={copy.stickers.emoji}
               onClick={() => setTab('emoji')}
             />
             {tab === 'stickers' && (
@@ -303,7 +317,7 @@ export function StickerPicker({
                 onClick={() => setManageOpen(true)}
                 className="ml-auto rounded-xl px-3 py-2 text-xs font-black text-white/60 transition hover:bg-white/10 hover:text-white"
               >
-                Manage
+                {copy.stickers.manage}
               </button>
             )}
           </div>
@@ -318,26 +332,18 @@ export function StickerPicker({
                 onSelect={scrollToStickerSection}
                 shortcuts={stickerShortcuts}
               />
-              <div className="mb-3 flex gap-2">
-                <input
+              <div
+                className="mb-3"
+                onKeyDown={searchPacksOnEnter}
+              >
+                <ClearableSearchInput
+                  ariaLabel={copy.stickers.searchStickers}
+                  clearLabel={copy.stickers.clearStickerSearch}
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter') return;
-
-                    event.preventDefault();
-                    void searchPacks();
-                  }}
-                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none placeholder:text-white/35"
-                  placeholder="Search stickers"
+                  onChange={setQuery}
+                  inputClassName="rounded-xl placeholder:text-white/35"
+                  placeholder={copy.stickers.searchStickers}
                 />
-                <button
-                  type="button"
-                  onClick={() => void searchPacks()}
-                  className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950"
-                >
-                  Search
-                </button>
               </div>
               {error && (
                 <div className="mb-3 rounded-xl border border-rose-300/25 bg-rose-500/15 p-2 text-xs text-rose-100">
@@ -346,26 +352,26 @@ export function StickerPicker({
               )}
               {loading && (
                 <div className="p-4 text-center text-sm text-white/45">
-                  Loading...
+                  {copy.app.loading}
                 </div>
               )}
               <StickerSection
                 favoriteIds={favoriteIds}
                 items={favoriteItems}
-                label="Favorites"
+                label={copy.stickers.favorites}
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
                 sectionRef={setStickerSectionRef('favorites')}
-                emptyText="No favorite stickers yet."
+                emptyText={copy.stickers.noFavorites}
               />
               <StickerSection
                 favoriteIds={favoriteIds}
                 items={recentItems}
-                label="Recent"
+                label={copy.stickers.recent}
                 onFavoriteToggle={toggleFavorite}
                 onSend={sendSticker}
                 sectionRef={setStickerSectionRef('recent')}
-                emptyText="Recently used stickers will appear here."
+                emptyText={copy.stickers.noRecent}
               />
               {savedPacks.map((pack) => (
                 <StickerSection
@@ -379,20 +385,20 @@ export function StickerPicker({
                   onFavoriteToggle={toggleFavorite}
                   onSend={sendSticker}
                   sectionRef={setStickerSectionRef(`pack:${pack.id}`)}
-                  emptyText="This pack has no stickers yet."
+                  emptyText={copy.stickers.emptyPack}
                 />
               ))}
               {!loading &&
                 savedPacks.length === 0 &&
                 explorePacks.length === 0 && (
                   <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/45">
-                    No sticker packs yet. Open Manage to create or save one.
+                    {copy.stickers.noStickerPacks}
                   </div>
                 )}
               {explorePacks.length > 0 && (
                 <div className="mt-4 grid gap-2">
                   <div className="text-center text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                    Explore
+                    {copy.stickers.explore}
                   </div>
                   {explorePacks.map((pack) => (
                     <StickerExplorePack

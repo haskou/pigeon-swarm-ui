@@ -386,14 +386,7 @@ export function CreateCommunityDialog({
           )}
         </div>
 
-        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-black text-white/70"
-          >
-            {copy.dialog.cancel}
-          </button>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             disabled={!canSubmit}
             className={cx(

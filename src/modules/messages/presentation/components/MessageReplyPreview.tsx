@@ -70,7 +70,7 @@ export function MessageReplyPreview({
       type="button"
       onClick={() => onReplyReferenceClick(replyMessageId)}
       className={cx(
-        'mb-2 block max-w-full rounded-2xl border px-3 py-2 text-left text-xs transition',
+        'mb-2 block max-w-full rounded-[inherit] border px-3 py-2 text-left text-xs transition',
         mine
           ? 'border-white/20 bg-white/10 hover:bg-white/15'
           : 'border-fuchsia-300/20 bg-fuchsia-400/10 hover:bg-fuchsia-400/15',

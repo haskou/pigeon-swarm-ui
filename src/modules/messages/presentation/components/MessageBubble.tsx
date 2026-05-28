@@ -170,7 +170,7 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex min-w-0 items-center gap-3', mine && 'justify-end')}
+        className={cx('flex min-w-0 items-end gap-3', mine && 'justify-end')}
       >
         {!mine && (
           <MessageAvatarColumn
@@ -194,6 +194,7 @@ export function MessageBubble({
             )}
           >
             <div
+              data-message-bubble
               onContextMenu={handleContextMenu}
               style={{
                 WebkitTouchCallout: 'none',
@@ -208,7 +209,7 @@ export function MessageBubble({
                 sticker
                   ? 'rounded-2xl bg-transparent p-0'
                   : cx(
-                      'rounded-2xl px-3 py-1.5',
+                      'rounded-2xl p-3',
                       mine
                         ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
                         : mentionHighlighted

@@ -33,6 +33,7 @@ import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
+import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import {
   ManagedCommunityChannels,
   type ManagedCommunityChannel,
@@ -1237,7 +1238,7 @@ export function ManageCommunityDialog({
                                             >
                                               {selected ? '✓' : ''}
                                             </span>
-                                            {role.name}
+                                            {communityRoleDisplayName(role)}
                                           </label>
                                         );
                                       })}

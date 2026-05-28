@@ -523,9 +523,12 @@ export function useCommunityMessageComposer({
       if (!element) return;
 
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('message-focus-ring');
+      const focusTarget =
+        element.querySelector<HTMLElement>('[data-message-bubble]') ?? element;
+
+      focusTarget.classList.add('message-focus-ring');
       window.setTimeout(
-        () => element.classList.remove('message-focus-ring'),
+        () => focusTarget.classList.remove('message-focus-ring'),
         1600,
       );
     });

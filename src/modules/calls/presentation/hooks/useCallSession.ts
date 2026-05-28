@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   CallParticipant,
@@ -306,46 +306,51 @@ export function useCallSession(): {
     setActiveCall(null);
   };
 
-  const reconcileCall = (call: CallResource, input: ReconcileCallInput) => {
-    const participants = mergeParticipantStatuses(input.participants, call);
+  const reconcileCall = useCallback(
+    (call: CallResource, input: ReconcileCallInput) => {
+      const participants = mergeParticipantStatuses(input.participants, call);
 
-    setActiveCall((current) => {
-      if (!current || current.id !== call.id) return current;
+      setActiveCall((current) => {
+        if (!current || current.id !== call.id) return current;
 
-      return {
-        ...current,
-        ...input,
-        call,
-        participants,
-        participantVolumes: current.participantVolumes,
-        screenShareVolumes: current.screenShareVolumes,
-        status: reconciledCallStatus(call, current),
-      };
-    });
+        return {
+          ...current,
+          ...input,
+          call,
+          participants,
+          participantVolumes: current.participantVolumes,
+          screenShareVolumes: current.screenShareVolumes,
+          status: reconciledCallStatus(call, current),
+        };
+      });
 
-    const currentIdentityId = currentIdentityIdRef.current;
-    const sendSignal = sendSignalRef.current;
+      const currentIdentityId = currentIdentityIdRef.current;
+      const sendSignal = sendSignalRef.current;
 
-    if (currentIdentityId) {
-      peerManager.retainPeers(
-        joinedRemotePeerIdentityIds(call, currentIdentityId),
-      );
-    }
+      if (currentIdentityId) {
+        peerManager.retainPeers(
+          joinedRemotePeerIdentityIds(call, currentIdentityId),
+        );
+      }
 
-    if (!currentIdentityId || !sendSignal || call.status !== 'active') return;
+      if (!currentIdentityId || !sendSignal || call.status !== 'active') {
+        return;
+      }
 
-    void connectJoinedPeers(
-      callSessionForJoinedPeerConnection(
-        call,
+      void connectJoinedPeers(
+        callSessionForJoinedPeerConnection(
+          call,
+          currentIdentityId,
+          input,
+          participants,
+          activeCallRef.current,
+        ),
         currentIdentityId,
-        input,
-        participants,
-        activeCallRef.current,
-      ),
-      currentIdentityId,
-      sendSignal,
-    );
-  };
+        sendSignal,
+      );
+    },
+    [peerManager],
+  );
 
   const receiveSignal = async (input: ReceivedSignal) => {
     logCallDebug('session:receive-signal', {

@@ -5,6 +5,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { MessageEditPolicy } from '../../../messages/domain/MessageEditPolicy';
+import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 
@@ -61,7 +62,7 @@ export class CommunityWorkspaceDialogActions {
       community,
       identityId,
     )) {
-      roleNames.add(role.name);
+      roleNames.add(communityRoleDisplayName(role));
     }
 
     return [...roleNames];

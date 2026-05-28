@@ -7,6 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { type StickerGridItem } from './stickerPickerParts';
@@ -92,9 +93,7 @@ export function StickerManagerDialog({
         })
         .catch((caught) => {
           if (!cancelled) {
-            setError(
-              toUserErrorMessage(caught, 'Sticker packs could not be found.'),
-            );
+            setError(toUserErrorMessage(caught, copy.stickers.searchError));
           }
         })
         .finally(() => {
@@ -121,7 +120,7 @@ export function StickerManagerDialog({
       setPackName('');
       setMode('mine');
     } catch (caught) {
-      setError(toUserErrorMessage(caught, 'Sticker pack could not be saved.'));
+      setError(toUserErrorMessage(caught, copy.stickers.saveError));
     } finally {
       setSaving(false);
     }
@@ -138,14 +137,15 @@ export function StickerManagerDialog({
       >
         <div className="mb-4 flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-black">Stickers</h2>
+            <h2 className="text-xl font-black">{copy.stickers.title}</h2>
             <p className="text-sm text-white/45">
-              Create packs, upload stickers, manage favorites and saved packs.
+              {copy.stickers.managerDescription}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={copy.dialog.close}
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15"
           >
             ×
@@ -161,19 +161,19 @@ export function StickerManagerDialog({
             active={mode === 'saved'}
             onClick={() => setMode('saved')}
           >
-            Saved packs
+            {copy.stickers.savedPacks}
           </ManagerModeButton>
           <ManagerModeButton
             active={mode === 'mine'}
             onClick={() => setMode('mine')}
           >
-            My packs
+            {copy.stickers.myPacks}
           </ManagerModeButton>
           <ManagerModeButton
             active={mode === 'create'}
             onClick={() => setMode('create')}
           >
-            Create pack
+            {copy.stickers.createPack}
           </ManagerModeButton>
         </div>
 
@@ -186,14 +186,14 @@ export function StickerManagerDialog({
               value={packName}
               onChange={(event) => setPackName(event.target.value)}
               className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-              placeholder="Pack name"
+              placeholder={copy.stickers.packName}
             />
             <button
               type="submit"
               disabled={saving || !packName.trim()}
               className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:opacity-45"
             >
-              Create
+              {copy.stickers.create}
             </button>
           </form>
         ) : mode === 'mine' ? (
@@ -222,7 +222,7 @@ export function StickerManagerDialog({
           onClick={() => void onRefresh()}
           className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-black text-white/70 transition hover:bg-white/15"
         >
-          Refresh
+          {copy.stickers.refresh}
         </button>
       </div>
     </div>

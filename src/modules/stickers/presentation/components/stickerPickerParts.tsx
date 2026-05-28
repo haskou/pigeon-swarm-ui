@@ -48,7 +48,7 @@ export function StickerShortcutBar({
   shortcuts: StickerShortcut[];
 }) {
   return (
-    <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 border-b border-white/10 bg-[#17171d]/95 px-3 py-2 backdrop-blur">
+    <div className="sticky -top-3 z-20 -mx-3 -mt-3 mb-3 border-b border-white/10 bg-[#17171d] px-3 pb-2 pt-3 shadow-[0_10px_18px_rgba(23,23,29,0.9)]">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {shortcuts.map((shortcut) => (
           <button

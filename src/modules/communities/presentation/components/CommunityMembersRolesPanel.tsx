@@ -5,8 +5,10 @@ import type {
 
 import { useMemo, useState } from 'react';
 
+import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { MemberRow } from './MemberRow';
 import { memberPrimaryName } from './communityMemberNames';
 
@@ -72,13 +74,13 @@ export function CommunityMembersRolesPanel({
         <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
           {copy.communities.members}
         </div>
-        <input
-          type="search"
-          value={memberSearch}
-          onChange={(event) => setMemberSearch(event.target.value)}
-          className="min-w-0 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60 sm:w-64"
+        <ClearableSearchInput
+          ariaLabel={copy.communities.searchMembers}
+          className="min-w-0 sm:w-64"
+          clearLabel={copy.communities.clearMemberSearch}
+          onChange={setMemberSearch}
           placeholder={copy.communities.searchMembers}
-          aria-label={copy.communities.searchMembers}
+          value={memberSearch}
         />
       </div>
       <div className="space-y-3">
@@ -134,7 +136,7 @@ export function CommunityMembersRolesPanel({
                             )}
                             aria-pressed={selected}
                           >
-                            {role.name}
+                            {communityRoleDisplayName(role)}
                           </button>
                         );
                       })}

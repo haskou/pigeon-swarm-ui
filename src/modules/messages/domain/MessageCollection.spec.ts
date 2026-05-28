@@ -40,6 +40,21 @@ describe(MessageCollection.name, () => {
     ).toBeUndefined();
   });
 
+  it('finds the latest delivered timestamp independently from list order', () => {
+    expect(
+      MessageCollection.latestDeliveredTimestamp([
+        message({ id: 'message-1', timestamp: 300 }),
+        message({ id: 'message-2', timestamp: 100 }),
+        message({
+          deliveryStatus: 'pending',
+          id: 'message-3',
+          timestamp: 500,
+        }),
+        message({ id: 'message-4', timestamp: 200 }),
+      ]),
+    ).toBe(300);
+  });
+
   it('applies edit events to their target message without rendering the edit event', () => {
     const original = message({
       attachments: [

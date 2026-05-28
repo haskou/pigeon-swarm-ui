@@ -147,6 +147,10 @@ input[type='submit'] {
   --app-safe-area-drawer-padding-y: 1rem;
 }
 
+.app-safe-area-drawer-flush {
+  --app-safe-area-drawer-padding-y: 0rem;
+}
+
 .app-safe-area-popup {
   --app-safe-area-popup-padding: 0.75rem;
   padding-bottom: calc(

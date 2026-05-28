@@ -15,7 +15,12 @@ describe(ListConversations.name, () => {
       loadMessages: jest.fn((_session: Session, conversationId: string) =>
         Promise.resolve(
           conversationId === 'newer'
-            ? { messages: [{ id: '2', timestamp: 20 }] }
+            ? {
+                messages: [
+                  { id: '2', timestamp: 20 },
+                  { id: '1', timestamp: 5 },
+                ],
+              }
             : { messages: [{ id: '1', timestamp: 10 }] },
         ),
       ),

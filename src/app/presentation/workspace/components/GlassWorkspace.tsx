@@ -1101,6 +1101,12 @@ export function GlassWorkspace({
     reconcileCallResourceRef.current = reconcileCallResource;
   }, [reconcileCallResource]);
 
+  useEffect(() => {
+    if (!activeCall?.call) return;
+
+    reconcileCall(activeCall.call, callDetailsForResource(activeCall.call));
+  }, [activeCall?.call, callDetailsForResource, reconcileCall]);
+
   const callSignalSender = useCallback(
     (callId: string) =>
       async (
@@ -2227,9 +2233,12 @@ export function GlassWorkspace({
       if (!element) return;
 
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('message-focus-ring');
+      const focusTarget =
+        element.querySelector<HTMLElement>('[data-message-bubble]') ?? element;
+
+      focusTarget.classList.add('message-focus-ring');
       window.setTimeout(
-        () => element.classList.remove('message-focus-ring'),
+        () => focusTarget.classList.remove('message-focus-ring'),
         1600,
       );
     });
@@ -3276,7 +3285,7 @@ export function GlassWorkspace({
           <>
             <div
               className={cx(
-                'app-safe-area-drawer-until-lg fixed inset-y-0 left-0 z-40 w-[calc(100vw-1.5rem)] max-w-[442px] p-3 transition sm:w-[calc(86vw+82px)] lg:static lg:block lg:w-auto lg:max-w-none lg:p-0',
+                'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-full max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:block lg:w-auto lg:max-w-none',
                 sidebarOpen ? 'block' : 'hidden lg:block',
               )}
             >

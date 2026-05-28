@@ -1,5 +1,6 @@
 import type { StickerPackResource, StickerResource } from '../../../../shared/domain/pigeonResources.types';
 
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { StickerGrid } from './stickerPickerParts';
 
 export function StickerExplorePack({
@@ -32,7 +33,7 @@ export function StickerExplorePack({
           onClick={() => void onSavePack(pack.id, saved)}
           className="rounded-lg bg-white/10 px-2 py-1 text-xs font-black text-white/70 transition hover:bg-white/15"
         >
-          {saved ? 'Remove' : 'Save'}
+          {saved ? copy.stickers.removePack : copy.stickers.savePack}
         </button>
       </div>
       <StickerGrid

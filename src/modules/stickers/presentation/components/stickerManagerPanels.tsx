@@ -7,6 +7,7 @@ import type {
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { StickerGrid, type StickerGridItem } from './stickerPickerParts';
 import { stickerAssetUrl } from './stickerPressPreview';
 import { invalidateStickerCaches } from './stickerLibraryCache';
@@ -29,7 +30,7 @@ export function MyPacksPanel({
   if (ownPacks.length === 0) {
     return (
       <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
-        Create a pack first to upload stickers.
+        {copy.stickers.createPackFirst}
       </div>
     );
   }
@@ -37,7 +38,7 @@ export function MyPacksPanel({
   return (
     <section>
       <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-        My packs
+        {copy.stickers.myPacks}
       </div>
       <div className="grid gap-3">
         {ownPacks.map((pack) => (
@@ -88,18 +89,20 @@ export function SavedPacksPanel({
           value={packSearch}
           onChange={(event) => setPackSearch(event.target.value)}
           className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
-          placeholder="Search sticker packs"
+          placeholder={copy.stickers.searchPacks}
         />
         {searchingPacks && (
           <div className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-white/35">
-            Searching...
+            {copy.stickers.searching}
           </div>
         )}
       </div>
       {packSearchResults.length > 0 && (
         <section className="mb-5">
           <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            {packSearch.trim() ? 'Search results' : 'Suggested packs'}
+            {packSearch.trim()
+              ? copy.stickers.searchResults
+              : copy.stickers.suggestedPacks}
           </div>
           <div className="grid gap-2">
             {packSearchResults.map((pack) => (
@@ -117,13 +120,13 @@ export function SavedPacksPanel({
         !searchingPacks &&
         packSearchResults.length === 0 && (
           <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
-            No packs found.
+            {copy.stickers.noPacksFound}
           </div>
         )}
       <div className="grid gap-4 md:grid-cols-2">
         <section>
           <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            Saved packs
+            {copy.stickers.savedPacks}
           </div>
           <div className="grid gap-2">
             {savedPacks.map((pack) => (
@@ -136,14 +139,14 @@ export function SavedPacksPanel({
             ))}
             {savedPacks.length === 0 && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
-                No saved packs yet.
+                {copy.stickers.noSavedPacks}
               </div>
             )}
           </div>
         </section>
         <section>
           <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            Favorites
+            {copy.stickers.favorites}
           </div>
           <StickerGrid
             favoriteIds={favoriteIds}
@@ -230,14 +233,14 @@ function ManagePackStickers({
           <div key={sticker.id} className="group relative">
             <img
               src={stickerAssetUrl(sticker.assetCid)}
-              alt="Sticker"
+              alt={copy.stickers.stickerAlt}
               className="aspect-square w-full rounded-xl bg-black/20 object-contain p-1"
             />
             <button
               type="button"
               onClick={() => void onStickerDelete(pack.id, sticker.id)}
               className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/75 text-xs font-black text-white/70 opacity-0 transition hover:text-white group-hover:opacity-100"
-              aria-label="Delete sticker"
+              aria-label={copy.stickers.deleteSticker}
             >
               x
             </button>
@@ -248,7 +251,7 @@ function ManagePackStickers({
             'grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-white/15 bg-black/20 text-2xl font-black text-white/45 transition hover:border-white/30 hover:bg-white/10 hover:text-white/80',
             uploading && 'pointer-events-none opacity-50',
           )}
-          aria-label="Add sticker"
+          aria-label={copy.stickers.addSticker}
         >
           {uploading ? (
             <span className="text-xs font-black uppercase tracking-[0.12em]">
@@ -292,7 +295,7 @@ function PackRow({
           onClick={() => void onSavePack(pack.id, saved)}
           className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white/70 transition hover:bg-white/15"
         >
-          {saved ? 'Remove' : 'Save'}
+          {saved ? copy.stickers.removePack : copy.stickers.savePack}
         </button>
       </div>
       {pack.stickers.length > 0 && (

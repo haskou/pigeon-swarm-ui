@@ -2,6 +2,7 @@ import type {
   Community,
   CommunityChannel,
   CommunityModerationLog,
+  CommunityPermission,
   CommunityRoleResource,
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -107,14 +108,19 @@ function ModerationLogRow({
       </div>
 
       <div className="mt-3 grid gap-2 rounded-2xl bg-black/20 p-3 text-xs text-white/55">
-        <div className="flex items-center justify-between gap-3">
-          <span>{copy.communities.moderationTarget}</span>
-          <span className="truncate font-semibold text-white/70">{target}</span>
+        <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3">
+          <span className="min-w-0">{copy.communities.moderationTarget}</span>
+          <span className="min-w-0 break-words text-right font-semibold text-white/70">
+            {target}
+          </span>
         </div>
         {Object.entries(log.details ?? {}).map(([key, value]) => (
-          <div className="flex items-center justify-between gap-3" key={key}>
-            <span>{prettify(key)}</span>
-            <span className="truncate font-semibold text-white/70">
+          <div
+            className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3"
+            key={key}
+          >
+            <span className="min-w-0">{prettify(key)}</span>
+            <span className="min-w-0 break-words text-right font-semibold text-white/70">
               {detailLabel(value, roles)}
             </span>
           </div>
@@ -170,7 +176,8 @@ function detailLabel(value: unknown, roles: CommunityRoleResource[]): string {
     return value
       .map((item) =>
         typeof item === 'string'
-          ? (roles.find((role) => role.id === item)?.name ?? item)
+          ? (roles.find((role) => role.id === item)?.name ??
+            permissionLabel(item))
           : String(item),
       )
       .join(', ');
@@ -187,4 +194,11 @@ function detailLabel(value: unknown, roles: CommunityRoleResource[]): string {
 
 function prettify(value: string): string {
   return value.replace(/_/g, ' ');
+}
+
+function permissionLabel(value: string): string {
+  return (
+    copy.communities.permissions[value as CommunityPermission] ??
+    prettify(value)
+  );
 }

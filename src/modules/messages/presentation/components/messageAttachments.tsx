@@ -149,7 +149,7 @@ export function ImageAttachmentAlbum({
                 onOpen(lightboxImages, lightboxIndex);
               }}
               className={cx(
-                'relative min-h-28 overflow-hidden bg-black/25 text-left transition hover:opacity-90',
+                'relative min-h-28 overflow-hidden rounded-2xl bg-black/25 text-left transition hover:opacity-90',
                 visibleItems.length === 1 ? 'aspect-[4/3]' : 'aspect-square',
               )}
               aria-label={copy.attachments.openImage}
@@ -158,7 +158,7 @@ export function ImageAttachmentAlbum({
                 <img
                   src={previewUrl}
                   alt=""
-                  className="h-full w-full object-cover"
+                  className="h-full w-full rounded-2xl object-cover"
                 />
               ) : (
                 <div className="grid h-full w-full place-items-center px-3 text-center text-xs font-black text-white/55">
