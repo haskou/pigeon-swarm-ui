@@ -43,7 +43,7 @@ interface MessageBubbleProps {
     onProgress?: (progress: AttachmentProgress) => void,
   ) => Promise<string>;
   onAttachmentOpen: (attachmentIndex: number) => void;
-  onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
+  onAvatarClick?: (event: MouseEvent<HTMLElement>) => void;
   onMessageClick?: (message: ChatMessage) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onMentionClick?: (identityId: string, target: HTMLElement) => void;
@@ -529,7 +529,7 @@ function MessageAvatarColumn({
   authorName: string;
   authorPicture?: string | null;
   mine?: boolean;
-  onAvatarClick: (event: MouseEvent<HTMLElement>) => void;
+  onAvatarClick?: (event: MouseEvent<HTMLElement>) => void;
   reserveAvatarSpace: boolean;
   showAvatar: boolean;
 }) {

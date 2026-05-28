@@ -27,6 +27,7 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 
 export type MessageContextMenuState = {
   message: ChatMessage;
+  source?: 'thread' | 'timeline';
   x: number;
   y: number;
 };

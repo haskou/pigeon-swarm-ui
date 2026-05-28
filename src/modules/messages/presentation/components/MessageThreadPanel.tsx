@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react';
+
 import { useState } from 'react';
 
 import type {
@@ -26,6 +28,7 @@ export function MessageThreadPanel({
   identityNames,
   identityPictures = {},
   messages,
+  onAuthorProfileOpen,
   onClose,
   onDraftChange,
   onMessageMenuOpen,
@@ -45,6 +48,10 @@ export function MessageThreadPanel({
   identityNames: Record<string, string>;
   identityPictures?: Record<string, string | undefined>;
   messages: ChatMessage[];
+  onAuthorProfileOpen?: (
+    message: ChatMessage,
+    target: HTMLElement,
+  ) => void;
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
@@ -72,6 +79,13 @@ export function MessageThreadPanel({
   const rootAuthorName = displayName(rootMessage.authorIdentityId);
   const rootMine =
     rootMessage.mine || rootMessage.authorIdentityId === currentIdentityId;
+  const avatarClickFor = (message: ChatMessage) => {
+    if (!onAuthorProfileOpen) return undefined;
+
+    return (event: MouseEvent<HTMLElement>) => {
+      onAuthorProfileOpen?.(message, event.currentTarget);
+    };
+  };
 
   return (
     <section
@@ -110,7 +124,7 @@ export function MessageThreadPanel({
               void openAttachment(rootMessage.attachments[attachmentIndex])
             }
             onAttachmentPreview={loadAttachmentPreview}
-            onAvatarClick={() => undefined}
+            onAvatarClick={avatarClickFor(rootMessage)}
             onMessageClick={onRootMessageOpen}
             onMessageMenuOpen={onMessageMenuOpen}
             onReplyReferenceClick={() => undefined}
@@ -141,7 +155,7 @@ export function MessageThreadPanel({
                   void openAttachment(message.attachments[attachmentIndex])
                 }
                 onAttachmentPreview={loadAttachmentPreview}
-                onAvatarClick={() => undefined}
+                onAvatarClick={avatarClickFor(message)}
                 onMessageMenuOpen={onMessageMenuOpen}
                 onReplyReferenceClick={() => undefined}
                 pinned={pinnedMessageIds.has(message.id)}

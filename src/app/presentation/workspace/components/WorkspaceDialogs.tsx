@@ -232,6 +232,7 @@ function MessageActionDialogs(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
   const contextMenuMessage = props.messageContextMenu?.message;
+  const contextMenuFromThread = props.messageContextMenu?.source === 'thread';
   const contextMenuMessagePinned = contextMenuMessage
     ? isPinnedMessage(contextMenuMessage, props.pinnedMessageIds)
     : false;
@@ -274,13 +275,16 @@ function MessageActionDialogs(
             : undefined
         }
         onOpenThread={
-          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread
             ? () => props.onOpenMessageThread(contextMenuMessage)
             : undefined
         }
         onPin={
           contextMenuMessage &&
           contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread &&
           !contextMenuMessagePinned
             ? () => props.onPinMessage(contextMenuMessage)
             : undefined
@@ -288,6 +292,7 @@ function MessageActionDialogs(
         onUnpin={
           contextMenuMessage &&
           contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread &&
           contextMenuMessagePinned
             ? () => props.onUnpinMessage(contextMenuMessage)
             : undefined

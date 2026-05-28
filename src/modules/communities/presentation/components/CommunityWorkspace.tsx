@@ -1740,14 +1740,18 @@ export function CommunityWorkspace({
             identityNames={communityIdentityNames}
             identityPictures={memberPictures}
             messages={threadPanel.messages}
+            onAuthorProfileOpen={(message, target) =>
+              openMessageAuthorProfile(message, profileAnchorFromTarget(target))
+            }
             onClose={() => setThreadPanel(null)}
             onDraftChange={updateThreadDraft}
             onMessageMenuOpen={(message, x, y) =>
-              setMessageContextMenu({ message, x, y })
+              setMessageContextMenu({ message, source: 'thread', x, y })
             }
             onRootMessageOpen={(message) => {
+              setMessages((current) => mergeChatMessages(current, [message]));
               setThreadPanel(null);
-              scrollToChannelMessage(message.id);
+              window.setTimeout(() => scrollToChannelMessage(message.id), 0);
             }}
             onSend={sendThreadMessage}
             onStickerSend={

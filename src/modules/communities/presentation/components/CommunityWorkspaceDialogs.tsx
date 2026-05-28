@@ -178,6 +178,7 @@ export function CommunityWorkspaceDialogs({
   onUnpinMessage,
   onViewRawMessage,
 }: CommunityWorkspaceDialogsProps) {
+  const contextMenuFromThread = messageContextMenu?.source === 'thread';
   const contextMenuMessagePinned = messageContextMenu
     ? isPinnedMessage(messageContextMenu.message, pinnedMessageIds)
     : false;
@@ -281,12 +282,13 @@ export function CommunityWorkspaceDialogs({
               : undefined
           }
           onOpenThread={
-            messageContextMenu.message.kind !== 'poll'
+            messageContextMenu.message.kind !== 'poll' && !contextMenuFromThread
               ? () => onOpenMessageThread(messageContextMenu.message)
               : undefined
           }
           onPin={
             messageContextMenu.message.kind !== 'poll' &&
+            !contextMenuFromThread &&
             (owner || currentPermissions.has('manage_messages')) &&
             !contextMenuMessagePinned
               ? () => onPinMessage(messageContextMenu.message)
@@ -294,6 +296,7 @@ export function CommunityWorkspaceDialogs({
           }
           onUnpin={
             messageContextMenu.message.kind !== 'poll' &&
+            !contextMenuFromThread &&
             (owner || currentPermissions.has('manage_messages')) &&
             contextMenuMessagePinned
               ? () => onUnpinMessage(messageContextMenu.message)

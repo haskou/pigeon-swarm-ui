@@ -3496,10 +3496,15 @@ export function GlassWorkspace({
                 messages={conversationThread.messages}
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
-                onMessageMenuOpen={handleMessageMenuOpen}
+                onMessageMenuOpen={(message, x, y) =>
+                  setMessageContextMenu({ message, source: 'thread', x, y })
+                }
                 onRootMessageOpen={(message) => {
+                  setMessages((current) =>
+                    MessageCollection.merge(current, [message]),
+                  );
                   setConversationThread(null);
-                  scrollToMessage(message.id);
+                  window.setTimeout(() => scrollToMessage(message.id), 0);
                 }}
                 onSend={sendConversationThreadMessage}
                 onStickerSend={sendConversationThreadSticker}
