@@ -115,9 +115,7 @@ export function ChatMessageTimeline({
       className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-2 py-3 sm:p-6"
     >
       {loadingInitialMessages ? (
-        <div className="grid min-h-full place-items-center">
-          <MessageListSkeleton />
-        </div>
+        <MessageListSkeleton />
       ) : (
         <MessageTimelineContent
           bottomRef={bottomRef}
