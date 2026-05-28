@@ -69,8 +69,9 @@ export function PinIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path
-        d="m14 4 6 6-3 1-4 4v4l-2 2-3-7-5-3 2-2h4l4-4 1-3Z"
+        d="M12 17v5M5 17h14M5 7h14M7 7v5a5 5 0 0 0 10 0V7M9 7V2h6v5"
         stroke="currentColor"
+        strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2"
       />
