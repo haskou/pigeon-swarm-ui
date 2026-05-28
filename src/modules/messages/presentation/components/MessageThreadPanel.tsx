@@ -30,6 +30,7 @@ export function MessageThreadPanel({
   onClose,
   onDraftChange,
   onMessageMenuOpen,
+  onRootMessageOpen,
   onSend,
   onStickerSend,
   rootMessage,
@@ -47,6 +48,7 @@ export function MessageThreadPanel({
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onRootMessageOpen: (message: ChatMessage) => void;
   onSend: (
     content: string,
     attachments: File[],
@@ -98,6 +100,7 @@ export function MessageThreadPanel({
           authorName={displayName(rootMessage.authorIdentityId)}
           authorPicture={identityPictures[rootMessage.authorIdentityId]}
           message={rootMessage}
+          onOpen={() => onRootMessageOpen(rootMessage)}
         />
       </header>
 
@@ -154,15 +157,22 @@ function ThreadRootCard({
   authorName,
   authorPicture,
   message,
+  onOpen,
 }: {
   authorName: string;
   authorPicture?: string | null;
   message: ChatMessage;
+  onOpen: () => void;
 }) {
   return (
-    <div className="mt-4 flex items-end gap-3">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mt-4 flex w-full items-end gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+      aria-label={copy.messages.originalMessage}
+    >
       <Avatar label={authorName} picture={authorPicture} />
-      <div className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2">
+      <div className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 transition hover:bg-white/12">
         <div className="truncate text-xs font-black text-white/65">
           {authorName}
         </div>
@@ -170,7 +180,7 @@ function ThreadRootCard({
           {messageSummary(message)}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

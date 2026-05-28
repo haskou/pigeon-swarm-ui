@@ -3497,6 +3497,10 @@ export function GlassWorkspace({
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
                 onMessageMenuOpen={handleMessageMenuOpen}
+                onRootMessageOpen={(message) => {
+                  setConversationThread(null);
+                  scrollToMessage(message.id);
+                }}
                 onSend={sendConversationThreadMessage}
                 onStickerSend={sendConversationThreadSticker}
                 rootMessage={conversationThread.root}

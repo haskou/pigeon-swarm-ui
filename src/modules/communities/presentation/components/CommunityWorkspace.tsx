@@ -1745,6 +1745,10 @@ export function CommunityWorkspace({
             onMessageMenuOpen={(message, x, y) =>
               setMessageContextMenu({ message, x, y })
             }
+            onRootMessageOpen={(message) => {
+              setThreadPanel(null);
+              scrollToChannelMessage(message.id);
+            }}
             onSend={sendThreadMessage}
             onStickerSend={
               currentPermissions.has('send_stickers')
