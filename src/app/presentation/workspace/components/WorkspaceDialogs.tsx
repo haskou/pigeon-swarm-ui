@@ -232,6 +232,9 @@ function MessageActionDialogs(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
   const contextMenuMessage = props.messageContextMenu?.message;
+  const contextMenuMessagePinned = contextMenuMessage
+    ? isPinnedMessage(contextMenuMessage, props.pinnedMessageIds)
+    : false;
 
   if (!props.messageContextMenu) {
     return props.rawMessage ? (
@@ -278,22 +281,18 @@ function MessageActionDialogs(
         onPin={
           contextMenuMessage &&
           contextMenuMessage.kind !== 'poll' &&
-          !props.pinnedMessageIds.has(contextMenuMessage.id)
+          !contextMenuMessagePinned
             ? () => props.onPinMessage(contextMenuMessage)
             : undefined
         }
         onUnpin={
           contextMenuMessage &&
           contextMenuMessage.kind !== 'poll' &&
-          props.pinnedMessageIds.has(contextMenuMessage.id)
+          contextMenuMessagePinned
             ? () => props.onUnpinMessage(contextMenuMessage)
             : undefined
         }
-        pinned={
-          contextMenuMessage
-            ? props.pinnedMessageIds.has(contextMenuMessage.id)
-            : false
-        }
+        pinned={contextMenuMessagePinned}
         onReactionToggle={props.onToggleReaction}
         onViewRaw={() => {
           if (contextMenuMessage) props.onViewRawMessage(contextMenuMessage);
@@ -309,6 +308,13 @@ function MessageActionDialogs(
       )}
     </>
   );
+}
+
+function isPinnedMessage(
+  message: ChatMessage,
+  pinnedMessageIds: ReadonlySet<string>,
+): boolean {
+  return pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId);
 }
 
 function CreateDialogs(

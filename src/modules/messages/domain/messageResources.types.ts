@@ -71,6 +71,7 @@ export type MessageResource = {
   plaintextPayload?: string;
   poll?: PollResource;
   pollId?: string;
+  pinnedByIdentityId?: string;
   previousMessageIds?: string[];
   question?: string;
   reactions?: MessageReaction[];
