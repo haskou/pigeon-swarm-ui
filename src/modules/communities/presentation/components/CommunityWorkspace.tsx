@@ -7,6 +7,7 @@ import {
 import {
   type MouseEvent,
   type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -42,6 +43,7 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/Composer';
+import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
@@ -134,6 +136,14 @@ interface CommunityWorkspaceProps {
   typingIdentityIds?: string[];
 }
 
+type MessageCollectionState = {
+  error: null | string;
+  messages: ChatMessage[];
+  root?: ChatMessage;
+  state: 'loading' | 'ready';
+  type: 'pins' | 'thread';
+};
+
 export function CommunityWorkspace({
   activeCall,
   activeChannelId,
@@ -216,7 +226,8 @@ export function CommunityWorkspace({
     () => resolveCommunityChannelId(activeChannelId, accessibleTextChannels),
     [accessibleTextChannels, activeChannelId],
   );
-  const [draft, setDraft] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -246,6 +257,8 @@ export function CommunityWorkspace({
   const [profileViewer, setProfileViewer] =
     useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [messageCollection, setMessageCollection] =
+    useState<MessageCollectionState | null>(null);
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
@@ -335,6 +348,52 @@ export function CommunityWorkspace({
     onMobileSidebarClose,
     resolvedChannelId,
   });
+  const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
+  const scheduleChannelDraftSync = useCallback(
+    (channelId: string, value: string) => {
+      const currentTimer = draftSyncTimersRef.current.get(channelId);
+
+      if (currentTimer) window.clearTimeout(currentTimer);
+
+      const timer = window.setTimeout(() => {
+        draftSyncTimersRef.current.delete(channelId);
+
+        if (value.trim()) {
+          void applicationContainer
+            .saveCommunityChannelDraft(session, community.id, channelId, value)
+            .catch(() => undefined);
+
+          return;
+        }
+
+        void applicationContainer
+          .deleteCommunityChannelDraft(session, community.id, channelId)
+          .catch(() => undefined);
+      }, 700);
+
+      draftSyncTimersRef.current.set(channelId, timer);
+    },
+    [community.id, session],
+  );
+  const setSelectedChannelDraft = useCallback(
+    (next: SetStateAction<string>) => {
+      if (!selectedChannelId) return;
+
+      setDrafts((current) => {
+        const currentValue = current[selectedChannelId] ?? '';
+        const value =
+          typeof next === 'function' ? next(currentValue) : next;
+
+        scheduleChannelDraftSync(selectedChannelId, value);
+
+        return {
+          ...current,
+          [selectedChannelId]: value,
+        };
+      });
+    },
+    [scheduleChannelDraftSync, selectedChannelId],
+  );
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -413,6 +472,150 @@ export function CommunityWorkspace({
     selectedChannelId,
     session,
   });
+  const openMessageThread = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId) return;
+
+      setMessageContextMenu(null);
+      setMessageCollection({
+        error: null,
+        messages: [],
+        root: message,
+        state: 'loading',
+        type: 'thread',
+      });
+      try {
+        const result =
+          await applicationContainer.listCommunityChannelMessageThread(
+            session,
+            community.id,
+            channelId,
+            message.id,
+          );
+        const threadMessages = await projectChannelMessages(
+          channelId,
+          result.messages,
+        );
+
+        setMessageCollection({
+          error: null,
+          messages: threadMessages,
+          root: message,
+          state: 'ready',
+          type: 'thread',
+        });
+      } catch (caught) {
+        setMessageCollection({
+          error: toUserErrorMessage(caught, copy.messages.threadError),
+          messages: [],
+          root: message,
+          state: 'ready',
+          type: 'thread',
+        });
+      }
+    },
+    [community.id, projectChannelMessages, selectedChannelId, session],
+  );
+  const openPinnedMessages = useCallback(async () => {
+    if (!selectedChannelId) return;
+
+    setCommunityMenuOpen(false);
+    setMessageCollection({
+      error: null,
+      messages: [],
+      state: 'loading',
+      type: 'pins',
+    });
+    try {
+      const result = await applicationContainer.listCommunityChannelMessagePins(
+        session,
+        community.id,
+        selectedChannelId,
+      );
+      const pinnedMessages = await projectChannelMessages(
+        selectedChannelId,
+        result.pins.map((pin) => pin.message),
+      );
+
+      setMessageCollection({
+        error: null,
+        messages: pinnedMessages,
+        state: 'ready',
+        type: 'pins',
+      });
+    } catch (caught) {
+      setMessageCollection({
+        error: toUserErrorMessage(caught, copy.messages.pinError),
+        messages: [],
+        state: 'ready',
+        type: 'pins',
+      });
+    }
+  }, [community.id, projectChannelMessages, selectedChannelId, session]);
+  const pinMessage = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId) return;
+
+      setMessageContextMenu(null);
+      try {
+        await applicationContainer.pinCommunityChannelMessage(
+          session,
+          community.id,
+          channelId,
+          message.id,
+        );
+      } catch (caught) {
+        setRawMessage(null);
+        setMessageCollection({
+          error: toUserErrorMessage(caught, copy.messages.pinError),
+          messages: [],
+          state: 'ready',
+          type: 'pins',
+        });
+      }
+    },
+    [community.id, selectedChannelId, session],
+  );
+  const unpinMessageFromDialog = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId) return;
+
+      try {
+        await applicationContainer.unpinCommunityChannelMessage(
+          session,
+          community.id,
+          channelId,
+          message.id,
+        );
+        setMessageCollection((current) =>
+          current?.type === 'pins'
+            ? {
+                ...current,
+                messages: current.messages.filter(
+                  (item) => item.id !== message.id,
+                ),
+              }
+            : current,
+        );
+      } catch (caught) {
+        setMessageCollection((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.unpinError),
+              }
+            : current,
+        );
+      }
+    },
+    [community.id, selectedChannelId, session],
+  );
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
@@ -538,11 +741,11 @@ export function CommunityWorkspace({
 
       if (!trigger) return;
 
-      setDraft(
+      setSelectedChannelDraft(
         `${draft.slice(0, trigger.start)}${token} ${draft.slice(trigger.end)}`,
       );
     },
-    [draft],
+    [draft, setSelectedChannelDraft],
   );
   const mentionTokens = useMemo(
     () =>
@@ -578,9 +781,39 @@ export function CommunityWorkspace({
     () => () => {
       communityMessageDecryptWorkerRef.current?.terminate();
       communityMessageDecryptWorkerRef.current = null;
+
+      for (const timer of draftSyncTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+
+      draftSyncTimersRef.current.clear();
     },
     [],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listCommunityDrafts(session)
+      .then((remoteDrafts) => {
+        if (cancelled) return;
+
+        setDrafts((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            remoteDrafts
+              .filter((draft) => draft.communityId === community.id)
+              .map((draft) => [draft.channelId, draft.content]),
+          ),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.id, session]);
 
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
@@ -951,7 +1184,7 @@ export function CommunityWorkspace({
     selectedChannelId,
     selectedChannelPolls,
     session,
-    setDraft,
+    setDraft: setSelectedChannelDraft,
     setMessages,
   });
 
@@ -1112,6 +1345,7 @@ export function CommunityWorkspace({
                 setCommunityMenuOpen(false);
               }}
               onLeaveCommunity={() => void leaveCommunity()}
+              onPinsOpen={() => void openPinnedMessages()}
               open={communityMenuOpen}
             />
           }
@@ -1330,6 +1564,53 @@ export function CommunityWorkspace({
         presenceByIdentityId={presenceByIdentityId}
       />
 
+      {messageCollection ? (
+        <MessageCollectionDialog
+          actions={
+            messageCollection.type === 'pins'
+              ? [
+                  {
+                    label: copy.messages.unpin,
+                    onClick: (message) => void unpinMessageFromDialog(message),
+                    tone: 'danger',
+                  },
+                ]
+              : []
+          }
+          emptyLabel={
+            messageCollection.state === 'loading'
+              ? copy.app.loading
+              : messageCollection.error ??
+                (messageCollection.type === 'pins'
+                  ? copy.messages.emptyPins
+                  : copy.messages.emptyThread)
+          }
+          identityNames={Object.fromEntries(
+            Object.entries(memberIdentities).map(([identityId, identity]) => [
+              identityId,
+              memberDisplayName(identity, identityId),
+            ]),
+          )}
+          messages={
+            messageCollection.type === 'thread' && messageCollection.root
+              ? [messageCollection.root, ...messageCollection.messages]
+              : messageCollection.messages
+          }
+          onClose={() => setMessageCollection(null)}
+          onMessageOpen={(message) => {
+            setMessageCollection(null);
+            setMessages((current) => mergeChatMessages(current, [message]));
+            scrollToChannelMessage(message.id);
+          }}
+          subtitle={messageCollection.error}
+          title={
+            messageCollection.type === 'pins'
+              ? copy.messages.pinnedMessages
+              : copy.messages.thread
+          }
+        />
+      ) : null}
+
       <CommunityWorkspaceDialogs
         avatarUrl={avatarUrl}
         avatarViewerOpen={avatarViewerOpen}
@@ -1367,6 +1648,8 @@ export function CommunityWorkspace({
         }
         onEditMessage={messageComposer.startEditingChannelMessage}
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
+        onOpenMessageThread={(message) => void openMessageThread(message)}
+        onPinMessage={(message) => void pinMessage(message)}
         onReplyToMessage={(message) => {
           messageComposer.startReplyToMessage(message);
           setMessageContextMenu(null);

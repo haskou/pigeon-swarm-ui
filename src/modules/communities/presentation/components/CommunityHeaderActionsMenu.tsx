@@ -12,6 +12,7 @@ type CommunityHeaderActionsMenuProps = {
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
+  onPinsOpen: () => void;
 };
 
 export function CommunityHeaderActionsMenu({
@@ -23,6 +24,7 @@ export function CommunityHeaderActionsMenu({
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
+  onPinsOpen,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   useCloseOnEscape(onClose, open);
 
@@ -43,6 +45,13 @@ export function CommunityHeaderActionsMenu({
           className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
         >
           {copy.chat.viewData}
+        </button>
+        <button
+          type="button"
+          onClick={onPinsOpen}
+          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+        >
+          {copy.messages.pinnedMessages}
         </button>
         {showCommunityKeyAction ? (
           <button

@@ -141,6 +141,8 @@ interface WorkspaceDialogsProps {
   onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
+  onOpenMessageThread: (message: ChatMessage) => void;
+  onPinMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
   onToggleReaction: (
     message: ChatMessage,
@@ -265,6 +267,16 @@ function MessageActionDialogs(
             props.session.identity.id,
           )
             ? () => props.onEditMessage(contextMenuMessage)
+            : undefined
+        }
+        onOpenThread={
+          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+            ? () => props.onOpenMessageThread(contextMenuMessage)
+            : undefined
+        }
+        onPin={
+          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+            ? () => props.onPinMessage(contextMenuMessage)
             : undefined
         }
         onReply={() => {

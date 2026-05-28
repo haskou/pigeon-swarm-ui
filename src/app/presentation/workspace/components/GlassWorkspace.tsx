@@ -52,6 +52,7 @@ import { ConversationPeer } from '../../../../modules/conversations/domain/Conve
 import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
 import { MessageReactions } from '../../../../modules/messages/domain/MessageReactions';
+import { MessageCollectionDialog } from '../../../../modules/messages/presentation/components/MessageCollectionDialog';
 import { SharedNetworkSelection } from '../../../../modules/networks/domain/SharedNetworkSelection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
@@ -159,6 +160,13 @@ type PendingSend = {
   sticker?: StickerMessageReference;
 };
 type FailedSends = Record<string, PendingSend>;
+type MessageCollectionState = {
+  error: null | string;
+  messages: ChatMessage[];
+  root?: ChatMessage;
+  state: 'loading' | 'ready';
+  type: 'pins' | 'thread';
+};
 type EditingMessage = {
   message: ChatMessage;
   previousDraft: string;
@@ -256,12 +264,15 @@ export function GlassWorkspace({
   const typingSentRef = useRef(
     new Map<string, { active: boolean; sentAt: number }>(),
   );
+  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [messageCollection, setMessageCollection] =
+    useState<MessageCollectionState | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
@@ -463,6 +474,66 @@ export function GlassWorkspace({
     workspaceMode,
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listConversationDrafts(session)
+      .then((remoteDrafts) => {
+        if (cancelled) return;
+
+        setDrafts((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            remoteDrafts.map((draft) => [draft.conversationId, draft.content]),
+          ),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, setDrafts]);
+
+  const scheduleConversationDraftSync = useCallback(
+    (conversationId: string, value: string) => {
+      const currentTimer = draftSyncTimersRef.current.get(conversationId);
+
+      if (currentTimer) window.clearTimeout(currentTimer);
+
+      const timer = window.setTimeout(() => {
+        draftSyncTimersRef.current.delete(conversationId);
+
+        if (value.trim()) {
+          void applicationContainer
+            .saveConversationDraft(session, conversationId, value)
+            .catch(() => undefined);
+
+          return;
+        }
+
+        void applicationContainer
+          .deleteConversationDraft(session, conversationId)
+          .catch(() => undefined);
+      }, 700);
+
+      draftSyncTimersRef.current.set(conversationId, timer);
+    },
+    [session],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timer of draftSyncTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+
+      draftSyncTimersRef.current.clear();
+    },
+    [],
+  );
+
   const communityUnreadCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -508,12 +579,13 @@ export function GlassWorkspace({
     (value: string) => {
       if (!activeConversation?.id) return;
 
+      scheduleConversationDraftSync(activeConversation.id, value);
       setDrafts((current) => ({
         ...current,
         [activeConversation.id]: value,
       }));
     },
-    [activeConversation?.id],
+    [activeConversation?.id, scheduleConversationDraftSync, setDrafts],
   );
   const cancelMessageEdit = useCallback(() => {
     if (!activeConversation?.id) {
@@ -2065,6 +2137,118 @@ export function GlassWorkspace({
     }
   };
 
+  const openMessageThread = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setMessageCollection({
+      error: null,
+      messages: [],
+      root: message,
+      state: 'loading',
+      type: 'thread',
+    });
+    try {
+      const result = await applicationContainer.loadMessageThread(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+
+      setMessageCollection({
+        error: null,
+        messages: result.messages,
+        root: message,
+        state: 'ready',
+        type: 'thread',
+      });
+    } catch (caught) {
+      setMessageCollection({
+        error: toUserErrorMessage(caught, copy.messages.threadError),
+        messages: [],
+        root: message,
+        state: 'ready',
+        type: 'thread',
+      });
+    }
+  };
+
+  const openPinnedMessages = async () => {
+    if (!activeConversation?.id) return;
+
+    setMessageCollection({
+      error: null,
+      messages: [],
+      state: 'loading',
+      type: 'pins',
+    });
+    try {
+      const pins = await applicationContainer.listMessagePins(
+        session,
+        activeConversation.id,
+      );
+
+      setMessageCollection({
+        error: null,
+        messages: pins.map((pin) => pin.message),
+        state: 'ready',
+        type: 'pins',
+      });
+    } catch (caught) {
+      setMessageCollection({
+        error: toUserErrorMessage(caught, copy.messages.pinError),
+        messages: [],
+        state: 'ready',
+        type: 'pins',
+      });
+    }
+  };
+
+  const pinMessage = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setSendError(null);
+    try {
+      await applicationContainer.pinMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.pinError));
+    }
+  };
+
+  const unpinMessageFromDialog = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    try {
+      await applicationContainer.unpinMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setMessageCollection((current) =>
+        current?.type === 'pins'
+          ? {
+              ...current,
+              messages: current.messages.filter((item) => item.id !== message.id),
+            }
+          : current,
+      );
+    } catch (caught) {
+      setMessageCollection((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.unpinError),
+            }
+          : current,
+      );
+    }
+  };
+
   const handleDeleteMessage = async (message: ChatMessage) => {
     if (!activeConversation?.id) return;
 
@@ -3023,6 +3207,7 @@ export function GlassWorkspace({
     isCreateCommunityOpen ||
     isCreateOpen ||
     !!incomingCall ||
+    !!messageCollection ||
     !!messageContextMenu ||
     nodeSettingsOpen ||
     notificationsOpen ||
@@ -3194,6 +3379,7 @@ export function GlassWorkspace({
                 onReplyReferenceClick={(messageId) =>
                   void handleReplyReferenceClick(messageId)
                 }
+                onOpenPins={() => void openPinnedMessages()}
                 onOpenSidebar={() => setSidebarOpen(true)}
                 onCreate={() => setIsCreateOpen(true)}
                 onOpenConversationWithIdentity={(identityId, identity) =>
@@ -3344,6 +3530,47 @@ export function GlassWorkspace({
         />
       ) : null}
 
+      {messageCollection ? (
+        <MessageCollectionDialog
+          actions={
+            messageCollection.type === 'pins'
+              ? [
+                  {
+                    label: copy.messages.unpin,
+                    onClick: (message) => void unpinMessageFromDialog(message),
+                    tone: 'danger',
+                  },
+                ]
+              : []
+          }
+          emptyLabel={
+            messageCollection.state === 'loading'
+              ? copy.app.loading
+              : messageCollection.error ??
+                (messageCollection.type === 'pins'
+                  ? copy.messages.emptyPins
+                  : copy.messages.emptyThread)
+          }
+          identityNames={identityNames}
+          messages={
+            messageCollection.type === 'thread' && messageCollection.root
+              ? [messageCollection.root, ...messageCollection.messages]
+              : messageCollection.messages
+          }
+          onClose={() => setMessageCollection(null)}
+          onMessageOpen={(message) => {
+            setMessageCollection(null);
+            void handleReplyReferenceClick(message.id);
+          }}
+          subtitle={messageCollection.error}
+          title={
+            messageCollection.type === 'pins'
+              ? copy.messages.pinnedMessages
+              : copy.messages.thread
+          }
+        />
+      ) : null}
+
       {hasWorkspaceDialogOpen ? (
         <Suspense fallback={null}>
           <WorkspaceDialogs
@@ -3439,6 +3666,8 @@ export function GlassWorkspace({
             onDeleteMessage={(message) => void handleDeleteMessage(message)}
             onEditMessage={startEditingMessage}
             onCopyMessage={copyMessageContent}
+            onOpenMessageThread={(message) => void openMessageThread(message)}
+            onPinMessage={(message) => void pinMessage(message)}
             onNetworksUpdated={onNodeNetworksReload}
             onReplyToMessage={(message) => {
               setReplyTarget(message);

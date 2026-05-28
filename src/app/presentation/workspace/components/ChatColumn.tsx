@@ -93,6 +93,7 @@ interface ChatColumnProps {
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
+  onOpenPins: () => void;
   onCreate: () => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
@@ -146,6 +147,7 @@ export function ChatColumn({
   onJumpToLatest,
   onMessageMenuOpen,
   onOpenConversationWithIdentity,
+  onOpenPins,
   onOpenSidebar,
   onReactionToggle,
   onRealtimeEventsOpen,
@@ -617,6 +619,7 @@ export function ChatColumn({
               setGroupInviteError(null);
               setGroupInviteOpen(true);
             }}
+            onPinsOpen={onOpenPins}
             onStartCall={onStartCall}
           />
         )}

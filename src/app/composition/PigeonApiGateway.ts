@@ -31,7 +31,12 @@ import type {
   CommunityTextChannel,
   CommunityVisibility,
   CommunityVoiceChannel,
+  CommunityChannelDraft,
+  CommunityChannelMessagePinsResource,
+  ConversationDraft,
+  ConversationDraftsResource,
   ConversationKeyEntry,
+  ConversationMessagePinsResource,
   ConversationResource,
   CreatePollInput,
   EditMessageOptions,
@@ -45,6 +50,7 @@ import type {
   LoginResult,
   MessageAttachment,
   MessageLinkPreview,
+  MessagePin,
   MessageReplyPreview,
   MessageResource,
   MyStickersResource,
@@ -83,6 +89,7 @@ import { PigeonPresenceApi } from '../../modules/identities/infrastructure/http/
 import { MessageLinkPreviews } from '../../modules/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../modules/messages/domain/messageProjector';
 import { MessageSignaturePayloadFactory } from '../../modules/messages/domain/MessageSignaturePayloadFactory';
+import { DraftPayloadCipher } from '../../modules/messages/infrastructure/crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from '../../modules/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from '../../modules/networks/infrastructure/http/PigeonNodeApi';
 import { NotificationDecision } from '../../modules/notifications/domain/notificationDecision';
@@ -226,6 +233,8 @@ export class PigeonApiGateway {
 
   private readonly conversations: ConversationMapper;
 
+  private readonly draftPayloads: DraftPayloadCipher;
+
   private readonly files: PigeonFilesGateway;
 
   private readonly http: HttpJsonClient;
@@ -277,8 +286,10 @@ export class PigeonApiGateway {
       signer,
       <T>(key: string, loader: () => Promise<T>) =>
         this.cachedRequest(key, loader),
+      new DraftPayloadCipher(),
     );
     this.conversations = conversations;
+    this.draftPayloads = new DraftPayloadCipher();
     this.files = new PigeonFilesGateway(
       new PigeonFilesApi(http, signer, attachmentCipher),
     );
@@ -749,6 +760,95 @@ export class PigeonApiGateway {
       channelId,
       options,
     );
+  }
+
+  public async listCommunityChannelMessageThread(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.listChannelMessageThread(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      options,
+    );
+  }
+
+  public async listCommunityChannelMessagePins(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CommunityChannelMessagePinsResource> {
+    return await this.communities.listChannelMessagePins(
+      session,
+      communityId,
+      channelId,
+    );
+  }
+
+  public async pinCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.communities.pinChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async unpinCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.communities.unpinChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async listCommunityDrafts(
+    session: Session,
+  ): Promise<CommunityChannelDraft[]> {
+    return await this.communities.listDrafts(session);
+  }
+
+  public async saveCommunityChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<CommunityChannelDraft> {
+    return await this.communities.saveChannelDraft(
+      session,
+      communityId,
+      channelId,
+      content,
+      updatedAt,
+    );
+  }
+
+  public async deleteCommunityChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    await this.communities.deleteChannelDraft(session, communityId, channelId);
   }
 
   public async searchCommunityChannelMessages(
@@ -1634,6 +1734,137 @@ export class PigeonApiGateway {
       nextCursor: envelope.nextCursor ?? null,
       previousCursor: envelope.previousCursor ?? null,
     };
+  }
+
+  public async loadMessageThread(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
+    const path = `${this.messagePath(conversationId, messageId)}/thread`;
+    const query = new URLSearchParams({
+      limit: String(options.limit ?? 50),
+    });
+    const result = await this.http.request<{
+      messages?: MessageResource[];
+      nextBeforeMessageId?: null | string;
+    }>(`${path}?${query.toString()}`, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return {
+      messages: await this.decryptMessages(
+        session,
+        conversationId,
+        result.messages ?? [],
+      ),
+      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
+    };
+  }
+
+  public async listMessagePins(
+    session: Session,
+    conversationId: string,
+  ): Promise<MessagePin[]> {
+    const path = `/conversations/${encodeURIComponent(conversationId)}/pins`;
+    const result = await this.http.request<ConversationMessagePinsResource>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
+    );
+    const messages = await this.decryptMessages(
+      session,
+      conversationId,
+      result.pins.map((pin) => pin.message),
+    );
+
+    return result.pins.map((pin, index) => ({
+      ...pin,
+      message: messages[index],
+    }));
+  }
+
+  public async pinMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `${this.messagePath(conversationId, messageId)}/pin`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'POST', path),
+      method: 'POST',
+    });
+  }
+
+  public async unpinMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `${this.messagePath(conversationId, messageId)}/pin`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async listConversationDrafts(
+    session: Session,
+  ): Promise<ConversationDraft[]> {
+    const path = '/conversations/me/drafts';
+    const result = await this.http.request<ConversationDraftsResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return await Promise.all(
+      result.drafts.map(async (draft) => ({
+        ...draft,
+        content: await this.draftPayloads.decrypt(
+          session,
+          draft.encryptedPayload,
+        ),
+      })),
+    );
+  }
+
+  public async saveConversationDraft(
+    session: Session,
+    conversationId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<ConversationDraft> {
+    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
+    const encryptedPayload = this.draftPayloads.encrypt(session, content);
+    const body = { encryptedPayload, updatedAt };
+    const draft = await this.http.request<Omit<ConversationDraft, 'content'>>(
+      path,
+      {
+        body: JSON.stringify(body),
+        headers: await this.signer.headers(session, 'PUT', path, body),
+        method: 'PUT',
+      },
+    );
+
+    return { ...draft, content };
+  }
+
+  public async deleteConversationDraft(
+    session: Session,
+    conversationId: string,
+  ): Promise<void> {
+    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {

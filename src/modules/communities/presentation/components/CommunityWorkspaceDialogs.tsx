@@ -113,11 +113,13 @@ type CommunityWorkspaceDialogsProps = {
   onCommunityUpdated: (community: Community) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onEditMessage: (message: ChatMessage) => void;
+  onOpenMessageThread: (message: ChatMessage) => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
     identity?: IdentityResource,
   ) => Promise<void>;
   onReplyToMessage: (message: ChatMessage) => void;
+  onPinMessage: (message: ChatMessage) => void;
   onSessionUpdated: (session: Session) => void;
   onToggleReaction: (
     message: ChatMessage,
@@ -167,6 +169,8 @@ export function CommunityWorkspaceDialogs({
   onDeleteMessage,
   onEditMessage,
   onOpenConversationWithIdentity,
+  onOpenMessageThread,
+  onPinMessage,
   onReplyToMessage,
   onSessionUpdated,
   onToggleReaction,
@@ -268,6 +272,17 @@ export function CommunityWorkspaceDialogs({
               currentIdentityId,
             )
               ? () => onEditMessage(messageContextMenu.message)
+              : undefined
+          }
+          onOpenThread={
+            messageContextMenu.message.kind !== 'poll'
+              ? () => onOpenMessageThread(messageContextMenu.message)
+              : undefined
+          }
+          onPin={
+            messageContextMenu.message.kind !== 'poll' &&
+            (owner || currentPermissions.has('manage_messages'))
+              ? () => onPinMessage(messageContextMenu.message)
               : undefined
           }
           onReply={() => onReplyToMessage(messageContextMenu.message)}

@@ -477,6 +477,7 @@ export function useCommunityMessageComposer({
               ),
               ...messagePayload,
               mentions: payload.mentions,
+              replyToMessageId: payload.replyTarget?.id,
               timestamp,
             },
           );

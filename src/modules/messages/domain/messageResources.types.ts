@@ -84,6 +84,57 @@ export type MessageResource = {
   votes?: PollVote[];
 };
 
+export type MessagePinResource = {
+  createdAt: number;
+  message: MessageResource;
+  messageId: string;
+  pinnedByIdentityId: string;
+};
+
+export type MessagePin = Omit<MessagePinResource, 'message'> & {
+  message: ChatMessage;
+};
+
+export type ConversationMessagePinsResource = {
+  conversationId: string;
+  pins: MessagePinResource[];
+};
+
+export type CommunityChannelMessagePinsResource = {
+  channelId: string;
+  communityId: string;
+  pins: MessagePinResource[];
+};
+
+export type ConversationDraftResource = {
+  conversationId: string;
+  encryptedPayload: string;
+  updatedAt: number;
+};
+
+export type ConversationDraft = ConversationDraftResource & {
+  content: string;
+};
+
+export type ConversationDraftsResource = {
+  drafts: ConversationDraftResource[];
+};
+
+export type CommunityChannelDraftResource = {
+  channelId: string;
+  communityId: string;
+  encryptedPayload: string;
+  updatedAt: number;
+};
+
+export type CommunityChannelDraft = CommunityChannelDraftResource & {
+  content: string;
+};
+
+export type CommunityChannelDraftsResource = {
+  drafts: CommunityChannelDraftResource[];
+};
+
 export type MessageReaction = {
   authorIdentityId: string;
   createdAt: number;

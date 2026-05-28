@@ -30,6 +30,8 @@ export function MessageContextMenu({
   onCopy,
   onDelete,
   onEdit,
+  onOpenThread,
+  onPin,
   onReactionToggle,
   onReply,
   onViewRaw,
@@ -40,6 +42,8 @@ export function MessageContextMenu({
   onCopy?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
+  onOpenThread?: () => void;
+  onPin?: () => void;
   onReactionToggle?: (
     message: ChatMessage,
     emoji: string,
@@ -236,6 +240,15 @@ export function MessageContextMenu({
             )}
           </div>
         ) : null}
+        {onOpenThread ? (
+          <button
+            type="button"
+            onClick={onOpenThread}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
+          >
+            {copy.messages.openThread}
+          </button>
+        ) : null}
         {onReply ? (
           <button
             type="button"
@@ -261,6 +274,15 @@ export function MessageContextMenu({
             className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
           >
             {copy.messages.edit}
+          </button>
+        ) : null}
+        {onPin ? (
+          <button
+            type="button"
+            onClick={onPin}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 active:bg-white/20 active:text-white"
+          >
+            {copy.messages.pin}
           </button>
         ) : null}
         <button

@@ -167,6 +167,143 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('loads conversation message threads without signing query parameters', async () => {
+    const rawMessage = {
+      id: 'reply-1',
+      replyToMessageId: 'message-1',
+      type: 'sent',
+    };
+    const projectedMessage = {
+      attachments: [],
+      authorIdentityId: 'identity-2',
+      content: 'reply',
+      encrypted: true,
+      id: 'reply-1',
+      mine: false,
+      raw: rawMessage,
+      reactions: [],
+      replyToMessageId: 'message-1',
+      timestamp: 1770000000000,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        messages: [rawMessage],
+        nextBeforeMessageId: 'reply-1',
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const messages = {
+      toChatMessage: jest.fn().mockResolvedValue(projectedMessage),
+    };
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 1 },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      messages as never,
+    );
+
+    await expect(
+      gateway.loadMessageThread(session, 'conversation-1', 'message-1'),
+    ).resolves.toEqual({
+      messages: [projectedMessage],
+      nextBeforeMessageId: 'reply-1',
+    });
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/conversations/conversation-1/messages/message-1/thread',
+    );
+    expect(http.request).toHaveBeenCalledWith(
+      '/conversations/conversation-1/messages/message-1/thread?limit=50',
+      {
+        headers: { 'X-Identity-Id': 'identity-1' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('pins and unpins conversation messages without request bodies', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/conversations/conversation-1/messages/message-1/pin';
+
+    await gateway.pinMessage(session, 'conversation-1', 'message-1');
+    await gateway.unpinMessage(session, 'conversation-1', 'message-1');
+
+    expect(signer.headers).toHaveBeenNthCalledWith(1, session, 'POST', path);
+    expect(signer.headers).toHaveBeenNthCalledWith(2, session, 'DELETE', path);
+    expect(http.request).toHaveBeenNthCalledWith(1, path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'POST',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(2, path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'DELETE',
+    });
+  });
+
+  it('stores conversation drafts as encrypted local payloads', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue({
+        conversationId: 'conversation-1',
+        encryptedPayload: 'encrypted-draft',
+        updatedAt: 1770000000000,
+      }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: {
+        encryptedKeyPair: { publicKey: 'public-key' },
+        id: 'identity-1',
+      },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(
+      gateway.saveConversationDraft(
+        session,
+        'conversation-1',
+        'draft text',
+        1770000000000,
+      ),
+    ).resolves.toMatchObject({
+      content: 'draft text',
+      conversationId: 'conversation-1',
+      updatedAt: 1770000000000,
+    });
+
+    const body = JSON.parse(
+      ((http.request as jest.Mock).mock.calls[0] as [string, RequestInit])[1]
+        .body as string,
+    ) as { encryptedPayload: string; updatedAt: number };
+
+    expect(body.encryptedPayload).toEqual(expect.any(String));
+    expect(body.updatedAt).toBe(1770000000000);
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'PUT',
+      '/conversations/conversation-1/draft',
+      body,
+    );
+  });
+
   it('creates communities with signed metadata payload', async () => {
     const community = {
       autoJoinEnabled: true,
