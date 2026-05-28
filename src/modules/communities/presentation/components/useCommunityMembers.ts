@@ -24,6 +24,7 @@ export function useCommunityMembers({
   activeCall,
   activeVoiceChannelId,
   community,
+  extraIdentityIds = [],
   session,
   visibleVoiceChannels,
   voiceChannels,
@@ -31,6 +32,7 @@ export function useCommunityMembers({
   activeCall?: CallSession | null;
   activeVoiceChannelId: null | string;
   community: Community;
+  extraIdentityIds?: readonly string[];
   session: Session;
   visibleVoiceChannels: CommunityVoiceChannel[];
   voiceChannels: CommunityVoiceChannel[];
@@ -62,9 +64,13 @@ export function useCommunityMembers({
   const identityIdsToLoad = useMemo(
     () =>
       Array.from(
-        new Set([...communityMemberIds, ...voiceConnectedIdentityIds]),
+        new Set([
+          ...communityMemberIds,
+          ...voiceConnectedIdentityIds,
+          ...extraIdentityIds,
+        ]),
       ),
-    [communityMemberIds, voiceConnectedIdentityIds],
+    [communityMemberIds, extraIdentityIds, voiceConnectedIdentityIds],
   );
 
   useEffect(() => {
@@ -126,12 +132,12 @@ export function useCommunityMembers({
   const reactionAuthorNames = useMemo(
     () =>
       Object.fromEntries(
-        community.memberIds.map((identityId) => [
+        Object.keys(memberIdentities).map((identityId) => [
           identityId,
           memberPrimaryName(memberIdentities[identityId], identityId),
         ]),
       ),
-    [community.memberIds, memberIdentities],
+    [memberIdentities],
   );
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {

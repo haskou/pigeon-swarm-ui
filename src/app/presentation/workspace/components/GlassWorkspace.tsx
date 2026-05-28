@@ -3496,6 +3496,7 @@ export function GlassWorkspace({
                 messages={conversationThread.messages}
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
+                onMessageMenuOpen={handleMessageMenuOpen}
                 onSend={sendConversationThreadMessage}
                 onStickerSend={sendConversationThreadSticker}
                 rootMessage={conversationThread.root}

@@ -22,18 +22,19 @@ export function MessageThreadPanel({
   currentIdentityId,
   disabled = false,
   draft,
+  embedded = false,
   error,
   identityNames,
   identityPictures = {},
   messages,
   onClose,
   onDraftChange,
+  onMessageMenuOpen,
   onSend,
   onStickerSend,
   rootMessage,
   session,
   title,
-  embedded = false,
 }: {
   currentIdentityId: string;
   disabled?: boolean;
@@ -45,6 +46,7 @@ export function MessageThreadPanel({
   messages: ChatMessage[];
   onClose: () => void;
   onDraftChange: (value: string) => void;
+  onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
   onSend: (
     content: string,
     attachments: File[],
@@ -118,9 +120,10 @@ export function MessageThreadPanel({
                 }
                 onAttachmentPreview={loadAttachmentPreview}
                 onAvatarClick={() => undefined}
-                onMessageMenuOpen={() => undefined}
+                onMessageMenuOpen={onMessageMenuOpen}
                 onReplyReferenceClick={() => undefined}
                 reserveAvatarSpace={false}
+                showReplyPreview={false}
                 showAvatar={message.authorIdentityId !== currentIdentityId}
                 onStickerClick={() => undefined}
               />
@@ -158,11 +161,7 @@ function ThreadRootCard({
 }) {
   return (
     <div className="mt-4 flex items-end gap-3">
-      <div className="w-5 shrink-0 border-l-2 border-b-2 border-white/20" />
-      <Avatar
-        label={authorName}
-        picture={authorPicture}
-      />
+      <Avatar label={authorName} picture={authorPicture} />
       <div className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2">
         <div className="truncate text-xs font-black text-white/65">
           {authorName}

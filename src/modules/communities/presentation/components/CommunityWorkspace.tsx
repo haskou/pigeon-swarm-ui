@@ -89,6 +89,7 @@ import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
+import { communityMessageIdentityIds } from './communityMessageIdentityIds';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -820,6 +821,27 @@ export function CommunityWorkspace({
       channel.name.toLowerCase().includes(query),
     );
   }, [accessibleVoiceChannels, channelSearch]);
+  const historicalIdentityIds = useMemo(
+    () =>
+      communityMessageIdentityIds({
+        messages: [
+          ...messages,
+          ...(threadPanel
+            ? [threadPanel.root, ...threadPanel.messages]
+            : []),
+          ...(messageCollection?.messages ?? []),
+          ...messageSearchResults.map((result) => result.message),
+        ],
+        polls: selectedChannelPolls,
+      }),
+    [
+      messageCollection?.messages,
+      messages,
+      messageSearchResults,
+      selectedChannelPolls,
+      threadPanel,
+    ],
+  );
   const {
     communityMemberIds,
     memberIdentities,
@@ -832,6 +854,7 @@ export function CommunityWorkspace({
     activeCall,
     activeVoiceChannelId,
     community,
+    extraIdentityIds: historicalIdentityIds,
     session,
     visibleVoiceChannels,
     voiceChannels,
@@ -1719,6 +1742,9 @@ export function CommunityWorkspace({
             messages={threadPanel.messages}
             onClose={() => setThreadPanel(null)}
             onDraftChange={updateThreadDraft}
+            onMessageMenuOpen={(message, x, y) =>
+              setMessageContextMenu({ message, x, y })
+            }
             onSend={sendThreadMessage}
             onStickerSend={
               currentPermissions.has('send_stickers')

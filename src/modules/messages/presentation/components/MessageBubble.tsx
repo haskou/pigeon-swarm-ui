@@ -64,6 +64,7 @@ interface MessageBubbleProps {
   replyPreview?: string;
   replySticker?: StickerMessageReference;
   reserveAvatarSpace?: boolean;
+  showReplyPreview?: boolean;
   showAvatar: boolean;
   threadAuthorName?: string;
   threadAuthorPicture?: string | null;
@@ -94,6 +95,7 @@ export function MessageBubble({
   replyPreview,
   replySticker,
   reserveAvatarSpace = true,
+  showReplyPreview = true,
   showAvatar,
   threadAuthorName,
   threadAuthorPicture,
@@ -104,7 +106,7 @@ export function MessageBubble({
     message.raw.type === 'call_event' || message.kind === 'call-event';
   const replyMessageId =
     message.replyToMessageId ?? message.replyPreview?.messageId;
-  const hasReply = Boolean(replyMessageId);
+  const hasReply = showReplyPreview && Boolean(replyMessageId);
   const [lightbox, setLightbox] = useState<{
     images: LightboxImage[];
     index: number;
