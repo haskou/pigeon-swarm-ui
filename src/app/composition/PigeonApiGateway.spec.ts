@@ -1571,8 +1571,8 @@ describe(PigeonApiGateway.name, () => {
     const bytes = new Uint8Array([1, 2, 3]).buffer;
     const upload = {
       cid: 'bafy-avatar',
-      contentType: 'image/png',
-      filename: 'avatar.png',
+      contentType: 'image/webp',
+      filename: 'avatar.webp',
       size: 3,
     };
     const http = {
@@ -1587,8 +1587,8 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const file = {
       arrayBuffer: jest.fn().mockResolvedValue(bytes),
-      name: 'avatar.png',
-      type: 'image/png',
+      name: 'avatar.webp',
+      type: 'image/webp',
     } as unknown as File;
     const gateway = new PigeonApiGateway(http, signer);
 
@@ -1603,8 +1603,8 @@ describe(PigeonApiGateway.name, () => {
     expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
       body: bytes,
       headers: {
-        'Content-Type': 'image/png',
-        'X-Filename': 'avatar.png',
+        'Content-Type': 'image/webp',
+        'X-Filename': 'avatar.webp',
         'X-Signature': 'http-signature',
       },
       method: 'POST',
@@ -1615,8 +1615,8 @@ describe(PigeonApiGateway.name, () => {
     const bytes = new Uint8Array([1, 2, 3]).buffer;
     const upload = {
       cid: 'bafy-sticker',
-      contentType: 'image/png',
-      filename: 'smile.png',
+      contentType: 'image/webp',
+      filename: 'smile.webp',
       size: 3,
     };
     const http = {
@@ -1631,8 +1631,8 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const file = {
       arrayBuffer: jest.fn().mockResolvedValue(bytes),
-      name: 'smile.png',
-      type: 'image/png',
+      name: 'smile.webp',
+      type: 'image/webp',
     } as unknown as File;
     const gateway = new PigeonApiGateway(http, signer);
 
@@ -1649,8 +1649,8 @@ describe(PigeonApiGateway.name, () => {
     expect(http.request).toHaveBeenCalledWith('/ipfs/public', {
       body: bytes,
       headers: {
-        'Content-Type': 'image/png',
-        'X-Filename': 'smile.png',
+        'Content-Type': 'image/webp',
+        'X-Filename': 'smile.webp',
         'X-Signature': 'http-signature',
       },
       method: 'POST',

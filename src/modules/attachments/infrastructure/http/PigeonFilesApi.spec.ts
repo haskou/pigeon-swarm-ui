@@ -97,6 +97,60 @@ describe(PigeonFilesApi.name, () => {
     });
   });
 
+  it('converts public image attachments before uploading them', async () => {
+    const sourceFile = new File(['png'], 'photo.png', { type: 'image/png' });
+    const webpFile = new File(['webp'], 'photo.webp', { type: 'image/webp' });
+    const request = jest.fn().mockResolvedValue({
+      cid: 'public-cid',
+      contentType: 'image/webp',
+      filename: 'photo.webp',
+      size: webpFile.size,
+    });
+    const signerHeaders = jest
+      .fn()
+      .mockResolvedValue({ 'X-Test-Signature': 'signature' });
+    const cipher = { encrypt: jest.fn() } as unknown as AttachmentCipher;
+    const publicImageUploadPreparer = {
+      prepare: jest.fn().mockResolvedValue(webpFile),
+    };
+    const api = new PigeonFilesApi(
+      httpClient({ request }),
+      signer({ headers: signerHeaders }),
+      cipher,
+      publicImageUploadPreparer,
+    );
+
+    await expect(
+      api.publishMessageAttachments(session, [sourceFile], undefined, {
+        encryptSmallAttachments: false,
+      }),
+    ).resolves.toEqual([
+      {
+        cid: 'public-cid',
+        contentType: 'image/webp',
+        encrypted: false,
+        filename: 'photo.webp',
+        size: webpFile.size,
+        storage: 'public',
+      },
+    ]);
+
+    expect(publicImageUploadPreparer.prepare).toHaveBeenCalledWith(sourceFile);
+    expect(cipher.encrypt).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith(
+      '/ipfs/public',
+      expect.objectContaining({
+        body: expect.any(ArrayBuffer),
+        headers: expect.objectContaining({
+          'Content-Type': 'image/webp',
+          'X-Filename': 'photo.webp',
+          'X-Test-Signature': 'signature',
+        }),
+        method: 'POST',
+      }),
+    );
+  });
+
   it('keeps small attachments encrypted by default', async () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     const encryption = attachmentEncryption();

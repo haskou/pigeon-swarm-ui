@@ -7,14 +7,14 @@ import type {
   CallSignalType,
   CallSession,
 } from '../../domain/callSession.types';
-import type { PeerMediaStats } from '../../infrastructure/media/callPeerConnectionManager';
+import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
 
 import {
   logCallDebug,
   logCallError,
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
-import { CallPeerConnectionManager } from '../../infrastructure/media/callPeerConnectionManager';
+import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 
 type SignalSender = (

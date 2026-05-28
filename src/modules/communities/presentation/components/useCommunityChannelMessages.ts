@@ -11,6 +11,7 @@ import {
 
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
+import { MessageCollection } from '../../../messages/domain/MessageCollection';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 
 export type CommunityChannelMessageLoadState = 'error' | 'idle' | 'loading';
@@ -84,6 +85,7 @@ export function useCommunityChannelMessages({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const keepChannelBottomUntilRef = useRef(0);
   const messageStateRef = useRef<CommunityChannelMessageLoadState>('idle');
+  const messagesRef = useRef<ChatMessage[]>([]);
   const loadChannelMessagesRef = useRef(loadChannelMessages);
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
@@ -100,6 +102,10 @@ export function useCommunityChannelMessages({
   useEffect(() => {
     selectedChannelIdRef.current = selectedChannelId;
   }, [selectedChannelId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const setMessageLoadState = useCallback(
     (state: CommunityChannelMessageLoadState) => {
@@ -299,18 +305,36 @@ export function useCommunityChannelMessages({
     channelWasHiddenRef.current = false;
     channelResumeSyncAtRef.current = now;
     void loadChannelMessagesRef
-      .current(channelId)
-      .then(({ cursor, loadedMessages }) => {
+      .current(channelId, undefined, { limit: 1 })
+      .then(({ loadedMessages: latestMessages }) => {
         if (selectedChannelIdRef.current !== channelId) return;
 
-        setMessages((current) => mergeChatMessages(current, loadedMessages));
-        setMessageCursor(cursor);
-
-        if (shouldStickToBottom) {
-          setNewChannelMessageCount(0);
-          onChannelViewedRef.current?.(channelId);
-          scrollChannelToBottom('auto', true);
+        if (
+          MessageCollection.hasSameLatestDeliveredMessage(
+            messagesRef.current,
+            latestMessages,
+          )
+        ) {
+          return;
         }
+
+        void loadChannelMessagesRef
+          .current(channelId)
+          .then(({ cursor, loadedMessages }) => {
+            if (selectedChannelIdRef.current !== channelId) return;
+
+            setMessages((current) =>
+              mergeChatMessages(current, loadedMessages),
+            );
+            setMessageCursor(cursor);
+
+            if (shouldStickToBottom) {
+              setNewChannelMessageCount(0);
+              onChannelViewedRef.current?.(channelId);
+              scrollChannelToBottom('auto', true);
+            }
+          })
+          .catch(() => undefined);
       })
       .catch(() => undefined);
   }, [isScrolledNearBottom, scrollChannelToBottom, selectedChannelId]);

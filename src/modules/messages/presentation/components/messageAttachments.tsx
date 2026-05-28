@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AttachmentProgress,
@@ -6,9 +6,10 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { cx } from '../../../../shared/presentation/cx';
 import type { LightboxImage } from './imageLightbox';
+import { MessageAttachmentPreview } from './MessageAttachmentPreview';
+import { visibleImageAlbumItems } from './visibleImageAlbumItems';
 
 export type IndexedAttachment = {
   attachment: MessageAttachment;
@@ -33,7 +34,7 @@ export function ImageAttachmentAlbum({
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
   const albumRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoadPreviews, setShouldLoadPreviews] = useState(false);
-  const visibleItems = items.length > 4 ? items.slice(0, 4) : items;
+  const visibleItems = useMemo(() => visibleImageAlbumItems(items), [items]);
   const extraCount = items.length > 4 ? items.length - 3 : 0;
   const lightboxImages = items.flatMap(({ attachment }, index) => {
     const url = previewUrls[index];
@@ -158,12 +159,12 @@ export function ImageAttachmentAlbum({
                 <img
                   src={previewUrl}
                   alt=""
+                  decoding="async"
+                  loading="lazy"
                   className="h-full w-full rounded-2xl object-cover"
                 />
               ) : (
-                <div className="grid h-full w-full place-items-center px-3 text-center text-xs font-black text-white/55">
-                  {progress ? `${progress.percent}%` : attachment.filename}
-                </div>
+                <ImageAttachmentSkeleton progress={progress} />
               )}
               {isOverflowTile && (
                 <div className="absolute inset-0 grid place-items-center bg-black/65 text-3xl font-black text-white">
@@ -207,13 +208,41 @@ export function AttachmentCard({
 }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
+  const [shouldLoadPreview, setShouldLoadPreview] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const hasPreview =
-    !isLargeOrChunkedAttachment(attachment) &&
+    !MessageAttachmentPreview.isLargeOrChunked(attachment) &&
     (attachment.contentType.startsWith('video/') ||
       attachment.contentType.startsWith('audio/'));
 
   useEffect(() => {
-    if (!hasPreview) return undefined;
+    const card = cardRef.current;
+
+    if (!card || shouldLoadPreview || !hasPreview) return undefined;
+
+    if (!('IntersectionObserver' in window)) {
+      setShouldLoadPreview(true);
+
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+
+        setShouldLoadPreview(true);
+        observer.disconnect();
+      },
+      { rootMargin: '360px 0px' },
+    );
+
+    observer.observe(card);
+
+    return () => observer.disconnect();
+  }, [hasPreview, shouldLoadPreview]);
+
+  useEffect(() => {
+    if (!hasPreview || !shouldLoadPreview) return undefined;
 
     let cancelled = false;
 
@@ -233,7 +262,7 @@ export function AttachmentCard({
     return () => {
       cancelled = true;
     };
-  }, [attachment, hasPreview, onPreview]);
+  }, [attachment, hasPreview, onPreview, shouldLoadPreview]);
 
   useEffect(
     () => () => {
@@ -244,6 +273,7 @@ export function AttachmentCard({
 
   return (
     <div
+      ref={cardRef}
       className={cx(
         'overflow-hidden rounded-2xl border text-left transition',
         mine
@@ -271,6 +301,12 @@ export function AttachmentCard({
             />
           </div>
         </div>
+      )}
+      {hasPreview && !previewUrl && (
+        <AttachmentPreviewSkeleton
+          mediaType={attachment.contentType.startsWith('audio/') ? 'audio' : 'video'}
+          progress={progress}
+        />
       )}
       {!hasPreview && (
         <div className="grid min-h-20 place-items-center bg-black/20 p-3 sm:min-h-32 sm:p-4">
@@ -308,16 +344,66 @@ export function AttachmentCard({
 }
 
 export function isImageAttachment(attachment: MessageAttachment): boolean {
-  if (isLargeOrChunkedAttachment(attachment)) return false;
-
-  return isBrowserPreviewImage(attachment.contentType);
+  return MessageAttachmentPreview.isImage(attachment);
 }
 
-function isLargeOrChunkedAttachment(attachment: MessageAttachment): boolean {
+function ImageAttachmentSkeleton({
+  progress,
+}: {
+  progress: AttachmentProgress | null;
+}) {
   return (
-    attachment.type === 'chunked_file' ||
-    !!attachment.chunks?.length ||
-    attachment.size > 50 * 1024 * 1024
+    <div className="relative h-full w-full overflow-hidden rounded-2xl bg-white/7">
+      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/14 via-white/8 to-transparent" />
+      <div className="absolute left-4 top-4 h-8 w-8 rounded-full bg-white/15" />
+      <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-white/14 to-transparent" />
+      <div className="absolute bottom-4 left-4 right-10 h-3 rounded-full bg-white/16" />
+      <div className="absolute bottom-9 left-4 h-3 w-1/2 rounded-full bg-white/12" />
+      {progress && (
+        <div className="absolute bottom-3 right-3 rounded-full bg-black/50 px-2 py-1 text-[0.65rem] font-black text-white/75">
+          {progress.percent}%
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttachmentPreviewSkeleton({
+  mediaType,
+  progress,
+}: {
+  mediaType: 'audio' | 'video';
+  progress: AttachmentProgress | null;
+}) {
+  if (mediaType === 'audio') {
+    return (
+      <div className="flex min-h-16 items-center gap-3 bg-black/20 px-3 py-3">
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-white/12" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-2.5 w-1/3 animate-pulse rounded-full bg-white/14" />
+          <div className="h-2 w-full animate-pulse rounded-full bg-white/10" />
+        </div>
+        {progress && (
+          <span className="text-xs font-black text-white/55">
+            {progress.percent}%
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden bg-black/25">
+      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/12 via-white/7 to-transparent" />
+      <div className="absolute inset-0 grid place-items-center">
+        <div className="h-12 w-16 rounded-2xl bg-white/12" />
+      </div>
+      {progress && (
+        <div className="absolute bottom-3 right-3 rounded-full bg-black/50 px-2 py-1 text-[0.65rem] font-black text-white/75">
+          {progress.percent}%
+        </div>
+      )}
+    </div>
   );
 }
 

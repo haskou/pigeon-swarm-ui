@@ -10,8 +10,8 @@ describe('callSessionDisplay', () => {
       title: 'voice chat',
     });
 
-    expect(callSessionTitle(call)).toBe('Beta community · voice chat');
-    expect(callSessionSubtitle(call)).toBe('Hasko, Den');
+    expect(callSessionTitle(call)).toBe('Beta community');
+    expect(callSessionSubtitle(call)).toBe('voice chat');
   });
 
   it('keeps conversation titles for direct calls', () => {

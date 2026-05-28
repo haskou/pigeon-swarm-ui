@@ -1,4 +1,7 @@
-import type { ChatMessage } from '../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  ConversationResource,
+} from '../../../shared/domain/pigeonResources.types';
 
 import { MessageCollection } from './MessageCollection';
 
@@ -12,6 +15,14 @@ const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   raw: { id: 'message-1', type: 'sent' },
   reactions: [],
   timestamp: 100,
+  ...overrides,
+});
+const conversation = (
+  overrides: Partial<ConversationResource> = {},
+): ConversationResource => ({
+  id: 'conversation-1',
+  latestMessageAt: 100,
+  networkId: 'network-1',
   ...overrides,
 });
 
@@ -53,6 +64,80 @@ describe(MessageCollection.name, () => {
         message({ id: 'message-4', timestamp: 200 }),
       ]),
     ).toBe(300);
+  });
+
+  it('detects whether loaded messages already include the conversation latest message', () => {
+    expect(
+      MessageCollection.isCaughtUpWithConversation(
+        [message({ timestamp: 100 })],
+        conversation({ latestMessageAt: 100 }),
+      ),
+    ).toBe(true);
+    expect(
+      MessageCollection.isCaughtUpWithConversation(
+        [message({ timestamp: 100 })],
+        conversation({ latestMessageAt: 200 }),
+      ),
+    ).toBe(false);
+    expect(
+      MessageCollection.isCaughtUpWithConversation(
+        [message({ deliveryStatus: 'pending', timestamp: 300 })],
+        conversation({ latestMessageAt: 200 }),
+      ),
+    ).toBe(false);
+  });
+
+  it('treats conversations without latest message metadata as caught up', () => {
+    expect(
+      MessageCollection.isCaughtUpWithConversation(
+        [],
+        conversation({ latestMessageAt: undefined }),
+      ),
+    ).toBe(true);
+  });
+
+  it('detects whether a latest-message probe matches the loaded timeline', () => {
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [
+          message({ id: 'message-1', timestamp: 100 }),
+          message({ id: 'message-2', timestamp: 200 }),
+        ],
+        [message({ id: 'message-2', timestamp: 200 })],
+      ),
+    ).toBe(true);
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [message({ id: 'message-1', timestamp: 100 })],
+        [message({ id: 'message-2', timestamp: 200 })],
+      ),
+    ).toBe(false);
+    expect(MessageCollection.hasSameLatestDeliveredMessage([], [])).toBe(true);
+  });
+
+  it('treats changed latest message content as not caught up', () => {
+    expect(
+      MessageCollection.hasSameLatestDeliveredMessage(
+        [
+          message({
+            content: 'before',
+            edited: false,
+            id: 'message-1',
+            timestamp: 100,
+          }),
+        ],
+        [
+          message({
+            content: 'after',
+            edited: true,
+            editedAt: 120,
+            id: 'message-1',
+            raw: { editedAt: 120, id: 'message-1', type: 'sent' },
+            timestamp: 100,
+          }),
+        ],
+      ),
+    ).toBe(false);
   });
 
   it('applies edit events to their target message without rendering the edit event', () => {

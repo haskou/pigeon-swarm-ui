@@ -1,4 +1,7 @@
-import type { ChatMessage } from '../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  ConversationResource,
+} from '../../../shared/domain/pigeonResources.types';
 
 export class MessageCollection {
   public static lastDelivered(
@@ -23,6 +26,37 @@ export class MessageCollection {
         ? message.timestamp
         : Math.max(latestTimestamp, message.timestamp);
     }, undefined);
+  }
+
+  public static isCaughtUpWithConversation(
+    messages: readonly ChatMessage[],
+    conversation: ConversationResource,
+  ): boolean {
+    if (conversation.latestMessageAt === undefined) return true;
+
+    const latestDeliveredTimestamp = this.latestDeliveredTimestamp(messages);
+
+    return (
+      latestDeliveredTimestamp !== undefined &&
+      latestDeliveredTimestamp >= conversation.latestMessageAt
+    );
+  }
+
+  public static hasSameLatestDeliveredMessage(
+    currentMessages: readonly ChatMessage[],
+    latestMessages: readonly ChatMessage[],
+  ): boolean {
+    const currentLatestMessage = this.lastDelivered(currentMessages);
+    const remoteLatestMessage = this.lastDelivered(latestMessages);
+
+    if (!currentLatestMessage || !remoteLatestMessage) {
+      return currentLatestMessage === remoteLatestMessage;
+    }
+
+    return this.isSameDeliveredMessage(
+      currentLatestMessage,
+      remoteLatestMessage,
+    );
   }
 
   public static merge(
@@ -79,6 +113,45 @@ export class MessageCollection {
 
   private static isEditMessage(message: ChatMessage): boolean {
     return message.raw.type === 'edited' && !!message.raw.targetMessageId;
+  }
+
+  private static isSameDeliveredMessage(
+    left: ChatMessage,
+    right: ChatMessage,
+  ): boolean {
+    return (
+      left.id === right.id &&
+      left.timestamp === right.timestamp &&
+      left.content === right.content &&
+      left.encrypted === right.encrypted &&
+      left.edited === right.edited &&
+      this.messageEditedAt(left) === this.messageEditedAt(right) &&
+      this.messageAttachmentKey(left) === this.messageAttachmentKey(right) &&
+      this.messageReactionKey(left) === this.messageReactionKey(right)
+    );
+  }
+
+  private static messageEditedAt(message: ChatMessage): number | undefined {
+    return message.editedAt ?? message.raw.editedAt;
+  }
+
+  private static messageAttachmentKey(message: ChatMessage): string {
+    return message.attachments
+      .map(
+        (attachment) =>
+          `${attachment.cid}:${attachment.filename}:${attachment.size}:${attachment.contentType}`,
+      )
+      .join('\u0000');
+  }
+
+  private static messageReactionKey(message: ChatMessage): string {
+    return message.reactions
+      .map(
+        (reaction) =>
+          `${reaction.authorIdentityId}:${reaction.emoji}:${reaction.createdAt}`,
+      )
+      .sort()
+      .join('\u0000');
   }
 
   private static indexMessages(

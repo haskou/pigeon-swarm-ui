@@ -64,7 +64,6 @@ import { CommunityMessageTimeline } from './CommunityMessageTimeline';
 import {
   CommunityMessageSearchPanel,
   type CommunityMessageSearchResultItem,
-  type CommunityMessageSearchScope,
 } from './CommunityMessageSearchPanel';
 import {
   CommunityWorkspaceDialogs,
@@ -84,6 +83,7 @@ import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
+import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -243,20 +243,6 @@ export function CommunityWorkspace({
   const [memberOpen, setMemberOpen] = useState(false);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
-  const [messageSearchError, setMessageSearchError] = useState<string | null>(
-    null,
-  );
-  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
-  const [messageSearchQuery, setMessageSearchQuery] = useState('');
-  const [messageSearchResults, setMessageSearchResults] = useState<
-    CommunityMessageSearchResultItem[]
-  >([]);
-  const [messageSearchSearched, setMessageSearchSearched] = useState(false);
-  const [messageSearchScope, setMessageSearchScope] =
-    useState<CommunityMessageSearchScope>('channel');
-  const [messageSearchState, setMessageSearchState] = useState<
-    'idle' | 'loading'
-  >('idle');
   const [profileViewer, setProfileViewer] =
     useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
@@ -397,67 +383,6 @@ export function CommunityWorkspace({
     },
     [scrollerRef],
   );
-  const runCommunityMessageSearch = useCallback(async () => {
-    const query = messageSearchQuery.trim();
-
-    if (!communityIsPublic || !query) return;
-
-    setMessageSearchState('loading');
-    setMessageSearchError(null);
-    setMessageSearchSearched(true);
-    try {
-      const result =
-        messageSearchScope === 'channel' && selectedChannelId
-          ? await applicationContainer.searchCommunityChannelMessages(
-              session,
-              community.id,
-              selectedChannelId,
-              { limit: 20, query },
-            )
-          : await applicationContainer.searchCommunityMessages(
-              session,
-              community.id,
-              { limit: 20, query },
-            );
-      const projectedResults = await Promise.all(
-        result.messages.map(async (message) => {
-          const channelId =
-            message.channelId ?? result.channelId ?? selectedChannelId;
-
-          if (!channelId) return null;
-
-          return {
-            channelId,
-            channelName: channelNameFor(channelId),
-            message: await projectChannelMessage(channelId, message),
-          };
-        }),
-      );
-
-      setMessageSearchResults(
-        projectedResults.filter(
-          (result): result is CommunityMessageSearchResultItem =>
-            Boolean(result),
-        ),
-      );
-    } catch (caught) {
-      setMessageSearchError(
-        toUserErrorMessage(caught, copy.communities.searchMessagesError),
-      );
-      setMessageSearchResults([]);
-    } finally {
-      setMessageSearchState('idle');
-    }
-  }, [
-    channelNameFor,
-    community.id,
-    communityIsPublic,
-    messageSearchQuery,
-    messageSearchScope,
-    projectChannelMessage,
-    selectedChannelId,
-    session,
-  ]);
   const handleSearchResultClick = useCallback(
     (result: CommunityMessageSearchResultItem) => {
       pendingSearchResultRef.current = result;
@@ -479,6 +404,15 @@ export function CommunityWorkspace({
       setMessages,
     ],
   );
+  const messageSearch = useCommunityMessageSearch({
+    channelNameFor,
+    communityId: community.id,
+    communityIsPublic,
+    onResultClick: handleSearchResultClick,
+    projectChannelMessage,
+    selectedChannelId,
+    session,
+  });
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
@@ -1052,7 +986,7 @@ export function CommunityWorkspace({
       )}
       <aside
         className={cx(
-          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-full max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none',
+          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-[92vw] max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none',
           mobileSidebarOpen ? 'block' : 'hidden lg:block',
         )}
       >
@@ -1194,7 +1128,7 @@ export function CommunityWorkspace({
           {communityIsPublic ? (
             <button
               className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/70 transition hover:bg-white/15"
-              onClick={() => setMessageSearchOpen((open) => !open)}
+              onClick={() => messageSearch.setOpen(!messageSearch.open)}
               type="button"
             >
               {copy.communities.searchMessages}
@@ -1202,26 +1136,20 @@ export function CommunityWorkspace({
           ) : null}
         </CommunityHeader>
 
-        {communityIsPublic && messageSearchOpen ? (
+        {communityIsPublic && messageSearch.open ? (
           <CommunityMessageSearchPanel
-            disabled={!selectedChannel && messageSearchScope === 'channel'}
-            error={messageSearchError}
-            onClose={() => setMessageSearchOpen(false)}
-            onQueryChange={(query) => {
-              setMessageSearchQuery(query);
-              setMessageSearchSearched(false);
-            }}
-            onResultClick={handleSearchResultClick}
-            onScopeChange={(scope) => {
-              setMessageSearchScope(scope);
-              setMessageSearchSearched(false);
-            }}
-            onSubmit={() => void runCommunityMessageSearch()}
-            query={messageSearchQuery}
-            results={messageSearchResults}
-            searched={messageSearchSearched}
-            scope={messageSearchScope}
-            state={messageSearchState}
+            disabled={!selectedChannel && messageSearch.scope === 'channel'}
+            error={messageSearch.error}
+            onClose={() => messageSearch.setOpen(false)}
+            onQueryChange={messageSearch.setQuery}
+            onResultClick={messageSearch.onResultClick}
+            onScopeChange={messageSearch.setScope}
+            onSubmit={() => void messageSearch.submit()}
+            query={messageSearch.query}
+            results={messageSearch.results}
+            searched={messageSearch.searched}
+            scope={messageSearch.scope}
+            state={messageSearch.state}
           />
         ) : null}
 

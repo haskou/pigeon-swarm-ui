@@ -64,6 +64,10 @@ export async function searchEmojiSuggestions(
     .slice(0, limit);
 }
 
+export async function preloadEmojiSuggestions(): Promise<void> {
+  await loadEmojiSuggestions();
+}
+
 export function replaceEmojiTrigger(
   value: string,
   trigger: EmojiTrigger,

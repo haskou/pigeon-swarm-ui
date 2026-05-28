@@ -447,7 +447,7 @@ async function cropStaticImage(
 
   drawCroppedImage(canvas, image, options);
 
-  return await canvasToBlob(canvas, 'image/jpeg', 0.9);
+  return await canvasToBlob(canvas, 'image/webp', 0.88);
 }
 
 async function cropAnimatedGif(
@@ -614,7 +614,7 @@ function outputFilename(
   blob: Blob,
 ): string {
   const basename = filename.replace(/\.[^.]+$/, '') || shape;
-  const extension = blob.type === 'image/gif' ? 'gif' : 'jpg';
+  const extension = blob.type === 'image/gif' ? 'gif' : 'webp';
 
   return `${basename}-${shape}.${extension}`;
 }

@@ -11,6 +11,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonPublicFilesClient } from '../../../attachments/infrastructure/http/PigeonPublicFilesClient';
+import { PublicImageUploadPreparer } from '../../../attachments/infrastructure/media/PublicImageUploadPreparer';
 
 export class PigeonStickersApi {
   private readonly publicFiles: PigeonPublicFilesClient;
@@ -19,6 +20,10 @@ export class PigeonStickersApi {
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     publicFiles?: PigeonPublicFilesClient,
+    private readonly publicImageUploadPreparer: Pick<
+      PublicImageUploadPreparer,
+      'prepare'
+    > = new PublicImageUploadPreparer(),
   ) {
     this.publicFiles = publicFiles ?? new PigeonPublicFilesClient(http, signer);
   }
@@ -27,11 +32,13 @@ export class PigeonStickersApi {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
+    const preparedFile = await this.publicImageUploadPreparer.prepare(file);
+
     return await this.publicFiles.upload(
       session,
-      await file.arrayBuffer(),
-      file.name,
-      file.type || 'application/octet-stream',
+      await preparedFile.arrayBuffer(),
+      preparedFile.name,
+      preparedFile.type || 'application/octet-stream',
     );
   }
 

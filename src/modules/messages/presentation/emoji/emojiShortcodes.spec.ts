@@ -1,5 +1,6 @@
 import {
   findEmojiTrigger,
+  preloadEmojiSuggestions,
   replaceEmojiTrigger,
   searchEmojiSuggestions,
 } from './emojiShortcodes';
@@ -23,6 +24,10 @@ describe('emoji shortcode helpers', () => {
         (suggestion) => suggestion.shortcode,
       ),
     ).toContain('sob');
+  });
+
+  it('preloads the emoji catalog', async () => {
+    await expect(preloadEmojiSuggestions()).resolves.toBeUndefined();
   });
 
   it('replaces the trigger and keeps the caret after the emoji', () => {
