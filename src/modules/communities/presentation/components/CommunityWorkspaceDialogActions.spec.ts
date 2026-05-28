@@ -124,4 +124,13 @@ describe(CommunityWorkspaceDialogActions.name, () => {
       CommunityWorkspaceDialogActions.profileRoleNames(community(), 'member-a'),
     ).toEqual([copy.communities.visibleToEveryone, 'Ops']);
   });
+
+  it('does not show implicit community roles for expelled identities', () => {
+    expect(
+      CommunityWorkspaceDialogActions.profileRoleNames(
+        community(),
+        'expelled-member',
+      ),
+    ).toEqual([]);
+  });
 });
