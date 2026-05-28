@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 import type {
+  AttachmentProgress,
   AttachmentUploadOptions,
   ChatMessage,
   Session,
@@ -6,8 +9,14 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
+import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../../identities/presentation/view-models/identityDisplay';
+import { Avatar } from './Avatar';
 import { Composer } from './Composer';
+import { MessageBubble } from './MessageBubble';
 
 export function MessageThreadPanel({
   currentIdentityId,
@@ -15,6 +24,7 @@ export function MessageThreadPanel({
   draft,
   error,
   identityNames,
+  identityPictures = {},
   messages,
   onClose,
   onDraftChange,
@@ -31,6 +41,7 @@ export function MessageThreadPanel({
   embedded?: boolean;
   error?: null | string;
   identityNames: Record<string, string>;
+  identityPictures?: Record<string, string | undefined>;
   messages: ChatMessage[];
   onClose: () => void;
   onDraftChange: (value: string) => void;
@@ -44,6 +55,16 @@ export function MessageThreadPanel({
   session: Session;
   title: string;
 }) {
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [, setAttachmentProgress] = useState<AttachmentProgress | null>(null);
+  const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
+    errorMessage: copy.composer.attachmentDownloadError,
+    onErrorChange: setAttachmentError,
+    onProgressChange: setAttachmentProgress,
+  });
+  const displayName = (identityId: string) =>
+    identityPrimaryDisplayName(identityDisplayName(identityId, identityNames));
+
   return (
     <section
       className={
@@ -72,7 +93,8 @@ export function MessageThreadPanel({
           </button>
         </div>
         <ThreadRootCard
-          identityNames={identityNames}
+          authorName={displayName(rootMessage.authorIdentityId)}
+          authorPicture={identityPictures[rootMessage.authorIdentityId]}
           message={rootMessage}
         />
       </header>
@@ -85,11 +107,22 @@ export function MessageThreadPanel({
         ) : (
           <div className="space-y-3">
             {messages.map((message) => (
-              <ThreadReply
+              <MessageBubble
+                authorName={displayName(message.authorIdentityId)}
+                authorPicture={identityPictures[message.authorIdentityId]}
                 currentIdentityId={currentIdentityId}
-                identityNames={identityNames}
                 key={message.id}
                 message={message}
+                onAttachmentOpen={(attachmentIndex) =>
+                  void openAttachment(message.attachments[attachmentIndex])
+                }
+                onAttachmentPreview={loadAttachmentPreview}
+                onAvatarClick={() => undefined}
+                onMessageMenuOpen={() => undefined}
+                onReplyReferenceClick={() => undefined}
+                reserveAvatarSpace={false}
+                showAvatar={message.authorIdentityId !== currentIdentityId}
+                onStickerClick={() => undefined}
               />
             ))}
           </div>
@@ -99,7 +132,7 @@ export function MessageThreadPanel({
       <Composer
         disabled={disabled}
         draft={draft}
-        error={error ?? null}
+        error={error ?? attachmentError}
         focusKey={`thread:${rootMessage.id}`}
         onCancelEdit={() => undefined}
         onDraftChange={onDraftChange}
@@ -115,63 +148,30 @@ export function MessageThreadPanel({
 }
 
 function ThreadRootCard({
-  identityNames,
+  authorName,
+  authorPicture,
   message,
 }: {
-  identityNames: Record<string, string>;
+  authorName: string;
+  authorPicture?: string | null;
   message: ChatMessage;
 }) {
   return (
-    <div className="mt-4 flex gap-3">
+    <div className="mt-4 flex items-end gap-3">
       <div className="w-5 shrink-0 border-l-2 border-b-2 border-white/20" />
+      <Avatar
+        label={authorName}
+        picture={authorPicture}
+      />
       <div className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2">
-        <div className="truncate text-sm font-black text-white">
-          {messageSummary(message)}
+        <div className="truncate text-xs font-black text-white/65">
+          {authorName}
         </div>
-        <div className="mt-1 truncate text-xs font-semibold text-white/45">
-          {identityDisplayName(message.authorIdentityId, identityNames)}
+        <div className="mt-1 truncate text-sm font-black text-white">
+          {messageSummary(message)}
         </div>
       </div>
     </div>
-  );
-}
-
-function ThreadReply({
-  currentIdentityId,
-  identityNames,
-  message,
-}: {
-  currentIdentityId: string;
-  identityNames: Record<string, string>;
-  message: ChatMessage;
-}) {
-  const mine = message.authorIdentityId === currentIdentityId;
-
-  return (
-    <article className={mine ? 'flex justify-end' : 'flex justify-start'}>
-      <div
-        className={
-          mine
-            ? 'max-w-[88%] rounded-2xl bg-[#274279] px-3 py-2 text-white'
-            : 'max-w-[88%] rounded-2xl bg-white/10 px-3 py-2 text-white/90'
-        }
-      >
-        <div className="mb-1 flex items-baseline gap-2 text-xs">
-          <span className="font-black text-white/75">
-            {identityDisplayName(message.authorIdentityId, identityNames)}
-          </span>
-          <span className="text-white/35">
-            {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        </div>
-        <div className="whitespace-pre-wrap break-words text-sm font-semibold leading-5">
-          {messageSummary(message)}
-        </div>
-      </div>
-    </article>
   );
 }
 
@@ -183,7 +183,9 @@ function messageSummary(message: ChatMessage): string {
   if (message.content.trim()) return message.content;
 
   if (message.attachments.length > 0) {
-    return message.attachments.map((attachment) => attachment.filename).join(', ');
+    return message.attachments
+      .map((attachment) => attachment.filename)
+      .join(', ');
   }
 
   return copy.messages.originalMessage;

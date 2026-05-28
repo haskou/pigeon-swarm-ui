@@ -6,7 +6,10 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../../identities/presentation/view-models/identityDisplay';
 
 export type MessageCollectionAction = {
   label: string;
@@ -103,7 +106,9 @@ function MessageCollectionItem({
   onMessageOpen?: (message: ChatMessage) => void;
 }) {
   const content = messageSummary(message);
-  const authorName = identityDisplayName(message.authorIdentityId, identityNames);
+  const authorName = identityPrimaryDisplayName(
+    identityDisplayName(message.authorIdentityId, identityNames),
+  );
   const authorPicture = identityPictures[message.authorIdentityId];
 
   return (

@@ -3492,6 +3492,7 @@ export function GlassWorkspace({
                 draft={conversationThread.draft}
                 error={conversationThread.error}
                 identityNames={identityNames}
+                identityPictures={identityPictures}
                 messages={conversationThread.messages}
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}

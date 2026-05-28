@@ -344,10 +344,12 @@ function MessageTimelineItem({
           showAvatar={isGroupConversation && startsNewAuthorRun}
           threadAuthorName={
             threadSummary?.lastMessage
-              ? messageAuthorName(
-                  threadSummary.lastMessage,
-                  currentIdentityName,
-                  identityNames,
+              ? identityPrimaryDisplayName(
+                  messageAuthorName(
+                    threadSummary.lastMessage,
+                    currentIdentityName,
+                    identityNames,
+                  ),
                 )
               : undefined
           }

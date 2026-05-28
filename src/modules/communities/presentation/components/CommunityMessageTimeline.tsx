@@ -290,7 +290,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       showAvatar={entry.endsAuthorRun}
                       threadAuthorName={
                         entry.threadSummary?.lastMessage
-                          ? memberDisplayName(
+                          ? memberPrimaryName(
                               memberIdentities[
                                 entry.threadSummary.lastMessage
                                   .authorIdentityId

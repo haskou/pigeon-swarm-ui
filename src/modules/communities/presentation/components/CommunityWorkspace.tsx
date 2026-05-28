@@ -1395,10 +1395,22 @@ export function CommunityWorkspace({
   });
   const handleTextChannelSelected = useCallback(
     (channelId: string) => {
+      const leavingThreadInCurrentChannel =
+        !!threadPanel && channelId === selectedChannelId;
+
       setThreadPanel(null);
       handleChannelSelected(channelId);
+
+      if (leavingThreadInCurrentChannel) {
+        requestAnimationFrame(() => scrollChannelToBottom('auto', true));
+      }
     },
-    [handleChannelSelected],
+    [
+      handleChannelSelected,
+      scrollChannelToBottom,
+      selectedChannelId,
+      threadPanel,
+    ],
   );
   const updateThreadDraft = useCallback((value: string) => {
     setThreadPanel((current) =>
@@ -1703,6 +1715,7 @@ export function CommunityWorkspace({
             embedded
             error={threadPanel.error}
             identityNames={communityIdentityNames}
+            identityPictures={memberPictures}
             messages={threadPanel.messages}
             onClose={() => setThreadPanel(null)}
             onDraftChange={updateThreadDraft}
@@ -2000,7 +2013,7 @@ function placeholderThreadRootMessage({
   return {
     attachments: [],
     authorIdentityId: currentIdentityId,
-    content: shortId(rootMessageId),
+    content: copy.messages.originalMessage,
     encrypted: false,
     id: rootMessageId,
     mine: false,

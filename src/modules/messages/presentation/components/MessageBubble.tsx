@@ -181,183 +181,198 @@ export function MessageBubble({
     <>
       <div
         data-message-id={message.id}
-        className={cx('flex min-w-0 items-end gap-3', mine && 'justify-end')}
+        className="min-w-0"
       >
-        {!mine && (
-          <MessageAvatarColumn
-            authorName={authorName}
-            authorPicture={authorPicture}
-            onAvatarClick={onAvatarClick}
-            reserveAvatarSpace={reserveAvatarSpace}
-            showAvatar={showAvatar}
-          />
-        )}
         <div
           className={cx(
-            'flex min-w-0 max-w-[96%] flex-col sm:max-w-[72%]',
-            mine ? 'items-end' : 'items-start',
+            'flex min-w-0 items-end gap-3',
+            mine && 'justify-end',
           )}
         >
+          {!mine && (
+            <MessageAvatarColumn
+              authorName={authorName}
+              authorPicture={authorPicture}
+              onAvatarClick={onAvatarClick}
+              reserveAvatarSpace={reserveAvatarSpace}
+              showAvatar={showAvatar}
+            />
+          )}
           <div
             className={cx(
-              'flex min-w-0 max-w-full items-end gap-2',
-              mine && 'flex-row-reverse',
+              'flex min-w-0 max-w-[96%] flex-col sm:max-w-[72%]',
+              mine ? 'items-end' : 'items-start',
             )}
           >
             <div
-              data-message-bubble
-              onContextMenu={handleContextMenu}
-              style={{
-                WebkitTouchCallout: 'none',
-              }}
-              onPointerCancel={clearLongPressTimer}
-              onPointerDown={handlePointerDown}
-              onPointerLeave={clearLongPressTimer}
-              onPointerMove={clearLongPressTimer}
-              onPointerUp={clearLongPressTimer}
               className={cx(
-                'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
-                sticker
-                  ? 'rounded-2xl bg-transparent p-0'
-                  : cx(
-                      'rounded-2xl p-3',
-                      mine
-                        ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
-                        : mentionHighlighted
-                          ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
-                        : 'border border-white/10 bg-black/25 text-white',
-                    ),
+                'flex min-w-0 max-w-full items-end gap-2',
+                mine && 'flex-row-reverse',
               )}
             >
-              {pinned && !sticker && <PinnedMessageMarker />}
-              {hasReply && replyMessageId && (
-                <MessageReplyPreview
-                  mine={mine}
-                  onAttachmentPreview={onAttachmentPreview}
-                  onReplyReferenceClick={onReplyReferenceClick}
-                  replyAuthorName={replyAuthorName}
-                  replyImage={replyImage}
-                  replyMessageId={replyMessageId}
-                  replyPreview={replyPreview}
-                  replySticker={replySticker}
-                />
-              )}
-              {message.attachments.length > 0 && (
-                <div className="grid gap-2">
-                  {imageAttachments.length > 0 && (
-                    <ImageAttachmentAlbum
-                      items={imageAttachments}
-                      mine={mine}
-                      onOpen={(images, index) => setLightbox({ images, index })}
-                      onPreview={onAttachmentPreview}
-                    />
-                  )}
-                  {otherAttachments.map(({ attachment, index }) => (
-                    <AttachmentCard
-                      attachment={attachment}
-                      key={`${message.id}-${attachment.cid}`}
-                      mine={mine}
-                      onPreview={onAttachmentPreview}
-                      pending={message.deliveryStatus === 'pending'}
-                      onClick={() => onAttachmentOpen(index)}
-                    />
-                  ))}
-                </div>
-              )}
-              {sticker && (
-                <div
-                  className={cx(
-                    stickerWithReply && 'flex items-end gap-2',
-                    stickerWithReply && mine && 'flex-row-reverse',
-                  )}
-                >
-                  <MessageStickerContent
+              <div
+                data-message-bubble
+                onContextMenu={handleContextMenu}
+                style={{
+                  WebkitTouchCallout: 'none',
+                }}
+                onPointerCancel={clearLongPressTimer}
+                onPointerDown={handlePointerDown}
+                onPointerLeave={clearLongPressTimer}
+                onPointerMove={clearLongPressTimer}
+                onPointerUp={clearLongPressTimer}
+                className={cx(
+                  'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                  sticker
+                    ? 'rounded-2xl bg-transparent p-0'
+                    : cx(
+                        'rounded-2xl p-3',
+                        mine
+                          ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
+                          : mentionHighlighted
+                            ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
+                            : 'border border-white/10 bg-black/25 text-white',
+                      ),
+                )}
+              >
+                {pinned && !sticker && <PinnedMessageMarker />}
+                {hasReply && replyMessageId && (
+                  <MessageReplyPreview
                     mine={mine}
-                    onStickerClick={onStickerClick}
-                    sticker={sticker}
+                    onAttachmentPreview={onAttachmentPreview}
+                    onReplyReferenceClick={onReplyReferenceClick}
+                    replyAuthorName={replyAuthorName}
+                    replyImage={replyImage}
+                    replyMessageId={replyMessageId}
+                    replyPreview={replyPreview}
+                    replySticker={replySticker}
                   />
-                  {stickerWithReply && (
-                    <MessageTimestamp timestamp={message.timestamp} />
-                  )}
-                </div>
-              )}
-              {message.attachmentProgress && (
-                <MessageAttachmentProgress
-                  progress={message.attachmentProgress}
-                />
-              )}
-              {message.content && !sticker && (
-                <div
-                  className={cx(
-                    'whitespace-pre-wrap break-words',
-                    (hasReply || message.attachments.length > 0) && 'mt-3',
-                    message.encrypted && 'text-white/55',
-                  )}
-                >
-                  <MarkdownMessage
-                    content={message.content}
-                    mentions={mentionTokens}
+                )}
+                {message.attachments.length > 0 && (
+                  <div className="grid gap-2">
+                    {imageAttachments.length > 0 && (
+                      <ImageAttachmentAlbum
+                        items={imageAttachments}
+                        mine={mine}
+                        onOpen={(images, index) =>
+                          setLightbox({ images, index })
+                        }
+                        onPreview={onAttachmentPreview}
+                      />
+                    )}
+                    {otherAttachments.map(({ attachment, index }) => (
+                      <AttachmentCard
+                        attachment={attachment}
+                        key={`${message.id}-${attachment.cid}`}
+                        mine={mine}
+                        onPreview={onAttachmentPreview}
+                        pending={message.deliveryStatus === 'pending'}
+                        onClick={() => onAttachmentOpen(index)}
+                      />
+                    ))}
+                  </div>
+                )}
+                {sticker && (
+                  <div
+                    className={cx(
+                      stickerWithReply && 'flex items-end gap-2',
+                      stickerWithReply && mine && 'flex-row-reverse',
+                    )}
+                  >
+                    <MessageStickerContent
+                      mine={mine}
+                      onStickerClick={onStickerClick}
+                      sticker={sticker}
+                    />
+                    {stickerWithReply && (
+                      <MessageTimestamp timestamp={message.timestamp} />
+                    )}
+                  </div>
+                )}
+                {message.attachmentProgress && (
+                  <MessageAttachmentProgress
+                    progress={message.attachmentProgress}
+                  />
+                )}
+                {message.content && !sticker && (
+                  <div
+                    className={cx(
+                      'whitespace-pre-wrap break-words',
+                      (hasReply || message.attachments.length > 0) && 'mt-3',
+                      message.encrypted && 'text-white/55',
+                    )}
+                  >
+                    <MarkdownMessage
+                      content={message.content}
+                      mentions={mentionTokens}
+                      mine={mine}
+                      onMentionClick={onMentionClick}
+                    />
+                  </div>
+                )}
+                {linkPreview && (
+                  <LinkPreviewCard
+                    description={linkPreview.description}
+                    finalUrl={linkPreview.finalUrl}
+                    image={linkPreview.image}
                     mine={mine}
-                    onMentionClick={onMentionClick}
+                    siteName={linkPreview.siteName}
+                    title={linkPreview.title}
+                    url={linkPreview.url}
                   />
-                </div>
-              )}
-              {linkPreview && (
-                <LinkPreviewCard
-                  description={linkPreview.description}
-                  finalUrl={linkPreview.finalUrl}
-                  image={linkPreview.image}
-                  mine={mine}
-                  siteName={linkPreview.siteName}
-                  title={linkPreview.title}
-                  url={linkPreview.url}
+                )}
+                {message.edited && !sticker && (
+                  <div className="mt-1 flex w-full justify-end">
+                    {canViewOriginalMessage ? (
+                      <button
+                        type="button"
+                        onClick={() => setOriginalMessageOpen(true)}
+                        className="text-[0.65rem] font-black uppercase text-white/45 transition hover:text-white/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                      >
+                        {copy.messages.edited}
+                      </button>
+                    ) : (
+                      <span className="text-[0.65rem] font-black uppercase text-white/45">
+                        {copy.messages.edited}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <MessageDeliveryStatus
+                  message={message}
+                  onRetryMessage={onRetryMessage}
                 />
+              </div>
+              {!stickerWithReply && (
+                <MessageTimestamp timestamp={message.timestamp} />
               )}
-              {message.edited && !sticker && (
-                <div className="mt-1 flex w-full justify-end">
-                  {canViewOriginalMessage ? (
-                    <button
-                      type="button"
-                      onClick={() => setOriginalMessageOpen(true)}
-                      className="text-[0.65rem] font-black uppercase text-white/45 transition hover:text-white/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-                    >
-                      {copy.messages.edited}
-                    </button>
-                  ) : (
-                    <span className="text-[0.65rem] font-black uppercase text-white/45">
-                      {copy.messages.edited}
-                    </span>
-                  )}
-                </div>
-              )}
-              <MessageDeliveryStatus
-                message={message}
-                onRetryMessage={onRetryMessage}
-              />
             </div>
-            {!stickerWithReply && (
-              <MessageTimestamp timestamp={message.timestamp} />
+            {reactionGroups.length > 0 && (
+              <MessageReactions
+                groups={reactionGroups}
+                mine={mine}
+                onToggle={(emoji, reacted) => {
+                  onReactionToggle?.(message, emoji, reacted);
+                }}
+              />
             )}
           </div>
-          {reactionGroups.length > 0 && (
-            <MessageReactions
-              groups={reactionGroups}
-              mine={mine}
-              onToggle={(emoji, reacted) => {
-                onReactionToggle?.(message, emoji, reacted);
-              }}
-            />
-          )}
-          {threadCount > 0 && onThreadOpen && (
+        </div>
+        {threadCount > 0 && onThreadOpen && (
+          <div
+            className={cx(
+              'mt-2 flex min-w-0',
+              mine ? 'justify-end' : reserveAvatarSpace ? 'pl-14' : '',
+            )}
+          >
             <MessageThreadLink
               authorName={threadAuthorName}
               authorPicture={threadAuthorPicture}
               count={threadCount}
-              mine={mine}
               onClick={() => onThreadOpen(message)}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
       {lightbox && (
         <ImageLightbox
@@ -394,23 +409,18 @@ function MessageThreadLink({
   authorName,
   authorPicture,
   count,
-  mine,
   onClick,
 }: {
   authorName?: string;
   authorPicture?: string | null;
   count: number;
-  mine: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cx(
-        'mt-2 flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-white/6 px-2.5 py-1.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white',
-        mine ? 'self-end' : 'self-start',
-      )}
+      className="flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-white/6 px-2.5 py-1.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
     >
       {authorPicture ? (
         <img
@@ -424,8 +434,10 @@ function MessageThreadLink({
         </span>
       )}
       <span className="min-w-0 truncate">
-        {authorName ? `${authorName} ` : ''}
-        {count} {count === 1 ? copy.messages.threadMessage : copy.messages.threadMessages}
+        {count}{' '}
+        {count === 1
+          ? copy.messages.threadMessage
+          : copy.messages.threadMessages}
       </span>
       <ThreadIcon className="h-3.5 w-3.5 shrink-0" />
     </button>
