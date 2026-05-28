@@ -1,5 +1,6 @@
 import {
   type KeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -23,6 +24,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import {
   type EmojiSuggestion,
+  preloadEmojiSuggestions,
   searchEmojiSuggestions,
 } from '../../../messages/presentation/emoji/emojiShortcodes';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -63,6 +65,7 @@ export function StickerPicker({
   const [query, setQuery] = useState('');
   const [emojiQuery, setEmojiQuery] = useState('');
   const [emojis, setEmojis] = useState<EmojiSuggestion[]>([]);
+  const [emojiLoading, setEmojiLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
@@ -83,6 +86,9 @@ export function StickerPicker({
       ),
     [library],
   );
+  const warmEmojiCatalog = useCallback(() => {
+    void preloadEmojiSuggestions();
+  }, []);
 
   const loadLibrary = async () => {
     setLoading(true);
@@ -100,6 +106,7 @@ export function StickerPicker({
     if (!open) return;
 
     void loadLibrary();
+    warmEmojiCatalog();
   }, [open]);
 
   useEffect(() => {
@@ -127,9 +134,17 @@ export function StickerPicker({
 
     let cancelled = false;
 
-    void searchEmojiSuggestions(emojiQuery, 5000).then((suggestions) => {
-      if (!cancelled) setEmojis(suggestions);
-    });
+    setEmojiLoading(true);
+    void searchEmojiSuggestions(emojiQuery, 5000)
+      .then((suggestions) => {
+        if (!cancelled) setEmojis(suggestions);
+      })
+      .catch(() => {
+        if (!cancelled) setEmojis([]);
+      })
+      .finally(() => {
+        if (!cancelled) setEmojiLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -278,6 +293,8 @@ export function StickerPicker({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
+        onFocus={warmEmojiCatalog}
+        onPointerEnter={warmEmojiCatalog}
         disabled={disabled}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-10"
         aria-label={copy.stickers.openPicker}
@@ -418,6 +435,7 @@ export function StickerPicker({
             <StickerEmojiPanel
               emojiQuery={emojiQuery}
               emojis={emojis}
+              loading={emojiLoading}
               onEmojiInsert={(emoji) => {
                 onEmojiInsert(emoji);
                 setOpen(false);
