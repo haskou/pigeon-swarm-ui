@@ -44,7 +44,15 @@ export class MessageTimelineEntries {
     const threadSummariesByRootMessageId = new Map(
       threadSummaries.map((summary) => [summary.rootMessageId, summary]),
     );
-    const rootMessages = messages;
+    const threadRootMessageIds = new Set(
+      threadSummaries.map((summary) => summary.rootMessageId),
+    );
+    const rootMessages = messages.filter(
+      (message) =>
+        !threadRootMessageIds.has(
+          MessageTimelineEntries.replyToMessageId(message) ?? '',
+        ),
+    );
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
       rootMessages.map((message) => [message.id, message]),

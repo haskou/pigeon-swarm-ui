@@ -32,7 +32,7 @@ describe(MessageTimelineEntries.name, () => {
     });
   });
 
-  it('uses explicit thread summaries instead of inferring them from replies', () => {
+  it('keeps replies visible when no thread summary exists for their root', () => {
     const root = chatMessage({
       content: 'Root',
       id: 'root-message',
@@ -45,18 +45,49 @@ describe(MessageTimelineEntries.name, () => {
       timestamp: 2,
     });
 
-    const entries = MessageTimelineEntries.build([root, normalReply], [], [
-      {
-        count: 4,
-        rootMessageId: root.id,
-      },
-    ]);
+    const entries = MessageTimelineEntries.build([root, normalReply], [], []);
 
     expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({
       id: `message:${root.id}`,
+      threadSummary: undefined,
+      type: 'message',
+    });
+    expect(entries[1]).toMatchObject({
+      id: `message:${normalReply.id}`,
+      replyMessage: root,
+      threadSummary: undefined,
+      type: 'message',
+    });
+  });
+
+  it('hides replies that belong to explicit thread summaries', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const threadReply = chatMessage({
+      content: 'Thread reply',
+      id: 'thread-reply',
+      rawReplyToMessageId: root.id,
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build([root, threadReply], [], [
+      {
+        count: 1,
+        lastMessage: threadReply,
+        rootMessageId: root.id,
+      },
+    ]);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: `message:${root.id}`,
       threadSummary: {
-        count: 4,
+        count: 1,
+        lastMessage: threadReply,
         rootMessageId: root.id,
       },
       type: 'message',
