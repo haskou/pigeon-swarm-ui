@@ -551,7 +551,7 @@ export function CommunityWorkspace({
     async (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
 
-      if (!channelId || !canManageMessages) return;
+      if (!channelId) return;
 
       if (channelId !== selectedChannelId) handleChannelSelected(channelId);
 
@@ -618,13 +618,50 @@ export function CommunityWorkspace({
       upsertChannelThreadSummary,
     ],
   );
+  const loadThreadRootMessage = useCallback(
+    async (
+      channelId: string,
+      rootMessageId: string,
+    ): Promise<ChatMessage | null> => {
+      const loadedRoot = messages.find((message) => message.id === rootMessageId);
+
+      if (loadedRoot) return loadedRoot;
+
+      let beforeMessageId: null | string | undefined;
+
+      for (let page = 0; page < 8; page += 1) {
+        const result = await applicationContainer.listCommunityChannelMessages(
+          session,
+          community.id,
+          channelId,
+          { beforeMessageId: beforeMessageId ?? undefined },
+        );
+        const loadedMessages = await projectChannelMessages(
+          channelId,
+          result.messages,
+        );
+        const root = loadedMessages.find(
+          (message) => message.id === rootMessageId,
+        );
+
+        if (root) return root;
+
+        if (!result.nextBeforeMessageId) break;
+
+        beforeMessageId = result.nextBeforeMessageId;
+      }
+
+      return null;
+    },
+    [community.id, messages, projectChannelMessages, session],
+  );
   const openMessageThreadFromSummary = useCallback(
     async (
       channelId: string,
       threadSummary: CommunityChannelThreadSummary,
     ) => {
       const root =
-        messages.find((message) => message.id === threadSummary.rootMessageId) ??
+        (await loadThreadRootMessage(channelId, threadSummary.rootMessageId)) ??
         placeholderThreadRootMessage({
           channelId,
           communityId: community.id,
@@ -634,7 +671,7 @@ export function CommunityWorkspace({
 
       await openMessageThread(root);
     },
-    [community.id, messages, openMessageThread, session.identity.id],
+    [community.id, loadThreadRootMessage, openMessageThread, session.identity.id],
   );
   const openPinnedMessages = useCallback(async () => {
     if (!selectedChannelId) return;
@@ -731,7 +768,7 @@ export function CommunityWorkspace({
     async (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
 
-      if (!channelId) return;
+      if (!channelId || !canManageMessages) return;
 
       setMessageContextMenu(null);
       try {
