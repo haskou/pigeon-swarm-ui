@@ -97,7 +97,6 @@ import {
 } from '../useWorkspacePreferences';
 import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
-import { shortId } from '../../../../shared/presentation/formatting';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -132,6 +131,7 @@ import {
   callAudioStorageKey,
   loadCallNoiseCancellationEnabled,
 } from './workspacePersistence';
+import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
@@ -716,119 +716,30 @@ export function GlassWorkspace({
 
     playNotificationSound();
   }, [notificationsMutedByPresence]);
-  const callParticipantForIdentity = useCallback(
-    (identityId: string): CallParticipant => {
-      const identity =
-        identityId === session.identity.id
-          ? session.identity
-          : identityProfiles[identityId];
-
-      return {
-        identity,
-        identityId,
-        muted: false,
-        name:
-          identityNames[identityId] ??
-          identity?.profile.name?.trim() ??
-          identityId,
-        picture: identityPictures[identityId] ?? null,
-      };
-    },
-    [identityNames, identityPictures, identityProfiles, session.identity],
-  );
-
   const callDetailsForResource = useCallback(
-    (
-      call: CallResource,
-    ): {
-      channelId?: string;
-      communityId?: string;
-      conversationId?: string;
-      kind: CallSession['kind'];
-      participants: CallParticipant[];
-      subtitle?: string;
-      title: string;
-    } => {
-      const participantIds =
-        call.scope.type === 'community_channel'
-          ? call.participants
-              .filter((participant) => participant.status === 'joined')
-              .map((participant) => participant.identityId)
-          : call.participantIds;
-      const participants = participantIds.map((identityId) => {
-        const participant = callParticipantForIdentity(identityId);
-        const status = call.participants.find(
-          (item) => item.identityId === identityId,
-        )?.status;
-
-        return { ...participant, status };
-      });
-
-      const scope = call.scope;
-
-      if (scope.type === 'community_channel') {
-        const community = communities.find(
-          (item) => item.id === scope.communityId,
-        );
-        const channel = community
-          ? CommunityChannels.find(community, scope.channelId)
-          : undefined;
-
-        return {
-          channelId: scope.channelId,
-          communityId: scope.communityId,
-          kind: 'community-voice',
-          participants,
-          subtitle: community?.name ?? copy.communities.privateCommunity,
-          title: channel?.name ?? copy.calls.voiceChannel,
-        };
-      }
-
-      const conversation = conversations.find(
-        (item) => item.id === scope.conversationId,
-      );
-      const peerIdentityId = conversation
-        ? ConversationPeer.identityId(
-            conversation,
-            session.identity.id,
-            session.keychain,
-          )
-        : undefined;
-      const peerIdentity = peerIdentityId
-        ? identityProfiles[peerIdentityId]
-        : undefined;
-      const peerHandle = peerIdentity?.profile.handle?.trim();
-      const oneToOneTitle =
-        peerIdentity?.profile.name.trim() ||
-        (peerHandle ? `@${peerHandle}` : undefined) ||
-        (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
-        copy.chat.noConversation;
-      const groupTitle =
-        conversation?.name ?? conversation?.title ?? copy.chat.noConversation;
-      const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
-
-      return {
-        conversationId: scope.conversationId,
-        kind,
-        participants,
-        subtitle:
-          kind === 'one-to-one'
-            ? peerHandle
-              ? `@${peerHandle}`
-              : peerIdentityId
-                ? shortId(peerIdentityId)
-                : undefined
-            : undefined,
-        title: kind === 'one-to-one' ? oneToOneTitle : groupTitle,
-      };
-    },
+    (call: CallResource) =>
+      resolveWorkspaceCallDetails({
+        call,
+        communities,
+        conversations,
+        currentIdentity: session.identity,
+        fallbackLabels: {
+          noConversation: copy.chat.noConversation,
+          privateCommunity: copy.communities.privateCommunity,
+          voiceChannel: copy.calls.voiceChannel,
+        },
+        identityNames,
+        identityPictures,
+        identityProfiles,
+        keychain: session.keychain,
+      }),
     [
-      callParticipantForIdentity,
       communities,
       conversations,
       identityNames,
+      identityPictures,
       identityProfiles,
-      session.identity.id,
+      session.identity,
       session.keychain,
     ],
   );
