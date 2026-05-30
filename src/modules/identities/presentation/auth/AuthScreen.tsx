@@ -56,7 +56,7 @@ export function AuthScreen({
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
