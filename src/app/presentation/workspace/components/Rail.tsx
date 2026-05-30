@@ -52,6 +52,12 @@ export function Rail({
   const { installState, requestInstall } = useInstallPrompt();
 
   const handleInstallApp = async () => {
+    if (installState === 'fallback') {
+      setInstallHelpOpen(true);
+
+      return;
+    }
+
     const installOutcome = await requestInstall();
 
     if (installOutcome === 'accepted') {
@@ -60,9 +66,7 @@ export function Rail({
       return;
     }
 
-    if (installState !== 'installed') {
-      setInstallHelpOpen(true);
-    }
+    setInstallHelpOpen(false);
   };
 
   const showInstallApp = installState !== 'installed';
