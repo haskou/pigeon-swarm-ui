@@ -294,7 +294,7 @@ export function useCommunityChannelMessages({
 
     const channelId = selectedChannelId;
 
-    if (!channelWasHiddenRef.current || !channelId) return;
+    if (!channelId) return;
 
     const now = Date.now();
 

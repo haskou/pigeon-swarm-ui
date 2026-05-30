@@ -72,7 +72,9 @@ async function registerServiceWorker(): Promise<void> {
     return;
   }
 
-  await navigator.serviceWorker.register(serviceWorkerPath);
+  await navigator.serviceWorker.register(serviceWorkerPath, {
+    updateViaCache: 'none',
+  });
 }
 
 if ('serviceWorker' in navigator) {

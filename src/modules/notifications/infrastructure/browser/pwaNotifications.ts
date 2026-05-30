@@ -11,6 +11,11 @@ type PwaNotificationPayload = {
 type EnsurePwaPushSubscriptionOptions = {
   requestPermission?: boolean;
 };
+export type EnsurePwaPushSubscriptionResult =
+  | 'granted'
+  | 'permission_denied'
+  | 'server_disabled'
+  | 'unsupported';
 type Permission = NotificationPermission;
 type PermissionRequester = () => Promise<Permission>;
 type ApplicationServerKey = Uint8Array<ArrayBuffer>;
@@ -24,6 +29,8 @@ type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
   };
 };
 
+class PushSubscriptionsUnsupportedError extends Error {}
+
 export function canUsePwaNotifications(): boolean {
   return (
     'Notification' in globalThis &&
@@ -33,7 +40,7 @@ export function canUsePwaNotifications(): boolean {
 }
 
 export function canUsePwaPushSubscriptions(): boolean {
-  return canUsePwaNotifications() && 'PushManager' in globalThis;
+  return canUsePwaNotifications();
 }
 
 export function currentPwaNotificationPermission(): PwaNotificationPermission {
@@ -58,7 +65,11 @@ export async function showPwaNotification(
 
   if (Notification.permission !== 'granted') return;
 
-  if (document.visibilityState === 'visible') return;
+  const pageIsVisible = document.visibilityState === 'visible';
+  const pageIsFocused =
+    typeof document.hasFocus !== 'function' || document.hasFocus();
+
+  if (pageIsVisible && pageIsFocused) return;
 
   const registration = await navigator.serviceWorker.ready;
 
@@ -178,6 +189,10 @@ async function subscriptionForRegistration(
   registration: ServiceWorkerRegistration,
   applicationServerKey: ApplicationServerKey,
 ): Promise<PushSubscription> {
+  if (!registration.pushManager) {
+    throw new PushSubscriptionsUnsupportedError();
+  }
+
   const existingSubscription = await registration.pushManager.getSubscription();
 
   if (!existingSubscription) {
@@ -202,26 +217,40 @@ async function subscriptionForRegistration(
 export async function ensurePwaPushSubscription(
   session: Session,
   options: EnsurePwaPushSubscriptionOptions = {},
-): Promise<void> {
-  if (!canUsePwaPushSubscriptions()) return;
+): Promise<EnsurePwaPushSubscriptionResult> {
+  if (!canUsePwaPushSubscriptions()) return 'unsupported';
 
-  if ((await currentPushPermission(options)) !== 'granted') return;
+  if ((await currentPushPermission(options)) !== 'granted') {
+    return 'permission_denied';
+  }
 
   const applicationServerKey = await enabledServerKey();
 
-  if (!applicationServerKey) return;
+  if (!applicationServerKey) return 'server_disabled';
 
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await subscriptionForRegistration(
-    session,
-    registration,
-    applicationServerKey,
-  );
+  let subscription: PushSubscription;
+
+  try {
+    subscription = await subscriptionForRegistration(
+      session,
+      registration,
+      applicationServerKey,
+    );
+  } catch (caught) {
+    if (caught instanceof PushSubscriptionsUnsupportedError) {
+      return 'unsupported';
+    }
+
+    throw caught;
+  }
 
   await applicationContainer.registerPushSubscription(
     session,
     subscription.toJSON(),
   );
+
+  return 'granted';
 }
 
 export async function deletePwaPushSubscription(
