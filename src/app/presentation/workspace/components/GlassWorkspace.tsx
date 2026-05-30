@@ -135,6 +135,10 @@ import {
   loadCallNoiseCancellationEnabled,
 } from './workspacePersistence';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
+import {
+  communitiesWithCallVoicePresence,
+  communityVoiceChannelTopologyKey,
+} from './communityVoicePresence';
 
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
@@ -374,6 +378,10 @@ export function GlassWorkspace({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
     useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
+  const communityVoiceTopologyKey = useMemo(
+    () => communityVoiceChannelTopologyKey(communities),
+    [communities],
+  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -1641,6 +1649,27 @@ export function GlassWorkspace({
     heartbeat: heartbeatActiveCall,
     onHeartbeatFailureLimit: leaveActiveCall,
   });
+
+  useEffect(() => {
+    if (!communityVoiceTopologyKey) return undefined;
+
+    let cancelled = false;
+
+    void applicationContainer
+      .listCalls(session)
+      .then((calls) => {
+        if (cancelled) return;
+
+        setCommunities((current) =>
+          communitiesWithCallVoicePresence(current, calls),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [communityVoiceTopologyKey, session, setCommunities]);
 
   useEffect(() => {
     let cancelled = false;
