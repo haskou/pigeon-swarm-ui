@@ -2089,7 +2089,7 @@ export function CommunityWorkspace({
             {typingIdentityIds.length > 0 && (
               <TypingIndicator
                 getIdentityName={(identityId) =>
-                  memberDisplayName(memberIdentities[identityId], identityId)
+                  memberPrimaryName(memberIdentities[identityId], identityId)
                 }
                 identityIds={typingIdentityIds}
               />
