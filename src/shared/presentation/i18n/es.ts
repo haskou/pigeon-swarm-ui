@@ -594,7 +594,11 @@ export const es = {
     enablePushDismiss: 'Ocultar aviso de notificaciones',
     enablePushError: 'No se pudieron activar las notificaciones.',
     enablePushLoading: 'Activando notificaciones...',
+    enablePushServerDisabled:
+      'Este servidor todavia no tiene activadas las notificaciones push.',
     enablePushTitle: 'Mensajes y llamadas',
+    enablePushUnsupported:
+      'Este navegador no puede registrar notificaciones push para esta app.',
     error: 'No se pudieron cargar las notificaciones.',
     groupInvitationTitle: 'Invitacion de grupo',
     invitationTitle: 'Invitacion de conversacion',

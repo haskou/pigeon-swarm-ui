@@ -389,14 +389,27 @@ export function GlassWorkspace({
     setPushEnableError(null);
 
     try {
-      await ensurePwaPushSubscription(session, { requestPermission: true });
+      const registrationState = await ensurePwaPushSubscription(session, {
+        requestPermission: true,
+      });
       const nextPermission = currentPwaNotificationPermission();
 
       setPushPermission(nextPermission);
 
-      if (nextPermission === 'denied') {
+      if (registrationState === 'permission_denied') {
         setPushEnableState('error');
         setPushEnableError(copy.notifications.enablePushDenied);
+
+        return;
+      }
+
+      if (registrationState !== 'granted') {
+        setPushEnableState('error');
+        setPushEnableError(
+          registrationState === 'server_disabled'
+            ? copy.notifications.enablePushServerDisabled
+            : copy.notifications.enablePushUnsupported,
+        );
 
         return;
       }

@@ -205,7 +205,9 @@ describe(ensurePwaPushSubscription.name, () => {
   it('does not request browser permission from automatic subscription checks', async () => {
     const { requestPermission } = installPushBrowser({ permission: 'default' });
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'permission_denied',
+    );
 
     expect(requestPermission).not.toHaveBeenCalled();
     expect(
@@ -232,7 +234,9 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     });
 
-    await ensurePwaPushSubscription(session(), { requestPermission: true });
+    await expect(
+      ensurePwaPushSubscription(session(), { requestPermission: true }),
+    ).resolves.toBe('granted');
 
     expect(calls).toEqual(['permission', 'vapid']);
     expect(
@@ -246,7 +250,9 @@ describe(ensurePwaPushSubscription.name, () => {
       requestedPermission: 'denied',
     });
 
-    await ensurePwaPushSubscription(session(), { requestPermission: true });
+    await expect(
+      ensurePwaPushSubscription(session(), { requestPermission: true }),
+    ).resolves.toBe('permission_denied');
 
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(
@@ -286,7 +292,9 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'granted',
+    );
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -314,7 +322,9 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'granted',
+    );
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -349,7 +359,9 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'granted',
+    );
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -404,5 +416,20 @@ describe(ensurePwaPushSubscription.name, () => {
         tag: 'notification-tag',
       }),
     );
+  });
+
+  it('reports server_disabled when VAPID settings are disabled', async () => {
+    installPushBrowser({ permission: 'granted' });
+    mockedApplicationContainer.getPushVapidPublicKey.mockResolvedValue({
+      enabled: false,
+    });
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'server_disabled',
+    );
+
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).not.toHaveBeenCalled();
   });
 });
