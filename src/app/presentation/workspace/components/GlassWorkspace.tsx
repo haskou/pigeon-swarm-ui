@@ -1725,7 +1725,12 @@ export function GlassWorkspace({
 
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
+      const pinUntil = keepPinned ? Date.now() + 5000 : 0;
       const scroll = () => {
+        if (keepPinned && keepMessageBottomUntilRef.current !== pinUntil) {
+          return;
+        }
+
         const scroller = scrollerRef.current;
 
         if (!scroller) return;
@@ -1738,7 +1743,7 @@ export function GlassWorkspace({
       };
 
       if (keepPinned) {
-        keepMessageBottomUntilRef.current = Date.now() + 5000;
+        keepMessageBottomUntilRef.current = pinUntil;
       }
 
       requestAnimationFrame(() => {
@@ -1939,14 +1944,15 @@ export function GlassWorkspace({
   });
 
   const handleLoadOlder = async () => {
+    keepMessageBottomUntilRef.current = 0;
+
     if (
       workspaceMode !== 'messages' ||
       !activeConversation?.id ||
       !activeConversationKey ||
       !messageCursorRef.current ||
       messageStateRef.current === 'loading' ||
-      Date.now() < suppressMessageLoadsUntilRef.current ||
-      Date.now() < keepMessageBottomUntilRef.current
+      Date.now() < suppressMessageLoadsUntilRef.current
     )
       return;
 
@@ -1998,6 +2004,8 @@ export function GlassWorkspace({
     if (Date.now() < suppressMessageLoadsUntilRef.current) return;
 
     if (isScrolledNearBottom()) setNewMessageCount(0);
+
+    if (isScrollingUp) keepMessageBottomUntilRef.current = 0;
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };

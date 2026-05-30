@@ -135,10 +135,17 @@ export function useCommunityChannelMessages({
 
   const scrollChannelToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
-      const scroll = () => bottomRef.current?.scrollIntoView({ behavior });
+      const pinUntil = keepPinned ? Date.now() + 5000 : 0;
+      const scroll = () => {
+        if (keepPinned && keepChannelBottomUntilRef.current !== pinUntil) {
+          return;
+        }
+
+        bottomRef.current?.scrollIntoView({ behavior });
+      };
 
       if (keepPinned) {
-        keepChannelBottomUntilRef.current = Date.now() + 5000;
+        keepChannelBottomUntilRef.current = pinUntil;
       }
 
       requestAnimationFrame(() => {
@@ -196,7 +203,9 @@ export function useCommunityChannelMessages({
     if (messageStateRef.current === 'loading' || !selectedChannelId) return;
 
     const previousHeight = scroller.scrollHeight;
+    const previousTop = scroller.scrollTop;
 
+    keepChannelBottomUntilRef.current = 0;
     setMessageLoadState('loading');
     void loadChannelMessagesRef
       .current(selectedChannelId, messageCursor)
@@ -207,7 +216,7 @@ export function useCommunityChannelMessages({
           if (!scrollerRef.current) return;
 
           scrollerRef.current.scrollTop =
-            scrollerRef.current.scrollHeight - previousHeight;
+            scrollerRef.current.scrollHeight - previousHeight + previousTop;
         });
       })
       .catch(() => setMessageLoadState('error'))
