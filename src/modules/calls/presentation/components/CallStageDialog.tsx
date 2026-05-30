@@ -53,11 +53,11 @@ export function CallStageDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[110] bg-[#060712]/95 p-4 text-white backdrop-blur-xl sm:p-6"
+      className="fixed inset-0 z-[110] bg-[#060712]/95 p-2 text-white backdrop-blur-xl sm:p-6"
       onClick={onClose}
     >
       <section
-        className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl shadow-black/60"
+        className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-2xl shadow-black/60 sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <CallStageHeader

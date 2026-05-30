@@ -33,7 +33,7 @@ export function CallStageFooter({
   onToggleScreenShare: () => void;
 }) {
   return (
-    <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-white/10 p-4">
+    <footer className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 p-2.5 sm:gap-3 sm:p-4">
       <CallButton
         active={call.cameraEnabled}
         label={
@@ -91,7 +91,7 @@ export function CallStageFooter({
       <button
         type="button"
         onClick={onEnd}
-        className="grid h-12 w-12 place-items-center rounded-[1.15rem] border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35 [&>svg]:h-6 [&>svg]:w-6"
+        className="grid h-10 w-10 place-items-center rounded-xl border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35 sm:h-12 sm:w-12 sm:rounded-[1.15rem] [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6"
         aria-label={copy.calls.leave}
         title={copy.calls.leave}
       >
@@ -113,7 +113,7 @@ function ScreenShareAudioToggle({
       type="button"
       onClick={onToggle}
       className={cx(
-        'flex h-12 items-center gap-2.5 rounded-[1.15rem] px-3.5 text-xs font-black transition [&>svg]:h-6 [&>svg]:w-6',
+        'flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-black transition sm:h-12 sm:gap-2.5 sm:rounded-[1.15rem] sm:px-3.5 [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6',
         active
           ? 'bg-emerald-300 text-slate-950 hover:bg-emerald-200'
           : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white',
@@ -125,7 +125,7 @@ function ScreenShareAudioToggle({
       title={active ? copy.calls.stopScreenSound : copy.calls.shareScreenSound}
     >
       <ScreenSoundIcon active={active} />
-      <span>{copy.calls.screenSound}</span>
+      <span className="hidden sm:inline">{copy.calls.screenSound}</span>
     </button>
   );
 }

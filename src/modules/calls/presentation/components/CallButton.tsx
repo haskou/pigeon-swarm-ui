@@ -23,7 +23,7 @@ export function CallButton({
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
       className={cx(
-        'relative grid h-11 w-11 place-items-center rounded-[1.15rem] transition',
+        'relative grid h-10 w-10 place-items-center rounded-xl transition sm:h-11 sm:w-11 sm:rounded-[1.15rem]',
         disabled
           ? 'cursor-not-allowed bg-white/5 text-white/30'
           : active
@@ -33,7 +33,9 @@ export function CallButton({
       aria-label={label}
       title={label}
     >
-      <span className="[&>svg]:h-6 [&>svg]:w-6">{children}</span>
+      <span className="[&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6">
+        {children}
+      </span>
       {badge && (
         <span className="absolute -bottom-1 -right-1 rounded-full border border-[#151722] bg-emerald-300 px-1.5 text-[0.55rem] font-black leading-4 text-slate-950">
           {badge}

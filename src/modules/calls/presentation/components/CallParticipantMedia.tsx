@@ -32,11 +32,11 @@ export function CallParticipantMedia({
   const media = (
     <div
       className={cx(
-        'relative mt-3 grid shrink-0 place-items-center overflow-hidden rounded-2xl',
+        'relative mt-1 grid shrink-0 place-items-center overflow-hidden rounded-xl sm:mt-3 sm:rounded-2xl',
         variant === 'strip'
           ? videoVisible
-            ? 'h-24 w-full bg-black'
-            : 'h-16 w-16 bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950'
+            ? 'h-16 w-full bg-black sm:h-24'
+            : 'h-12 w-12 bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xl font-black text-slate-950 sm:h-16 sm:w-16 sm:text-2xl'
           : videoVisible || (preferScreenPreview && screenVisible)
             ? 'aspect-video w-full bg-black'
             : 'h-20 w-20 bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 sm:h-24 sm:w-24',

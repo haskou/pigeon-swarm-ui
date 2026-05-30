@@ -20,13 +20,15 @@ export function CallStageHeader({
   const title = callSessionTitle(call);
 
   return (
-    <header className="flex flex-wrap items-center gap-3 border-b border-white/10 p-4 sm:p-5">
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+    <header className="flex flex-wrap items-center gap-2 border-b border-white/10 p-2.5 sm:gap-3 sm:p-5">
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-400/15 text-emerald-200 sm:h-12 sm:w-12 sm:rounded-2xl">
         <SpeakerIcon />
       </div>
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-xl font-black text-white">{title}</h2>
-        <p className="truncate text-sm text-white/50">
+        <h2 className="truncate text-base font-black text-white sm:text-xl">
+          {title}
+        </h2>
+        <p className="truncate text-xs text-white/50 sm:text-sm">
           {call.status === 'permission-denied'
             ? copy.calls.microphoneUnavailable
             : subtitle || copy.calls.waitingForParticipants}
@@ -40,14 +42,14 @@ export function CallStageHeader({
       <button
         type="button"
         onClick={onDataToggle}
-        className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15 sm:rounded-2xl sm:px-4 sm:text-sm"
       >
         {dataOpen ? copy.calls.hideCallData : copy.calls.viewCallData}
       </button>
       <button
         type="button"
         onClick={onClose}
-        className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+        className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white sm:h-10 sm:w-10 sm:rounded-2xl"
         aria-label={copy.dialog.close}
       >
         x
