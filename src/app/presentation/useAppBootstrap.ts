@@ -19,7 +19,7 @@ import {
 } from '../../modules/identities/infrastructure/storage/savedCredentials';
 import { useNodeNetworks } from '../../modules/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../modules/networks/presentation/hooks/usePeers';
-import { applicationContainer } from '../composition/applicationContainer';
+import { loadApplicationContainer } from '../composition/loadApplicationContainer';
 
 type RestoreState = 'done' | 'loading';
 
@@ -81,8 +81,13 @@ export function useAppBootstrap(): {
       return;
     }
 
-    void applicationContainer
-      .login(savedCredentials.identityId, savedCredentials.password)
+    void loadApplicationContainer()
+      .then((applicationContainer) =>
+        applicationContainer.login(
+          savedCredentials.identityId,
+          savedCredentials.password,
+        ),
+      )
       .then((result) => {
         handleAuthenticated(result.session, result.conversations);
         setRestoreState('done');

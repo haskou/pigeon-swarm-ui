@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Peer } from '../../application/list-peers/ListPeers';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { NodeBootstrapApi } from '../../infrastructure/http/NodeBootstrapApi';
+
+const nodeBootstrapApi = new NodeBootstrapApi();
 
 type PeersState = {
   error: Error | null;
@@ -23,7 +25,7 @@ export function usePeers(): PeersState {
     setError(null);
 
     try {
-      setPeers(await applicationContainer.listPeers());
+      setPeers(await nodeBootstrapApi.getPeers());
     } catch (caught) {
       setError(new Error(toUserErrorMessage(caught, copy.peers.error)));
     } finally {

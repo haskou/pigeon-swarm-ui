@@ -11,7 +11,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
@@ -39,6 +39,8 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     setError(null);
 
     try {
+      const applicationContainer = await loadApplicationContainer();
+
       setCommunities(await applicationContainer.listCommunities(session));
     } catch (caught) {
       setError(
