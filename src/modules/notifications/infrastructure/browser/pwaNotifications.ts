@@ -24,6 +24,8 @@ type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
   };
 };
 
+const notificationBadge = '/favicon/notification-badge.png';
+
 export function canUsePwaNotifications(): boolean {
   return (
     'Notification' in globalThis &&
@@ -63,7 +65,7 @@ export async function showPwaNotification(
   const registration = await navigator.serviceWorker.ready;
 
   await registration.showNotification(payload.title, {
-    badge: '/favicon/favicon-32x32.png',
+    badge: notificationBadge,
     body: payload.body,
     data: {
       url: payload.url ?? '/',
