@@ -63,10 +63,7 @@ function installPushBrowser(input: {
   existingUnsubscribe: jest.Mock<Promise<boolean>, []>;
   getSubscription: jest.Mock<Promise<PushSubscription | null>, []>;
   requestPermission: jest.Mock<Promise<NotificationPermission>, []>;
-  showNotification: jest.Mock<
-    Promise<void>,
-    [string, NotificationOptions?]
-  >;
+  showNotification: jest.Mock<Promise<void>, [string, NotificationOptions?]>;
   subscribe: jest.Mock<Promise<PushSubscription>, []>;
   subscriptionJson: PushSubscriptionJSON;
 } {
@@ -138,6 +135,7 @@ function installPushBrowser(input: {
       },
     },
   });
+
   if (input.pushManager !== false) {
     Object.defineProperty(globalThis, 'PushManager', {
       configurable: true,
@@ -304,9 +302,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
-      'granted',
-    );
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -334,9 +330,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
-      'granted',
-    );
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -371,9 +365,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
-      'granted',
-    );
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -454,9 +446,7 @@ describe(ensurePwaPushSubscription.name, () => {
     Reflect.deleteProperty(globalThis, 'PushManager');
     mockCurrentVapidPublicKey();
 
-    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
-      'granted',
-    );
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).toHaveBeenCalledWith(session(), subscriptionJson);

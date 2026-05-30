@@ -29,6 +29,8 @@ type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
   };
 };
 
+class PushSubscriptionsUnsupportedError extends Error {}
+
 export function canUsePwaNotifications(): boolean {
   return (
     'Notification' in globalThis &&
@@ -250,8 +252,6 @@ export async function ensurePwaPushSubscription(
 
   return 'granted';
 }
-
-class PushSubscriptionsUnsupportedError extends Error {}
 
 export async function deletePwaPushSubscription(
   session: Session,
