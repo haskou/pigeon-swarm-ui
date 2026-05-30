@@ -298,6 +298,7 @@ export function GlassWorkspace({
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     setActiveCommunityId,
     setActiveConversationId,
     setCommunityChannelById,
@@ -305,7 +306,7 @@ export function GlassWorkspace({
     setDrafts,
     setWorkspaceMode,
     workspaceMode,
-  } = useWorkspacePreferenceState(conversations, session.identity.id);
+  } = useWorkspacePreferenceState(conversations, session);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
@@ -570,7 +571,9 @@ export function GlassWorkspace({
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     identityId: session.identity.id,
+    session,
     workspaceMode,
   });
 

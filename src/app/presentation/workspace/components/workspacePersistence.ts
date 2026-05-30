@@ -3,6 +3,10 @@ import type { ConversationResource } from '../../../../shared/domain/pigeonResou
 import { readJsonObjectFromLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 
 export type ConversationDrafts = Record<string, string>;
+export type EncryptedConversationDrafts = {
+  encryptedPayloads: Record<string, string>;
+  version: 1;
+};
 export type WorkspacePreference = {
   channelByCommunityId?: Record<string, string>;
   communityId?: null | string;
@@ -37,8 +41,41 @@ export function initialConversationId(
     : (conversations[0]?.id ?? null);
 }
 
-export function loadDrafts(identityId: string): ConversationDrafts {
-  return readJsonObjectFromLocalStorage(draftsStorageKey(identityId), {});
+export function encryptedDraftsStorageValue(
+  encryptedPayloads: Record<string, string>,
+): EncryptedConversationDrafts {
+  return {
+    encryptedPayloads,
+    version: 1,
+  };
+}
+
+export function loadLegacyPlainDrafts(identityId: string): ConversationDrafts {
+  const stored = readJsonObjectFromLocalStorage<Record<string, unknown>>(
+    draftsStorageKey(identityId),
+    {},
+  );
+
+  if (isEncryptedConversationDrafts(stored)) return {};
+
+  return Object.fromEntries(
+    Object.entries(stored).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
+
+export function loadEncryptedDraftPayloads(
+  identityId: string,
+): Record<string, string> {
+  const stored = readJsonObjectFromLocalStorage<Record<string, unknown>>(
+    draftsStorageKey(identityId),
+    {},
+  );
+
+  if (!isEncryptedConversationDrafts(stored)) return {};
+
+  return stored.encryptedPayloads;
 }
 
 export function loadWorkspacePreference(
@@ -63,4 +100,18 @@ export function loadCallNoiseCancellationEnabled(identityId: string): boolean {
   );
 
   return preference.noiseCancellationEnabled ?? true;
+}
+
+function isEncryptedConversationDrafts(
+  value: Record<string, unknown>,
+): value is EncryptedConversationDrafts {
+  return (
+    value.version === 1 &&
+    typeof value.encryptedPayloads === 'object' &&
+    value.encryptedPayloads !== null &&
+    !Array.isArray(value.encryptedPayloads) &&
+    Object.values(value.encryptedPayloads).every(
+      (payload) => typeof payload === 'string',
+    )
+  );
 }
