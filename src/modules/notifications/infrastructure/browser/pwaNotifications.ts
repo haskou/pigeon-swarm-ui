@@ -58,7 +58,11 @@ export async function showPwaNotification(
 
   if (Notification.permission !== 'granted') return;
 
-  if (document.visibilityState === 'visible') return;
+  const pageIsVisible = document.visibilityState === 'visible';
+  const pageIsFocused =
+    typeof document.hasFocus !== 'function' || document.hasFocus();
+
+  if (pageIsVisible && pageIsFocused) return;
 
   const registration = await navigator.serviceWorker.ready;
 

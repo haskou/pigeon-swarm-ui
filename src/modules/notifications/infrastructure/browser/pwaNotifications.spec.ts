@@ -4,6 +4,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import {
   currentPwaNotificationPermission,
   ensurePwaPushSubscription,
+  showPwaNotification,
 } from './pwaNotifications';
 
 jest.mock('../../../../app/composition/applicationContainer', () => ({
@@ -61,6 +62,10 @@ function installPushBrowser(input: {
   existingUnsubscribe: jest.Mock<Promise<boolean>, []>;
   getSubscription: jest.Mock<Promise<PushSubscription | null>, []>;
   requestPermission: jest.Mock<Promise<NotificationPermission>, []>;
+  showNotification: jest.Mock<
+    Promise<void>,
+    [string, NotificationOptions?]
+  >;
   subscribe: jest.Mock<Promise<PushSubscription>, []>;
   subscriptionJson: PushSubscriptionJSON;
 } {
@@ -84,6 +89,10 @@ function installPushBrowser(input: {
       toJSON: () => subscriptionJson,
     } as unknown as PushSubscription),
   );
+  const showNotification = jest.fn<
+    Promise<void>,
+    [string, NotificationOptions?]
+  >(() => Promise.resolve());
   const existingUnsubscribe = jest.fn(() => Promise.resolve(true));
   const existingSubscription = input.existingSubscription
     ? ({
@@ -119,6 +128,7 @@ function installPushBrowser(input: {
             getSubscription,
             subscribe,
           },
+          showNotification,
         }),
       },
     },
@@ -132,9 +142,23 @@ function installPushBrowser(input: {
     existingUnsubscribe,
     getSubscription,
     requestPermission,
+    showNotification,
     subscribe,
     subscriptionJson,
   };
+}
+
+function installDocumentVisibility(input: {
+  focused?: boolean;
+  visibilityState: DocumentVisibilityState;
+}): void {
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      hasFocus: () => input.focused ?? true,
+      visibilityState: input.visibilityState,
+    },
+  });
 }
 
 function mockCurrentVapidPublicKey(): void {
@@ -165,12 +189,17 @@ describe(ensurePwaPushSubscription.name, () => {
     globalThis,
     'PushManager',
   );
+  const originalDocument = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'document',
+  );
 
   afterEach(() => {
     jest.clearAllMocks();
     restoreGlobalProperty('navigator', originalNavigator);
     restoreGlobalProperty('Notification', originalNotification);
     restoreGlobalProperty('PushManager', originalPushManager);
+    restoreGlobalProperty('document', originalDocument);
   });
 
   it('does not request browser permission from automatic subscription checks', async () => {
@@ -333,5 +362,47 @@ describe(ensurePwaPushSubscription.name, () => {
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('does not show a local notification while the page is visible and focused', async () => {
+    const { showNotification } = installPushBrowser({ permission: 'granted' });
+
+    installDocumentVisibility({
+      focused: true,
+      visibilityState: 'visible',
+    });
+
+    await showPwaNotification({
+      body: 'Notification body',
+      tag: 'notification-tag',
+      title: 'Notification title',
+    });
+
+    expect(showNotification).not.toHaveBeenCalled();
+  });
+
+  it('shows a local notification when the page is visible but not focused', async () => {
+    const { showNotification } = installPushBrowser({ permission: 'granted' });
+
+    installDocumentVisibility({
+      focused: false,
+      visibilityState: 'visible',
+    });
+
+    await showPwaNotification({
+      body: 'Notification body',
+      tag: 'notification-tag',
+      title: 'Notification title',
+      url: '/messages',
+    });
+
+    expect(showNotification).toHaveBeenCalledWith(
+      'Notification title',
+      expect.objectContaining({
+        body: 'Notification body',
+        data: { url: '/messages' },
+        tag: 'notification-tag',
+      }),
+    );
   });
 });

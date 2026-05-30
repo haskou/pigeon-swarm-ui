@@ -41,13 +41,13 @@ export function useWorkspaceResumeSync({
       return;
     }
 
-    if (!workspaceWasHiddenRef.current) return;
-
     const now = Date.now();
 
     if (now - workspaceResumeSyncAtRef.current < MIN_RESUME_SYNC_INTERVAL_MS) {
       return;
     }
+
+    const workspaceWasHidden = workspaceWasHiddenRef.current;
 
     workspaceWasHiddenRef.current = false;
     workspaceResumeSyncAtRef.current = now;
@@ -78,7 +78,7 @@ export function useWorkspaceResumeSync({
         }
       }
 
-      if (workspaceMode === 'community') {
+      if (workspaceMode === 'community' && workspaceWasHidden) {
         await onCommunitiesReload().catch(() => undefined);
       }
     })();
