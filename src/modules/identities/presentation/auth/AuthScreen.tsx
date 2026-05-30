@@ -94,7 +94,8 @@ export function AuthScreen({
     selectedNetwork,
   });
   const passwordChecks = passwordValidationChecks(password);
-  const canShowInstallButton = installState !== 'installed';
+  const canShowInstallButton =
+    installState !== 'fallback' && installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
   const installHelp =
@@ -346,12 +347,17 @@ export function AuthScreen({
               >
                 {installButtonLabel}
               </button>
-              {(showInstallHelp || installState === 'fallback') && installHelp && (
+              {showInstallHelp && installHelp && (
                 <p className="mt-2 text-center text-xs leading-snug text-white/45">
                   {installHelp}
                 </p>
               )}
             </div>
+          )}
+          {!canShowInstallButton && installHelp && (
+            <p className="mt-3 text-center text-xs leading-snug text-white/45">
+              {installHelp}
+            </p>
           )}
         </form>
       </div>
