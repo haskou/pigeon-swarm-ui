@@ -38,7 +38,7 @@ export function canUsePwaNotifications(): boolean {
 }
 
 export function canUsePwaPushSubscriptions(): boolean {
-  return canUsePwaNotifications() && 'PushManager' in globalThis;
+  return canUsePwaNotifications();
 }
 
 export function currentPwaNotificationPermission(): PwaNotificationPermission {
@@ -187,6 +187,10 @@ async function subscriptionForRegistration(
   registration: ServiceWorkerRegistration,
   applicationServerKey: ApplicationServerKey,
 ): Promise<PushSubscription> {
+  if (!registration.pushManager) {
+    throw new PushSubscriptionsUnsupportedError();
+  }
+
   const existingSubscription = await registration.pushManager.getSubscription();
 
   if (!existingSubscription) {
@@ -223,11 +227,21 @@ export async function ensurePwaPushSubscription(
   if (!applicationServerKey) return 'server_disabled';
 
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await subscriptionForRegistration(
-    session,
-    registration,
-    applicationServerKey,
-  );
+  let subscription: PushSubscription;
+
+  try {
+    subscription = await subscriptionForRegistration(
+      session,
+      registration,
+      applicationServerKey,
+    );
+  } catch (caught) {
+    if (caught instanceof PushSubscriptionsUnsupportedError) {
+      return 'unsupported';
+    }
+
+    throw caught;
+  }
 
   await applicationContainer.registerPushSubscription(
     session,
@@ -236,6 +250,8 @@ export async function ensurePwaPushSubscription(
 
   return 'granted';
 }
+
+class PushSubscriptionsUnsupportedError extends Error {}
 
 export async function deletePwaPushSubscription(
   session: Session,

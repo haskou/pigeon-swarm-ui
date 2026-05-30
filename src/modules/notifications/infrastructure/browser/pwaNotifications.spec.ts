@@ -57,6 +57,7 @@ function installPushBrowser(input: {
     json: PushSubscriptionJSON;
   };
   permission: NotificationPermission;
+  pushManager?: boolean;
   requestedPermission?: NotificationPermission;
 }): {
   existingUnsubscribe: jest.Mock<Promise<boolean>, []>;
@@ -124,19 +125,27 @@ function installPushBrowser(input: {
     value: {
       serviceWorker: {
         ready: Promise.resolve({
-          pushManager: {
-            getSubscription,
-            subscribe,
-          },
+          ...(input.pushManager === false
+            ? {}
+            : {
+                pushManager: {
+                  getSubscription,
+                  subscribe,
+                },
+              }),
           showNotification,
         }),
       },
     },
   });
-  Object.defineProperty(globalThis, 'PushManager', {
-    configurable: true,
-    value: class PushManager {},
-  });
+  if (input.pushManager !== false) {
+    Object.defineProperty(globalThis, 'PushManager', {
+      configurable: true,
+      value: class PushManager {},
+    });
+  } else {
+    Reflect.deleteProperty(globalThis, 'PushManager');
+  }
 
   return {
     existingUnsubscribe,
@@ -263,12 +272,15 @@ describe(ensurePwaPushSubscription.name, () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('reports the current permission only when push subscriptions are supported', () => {
+  it('reports the current permission only when service workers and notifications are supported', () => {
     installPushBrowser({ permission: 'default' });
 
     expect(currentPwaNotificationPermission()).toBe('default');
 
-    Reflect.deleteProperty(globalThis, 'PushManager');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {},
+    });
 
     expect(currentPwaNotificationPermission()).toBe('unsupported');
   });
@@ -428,6 +440,38 @@ describe(ensurePwaPushSubscription.name, () => {
       'server_disabled',
     );
 
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not require a global PushManager when the registration exposes pushManager', async () => {
+    const { subscriptionJson } = installPushBrowser({
+      permission: 'granted',
+      pushManager: true,
+    });
+
+    Reflect.deleteProperty(globalThis, 'PushManager');
+    mockCurrentVapidPublicKey();
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'granted',
+    );
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('reports unsupported when the service worker registration has no pushManager', async () => {
+    installPushBrowser({
+      permission: 'granted',
+      pushManager: false,
+    });
+    mockCurrentVapidPublicKey();
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'unsupported',
+    );
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).not.toHaveBeenCalled();
