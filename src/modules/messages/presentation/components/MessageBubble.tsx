@@ -244,6 +244,7 @@ export function MessageBubble({
                 className={cx(
                   'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                   onMessageClick && 'cursor-pointer',
+                  message.deliveryStatus === 'pending' && 'opacity-70',
                   sticker
                     ? 'rounded-2xl bg-transparent p-0'
                     : cx(

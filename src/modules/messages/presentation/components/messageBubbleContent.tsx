@@ -79,31 +79,19 @@ export function MessageDeliveryStatus({
   message: ChatMessage;
   onRetryMessage?: (message: ChatMessage) => void;
 }) {
-  if (
-    message.deliveryStatus !== 'pending' &&
-    message.deliveryStatus !== 'failed'
-  ) {
-    return null;
-  }
+  if (message.deliveryStatus !== 'failed') return null;
 
   return (
     <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
-      {message.deliveryStatus === 'pending' && (
-        <span>{copy.messages.sending}</span>
-      )}
-      {message.deliveryStatus === 'failed' && (
-        <>
-          <span className="text-rose-100">{copy.messages.sendFailed}</span>
-          {onRetryMessage && (
-            <button
-              type="button"
-              onClick={() => onRetryMessage(message)}
-              className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
-            >
-              {copy.messages.retrySend}
-            </button>
-          )}
-        </>
+      <span className="text-rose-100">{copy.messages.sendFailed}</span>
+      {onRetryMessage && (
+        <button
+          type="button"
+          onClick={() => onRetryMessage(message)}
+          className="rounded-full bg-white/15 px-2 py-0.5 text-white transition hover:bg-white/25"
+        >
+          {copy.messages.retrySend}
+        </button>
       )}
     </div>
   );
