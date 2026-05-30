@@ -102,6 +102,10 @@ export function MessageContextMenu({
     onReactionToggle?.(menu.message, emoji, reacted);
     onClose();
   };
+  const runAction = (action: () => void) => {
+    onClose();
+    action();
+  };
   const anchorStyle = {
     anchorName: '--message-menu-anchor',
     left: menu.x,
@@ -258,53 +262,53 @@ export function MessageContextMenu({
           <MessageMenuAction
             icon={<ThreadIcon />}
             label={copy.messages.openThread}
-            onClick={onOpenThread}
+            onClick={() => runAction(onOpenThread)}
           />
         ) : null}
         {onReply ? (
           <MessageMenuAction
             icon={<ReplyIcon />}
             label={copy.messages.reply}
-            onClick={onReply}
+            onClick={() => runAction(onReply)}
           />
         ) : null}
         {onCopy ? (
           <MessageMenuAction
             icon={<CopyIcon />}
             label={copy.messages.copy}
-            onClick={onCopy}
+            onClick={() => runAction(onCopy)}
           />
         ) : null}
         {onEdit ? (
           <MessageMenuAction
             icon={<EditIcon />}
             label={copy.messages.edit}
-            onClick={onEdit}
+            onClick={() => runAction(onEdit)}
           />
         ) : null}
         {onUnpin ? (
           <MessageMenuAction
             icon={<PinIcon />}
             label={copy.messages.unpin}
-            onClick={onUnpin}
+            onClick={() => runAction(onUnpin)}
           />
         ) : onPin ? (
           <MessageMenuAction
             icon={<PinIcon />}
             label={pinned ? copy.messages.unpin : copy.messages.pin}
-            onClick={onPin}
+            onClick={() => runAction(onPin)}
           />
         ) : null}
         <MessageMenuAction
           icon={<DataIcon />}
           label={copy.messages.viewRaw}
-          onClick={onViewRaw}
+          onClick={() => runAction(onViewRaw)}
         />
         {onDelete ? (
           <MessageMenuAction
             icon={<TrashIcon />}
             label={copy.messages.delete}
-            onClick={onDelete}
+            onClick={() => runAction(onDelete)}
             tone="danger"
           />
         ) : null}
