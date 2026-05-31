@@ -4,6 +4,8 @@ import {
   FormEvent,
   KeyboardEvent,
   ReactNode,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -31,12 +33,18 @@ import {
 import { ComposerMentionOverlay } from './ComposerMentionOverlay';
 import { ComposerContextBanner } from './ComposerContextBanner';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
-import { StickerPicker } from '../../../stickers/presentation/components/StickerPicker';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
 const COMPOSER_MAX_ROWS = 20;
 const LARGE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+const StickerPicker = lazy(() =>
+  import('../../../stickers/presentation/components/StickerPicker').then(
+    (module) => ({
+      default: module.StickerPicker,
+    }),
+  ),
+);
 
 interface ComposerProps {
   defaultEncryptAttachments?: boolean;
@@ -587,12 +595,16 @@ export function Composer({
                 hideMobileSecondaryActions && 'hidden sm:block',
               )}
             >
-              <StickerPicker
-                disabled={disabled}
-                onEmojiInsert={insertLooseEmoji}
-                onStickerSend={onStickerSend}
-                session={session}
-              />
+              <Suspense
+                fallback={<StickerPickerFallbackButton disabled={disabled} />}
+              >
+                <StickerPicker
+                  disabled={disabled}
+                  onEmojiInsert={insertLooseEmoji}
+                  onStickerSend={onStickerSend}
+                  session={session}
+                />
+              </Suspense>
             </div>
           )}
           {!isEditing && onPollCreate && (
@@ -746,6 +758,33 @@ function SendArrowIcon({ className }: { className?: string }) {
     >
       <path d="m9 5 7 7-7 7" />
     </svg>
+  );
+}
+
+function StickerPickerFallbackButton({ disabled }: { disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-xl text-white/45 transition disabled:cursor-not-allowed disabled:opacity-45"
+      aria-label={copy.stickers.openPicker}
+    >
+      <svg
+        aria-hidden="true"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+        <path d="M9 9h.01" />
+        <path d="M15 9h.01" />
+      </svg>
+    </button>
   );
 }
 

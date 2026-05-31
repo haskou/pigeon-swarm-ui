@@ -68,6 +68,8 @@ export function StickerShortcutBar({
               <img
                 src={stickerAssetUrl(shortcut.sticker.assetCid)}
                 alt=""
+                decoding="async"
+                loading="lazy"
                 className="h-full w-full object-contain p-1"
               />
             ) : (
@@ -200,6 +202,8 @@ function StickerGridButton({
         <img
           src={stickerAssetUrl(sticker.assetCid)}
           alt="Sticker"
+          decoding="async"
+          loading="lazy"
           className="max-h-full max-w-full object-contain"
           draggable={false}
         />

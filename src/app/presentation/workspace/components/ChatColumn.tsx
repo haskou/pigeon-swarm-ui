@@ -1,7 +1,7 @@
 import type { FormEvent, MouseEvent } from 'react';
 
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
@@ -28,8 +28,6 @@ import {
   type IdentityPictures,
 } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { Composer } from '../../../../modules/messages/presentation/components/Composer';
-import { CreatePollDialog } from '../../../../modules/polls/presentation/components/CreatePollDialog';
-import { StickerPackPreviewDialog } from '../../../../modules/stickers/presentation/components/StickerPackPreviewDialog';
 import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
 import { memberPrimaryName } from '../../../../modules/communities/presentation/components/communityMemberNames';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
@@ -37,16 +35,53 @@ import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../../modules/identities/presentation/view-models/profilePopoverAnchor';
-import { UserProfileDialog } from '../../../../modules/identities/presentation/components/UserProfileDialog';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatConversationHeader } from './ChatConversationHeader';
 import { ChatMessageTimeline } from './ChatMessageTimeline';
 import { ChatTypingIndicator } from './ChatTypingIndicator';
-import { ConversationDataDialog } from './ConversationDataDialog';
 import { ConversationActionsMenu } from './ConversationActionsMenu';
-import { ConversationKeyDialog } from './ConversationKeyDialog';
-import { GroupProfileDialog } from './GroupProfileDialog';
-import { GroupInvitationDialog } from './GroupInvitationDialog';
+
+const ConversationDataDialog = lazy(() =>
+  import('./ConversationDataDialog').then((module) => ({
+    default: module.ConversationDataDialog,
+  })),
+);
+const ConversationKeyDialog = lazy(() =>
+  import('./ConversationKeyDialog').then((module) => ({
+    default: module.ConversationKeyDialog,
+  })),
+);
+const CreatePollDialog = lazy(() =>
+  import('../../../../modules/polls/presentation/components/CreatePollDialog').then(
+    (module) => ({
+      default: module.CreatePollDialog,
+    }),
+  ),
+);
+const GroupInvitationDialog = lazy(() =>
+  import('./GroupInvitationDialog').then((module) => ({
+    default: module.GroupInvitationDialog,
+  })),
+);
+const GroupProfileDialog = lazy(() =>
+  import('./GroupProfileDialog').then((module) => ({
+    default: module.GroupProfileDialog,
+  })),
+);
+const StickerPackPreviewDialog = lazy(() =>
+  import('../../../../modules/stickers/presentation/components/StickerPackPreviewDialog').then(
+    (module) => ({
+      default: module.StickerPackPreviewDialog,
+    }),
+  ),
+);
+const UserProfileDialog = lazy(() =>
+  import('../../../../modules/identities/presentation/components/UserProfileDialog').then(
+    (module) => ({
+      default: module.UserProfileDialog,
+    }),
+  ),
+);
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -708,94 +743,108 @@ export function ChatColumn({
             session={session}
           />
           {stickerPackPreview && (
-            <StickerPackPreviewDialog
-              onClose={() => setStickerPackPreview(null)}
-              onStickerSend={onStickerSend}
-              session={session}
-              sticker={stickerPackPreview}
-            />
+            <Suspense fallback={null}>
+              <StickerPackPreviewDialog
+                onClose={() => setStickerPackPreview(null)}
+                onStickerSend={onStickerSend}
+                session={session}
+                sticker={stickerPackPreview}
+              />
+            </Suspense>
           )}
           {pollDialogOpen && (
-            <CreatePollDialog
-              onClose={() => setPollDialogOpen(false)}
-              onSubmit={handleCreatePoll}
-            />
+            <Suspense fallback={null}>
+              <CreatePollDialog
+                onClose={() => setPollDialogOpen(false)}
+                onSubmit={handleCreatePoll}
+              />
+            </Suspense>
           )}
         </>
       )}
       {conversationDataOpen && (
-        <ConversationDataDialog
-          data={conversationData}
-          onClose={() => setConversationDataOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <ConversationDataDialog
+            data={conversationData}
+            onClose={() => setConversationDataOpen(false)}
+          />
+        </Suspense>
       )}
       {groupInviteOpen && activeConversation && (
-        <GroupInvitationDialog
-          autoFocus={canAutoFocusInput}
-          error={groupInviteError}
-          input={groupInviteInput}
-          loading={groupInviteLoading}
-          onClose={() => setGroupInviteOpen(false)}
-          onInputChange={setGroupInviteInput}
-          onSubmit={(event) => void sendGroupInvitation(event)}
-        />
+        <Suspense fallback={null}>
+          <GroupInvitationDialog
+            autoFocus={canAutoFocusInput}
+            error={groupInviteError}
+            input={groupInviteInput}
+            loading={groupInviteLoading}
+            onClose={() => setGroupInviteOpen(false)}
+            onInputChange={setGroupInviteInput}
+            onSubmit={(event) => void sendGroupInvitation(event)}
+          />
+        </Suspense>
       )}
       {conversationKeyDialog && (
-        <ConversationKeyDialog
-          encryptedConversationKey={encryptedConversationKey}
-          error={conversationKeyError}
-          input={conversationKeyInput}
-          mode={conversationKeyDialog}
-          onClose={closeConversationKeyDialog}
-          onCopy={() =>
-            void navigator.clipboard.writeText(encryptedConversationKey)
-          }
-          onImport={() => void importConversationKey()}
-          onInputChange={setConversationKeyInput}
-          saving={conversationKeySaving}
-        />
+        <Suspense fallback={null}>
+          <ConversationKeyDialog
+            encryptedConversationKey={encryptedConversationKey}
+            error={conversationKeyError}
+            input={conversationKeyInput}
+            mode={conversationKeyDialog}
+            onClose={closeConversationKeyDialog}
+            onCopy={() =>
+              void navigator.clipboard.writeText(encryptedConversationKey)
+            }
+            onImport={() => void importConversationKey()}
+            onInputChange={setConversationKeyInput}
+            saving={conversationKeySaving}
+          />
+        </Suspense>
       )}
       {profileViewer && (
-        <UserProfileDialog
-          anchor={profileViewer.anchor}
-          identity={profileViewer.identity}
-          identityId={profileViewer.identityId}
-          name={profileViewer.name}
-          nodeNetworks={nodeNetworks}
-          onClose={() => setProfileViewer(null)}
-          presence={presenceByIdentityId[profileViewer.identityId]}
-          onOpenConversation={
-            profileViewer.identityId === session.identity.id ||
-            !onOpenConversationWithIdentity
-              ? undefined
-              : () =>
-                  onOpenConversationWithIdentity(
-                    profileViewer.identityId,
-                    profileViewer.identity,
-                  )
-          }
-          picture={profileViewer.picture}
-        />
+        <Suspense fallback={null}>
+          <UserProfileDialog
+            anchor={profileViewer.anchor}
+            identity={profileViewer.identity}
+            identityId={profileViewer.identityId}
+            name={profileViewer.name}
+            nodeNetworks={nodeNetworks}
+            onClose={() => setProfileViewer(null)}
+            presence={presenceByIdentityId[profileViewer.identityId]}
+            onOpenConversation={
+              profileViewer.identityId === session.identity.id ||
+              !onOpenConversationWithIdentity
+                ? undefined
+                : () =>
+                    onOpenConversationWithIdentity(
+                      profileViewer.identityId,
+                      profileViewer.identity,
+                    )
+            }
+            picture={profileViewer.picture}
+          />
+        </Suspense>
       )}
       {groupProfileOpen && activeConversation && (
-        <GroupProfileDialog
-          conversation={activeConversation}
-          networkId={conversationNetworkId}
-          nodeNetworks={nodeNetworks}
-          onClose={() => setGroupProfileOpen(false)}
-          onIdentityClick={(participant, event) => {
-            setGroupProfileOpen(false);
-            setProfileViewer({
-              anchor: profileAnchorFromTarget(event.currentTarget),
-              identity: participant.identity,
-              identityId: participant.identityId,
-              name: participant.name,
-              picture: participant.picture,
-            });
-          }}
-          participants={groupParticipants}
-          presenceByIdentityId={presenceByIdentityId}
-        />
+        <Suspense fallback={null}>
+          <GroupProfileDialog
+            conversation={activeConversation}
+            networkId={conversationNetworkId}
+            nodeNetworks={nodeNetworks}
+            onClose={() => setGroupProfileOpen(false)}
+            onIdentityClick={(participant, event) => {
+              setGroupProfileOpen(false);
+              setProfileViewer({
+                anchor: profileAnchorFromTarget(event.currentTarget),
+                identity: participant.identity,
+                identityId: participant.identityId,
+                name: participant.name,
+                picture: participant.picture,
+              });
+            }}
+            participants={groupParticipants}
+            presenceByIdentityId={presenceByIdentityId}
+          />
+        </Suspense>
       )}
     </section>
   );
