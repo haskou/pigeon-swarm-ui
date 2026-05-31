@@ -115,8 +115,18 @@ export function ManageCommunityChannelsPanel({
             state={state}
           />
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/8 p-4 text-sm font-semibold text-white/45">
-            {copy.communities.noChannels}
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/8 p-4 text-sm font-semibold text-white/45">
+            <span>{copy.communities.noChannels}</span>
+            {canSave && (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={state === 'loading'}
+                className="justify-self-start rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {saveLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
