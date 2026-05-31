@@ -4,6 +4,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import {
   currentPwaNotificationPermission,
   ensurePwaPushSubscription,
+  showPwaNotification,
 } from './pwaNotifications';
 
 jest.mock('../../../../app/composition/applicationContainer', () => ({
@@ -56,11 +57,13 @@ function installPushBrowser(input: {
     json: PushSubscriptionJSON;
   };
   permission: NotificationPermission;
+  pushManager?: boolean;
   requestedPermission?: NotificationPermission;
 }): {
   existingUnsubscribe: jest.Mock<Promise<boolean>, []>;
   getSubscription: jest.Mock<Promise<PushSubscription | null>, []>;
   requestPermission: jest.Mock<Promise<NotificationPermission>, []>;
+  showNotification: jest.Mock<Promise<void>, [string, NotificationOptions?]>;
   subscribe: jest.Mock<Promise<PushSubscription>, []>;
   subscriptionJson: PushSubscriptionJSON;
 } {
@@ -84,6 +87,10 @@ function installPushBrowser(input: {
       toJSON: () => subscriptionJson,
     } as unknown as PushSubscription),
   );
+  const showNotification = jest.fn<
+    Promise<void>,
+    [string, NotificationOptions?]
+  >(() => Promise.resolve());
   const existingUnsubscribe = jest.fn(() => Promise.resolve(true));
   const existingSubscription = input.existingSubscription
     ? ({
@@ -115,26 +122,50 @@ function installPushBrowser(input: {
     value: {
       serviceWorker: {
         ready: Promise.resolve({
-          pushManager: {
-            getSubscription,
-            subscribe,
-          },
+          ...(input.pushManager === false
+            ? {}
+            : {
+                pushManager: {
+                  getSubscription,
+                  subscribe,
+                },
+              }),
+          showNotification,
         }),
       },
     },
   });
-  Object.defineProperty(globalThis, 'PushManager', {
-    configurable: true,
-    value: class PushManager {},
-  });
+
+  if (input.pushManager !== false) {
+    Object.defineProperty(globalThis, 'PushManager', {
+      configurable: true,
+      value: class PushManager {},
+    });
+  } else {
+    Reflect.deleteProperty(globalThis, 'PushManager');
+  }
 
   return {
     existingUnsubscribe,
     getSubscription,
     requestPermission,
+    showNotification,
     subscribe,
     subscriptionJson,
   };
+}
+
+function installDocumentVisibility(input: {
+  focused?: boolean;
+  visibilityState: DocumentVisibilityState;
+}): void {
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      hasFocus: () => input.focused ?? true,
+      visibilityState: input.visibilityState,
+    },
+  });
 }
 
 function mockCurrentVapidPublicKey(): void {
@@ -165,18 +196,25 @@ describe(ensurePwaPushSubscription.name, () => {
     globalThis,
     'PushManager',
   );
+  const originalDocument = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'document',
+  );
 
   afterEach(() => {
     jest.clearAllMocks();
     restoreGlobalProperty('navigator', originalNavigator);
     restoreGlobalProperty('Notification', originalNotification);
     restoreGlobalProperty('PushManager', originalPushManager);
+    restoreGlobalProperty('document', originalDocument);
   });
 
   it('does not request browser permission from automatic subscription checks', async () => {
     const { requestPermission } = installPushBrowser({ permission: 'default' });
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'permission_denied',
+    );
 
     expect(requestPermission).not.toHaveBeenCalled();
     expect(
@@ -203,7 +241,9 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     });
 
-    await ensurePwaPushSubscription(session(), { requestPermission: true });
+    await expect(
+      ensurePwaPushSubscription(session(), { requestPermission: true }),
+    ).resolves.toBe('granted');
 
     expect(calls).toEqual(['permission', 'vapid']);
     expect(
@@ -217,7 +257,9 @@ describe(ensurePwaPushSubscription.name, () => {
       requestedPermission: 'denied',
     });
 
-    await ensurePwaPushSubscription(session(), { requestPermission: true });
+    await expect(
+      ensurePwaPushSubscription(session(), { requestPermission: true }),
+    ).resolves.toBe('permission_denied');
 
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(
@@ -228,12 +270,15 @@ describe(ensurePwaPushSubscription.name, () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('reports the current permission only when push subscriptions are supported', () => {
+  it('reports the current permission only when service workers and notifications are supported', () => {
     installPushBrowser({ permission: 'default' });
 
     expect(currentPwaNotificationPermission()).toBe('default');
 
-    Reflect.deleteProperty(globalThis, 'PushManager');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {},
+    });
 
     expect(currentPwaNotificationPermission()).toBe('unsupported');
   });
@@ -257,7 +302,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -285,7 +330,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -320,7 +365,7 @@ describe(ensurePwaPushSubscription.name, () => {
       });
     mockCurrentVapidPublicKey();
 
-    await ensurePwaPushSubscription(session());
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
     expect(
       mockedApplicationContainer.deletePushSubscription,
@@ -333,5 +378,92 @@ describe(ensurePwaPushSubscription.name, () => {
     expect(
       mockedApplicationContainer.registerPushSubscription,
     ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('does not show a local notification while the page is visible and focused', async () => {
+    const { showNotification } = installPushBrowser({ permission: 'granted' });
+
+    installDocumentVisibility({
+      focused: true,
+      visibilityState: 'visible',
+    });
+
+    await showPwaNotification({
+      body: 'Notification body',
+      tag: 'notification-tag',
+      title: 'Notification title',
+    });
+
+    expect(showNotification).not.toHaveBeenCalled();
+  });
+
+  it('shows a local notification when the page is visible but not focused', async () => {
+    const { showNotification } = installPushBrowser({ permission: 'granted' });
+
+    installDocumentVisibility({
+      focused: false,
+      visibilityState: 'visible',
+    });
+
+    await showPwaNotification({
+      body: 'Notification body',
+      tag: 'notification-tag',
+      title: 'Notification title',
+      url: '/messages',
+    });
+
+    expect(showNotification).toHaveBeenCalledWith(
+      'Notification title',
+      expect.objectContaining({
+        body: 'Notification body',
+        data: { url: '/messages' },
+        tag: 'notification-tag',
+      }),
+    );
+  });
+
+  it('reports server_disabled when VAPID settings are disabled', async () => {
+    installPushBrowser({ permission: 'granted' });
+    mockedApplicationContainer.getPushVapidPublicKey.mockResolvedValue({
+      enabled: false,
+    });
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'server_disabled',
+    );
+
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not require a global PushManager when the registration exposes pushManager', async () => {
+    const { subscriptionJson } = installPushBrowser({
+      permission: 'granted',
+      pushManager: true,
+    });
+
+    Reflect.deleteProperty(globalThis, 'PushManager');
+    mockCurrentVapidPublicKey();
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledWith(session(), subscriptionJson);
+  });
+
+  it('reports unsupported when the service worker registration has no pushManager', async () => {
+    installPushBrowser({
+      permission: 'granted',
+      pushManager: false,
+    });
+    mockCurrentVapidPublicKey();
+
+    await expect(ensurePwaPushSubscription(session())).resolves.toBe(
+      'unsupported',
+    );
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).not.toHaveBeenCalled();
   });
 });

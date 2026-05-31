@@ -129,28 +129,16 @@ self.addEventListener('push', (event) => {
 });
 
 async function showPushNotification(payload) {
-  if (await hasVisibleWindowClient()) return;
-
   await self.registration.showNotification(payload.title, {
     badge: payload.badge || notificationBadge,
     body: payload.body,
     data: {
+      ...payload.data,
       url: payload.url || '/',
     },
     icon: payload.icon || '/favicon/android-chrome-192x192.png',
     tag: payload.tag,
   });
-}
-
-async function hasVisibleWindowClient() {
-  const windowClients = await self.clients.matchAll({
-    includeUncontrolled: true,
-    type: 'window',
-  });
-
-  return windowClients.some(
-    (client) => client.focused || client.visibilityState === 'visible',
-  );
 }
 
 function pushPayload(data) {
@@ -170,6 +158,7 @@ function pushPayload(data) {
     return {
       badge: typeof payload.badge === 'string' ? payload.badge : undefined,
       body: typeof payload.body === 'string' ? payload.body : '',
+      data: payloadData(payload.data),
       icon: typeof payload.icon === 'string' ? payload.icon : undefined,
       tag: typeof payload.tag === 'string' ? payload.tag : undefined,
       title: typeof payload.title === 'string' ? payload.title : 'Pigeon Swarm',
@@ -182,4 +171,10 @@ function pushPayload(data) {
       url: '/',
     };
   }
+}
+
+function payloadData(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  return value;
 }

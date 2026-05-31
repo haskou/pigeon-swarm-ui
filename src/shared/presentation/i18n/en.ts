@@ -721,7 +721,11 @@ export const en = {
     enablePushDismiss: 'Dismiss notification prompt',
     enablePushError: 'Notifications could not be enabled.',
     enablePushLoading: 'Enabling notifications...',
+    enablePushServerDisabled:
+      'Push notifications are not enabled on this server yet.',
     enablePushTitle: 'Messages and calls',
+    enablePushUnsupported:
+      'This browser cannot register push notifications for this app.',
     error: 'Notifications could not be loaded.',
     groupInvitationTitle: 'Group invitation',
     invitationTitle: 'Conversation invitation',
