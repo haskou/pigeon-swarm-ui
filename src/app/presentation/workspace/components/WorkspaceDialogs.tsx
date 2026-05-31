@@ -141,7 +141,11 @@ interface WorkspaceDialogsProps {
   onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
+  onOpenMessageThread: (message: ChatMessage) => void;
+  onPinMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
+  onUnpinMessage: (message: ChatMessage) => void;
+  pinnedMessageIds: ReadonlySet<string>;
   onToggleReaction: (
     message: ChatMessage,
     emoji: string,
@@ -229,6 +233,10 @@ function MessageActionDialogs(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
   const contextMenuMessage = props.messageContextMenu?.message;
+  const contextMenuFromThread = props.messageContextMenu?.source === 'thread';
+  const contextMenuMessagePinned = contextMenuMessage
+    ? isPinnedMessage(contextMenuMessage, props.pinnedMessageIds)
+    : false;
 
   if (!props.messageContextMenu) {
     return props.rawMessage ? (
@@ -260,6 +268,7 @@ function MessageActionDialogs(
         }
         onEdit={
           contextMenuMessage &&
+          !contextMenuFromThread &&
           MessageEditPolicy.canEdit(
             contextMenuMessage,
             props.session.identity.id,
@@ -267,9 +276,35 @@ function MessageActionDialogs(
             ? () => props.onEditMessage(contextMenuMessage)
             : undefined
         }
-        onReply={() => {
-          if (contextMenuMessage) props.onReplyToMessage(contextMenuMessage);
-        }}
+        onOpenThread={
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread
+            ? () => props.onOpenMessageThread(contextMenuMessage)
+            : undefined
+        }
+        onPin={
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread &&
+          !contextMenuMessagePinned
+            ? () => props.onPinMessage(contextMenuMessage)
+            : undefined
+        }
+        onReply={
+          contextMenuMessage && contextMenuMessage.kind !== 'poll'
+            ? () => props.onReplyToMessage(contextMenuMessage)
+            : undefined
+        }
+        onUnpin={
+          contextMenuMessage &&
+          contextMenuMessage.kind !== 'poll' &&
+          !contextMenuFromThread &&
+          contextMenuMessagePinned
+            ? () => props.onUnpinMessage(contextMenuMessage)
+            : undefined
+        }
+        pinned={contextMenuMessagePinned}
         onReactionToggle={props.onToggleReaction}
         onViewRaw={() => {
           if (contextMenuMessage) props.onViewRawMessage(contextMenuMessage);
@@ -285,6 +320,13 @@ function MessageActionDialogs(
       )}
     </>
   );
+}
+
+function isPinnedMessage(
+  message: ChatMessage,
+  pinnedMessageIds: ReadonlySet<string>,
+): boolean {
+  return pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId);
 }
 
 function CreateDialogs(

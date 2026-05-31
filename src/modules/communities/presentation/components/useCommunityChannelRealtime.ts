@@ -33,6 +33,9 @@ type UseCommunityChannelRealtimeInput = {
   isScrolledNearBottom: () => boolean;
   loadChannelMessages: LoadCommunityChannelMessages;
   onChannelViewed?: (channelId: string) => void;
+  onMessageDeleted?: (messageId: string) => void;
+  onMessageEdited?: (message: ChatMessage) => void;
+  onThreadMessageReceived?: (message: ChatMessage) => void;
   projectChannelMessage: ProjectCommunityChannelMessage;
   realtimeEvent?: null | RealtimeDomainEvent;
   resetNewChannelMessageCount: () => void;
@@ -55,6 +58,9 @@ export function useCommunityChannelRealtime({
   isScrolledNearBottom,
   loadChannelMessages,
   onChannelViewed,
+  onMessageDeleted,
+  onMessageEdited,
+  onThreadMessageReceived,
   projectChannelMessage,
   realtimeEvent,
   resetNewChannelMessageCount,
@@ -108,6 +114,7 @@ export function useCommunityChannelRealtime({
       setMessages((current) =>
         current.filter((message) => message.id !== targetMessageId),
       );
+      onMessageDeleted?.(targetMessageId);
 
       return;
     }
@@ -153,7 +160,12 @@ export function useCommunityChannelRealtime({
       if (message) {
         void projectChannelMessage(channelId, message)
           .then((projected) => {
-            setMessages((current) => mergeChatMessages(current, [projected]));
+            onMessageEdited?.(projected);
+            setMessages((current) =>
+              current.some((item) => item.id === projected.id)
+                ? mergeChatMessages(current, [projected])
+                : current,
+            );
           })
           .catch(() => undefined);
 
@@ -168,6 +180,7 @@ export function useCommunityChannelRealtime({
           if (cancelled) return;
 
           setMessages((current) => mergeChatMessages(current, loadedMessages));
+          loadedMessages.forEach((message) => onMessageEdited?.(message));
         })
         .catch(() => undefined);
 
@@ -220,6 +233,12 @@ export function useCommunityChannelRealtime({
       .then((projected) => {
         if (cancelled) return;
 
+        if (projected.replyToMessageId) {
+          onThreadMessageReceived?.(projected);
+
+          return;
+        }
+
         setMessages((current) => {
           if (current.some((item) => item.id === projected.id)) return current;
 
@@ -246,6 +265,9 @@ export function useCommunityChannelRealtime({
     incrementNewChannelMessageCount,
     isScrolledNearBottom,
     onChannelViewed,
+    onMessageDeleted,
+    onMessageEdited,
+    onThreadMessageReceived,
     projectChannelMessage,
     realtimeEvent,
     resetNewChannelMessageCount,

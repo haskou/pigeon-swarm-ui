@@ -11,6 +11,8 @@ import type { LightboxImage } from './imageLightbox';
 import { MessageAttachmentPreview } from './MessageAttachmentPreview';
 import { visibleImageAlbumItems } from './visibleImageAlbumItems';
 
+const previewViewportMargin = 360;
+
 export type IndexedAttachment = {
   attachment: MessageAttachment;
   index: number;
@@ -55,6 +57,12 @@ export function ImageAttachmentAlbum({
 
     if (!album || shouldLoadPreviews) return undefined;
 
+    if (isNearPreviewViewport(album)) {
+      setShouldLoadPreviews(true);
+
+      return undefined;
+    }
+
     if (!('IntersectionObserver' in window)) {
       setShouldLoadPreviews(true);
 
@@ -68,7 +76,7 @@ export function ImageAttachmentAlbum({
         setShouldLoadPreviews(true);
         observer.disconnect();
       },
-      { rootMargin: '360px 0px' },
+      { rootMargin: `${previewViewportMargin}px 0px` },
     );
 
     observer.observe(album);
@@ -220,6 +228,12 @@ export function AttachmentCard({
 
     if (!card || shouldLoadPreview || !hasPreview) return undefined;
 
+    if (isNearPreviewViewport(card)) {
+      setShouldLoadPreview(true);
+
+      return undefined;
+    }
+
     if (!('IntersectionObserver' in window)) {
       setShouldLoadPreview(true);
 
@@ -233,7 +247,7 @@ export function AttachmentCard({
         setShouldLoadPreview(true);
         observer.disconnect();
       },
-      { rootMargin: '360px 0px' },
+      { rootMargin: `${previewViewportMargin}px 0px` },
     );
 
     observer.observe(card);
@@ -415,4 +429,15 @@ function formatFileSize(bytes: number): string {
   if (kilobytes < 1024) return `${kilobytes.toFixed(1)} KB`;
 
   return `${(kilobytes / 1024).toFixed(1)} MB`;
+}
+
+function isNearPreviewViewport(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+
+  return (
+    rect.bottom >= -previewViewportMargin &&
+    rect.top <= window.innerHeight + previewViewportMargin &&
+    rect.right >= -previewViewportMargin &&
+    rect.left <= window.innerWidth + previewViewportMargin
+  );
 }

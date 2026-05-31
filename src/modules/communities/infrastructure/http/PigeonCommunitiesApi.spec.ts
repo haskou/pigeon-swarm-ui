@@ -1,6 +1,7 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
 import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
@@ -225,6 +226,83 @@ describe(PigeonCommunitiesApi.name, () => {
         id: 'message-1',
         mentions: [],
         plaintextPayload: '{"content":"hello"}',
+        type: 'sent',
+      }),
+      'secret',
+    );
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/communities/community-1/channels/channel-1/messages',
+      body,
+    );
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/community-1/channels/channel-1/messages',
+      {
+        body: JSON.stringify(body),
+        headers: { 'X-Identity-Id': 'identity-1' },
+        method: 'POST',
+      },
+    );
+  });
+
+  it('includes reply targets in community channel message bodies and signatures', async () => {
+    const created = {
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      id: 'message-1',
+      replyToMessageId: 'root-message',
+      type: 'sent',
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(created),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const sign = jest.fn().mockResolvedValue({
+      toString: () => 'domain-signature',
+    });
+    const session = {
+      encryptedKeyPair: { sign },
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+    const body = {
+      attachmentExternalIdentifiers: [],
+      createdAt: 1779315464545,
+      encryptedPayload: 'encrypted-payload',
+      id: 'message-1',
+      mentions: [],
+      replyToMessageId: 'root-message',
+      signature: 'domain-signature',
+    };
+
+    await expect(
+      api.createChannelMessage(session, 'community-1', 'channel-1', {
+        encryptedPayload: 'encrypted-payload',
+        id: 'message-1',
+        replyToMessageId: 'root-message',
+        timestamp: 1779315464545,
+      }),
+    ).resolves.toBe(created);
+
+    expect(sign).toHaveBeenCalledWith(
+      JSON.stringify({
+        attachmentExternalIdentifiers: [],
+        authorIdentityId: 'identity-1',
+        channelId: 'channel-1',
+        communityId: 'community-1',
+        createdAt: 1779315464545,
+        encryptedPayload: 'encrypted-payload',
+        id: 'message-1',
+        mentions: [],
+        replyToMessageId: 'root-message',
         type: 'sent',
       }),
       'secret',
@@ -478,6 +556,154 @@ describe(PigeonCommunitiesApi.name, () => {
       {
         headers: { 'X-Identity-Id': 'identity-1' },
         method: 'GET',
+      },
+    );
+  });
+
+  it('loads community channel message threads without signing query parameters', async () => {
+    const response = {
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      messages: [{ id: 'reply-1', replyToMessageId: 'message-1' }],
+      nextBeforeMessageId: 'reply-1',
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+
+    await expect(
+      api.listChannelMessageThread(
+        session,
+        'community-1',
+        'channel-1',
+        'message-1',
+      ),
+    ).resolves.toEqual({
+      messages: response.messages,
+      nextBeforeMessageId: 'reply-1',
+    });
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/communities/community-1/channels/channel-1/messages/message-1/thread',
+    );
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/community-1/channels/channel-1/messages/message-1/thread?limit=50',
+      {
+        headers: { 'X-Identity-Id': 'identity-1' },
+        method: 'GET',
+      },
+    );
+  });
+
+  it('pins and unpins community channel messages without request bodies', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+    const path =
+      '/communities/community-1/channels/channel-1/messages/message-1/pin';
+
+    await api.pinChannelMessage(
+      session,
+      'community-1',
+      'channel-1',
+      'message-1',
+    );
+    await api.unpinChannelMessage(
+      session,
+      'community-1',
+      'channel-1',
+      'message-1',
+    );
+
+    expect(signer.headers).toHaveBeenNthCalledWith(1, session, 'POST', path);
+    expect(signer.headers).toHaveBeenNthCalledWith(2, session, 'DELETE', path);
+    expect(http.request).toHaveBeenNthCalledWith(1, path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'POST',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(2, path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'DELETE',
+    });
+  });
+
+  it('stores community channel drafts as encrypted local payloads', async () => {
+    const response = {
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      encryptedPayload: 'encrypted-draft',
+      updatedAt: 1770000000000,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const draftPayloads = {
+      encrypt: jest.fn().mockReturnValue('encrypted-draft'),
+    } as unknown as DraftPayloadCipher;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+      draftPayloads,
+    );
+    const body = {
+      encryptedPayload: 'encrypted-draft',
+      updatedAt: 1770000000000,
+    };
+
+    await expect(
+      api.saveChannelDraft(
+        session,
+        'community-1',
+        'channel-1',
+        'hello',
+        1770000000000,
+      ),
+    ).resolves.toEqual({ ...response, content: 'hello' });
+
+    expect(draftPayloads.encrypt).toHaveBeenCalledWith(session, 'hello');
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'PUT',
+      '/communities/community-1/channels/channel-1/draft',
+      body,
+    );
+    expect(http.request).toHaveBeenCalledWith(
+      '/communities/community-1/channels/channel-1/draft',
+      {
+        body: JSON.stringify(body),
+        headers: { 'X-Identity-Id': 'identity-1' },
+        method: 'PUT',
       },
     );
   });

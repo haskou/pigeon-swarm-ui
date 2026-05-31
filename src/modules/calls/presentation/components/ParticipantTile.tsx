@@ -71,7 +71,7 @@ export function ParticipantTile({
       className={cx(
         'flex shrink-0 flex-col items-center rounded-[1.5rem] border bg-black/25 text-center transition',
         variant === 'strip'
-          ? 'min-h-[222px] w-[230px] p-3'
+          ? 'min-h-[150px] w-[154px] p-2 sm:min-h-[222px] sm:w-[230px] sm:p-3'
           : 'min-h-[340px] w-full max-w-[300px] justify-center px-3 py-5 sm:min-h-[360px] sm:max-w-[340px] sm:py-6',
         participant.speaking
           ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
@@ -86,11 +86,11 @@ export function ParticipantTile({
         preferScreenPreview={variant === 'grid'}
         variant={variant}
       />
-      <div className="mt-2 w-full shrink-0">
-        <h3 className="max-w-full truncate text-base font-black text-white">
+      <div className="mt-1.5 w-full shrink-0 sm:mt-2">
+        <h3 className="max-w-full truncate text-sm font-black text-white sm:text-base">
           {participantName}
         </h3>
-        <p className="mt-0.5 max-w-full truncate text-xs text-white/45">
+        <p className="mt-0.5 max-w-full truncate text-[0.65rem] text-white/45 sm:text-xs">
           {participantSubtitle}
         </p>
       </div>
@@ -103,6 +103,7 @@ export function ParticipantTile({
         onToggleMute={toggleParticipantMute}
         onVoiceVolumeChange={updateVolume}
         screenShareVolumePercent={screenShareVolumePercent}
+        showScreenShareVolume={variant !== 'strip'}
         variant={variant}
         voiceVolumePercent={volumePercent}
       />

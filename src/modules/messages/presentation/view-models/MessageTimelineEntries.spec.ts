@@ -1,109 +1,119 @@
-import type {
-  ChatMessage,
-  PollResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
 import { MessageTimelineEntries } from './MessageTimelineEntries';
 
-const timestamp = Date.UTC(2026, 4, 22, 10, 0, 0);
-
-const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
-  attachments: [],
-  authorIdentityId: 'identity-a',
-  content: 'hello',
-  encrypted: false,
-  id: 'message-a',
-  mine: false,
-  raw: { id: 'message-a', type: 'sent' },
-  reactions: [],
-  timestamp,
-  ...overrides,
-});
-
-const poll = (overrides: Partial<PollResource> = {}): PollResource => ({
-  allowsMultipleVotes: false,
-  createdAt: timestamp + 2000,
-  creatorIdentityId: 'identity-a',
-  id: 'poll-a',
-  options: [{ id: 'option-a', text: 'Yes' }],
-  question: 'Poll?',
-  scope: {
-    conversationId: 'conversation-a',
-    networkId: 'network-a',
-    type: 'group_conversation',
-  },
-  status: 'open',
-  votes: [],
-  ...overrides,
-});
-
 describe(MessageTimelineEntries.name, () => {
-  it('builds author run metadata in one pass while ignoring poll gaps', () => {
-    const entries = MessageTimelineEntries.build(
-      [
-        message({ id: 'message-a', timestamp, authorIdentityId: 'identity-a' }),
-        message({
-          id: 'message-b',
-          timestamp: timestamp + 1000,
-          authorIdentityId: 'identity-a',
-        }),
-        message({
-          id: 'message-c',
-          timestamp: timestamp + 3000,
-          authorIdentityId: 'identity-b',
-        }),
-      ],
-      [poll({ createdAt: timestamp + 2000 })],
-    );
+  it('keeps visible replies in the root timeline', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const editedReply = chatMessage({
+      content: 'Edited reply',
+      id: 'thread-reply',
+      rawReplyToMessageId: root.id,
+      timestamp: 2,
+    });
 
-    expect(entries.map((entry) => entry.id)).toEqual([
-      'message:message-a',
-      'message:message-b',
-      'poll:poll-a',
-      'message:message-c',
-    ]);
+    const entries = MessageTimelineEntries.build([root, editedReply], []);
+
+    expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({
-      endsAuthorRun: false,
-      startsNewAuthorRun: true,
+      id: `message:${root.id}`,
+      threadSummary: undefined,
       type: 'message',
     });
     expect(entries[1]).toMatchObject({
-      endsAuthorRun: true,
-      startsNewAuthorRun: false,
-      type: 'message',
-    });
-    expect(entries[3]).toMatchObject({
-      endsAuthorRun: true,
-      startsNewAuthorRun: true,
+      id: `message:${editedReply.id}`,
+      replyMessage: root,
+      threadSummary: undefined,
       type: 'message',
     });
   });
 
-  it('links reply targets and starts new day after poll separators', () => {
-    const nextDay = Date.UTC(2026, 4, 23, 8, 0, 0);
-    const entries = MessageTimelineEntries.build(
-      [
-        message({ id: 'message-a', timestamp }),
-        message({
-          id: 'message-b',
-          replyToMessageId: 'message-a',
-          timestamp: nextDay + 1000,
-        }),
-      ],
-      [poll({ createdAt: nextDay })],
-    );
-    const replyEntry = entries[2];
-
-    expect(entries[1]).toMatchObject({
-      startsNewDay: true,
-      type: 'poll',
+  it('keeps replies visible when no thread summary exists for their root', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
     });
-    expect(replyEntry).toMatchObject({
-      startsNewDay: false,
+    const normalReply = chatMessage({
+      content: 'Normal reply',
+      id: 'normal-reply',
+      rawReplyToMessageId: root.id,
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build([root, normalReply], [], []);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      id: `message:${root.id}`,
+      threadSummary: undefined,
       type: 'message',
     });
-    expect(replyEntry.type === 'message' && replyEntry.replyMessage?.id).toBe(
-      'message-a',
-    );
+    expect(entries[1]).toMatchObject({
+      id: `message:${normalReply.id}`,
+      replyMessage: root,
+      threadSummary: undefined,
+      type: 'message',
+    });
+  });
+
+  it('hides replies that belong to explicit thread summaries', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const threadReply = chatMessage({
+      content: 'Thread reply',
+      id: 'thread-reply',
+      rawReplyToMessageId: root.id,
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build([root, threadReply], [], [
+      {
+        count: 1,
+        lastMessage: threadReply,
+        rootMessageId: root.id,
+      },
+    ]);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: `message:${root.id}`,
+      threadSummary: {
+        count: 1,
+        lastMessage: threadReply,
+        rootMessageId: root.id,
+      },
+      type: 'message',
+    });
   });
 });
+
+function chatMessage(input: {
+  content: string;
+  id: string;
+  rawReplyToMessageId?: string;
+  timestamp: number;
+}): ChatMessage {
+  return {
+    attachments: [],
+    authorIdentityId: 'identity-id',
+    content: input.content,
+    encrypted: false,
+    id: input.id,
+    mine: false,
+    raw: {
+      id: input.id,
+      replyToMessageId: input.rawReplyToMessageId,
+      type: 'sent',
+    },
+    reactions: [],
+    timestamp: input.timestamp,
+  };
+}

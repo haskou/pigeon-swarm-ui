@@ -14,11 +14,16 @@ import type {
   CommunityTextChannel,
   CommunityVisibility,
   CommunityVoiceChannel,
+  CommunityChannelDraft,
+  CommunityChannelDraftsResource,
+  CommunityChannelMessagePinsResource,
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+
+import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
 type CachedRequest = <T>(key: string, loader: () => Promise<T>) => Promise<T>;
 
@@ -36,6 +41,7 @@ type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
   attachmentExternalIdentifiers?: string[];
   id?: string;
   mentions?: CommunityMessageMention[];
+  replyToMessageId?: string;
   timestamp?: number;
 };
 
@@ -58,15 +64,21 @@ type CommunityChannelMessageRequestBody = {
   id?: string;
   mentions: CommunityMessageMention[];
   plaintextPayload?: string;
+  replyToMessageId?: string;
   signature: string;
 };
 
 export class PigeonCommunitiesApi {
+  private readonly draftPayloads: DraftPayloadCipher;
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly cachedRequest: CachedRequest,
-  ) {}
+    draftPayloads?: DraftPayloadCipher,
+  ) {
+    this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+  }
 
   public async list(session: Session): Promise<Community[]> {
     const path = '/communities/';
@@ -559,6 +571,7 @@ export class PigeonCommunitiesApi {
             id,
             mentions,
             plaintextPayload: input.plaintextPayload,
+            replyToMessageId: input.replyToMessageId,
           })
         : await this.createEncryptedChannelMessageBody(session, {
             attachmentExternalIdentifiers,
@@ -568,6 +581,7 @@ export class PigeonCommunitiesApi {
             encryptedPayload: input.encryptedPayload,
             id,
             mentions,
+            replyToMessageId: input.replyToMessageId,
           });
 
     return await this.http.request<MessageResource>(path, {
@@ -620,6 +634,148 @@ export class PigeonCommunitiesApi {
         ? nextBeforeMessageIdFromTimeline(messages, responseLimit)
         : responseNextBeforeMessageId(result, messages, responseLimit),
     };
+  }
+
+  public async listChannelMessageThread(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/thread`;
+    const query = new URLSearchParams({
+      limit: String(options.limit ?? 50),
+    });
+    const result = await this.http.request<{
+      messages?: MessageResource[];
+      nextBeforeMessageId?: null | string;
+    }>(`${path}?${query.toString()}`, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return {
+      messages: result.messages ?? [],
+      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
+    };
+  }
+
+  public async listChannelMessagePins(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CommunityChannelMessagePinsResource> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/pins`;
+
+    return await this.http.request<CommunityChannelMessagePinsResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+  }
+
+  public async pinChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/pin`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'POST', path),
+      method: 'POST',
+    });
+  }
+
+  public async unpinChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/pin`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
+  }
+
+  public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
+    const path = '/communities/me/drafts';
+    const result = await this.http.request<CommunityChannelDraftsResource>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
+    );
+
+    return await Promise.all(
+      result.drafts.map(async (draft) => ({
+        ...draft,
+        content: await this.draftPayloads.decrypt(
+          session,
+          draft.encryptedPayload,
+        ),
+      })),
+    );
+  }
+
+  public async saveChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<CommunityChannelDraft> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/draft`;
+    const encryptedPayload = this.draftPayloads.encrypt(session, content);
+    const body = { encryptedPayload, updatedAt };
+    const draft = await this.http.request<
+      Omit<CommunityChannelDraft, 'content'>
+    >(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+
+    return { ...draft, content };
+  }
+
+  public async deleteChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    const path = `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/draft`;
+
+    await this.http.request(path, {
+      headers: await this.signer.headers(session, 'DELETE', path),
+      method: 'DELETE',
+    });
   }
 
   public async searchChannelMessages(
@@ -806,6 +962,7 @@ export class PigeonCommunitiesApi {
       encryptedPayload: string;
       id: string;
       mentions: CommunityMessageMention[];
+      replyToMessageId?: string;
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
@@ -817,6 +974,9 @@ export class PigeonCommunitiesApi {
       encryptedPayload: input.encryptedPayload,
       id: input.id,
       mentions: input.mentions,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       type: 'sent',
     };
     const signature = await session.encryptedKeyPair.sign(
@@ -830,6 +990,9 @@ export class PigeonCommunitiesApi {
       encryptedPayload: input.encryptedPayload,
       id: input.id,
       mentions: input.mentions,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       signature: signature.toString(),
     };
   }
@@ -844,6 +1007,7 @@ export class PigeonCommunitiesApi {
       id: string;
       mentions: CommunityMessageMention[];
       plaintextPayload: string;
+      replyToMessageId?: string;
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
@@ -855,6 +1019,9 @@ export class PigeonCommunitiesApi {
       id: input.id,
       mentions: input.mentions,
       plaintextPayload: input.plaintextPayload,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       type: 'sent',
     };
     const signature = await session.encryptedKeyPair.sign(
@@ -868,6 +1035,9 @@ export class PigeonCommunitiesApi {
       id: input.id,
       mentions: input.mentions,
       plaintextPayload: input.plaintextPayload,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
       signature: signature.toString(),
     };
   }

@@ -52,6 +52,8 @@ import { ConversationPeer } from '../../../../modules/conversations/domain/Conve
 import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
 import { MessageReactions } from '../../../../modules/messages/domain/MessageReactions';
+import { MessageCollectionDialog } from '../../../../modules/messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../../modules/messages/presentation/components/MessageThreadPanel';
 import { SharedNetworkSelection } from '../../../../modules/networks/domain/SharedNetworkSelection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
@@ -63,6 +65,7 @@ import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
+import { identityDisplayName } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -132,6 +135,10 @@ import {
   loadCallNoiseCancellationEnabled,
 } from './workspacePersistence';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
+import {
+  communitiesWithCallVoicePresence,
+  communityVoiceChannelTopologyKey,
+} from './communityVoicePresence';
 
 const Inspector = lazy(() =>
   import('./Inspector').then((module) => ({
@@ -159,6 +166,17 @@ type PendingSend = {
   sticker?: StickerMessageReference;
 };
 type FailedSends = Record<string, PendingSend>;
+type MessageCollectionState = {
+  error: null | string;
+  messages: ChatMessage[];
+  state: 'loading' | 'ready';
+};
+type ConversationThreadState = MessageCollectionState & {
+  draft: string;
+  editingMessage: EditingMessage | null;
+  replyTarget: ChatMessage | null;
+  root: ChatMessage;
+};
 type EditingMessage = {
   message: ChatMessage;
   previousDraft: string;
@@ -166,6 +184,65 @@ type EditingMessage = {
 
 function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
+}
+
+function mergeConversationMessageIfTargetExists(
+  currentMessages: ChatMessage[],
+  incomingMessage: ChatMessage,
+): ChatMessage[] {
+  const targetMessageId = incomingMessage.raw.targetMessageId;
+
+  if (
+    incomingMessage.raw.type === 'edited' &&
+    targetMessageId &&
+    !currentMessages.some((message) => message.id === targetMessageId)
+  ) {
+    return currentMessages;
+  }
+
+  return MessageCollection.merge(currentMessages, [incomingMessage]);
+}
+
+function mergeConversationThreadMessage(
+  currentThread: ConversationThreadState,
+  incomingMessage: ChatMessage,
+): ConversationThreadState {
+  const rootMessages = mergeConversationMessageIfTargetExists(
+    [currentThread.root],
+    incomingMessage,
+  );
+
+  return {
+    ...currentThread,
+    messages: mergeConversationMessageIfTargetExists(
+      currentThread.messages,
+      incomingMessage,
+    ),
+    root:
+      rootMessages.find((message) => message.id === currentThread.root.id) ??
+      currentThread.root,
+  };
+}
+
+function removeConversationThreadMessage(
+  currentThread: ConversationThreadState,
+  messageId: string,
+): ConversationThreadState | null {
+  if (currentThread.root.id === messageId) return null;
+
+  const deletingEditedMessage =
+    currentThread.editingMessage?.message.id === messageId;
+  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
+
+  return {
+    ...currentThread,
+    draft: deletingEditedMessage
+      ? (currentThread.editingMessage?.previousDraft ?? '')
+      : currentThread.draft,
+    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
+    messages: currentThread.messages.filter((message) => message.id !== messageId),
+  };
 }
 
 function canActOnMembershipRequest(
@@ -225,6 +302,7 @@ export function GlassWorkspace({
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     setActiveCommunityId,
     setActiveConversationId,
     setCommunityChannelById,
@@ -232,7 +310,7 @@ export function GlassWorkspace({
     setDrafts,
     setWorkspaceMode,
     workspaceMode,
-  } = useWorkspacePreferenceState(conversations, session.identity.id);
+  } = useWorkspacePreferenceState(conversations, session);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageCursor, setMessageCursor] = useState<string | null>(null);
   const [messageState, setMessageState] = useState<LoadState>('idle');
@@ -256,12 +334,20 @@ export function GlassWorkspace({
   const typingSentRef = useRef(
     new Map<string, { active: boolean; sentAt: number }>(),
   );
+  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [messageCollection, setMessageCollection] =
+    useState<MessageCollectionState | null>(null);
+  const [conversationThread, setConversationThread] =
+    useState<ConversationThreadState | null>(null);
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
@@ -292,6 +378,10 @@ export function GlassWorkspace({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
     useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
+  const communityVoiceTopologyKey = useMemo(
+    () => communityVoiceChannelTopologyKey(communities),
+    [communities],
+  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -460,6 +550,36 @@ export function GlassWorkspace({
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
     : '';
+
+  useEffect(() => {
+    setConversationThread(null);
+  }, [activeConversation?.id]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setPinnedMessageIds(new Set());
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void applicationContainer
+      .listMessagePins(session, activeConversation.id)
+      .then((pins) => {
+        if (!cancelled) {
+          setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPinnedMessageIds(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation?.id, session]);
+
   const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
     activeCommunityId,
     communities,
@@ -472,9 +592,76 @@ export function GlassWorkspace({
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     identityId: session.identity.id,
+    session,
     workspaceMode,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listConversationDrafts(session)
+      .then((remoteDrafts) => {
+        if (cancelled) return;
+
+        setDrafts((current) => {
+          const next = { ...current };
+
+          for (const draft of remoteDrafts) {
+            if (next[draft.conversationId] === undefined) {
+              next[draft.conversationId] = draft.content;
+            }
+          }
+
+          return next;
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, setDrafts]);
+
+  const scheduleConversationDraftSync = useCallback(
+    (conversationId: string, value: string) => {
+      const currentTimer = draftSyncTimersRef.current.get(conversationId);
+
+      if (currentTimer) window.clearTimeout(currentTimer);
+
+      const timer = window.setTimeout(() => {
+        draftSyncTimersRef.current.delete(conversationId);
+
+        if (value.trim()) {
+          void applicationContainer
+            .saveConversationDraft(session, conversationId, value)
+            .catch(() => undefined);
+
+          return;
+        }
+
+        void applicationContainer
+          .deleteConversationDraft(session, conversationId)
+          .catch(() => undefined);
+      }, 700);
+
+      draftSyncTimersRef.current.set(conversationId, timer);
+    },
+    [session],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timer of draftSyncTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+
+      draftSyncTimersRef.current.clear();
+    },
+    [],
+  );
 
   const communityUnreadCounts = useMemo(
     () =>
@@ -521,12 +708,13 @@ export function GlassWorkspace({
     (value: string) => {
       if (!activeConversation?.id) return;
 
+      scheduleConversationDraftSync(activeConversation.id, value);
       setDrafts((current) => ({
         ...current,
         [activeConversation.id]: value,
       }));
     },
-    [activeConversation?.id],
+    [activeConversation?.id, scheduleConversationDraftSync, setDrafts],
   );
   const cancelMessageEdit = useCallback(() => {
     if (!activeConversation?.id) {
@@ -1481,6 +1669,27 @@ export function GlassWorkspace({
   });
 
   useEffect(() => {
+    if (!communityVoiceTopologyKey) return undefined;
+
+    let cancelled = false;
+
+    void applicationContainer
+      .listCalls(session)
+      .then((calls) => {
+        if (cancelled) return;
+
+        setCommunities((current) =>
+          communitiesWithCallVoicePresence(current, calls),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [communityVoiceTopologyKey, session, setCommunities]);
+
+  useEffect(() => {
     let cancelled = false;
     const identityId = session.identity.id;
 
@@ -1566,7 +1775,12 @@ export function GlassWorkspace({
 
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
+      const pinUntil = keepPinned ? Date.now() + 5000 : 0;
       const scroll = () => {
+        if (keepPinned && keepMessageBottomUntilRef.current !== pinUntil) {
+          return;
+        }
+
         const scroller = scrollerRef.current;
 
         if (!scroller) return;
@@ -1579,7 +1793,7 @@ export function GlassWorkspace({
       };
 
       if (keepPinned) {
-        keepMessageBottomUntilRef.current = Date.now() + 5000;
+        keepMessageBottomUntilRef.current = pinUntil;
       }
 
       requestAnimationFrame(() => {
@@ -1780,14 +1994,15 @@ export function GlassWorkspace({
   });
 
   const handleLoadOlder = async () => {
+    keepMessageBottomUntilRef.current = 0;
+
     if (
       workspaceMode !== 'messages' ||
       !activeConversation?.id ||
       !activeConversationKey ||
       !messageCursorRef.current ||
       messageStateRef.current === 'loading' ||
-      Date.now() < suppressMessageLoadsUntilRef.current ||
-      Date.now() < keepMessageBottomUntilRef.current
+      Date.now() < suppressMessageLoadsUntilRef.current
     )
       return;
 
@@ -1839,6 +2054,8 @@ export function GlassWorkspace({
     if (Date.now() < suppressMessageLoadsUntilRef.current) return;
 
     if (isScrolledNearBottom()) setNewMessageCount(0);
+
+    if (isScrollingUp) keepMessageBottomUntilRef.current = 0;
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };
@@ -2078,6 +2295,342 @@ export function GlassWorkspace({
     }
   };
 
+  const openMessageThread = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setConversationThread({
+      draft: '',
+      editingMessage: null,
+      error: null,
+      messages: [],
+      replyTarget: null,
+      root: message,
+      state: 'loading',
+    });
+    try {
+      const result = await applicationContainer.loadMessageThread(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+
+      setConversationThread({
+        draft: '',
+        editingMessage: null,
+        error: null,
+        messages: result.messages,
+        replyTarget: null,
+        root: message,
+        state: 'ready',
+      });
+    } catch (caught) {
+      setConversationThread({
+        draft: '',
+        editingMessage: null,
+        error: toUserErrorMessage(caught, copy.messages.threadError),
+        messages: [],
+        replyTarget: null,
+        root: message,
+        state: 'ready',
+      });
+    }
+  };
+
+  const openPinnedMessages = async () => {
+    if (!activeConversation?.id) return;
+
+    setMessageCollection({
+      error: null,
+      messages: [],
+      state: 'loading',
+    });
+    try {
+      const pins = await applicationContainer.listMessagePins(
+        session,
+        activeConversation.id,
+      );
+
+      setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+      setMessageCollection({
+        error: null,
+        messages: pins.map((pin) => pin.message),
+        state: 'ready',
+      });
+    } catch (caught) {
+      setMessageCollection({
+        error: toUserErrorMessage(caught, copy.messages.pinError),
+        messages: [],
+        state: 'ready',
+      });
+    }
+  };
+
+  const pinMessage = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setSendError(null);
+    try {
+      await applicationContainer.pinMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setPinnedMessageIds((current) => new Set(current).add(message.id));
+    } catch (caught) {
+      setSendError(toUserErrorMessage(caught, copy.messages.pinError));
+    }
+  };
+
+  const unpinMessageFromDialog = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    try {
+      await applicationContainer.unpinMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setPinnedMessageIds((current) => {
+        const next = new Set(current);
+
+        next.delete(message.id);
+
+        return next;
+      });
+      setMessageCollection((current) =>
+        current
+          ? {
+              ...current,
+              messages: current.messages.filter((item) => item.id !== message.id),
+            }
+          : current,
+      );
+    } catch (caught) {
+      setMessageCollection((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.unpinError),
+            }
+          : current,
+      );
+    }
+  };
+
+  const unpinMessage = async (message: ChatMessage) => {
+    setMessageContextMenu(null);
+    await unpinMessageFromDialog(message);
+  };
+
+  const updateConversationThreadDraft = (value: string) => {
+    setConversationThread((current) =>
+      current ? { ...current, draft: value } : current,
+    );
+  };
+
+  const startEditingConversationThreadMessage = (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: message.content,
+            editingMessage: {
+              message,
+              previousDraft: current.draft,
+            },
+            replyTarget: null,
+          }
+        : current,
+    );
+  };
+
+  const cancelConversationThreadEdit = () => {
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: current.editingMessage?.previousDraft ?? '',
+            editingMessage: null,
+          }
+        : current,
+    );
+  };
+  const startReplyingToConversationThreadMessage = (message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            editingMessage: null,
+            replyTarget: message,
+          }
+        : current,
+    );
+  };
+  const cancelConversationThreadReply = () => {
+    setConversationThread((current) =>
+      current ? { ...current, replyTarget: null } : current,
+    );
+  };
+
+  const handleEditConversationThreadMessage = async (content: string) => {
+    if (!activeConversation?.id || !conversationThread?.editingMessage) return;
+
+    const targetMessage = conversationThread.editingMessage.message;
+
+    setConversationThread((current) =>
+      current ? { ...current, error: null } : current,
+    );
+    try {
+      const editEvent = await applicationContainer.editMessage(
+        session,
+        activeConversation.id,
+        targetMessage.id,
+        content,
+      );
+
+      setMessages((current) =>
+        mergeConversationMessageIfTargetExists(current, editEvent),
+      );
+      setConversationThread((current) =>
+        current
+          ? {
+              ...mergeConversationThreadMessage(current, editEvent),
+              draft: '',
+              editingMessage: null,
+              error: null,
+              replyTarget: null,
+            }
+          : current,
+      );
+    } catch (caught) {
+      setConversationThread((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.editError),
+            }
+          : current,
+      );
+    }
+  };
+
+  const handleDeleteConversationThreadMessage = async (message: ChatMessage) => {
+    if (!activeConversation?.id) return;
+
+    setMessageContextMenu(null);
+    setConversationThread((current) =>
+      current ? { ...current, error: null } : current,
+    );
+    try {
+      await applicationContainer.deleteMessage(
+        session,
+        activeConversation.id,
+        message.id,
+      );
+      setMessages((current) =>
+        current.filter((item) => item.id !== message.id),
+      );
+      setConversationThread((current) => {
+        if (!current) return current;
+
+        return removeConversationThreadMessage(current, message.id);
+      });
+    } catch (caught) {
+      setConversationThread((current) =>
+        current
+          ? {
+              ...current,
+              error: toUserErrorMessage(caught, copy.messages.deleteError),
+            }
+          : current,
+      );
+    }
+  };
+
+  const sendConversationThreadMessage = async (
+    content: string,
+    attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
+  ) => {
+    if (!activeConversation?.id || !conversationThread) return;
+
+    const rootMessage = conversationThread.root;
+    const sent = await applicationContainer.sendMessage(
+      session,
+      activeConversation.id,
+      content,
+      {
+        attachments,
+        attachmentUpload,
+        previousMessageIds:
+          conversationThread.messages.length > 0
+            ? [
+                conversationThread.messages[
+                  conversationThread.messages.length - 1
+                ].id,
+              ]
+            : [rootMessage.id],
+        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
+        replyToMessageId: rootMessage.id,
+      },
+    );
+
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: '',
+            messages: MessageCollection.merge(current.messages, [sent]),
+            replyTarget: null,
+          }
+        : current,
+    );
+  };
+
+  const sendConversationThreadSticker = async (
+    sticker: StickerMessageReference,
+  ) => {
+    if (!activeConversation?.id || !conversationThread) return;
+
+    const rootMessage = conversationThread.root;
+    const sent = await applicationContainer.sendMessage(
+      session,
+      activeConversation.id,
+      '',
+      {
+        previousMessageIds:
+          conversationThread.messages.length > 0
+            ? [
+                conversationThread.messages[
+                  conversationThread.messages.length - 1
+                ].id,
+              ]
+            : [rootMessage.id],
+        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
+        replyToMessageId: rootMessage.id,
+        sticker,
+      },
+    );
+
+    void applicationContainer.markStickerUsed(session, sticker);
+    setConversationThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: '',
+            messages: MessageCollection.merge(current.messages, [sent]),
+            replyTarget: null,
+          }
+        : current,
+    );
+  };
+
   const handleDeleteMessage = async (message: ChatMessage) => {
     if (!activeConversation?.id) return;
 
@@ -2304,14 +2857,27 @@ export function GlassWorkspace({
 
         if (!message) return;
 
-        setMessages((current) => MessageCollection.merge(current, [message]));
-
         const isEditMessage = message.raw.type === 'edited';
+        const isThreadReply = Boolean(message.replyToMessageId);
+
+        if (isThreadReply || isEditMessage) {
+          setConversationThread((current) =>
+            current ? mergeConversationThreadMessage(current, message) : current,
+          );
+        }
+
+        if (!isThreadReply) {
+          setMessages((current) =>
+            isEditMessage
+              ? mergeConversationMessageIfTargetExists(current, message)
+              : MessageCollection.merge(current, [message]),
+          );
+        }
 
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
-          scrollMessagesToBottom('smooth', true);
-        } else if (!isEditMessage) {
+          if (!isThreadReply) scrollMessagesToBottom('smooth', true);
+        } else if (!isEditMessage && !isThreadReply) {
           setNewMessageCount((current) => current + 1);
         }
       } catch (caught) {
@@ -2560,6 +3126,8 @@ export function GlassWorkspace({
 
       if (
         event.type === 'communities.v1.channel.message.was_deleted' ||
+        event.type === 'communities.v1.channel.message.was_pinned' ||
+        event.type === 'communities.v1.channel.message.was_unpinned' ||
         event.type === 'communities.v1.channel.message.reaction.was_added' ||
         event.type === 'communities.v1.channel.message.reaction.was_removed' ||
         event.type === 'communities.v1.call.event.was_recorded'
@@ -2735,6 +3303,9 @@ export function GlassWorkspace({
           event.type === 'conversations.v1.message.reaction.was_removed';
         const isEditEvent =
           event.type === 'conversations.v1.message.was_edited';
+        const isPinEvent =
+          event.type === 'conversations.v1.message.was_pinned' ||
+          event.type === 'conversations.v1.message.was_unpinned';
         const isSelectedConversation =
           workspaceMode === 'messages' &&
           !!conversationId &&
@@ -2756,6 +3327,7 @@ export function GlassWorkspace({
           !isActiveConversation &&
           !isReactionEvent &&
           !isEditEvent &&
+          !isPinEvent &&
           authorId !== session.identity.id &&
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
@@ -2795,6 +3367,11 @@ export function GlassWorkspace({
               setMessages((current) =>
                 current.filter((message) => message.id !== targetMessageId),
               );
+              setConversationThread((current) =>
+                current
+                  ? removeConversationThreadMessage(current, targetMessageId)
+                  : current,
+              );
             }
 
             return;
@@ -2826,6 +3403,22 @@ export function GlassWorkspace({
                   : message,
               ),
             );
+
+            return;
+          }
+
+          if (isPinEvent && messageId) {
+            setPinnedMessageIds((current) => {
+              const next = new Set(current);
+
+              if (event.type.endsWith('.was_pinned')) {
+                next.add(messageId);
+              } else {
+                next.delete(messageId);
+              }
+
+              return next;
+            });
 
             return;
           }
@@ -3036,6 +3629,7 @@ export function GlassWorkspace({
     isCreateCommunityOpen ||
     isCreateOpen ||
     !!incomingCall ||
+    !!messageCollection ||
     !!messageContextMenu ||
     nodeSettingsOpen ||
     notificationsOpen ||
@@ -3160,74 +3754,129 @@ export function GlassWorkspace({
               />
             )}
 
-            <Suspense fallback={null}>
-              <ChatColumn
-                session={session}
-                activeConversation={activeConversation}
-                conversationKey={activeConversationKey}
-                draft={activeConversationDraft}
-                editingMessage={editingMessage?.message ?? null}
-                hasConversationKey={!!activeConversationKey}
-                hasReachedMessageStart={!messageCursor}
-                peerIdentityId={activeConversationPeerIdentityId}
-                peerIdentity={
-                  activeConversationPeerIdentityId
-                    ? identityProfiles[activeConversationPeerIdentityId]
-                    : undefined
-                }
-                peerPicture={
-                  activeConversationPeerIdentityId
-                    ? identityPictures[activeConversationPeerIdentityId]
-                    : undefined
-                }
+            {conversationThread && activeConversation ? (
+              <MessageThreadPanel
+                currentIdentityId={session.identity.id}
+                disabled={!activeConversationKey}
+                draft={conversationThread.draft}
+                editingMessage={conversationThread.editingMessage?.message ?? null}
+                error={conversationThread.error}
                 identityNames={identityNames}
                 identityPictures={identityPictures}
-                identityProfiles={identityProfiles}
-                presenceByIdentityId={presenceByIdentityId}
-                messages={messages}
-                messageState={messageState}
-                newMessageCount={newMessageCount}
-                nodeNetworks={nodeNetworks}
-                sendError={sendError}
-                scrollerRef={scrollerRef}
-                bottomRef={bottomRef}
-                onScroll={handleScroll}
-                onCancelEdit={cancelMessageEdit}
-                onEditMessage={handleEditMessage}
-                onSend={handleSend}
-                onStickerSend={handleSendSticker}
-                onConversationKeyImported={handleConversationKeyImported}
-                onDraftChange={updateActiveConversationDraft}
-                onEscape={closeTransientUi}
-                onJumpToLatest={jumpToLatestMessages}
-                onMessageMenuOpen={handleMessageMenuOpen}
-                onReactionToggle={(message, emoji, reacted) =>
-                  void handleToggleMessageReaction(message, emoji, reacted)
+                messages={conversationThread.messages}
+                onCancelEdit={cancelConversationThreadEdit}
+                onCancelReply={cancelConversationThreadReply}
+                onClose={() => setConversationThread(null)}
+                onDraftChange={updateConversationThreadDraft}
+                onEdit={handleEditConversationThreadMessage}
+                onMessageMenuOpen={(message, x, y) =>
+                  setMessageContextMenu({ message, source: 'thread', x, y })
                 }
-                onReplyReferenceClick={(messageId) =>
-                  void handleReplyReferenceClick(messageId)
+                onRootMessageOpen={(message) => {
+                  setMessages((current) =>
+                    MessageCollection.merge(current, [message]),
+                  );
+                  setConversationThread(null);
+                  window.setTimeout(() => scrollToMessage(message.id), 0);
+                }}
+                onSend={sendConversationThreadMessage}
+                onStickerSend={sendConversationThreadSticker}
+                pinnedMessageIds={pinnedMessageIds}
+                replyTo={conversationThread.replyTarget}
+                replyToAuthorName={
+                  conversationThread.replyTarget
+                    ? identityDisplayName(
+                        conversationThread.replyTarget.authorIdentityId,
+                        identityNames,
+                      )
+                    : undefined
                 }
-                onOpenSidebar={() => setSidebarOpen(true)}
-                onCreate={() => setIsCreateOpen(true)}
-                onOpenConversationWithIdentity={(identityId, identity) =>
-                  openOrCreateConversationWithIdentity(
-                    identityId,
-                    identity,
-                    activeConversation?.networkId,
-                  )
+                rootMessage={conversationThread.root}
+                session={session}
+                title={
+                  activeConversation.title ??
+                  activeConversation.name ??
+                  (activeConversationPeerIdentityId
+                    ? identityNames[activeConversationPeerIdentityId]
+                    : undefined) ??
+                  activeConversation.id
                 }
-                progress={attachmentProgress}
-                realtimeStatus={realtimeStatus}
-                realtimeEvent={conversationRealtimeEvent}
-                onRealtimeEventsOpen={openRealtimeEvents}
-                replyToMessage={replyTarget}
-                onCancelReply={() => setReplyTarget(null)}
-                onRetryMessage={retryMessage}
-                onStartCall={startConversationCall}
-                onTypingActive={sendConversationTyping}
-                typingIdentityIds={conversationTypingIdentityIds}
               />
-            </Suspense>
+            ) : (
+              <Suspense fallback={null}>
+                <ChatColumn
+                  session={session}
+                  activeConversation={activeConversation}
+                  conversationKey={activeConversationKey}
+                  draft={activeConversationDraft}
+                  editingMessage={editingMessage?.message ?? null}
+                  hasConversationKey={!!activeConversationKey}
+                  hasReachedMessageStart={!messageCursor}
+                  peerIdentityId={activeConversationPeerIdentityId}
+                  peerIdentity={
+                    activeConversationPeerIdentityId
+                      ? identityProfiles[activeConversationPeerIdentityId]
+                      : undefined
+                  }
+                  peerPicture={
+                    activeConversationPeerIdentityId
+                      ? identityPictures[activeConversationPeerIdentityId]
+                      : undefined
+                  }
+                  identityNames={identityNames}
+                  identityPictures={identityPictures}
+                  identityProfiles={identityProfiles}
+                  presenceByIdentityId={presenceByIdentityId}
+                  messages={messages}
+                  messageState={messageState}
+                  newMessageCount={newMessageCount}
+                  nodeNetworks={nodeNetworks}
+                  pinnedMessageIds={pinnedMessageIds}
+                  sendError={sendError}
+                  scrollerRef={scrollerRef}
+                  bottomRef={bottomRef}
+                  onScroll={handleScroll}
+                  onCancelEdit={cancelMessageEdit}
+                  onEditMessage={handleEditMessage}
+                  onSend={handleSend}
+                  onStickerSend={handleSendSticker}
+                  onConversationKeyImported={handleConversationKeyImported}
+                  onDraftChange={updateActiveConversationDraft}
+                  onEscape={closeTransientUi}
+                  onJumpToLatest={jumpToLatestMessages}
+                  onMessageMenuOpen={handleMessageMenuOpen}
+                  onOpenMessageThread={(message) =>
+                    void openMessageThread(message)
+                  }
+                  onReactionToggle={(message, emoji, reacted) =>
+                    void handleToggleMessageReaction(message, emoji, reacted)
+                  }
+                  onReplyReferenceClick={(messageId) =>
+                    void handleReplyReferenceClick(messageId)
+                  }
+                  onOpenPins={() => void openPinnedMessages()}
+                  onOpenSidebar={() => setSidebarOpen(true)}
+                  onCreate={() => setIsCreateOpen(true)}
+                  onOpenConversationWithIdentity={(identityId, identity) =>
+                    openOrCreateConversationWithIdentity(
+                      identityId,
+                      identity,
+                      activeConversation?.networkId,
+                    )
+                  }
+                  progress={attachmentProgress}
+                  realtimeStatus={realtimeStatus}
+                  realtimeEvent={conversationRealtimeEvent}
+                  onRealtimeEventsOpen={openRealtimeEvents}
+                  replyToMessage={replyTarget}
+                  onCancelReply={() => setReplyTarget(null)}
+                  onRetryMessage={retryMessage}
+                  onStartCall={startConversationCall}
+                  onTypingActive={sendConversationTyping}
+                  typingIdentityIds={conversationTypingIdentityIds}
+                />
+              </Suspense>
+            )}
 
             <Suspense fallback={null}>
               <Inspector
@@ -3357,6 +4006,33 @@ export function GlassWorkspace({
         />
       ) : null}
 
+      {messageCollection ? (
+        <MessageCollectionDialog
+          actions={[
+            {
+              label: copy.messages.unpin,
+              onClick: (message) => void unpinMessageFromDialog(message),
+              tone: 'danger',
+            },
+          ]}
+          emptyLabel={
+            messageCollection.state === 'loading'
+              ? copy.app.loading
+              : messageCollection.error ?? copy.messages.emptyPins
+          }
+          identityNames={identityNames}
+          identityPictures={identityPictures}
+          messages={messageCollection.messages}
+          onClose={() => setMessageCollection(null)}
+          onMessageOpen={(message) => {
+            setMessageCollection(null);
+            void handleReplyReferenceClick(message.id);
+          }}
+          subtitle={messageCollection.error}
+          title={copy.messages.pinnedMessages}
+        />
+      ) : null}
+
       {hasWorkspaceDialogOpen ? (
         <Suspense fallback={null}>
           <WorkspaceDialogs
@@ -3449,15 +4125,33 @@ export function GlassWorkspace({
             onDeclineNotification={(notificationId) =>
               void declineNotification(notificationId)
             }
-            onDeleteMessage={(message) => void handleDeleteMessage(message)}
-            onEditMessage={startEditingMessage}
+            onDeleteMessage={(message) =>
+              void (messageContextMenu?.source === 'thread'
+                ? handleDeleteConversationThreadMessage(message)
+                : handleDeleteMessage(message))
+            }
+            onEditMessage={(message) =>
+              messageContextMenu?.source === 'thread'
+                ? startEditingConversationThreadMessage(message)
+                : startEditingMessage(message)
+            }
             onCopyMessage={copyMessageContent}
-            onNetworksUpdated={onNodeNetworksReload}
+            onOpenMessageThread={(message) => void openMessageThread(message)}
+            onPinMessage={(message) => void pinMessage(message)}
             onReplyToMessage={(message) => {
-              setReplyTarget(message);
-              setEditingMessage(null);
+              if (messageContextMenu?.source === 'thread') {
+                startReplyingToConversationThreadMessage(message);
+
+                return;
+              }
+
               setMessageContextMenu(null);
+              setEditingMessage(null);
+              setReplyTarget(message);
             }}
+            onNetworksUpdated={onNodeNetworksReload}
+            onUnpinMessage={(message) => void unpinMessage(message)}
+            pinnedMessageIds={pinnedMessageIds}
             onToggleReaction={(message, emoji, reacted) =>
               void handleToggleMessageReaction(message, emoji, reacted)
             }

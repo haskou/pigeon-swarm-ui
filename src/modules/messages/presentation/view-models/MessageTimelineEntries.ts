@@ -25,17 +25,37 @@ export type MessageTimelineEntry =
       replyMessage?: ChatMessage;
       startsNewAuthorRun: boolean;
       startsNewDay: boolean;
+      threadSummary?: MessageThreadSummary;
       type: 'message';
     };
+
+export type MessageThreadSummary = {
+  count: number;
+  lastMessage?: ChatMessage;
+  rootMessageId: string;
+};
 
 export class MessageTimelineEntries {
   public static build(
     messages: ChatMessage[],
     polls: PollResource[],
+    threadSummaries: MessageThreadSummary[] = [],
   ): MessageTimelineEntry[] {
-    const items = messagePollTimelineItems(messages, polls);
+    const threadSummariesByRootMessageId = new Map(
+      threadSummaries.map((summary) => [summary.rootMessageId, summary]),
+    );
+    const threadRootMessageIds = new Set(
+      threadSummaries.map((summary) => summary.rootMessageId),
+    );
+    const rootMessages = messages.filter(
+      (message) =>
+        !threadRootMessageIds.has(
+          MessageTimelineEntries.replyToMessageId(message) ?? '',
+        ),
+    );
+    const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
-      messages.map((message) => [message.id, message]),
+      rootMessages.map((message) => [message.id, message]),
     );
     const entries: MessageTimelineEntry[] = [];
     let previousMessage: ChatMessage | undefined;
@@ -57,16 +77,21 @@ export class MessageTimelineEntries {
         continue;
       }
 
+      const replyToMessageId = MessageTimelineEntries.replyToMessageId(
+        item.message,
+      );
+
       entries.push({
         endsAuthorRun: true,
         id: item.id,
         item,
         previousMessage,
-        replyMessage: item.message.replyToMessageId
-          ? messagesById.get(item.message.replyToMessageId)
+        replyMessage: replyToMessageId
+          ? messagesById.get(replyToMessageId)
           : undefined,
         startsNewAuthorRun: startsAuthorRun(previousMessage, item.message),
         startsNewDay,
+        threadSummary: threadSummariesByRootMessageId.get(item.message.id),
         type: 'message',
       });
 
@@ -88,6 +113,10 @@ export class MessageTimelineEntries {
     }
 
     return entries;
+  }
+
+  private static replyToMessageId(message: ChatMessage): string | undefined {
+    return message.replyToMessageId ?? message.raw.replyToMessageId;
   }
 
   private static startsTimelineDay(

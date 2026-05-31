@@ -5,6 +5,7 @@ import { CallDataPanel } from './CallDataPanel';
 import { callParticipantHasActiveScreenShare } from './callParticipantHasActiveScreenShare';
 import { CallParticipantTiles } from './CallParticipantTiles';
 import { CallScreenShareStage } from './CallScreenShareStage';
+import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
 
 export function CallStageBody({
   call,
@@ -41,11 +42,11 @@ export function CallStageBody({
     return (
       <div
         className={cx(
-          'min-h-0 flex-1 gap-4 overflow-hidden p-4 sm:p-5',
+          'min-h-0 flex-1 gap-2 overflow-hidden p-2.5 sm:gap-4 sm:p-5',
           dataOpen ? 'flex flex-col xl:flex-row' : 'flex flex-col',
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
           <CallScreenShareStage
             onExpand={() => onExpandScreen(screenParticipant)}
             onScreenShareVolumeChange={(volumePercent) =>
@@ -56,6 +57,17 @@ export function CallStageBody({
             }
             participant={screenParticipant}
             screenShareVolumePercent={screenShareVolumePercent}
+          />
+          <ScreenShareVolumeControl
+            className="sm:hidden"
+            placement="inline"
+            onChange={(volumePercent) =>
+              onParticipantScreenShareVolumeChange(
+                screenParticipant.identityId,
+                volumePercent,
+              )
+            }
+            value={screenShareVolumePercent}
           />
           <CallParticipantTiles
             call={call}
@@ -79,7 +91,7 @@ export function CallStageBody({
   return (
     <div
       className={cx(
-        'min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-5',
+        'min-h-0 flex-1 gap-2 overflow-y-auto p-2.5 sm:gap-4 sm:p-5',
         dataOpen ? 'flex flex-col lg:flex-row' : 'flex',
       )}
     >

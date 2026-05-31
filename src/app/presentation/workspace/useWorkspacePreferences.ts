@@ -3,26 +3,31 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 
 import type { ConversationResource } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../shared/domain/pigeonResources.types';
 
 import {
   writeJsonToLocalStorage,
   writeStringToLocalStorage,
 } from '../../../shared/infrastructure/storage/jsonLocalStorage';
+import { DraftPayloadCipher } from '../../../modules/messages/infrastructure/crypto/DraftPayloadCipher';
 import {
   communityUnreadStorageKey,
   type CommunityUnreadCounts,
   type ConversationDrafts,
   draftsStorageKey,
+  encryptedDraftsStorageValue,
   initialConversationId,
   lastConversationStorageKey,
+  loadEncryptedDraftPayloads,
+  loadLegacyPlainDrafts,
   loadCommunityUnreadCounts,
-  loadDrafts,
   loadWorkspacePreference,
   type WorkspacePreference,
   workspaceStorageKey,
 } from './components/workspacePersistence';
 
 type WorkspaceMode = 'community' | 'messages';
+const draftPayloadCipher = new DraftPayloadCipher();
 
 export function useWorkspacePreferences(input: {
   activeConversationId: string | null;
@@ -30,7 +35,9 @@ export function useWorkspacePreferences(input: {
   communityChannelById: Record<string, string>;
   communityUnreadCountsById: CommunityUnreadCounts;
   drafts: ConversationDrafts;
+  draftsHydrated: boolean;
   identityId: string;
+  session: Session;
   workspaceMode: WorkspaceMode;
 }): void {
   const {
@@ -39,13 +46,20 @@ export function useWorkspacePreferences(input: {
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     identityId,
+    session,
     workspaceMode,
   } = input;
 
   useEffect(() => {
-    writeJsonToLocalStorage(draftsStorageKey(identityId), drafts);
-  }, [drafts, identityId]);
+    if (!draftsHydrated) return;
+
+    writeJsonToLocalStorage(
+      draftsStorageKey(identityId),
+      encryptedDraftsStorageValue(encryptDrafts(session, drafts)),
+    );
+  }, [drafts, draftsHydrated, identityId, session]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -76,13 +90,14 @@ export function useWorkspacePreferences(input: {
 
 export function useWorkspacePreferenceState(
   conversations: ConversationResource[],
-  identityId: string,
+  session: Session,
 ): {
   activeCommunityId: string | null;
   activeConversationId: string | null;
   communityChannelById: Record<string, string>;
   communityUnreadCountsById: CommunityUnreadCounts;
   drafts: ConversationDrafts;
+  draftsHydrated: boolean;
   setActiveCommunityId: Dispatch<SetStateAction<string | null>>;
   setActiveConversationId: Dispatch<SetStateAction<string | null>>;
   setCommunityChannelById: Dispatch<SetStateAction<Record<string, string>>>;
@@ -91,6 +106,7 @@ export function useWorkspacePreferenceState(
   setWorkspaceMode: Dispatch<SetStateAction<WorkspaceMode>>;
   workspaceMode: WorkspaceMode;
 } {
+  const identityId = session.identity.id;
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(() => initialConversationId(conversations, identityId));
@@ -110,14 +126,32 @@ export function useWorkspacePreferenceState(
       loadCommunityUnreadCounts(identityId),
     );
   const [drafts, setDrafts] = useState<ConversationDrafts>(() =>
-    loadDrafts(identityId),
+    loadLegacyPlainDrafts(identityId),
   );
+  const [draftsHydrated, setDraftsHydrated] = useState(false);
 
   useEffect(() => {
-    setDrafts(loadDrafts(identityId));
+    let cancelled = false;
+
+    setDraftsHydrated(false);
+    setDrafts(loadLegacyPlainDrafts(identityId));
     setCommunityUnreadCountsById(loadCommunityUnreadCounts(identityId));
     setWorkspacePreference(loadWorkspacePreference(identityId));
-  }, [identityId]);
+
+    void decryptStoredDrafts(session).then((decryptedDrafts) => {
+      if (cancelled) return;
+
+      setDrafts((current) => ({
+        ...current,
+        ...decryptedDrafts,
+      }));
+      setDraftsHydrated(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identityId, session]);
 
   useEffect(() => {
     setWorkspaceMode(workspacePreference.mode ?? 'messages');
@@ -131,6 +165,7 @@ export function useWorkspacePreferenceState(
     communityChannelById,
     communityUnreadCountsById,
     drafts,
+    draftsHydrated,
     setActiveCommunityId,
     setActiveConversationId,
     setCommunityChannelById,
@@ -139,4 +174,32 @@ export function useWorkspacePreferenceState(
     setWorkspaceMode,
     workspaceMode,
   };
+}
+
+function encryptDrafts(
+  session: Session,
+  drafts: ConversationDrafts,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(drafts)
+      .filter(([, content]) => content.trim().length > 0)
+      .map(([conversationId, content]) => [
+        conversationId,
+        draftPayloadCipher.encrypt(session, content),
+      ]),
+  );
+}
+
+async function decryptStoredDrafts(
+  session: Session,
+): Promise<ConversationDrafts> {
+  const encryptedPayloads = loadEncryptedDraftPayloads(session.identity.id);
+  const drafts = await Promise.all(
+    Object.entries(encryptedPayloads).map(async ([conversationId, payload]) => [
+      conversationId,
+      await draftPayloadCipher.decrypt(session, payload),
+    ]),
+  );
+
+  return Object.fromEntries(drafts);
 }

@@ -25,6 +25,7 @@ interface ChatConversationHeaderProps {
   onConversationOpen: (event?: MouseEvent<HTMLElement>) => void;
   onMenuToggle: () => void;
   onOpenSidebar: () => void;
+  onPinsOpen?: () => void;
   onRealtimeEventsOpen?: () => void;
   peerPicture?: string;
   peerPresence?: IdentityPresence;
@@ -46,6 +47,7 @@ export function ChatConversationHeader({
   onConversationOpen,
   onMenuToggle,
   onOpenSidebar,
+  onPinsOpen,
   onRealtimeEventsOpen,
   peerPicture,
   peerPresence,
@@ -98,6 +100,7 @@ export function ChatConversationHeader({
       menuOpen={menuOpen}
       onMenuToggle={activeConversation ? onMenuToggle : undefined}
       onOpenSidebar={onOpenSidebar}
+      onPinsOpen={activeConversation ? onPinsOpen : undefined}
       onRealtimeEventsOpen={onRealtimeEventsOpen}
       realtimeStatus={realtimeStatus}
       subtitle={

@@ -3,9 +3,12 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { NodeNetwork } from '../../application/list-node-networks/ListNodeNetworks';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { NodeBootstrapApi } from '../../infrastructure/http/NodeBootstrapApi';
+
+const nodeBootstrapApi = new NodeBootstrapApi();
 
 type NodeNetworksState = {
   error: Error | null;
@@ -28,13 +31,19 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
     setError(null);
 
     try {
-      const nodeInfo = await applicationContainer.getNodeInfo();
+      const nodeInfo = await nodeBootstrapApi.getInfo();
 
       setNode(nodeInfo);
       try {
-        setNetworks(
-          await applicationContainer.listNodeNetworks(session ?? undefined),
-        );
+        if (session) {
+          const applicationContainer = await loadApplicationContainer();
+
+          setNetworks(await applicationContainer.listNodeNetworks(session));
+
+          return;
+        }
+
+        setNetworks(await nodeBootstrapApi.getNetworks());
       } catch {
         setNetworks([]);
       }

@@ -52,6 +52,12 @@ export function Rail({
   const { installState, requestInstall } = useInstallPrompt();
 
   const handleInstallApp = async () => {
+    if (installState === 'fallback') {
+      setInstallHelpOpen(true);
+
+      return;
+    }
+
     const installOutcome = await requestInstall();
 
     if (installOutcome === 'accepted') {
@@ -60,17 +66,21 @@ export function Rail({
       return;
     }
 
-    if (installState !== 'installed') {
-      setInstallHelpOpen(true);
-    }
+    setInstallHelpOpen(false);
   };
 
   const showInstallApp = installState !== 'installed';
   const installButtonReady = installState === 'ready';
+  const installButtonChecking = installState === 'checking';
   const installButtonPrompting = installState === 'prompting';
+  const installButtonDisabled = installButtonChecking || installButtonPrompting;
   const installTitle = installButtonReady
     ? copy.auth.installApp
-    : copy.auth.installAppInstructions;
+    : installButtonChecking
+      ? copy.auth.installAppChecking
+      : installButtonPrompting
+        ? copy.auth.installAppPrompting
+        : copy.auth.installAppInstructions;
 
   return (
     <aside
@@ -138,8 +148,9 @@ export function Rail({
           type="button"
           onClick={handleInstallApp}
           aria-busy={installButtonPrompting}
+          disabled={installButtonDisabled}
           className={cx(
-            'relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/12 hover:text-white',
+            'relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/12 hover:text-white disabled:cursor-wait disabled:opacity-55 disabled:hover:bg-white/5 disabled:hover:text-white/65',
             installButtonReady &&
               'border-cyan-200/30 bg-cyan-300/10 text-cyan-100',
             installButtonPrompting && 'cursor-wait opacity-70',

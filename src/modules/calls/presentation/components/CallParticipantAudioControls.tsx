@@ -13,6 +13,7 @@ export function CallParticipantAudioControls({
   onToggleMute,
   onVoiceVolumeChange,
   screenShareVolumePercent,
+  showScreenShareVolume = true,
   variant,
   voiceVolumePercent,
 }: {
@@ -24,6 +25,7 @@ export function CallParticipantAudioControls({
   onToggleMute: () => void;
   onVoiceVolumeChange: (nextVolume: number) => void;
   screenShareVolumePercent: number;
+  showScreenShareVolume?: boolean;
   variant: 'grid' | 'strip';
   voiceVolumePercent: number;
 }) {
@@ -31,8 +33,8 @@ export function CallParticipantAudioControls({
     <>
       <div
         className={cx(
-          'flex w-full items-center gap-2 rounded-2xl border border-white/8 bg-white/6 p-2 text-left',
-          variant === 'strip' ? 'mt-3' : 'mt-5',
+          'flex w-full items-center gap-1.5 rounded-xl border border-white/8 bg-white/6 p-1.5 text-left sm:gap-2 sm:rounded-2xl sm:p-2',
+          variant === 'strip' ? 'mt-2 sm:mt-3' : 'mt-5',
         )}
       >
         <button
@@ -40,7 +42,7 @@ export function CallParticipantAudioControls({
           onClick={onToggleMute}
           disabled={isCurrentIdentity && !hasMicrophone}
           className={cx(
-            'grid h-9 w-9 shrink-0 place-items-center rounded-2xl font-black transition',
+            'grid h-8 w-8 shrink-0 place-items-center rounded-xl font-black transition sm:h-9 sm:w-9 sm:rounded-2xl',
             muted
               ? 'bg-fuchsia-500/25 text-fuchsia-100 hover:bg-fuchsia-500/35'
               : 'bg-white/10 text-white/65 hover:bg-white/15 hover:text-white',
@@ -59,7 +61,7 @@ export function CallParticipantAudioControls({
           value={voiceVolumePercent}
         />
       </div>
-      {!isCurrentIdentity && hasScreenShare && (
+      {showScreenShareVolume && !isCurrentIdentity && hasScreenShare && (
         <ScreenShareVolumeControl
           placement="inline"
           onChange={onScreenShareVolumeChange}

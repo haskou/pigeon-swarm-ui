@@ -31,11 +31,19 @@ export type CommunityChannelPermissions = {
   visibleRoleIds: string[];
 };
 
+export type CommunityChannelThreadSummary = {
+  lastReplyAt: number;
+  lastReplyMessageId: string;
+  replyCount: number;
+  rootMessageId: string;
+};
+
 export type CommunityTextChannel = {
   createdAt: number;
   id: string;
   name: string;
   permissions?: CommunityChannelPermissions;
+  threads?: CommunityChannelThreadSummary[];
   type: 'text';
 };
 

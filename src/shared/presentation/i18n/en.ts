@@ -584,6 +584,8 @@ export const en = {
     edited: 'Edited',
     editError: 'The message could not be edited.',
     editing: 'Editing message',
+    emptyPins: 'No pinned messages yet.',
+    emptyThread: 'This thread has no replies yet.',
     missingCommunityKey:
       'This community key is missing from the keychain, so channel messages cannot be decrypted.',
     missingConversationKey:
@@ -593,6 +595,11 @@ export const en = {
     originalMessage: 'original message',
     rawTitle: 'Message data',
     reactionError: 'The reaction could not be updated.',
+    openThread: 'Open thread',
+    pin: 'Pin',
+    pinError: 'The message could not be pinned.',
+    pinned: 'Pinned',
+    pinnedMessages: 'Pinned messages',
     reply: 'Reply',
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
@@ -602,6 +609,12 @@ export const en = {
     searchReaction: 'Search emoji',
     sendFailed: 'Failed',
     sending: 'Sending',
+    thread: 'Thread',
+    threadError: 'The thread could not be loaded.',
+    threadMessage: 'message',
+    threadMessages: 'messages',
+    unpin: 'Unpin',
+    unpinError: 'The message could not be unpinned.',
     viewRaw: 'View data',
   },
   network: {

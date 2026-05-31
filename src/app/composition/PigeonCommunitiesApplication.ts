@@ -3,6 +3,8 @@ import { KeyPair } from '@haskou/value-objects';
 import type {
   Community,
   CommunityChannel,
+  CommunityChannelDraft,
+  CommunityChannelMessagePinsResource,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
   CommunityMembershipRequest,
@@ -38,6 +40,7 @@ type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
   attachmentExternalIdentifiers?: string[];
   id?: string;
   mentions?: CommunityMessageMention[];
+  replyToMessageId?: string;
   timestamp?: number;
 };
 
@@ -459,6 +462,97 @@ export class PigeonCommunitiesApplication {
       communityId,
       channelId,
       options,
+    );
+  }
+
+  public async listChannelMessageThread(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.gateway.listCommunityChannelMessageThread(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      options,
+    );
+  }
+
+  public async listChannelMessagePins(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CommunityChannelMessagePinsResource> {
+    return await this.gateway.listCommunityChannelMessagePins(
+      session,
+      communityId,
+      channelId,
+    );
+  }
+
+  public async pinChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.pinCommunityChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async unpinChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.unpinCommunityChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
+    return await this.gateway.listCommunityDrafts(session);
+  }
+
+  public async saveChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<CommunityChannelDraft> {
+    return await this.gateway.saveCommunityChannelDraft(
+      session,
+      communityId,
+      channelId,
+      content,
+      updatedAt,
+    );
+  }
+
+  public async deleteChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    await this.gateway.deleteCommunityChannelDraft(
+      session,
+      communityId,
+      channelId,
     );
   }
 

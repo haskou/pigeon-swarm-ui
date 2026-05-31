@@ -96,6 +96,7 @@ type CommunityWorkspaceDialogsProps = {
   owner: boolean;
   presenceByIdentityId: Record<string, IdentityPresence>;
   profileViewer: CommunityProfileView | null;
+  pinnedMessageIds: ReadonlySet<string>;
   rawMessage: ChatMessage | null;
   session: Session;
   onCloseAvatarViewer: () => void;
@@ -113,11 +114,14 @@ type CommunityWorkspaceDialogsProps = {
   onCommunityUpdated: (community: Community) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onEditMessage: (message: ChatMessage) => void;
+  onOpenMessageThread: (message: ChatMessage) => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
     identity?: IdentityResource,
   ) => Promise<void>;
+  onPinMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
+  onUnpinMessage: (message: ChatMessage) => void;
   onSessionUpdated: (session: Session) => void;
   onToggleReaction: (
     message: ChatMessage,
@@ -148,6 +152,7 @@ export function CommunityWorkspaceDialogs({
   nodeNetworks,
   owner,
   presenceByIdentityId,
+  pinnedMessageIds,
   profileViewer,
   rawMessage,
   session,
@@ -167,11 +172,19 @@ export function CommunityWorkspaceDialogs({
   onDeleteMessage,
   onEditMessage,
   onOpenConversationWithIdentity,
+  onOpenMessageThread,
+  onPinMessage,
   onReplyToMessage,
   onSessionUpdated,
   onToggleReaction,
+  onUnpinMessage,
   onViewRawMessage,
 }: CommunityWorkspaceDialogsProps) {
+  const contextMenuFromThread = messageContextMenu?.source === 'thread';
+  const contextMenuMessagePinned = messageContextMenu
+    ? isPinnedMessage(messageContextMenu.message, pinnedMessageIds)
+    : false;
+
   return (
     <Suspense fallback={null}>
       {avatarViewerOpen && avatarUrl && (
@@ -263,6 +276,7 @@ export function CommunityWorkspaceDialogs({
               : undefined
           }
           onEdit={
+            !contextMenuFromThread &&
             CommunityWorkspaceDialogActions.canEditMessage(
               messageContextMenu.message,
               currentIdentityId,
@@ -270,7 +284,33 @@ export function CommunityWorkspaceDialogs({
               ? () => onEditMessage(messageContextMenu.message)
               : undefined
           }
-          onReply={() => onReplyToMessage(messageContextMenu.message)}
+          onOpenThread={
+            messageContextMenu.message.kind !== 'poll' && !contextMenuFromThread
+              ? () => onOpenMessageThread(messageContextMenu.message)
+              : undefined
+          }
+          onPin={
+            messageContextMenu.message.kind !== 'poll' &&
+            !contextMenuFromThread &&
+            currentPermissions.has('manage_messages') &&
+            !contextMenuMessagePinned
+              ? () => onPinMessage(messageContextMenu.message)
+              : undefined
+          }
+          onReply={
+            messageContextMenu.message.kind !== 'poll'
+              ? () => onReplyToMessage(messageContextMenu.message)
+              : undefined
+          }
+          onUnpin={
+            messageContextMenu.message.kind !== 'poll' &&
+            !contextMenuFromThread &&
+            currentPermissions.has('manage_messages') &&
+            contextMenuMessagePinned
+              ? () => onUnpinMessage(messageContextMenu.message)
+              : undefined
+          }
+          pinned={contextMenuMessagePinned}
           onReactionToggle={onToggleReaction}
           onViewRaw={() => onViewRawMessage(messageContextMenu.message)}
         />
@@ -300,4 +340,11 @@ export function CommunityWorkspaceDialogs({
       )}
     </Suspense>
   );
+}
+
+function isPinnedMessage(
+  message: ChatMessage,
+  pinnedMessageIds: ReadonlySet<string>,
+): boolean {
+  return pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId);
 }

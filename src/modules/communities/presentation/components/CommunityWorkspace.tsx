@@ -7,6 +7,7 @@ import {
 import {
   type MouseEvent,
   type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -18,6 +19,8 @@ import type { NodeNetwork } from '../../../networks/application/list-node-networ
 import type { CallSession } from '../../../calls/domain/callSession.types';
 import type {
   Community,
+  AttachmentUploadOptions,
+  CommunityChannelThreadSummary,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ChatMessage,
@@ -42,6 +45,8 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/Composer';
+import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
@@ -84,6 +89,7 @@ import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
+import { communityMessageIdentityIds } from './communityMessageIdentityIds';
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -133,6 +139,25 @@ interface CommunityWorkspaceProps {
   session: Session;
   typingIdentityIds?: string[];
 }
+
+type MessageCollectionState = {
+  error: null | string;
+  messages: ChatMessage[];
+  state: 'loading' | 'ready';
+};
+
+type CommunityThreadState = MessageCollectionState & {
+  channelId: string;
+  draft: string;
+  editingMessage: CommunityThreadEditingMessage | null;
+  replyTarget: ChatMessage | null;
+  root: ChatMessage;
+};
+
+type CommunityThreadEditingMessage = {
+  message: ChatMessage;
+  previousDraft: string;
+};
 
 export function CommunityWorkspace({
   activeCall,
@@ -216,7 +241,8 @@ export function CommunityWorkspace({
     () => resolveCommunityChannelId(activeChannelId, accessibleTextChannels),
     [accessibleTextChannels, activeChannelId],
   );
-  const [draft, setDraft] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -246,6 +272,17 @@ export function CommunityWorkspace({
   const [profileViewer, setProfileViewer] =
     useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
+  const [messageCollection, setMessageCollection] =
+    useState<MessageCollectionState | null>(null);
+  const [threadPanel, setThreadPanel] = useState<CommunityThreadState | null>(
+    null,
+  );
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
+    Record<string, CommunityChannelThreadSummary[]>
+  >({});
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
@@ -258,6 +295,37 @@ export function CommunityWorkspace({
     useRef<CommunityMessageSearchResultItem | null>(null);
   const communityKey = session.keychain.conversations[community.id];
   const communityIsPublic = community.visibility === 'public';
+  const textChannelsWithThreads = useMemo(
+    () =>
+      textChannels.map((channel) => ({
+        ...channel,
+        threads:
+          channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+      })),
+    [channelThreadsByChannelId, textChannels],
+  );
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listCommunityChannels(session, community.id)
+      .then((channels) => {
+        if (cancelled) return;
+
+        setChannelThreadsByChannelId(
+          Object.fromEntries(
+            channels
+              .filter((channel) => channel.type === 'text')
+              .map((channel) => [channel.id, channel.threads ?? []]),
+          ),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.id, session]);
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
@@ -335,13 +403,60 @@ export function CommunityWorkspace({
     onMobileSidebarClose,
     resolvedChannelId,
   });
+  const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
+  const scheduleChannelDraftSync = useCallback(
+    (channelId: string, value: string) => {
+      const currentTimer = draftSyncTimersRef.current.get(channelId);
+
+      if (currentTimer) window.clearTimeout(currentTimer);
+
+      const timer = window.setTimeout(() => {
+        draftSyncTimersRef.current.delete(channelId);
+
+        if (value.trim()) {
+          void applicationContainer
+            .saveCommunityChannelDraft(session, community.id, channelId, value)
+            .catch(() => undefined);
+
+          return;
+        }
+
+        void applicationContainer
+          .deleteCommunityChannelDraft(session, community.id, channelId)
+          .catch(() => undefined);
+      }, 700);
+
+      draftSyncTimersRef.current.set(channelId, timer);
+    },
+    [community.id, session],
+  );
+  const setSelectedChannelDraft = useCallback(
+    (next: SetStateAction<string>) => {
+      if (!selectedChannelId) return;
+
+      setDrafts((current) => {
+        const currentValue = current[selectedChannelId] ?? '';
+        const value =
+          typeof next === 'function' ? next(currentValue) : next;
+
+        scheduleChannelDraftSync(selectedChannelId, value);
+
+        return {
+          ...current,
+          [selectedChannelId]: value,
+        };
+      });
+    },
+    [scheduleChannelDraftSync, selectedChannelId],
+  );
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
   const networkName = network?.name ?? shortId(community.networkId);
-  const selectedChannel = textChannels.find(
+  const selectedChannel = textChannelsWithThreads.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const canManageMessages = currentPermissions.has('manage_messages');
   const selectedChannelPolls = useMemo(
     () =>
       selectedChannelId
@@ -356,9 +471,10 @@ export function CommunityWorkspace({
   );
   const channelNameFor = useCallback(
     (channelId: string) =>
-      textChannels.find((channel) => channel.id === channelId)?.name ??
+      textChannelsWithThreads.find((channel) => channel.id === channelId)
+        ?.name ??
       shortId(channelId),
-    [textChannels],
+    [textChannelsWithThreads],
   );
   const scrollToChannelMessage = useCallback(
     (messageId: string) => {
@@ -413,6 +529,321 @@ export function CommunityWorkspace({
     selectedChannelId,
     session,
   });
+  const upsertChannelThreadSummary = useCallback(
+    (channelId: string, summary: CommunityChannelThreadSummary) => {
+      setChannelThreadsByChannelId((current) => {
+        const currentThreads = current[channelId] ?? [];
+        const nextThreads = [
+          summary,
+          ...currentThreads.filter(
+            (thread) => thread.rootMessageId !== summary.rootMessageId,
+          ),
+        ].sort((left, right) => right.lastReplyAt - left.lastReplyAt);
+
+        return {
+          ...current,
+          [channelId]: nextThreads,
+        };
+      });
+    },
+    [],
+  );
+  const openMessageThread = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId) return;
+
+      if (channelId !== selectedChannelId) handleChannelSelected(channelId);
+
+      setMessageContextMenu(null);
+      setThreadPanel({
+        channelId,
+        draft: '',
+        editingMessage: null,
+        error: null,
+        messages: [],
+        replyTarget: null,
+        root: message,
+        state: 'loading',
+      });
+      try {
+        const result =
+          await applicationContainer.listCommunityChannelMessageThread(
+            session,
+            community.id,
+            channelId,
+            message.id,
+          );
+        const threadMessages = await projectChannelMessages(
+          channelId,
+          result.messages,
+        );
+
+        setThreadPanel({
+          channelId,
+          draft: '',
+          editingMessage: null,
+          error: null,
+          messages: threadMessages,
+          replyTarget: null,
+          root: message,
+          state: 'ready',
+        });
+        if (threadMessages.length > 0) {
+          const lastReply = threadMessages[threadMessages.length - 1];
+
+          upsertChannelThreadSummary(channelId, {
+            lastReplyAt: lastReply.timestamp,
+            lastReplyMessageId: lastReply.id,
+            replyCount: threadMessages.length,
+            rootMessageId: message.id,
+          });
+        }
+      } catch (caught) {
+        setThreadPanel({
+          channelId,
+          draft: '',
+          editingMessage: null,
+          error: toUserErrorMessage(caught, copy.messages.threadError),
+          messages: [],
+          replyTarget: null,
+          root: message,
+          state: 'ready',
+        });
+      }
+    },
+    [
+      community.id,
+      handleChannelSelected,
+      projectChannelMessages,
+      selectedChannelId,
+      session,
+      upsertChannelThreadSummary,
+    ],
+  );
+  const loadThreadRootMessage = useCallback(
+    async (
+      channelId: string,
+      rootMessageId: string,
+    ): Promise<ChatMessage | null> => {
+      const loadedRoot = messages.find((message) => message.id === rootMessageId);
+
+      if (loadedRoot) return loadedRoot;
+
+      let beforeMessageId: null | string | undefined;
+
+      for (let page = 0; page < 8; page += 1) {
+        const result = await applicationContainer.listCommunityChannelMessages(
+          session,
+          community.id,
+          channelId,
+          { beforeMessageId: beforeMessageId ?? undefined },
+        );
+        const loadedMessages = await projectChannelMessages(
+          channelId,
+          result.messages,
+        );
+        const root = loadedMessages.find(
+          (message) => message.id === rootMessageId,
+        );
+
+        if (root) return root;
+
+        if (!result.nextBeforeMessageId) break;
+
+        beforeMessageId = result.nextBeforeMessageId;
+      }
+
+      return null;
+    },
+    [community.id, messages, projectChannelMessages, session],
+  );
+  const openMessageThreadFromSummary = useCallback(
+    async (
+      channelId: string,
+      threadSummary: CommunityChannelThreadSummary,
+    ) => {
+      const root =
+        (await loadThreadRootMessage(channelId, threadSummary.rootMessageId)) ??
+        placeholderThreadRootMessage({
+          channelId,
+          communityId: community.id,
+          currentIdentityId: session.identity.id,
+          rootMessageId: threadSummary.rootMessageId,
+        });
+
+      await openMessageThread(root);
+    },
+    [community.id, loadThreadRootMessage, openMessageThread, session.identity.id],
+  );
+  const openPinnedMessages = useCallback(async () => {
+    if (!selectedChannelId) return;
+
+    setCommunityMenuOpen(false);
+    setMessageCollection({
+      error: null,
+      messages: [],
+      state: 'loading',
+    });
+    try {
+      const result = await applicationContainer.listCommunityChannelMessagePins(
+        session,
+        community.id,
+        selectedChannelId,
+      );
+      const pinnedMessages = await projectChannelMessages(
+        selectedChannelId,
+        result.pins.map((pin) => pin.message),
+      );
+
+      setPinnedMessageIds(new Set(result.pins.map((pin) => pin.messageId)));
+      setMessageCollection({
+        error: null,
+        messages: pinnedMessages,
+        state: 'ready',
+      });
+    } catch (caught) {
+      setMessageCollection({
+        error: toUserErrorMessage(caught, copy.messages.pinError),
+        messages: [],
+        state: 'ready',
+      });
+    }
+  }, [community.id, projectChannelMessages, selectedChannelId, session]);
+  useEffect(() => {
+    if (!selectedChannelId) {
+      setPinnedMessageIds(new Set());
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void applicationContainer
+      .listCommunityChannelMessagePins(session, community.id, selectedChannelId)
+      .then((result) => {
+        if (!cancelled) {
+          setPinnedMessageIds(new Set(result.pins.map((pin) => pin.messageId)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPinnedMessageIds(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.id, selectedChannelId, session]);
+  useEffect(() => {
+    if (!realtimeEvent || realtimeEvent.aggregate_id !== community.id) return;
+
+    if (
+      realtimeEvent.type !== 'communities.v1.channel.message.was_pinned' &&
+      realtimeEvent.type !== 'communities.v1.channel.message.was_unpinned'
+    ) {
+      return;
+    }
+
+    const channelId =
+      typeof realtimeEvent.attributes.channelId === 'string'
+        ? realtimeEvent.attributes.channelId
+        : null;
+    const messageId =
+      typeof realtimeEvent.attributes.messageId === 'string'
+        ? realtimeEvent.attributes.messageId
+        : null;
+
+    if (!messageId || channelId !== selectedChannelId) return;
+
+    setPinnedMessageIds((current) => {
+      const next = new Set(current);
+
+      if (realtimeEvent.type.endsWith('.was_pinned')) {
+        next.add(messageId);
+      } else {
+        next.delete(messageId);
+      }
+
+      return next;
+    });
+  }, [community.id, realtimeEvent, selectedChannelId]);
+  const pinMessage = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId || !canManageMessages) return;
+
+      setMessageContextMenu(null);
+      try {
+        await applicationContainer.pinCommunityChannelMessage(
+          session,
+          community.id,
+          channelId,
+          message.id,
+        );
+        setPinnedMessageIds((current) => new Set(current).add(message.id));
+      } catch (caught) {
+        setRawMessage(null);
+        setMessageCollection({
+          error: toUserErrorMessage(caught, copy.messages.pinError),
+          messages: [],
+          state: 'ready',
+        });
+      }
+    },
+    [canManageMessages, community.id, selectedChannelId, session],
+  );
+  const unpinMessageFromDialog = useCallback(
+    async (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+
+      if (!channelId || !canManageMessages) return;
+
+      try {
+        await applicationContainer.unpinCommunityChannelMessage(
+          session,
+          community.id,
+          channelId,
+          message.id,
+        );
+        setPinnedMessageIds((current) => {
+          const next = new Set(current);
+
+          next.delete(message.id);
+
+          return next;
+        });
+        setMessageCollection((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.filter(
+                  (item) => item.id !== message.id,
+                ),
+              }
+            : current,
+        );
+      } catch (caught) {
+        setMessageCollection((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.unpinError),
+              }
+            : current,
+        );
+      }
+    },
+    [canManageMessages, community.id, selectedChannelId, session],
+  );
+  const unpinMessage = useCallback(
+    async (message: ChatMessage) => {
+      setMessageContextMenu(null);
+      await unpinMessageFromDialog(message);
+    },
+    [unpinMessageFromDialog],
+  );
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
@@ -420,13 +851,18 @@ export function CommunityWorkspace({
       : null;
   const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
+    const accessibleChannels = accessibleTextChannels.map(
+      (channel) =>
+        textChannelsWithThreads.find((item) => item.id === channel.id) ??
+        channel,
+    );
 
-    if (!query) return accessibleTextChannels;
+    if (!query) return accessibleChannels;
 
-    return accessibleTextChannels.filter((channel) =>
+    return accessibleChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [accessibleTextChannels, channelSearch]);
+  }, [accessibleTextChannels, channelSearch, textChannelsWithThreads]);
   const visibleVoiceChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
 
@@ -436,6 +872,27 @@ export function CommunityWorkspace({
       channel.name.toLowerCase().includes(query),
     );
   }, [accessibleVoiceChannels, channelSearch]);
+  const historicalIdentityIds = useMemo(
+    () =>
+      communityMessageIdentityIds({
+        messages: [
+          ...messages,
+          ...(threadPanel
+            ? [threadPanel.root, ...threadPanel.messages]
+            : []),
+          ...(messageCollection?.messages ?? []),
+          ...messageSearch.results.map((result) => result.message),
+        ],
+        polls: selectedChannelPolls,
+      }),
+    [
+      messageCollection?.messages,
+      messages,
+      messageSearch.results,
+      selectedChannelPolls,
+      threadPanel,
+    ],
+  );
   const {
     communityMemberIds,
     memberIdentities,
@@ -448,10 +905,36 @@ export function CommunityWorkspace({
     activeCall,
     activeVoiceChannelId,
     community,
+    extraIdentityIds: historicalIdentityIds,
     session,
     visibleVoiceChannels,
     voiceChannels,
   });
+  const communityIdentityNames = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(memberIdentities).map(([identityId, identity]) => [
+          identityId,
+          memberDisplayName(identity, identityId),
+        ]),
+      ),
+    [memberIdentities],
+  );
+  const threadLabelByRootMessageId = useMemo(() => {
+    const labels: Record<string, string> = {};
+
+    for (const message of messages) {
+      if (!message.replyToMessageId) {
+        labels[message.id] = threadTitleFromMessage(message);
+      }
+    }
+
+    if (threadPanel) {
+      labels[threadPanel.root.id] = threadTitleFromMessage(threadPanel.root);
+    }
+
+    return labels;
+  }, [messages, threadPanel]);
   const mentionSuggestions = useMemo(() => {
     if (!selectedChannel) return [];
 
@@ -538,11 +1021,11 @@ export function CommunityWorkspace({
 
       if (!trigger) return;
 
-      setDraft(
+      setSelectedChannelDraft(
         `${draft.slice(0, trigger.start)}${token} ${draft.slice(trigger.end)}`,
       );
     },
-    [draft],
+    [draft, setSelectedChannelDraft],
   );
   const mentionTokens = useMemo(
     () =>
@@ -578,9 +1061,45 @@ export function CommunityWorkspace({
     () => () => {
       communityMessageDecryptWorkerRef.current?.terminate();
       communityMessageDecryptWorkerRef.current = null;
+
+      for (const timer of draftSyncTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+
+      draftSyncTimersRef.current.clear();
     },
     [],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listCommunityDrafts(session)
+      .then((remoteDrafts) => {
+        if (cancelled) return;
+
+        setDrafts((current) => {
+          const next = { ...current };
+
+          for (const draft of remoteDrafts) {
+            if (
+              draft.communityId === community.id &&
+              next[draft.channelId] === undefined
+            ) {
+              next[draft.channelId] = draft.content;
+            }
+          }
+
+          return next;
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [community.id, session]);
 
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
@@ -951,13 +1470,291 @@ export function CommunityWorkspace({
     selectedChannelId,
     selectedChannelPolls,
     session,
-    setDraft,
+    setDraft: setSelectedChannelDraft,
     setMessages,
   });
+  const handleTextChannelSelected = useCallback(
+    (channelId: string) => {
+      const leavingThreadInCurrentChannel =
+        !!threadPanel && channelId === selectedChannelId;
+
+      setThreadPanel(null);
+      handleChannelSelected(channelId);
+
+      if (leavingThreadInCurrentChannel) {
+        requestAnimationFrame(() => scrollChannelToBottom('auto', true));
+      }
+    },
+    [
+      handleChannelSelected,
+      scrollChannelToBottom,
+      selectedChannelId,
+      threadPanel,
+    ],
+  );
+  const updateThreadDraft = useCallback((value: string) => {
+    setThreadPanel((current) =>
+      current ? { ...current, draft: value } : current,
+    );
+  }, []);
+  const startEditingThreadMessage = useCallback((message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            draft: message.content,
+            editingMessage: {
+              message,
+              previousDraft: current.draft,
+            },
+            replyTarget: null,
+          }
+        : current,
+    );
+  }, []);
+  const cancelThreadMessageEdit = useCallback(() => {
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            draft: current.editingMessage?.previousDraft ?? '',
+            editingMessage: null,
+          }
+        : current,
+    );
+  }, []);
+  const startReplyingToThreadMessage = useCallback((message: ChatMessage) => {
+    setMessageContextMenu(null);
+    setThreadPanel((current) =>
+      current
+        ? {
+            ...current,
+            editingMessage: null,
+            replyTarget: message,
+          }
+        : current,
+    );
+  }, []);
+  const cancelThreadMessageReply = useCallback(() => {
+    setThreadPanel((current) =>
+      current ? { ...current, replyTarget: null } : current,
+    );
+  }, []);
+  const editThreadMessage = useCallback(
+    async (content: string) => {
+      if (!threadPanel?.editingMessage) return;
+
+      const targetMessage = threadPanel.editingMessage.message;
+
+      setThreadPanel((current) =>
+        current ? { ...current, error: null } : current,
+      );
+      try {
+        const projected = await messageComposer.editChannelMessage(
+          targetMessage,
+          content,
+        );
+
+        setMessages((current) =>
+          current.some((message) => message.id === projected.id)
+            ? mergeChatMessages(current, [projected])
+            : current,
+        );
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...mergeCommunityThreadMessage(current, projected),
+                draft: '',
+                editingMessage: null,
+                error: null,
+                replyTarget: null,
+              }
+            : current,
+        );
+      } catch (caught) {
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.editError),
+              }
+            : current,
+        );
+      }
+    },
+    [messageComposer, setMessages, threadPanel],
+  );
+  const deleteThreadMessage = useCallback(
+    async (message: ChatMessage) => {
+      if (!window.confirm(copy.messages.deleteConfirm)) return;
+
+      setMessageContextMenu(null);
+      setThreadPanel((current) =>
+        current ? { ...current, error: null } : current,
+      );
+      try {
+        const deleted = await messageComposer.deleteChannelMessage(message);
+
+        if (!deleted) return;
+
+        setMessages((current) =>
+          current.filter((item) => item.id !== message.id),
+        );
+        setThreadPanel((current) => {
+          if (!current) return current;
+
+          return removeCommunityThreadMessage(current, message.id);
+        });
+      } catch (caught) {
+        setThreadPanel((current) =>
+          current
+            ? {
+                ...current,
+                error: toUserErrorMessage(caught, copy.messages.deleteError),
+              }
+            : current,
+        );
+      }
+    },
+    [messageComposer, setMessages],
+  );
+  const sendThreadMessage = useCallback(
+    async (
+      content: string,
+      attachments: File[],
+      attachmentUpload: AttachmentUploadOptions,
+    ) => {
+      if (!threadPanel) return;
+
+      const sent = await messageComposer.sendReplyToMessage(
+        threadPanel.root,
+        content,
+        attachments,
+        attachmentUpload,
+        {
+          renderInChannel: false,
+          replyPreviewTarget: threadPanel.replyTarget,
+        },
+      );
+
+      if (!sent) return;
+
+      setThreadPanel((current) =>
+        current
+          ? {
+              ...current,
+              draft: '',
+              messages: mergeChatMessages(current.messages, [sent]),
+              replyTarget: null,
+            }
+          : current,
+      );
+      upsertChannelThreadSummary(threadPanel.channelId, {
+        lastReplyAt: sent.timestamp,
+        lastReplyMessageId: sent.id,
+        replyCount: threadPanel.messages.some(
+          (message) => message.id === sent.id,
+        )
+          ? threadPanel.messages.length
+          : threadPanel.messages.length + 1,
+        rootMessageId: threadPanel.root.id,
+      });
+    },
+    [messageComposer, threadPanel, upsertChannelThreadSummary],
+  );
+  const sendThreadSticker = useCallback(
+    async (sticker: StickerMessageReference) => {
+      if (!threadPanel) return;
+
+      const sent = await messageComposer.sendStickerReplyToMessage(
+        threadPanel.root,
+        sticker,
+        {
+          renderInChannel: false,
+          replyPreviewTarget: threadPanel.replyTarget,
+        },
+      );
+
+      if (!sent) return;
+
+      setThreadPanel((current) =>
+        current
+          ? {
+              ...current,
+              draft: '',
+              messages: mergeChatMessages(current.messages, [sent]),
+              replyTarget: null,
+            }
+          : current,
+      );
+      upsertChannelThreadSummary(threadPanel.channelId, {
+        lastReplyAt: sent.timestamp,
+        lastReplyMessageId: sent.id,
+        replyCount: threadPanel.messages.some(
+          (message) => message.id === sent.id,
+        )
+          ? threadPanel.messages.length
+          : threadPanel.messages.length + 1,
+        rootMessageId: threadPanel.root.id,
+      });
+    },
+    [messageComposer, threadPanel, upsertChannelThreadSummary],
+  );
 
   useEffect(() => {
     messageComposer.resetForChannelChange();
   }, [selectedChannelId]);
+
+  useEffect(() => {
+    if (!threadPanel || threadPanel.channelId === selectedChannelId) return;
+
+    setThreadPanel(null);
+  }, [selectedChannelId, threadPanel]);
+
+  const handleRealtimeThreadMessage = useCallback(
+    (message: ChatMessage) => {
+      const channelId = message.raw.channelId ?? selectedChannelId;
+      const rootMessageId = message.replyToMessageId;
+
+      if (!channelId || !rootMessageId) return;
+
+      const currentSummary = channelThreadsByChannelId[channelId]?.find(
+        (thread) => thread.rootMessageId === rootMessageId,
+      );
+
+      setThreadPanel((current) =>
+        current?.channelId === channelId && current.root.id === rootMessageId
+          ? {
+              ...current,
+              messages: mergeChatMessages(current.messages, [message]),
+            }
+          : current,
+      );
+      upsertChannelThreadSummary(channelId, {
+        lastReplyAt: message.timestamp,
+        lastReplyMessageId: message.id,
+        replyCount: currentSummary
+          ? currentSummary.replyCount +
+            (currentSummary.lastReplyMessageId === message.id ? 0 : 1)
+          : 1,
+        rootMessageId,
+      });
+    },
+    [channelThreadsByChannelId, selectedChannelId, upsertChannelThreadSummary],
+  );
+
+  const handleRealtimeMessageEdited = useCallback((message: ChatMessage) => {
+    setThreadPanel((current) =>
+      current ? mergeCommunityThreadMessage(current, message) : current,
+    );
+  }, []);
+
+  const handleRealtimeMessageDeleted = useCallback((messageId: string) => {
+    setThreadPanel((current) =>
+      current ? removeCommunityThreadMessage(current, messageId) : current,
+    );
+  }, []);
 
   useCommunityChannelRealtime({
     communityId: community.id,
@@ -965,6 +1762,9 @@ export function CommunityWorkspace({
     isScrolledNearBottom,
     loadChannelMessages,
     onChannelViewed,
+    onMessageDeleted: handleRealtimeMessageDeleted,
+    onMessageEdited: handleRealtimeMessageEdited,
+    onThreadMessageReceived: handleRealtimeThreadMessage,
     projectChannelMessage,
     realtimeEvent,
     resetNewChannelMessageCount,
@@ -1046,11 +1846,16 @@ export function CommunityWorkspace({
               channelSearch={channelSearch}
               channelUnreadCounts={channelUnreadCounts}
               onChannelSearchChange={setChannelSearch}
-              onTextChannelSelected={handleChannelSelected}
+              onTextChannelSelected={handleTextChannelSelected}
+              onThreadSelected={(channel, thread) =>
+                void openMessageThreadFromSummary(channel.id, thread)
+              }
               onVoiceChannelJoin={joinVoiceChannel}
               onVoiceParticipantClick={openVoiceParticipantProfile}
               selectedChannelId={selectedChannelId}
-              textChannels={textChannels}
+              selectedThreadRootMessageId={threadPanel?.root.id}
+              textChannels={textChannelsWithThreads}
+              threadLabelByRootMessageId={threadLabelByRootMessageId}
               visibleTextChannels={visibleTextChannels}
               visibleVoiceChannels={visibleVoiceChannels}
               voiceChannels={voiceChannels}
@@ -1121,6 +1926,7 @@ export function CommunityWorkspace({
           }
           onOpenAvatar={avatarUrl ? () => setAvatarViewerOpen(true) : undefined}
           onOpenMobileSidebar={onOpenMobileSidebar}
+          onPinsOpen={() => void openPinnedMessages()}
           onRealtimeEventsOpen={onRealtimeEventsOpen}
           realtimeStatus={realtimeStatus}
           selectedChannel={selectedChannel}
@@ -1153,7 +1959,59 @@ export function CommunityWorkspace({
           />
         ) : null}
 
-        {!selectedChannel ? (
+        {threadPanel ? (
+          <MessageThreadPanel
+            currentIdentityId={session.identity.id}
+            disabled={
+              threadPanel.state === 'loading' ||
+              messageState === 'loading' ||
+              (!communityIsPublic && !communityKey) ||
+              !currentPermissions.has('send_messages')
+            }
+            draft={threadPanel.draft}
+            editingMessage={threadPanel.editingMessage?.message ?? null}
+            embedded
+            error={threadPanel.error}
+            identityNames={communityIdentityNames}
+            identityPictures={memberPictures}
+            messages={threadPanel.messages}
+            onCancelEdit={cancelThreadMessageEdit}
+            onCancelReply={cancelThreadMessageReply}
+            onAuthorProfileOpen={(message, target) =>
+              openMessageAuthorProfile(message, profileAnchorFromTarget(target))
+            }
+            onClose={() => setThreadPanel(null)}
+            onDraftChange={updateThreadDraft}
+            onEdit={editThreadMessage}
+            onMessageMenuOpen={(message, x, y) =>
+              setMessageContextMenu({ message, source: 'thread', x, y })
+            }
+            onRootMessageOpen={(message) => {
+              setMessages((current) => mergeChatMessages(current, [message]));
+              setThreadPanel(null);
+              window.setTimeout(() => scrollToChannelMessage(message.id), 0);
+            }}
+            onSend={sendThreadMessage}
+            onStickerSend={
+              currentPermissions.has('send_stickers')
+                ? sendThreadSticker
+                : undefined
+            }
+            pinnedMessageIds={pinnedMessageIds}
+            replyTo={threadPanel.replyTarget}
+            replyToAuthorName={
+              threadPanel.replyTarget
+                ? memberDisplayName(
+                    memberIdentities[threadPanel.replyTarget.authorIdentityId],
+                    threadPanel.replyTarget.authorIdentityId,
+                  )
+                : undefined
+            }
+            rootMessage={threadPanel.root}
+            session={session}
+            title={`# ${channelNameFor(threadPanel.channelId)}`}
+          />
+        ) : !selectedChannel ? (
           <div className="grid flex-1 place-items-center p-6 text-center">
             <div className="max-w-md">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10 text-3xl font-black">
@@ -1209,6 +2067,7 @@ export function CommunityWorkspace({
               onMessageMenuOpen={(message, x, y) =>
                 setMessageContextMenu({ message, x, y })
               }
+              onOpenThread={(message) => void openMessageThread(message)}
               onReactionToggle={(message, emoji, reacted) =>
                 void messageComposer.handleToggleChannelMessageReaction(
                   message,
@@ -1219,6 +2078,7 @@ export function CommunityWorkspace({
               onReplyReferenceClick={messageComposer.handleReplyReferenceClick}
               onRetryMessage={messageComposer.retryChannelMessage}
               canClosePolls={currentPermissions.has('create_polls')}
+              channelThreadSummaries={selectedChannel.threads ?? []}
               onPollClose={closePoll}
               onPollRemoveVote={removePollVote}
               onPollVote={votePoll}
@@ -1227,6 +2087,7 @@ export function CommunityWorkspace({
               currentRoleIds={currentRoleIds}
               reactionAuthorNames={reactionAuthorNames}
               polls={selectedChannelPolls}
+              pinnedMessageIds={pinnedMessageIds}
               scrollerRef={scrollerRef}
               session={session}
               visibleMessages={visibleMessages}
@@ -1234,7 +2095,7 @@ export function CommunityWorkspace({
             {typingIdentityIds.length > 0 && (
               <TypingIndicator
                 getIdentityName={(identityId) =>
-                  memberDisplayName(memberIdentities[identityId], identityId)
+                  memberPrimaryName(memberIdentities[identityId], identityId)
                 }
                 identityIds={typingIdentityIds}
               />
@@ -1330,6 +2191,38 @@ export function CommunityWorkspace({
         presenceByIdentityId={presenceByIdentityId}
       />
 
+      {messageCollection ? (
+        <MessageCollectionDialog
+          actions={
+            canManageMessages
+              ? [
+                  {
+                    label: copy.messages.unpin,
+                    onClick: (message) => void unpinMessageFromDialog(message),
+                    tone: 'danger',
+                  },
+                ]
+              : []
+          }
+          emptyLabel={
+            messageCollection.state === 'loading'
+              ? copy.app.loading
+              : messageCollection.error ?? copy.messages.emptyPins
+          }
+          identityNames={communityIdentityNames}
+          identityPictures={memberPictures}
+          messages={messageCollection.messages}
+          onClose={() => setMessageCollection(null)}
+          onMessageOpen={(message) => {
+            setMessageCollection(null);
+            setMessages((current) => mergeChatMessages(current, [message]));
+            scrollToChannelMessage(message.id);
+          }}
+          subtitle={messageCollection.error}
+          title={copy.messages.pinnedMessages}
+        />
+      ) : null}
+
       <CommunityWorkspaceDialogs
         avatarUrl={avatarUrl}
         avatarViewerOpen={avatarViewerOpen}
@@ -1363,13 +2256,27 @@ export function CommunityWorkspace({
         onCommunityKeyInputChange={setCommunityKeyInput}
         onCommunityUpdated={onCommunityUpdated}
         onDeleteMessage={(message) =>
-          void messageComposer.handleDeleteChannelMessage(message)
+          void (messageContextMenu?.source === 'thread'
+            ? deleteThreadMessage(message)
+            : messageComposer.handleDeleteChannelMessage(message))
         }
-        onEditMessage={messageComposer.startEditingChannelMessage}
+        onEditMessage={(message) =>
+          messageContextMenu?.source === 'thread'
+            ? startEditingThreadMessage(message)
+            : messageComposer.startEditingChannelMessage(message)
+        }
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
+        onOpenMessageThread={(message) => void openMessageThread(message)}
+        onPinMessage={(message) => void pinMessage(message)}
         onReplyToMessage={(message) => {
-          messageComposer.startReplyToMessage(message);
+          if (messageContextMenu?.source === 'thread') {
+            startReplyingToThreadMessage(message);
+
+            return;
+          }
+
           setMessageContextMenu(null);
+          messageComposer.startReplyToMessage(message);
         }}
         onSessionUpdated={onSessionUpdated}
         onToggleReaction={(message, emoji, reacted) =>
@@ -1383,14 +2290,101 @@ export function CommunityWorkspace({
           setRawMessage(message);
           setMessageContextMenu(null);
         }}
+        onUnpinMessage={(message) => void unpinMessage(message)}
         owner={owner}
         presenceByIdentityId={presenceByIdentityId}
+        pinnedMessageIds={pinnedMessageIds}
         profileViewer={profileViewer}
         rawMessage={rawMessage}
         session={session}
       />
     </>
   );
+}
+
+function placeholderThreadRootMessage({
+  channelId,
+  communityId,
+  currentIdentityId,
+  rootMessageId,
+}: {
+  channelId: string;
+  communityId: string;
+  currentIdentityId: string;
+  rootMessageId: string;
+}): ChatMessage {
+  return {
+    attachments: [],
+    authorIdentityId: currentIdentityId,
+    content: copy.messages.originalMessage,
+    encrypted: false,
+    id: rootMessageId,
+    mine: false,
+    raw: {
+      channelId,
+      communityId,
+      id: rootMessageId,
+      type: 'sent',
+    },
+    reactions: [],
+    timestamp: Date.now(),
+  };
+}
+
+function mergeCommunityThreadMessage(
+  currentThread: CommunityThreadState,
+  incomingMessage: ChatMessage,
+): CommunityThreadState {
+  const rootMessages =
+    currentThread.root.id === incomingMessage.id
+      ? mergeChatMessages([currentThread.root], [incomingMessage])
+      : [currentThread.root];
+  const threadMessages = currentThread.messages.some(
+    (message) => message.id === incomingMessage.id,
+  )
+    ? mergeChatMessages(currentThread.messages, [incomingMessage])
+    : currentThread.messages;
+
+  return {
+    ...currentThread,
+    messages: threadMessages,
+    root:
+      rootMessages.find((message) => message.id === currentThread.root.id) ??
+      currentThread.root,
+  };
+}
+
+function removeCommunityThreadMessage(
+  currentThread: CommunityThreadState,
+  messageId: string,
+): CommunityThreadState | null {
+  if (currentThread.root.id === messageId) return null;
+
+  const deletingEditedMessage =
+    currentThread.editingMessage?.message.id === messageId;
+  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
+
+  return {
+    ...currentThread,
+    draft: deletingEditedMessage
+      ? (currentThread.editingMessage?.previousDraft ?? '')
+      : currentThread.draft,
+    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
+    messages: currentThread.messages.filter((message) => message.id !== messageId),
+  };
+}
+
+function threadTitleFromMessage(message: ChatMessage): string {
+  if (message.content.trim()) return message.content.trim().slice(0, 64);
+
+  if (message.sticker) return copy.stickers.stickerAlt;
+
+  if (message.attachments.length > 0) {
+    return message.attachments[0]?.filename ?? copy.messages.thread;
+  }
+
+  return shortId(message.id);
 }
 
 function findMentionTrigger(

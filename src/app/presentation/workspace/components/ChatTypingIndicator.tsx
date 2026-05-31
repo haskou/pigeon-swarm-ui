@@ -1,5 +1,6 @@
 import {
   identityDisplayName,
+  identityPrimaryDisplayName,
   type IdentityNames,
 } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { TypingIndicator } from '../../../../modules/messages/presentation/components/TypingIndicator';
@@ -16,7 +17,9 @@ export function ChatTypingIndicator({
   return (
     <TypingIndicator
       getIdentityName={(identityId) =>
-        identityDisplayName(identityId, identityNames)
+        identityPrimaryDisplayName(
+          identityDisplayName(identityId, identityNames),
+        )
       }
       identityIds={identityIds}
     />

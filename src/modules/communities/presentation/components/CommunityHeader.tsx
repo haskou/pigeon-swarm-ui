@@ -25,6 +25,7 @@ export function CommunityHeader({
   onCommunityMenuToggle,
   onOpenAvatar,
   onOpenMobileSidebar,
+  onPinsOpen,
   onRealtimeEventsOpen,
   realtimeStatus,
   selectedChannel,
@@ -42,6 +43,7 @@ export function CommunityHeader({
   onCommunityMenuToggle: () => void;
   onOpenAvatar?: () => void;
   onOpenMobileSidebar: () => void;
+  onPinsOpen?: () => void;
   onRealtimeEventsOpen?: () => void;
   realtimeStatus: 'connected' | 'reconnecting';
   selectedChannel?: CommunityTextChannel;
@@ -103,6 +105,7 @@ export function CommunityHeader({
       menuOpen={communityMenuOpen}
       onMenuToggle={onCommunityMenuToggle}
       onOpenSidebar={onOpenMobileSidebar}
+      onPinsOpen={selectedChannel ? onPinsOpen : undefined}
       onRealtimeEventsOpen={onRealtimeEventsOpen}
       realtimeStatus={realtimeStatus}
       subtitle={subtitle}

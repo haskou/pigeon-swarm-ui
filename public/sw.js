@@ -1,10 +1,12 @@
 const cacheVersion = 'pigeon-swarm-v1';
+const notificationBadge = '/favicon/notification-badge.png';
 const appShell = [
   '/',
   '/favicon/site.webmanifest',
   '/favicon/android-chrome-192x192.png',
   '/favicon/android-chrome-512x512.png',
   '/favicon/apple-touch-icon.png',
+  notificationBadge,
   '/logo.png',
   '/connectionLost.png',
 ];
@@ -128,7 +130,7 @@ self.addEventListener('push', (event) => {
 
 async function showPushNotification(payload) {
   await self.registration.showNotification(payload.title, {
-    badge: payload.badge || '/favicon/favicon-32x32.png',
+    badge: payload.badge || notificationBadge,
     body: payload.body,
     data: {
       ...payload.data,

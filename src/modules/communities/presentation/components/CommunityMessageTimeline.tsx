@@ -4,6 +4,7 @@ import { Fragment, memo, type RefObject, useMemo } from 'react';
 import type {
   AttachmentProgress,
   ChatMessage,
+  CommunityChannelThreadSummary,
   IdentityResource,
   MessageAttachment,
   PollResource,
@@ -50,6 +51,7 @@ interface CommunityMessageTimelineProps {
   onIdentityProfileOpen?: (identityId: string, target: HTMLElement) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onOpenThread: (message: ChatMessage) => void;
   onReactionToggle: (
     message: ChatMessage,
     emoji: string,
@@ -59,10 +61,12 @@ interface CommunityMessageTimelineProps {
   onRetryMessage: (message: ChatMessage) => void;
   onPollClose?: (poll: PollResource) => Promise<void>;
   canClosePolls: boolean;
+  channelThreadSummaries?: CommunityChannelThreadSummary[];
   onPollRemoveVote?: (poll: PollResource) => Promise<void>;
   onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
+  pinnedMessageIds: ReadonlySet<string>;
   currentRoleIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   polls?: PollResource[];
@@ -87,6 +91,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onIdentityProfileOpen,
   onJumpToLatest,
   onMessageMenuOpen,
+  onOpenThread,
   onPollClose,
   canClosePolls,
   onPollRemoveVote,
@@ -96,6 +101,8 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onRetryMessage,
   onScroll,
   onStickerClick,
+  channelThreadSummaries = [],
+  pinnedMessageIds,
   polls = [],
   currentRoleIds,
   reactionAuthorNames,
@@ -104,8 +111,19 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   visibleMessages,
 }: CommunityMessageTimelineProps) {
   const timelineEntries = useMemo(
-    () => MessageTimelineEntries.build(visibleMessages, polls),
-    [polls, visibleMessages],
+    () =>
+      MessageTimelineEntries.build(
+        visibleMessages,
+        polls,
+        channelThreadSummaries.map((summary) => ({
+          count: summary.replyCount,
+          lastMessage: visibleMessages.find(
+            (message) => message.id === summary.lastReplyMessageId,
+          ),
+          rootMessageId: summary.rootMessageId,
+        })),
+      ),
+    [channelThreadSummaries, polls, visibleMessages],
   );
 
   return (
@@ -247,10 +265,12 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       }
                       onMessageMenuOpen={onMessageMenuOpen}
                       onMentionClick={onIdentityProfileOpen}
+                      onThreadOpen={onOpenThread}
                       onReactionToggle={onReactionToggle}
                       onReplyReferenceClick={onReplyReferenceClick}
                       onRetryMessage={onRetryMessage}
                       onStickerClick={onStickerClick}
+                      pinned={pinnedMessageIds.has(message.id)}
                       reactionAuthorNames={reactionAuthorNames}
                       mentionHighlighted={CommunityMentionHighlightPolicy.mentionsIdentity(
                         message,
@@ -282,6 +302,25 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         replyMessage?.content ?? message.replyPreview?.content
                       }
                       showAvatar={entry.endsAuthorRun}
+                      threadAuthorName={
+                        entry.threadSummary?.lastMessage
+                          ? memberPrimaryName(
+                              memberIdentities[
+                                entry.threadSummary.lastMessage
+                                  .authorIdentityId
+                              ],
+                              entry.threadSummary.lastMessage.authorIdentityId,
+                            )
+                          : undefined
+                      }
+                      threadAuthorPicture={
+                        entry.threadSummary?.lastMessage
+                          ? memberPictures[
+                              entry.threadSummary.lastMessage.authorIdentityId
+                            ]
+                          : undefined
+                      }
+                      threadCount={entry.threadSummary?.count}
                     />
                   </div>
                 </Fragment>

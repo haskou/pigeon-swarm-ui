@@ -4,8 +4,9 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -14,7 +15,6 @@ import {
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
-import { useNodeNetworks } from '../../../networks/presentation/hooks/useNodeNetworks';
 import {
   normalizeHandleInput,
   passwordValidationChecks,
@@ -36,6 +36,7 @@ import { PasswordChecklist } from './PasswordChecklist';
 type LoadState = 'idle' | 'loading' | 'error';
 
 interface AuthScreenProps {
+  availableNetworks: NodeNetwork[];
   onAuthenticated: (
     session: Session,
     conversations: ConversationResource[],
@@ -44,6 +45,7 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({
+  availableNetworks,
   onAuthenticated,
   peerCount,
 }: AuthScreenProps): ReactElement {
@@ -54,12 +56,11 @@ export function AuthScreen({
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { installState, requestInstall } = useInstallPrompt();
-  const { networks: availableNetworks } = useNodeNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const modeOptions = [
     { label: copy.auth.login, value: 'login' },
@@ -93,7 +94,8 @@ export function AuthScreen({
     selectedNetwork,
   });
   const passwordChecks = passwordValidationChecks(password);
-  const canShowInstallButton = installState !== 'installed';
+  const canShowInstallButton =
+    installState !== 'fallback' && installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
   const installHelp =
@@ -120,6 +122,7 @@ export function AuthScreen({
     setError(null);
 
     try {
+      const applicationContainer = await loadApplicationContainer();
       const result =
         mode === 'login'
           ? await applicationContainer.login(
@@ -344,12 +347,17 @@ export function AuthScreen({
               >
                 {installButtonLabel}
               </button>
-              {(showInstallHelp || installState === 'fallback') && installHelp && (
+              {showInstallHelp && installHelp && (
                 <p className="mt-2 text-center text-xs leading-snug text-white/45">
                   {installHelp}
                 </p>
               )}
             </div>
+          )}
+          {!canShowInstallButton && installHelp && (
+            <p className="mt-3 text-center text-xs leading-snug text-white/45">
+              {installHelp}
+            </p>
           )}
         </form>
       </div>

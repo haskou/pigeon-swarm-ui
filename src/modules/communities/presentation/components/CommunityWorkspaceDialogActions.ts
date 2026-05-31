@@ -52,9 +52,14 @@ export class CommunityWorkspaceDialogActions {
     community: Community,
     identityId: string,
   ): string[] {
+    const isOwner = community.ownerIdentityId === identityId;
+    const isMember = community.memberIds.includes(identityId);
+
+    if (!isOwner && !isMember) return [];
+
     const roleNames = new Set<string>();
 
-    if (community.ownerIdentityId === identityId) {
+    if (isOwner) {
       roleNames.add(copy.communities.owner);
     }
 

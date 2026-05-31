@@ -46,7 +46,9 @@ type CommunityPendingSend = {
   channelId: string;
   content: string;
   mentions?: CommunityMessageMention[];
+  replyPreviewTarget?: ChatMessage | null;
   replyTarget: ChatMessage | null;
+  renderInChannel?: boolean;
   sticker?: StickerMessageReference;
 };
 
@@ -139,7 +141,7 @@ export function useCommunityMessageComposer({
     if (!selectedChannelId) return Promise.resolve();
 
     onTypingActive?.(selectedChannelId, false);
-    sendPendingChannelMessage({
+    void sendPendingChannelMessage({
       attachments,
       attachmentUpload,
       channelId: selectedChannelId,
@@ -158,7 +160,7 @@ export function useCommunityMessageComposer({
     if (!selectedChannelId) return Promise.resolve();
 
     onTypingActive?.(selectedChannelId, false);
-    sendPendingChannelMessage({
+    void sendPendingChannelMessage({
       attachments: [],
       attachmentUpload: {},
       channelId: selectedChannelId,
@@ -202,57 +204,75 @@ export function useCommunityMessageComposer({
     }
   };
 
-  const handleEditChannelMessage = async (content: string) => {
-    if (!selectedChannelId || !editingMessage) return;
+  const editChannelMessage = async (
+    message: ChatMessage,
+    content: string,
+  ): Promise<ChatMessage> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
 
-    const channelId = selectedChannelId;
-    const targetMessage = editingMessage.message;
+    if (!channelId) {
+      throw new Error(copy.messages.editError);
+    }
+
     const mentions = mentionsForContent(content);
 
     setError(null);
 
-    try {
-      const timestamp = Date.now();
-      const linkPreview = await createLinkPreviewForContent(session, content);
-      const payloadInput = {
-        attachments: targetMessage.attachments,
-        authorIdentityId: session.identity.id,
-        channelId,
-        communityId: community.id,
-        content,
-        eventType: 'CommunityChannelMessageEdited' as const,
-        linkPreview,
+    const timestamp = Date.now();
+    const linkPreview = await createLinkPreviewForContent(session, content);
+    const replyToMessageId =
+      message.replyToMessageId ?? message.raw.replyToMessageId;
+    const payloadInput = {
+      attachments: message.attachments,
+      authorIdentityId: session.identity.id,
+      channelId,
+      communityId: community.id,
+      content,
+      eventType: 'CommunityChannelMessageEdited' as const,
+      linkPreview,
+      mentions,
+      replyPreview: message.replyPreview,
+      replyToMessageId,
+      timestamp,
+    };
+    const messagePayload = communityIsPublic
+      ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
+      : {
+          encryptedPayload: await encryptCommunityChannelPayload({
+            ...payloadInput,
+            communityKey: session.keychain.conversations[community.id],
+          }),
+        };
+    const edited = await applicationContainer.editCommunityChannelMessage(
+      session,
+      community.id,
+      channelId,
+      message.id,
+      {
+        attachmentExternalIdentifiers: message.attachments.map(
+          (attachment) => attachment.cid,
+        ),
+        ...messagePayload,
         mentions,
         timestamp,
-      };
-      const messagePayload = communityIsPublic
-        ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
-        : {
-            encryptedPayload: await encryptCommunityChannelPayload({
-              ...payloadInput,
-              communityKey: session.keychain.conversations[community.id],
-            }),
-          };
-      const edited = await applicationContainer.editCommunityChannelMessage(
-        session,
-        community.id,
-        channelId,
-        targetMessage.id,
-        {
-          attachmentExternalIdentifiers: targetMessage.attachments.map(
-            (attachment) => attachment.cid,
-          ),
-          ...messagePayload,
-          mentions,
-          timestamp,
-        },
-      );
-      const projected = await projectChannelMessage(channelId, edited);
+      },
+    );
+
+    return await projectChannelMessage(channelId, edited);
+  };
+
+  const handleEditChannelMessage = async (content: string) => {
+    if (!selectedChannelId || !editingMessage) return;
+
+    const targetMessage = editingMessage.message;
+
+    try {
+      const projected = await editChannelMessage(targetMessage, content);
 
       setMessages((current) => mergeChatMessages(current, [projected]));
       setEditingMessage(null);
       setDraft('');
-      onTypingActive?.(channelId, false);
+      onTypingActive?.(targetMessage.raw.channelId ?? selectedChannelId, false);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.messages.editError));
     }
@@ -280,6 +300,27 @@ export function useCommunityMessageComposer({
     setError(copy.messages.replyTargetNotFound);
   };
 
+  const deleteChannelMessage = async (message: ChatMessage): Promise<boolean> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
+
+    if (
+      !channelId ||
+      (!message.mine && !owner && !currentPermissions.has('manage_messages'))
+    ) {
+      return false;
+    }
+
+    setError(null);
+    await applicationContainer.deleteCommunityChannelMessage(
+      session,
+      community.id,
+      channelId,
+      message.id,
+    );
+
+    return true;
+  };
+
   const handleDeleteChannelMessage = async (message: ChatMessage) => {
     if (
       !selectedChannelId ||
@@ -289,14 +330,11 @@ export function useCommunityMessageComposer({
 
     if (!window.confirm(copy.messages.deleteConfirm)) return;
 
-    setError(null);
     try {
-      await applicationContainer.deleteCommunityChannelMessage(
-        session,
-        community.id,
-        selectedChannelId,
-        message.id,
-      );
+      const deleted = await deleteChannelMessage(message);
+
+      if (!deleted) return;
+
       setMessages((current) =>
         current.filter((item) => item.id !== message.id),
       );
@@ -378,10 +416,17 @@ export function useCommunityMessageComposer({
     setError(null);
   };
 
-  const sendPendingChannelMessage = (payload: CommunityPendingSend) => {
+  const sendPendingChannelMessage = (
+    payload: CommunityPendingSend,
+  ): Promise<ChatMessage> => {
     setError(null);
     const timestamp = Date.now();
     const optimisticId = `pending:${community.id}:${payload.channelId}:${timestamp}:${UUID.generate().toString()}`;
+    const renderInChannel = payload.renderInChannel ?? true;
+    const replyPreview =
+      payload.replyPreviewTarget === undefined
+        ? replyPreviewFromMessage(payload.replyTarget)
+        : replyPreviewFromMessage(payload.replyPreviewTarget);
 
     setFailedSends((current) => {
       const next = { ...current };
@@ -390,40 +435,42 @@ export function useCommunityMessageComposer({
 
       return next;
     });
-    setMessages((current) => [
-      ...current,
-      {
-        attachments: PendingMessageAttachments.fromFiles(
-          payload.attachments,
-          optimisticId,
-        ),
-        authorIdentityId: session.identity.id,
-        content: payload.sticker
-          ? ''
-          : payload.content ||
-            payload.attachments.map((attachment) => attachment.name).join(', '),
-        deliveryStatus: 'pending',
-        encrypted: false,
-        id: optimisticId,
-        mentions: payload.mentions,
-        mine: true,
-        raw: {
-          channelId: payload.channelId,
-          communityId: community.id,
+    if (renderInChannel) {
+      setMessages((current) => [
+        ...current,
+        {
+          attachments: PendingMessageAttachments.fromFiles(
+            payload.attachments,
+            optimisticId,
+          ),
+          authorIdentityId: session.identity.id,
+          content: payload.sticker
+            ? ''
+            : payload.content ||
+              payload.attachments.map((attachment) => attachment.name).join(', '),
+          deliveryStatus: 'pending',
+          encrypted: false,
           id: optimisticId,
           mentions: payload.mentions,
-          type: 'sent',
+          mine: true,
+          raw: {
+            channelId: payload.channelId,
+            communityId: community.id,
+            id: optimisticId,
+            mentions: payload.mentions,
+            type: 'sent',
+          },
+          reactions: [],
+          replyPreview,
+          replyToMessageId: payload.replyTarget?.id,
+          sticker: payload.sticker,
+          timestamp,
         },
-        reactions: [],
-        replyPreview: replyPreviewFromMessage(payload.replyTarget),
-        replyToMessageId: payload.replyTarget?.id,
-        sticker: payload.sticker,
-        timestamp,
-      },
-    ]);
-    scrollChannelToBottom('smooth');
+      ]);
+      scrollChannelToBottom('smooth');
+    }
 
-    sendQueueRef.current = sendQueueRef.current.then(async () => {
+    const delivery = sendQueueRef.current.then(async () => {
       try {
         const messageAttachments =
           await applicationContainer.publishMessageAttachments(
@@ -453,7 +500,7 @@ export function useCommunityMessageComposer({
           content: payload.content,
           linkPreview,
           mentions: payload.mentions,
-          replyPreview: replyPreviewFromMessage(payload.replyTarget),
+          replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
           timestamp,
@@ -477,6 +524,7 @@ export function useCommunityMessageComposer({
               ),
               ...messagePayload,
               mentions: payload.mentions,
+              replyToMessageId: payload.replyTarget?.id,
               timestamp,
             },
           );
@@ -489,28 +537,90 @@ export function useCommunityMessageComposer({
           void applicationContainer.markStickerUsed(session, payload.sticker);
         }
 
-        setMessages((current) =>
-          mergeChatMessages(
-            current.filter((message) => message.id !== optimisticId),
-            [projected],
-          ),
-        );
-        scrollChannelToBottom('smooth', true);
+        if (renderInChannel) {
+          setMessages((current) =>
+            mergeChatMessages(
+              current.filter((message) => message.id !== optimisticId),
+              [projected],
+            ),
+          );
+          scrollChannelToBottom('smooth', true);
+        }
+
+        return projected;
       } catch (caught) {
         setError(toUserErrorMessage(caught, copy.communities.messageError));
         setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === optimisticId
-              ? {
-                  ...message,
-                  attachmentProgress: undefined,
-                  deliveryStatus: 'failed',
-                }
-              : message,
-          ),
-        );
+        if (renderInChannel) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === optimisticId
+                ? {
+                    ...message,
+                    attachmentProgress: undefined,
+                    deliveryStatus: 'failed',
+                  }
+                : message,
+            ),
+          );
+        }
+        throw caught;
       }
+    });
+
+    sendQueueRef.current = delivery.catch(() => undefined).then(() => undefined);
+
+    return delivery;
+  };
+
+  const sendReplyToMessage = (
+    message: ChatMessage,
+    content: string,
+    attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
+    options: {
+      renderInChannel?: boolean;
+      replyPreviewTarget?: ChatMessage | null;
+    } = {},
+  ): Promise<ChatMessage | null> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
+
+    if (!channelId) return Promise.resolve(null);
+
+    return sendPendingChannelMessage({
+      attachments,
+      attachmentUpload,
+      channelId,
+      content,
+      mentions: selectedChannel ? mentionsForContent(content) : [],
+      replyPreviewTarget: options.replyPreviewTarget,
+      renderInChannel: options.renderInChannel,
+      replyTarget: message,
+    });
+  };
+
+  const sendStickerReplyToMessage = (
+    message: ChatMessage,
+    sticker: StickerMessageReference,
+    options: {
+      renderInChannel?: boolean;
+      replyPreviewTarget?: ChatMessage | null;
+    } = {},
+  ): Promise<ChatMessage | null> => {
+    const channelId = message.raw.channelId ?? selectedChannelId;
+
+    if (!channelId) return Promise.resolve(null);
+
+    return sendPendingChannelMessage({
+      attachments: [],
+      attachmentUpload: {},
+      channelId,
+      content: '',
+      mentions: [],
+      replyPreviewTarget: options.replyPreviewTarget,
+      renderInChannel: options.renderInChannel,
+      replyTarget: message,
+      sticker,
     });
   };
 
@@ -538,7 +648,9 @@ export function useCommunityMessageComposer({
     attachmentProgress,
     cancelEditingChannelMessage,
     clearReplyTarget,
+    deleteChannelMessage,
     draft,
+    editChannelMessage,
     editingMessage: editingMessage?.message ?? null,
     error,
     handleDeleteChannelMessage,
@@ -553,6 +665,8 @@ export function useCommunityMessageComposer({
     replyTarget,
     resetForChannelChange,
     retryChannelMessage,
+    sendReplyToMessage,
+    sendStickerReplyToMessage,
     setError,
     startEditingChannelMessage,
     startReplyToMessage,

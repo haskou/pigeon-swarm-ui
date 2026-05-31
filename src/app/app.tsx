@@ -68,23 +68,22 @@ function isServerConnectionScreen(input: {
 }
 
 function isLoadingScreen(input: {
-  isLoadingNetworks: boolean;
   isRestoringSession: boolean;
-  sessionPresent: boolean;
 }): boolean {
-  return (
-    (!input.sessionPresent && input.isLoadingNetworks) ||
-    input.isRestoringSession
-  );
+  return input.isRestoringSession;
 }
 
 function isNetworkCreationScreen(input: {
   hasNetworkError: boolean;
+  isLoadingNetworks: boolean;
   networkCount: number;
   sessionPresent: boolean;
 }): boolean {
   return (
-    !input.sessionPresent && input.networkCount === 0 && !input.hasNetworkError
+    !input.sessionPresent &&
+    !input.isLoadingNetworks &&
+    input.networkCount === 0 &&
+    !input.hasNetworkError
   );
 }
 
@@ -165,6 +164,7 @@ function App(): ReactElement {
       <AppScreenSuspense>
         {screen === 'auth' || !session ? (
           <AuthScreen
+            availableNetworks={nodeNetworks.networks}
             onAuthenticated={handleAuthenticated}
             peerCount={peers.peers.length}
           />

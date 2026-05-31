@@ -18,8 +18,14 @@ type InstallPromptSnapshot = {
 };
 
 type InstallOutcome = 'accepted' | 'fallback';
+type InstallPromptWindow = Window & {
+  __pigeonAppInstalled?: boolean;
+  __pigeonInstallPrompt?: BeforeInstallPromptEvent | null;
+};
 
 const fallbackDelayMs = 1600;
+const beforeInstallPromptEvent = 'pigeon-beforeinstallprompt';
+const appInstalledEvent = 'pigeon-appinstalled';
 const subscribers = new Set<(snapshot: InstallPromptSnapshot) => void>();
 
 let snapshot: InstallPromptSnapshot = {
@@ -74,6 +80,7 @@ async function requestInstall(): Promise<InstallOutcome> {
     await installPrompt.prompt();
     const choice = await installPrompt.userChoice;
 
+    storeInstallPrompt(null);
     if (choice.outcome === 'accepted') {
       updateInstallPrompt({
         installPrompt: null,
@@ -83,6 +90,7 @@ async function requestInstall(): Promise<InstallOutcome> {
       return 'accepted';
     }
   } catch {
+    storeInstallPrompt(null);
     updateInstallPrompt({
       installPrompt: null,
       installState: 'fallback',
@@ -104,7 +112,7 @@ function initializeInstallPrompt(): void {
 
   initialized = true;
 
-  if (isPwaStandalone()) {
+  if (isAppInstalled()) {
     updateInstallPrompt({
       installPrompt: null,
       installState: 'installed',
@@ -113,8 +121,24 @@ function initializeInstallPrompt(): void {
     return;
   }
 
+  const storedInstallPrompt = installPromptWindow().__pigeonInstallPrompt;
+
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   window.addEventListener('appinstalled', handleAppInstalled);
+  window.addEventListener(
+    beforeInstallPromptEvent,
+    handleStoredBeforeInstallPrompt,
+  );
+  window.addEventListener(appInstalledEvent, handleAppInstalled);
+
+  if (storedInstallPrompt) {
+    updateInstallPrompt({
+      installPrompt: storedInstallPrompt,
+      installState: 'ready',
+    });
+
+    return;
+  }
 
   fallbackTimer = window.setTimeout(() => {
     if (snapshot.installState === 'checking') {
@@ -128,13 +152,24 @@ function initializeInstallPrompt(): void {
 
 function handleBeforeInstallPrompt(event: Event): void {
   event.preventDefault();
+  storeInstallPrompt(event as BeforeInstallPromptEvent);
+  handleStoredBeforeInstallPrompt();
+}
+
+function handleStoredBeforeInstallPrompt(): void {
+  const installPrompt = installPromptWindow().__pigeonInstallPrompt;
+
+  if (!installPrompt) return;
+
   updateInstallPrompt({
-    installPrompt: event as BeforeInstallPromptEvent,
+    installPrompt,
     installState: 'ready',
   });
 }
 
 function handleAppInstalled(): void {
+  installPromptWindow().__pigeonAppInstalled = true;
+  storeInstallPrompt(null);
   updateInstallPrompt({
     installPrompt: null,
     installState: 'installed',
@@ -151,4 +186,16 @@ function isPwaStandalone(): boolean {
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
   );
+}
+
+function isAppInstalled(): boolean {
+  return isPwaStandalone() || installPromptWindow().__pigeonAppInstalled === true;
+}
+
+function installPromptWindow(): InstallPromptWindow {
+  return window as InstallPromptWindow;
+}
+
+function storeInstallPrompt(installPrompt: BeforeInstallPromptEvent | null) {
+  installPromptWindow().__pigeonInstallPrompt = installPrompt;
 }

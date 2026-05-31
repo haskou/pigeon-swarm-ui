@@ -10,6 +10,8 @@ import type {
   ChatMessage,
   Community,
   CommunityChannel,
+  CommunityChannelDraft,
+  CommunityChannelMessagePinsResource,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
   CommunityMessageMention,
@@ -22,6 +24,7 @@ import type {
   CommunityVisibility,
   CommunityVoiceChannel,
   ConversationKeyEntry,
+  ConversationDraft,
   ConversationResource,
   CreatePollInput,
   EditMessageOptions,
@@ -32,6 +35,7 @@ import type {
   LoginResult,
   MessageLinkPreview,
   MessageAttachment,
+  MessagePin,
   MessageResource,
   MyStickersResource,
   NotificationResource,
@@ -132,6 +136,7 @@ type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
   attachmentExternalIdentifiers?: string[];
   id?: string;
   mentions?: CommunityMessageMention[];
+  replyToMessageId?: string;
   timestamp?: number;
 };
 
@@ -846,6 +851,95 @@ export class PigeonApplication {
     );
   }
 
+  public async listCommunityChannelMessageThread(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{
+    messages: MessageResource[];
+    nextBeforeMessageId?: null | string;
+  }> {
+    return await this.communities.listChannelMessageThread(
+      session,
+      communityId,
+      channelId,
+      messageId,
+      options,
+    );
+  }
+
+  public async listCommunityChannelMessagePins(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<CommunityChannelMessagePinsResource> {
+    return await this.communities.listChannelMessagePins(
+      session,
+      communityId,
+      channelId,
+    );
+  }
+
+  public async pinCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.communities.pinChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async unpinCommunityChannelMessage(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.communities.unpinChannelMessage(
+      session,
+      communityId,
+      channelId,
+      messageId,
+    );
+  }
+
+  public async listCommunityDrafts(
+    session: Session,
+  ): Promise<CommunityChannelDraft[]> {
+    return await this.communities.listDrafts(session);
+  }
+
+  public async saveCommunityChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<CommunityChannelDraft> {
+    return await this.communities.saveChannelDraft(
+      session,
+      communityId,
+      channelId,
+      content,
+      updatedAt,
+    );
+  }
+
+  public async deleteCommunityChannelDraft(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<void> {
+    await this.communities.deleteChannelDraft(session, communityId, channelId);
+  }
+
   public async searchCommunityChannelMessages(
     session: Session,
     communityId: string,
@@ -1331,6 +1425,70 @@ export class PigeonApplication {
     return await this.loadMessagesAroundUseCase.loadAround(
       new LoadMessagesAroundMessage({ conversationId, messageId, session }),
     );
+  }
+
+  public async loadMessageThread(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    options: { limit?: number } = {},
+  ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
+    return await this.gateway.loadMessageThread(
+      session,
+      conversationId,
+      messageId,
+      options,
+    );
+  }
+
+  public async listMessagePins(
+    session: Session,
+    conversationId: string,
+  ): Promise<MessagePin[]> {
+    return await this.gateway.listMessagePins(session, conversationId);
+  }
+
+  public async pinMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.pinMessage(session, conversationId, messageId);
+  }
+
+  public async unpinMessage(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.gateway.unpinMessage(session, conversationId, messageId);
+  }
+
+  public async listConversationDrafts(
+    session: Session,
+  ): Promise<ConversationDraft[]> {
+    return await this.gateway.listConversationDrafts(session);
+  }
+
+  public async saveConversationDraft(
+    session: Session,
+    conversationId: string,
+    content: string,
+    updatedAt = Date.now(),
+  ): Promise<ConversationDraft> {
+    return await this.gateway.saveConversationDraft(
+      session,
+      conversationId,
+      content,
+      updatedAt,
+    );
+  }
+
+  public async deleteConversationDraft(
+    session: Session,
+    conversationId: string,
+  ): Promise<void> {
+    await this.gateway.deleteConversationDraft(session, conversationId);
   }
 
   public async login(
