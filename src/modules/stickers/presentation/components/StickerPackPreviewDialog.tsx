@@ -144,6 +144,7 @@ export function StickerPackPreviewDialog({
               <img
                 src={stickerAssetUrl(sticker.assetCid)}
                 alt={copy.stickers.stickerAlt}
+                decoding="async"
                 className="max-h-48 max-w-full object-contain"
               />
             </button>
@@ -166,6 +167,8 @@ export function StickerPackPreviewDialog({
                     <img
                       src={stickerAssetUrl(packSticker.assetCid)}
                       alt={copy.stickers.stickerAlt}
+                      decoding="async"
+                      loading="lazy"
                       className="max-h-full max-w-full object-contain"
                     />
                   </button>

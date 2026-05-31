@@ -22,6 +22,7 @@ import { ClearableSearchInput } from '../../../../shared/presentation/components
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { shortId } from '../../../../shared/presentation/formatting';
 
 type CommunityDiscoveryDialogProps = {
   headerControl?: ReactElement;
@@ -47,22 +48,26 @@ export function CommunityDiscoveryDialog({
   const [communities, setCommunities] = useState<CommunityDiscoveryResource[]>(
     [],
   );
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const [state, setState] = useState<'idle' | 'loading'>('loading');
   const [joinCommunityId, setJoinCommunityId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const networkNames = useMemo(
+    () => new Map(nodeNetworks.map((network) => [network.id, network.name])),
+    [nodeNetworks],
+  );
   const networkOptions = useMemo(
     () =>
       session.identity.networks.map((id) => ({
-        label: nodeNetworks.find((network) => network.id === id)?.name ?? id,
+        label: networkNames.get(id) ?? id,
         value: id,
       })),
-    [nodeNetworks, session.identity.networks],
+    [networkNames, session.identity.networks],
   );
 
   useEffect(() => {
     let cancelled = false;
+    setState('loading');
     const timeout = window.setTimeout(() => {
-      setState('loading');
       setError(null);
 
       void applicationContainer
@@ -178,26 +183,81 @@ export function CommunityDiscoveryDialog({
         )}
 
         <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-          {state === 'loading' && communities.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-              {copy.communities.discoverLoading}
-            </div>
-          )}
-          {state === 'idle' && communities.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-              {copy.communities.discoverEmpty}
-            </div>
-          )}
-          {communities.map((community) => (
-            <CommunityDiscoveryRow
-              community={community}
-              disabled={joinCommunityId === community.id}
-              key={community.id}
-              onRequestJoin={() => void requestJoin(community)}
+          {state === 'loading' ? (
+            <CommunityDiscoverySkeleton />
+          ) : communities.length === 0 ? (
+            <CommunityDiscoveryEmptyState
+              networkName={networkNames.get(networkId) ?? shortId(networkId)}
             />
-          ))}
+          ) : (
+            communities.map((community) => (
+              <CommunityDiscoveryRow
+                community={community}
+                disabled={joinCommunityId === community.id}
+                key={community.id}
+                networkName={
+                  networkNames.get(community.networkId) ??
+                  shortId(community.networkId)
+                }
+                onRequestJoin={() => void requestJoin(community)}
+              />
+            ))
+          )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function CommunityDiscoverySkeleton() {
+  return (
+    <div className="space-y-3" aria-label={copy.communities.discoverLoading}>
+      {Array.from({ length: 4 }, (_, index) => (
+        <article
+          className="animate-pulse rounded-2xl border border-white/10 bg-black/25 p-4"
+          key={index}
+        >
+          <div className="flex gap-3">
+            <div className="h-12 w-12 shrink-0 rounded-2xl bg-white/10" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="h-4 w-36 rounded-full bg-white/12" />
+                <div className="h-5 w-20 rounded-full bg-white/8" />
+                <div className="h-5 w-28 rounded-full bg-white/8" />
+              </div>
+              <div className="mt-3 h-3 w-full max-w-xl rounded-full bg-white/8" />
+              <div className="mt-2 h-3 w-3/5 rounded-full bg-white/8" />
+            </div>
+            <div className="h-11 w-28 shrink-0 rounded-2xl bg-white/10" />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CommunityDiscoveryEmptyState({
+  networkName,
+}: {
+  networkName: string;
+}) {
+  return (
+    <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-center">
+      <div className="max-w-sm">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/8 text-2xl">
+          #
+        </div>
+        <h3 className="mt-4 text-lg font-black text-white">
+          {copy.communities.discoverEmptyTitle}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-white/55">
+          {copy.communities.discoverEmptyBody}
+        </p>
+        <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/60">
+          <span className="text-white/35">{copy.communities.network}</span>
+          <span className="truncate">{networkName}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -205,10 +265,12 @@ export function CommunityDiscoveryDialog({
 function CommunityDiscoveryRow({
   community,
   disabled,
+  networkName,
   onRequestJoin,
 }: {
   community: CommunityDiscoveryResource;
   disabled: boolean;
+  networkName: string;
   onRequestJoin: () => void;
 }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -253,6 +315,10 @@ function CommunityDiscoveryRow({
             <h3 className="truncate font-black text-white">{community.name}</h3>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-black text-white/55">
               {community.memberCount} {copy.communities.members}
+            </span>
+            <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-xs font-black text-cyan-100/80">
+              <span className="text-cyan-100/45">{copy.communities.network}</span>
+              <span className="max-w-40 truncate">{networkName}</span>
             </span>
             {community.autoJoinEnabled && community.membershipStatus === 'none' ? (
               <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-xs font-black text-amber-100">

@@ -1,5 +1,7 @@
 import {
   type KeyboardEvent,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -28,9 +30,7 @@ import {
   searchEmojiSuggestions,
 } from '../../../messages/presentation/emoji/emojiShortcodes';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { StickerEmojiPanel } from './StickerEmojiPanel';
 import { StickerExplorePack } from './StickerExplorePack';
-import { StickerManagerDialog } from './StickerManagerDialog';
 import {
   PickerTab,
   type StickerGridItem,
@@ -42,8 +42,19 @@ import {
   cachedGetMyStickers,
   cachedListStickerPacks,
   invalidateStickerCaches,
-  preloadStickerAsset,
+  preloadStickerAssets,
 } from './stickerLibraryCache';
+
+const StickerEmojiPanel = lazy(() =>
+  import('./StickerEmojiPanel').then((module) => ({
+    default: module.StickerEmojiPanel,
+  })),
+);
+const StickerManagerDialog = lazy(() =>
+  import('./StickerManagerDialog').then((module) => ({
+    default: module.StickerManagerDialog,
+  })),
+);
 
 type StickerPickerProps = {
   disabled: boolean;
@@ -218,24 +229,37 @@ export function StickerPicker({
     await loadLibrary();
   };
 
-  const recentItems = usageItems(library?.recentStickers ?? []);
-  const favoriteItems = usageItems(library?.favoriteStickers ?? []);
-  const savedPacks = library?.savedPacks ?? [];
-  const explorePacks = publicPacks
-    .filter((pack) => !savedPackIds.has(pack.id))
-    .slice(0, 2);
-  const stickerShortcuts: StickerShortcut[] = [
-    { id: 'favorites', label: copy.stickers.favorites, type: 'favorites' },
-    { id: 'recent', label: copy.stickers.recent, type: 'recent' },
-    ...savedPacks
-      .filter((pack) => pack.stickers.length > 0)
-      .map((pack) => ({
-        id: `pack:${pack.id}`,
-        label: pack.name,
-        sticker: pack.stickers[0],
-        type: 'pack' as const,
-      })),
-  ];
+  const recentItems = useMemo(
+    () => usageItems(library?.recentStickers ?? []),
+    [library?.recentStickers],
+  );
+  const favoriteItems = useMemo(
+    () => usageItems(library?.favoriteStickers ?? []),
+    [library?.favoriteStickers],
+  );
+  const savedPacks = useMemo(
+    () => library?.savedPacks ?? [],
+    [library?.savedPacks],
+  );
+  const explorePacks = useMemo(
+    () => publicPacks.filter((pack) => !savedPackIds.has(pack.id)).slice(0, 2),
+    [publicPacks, savedPackIds],
+  );
+  const stickerShortcuts: StickerShortcut[] = useMemo(
+    () => [
+      { id: 'favorites', label: copy.stickers.favorites, type: 'favorites' },
+      { id: 'recent', label: copy.stickers.recent, type: 'recent' },
+      ...savedPacks
+        .filter((pack) => pack.stickers.length > 0)
+        .map((pack) => ({
+          id: `pack:${pack.id}`,
+          label: pack.name,
+          sticker: pack.stickers[0],
+          type: 'pack' as const,
+        })),
+    ],
+    [savedPacks],
+  );
   const setStickerSectionRef =
     (sectionId: string) => (node: HTMLDivElement | null) => {
       if (node) {
@@ -278,15 +302,15 @@ export function StickerPicker({
       ...favoriteItems.map(({ sticker }) => sticker.assetCid),
       ...recentItems.map(({ sticker }) => sticker.assetCid),
       ...savedPacks.flatMap((pack) =>
-        pack.stickers.map((sticker) => sticker.assetCid),
+        pack.stickers.slice(0, 4).map((sticker) => sticker.assetCid),
       ),
-      ...publicPacks.flatMap((pack) =>
-        pack.stickers.map((sticker) => sticker.assetCid),
+      ...explorePacks.flatMap((pack) =>
+        pack.stickers.slice(0, 4).map((sticker) => sticker.assetCid),
       ),
     ];
 
-    assetCids.slice(0, 80).forEach(preloadStickerAsset);
-  }, [favoriteItems, publicPacks, recentItems, savedPacks]);
+    preloadStickerAssets(assetCids);
+  }, [explorePacks, favoriteItems, recentItems, savedPacks]);
 
   return (
     <div className="relative" ref={pickerRef}>
@@ -432,42 +456,46 @@ export function StickerPicker({
               )}
             </div>
           ) : (
-            <StickerEmojiPanel
-              emojiQuery={emojiQuery}
-              emojis={emojis}
-              loading={emojiLoading}
-              onEmojiInsert={(emoji) => {
-                onEmojiInsert(emoji);
-                setOpen(false);
-              }}
-              onQueryChange={setEmojiQuery}
-            />
+            <Suspense fallback={<StickerPanelLoading />}>
+              <StickerEmojiPanel
+                emojiQuery={emojiQuery}
+                emojis={emojis}
+                loading={emojiLoading}
+                onEmojiInsert={(emoji) => {
+                  onEmojiInsert(emoji);
+                  setOpen(false);
+                }}
+                onQueryChange={setEmojiQuery}
+              />
+            </Suspense>
           )}
         </div>
       )}
       {manageOpen &&
         createPortal(
-          <StickerManagerDialog
-            favoriteIds={favoriteIds}
-            favoriteItems={favoriteItems}
-            library={library}
-            onClose={() => setManageOpen(false)}
-            onCreatePack={async (input) => {
-              await applicationContainer.createStickerPack(session, input);
-              invalidateStickerCaches();
-              await loadLibrary();
-            }}
-            onFavoriteToggle={toggleFavorite}
-            onRefresh={async () => {
-              invalidateStickerCaches();
-              await loadLibrary();
-            }}
-            onSavePack={savePack}
-            onStickerDelete={deleteSticker}
-            onStickerCreated={loadLibrary}
-            savedPackIds={savedPackIds}
-            session={session}
-          />,
+          <Suspense fallback={<StickerManagerLoading />}>
+            <StickerManagerDialog
+              favoriteIds={favoriteIds}
+              favoriteItems={favoriteItems}
+              library={library}
+              onClose={() => setManageOpen(false)}
+              onCreatePack={async (input) => {
+                await applicationContainer.createStickerPack(session, input);
+                invalidateStickerCaches();
+                await loadLibrary();
+              }}
+              onFavoriteToggle={toggleFavorite}
+              onRefresh={async () => {
+                invalidateStickerCaches();
+                await loadLibrary();
+              }}
+              onSavePack={savePack}
+              onStickerDelete={deleteSticker}
+              onStickerCreated={loadLibrary}
+              savedPackIds={savedPackIds}
+              session={session}
+            />
+          </Suspense>,
           document.body,
         )}
     </div>
@@ -479,4 +507,22 @@ function usageItems(items: StickerUsageResource[]): StickerGridItem[] {
     packId: item.packId,
     sticker: item.sticker,
   }));
+}
+
+function StickerPanelLoading() {
+  return (
+    <div className="grid h-[24rem] max-h-[calc(100dvh-8rem)] place-items-center p-3 text-sm text-white/45">
+      {copy.app.loading}
+    </div>
+  );
+}
+
+function StickerManagerLoading() {
+  return (
+    <div className="fixed inset-0 z-[160] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="rounded-2xl border border-white/10 bg-[#17171d] px-5 py-4 text-sm text-white/45 shadow-2xl">
+        {copy.app.loading}
+      </div>
+    </div>
+  );
 }

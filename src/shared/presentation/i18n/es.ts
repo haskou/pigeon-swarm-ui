@@ -231,7 +231,10 @@ export const es = {
     description: 'Descripcion',
     descriptionPlaceholder: 'Un espacio privado para un equipo o proyecto.',
     discover: 'Descubrir comunidades',
+    discoverEmptyBody:
+      'Prueba otra busqueda o cambia de red para encontrar comunidades visibles.',
     discoverEmpty: 'No hay comunidades para esta busqueda.',
+    discoverEmptyTitle: 'No hay comunidades visibles',
     discoverError: 'No se pudieron buscar comunidades.',
     discoverHint: 'Busca comunidades visibles en tus redes.',
     discoverJoin: 'Solicitar unirse',
@@ -505,8 +508,8 @@ export const es = {
   },
   imageEditor: {
     apply: 'Aplicar recorte',
-    avatar: 'Avatar cuadrado, redimensionado a 512 x 512.',
-    banner: 'Banner ancho, redimensionado a 1600 x 533.',
+    avatar: 'Avatar cuadrado, redimensionado a 256 x 256.',
+    banner: 'Banner ancho, redimensionado a 512 x 171.',
     dragHelp: 'Arrastra la imagen para recolocarla. Funciona con raton y tactil.',
     horizontal: 'Horizontal',
     reset: 'Restablecer',
