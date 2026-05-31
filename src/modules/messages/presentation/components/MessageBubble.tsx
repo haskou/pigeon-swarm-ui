@@ -204,7 +204,7 @@ export function MessageBubble({
       >
         <div
           className={cx(
-            'flex min-w-0 items-end gap-3',
+            'flex min-w-0 items-end gap-2.5',
             mine && 'justify-end',
           )}
         >
@@ -248,7 +248,7 @@ export function MessageBubble({
                   sticker
                     ? 'rounded-2xl bg-transparent p-0'
                     : cx(
-                        'rounded-2xl p-3',
+                        'rounded-2xl p-2.5',
                         mine
                           ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
                           : mentionHighlighted

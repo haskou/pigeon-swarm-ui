@@ -115,11 +115,14 @@ export function Composer({
   const isEditing = !!editingMessage;
   const canAttach = !disabled && !isEditing;
   const trimmedDraft = draft.trim();
+  const hasDraftText = trimmedDraft.length > 0;
+  const hideMobileSecondaryActions = !isEditing && hasDraftText;
+  const showMobileSendButton =
+    isEditing || hasDraftText || (!isEditing && attachments.length > 0);
   const canSend =
     (isEditing
-      ? trimmedDraft.length > 0 &&
-        trimmedDraft !== editingMessage.content.trim()
-      : trimmedDraft.length > 0 || attachments.length > 0) &&
+      ? hasDraftText && trimmedDraft !== editingMessage.content.trim()
+      : hasDraftText || attachments.length > 0) &&
     trimmedDraft.length <= MESSAGE_MAX_LENGTH &&
     !disabled;
   const emojiTrigger = useMemo(
@@ -578,19 +581,29 @@ export function Composer({
             />
           )}
           {!isEditing && onStickerSend && (
-            <StickerPicker
-              disabled={disabled}
-              onEmojiInsert={insertLooseEmoji}
-              onStickerSend={onStickerSend}
-              session={session}
-            />
+            <div
+              className={cx(
+                'shrink-0',
+                hideMobileSecondaryActions && 'hidden sm:block',
+              )}
+            >
+              <StickerPicker
+                disabled={disabled}
+                onEmojiInsert={insertLooseEmoji}
+                onStickerSend={onStickerSend}
+                session={session}
+              />
+            </div>
           )}
           {!isEditing && onPollCreate && (
             <button
               type="button"
               onClick={onPollCreate}
               disabled={disabled}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
+              className={cx(
+                'h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10',
+                hideMobileSecondaryActions ? 'hidden sm:grid' : 'grid',
+              )}
               aria-label={copy.polls.create}
               title={copy.polls.create}
             >
@@ -681,9 +694,23 @@ export function Composer({
           </span>
           <button
             disabled={!canSend}
-            className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4"
+            aria-label={isEditing ? copy.messages.saveEdit : copy.composer.send}
+            className={cx(
+              'shrink-0 items-center justify-center rounded-xl bg-white text-sm font-black text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-45',
+              showMobileSendButton ? 'inline-grid sm:inline-flex' : 'hidden sm:inline-flex',
+              isEditing
+                ? 'px-3 py-2 sm:px-4'
+                : 'h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2',
+            )}
           >
-            {isEditing ? copy.messages.saveEdit : copy.composer.send}
+            {isEditing ? (
+              copy.messages.saveEdit
+            ) : (
+              <>
+                <SendArrowIcon className="h-5 w-5 sm:hidden" />
+                <span className="hidden sm:inline">{copy.composer.send}</span>
+              </>
+            )}
           </button>
         </div>
       </form>
@@ -702,6 +729,23 @@ export function Composer({
           document.body,
         )}
     </>
+  );
+}
+
+function SendArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.75"
+      viewBox="0 0 24 24"
+    >
+      <path d="m9 5 7 7-7 7" />
+    </svg>
   );
 }
 
