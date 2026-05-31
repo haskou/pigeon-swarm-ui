@@ -601,7 +601,7 @@ export function Composer({
               onClick={onPollCreate}
               disabled={disabled}
               className={cx(
-                'h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10',
+                'h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed',
                 hideMobileSecondaryActions ? 'hidden sm:grid' : 'grid',
               )}
               aria-label={copy.polls.create}
@@ -630,7 +630,7 @@ export function Composer({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed sm:h-10 sm:w-10"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed"
               aria-label={copy.composer.attach}
             >
               <svg
@@ -700,7 +700,7 @@ export function Composer({
               showMobileSendButton ? 'inline-grid sm:inline-flex' : 'hidden sm:inline-flex',
               isEditing
                 ? 'px-3 py-2 sm:px-4'
-                : 'h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2',
+                : 'h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2',
             )}
           >
             {isEditing ? (
