@@ -158,6 +158,20 @@ export function MessageContextMenu({
     );
   }, [emojiSearchOpen, menu.x, menu.y]);
 
+  useEffect(() => {
+    const messageElement = document.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(menu.message.id)}"] [data-message-bubble]`,
+    );
+
+    if (!messageElement) return;
+
+    messageElement.classList.add('message-context-ring');
+
+    return () => {
+      messageElement.classList.remove('message-context-ring');
+    };
+  }, [menu.message.id]);
+
   useLayoutEffect(() => {
     if (!emojiSearchOpen) {
       setEmojiSuggestions([]);
@@ -258,13 +272,6 @@ export function MessageContextMenu({
             )}
           </div>
         ) : null}
-        {onOpenThread ? (
-          <MessageMenuAction
-            icon={<ThreadIcon />}
-            label={copy.messages.openThread}
-            onClick={() => runAction(onOpenThread)}
-          />
-        ) : null}
         {onReply ? (
           <MessageMenuAction
             icon={<ReplyIcon />}
@@ -286,6 +293,13 @@ export function MessageContextMenu({
             onClick={() => runAction(onEdit)}
           />
         ) : null}
+        {onOpenThread ? (
+          <MessageMenuAction
+            icon={<ThreadIcon />}
+            label={copy.messages.openThread}
+            onClick={() => runAction(onOpenThread)}
+          />
+        ) : null}
         {onUnpin ? (
           <MessageMenuAction
             icon={<PinIcon />}
@@ -305,12 +319,15 @@ export function MessageContextMenu({
           onClick={() => runAction(onViewRaw)}
         />
         {onDelete ? (
-          <MessageMenuAction
-            icon={<TrashIcon />}
-            label={copy.messages.delete}
-            onClick={() => runAction(onDelete)}
-            tone="danger"
-          />
+          <>
+            <div className="my-1 h-px bg-white/10" />
+            <MessageMenuAction
+              icon={<TrashIcon />}
+              label={copy.messages.delete}
+              onClick={() => runAction(onDelete)}
+              tone="danger"
+            />
+          </>
         ) : null}
       </div>
     </>

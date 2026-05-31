@@ -491,7 +491,7 @@ export const es = {
     addReaction: 'Anadir reaccion',
     cancelEdit: 'Cancelar edicion',
     cancelReply: 'Cancelar respuesta',
-    copy: 'Copiar',
+    copy: 'Copiar texto',
     decryptFailed: '[cifrado] Este evento no se pudo descifrar.',
     delete: 'Eliminar',
     deleteConfirm: 'Eliminar este mensaje?',
@@ -530,7 +530,7 @@ export const es = {
     threadMessages: 'mensajes',
     unpin: 'Desfijar',
     unpinError: 'No se pudo desfijar el mensaje.',
-    viewRaw: 'Ver datos',
+    viewRaw: 'Ver datos del mensaje',
   },
   network: {
     create: 'Crear red',

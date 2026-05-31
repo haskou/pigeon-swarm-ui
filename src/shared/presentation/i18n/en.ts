@@ -589,7 +589,7 @@ export const en = {
     addReaction: 'Add reaction',
     cancelEdit: 'Cancel edit',
     cancelReply: 'Cancel reply',
-    copy: 'Copy',
+    copy: 'Copy text',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
     deleteConfirm: 'Delete this message?',
@@ -630,7 +630,7 @@ export const en = {
     threadMessages: 'messages',
     unpin: 'Unpin',
     unpinError: 'The message could not be unpinned.',
-    viewRaw: 'View data',
+    viewRaw: 'View message data',
   },
   network: {
     create: 'Create network',
