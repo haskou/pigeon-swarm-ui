@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   CallParticipant,
   CallIceServerConfig,
+  CallMicrophoneErrorCode,
   CallResource,
   CallSignalType,
   CallSession,
@@ -72,6 +73,7 @@ export function useCallSession(): {
   toggleDeafen: () => void;
   toggleMute: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
+  retryMicrophone: () => Promise<void>;
   toggleScreenShareAudio: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
 } {
@@ -213,6 +215,7 @@ export function useCallSession(): {
     });
 
     let stream: MediaStream | null = null;
+    let microphoneError: CallMicrophoneErrorCode | undefined;
 
     try {
       stream =
@@ -231,6 +234,7 @@ export function useCallSession(): {
                     callId: nextCall.id,
                     error,
                   });
+                  microphoneError = classifyMicrophoneError(error);
 
                   return null;
                 });
@@ -238,7 +242,12 @@ export function useCallSession(): {
       if (!stream) {
         setActiveCall((current) =>
           current?.id === nextCall.id
-            ? { ...current, hasMicrophone: false, muted: true }
+            ? {
+                ...current,
+                hasMicrophone: false,
+                microphoneError: microphoneError ?? 'unknown',
+                muted: true,
+              }
             : current,
         );
       }
@@ -284,6 +293,7 @@ export function useCallSession(): {
           ? {
               ...current,
               hasMicrophone: false,
+              microphoneError: classifyMicrophoneError(error),
               muted: true,
               status: 'permission-denied',
             }
@@ -455,6 +465,49 @@ export function useCallSession(): {
         ),
       };
     });
+  };
+
+  const retryMicrophone = async () => {
+    const current = activeCallRef.current;
+
+    if (!current) return;
+
+    try {
+      const stream = await mediaManager.startAudio({
+        noiseCancellationEnabled: current.noiseCancellationEnabled,
+      });
+
+      peerManager.setLocalStream(stream);
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? {
+              ...active,
+              hasMicrophone: true,
+              localPreviewStream: stream,
+              microphoneError: undefined,
+              muted: false,
+              participants: active.participants.map((participant) =>
+                participant.identityId === active.currentIdentityId
+                  ? { ...participant, mediaStream: stream, muted: false }
+                  : participant,
+              ),
+              status:
+                active.status === 'permission-denied' ? 'live' : active.status,
+            }
+          : active,
+      );
+    } catch (error) {
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? {
+              ...active,
+              hasMicrophone: false,
+              microphoneError: classifyMicrophoneError(error),
+              muted: true,
+            }
+          : active,
+      );
+    }
   };
 
   const toggleNoiseCancellation = async (enabled: boolean) => {
@@ -676,6 +729,7 @@ export function useCallSession(): {
     toggleDeafen,
     toggleMute,
     toggleNoiseCancellation,
+    retryMicrophone,
     toggleScreenShareAudio,
     toggleScreenShare,
   };
@@ -882,13 +936,19 @@ function remoteParticipantWithMediaState(
   return {
     ...participant,
     audioLevel: stat?.audioLevel,
+    bitrateKbps: stat?.bitrateKbps,
+    codec: stat?.codec,
+    connectionPath: stat?.connectionPath,
     connectionState: stat?.connectionState ?? participant.connectionState,
+    iceState: stat?.iceState,
+    jitterMs: stat?.jitterMs,
     latencyMs: stat?.latencyMs,
     mediaStream,
     packetsLost: stat?.packetsLost,
     screenSharing: hasVideoTrack(screenStream),
     screenStream,
     speaking: stat?.speaking ?? false,
+    transport: stat?.transport,
     videoEnabled: hasVideoTrack(mediaStream),
   };
 }
@@ -940,8 +1000,13 @@ function callParticipantsMediaStateEqual(
 
     return (
       currentParticipant.identityId === nextParticipant.identityId &&
+      currentParticipant.bitrateKbps === nextParticipant.bitrateKbps &&
+      currentParticipant.codec === nextParticipant.codec &&
+      currentParticipant.connectionPath === nextParticipant.connectionPath &&
       currentParticipant.connectionState === nextParticipant.connectionState &&
       currentParticipant.deafened === nextParticipant.deafened &&
+      currentParticipant.iceState === nextParticipant.iceState &&
+      currentParticipant.jitterMs === nextParticipant.jitterMs &&
       currentParticipant.latencyMs === nextParticipant.latencyMs &&
       currentParticipant.mediaStream === nextParticipant.mediaStream &&
       currentParticipant.muted === nextParticipant.muted &&
@@ -949,7 +1014,24 @@ function callParticipantsMediaStateEqual(
       currentParticipant.screenSharing === nextParticipant.screenSharing &&
       currentParticipant.screenStream === nextParticipant.screenStream &&
       currentParticipant.speaking === nextParticipant.speaking &&
+      currentParticipant.transport === nextParticipant.transport &&
       currentParticipant.videoEnabled === nextParticipant.videoEnabled
     );
   });
+}
+
+function classifyMicrophoneError(error: unknown): CallMicrophoneErrorCode {
+  if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
+  if (!window.isSecureContext) return 'not-secure';
+
+  if (!(error instanceof Error)) return 'unknown';
+
+  if (error.name === 'NotAllowedError') return 'denied';
+  if (error.name === 'NotFoundError') return 'missing-device';
+  if (error.name === 'NotReadableError') return 'in-use';
+  if (error.name === 'OverconstrainedError') return 'constraint';
+  if (error.name === 'SecurityError') return 'security';
+  if (error instanceof TypeError) return 'unsupported';
+
+  return 'unknown';
 }

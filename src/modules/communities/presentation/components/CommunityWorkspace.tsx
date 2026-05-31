@@ -118,6 +118,7 @@ interface CommunityWorkspaceProps {
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
   onCallToggleNoiseCancellation?: () => void;
+  onCallRetryMicrophone?: () => void;
   onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
@@ -175,6 +176,7 @@ export function CommunityWorkspace({
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
+  onCallRetryMicrophone,
   onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onChannelSelected,
@@ -1876,6 +1878,7 @@ export function CommunityWorkspace({
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
               onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+              onCallRetryMicrophone={onCallRetryMicrophone}
               onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}

@@ -15,6 +15,7 @@ import {
 } from './callIcons';
 import { VideoPreview } from './VideoPreview';
 import { callSessionTitle } from './callSessionDisplay';
+import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
 
 type CompactCallBarProps = {
   call: CallSession;
@@ -24,6 +25,7 @@ type CompactCallBarProps = {
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
+  onRetryMicrophone: () => void;
   onToggleScreenShare: () => void;
   screenParticipant?: CallSession['participants'][number];
   subtitle: string;
@@ -37,6 +39,7 @@ export const CompactCallBar = memo(function CompactCallBar({
   onToggleDeafen,
   onToggleMute,
   onToggleNoiseCancellation,
+  onRetryMicrophone,
   onToggleScreenShare,
   screenParticipant,
   subtitle,
@@ -61,6 +64,13 @@ export const CompactCallBar = memo(function CompactCallBar({
           </div>
           <CompactCallTitle call={call} subtitle={subtitle} />
         </div>
+        {!call.hasMicrophone && (
+          <MicrophoneBlockedNotice
+            call={call}
+            compact
+            onRetryMicrophone={onRetryMicrophone}
+          />
+        )}
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <CompactMediaControls
             call={call}
@@ -184,6 +194,28 @@ function CompactMediaControls({
   return (
     <>
       <CallButton
+        active={call.muted}
+        blocked={!call.hasMicrophone}
+        disabled={!call.hasMicrophone}
+        label={call.muted ? copy.calls.unmute : copy.calls.mute}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleMute();
+        }}
+      >
+        <MicrophoneIcon muted={call.muted || !call.hasMicrophone} />
+      </CallButton>
+      <CallButton
+        active={call.deafened}
+        label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleDeafen();
+        }}
+      >
+        <HeadphonesIcon deafened={call.deafened} />
+      </CallButton>
+      <CallButton
         active={call.cameraEnabled}
         label={
           call.cameraEnabled ? copy.calls.disableCamera : copy.calls.camera
@@ -208,27 +240,6 @@ function CompactMediaControls({
         }}
       >
         <ScreenShareIcon active={call.screenSharing} />
-      </CallButton>
-      <CallButton
-        active={call.muted}
-        disabled={!call.hasMicrophone}
-        label={call.muted ? copy.calls.unmute : copy.calls.mute}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleMute();
-        }}
-      >
-        <MicrophoneIcon muted={call.muted} />
-      </CallButton>
-      <CallButton
-        active={call.deafened}
-        label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleDeafen();
-        }}
-      >
-        <HeadphonesIcon deafened={call.deafened} />
       </CallButton>
       <CallButton
         active={call.noiseCancellationEnabled}

@@ -416,6 +416,7 @@ export function GlassWorkspace({
     toggleDeafen,
     toggleMute,
     toggleNoiseCancellation,
+    retryMicrophone,
     toggleScreenShareAudio,
     toggleScreenShare,
   } = useCallSession();
@@ -3732,6 +3733,7 @@ export function GlassWorkspace({
                     onCallToggleDeafen={toggleDeafen}
                     onCallToggleMute={toggleMute}
                     onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
+                    onCallRetryMicrophone={retryMicrophone}
                     onCallToggleScreenShareAudio={toggleScreenShareAudio}
                     onCallToggleScreenShare={toggleScreenShare}
                     onLogout={logout}
@@ -3936,6 +3938,7 @@ export function GlassWorkspace({
               onCallToggleDeafen={toggleDeafen}
               onCallToggleMute={toggleMute}
               onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
+              onCallRetryMicrophone={retryMicrophone}
               onCallToggleScreenShareAudio={toggleScreenShareAudio}
               onCallToggleScreenShare={toggleScreenShare}
               realtimeEvent={communityRealtimeEvent}

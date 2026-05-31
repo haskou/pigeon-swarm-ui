@@ -18,6 +18,16 @@ export type CallResourceParticipant = {
   status: CallParticipantStatus;
 };
 
+export type CallMicrophoneErrorCode =
+  | 'constraint'
+  | 'denied'
+  | 'in-use'
+  | 'missing-device'
+  | 'not-secure'
+  | 'security'
+  | 'unknown'
+  | 'unsupported';
+
 export type CallScope =
   | {
       conversationId: string;
@@ -56,10 +66,15 @@ export type CallIceServerConfig = {
 
 export type CallParticipant = {
   audioLevel?: number;
+  bitrateKbps?: number;
+  codec?: string;
+  connectionPath?: 'direct' | 'relay' | 'unknown';
   connectionState?: RTCPeerConnectionState;
   deafened?: boolean;
   identity?: IdentityResource;
   identityId: string;
+  iceState?: RTCIceConnectionState;
+  jitterMs?: number;
   latencyMs?: number;
   mediaStream?: MediaStream;
   muted: boolean;
@@ -70,6 +85,7 @@ export type CallParticipant = {
   screenSharing?: boolean;
   speaking?: boolean;
   status?: CallParticipantStatus;
+  transport?: string;
   videoEnabled?: boolean;
 };
 
@@ -82,6 +98,7 @@ export type CallSession = {
   conversationId?: string;
   kind: CallKind;
   muted: boolean;
+  microphoneError?: CallMicrophoneErrorCode;
   noiseCancellationEnabled: boolean;
   hasMicrophone: boolean;
   cameraEnabled: boolean;

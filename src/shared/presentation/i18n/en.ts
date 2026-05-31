@@ -70,7 +70,24 @@ export const en = {
   calls: {
     answer: 'Answer',
     callData: 'Call data',
+    callMetricBitrate: 'Bitrate',
+    callMetricCodec: 'Codec',
+    callMetricIceState: 'ICE state',
+    callMetricJitter: 'Jitter',
+    callMetricLatency: 'Latency',
+    callMetricPacketLoss: 'Packet loss',
+    callMetricPath: 'Path',
+    callMetricPathDirect: 'Direct',
+    callMetricPathRelay: 'Relay',
+    callMetricPeerId: 'Peer ID',
+    callMetricStatus: 'Status',
+    callMetricTransport: 'Transport',
     camera: 'Start camera',
+    connectionQuality: 'Connection quality',
+    connectionQualityConnecting: 'Connecting',
+    connectionQualityGood: 'Good connection',
+    connectionQualityPoor: 'Poor connection',
+    connectionQualityWeak: 'Weak connection',
     deafen: 'Silence call audio',
     decline: 'Decline',
     declined: 'Call declined',
@@ -85,6 +102,26 @@ export const en = {
     live: 'Live',
     microphoneUnavailable:
       'Microphone permission is unavailable. Check browser permissions and HTTPS.',
+    microphoneAllow: 'Allow microphone',
+    microphoneBlockedTitle: 'Cannot use microphone',
+    microphoneConstraint:
+      'The requested audio configuration is not compatible with this device.',
+    microphoneDenied:
+      'The browser has not granted microphone permission.',
+    microphoneHelp: 'Open help',
+    microphoneInUse:
+      'The microphone is busy in another app or browser tab.',
+    microphoneMissingDevice: 'No microphone device was found.',
+    microphoneNotSecure:
+      'Microphone access requires HTTPS or an installed app context.',
+    microphoneRetry: 'Retry',
+    microphoneSecurity:
+      'The browser blocked microphone access for this page.',
+    microphoneTroubleshooting:
+      'Check that you are using HTTPS and that the browser permission is not blocked.',
+    microphoneUnknown: 'The microphone could not be started.',
+    microphoneUnsupported:
+      'This browser does not expose microphone capture.',
     missed: 'Missed call',
     mute: 'Mute microphone',
     muted: 'Muted',
@@ -93,6 +130,8 @@ export const en = {
     noiseCancellationOff: 'Turn off noise cancellation',
     noiseCancellationOn: 'Turn on noise cancellation',
     outgoingCallDirection: 'Outgoing',
+    manyParticipants: 'participants',
+    oneParticipant: 'participant',
     screen: 'Screen',
     screenShareVolume: 'Screen volume',
     screenSound: 'Screen sound',

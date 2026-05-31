@@ -20,6 +20,7 @@ export function CallStageDialog({
   onToggleDeafen,
   onToggleMute,
   onToggleNoiseCancellation,
+  onRetryMicrophone,
   onToggleScreenShareAudio,
   onToggleScreenShare,
   subtitle,
@@ -41,6 +42,7 @@ export function CallStageDialog({
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
+  onRetryMicrophone: () => void;
   onToggleScreenShareAudio: () => void;
   onToggleScreenShare: () => void;
   subtitle: string;
@@ -65,6 +67,7 @@ export function CallStageDialog({
           dataOpen={dataOpen}
           onClose={onClose}
           onDataToggle={onDataToggle}
+          onRetryMicrophone={onRetryMicrophone}
           subtitle={subtitle}
         />
         <CallStageBody

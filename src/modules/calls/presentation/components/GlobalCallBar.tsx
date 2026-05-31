@@ -32,6 +32,7 @@ interface GlobalCallBarProps {
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
+  onRetryMicrophone: () => void;
   onToggleScreenShareAudio: () => void;
   onToggleScreenShare: () => void;
 }
@@ -45,6 +46,7 @@ export function GlobalCallBar({
   onToggleDeafen,
   onToggleMute,
   onToggleNoiseCancellation,
+  onRetryMicrophone,
   onToggleScreenShareAudio,
   onToggleScreenShare,
 }: GlobalCallBarProps) {
@@ -71,6 +73,7 @@ export function GlobalCallBar({
         onToggleDeafen={onToggleDeafen}
         onToggleMute={onToggleMute}
         onToggleNoiseCancellation={onToggleNoiseCancellation}
+        onRetryMicrophone={onRetryMicrophone}
         onToggleScreenShare={onToggleScreenShare}
         screenParticipant={screenParticipant}
         subtitle={subtitle}
@@ -92,6 +95,7 @@ export function GlobalCallBar({
               onToggleDeafen={onToggleDeafen}
               onToggleMute={onToggleMute}
               onToggleNoiseCancellation={onToggleNoiseCancellation}
+              onRetryMicrophone={onRetryMicrophone}
               onToggleScreenShareAudio={onToggleScreenShareAudio}
               onToggleScreenShare={onToggleScreenShare}
               subtitle={subtitle}

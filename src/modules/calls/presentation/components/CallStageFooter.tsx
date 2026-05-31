@@ -35,6 +35,22 @@ export function CallStageFooter({
   return (
     <footer className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 p-2.5 sm:gap-3 sm:p-4">
       <CallButton
+        active={call.muted}
+        blocked={!call.hasMicrophone}
+        disabled={!call.hasMicrophone}
+        label={call.muted ? copy.calls.unmute : copy.calls.mute}
+        onClick={onToggleMute}
+      >
+        <MicrophoneIcon muted={call.muted || !call.hasMicrophone} />
+      </CallButton>
+      <CallButton
+        active={call.deafened}
+        label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
+        onClick={onToggleDeafen}
+      >
+        <HeadphonesIcon deafened={call.deafened} />
+      </CallButton>
+      <CallButton
         active={call.cameraEnabled}
         label={
           call.cameraEnabled ? copy.calls.disableCamera : copy.calls.camera
@@ -60,21 +76,6 @@ export function CallStageFooter({
           onToggle={onToggleScreenShareAudio}
         />
       )}
-      <CallButton
-        active={call.muted}
-        disabled={!call.hasMicrophone}
-        label={call.muted ? copy.calls.unmute : copy.calls.mute}
-        onClick={onToggleMute}
-      >
-        <MicrophoneIcon muted={call.muted} />
-      </CallButton>
-      <CallButton
-        active={call.deafened}
-        label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
-        onClick={onToggleDeafen}
-      >
-        <HeadphonesIcon deafened={call.deafened} />
-      </CallButton>
       <CallButton
         active={call.noiseCancellationEnabled}
         badge={copy.calls.noiseCancellationBadge}
