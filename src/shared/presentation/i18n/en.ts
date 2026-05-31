@@ -605,8 +605,8 @@ export const en = {
   },
   imageEditor: {
     apply: 'Apply crop',
-    avatar: 'Square avatar, resized to 512 x 512.',
-    banner: 'Wide banner, resized to 1600 x 533.',
+    avatar: 'Square avatar, resized to 256 x 256.',
+    banner: 'Wide banner, resized to 512 x 171.',
     dragHelp: 'Drag the image to reposition it. Works with mouse and touch.',
     horizontal: 'Horizontal',
     reset: 'Reset',

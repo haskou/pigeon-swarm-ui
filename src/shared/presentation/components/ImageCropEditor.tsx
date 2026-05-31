@@ -30,15 +30,15 @@ const cropPresets: Record<
 > = {
   avatar: {
     aspectClass: 'aspect-square',
-    height: 512,
+    height: 256,
     label: copy.imageEditor.avatar,
-    width: 512,
+    width: 256,
   },
   banner: {
     aspectClass: 'aspect-[3/1]',
-    height: 533,
+    height: 171,
     label: copy.imageEditor.banner,
-    width: 1600,
+    width: 512,
   },
 };
 
