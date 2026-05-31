@@ -249,7 +249,10 @@ export const en = {
     description: 'Description',
     descriptionPlaceholder: 'A private space for a team, project or crew.',
     discover: 'Discover communities',
+    discoverEmptyBody:
+      'Try another search or switch networks to find visible communities.',
     discoverEmpty: 'No communities match this search.',
+    discoverEmptyTitle: 'No visible communities',
     discoverError: 'Communities could not be searched.',
     discoverHint: 'Search private communities visible on your networks.',
     discoverJoin: 'Request to join',

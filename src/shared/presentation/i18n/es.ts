@@ -231,7 +231,10 @@ export const es = {
     description: 'Descripcion',
     descriptionPlaceholder: 'Un espacio privado para un equipo o proyecto.',
     discover: 'Descubrir comunidades',
+    discoverEmptyBody:
+      'Prueba otra busqueda o cambia de red para encontrar comunidades visibles.',
     discoverEmpty: 'No hay comunidades para esta busqueda.',
+    discoverEmptyTitle: 'No hay comunidades visibles',
     discoverError: 'No se pudieron buscar comunidades.',
     discoverHint: 'Busca comunidades visibles en tus redes.',
     discoverJoin: 'Solicitar unirse',
