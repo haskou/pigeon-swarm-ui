@@ -310,9 +310,14 @@ export function AuthScreen({
             </button>
             <label
               htmlFor="remember-me"
-              className="ml-2 block cursor-pointer text-sm text-white/60"
+              className="ml-2 block min-w-0 cursor-pointer text-sm text-white/60"
             >
-              {copy.auth.rememberMe}
+              <span className="block font-bold text-white/70">
+                {copy.auth.rememberMe}
+              </span>
+              <span className="block text-xs leading-snug text-white/35">
+                {copy.auth.rememberMeHelp}
+              </span>
             </label>
           </div>
 
@@ -331,6 +336,11 @@ export function AuthScreen({
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}
           </button>
+          {mode === 'login' && (
+            <p className="mt-2 text-center text-xs leading-snug text-white/45">
+              {copy.auth.loginSubmitHelp}
+            </p>
+          )}
 
           {canShowInstallButton && (
             <div className="mt-3">

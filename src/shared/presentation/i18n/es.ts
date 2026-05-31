@@ -20,8 +20,11 @@ export const es = {
     createIdentityShort: 'Crear',
     fallbackNetworksLabel: 'Redes, separadas por comas',
     handleLabel: 'usuario',
-    identityIdHelp: 'Usa tu @usuario o el ID completo de identidad.',
-    identityIdLabel: 'ID de identidad o usuario',
+    heroBody:
+      'Tus conversaciones viajan por redes compartidas, no por un servidor central. Tu identidad se descifra en tu dispositivo. Tus claves no salen de ahi.',
+    heroTitle: 'Mensajeria P2P para comunidades privadas.',
+    identityIdHelp: 'Puedes usar @usuario o el ID completo de identidad.',
+    identityIdLabel: 'Usuario o ID de identidad',
     installApp: 'Instalar app',
     installAppChecking: 'Comprobando soporte de instalacion...',
     installAppDevHelp:
@@ -29,7 +32,7 @@ export const es = {
     installAppDismissed:
       'La instalacion se ha cancelado. Puedes intentarlo otra vez desde el menu del navegador.',
     installAppHelp:
-      'Este navegador aun no ha expuesto el instalador. Usa el menu del navegador para anadir Pigeon Swarm a la pantalla de inicio.',
+      'Instalacion no disponible todavia en este navegador. Cuando Chrome permita instalar la app, podras anadir Pigeon Swarm a la pantalla de inicio desde el menu del navegador.',
     installAppInstructions: 'Como instalar',
     installAppIosHelp:
       'En Safari, toca Compartir y despues Anadir a pantalla de inicio.',
@@ -38,7 +41,9 @@ export const es = {
     invalidLogin: 'El usuario o la contrasena no son correctos.',
     loadingSubmit: 'Derivando claves y llamando a la API...',
     login: 'Iniciar sesion',
-    loginSubmit: 'Descifrar identidad y entrar',
+    loginSubmit: 'Descifrar y entrar',
+    loginSubmitHelp:
+      'Tu contrasena se usa para descifrar tu identidad en este dispositivo.',
     mobileIntro: 'Mensajeria P2P cifrada con identidades en tu nodo.',
     networkLabel: 'Red',
     networksLabel: 'Redes',
@@ -57,7 +62,9 @@ export const es = {
       'Usa de 12 a 256 caracteres con mayuscula, minuscula, numero y simbolo.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
-    rememberMe: 'Recordarme',
+    rememberMe: 'Mantener sesion iniciada',
+    rememberMeHelp:
+      'Guarda usuario y contrasena en este navegador para restaurar la sesion.',
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   calls: {

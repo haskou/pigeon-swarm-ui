@@ -20,10 +20,10 @@ export const en = {
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:
-      'The client fetches your identity, decrypts it with your password, downloads the keychain, and loads conversations. Your decrypted key never leaves your device.',
-    heroTitle: 'P2P messaging for everyone.',
-    identityIdHelp: 'Use your @username or full identity ID.',
-    identityIdLabel: 'Identity ID or username',
+      'Your conversations travel through shared networks, not a central server. Your identity is decrypted on your device. Your keys do not leave it.',
+    heroTitle: 'P2P messaging for private communities.',
+    identityIdHelp: 'You can use @username or the full identity ID.',
+    identityIdLabel: 'Username or identity ID',
     installApp: 'Install app',
     installAppChecking: 'Checking install support...',
     installAppDevHelp:
@@ -31,7 +31,7 @@ export const en = {
     installAppDismissed:
       'Installation was dismissed. You can try again from the browser menu.',
     installAppHelp:
-      'This browser has not exposed the installer yet. Use the browser menu to add Pigeon Swarm to your Home Screen.',
+      'Installation is not available in this browser yet. When Chrome allows installing the app, you can add Pigeon Swarm to your Home Screen from the browser menu.',
     installAppInstructions: 'How to install',
     installAppIosHelp: 'In Safari, tap Share, then Add to Home Screen.',
     installAppPrompting: 'Opening installer...',
@@ -39,7 +39,9 @@ export const en = {
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
-    loginSubmit: 'Decrypt identity & enter',
+    loginSubmit: 'Decrypt and enter',
+    loginSubmitHelp:
+      'Your password is used to decrypt your identity on this device.',
     mobileIntro: 'Encrypted P2P messaging with identities stored on your node.',
     networkLabel: 'Network',
     networksLabel: 'Networks',
@@ -59,7 +61,9 @@ export const en = {
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
-    rememberMe: 'Remember me',
+    rememberMe: 'Stay signed in',
+    rememberMeHelp:
+      'Stores username and password in this browser to restore the session.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
