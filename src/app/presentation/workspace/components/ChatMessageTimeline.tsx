@@ -303,7 +303,7 @@ function MessageTimelineItem({
       {startsNewDay && (
         <DateSeparator label={formatDateSeparator(message.timestamp)} />
       )}
-      <div className={startsNewDay || startsNewAuthorRun ? 'mt-4' : 'mt-1'}>
+      <div className={startsNewDay || startsNewAuthorRun ? 'mt-3' : 'mt-0.5'}>
         <MessageBubble
           message={message}
           currentIdentityId={currentIdentityId}

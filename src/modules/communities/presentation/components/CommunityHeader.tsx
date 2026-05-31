@@ -51,8 +51,11 @@ export function CommunityHeader({
   const title = selectedChannel ? `# ${selectedChannel.name}` : community.name;
   const subtitle = selectedChannel ? (
     <p className="truncate text-sm text-white/50">
-      {copy.communities.channelMetadataOnly}{' '}
-      <span title={community.networkId}>{networkName}</span>
+      <span className="lg:hidden">{community.name}</span>
+      <span className="hidden lg:inline">
+        {copy.communities.channelMetadataOnly}{' '}
+        <span title={community.networkId}>{networkName}</span>
+      </span>
     </p>
   ) : (
     <p className="truncate text-sm text-white/50">{community.description}</p>

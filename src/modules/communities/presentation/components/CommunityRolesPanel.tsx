@@ -5,7 +5,6 @@ import type {
 
 import { useState } from 'react';
 
-import { ALL_COMMUNITY_PERMISSIONS } from '../../domain/CommunityAccessPolicy';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
@@ -20,6 +19,7 @@ export function CommunityRolesPanel({
   onUpdateRole,
   roleName,
   rolePermissions,
+  roleMemberCounts,
   roles,
   selectedRole,
   state,
@@ -33,6 +33,7 @@ export function CommunityRolesPanel({
   onUpdateRole: () => void;
   roleName: string;
   rolePermissions: CommunityPermission[];
+  roleMemberCounts: Record<string, number>;
   roles: CommunityRoleResource[];
   selectedRole: CommunityRoleResource | null;
   state: 'idle' | 'loading';
@@ -45,6 +46,9 @@ export function CommunityRolesPanel({
     selectedRoleIsBuiltIn && selectedRole
       ? communityRoleDisplayName(selectedRole)
       : roleName;
+  const selectedRoleMemberCount = selectedRole
+    ? (roleMemberCounts[selectedRole.id] ?? 0)
+    : 0;
 
   return (
     <div className="grid min-h-0 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -58,7 +62,7 @@ export function CommunityRolesPanel({
               className={cx(
                 'block w-full rounded-2xl px-3 py-2 text-left text-sm font-black transition',
                 selectedRole?.id === role.id
-                  ? 'bg-white text-slate-950'
+                  ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
                   : 'bg-white/8 text-white/75 hover:bg-white/12',
               )}
             >
@@ -92,41 +96,27 @@ export function CommunityRolesPanel({
           )}
           placeholder={copy.communities.roleName}
         />
-        <div className="grid gap-2 sm:grid-cols-2">
-          {ALL_COMMUNITY_PERMISSIONS.map((permission) => {
-            const selected = rolePermissions.includes(permission);
-
-            return (
-              <label
-                key={permission}
-                className={cx(
-                  'flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-xs font-black transition',
-                  selected
-                    ? 'border-cyan-200/70 bg-cyan-200 text-slate-950'
-                    : 'border-white/10 bg-white/8 text-white/75 hover:bg-white/12 hover:text-white',
-                )}
-              >
-                <span>{permissionLabel(permission)}</span>
-                <span
-                  aria-hidden="true"
-                  className={cx(
-                    'grid h-5 w-5 shrink-0 place-items-center rounded border text-[0.65rem]',
-                    selected
-                      ? 'border-slate-950 bg-slate-950 text-white'
-                      : 'border-white/35',
-                  )}
-                >
-                  {selected ? '✓' : ''}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={() => onRolePermissionToggle(permission)}
-                  className="sr-only"
-                />
-              </label>
-            );
-          })}
+        <div className="grid gap-3">
+          {PERMISSION_GROUPS.map((group) => (
+            <section
+              key={group.id}
+              className="rounded-2xl border border-white/10 bg-white/5 p-3"
+            >
+              <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
+                {permissionGroupLabel(group.id)}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {group.permissions.map((permission) => (
+                  <PermissionToggle
+                    key={permission}
+                    onToggle={() => onRolePermissionToggle(permission)}
+                    permission={permission}
+                    selected={rolePermissions.includes(permission)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -164,6 +154,14 @@ export function CommunityRolesPanel({
             <div className="text-xs font-bold text-rose-50/85">
               {copy.communities.roleDeleteConfirm}
             </div>
+            {selectedRoleMemberCount > 0 && (
+              <div className="mt-2 rounded-xl bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">
+                {copy.communities.roleDeleteMembersWarning.replace(
+                  '{count}',
+                  String(selectedRoleMemberCount),
+                )}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -189,6 +187,122 @@ export function CommunityRolesPanel({
       </div>
     </div>
   );
+}
+
+type PermissionGroupId =
+  | 'administration'
+  | 'mentions'
+  | 'messages'
+  | 'moderation'
+  | 'voice';
+
+const PERMISSION_GROUPS: Array<{
+  id: PermissionGroupId;
+  permissions: CommunityPermission[];
+}> = [
+  {
+    id: 'administration',
+    permissions: [
+      'view_channels',
+      'manage_channels',
+      'manage_roles',
+      'manage_members',
+      'manage_messages',
+    ],
+  },
+  {
+    id: 'moderation',
+    permissions: [
+      'create_invites',
+      'approve_members',
+      'reject_members',
+      'ban_members',
+    ],
+  },
+  {
+    id: 'messages',
+    permissions: [
+      'send_messages',
+      'attach_files',
+      'embed_links',
+      'send_stickers',
+      'create_polls',
+    ],
+  },
+  {
+    id: 'mentions',
+    permissions: ['mention_everyone', 'mention_here', 'mention_roles'],
+  },
+  {
+    id: 'voice',
+    permissions: ['connect_voice'],
+  },
+];
+
+const SENSITIVE_PERMISSIONS = new Set<CommunityPermission>([
+  'ban_members',
+  'manage_members',
+  'manage_messages',
+  'manage_roles',
+]);
+
+function PermissionToggle({
+  onToggle,
+  permission,
+  selected,
+}: {
+  onToggle: () => void;
+  permission: CommunityPermission;
+  selected: boolean;
+}) {
+  const sensitive = SENSITIVE_PERMISSIONS.has(permission);
+
+  return (
+    <label
+      className={cx(
+        'flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs font-black transition',
+        selected && sensitive
+          ? 'border-amber-300/70 bg-amber-300/20 text-amber-50'
+          : selected
+            ? 'border-[#c8c0d8]/70 bg-[#c8c0d8]/85 text-[#171426]'
+            : sensitive
+              ? 'border-amber-300/25 bg-amber-300/5 text-amber-50/80 hover:bg-amber-300/10'
+              : 'border-white/10 bg-white/8 text-white/75 hover:bg-white/12 hover:text-white',
+      )}
+    >
+      <span className="min-w-0">
+        <span className="block truncate">{permissionLabel(permission)}</span>
+        {sensitive && (
+          <span className="mt-0.5 block text-[0.6rem] uppercase tracking-[0.12em] opacity-70">
+            {copy.communities.sensitivePermission}
+          </span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        className={cx(
+          'grid h-5 w-5 shrink-0 place-items-center rounded border text-[0.65rem]',
+          selected
+            ? sensitive
+              ? 'border-amber-100 bg-amber-100 text-amber-950'
+              : 'border-[#171426] bg-[#171426] text-white'
+            : 'border-white/35',
+        )}
+      >
+        {selected ? '✓' : ''}
+      </span>
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        className="sr-only"
+      />
+    </label>
+  );
+}
+
+function permissionGroupLabel(group: PermissionGroupId): string {
+  return copy.communities.permissionGroups[group];
 }
 
 function permissionLabel(permission: CommunityPermission): string {

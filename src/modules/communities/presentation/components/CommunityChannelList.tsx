@@ -166,7 +166,7 @@ function ThreadChannelButton({
       className={cx(
         'flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-black transition',
         active
-          ? 'bg-white/90 text-slate-950'
+          ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
           : 'text-white/60 hover:bg-white/10 hover:text-white',
       )}
     >
@@ -198,7 +198,7 @@ function TextChannelButton({
       className={cx(
         'flex w-full items-center gap-2 rounded-2xl px-3 py-1.5 text-left text-sm font-black transition',
         active
-          ? 'bg-white text-slate-950'
+          ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
           : 'text-white hover:bg-white/12',
       )}
     >

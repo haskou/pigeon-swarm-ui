@@ -7,10 +7,12 @@ function statsReport(entries: RTCStats[]): RTCStatsReport {
 function peerWithStats(
   entries: RTCStats[],
   connectionState: RTCPeerConnectionState = 'connected',
+  iceConnectionState: RTCIceConnectionState = 'connected',
 ): RTCPeerConnection {
   return {
     connectionState,
     getStats: jest.fn(() => Promise.resolve(statsReport(entries))),
+    iceConnectionState,
   } as unknown as RTCPeerConnection;
 }
 
@@ -38,7 +40,9 @@ describe(collectPeerMediaStats.name, () => {
 
     expect(stats).toEqual({
       audioLevel: 0.08,
+      connectionPath: 'unknown',
       connectionState: 'connected',
+      iceState: 'connected',
       latencyMs: 123,
       packetsLost: 3,
       speaking: true,
@@ -70,6 +74,7 @@ describe(collectPeerMediaStats.name, () => {
 
     expect(stats).toEqual({
       connectionState: 'failed',
+      iceState: 'connected',
       speaking: false,
     });
   });

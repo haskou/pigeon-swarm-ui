@@ -19,8 +19,13 @@ export function CallDataPanel({ call }: { call: CallSession }) {
     },
     participants: call.participants.map((participant) => ({
       audioLevel: participant.audioLevel,
+      bitrateKbps: participant.bitrateKbps,
+      codec: participant.codec,
+      connectionPath: participant.connectionPath,
       connectionState: participant.connectionState,
       identityId: participant.identityId,
+      iceState: participant.iceState,
+      jitterMs: participant.jitterMs,
       latencyMs: participant.latencyMs,
       muted: participant.muted,
       name: participant.name,
@@ -28,6 +33,7 @@ export function CallDataPanel({ call }: { call: CallSession }) {
       screenSharing: participant.screenSharing,
       speaking: participant.speaking,
       status: participant.status,
+      transport: participant.transport,
       videoEnabled: participant.videoEnabled,
     })),
   };

@@ -2,6 +2,8 @@ import type {
   CommunityRoleResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { useEffect, useMemo, useState } from 'react';
+
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
@@ -14,6 +16,7 @@ type ManageCommunityChannelsPanelProps = {
   channelOrder: ManagedCommunityChannel[];
   channelPermissionDrafts: Record<string, string[]>;
   channelType: 'text' | 'voice';
+  canSave: boolean;
   onChannelCreate: () => void;
   onChannelDelete: (channel: ManagedCommunityChannel) => void;
   onChannelDraftChange: (channelId: string, value: string) => void;
@@ -21,9 +24,11 @@ type ManageCommunityChannelsPanelProps = {
   onChannelTypeChange: (type: 'text' | 'voice') => void;
   onPendingChannelDeleteChange: (channelId: null | string) => void;
   onRoleToggle: (channelId: string, roleId: string) => void;
+  onSave: () => void;
   onChannelMove: (channelId: string, direction: -1 | 1) => void;
   pendingChannelDeleteId: null | string;
   roles: CommunityRoleResource[];
+  saveLabel: string;
   state: 'idle' | 'loading';
 };
 
@@ -33,6 +38,7 @@ export function ManageCommunityChannelsPanel({
   channelOrder,
   channelPermissionDrafts,
   channelType,
+  canSave,
   onChannelCreate,
   onChannelDelete,
   onChannelDraftChange,
@@ -41,131 +47,247 @@ export function ManageCommunityChannelsPanel({
   onChannelTypeChange,
   onPendingChannelDeleteChange,
   onRoleToggle,
+  onSave,
   pendingChannelDeleteId,
   roles,
+  saveLabel,
   state,
 }: ManageCommunityChannelsPanelProps) {
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    channelOrder[0]?.id ?? null,
+  );
+  const selectedChannel = useMemo(
+    () =>
+      channelOrder.find((channel) => channel.id === selectedChannelId) ??
+      null,
+    [channelOrder, selectedChannelId],
+  );
+
+  useEffect(() => {
+    if (selectedChannel) return;
+
+    setSelectedChannelId(channelOrder[0]?.id ?? null);
+  }, [channelOrder, selectedChannel]);
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="mb-3 px-1 text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.channels}
       </div>
-      <div className="max-h-[34vh] space-y-3 overflow-y-auto pr-1 sm:max-h-[48vh]">
-        {channelOrder.map((channel, index) => (
-          <ChannelDraftCard
-            channel={channel}
+      <div className="grid min-h-0 gap-3 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="min-h-0 rounded-2xl border border-white/10 bg-black/20 p-2">
+          <div className="max-h-[34vh] space-y-1 overflow-y-auto pr-1 sm:max-h-[46vh]">
+            {channelOrder.map((channel) => (
+              <ChannelListButton
+                active={channel.id === selectedChannelId}
+                channel={channel}
+                channelDrafts={channelDrafts}
+                key={channel.id}
+                onSelect={() => setSelectedChannelId(channel.id)}
+              />
+            ))}
+          </div>
+          <ChannelCreateRow
+            channelName={channelName}
+            channelType={channelType}
+            disabled={state === 'loading'}
+            onChannelCreate={onChannelCreate}
+            onChannelNameChange={onChannelNameChange}
+            onChannelTypeChange={onChannelTypeChange}
+          />
+        </div>
+        {selectedChannel ? (
+          <ChannelEditorPanel
+            canSave={canSave}
+            channel={selectedChannel}
             channelDrafts={channelDrafts}
             channelOrder={channelOrder}
             channelPermissionDrafts={channelPermissionDrafts}
-            index={index}
-            key={channel.id}
             onChannelDelete={onChannelDelete}
             onChannelDraftChange={onChannelDraftChange}
             onChannelMove={onChannelMove}
             onPendingChannelDeleteChange={onPendingChannelDeleteChange}
             onRoleToggle={onRoleToggle}
+            onSave={onSave}
             pendingChannelDeleteId={pendingChannelDeleteId}
             roles={roles}
+            saveLabel={saveLabel}
             state={state}
           />
-        ))}
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1">
-        {(['text', 'voice'] as const).map((type) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => onChannelTypeChange(type)}
-            className={cx(
-              'rounded-2xl px-3 py-2 text-xs font-black transition',
-              channelType === type
-                ? 'bg-white text-slate-950'
-                : 'text-white/55 hover:bg-white/10',
+        ) : (
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/8 p-4 text-sm font-semibold text-white/45">
+            <span>{copy.communities.noChannels}</span>
+            {canSave && (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={state === 'loading'}
+                className="justify-self-start rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {saveLabel}
+              </button>
             )}
-          >
-            {type === 'voice'
-              ? copy.communities.voiceChannel
-              : copy.communities.textChannel}
-          </button>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-2">
-        <input
-          value={channelName}
-          onChange={(event) => onChannelNameChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            onChannelCreate();
-          }}
-          className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder={copy.communities.addChannelPlaceholder}
-        />
-        <button
-          type="button"
-          onClick={onChannelCreate}
-          disabled={!channelName.trim() || state === 'loading'}
-          className="grid h-11 w-12 shrink-0 place-items-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-          aria-label={copy.communities.addInitialChannel}
-        >
-          +
-        </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ChannelDraftCard({
+function ChannelCreateRow({
+  channelName,
+  channelType,
+  disabled,
+  onChannelCreate,
+  onChannelNameChange,
+  onChannelTypeChange,
+}: {
+  channelName: string;
+  channelType: 'text' | 'voice';
+  disabled: boolean;
+  onChannelCreate: () => void;
+  onChannelNameChange: (name: string) => void;
+  onChannelTypeChange: (type: 'text' | 'voice') => void;
+}) {
+  return (
+    <div className="mt-2 flex gap-2">
+      <input
+        value={channelName}
+        onChange={(event) => onChannelNameChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          onChannelCreate();
+        }}
+        className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+        placeholder={copy.communities.addChannelPlaceholder}
+      />
+      <select
+        value={channelType}
+        onChange={(event) =>
+          onChannelTypeChange(event.target.value as 'text' | 'voice')
+        }
+        className="h-10 w-24 shrink-0 rounded-xl border border-white/10 bg-black/25 px-2 text-xs font-black text-white outline-none focus:border-cyan-300/60"
+        aria-label={copy.communities.channelType}
+      >
+        {(['text', 'voice'] as const).map((type) => (
+          <option
+            key={type}
+            value={type}
+          >
+            {type === 'voice'
+              ? copy.communities.voiceChannel
+              : copy.communities.textChannel}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={onChannelCreate}
+        disabled={!channelName.trim() || disabled}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+        aria-label={copy.communities.addInitialChannel}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function ChannelListButton({
+  active,
+  channel,
+  channelDrafts,
+  onSelect,
+}: {
+  active: boolean;
+  channel: ManagedCommunityChannel;
+  channelDrafts: Record<string, string>;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cx(
+        'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-black transition',
+        active
+          ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
+          : 'text-white/70 hover:bg-white/10 hover:text-white',
+      )}
+    >
+      <span className="grid w-5 shrink-0 place-items-center text-current/80">
+        {channel.type === 'voice' ? <VoiceIcon /> : '#'}
+      </span>
+      <span className="min-w-0 flex-1 truncate">
+        {channelDrafts[channel.id] ?? channel.name}
+      </span>
+    </button>
+  );
+}
+
+function ChannelEditorPanel({
+  canSave,
   channel,
   channelDrafts,
   channelOrder,
   channelPermissionDrafts,
-  index,
   onChannelDelete,
   onChannelDraftChange,
   onChannelMove,
   onPendingChannelDeleteChange,
   onRoleToggle,
+  onSave,
   pendingChannelDeleteId,
   roles,
+  saveLabel,
   state,
 }: {
+  canSave: boolean;
   channel: ManagedCommunityChannel;
   channelDrafts: Record<string, string>;
   channelOrder: ManagedCommunityChannel[];
   channelPermissionDrafts: Record<string, string[]>;
-  index: number;
   onChannelDelete: (channel: ManagedCommunityChannel) => void;
   onChannelDraftChange: (channelId: string, value: string) => void;
   onChannelMove: (channelId: string, direction: -1 | 1) => void;
   onPendingChannelDeleteChange: (channelId: null | string) => void;
   onRoleToggle: (channelId: string, roleId: string) => void;
+  onSave: () => void;
   pendingChannelDeleteId: null | string;
   roles: CommunityRoleResource[];
+  saveLabel: string;
   state: 'idle' | 'loading';
 }) {
+  const index = channelOrder.findIndex(
+    (candidate) => candidate.id === channel.id,
+  );
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/8 p-3">
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-white/65">
-          {channel.type === 'voice' ? <VoiceIcon /> : '#'}
-        </span>
-        <div className="min-w-0 flex-1 space-y-2">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+        <div className="min-w-0">
+          <label className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
+            {copy.communities.name}
+          </label>
           <input
             value={channelDrafts[channel.id] ?? channel.name}
             onChange={(event) =>
               onChannelDraftChange(channel.id, event.target.value)
             }
-            className="h-10 w-full min-w-0 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-white outline-none focus:border-cyan-300/60"
+            className="h-10 w-full min-w-0 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-white outline-none focus:border-cyan-300/60"
           />
-          <ChannelDraftActions
-            channel={channel}
-            channelOrder={channelOrder}
-            index={index}
-            onChannelMove={onChannelMove}
-            onPendingChannelDeleteChange={onPendingChannelDeleteChange}
-            state={state}
-          />
+        </div>
+        <div>
+          <div className="mb-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
+            {copy.communities.channelType}
+          </div>
+          <span className="inline-flex h-10 items-center gap-2 rounded-xl bg-black/25 px-3 text-xs font-black text-white/70">
+            {channel.type === 'voice' ? <VoiceIcon /> : '#'}
+            {channel.type === 'voice'
+              ? copy.communities.voiceChannel
+              : copy.communities.textChannel}
+          </span>
         </div>
       </div>
       <ChannelVisibilityRoles
@@ -174,6 +296,24 @@ function ChannelDraftCard({
         onRoleToggle={onRoleToggle}
         roles={roles}
       />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <ChannelDraftActions
+          channel={channel}
+          channelOrder={channelOrder}
+          index={index}
+          onChannelMove={onChannelMove}
+          onPendingChannelDeleteChange={onPendingChannelDeleteChange}
+          state={state}
+        />
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!canSave || state === 'loading'}
+          className="ml-auto rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {saveLabel}
+        </button>
+      </div>
       {pendingChannelDeleteId === channel.id && (
         <ChannelDeleteConfirmation
           channel={channel}

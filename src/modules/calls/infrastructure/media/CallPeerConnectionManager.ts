@@ -80,6 +80,11 @@ export class CallPeerConnectionManager {
 
   private readonly localScreenStreams = new Map<string, MediaStream>();
 
+  private readonly previousStatsSamples = new Map<
+    string,
+    { bytesReceived: number; sampledAt: number }
+  >();
+
   private localStream: MediaStream | null = null;
 
   private rtcConfiguration: RTCConfiguration | null = null;
@@ -328,6 +333,7 @@ export class CallPeerConnectionManager {
     this.remoteScreenAudioStreamIds.clear();
     this.remoteScreenAudioTrackIds.clear();
     this.localScreenStreams.clear();
+    this.previousStatsSamples.clear();
     this.localStream = null;
     this.rtcConfiguration = null;
     this.deafened = false;
@@ -336,10 +342,17 @@ export class CallPeerConnectionManager {
   public async collectStats(): Promise<Record<string, PeerMediaStats>> {
     const entries = await Promise.all(
       [...this.peers.entries()].map(
-        async ([identityId, peer]): Promise<[string, PeerMediaStats]> => [
-          identityId,
-          await collectPeerMediaStats(peer),
-        ],
+        async ([identityId, peer]): Promise<[string, PeerMediaStats]> => {
+          const firstPassStats = await collectPeerMediaStats(peer);
+          const bitrateKbps = this.bitrateFor(identityId, firstPassStats);
+
+          return [
+            identityId,
+            bitrateKbps === undefined
+              ? firstPassStats
+              : { ...firstPassStats, bitrateKbps },
+          ];
+        },
       ),
     );
     const stats: Record<string, PeerMediaStats> = {};
@@ -349,6 +362,30 @@ export class CallPeerConnectionManager {
     }
 
     return stats;
+  }
+
+  private bitrateFor(
+    identityId: string,
+    stats: PeerMediaStats,
+  ): number | undefined {
+    if (stats.bytesReceived === undefined) return undefined;
+
+    const sampledAt = Date.now();
+    const previous = this.previousStatsSamples.get(identityId);
+
+    this.previousStatsSamples.set(identityId, {
+      bytesReceived: stats.bytesReceived,
+      sampledAt,
+    });
+
+    if (!previous) return undefined;
+
+    const elapsedSeconds = (sampledAt - previous.sampledAt) / 1000;
+    const bytesDelta = stats.bytesReceived - previous.bytesReceived;
+
+    if (elapsedSeconds <= 0 || bytesDelta < 0) return undefined;
+
+    return Math.round((bytesDelta * 8) / elapsedSeconds / 1000);
   }
 
   private async handleIceCandidateSignal(

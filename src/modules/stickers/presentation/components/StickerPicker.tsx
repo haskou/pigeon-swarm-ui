@@ -296,7 +296,7 @@ export function StickerPicker({
         onFocus={warmEmojiCatalog}
         onPointerEnter={warmEmojiCatalog}
         disabled={disabled}
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45 sm:h-10 sm:w-10"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-xl text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={copy.stickers.openPicker}
       >
         <svg

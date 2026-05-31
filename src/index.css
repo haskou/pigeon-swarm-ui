@@ -302,6 +302,12 @@ textarea:disabled,
   transition: outline-color 0.3s ease;
 }
 
+.message-context-ring {
+  border-radius: 1.5rem;
+  outline: 2px solid rgba(244, 114, 182, 0.72);
+  outline-offset: 4px;
+}
+
 .message-context-menu {
   left: var(--message-menu-left);
   top: var(--message-menu-top);

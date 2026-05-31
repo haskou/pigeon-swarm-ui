@@ -31,7 +31,7 @@ export function MessageStickerContent({
           onStickerClick?.(sticker);
         }}
         className={cx(
-          'flex w-full touch-none select-none rounded-2xl p-1 transition hover:bg-white/10',
+          'flex w-full touch-none select-none rounded-2xl p-0.5 transition hover:bg-white/10',
           mine ? 'justify-end' : 'justify-start',
         )}
         title="View sticker pack"
@@ -40,7 +40,7 @@ export function MessageStickerContent({
         <img
           src={stickerAssetUrl(sticker.assetCid)}
           alt="Sticker"
-          className="max-h-48 max-w-48 object-contain sm:max-h-56 sm:max-w-56"
+          className="max-h-40 max-w-40 object-contain sm:max-h-48 sm:max-w-48"
           draggable={false}
         />
       </button>

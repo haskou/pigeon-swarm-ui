@@ -49,6 +49,7 @@ export function CommunityMembersRolesPanel({
   state: 'idle' | 'loading';
 }) {
   const [memberSearch, setMemberSearch] = useState('');
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] =
     useState<PendingMemberAction>(null);
   const visibleMemberIds = useMemo(
@@ -83,7 +84,7 @@ export function CommunityMembersRolesPanel({
           value={memberSearch}
         />
       </div>
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {visibleMemberIds.length === 0 ? (
           <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">
             {copy.communities.noMatchingMembers}
@@ -96,21 +97,46 @@ export function CommunityMembersRolesPanel({
             );
             const actionPendingForMember =
               pendingAction?.identityId === identityId;
+            const expanded = expandedMemberId === identityId;
+            const selectedRoleIds = memberRoleDrafts[identityId] ?? [];
 
             return (
               <div
                 key={identityId}
-                className="rounded-2xl border border-white/10 bg-white/8 p-3"
+                className="rounded-2xl border border-white/10 bg-white/6"
               >
-                <MemberRow
-                  identity={memberIdentities[identityId]}
-                  identityId={identityId}
-                  onClick={() => undefined}
-                  owner={identityId === ownerIdentityId}
-                  pictureUrl={memberPictures[identityId] ?? null}
-                />
-                {canManageRoles && editableRoles.length > 0 && (
-                  <div className="mt-3 rounded-2xl bg-black/20 p-3">
+                <div className="flex items-center gap-2 p-1.5">
+                  <div className="min-w-0 flex-1">
+                    <MemberRow
+                      compact
+                      identity={memberIdentities[identityId]}
+                      identityId={identityId}
+                      onClick={() =>
+                        setExpandedMemberId(expanded ? null : identityId)
+                      }
+                      owner={identityId === ownerIdentityId}
+                      pictureUrl={memberPictures[identityId] ?? null}
+                      showBanner={false}
+                    />
+                  </div>
+                  <MemberRoleSummary
+                    roles={editableRoles}
+                    selectedRoleIds={selectedRoleIds}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedMemberId(expanded ? null : identityId)
+                    }
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-black text-white/60 transition hover:bg-white/15 hover:text-white"
+                    aria-expanded={expanded}
+                    aria-label={memberName}
+                  >
+                    {expanded ? '−' : '+'}
+                  </button>
+                </div>
+                {expanded && canManageRoles && editableRoles.length > 0 && (
+                  <div className="mx-2 mb-2 rounded-2xl bg-black/20 p-3">
                     <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
                       {copy.communities.assignRoles}
                     </div>
@@ -143,13 +169,13 @@ export function CommunityMembersRolesPanel({
                     </div>
                   </div>
                 )}
-                {canManageRoles && editableRoles.length === 0 && (
-                  <div className="mt-3 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
+                {expanded && canManageRoles && editableRoles.length === 0 && (
+                  <div className="mx-2 mb-2 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
                     {copy.communities.noCustomRoles}
                   </div>
                 )}
-                {identityId !== ownerIdentityId && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                {expanded && identityId !== ownerIdentityId && (
+                  <div className="mx-2 mb-2 flex flex-wrap gap-2">
                     {canKickMembers && (
                       <button
                         type="button"
@@ -177,7 +203,7 @@ export function CommunityMembersRolesPanel({
                   </div>
                 )}
                 {pendingAction && actionPendingForMember && (
-                  <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mx-2 mb-2 flex flex-col gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="min-w-0 text-xs font-bold text-rose-50/85">
                       {pendingAction.action === 'kick'
                         ? copy.communities.kickMember
@@ -216,6 +242,43 @@ export function CommunityMembersRolesPanel({
           })
         )}
       </div>
+    </div>
+  );
+}
+
+function MemberRoleSummary({
+  roles,
+  selectedRoleIds,
+}: {
+  roles: CommunityRoleResource[];
+  selectedRoleIds: string[];
+}) {
+  const selectedRoles = roles.filter((role) => selectedRoleIds.includes(role.id));
+
+  if (selectedRoles.length === 0) {
+    return (
+      <span className="hidden rounded-full bg-white/8 px-2 py-1 text-[0.65rem] font-black text-white/35 sm:inline-flex">
+        {copy.communities.roles}
+      </span>
+    );
+  }
+
+  return (
+    <div className="hidden max-w-48 flex-wrap justify-end gap-1 sm:flex">
+      {selectedRoles.slice(0, 2).map((role) => (
+        <span
+          key={role.id}
+          className="max-w-24 truncate rounded-full bg-cyan-200/15 px-2 py-1 text-[0.65rem] font-black text-cyan-100"
+          title={communityRoleDisplayName(role)}
+        >
+          {communityRoleDisplayName(role)}
+        </span>
+      ))}
+      {selectedRoles.length > 2 && (
+        <span className="rounded-full bg-white/10 px-2 py-1 text-[0.65rem] font-black text-white/45">
+          +{selectedRoles.length - 2}
+        </span>
+      )}
     </div>
   );
 }
