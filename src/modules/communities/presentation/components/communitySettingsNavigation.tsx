@@ -28,7 +28,7 @@ export function CommunitySettingsNavigation({
           className={cx(
             'shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-left text-xs font-black transition sm:block sm:w-full',
             activeSection === section
-              ? 'bg-white text-slate-950'
+              ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
               : 'text-white/55 hover:bg-white/10',
           )}
         >

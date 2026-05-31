@@ -18,6 +18,7 @@ import { CommunityChannels } from '../../domain/CommunityChannels';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
@@ -381,7 +382,18 @@ export function ManageCommunityDialog({
     ? (roles.find((role) => role.id === selectedRoleId) ?? null)
     : null;
   const editableRoles = roles.filter((role) => !role.builtIn);
-  const bannedMemberIds = new Set(community.bannedMemberIds ?? []);
+  const roleMemberCounts = roles.reduce<Record<string, number>>(
+    (counts, role) => ({
+      ...counts,
+      [role.id]:
+        role.id === 'everyone'
+          ? community.memberIds.length
+          : (community.memberRoles ?? []).filter((assignment) =>
+              assignment.roleIds.includes(role.id),
+            ).length,
+    }),
+    {},
+  );
 
   const refreshCommunity = async () => {
     const freshCommunity = await applicationContainer.getCommunity(
@@ -731,6 +743,16 @@ export function ManageCommunityDialog({
       : activeSection === 'channels'
         ? hasProfileChanges
         : hasManageCommunityChanges;
+  const activeSectionSaveLabel =
+    state === 'loading'
+      ? copy.profile.saving
+      : lastSavedSection === activeSection
+        ? copy.communities.saved
+        : activeSectionHasExternalChanges
+          ? copy.communities.saveChanges
+          : activeSection === 'channels'
+            ? copy.communities.saveChannels
+            : copy.profile.save;
 
   useEffect(() => {
     if (hasManageCommunityChanges) setLastSavedSection(null);
@@ -965,6 +987,7 @@ export function ManageCommunityDialog({
       />
       <section className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
         <DialogHeader title={copy.communities.manage} onClose={onClose} />
+        <CommunityManagementContextHeader community={community} />
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
           <CommunitySettingsNavigation
             activeSection={activeSection}
@@ -998,6 +1021,11 @@ export function ManageCommunityDialog({
 
                 {activeSection === 'channels' && (
                   <ManageCommunityChannelsPanel
+                    canSave={
+                      !!name.trim() &&
+                      state !== 'loading' &&
+                      hasManageCommunityChanges
+                    }
                     channelDrafts={channelDrafts}
                     channelName={channelName}
                     channelOrder={channelOrder}
@@ -1016,8 +1044,10 @@ export function ManageCommunityDialog({
                     onChannelTypeChange={setChannelType}
                     onPendingChannelDeleteChange={setPendingChannelDeleteId}
                     onRoleToggle={toggleChannelRole}
+                    onSave={() => void saveChanges()}
                     pendingChannelDeleteId={pendingChannelDeleteId}
                     roles={roles}
+                    saveLabel={activeSectionSaveLabel}
                     state={state}
                   />
                 )}
@@ -1033,6 +1063,7 @@ export function ManageCommunityDialog({
                   onUpdateRole={() => void updateRole()}
                   roleName={roleName}
                   rolePermissions={rolePermissions}
+                  roleMemberCounts={roleMemberCounts}
                   roles={roles}
                   selectedRole={selectedRole}
                   state={state}
@@ -1102,7 +1133,7 @@ export function ManageCommunityDialog({
                 </div>
               )}
             </div>
-            {(activeSection === 'profile' || activeSection === 'channels') && (
+            {activeSection === 'profile' && (
               <div className="mt-4 grid gap-2">
                 <div className="min-h-4 text-right text-[0.7rem] font-black uppercase tracking-[0.14em] text-white/35">
                   {lastSavedSection === activeSection
@@ -1121,15 +1152,7 @@ export function ManageCommunityDialog({
                   }
                   className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {state === 'loading'
-                    ? copy.profile.saving
-                    : lastSavedSection === activeSection
-                      ? copy.communities.saved
-                      : activeSectionHasExternalChanges
-                        ? copy.communities.saveChanges
-                        : activeSection === 'channels'
-                          ? copy.communities.saveChannels
-                          : copy.profile.save}
+                  {activeSectionSaveLabel}
                 </button>
               </div>
             )}
@@ -1158,6 +1181,29 @@ export function ManageCommunityDialog({
     document.body,
   );
 }
+
+function CommunityManagementContextHeader({
+  community,
+}: {
+  community: Community;
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
+        {community.name.slice(0, 1).toUpperCase()}
+      </span>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-black text-white">
+          {community.name}
+        </div>
+        <div className="truncate text-xs font-semibold text-white/45">
+          {copy.communities.network} · {shortId(community.networkId)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function draftChannelId(): string {
   return `draft:${UUID.generate().toString()}`;
 }

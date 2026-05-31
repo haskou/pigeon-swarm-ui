@@ -16,6 +16,7 @@ import { loadPublicImage } from './communityImages';
 import { memberPrimaryName } from './communityMemberNames';
 
 export function MemberRow({
+  compact = false,
   identity,
   identityId,
   name,
@@ -23,7 +24,9 @@ export function MemberRow({
   owner = false,
   pictureUrl,
   presence,
+  showBanner = true,
 }: {
+  compact?: boolean;
   identity?: IdentityResource;
   identityId: string;
   name?: string;
@@ -31,6 +34,7 @@ export function MemberRow({
   owner?: boolean;
   pictureUrl: null | string;
   presence?: IdentityPresence;
+  showBanner?: boolean;
 }) {
   const displayName = name ?? memberPrimaryName(identity, identityId);
   const handle = identity?.profile.handle?.trim();
@@ -40,9 +44,13 @@ export function MemberRow({
     <button
       type="button"
       onClick={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+      className={
+        compact
+          ? 'relative flex w-full items-center gap-2 overflow-hidden rounded-xl bg-transparent p-2 text-left transition hover:bg-white/8'
+          : 'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12'
+      }
     >
-      {bannerUrl && (
+      {showBanner && bannerUrl && (
         <span
           aria-hidden="true"
           className="absolute inset-0 bg-cover bg-center"
