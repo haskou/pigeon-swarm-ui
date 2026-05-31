@@ -514,6 +514,7 @@ export const es = {
     pinError: 'No se pudo fijar el mensaje.',
     pinned: 'Fijado',
     pinnedMessages: 'Mensajes fijados',
+    viewPinned: 'Ver fijados',
     reply: 'Responder',
     replyingTo: 'Respondiendo a',
     replyTargetNotFound: 'No se encontro el mensaje respondido.',

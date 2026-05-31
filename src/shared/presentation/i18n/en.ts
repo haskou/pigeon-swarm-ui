@@ -614,6 +614,7 @@ export const en = {
     pinError: 'The message could not be pinned.',
     pinned: 'Pinned',
     pinnedMessages: 'Pinned messages',
+    viewPinned: 'View pins',
     reply: 'Reply',
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',

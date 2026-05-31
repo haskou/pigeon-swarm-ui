@@ -78,7 +78,7 @@ export function ConversationActionsMenu({
           }}
           className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 sm:hidden"
         >
-          {copy.messages.pinnedMessages}
+          {copy.messages.viewPinned}
         </button>
         <button
           type="button"

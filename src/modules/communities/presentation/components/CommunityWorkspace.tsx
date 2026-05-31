@@ -1917,6 +1917,9 @@ export function CommunityWorkspace({
                 setCommunityMenuOpen(false);
               }}
               onLeaveCommunity={() => void leaveCommunity()}
+              onOpenPins={
+                selectedChannel ? () => void openPinnedMessages() : undefined
+              }
               open={communityMenuOpen}
             />
           }

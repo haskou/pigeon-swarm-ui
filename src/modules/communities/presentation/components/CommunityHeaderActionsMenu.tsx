@@ -12,6 +12,7 @@ type CommunityHeaderActionsMenuProps = {
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
+  onOpenPins?: () => void;
 };
 
 export function CommunityHeaderActionsMenu({
@@ -23,6 +24,7 @@ export function CommunityHeaderActionsMenu({
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
+  onOpenPins,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   useCloseOnEscape(onClose, open);
 
@@ -37,6 +39,18 @@ export function CommunityHeaderActionsMenu({
         aria-label={copy.dialog.close}
       />
       <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+        {onOpenPins ? (
+          <button
+            type="button"
+            onClick={() => {
+              onOpenPins();
+              onClose();
+            }}
+            className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10 sm:hidden"
+          >
+            {copy.messages.viewPinned}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onCommunityDataOpen}
