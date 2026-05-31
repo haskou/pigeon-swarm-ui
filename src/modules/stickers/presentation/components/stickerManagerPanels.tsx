@@ -11,10 +11,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { StickerGrid, type StickerGridItem } from './stickerPickerParts';
 import { stickerAssetUrl } from './stickerPressPreview';
 import { invalidateStickerCaches } from './stickerLibraryCache';
-import {
-  prepareStickerFile,
-  stickerTypeFromUpload,
-} from './stickerUploadPreparation';
+import { prepareStickerFile } from './stickerUploadPreparation';
 
 export function MyPacksPanel({
   onStickerCreated,
@@ -205,7 +202,7 @@ function ManagePackStickers({
             contentType: upload.contentType,
             dimensions,
             sizeBytes: upload.size,
-            type: stickerTypeFromUpload(upload),
+            type: preparedSticker.type,
           });
         } catch {
           failedFiles.push(file.name);

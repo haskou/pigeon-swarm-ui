@@ -6,7 +6,6 @@ describe(PublicImageUploadPreparer.name, () => {
     const preparer = new PublicImageUploadPreparer(encodeImage);
     const files = [
       new File(['hello'], 'readme.txt', { type: 'text/plain' }),
-      new File(['gif'], 'animated.gif', { type: 'image/gif' }),
       new File(['webp'], 'avatar.webp', { type: 'image/webp' }),
       new File(['svg'], 'logo.svg', { type: 'image/svg+xml' }),
     ];
@@ -46,5 +45,25 @@ describe(PublicImageUploadPreparer.name, () => {
     expect(encodeImage).toHaveBeenCalledWith(source);
     expect(result.name).toBe('banner.webp');
     expect(result.type).toBe('image/webp');
+  });
+
+  it('converts gifs to webp files through the gif encoder', async () => {
+    const encoded = new Blob(['animated-webp-bytes'], { type: 'image/webp' });
+    const source = new File(['gif-bytes'], 'sticker.gif', {
+      lastModified: 4321,
+      type: 'image/gif',
+    });
+    const encodeImage = jest.fn();
+    const encodeGif = jest.fn().mockResolvedValue(encoded);
+    const preparer = new PublicImageUploadPreparer(encodeImage, encodeGif);
+
+    const result = await preparer.prepare(source);
+
+    expect(encodeImage).not.toHaveBeenCalled();
+    expect(encodeGif).toHaveBeenCalledWith(source);
+    expect(result.name).toBe('sticker.webp');
+    expect(result.type).toBe('image/webp');
+    expect(result.lastModified).toBe(4321);
+    await expect(result.text()).resolves.toBe('animated-webp-bytes');
   });
 });

@@ -1,12 +1,11 @@
 import type { CSSProperties, PointerEvent } from 'react';
 
-import { GIFEncoder, applyPalette, quantize } from 'gifenc';
-import { decompressFrames, parseGIF } from 'gifuct-js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { copy } from '../i18n/copy';
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape';
+import { AnimatedWebpEncoder } from '../media/AnimatedWebpEncoder';
 
 type ImageCropShape = 'avatar' | 'banner';
 
@@ -23,17 +22,6 @@ type DragState = {
   pointerId: number;
   startX: number;
   startY: number;
-};
-
-type GifFrameSnapshot = {
-  dims: {
-    height: number;
-    left: number;
-    top: number;
-    width: number;
-  };
-  disposalType: number;
-  restoreData?: ImageData;
 };
 
 const cropPresets: Record<
@@ -460,116 +448,19 @@ async function cropAnimatedGif(
     zoom: number;
   },
 ): Promise<Blob> {
-  const parsed = parseGIF(await file.arrayBuffer());
-  const frames = decompressFrames(parsed, true);
-  const sourceCanvas = document.createElement('canvas');
-  const outputCanvas = document.createElement('canvas');
-  const sourceContext = sourceCanvas.getContext('2d');
-  const outputContext = outputCanvas.getContext('2d');
-  const encoder = GIFEncoder();
-  let previousFrame: GifFrameSnapshot | null = null;
-
-  if (!sourceContext || !outputContext) {
-    throw new Error('GIF crop failed');
-  }
-
-  sourceCanvas.width = parsed.lsd.width;
-  sourceCanvas.height = parsed.lsd.height;
-  outputCanvas.width = options.outputWidth;
-  outputCanvas.height = options.outputHeight;
-
-  for (const [index, frame] of frames.entries()) {
-    applyGifDisposal(sourceContext, previousFrame);
-
-    const restoreData =
-      frame.disposalType === 3
-        ? sourceContext.getImageData(
-            0,
-            0,
-            sourceCanvas.width,
-            sourceCanvas.height,
-          )
-        : undefined;
-
-    compositeGifPatch(sourceContext, frame.patch, frame.dims);
-    drawCroppedSource(
-      outputCanvas,
-      sourceCanvas,
-      sourceCanvas.width,
-      sourceCanvas.height,
-      options,
-    );
-
-    const rgba = outputContext.getImageData(
-      0,
-      0,
-      outputCanvas.width,
-      outputCanvas.height,
-    ).data;
-    const palette = quantize(rgba, 256, { format: 'rgb565' });
-    const indexed = applyPalette(rgba, palette, 'rgb565');
-
-    encoder.writeFrame(indexed, outputCanvas.width, outputCanvas.height, {
-      delay: Math.max(20, frame.delay || 100),
-      palette,
-      repeat: index === 0 ? 0 : undefined,
-    });
-
-    previousFrame = {
-      dims: frame.dims,
-      disposalType: frame.disposalType,
-      restoreData,
-    };
-  }
-
-  encoder.finish();
-
-  return new Blob([bytesToBlobPart(encoder.bytes())], { type: 'image/gif' });
-}
-
-function applyGifDisposal(
-  context: CanvasRenderingContext2D,
-  previousFrame: GifFrameSnapshot | null,
-): void {
-  if (!previousFrame) return;
-
-  if (previousFrame.disposalType === 2) {
-    context.clearRect(
-      previousFrame.dims.left,
-      previousFrame.dims.top,
-      previousFrame.dims.width,
-      previousFrame.dims.height,
-    );
-  }
-
-  if (previousFrame.disposalType === 3 && previousFrame.restoreData) {
-    context.putImageData(previousFrame.restoreData, 0, 0);
-  }
-}
-
-function compositeGifPatch(
-  context: CanvasRenderingContext2D,
-  patch: Uint8ClampedArray,
-  dims: { height: number; left: number; top: number; width: number },
-): void {
-  const imageData = context.getImageData(
-    dims.left,
-    dims.top,
-    dims.width,
-    dims.height,
-  );
-  const output = imageData.data;
-
-  for (let index = 0; index < patch.length; index += 4) {
-    if (patch[index + 3] === 0) continue;
-
-    output[index] = patch[index];
-    output[index + 1] = patch[index + 1];
-    output[index + 2] = patch[index + 2];
-    output[index + 3] = patch[index + 3];
-  }
-
-  context.putImageData(imageData, dims.left, dims.top);
+  return await new AnimatedWebpEncoder().encodeGif(file, {
+    drawFrame: ({ outputCanvas, sourceCanvas, sourceHeight, sourceWidth }) => {
+      drawCroppedSource(
+        outputCanvas,
+        sourceCanvas,
+        sourceWidth,
+        sourceHeight,
+        options,
+      );
+    },
+    outputHeight: options.outputHeight,
+    outputWidth: options.outputWidth,
+  });
 }
 
 function canvasToBlob(
@@ -593,13 +484,6 @@ function isGifFile(file: File): boolean {
   return file.type === 'image/gif' || /\.gif$/i.test(file.name);
 }
 
-function bytesToBlobPart(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-}
-
 function clampOffset(value: number): number {
   return Math.max(-100, Math.min(100, value));
 }
@@ -614,7 +498,7 @@ function outputFilename(
   blob: Blob,
 ): string {
   const basename = filename.replace(/\.[^.]+$/, '') || shape;
-  const extension = blob.type === 'image/gif' ? 'gif' : 'webp';
+  const extension = blob.type === 'image/webp' ? 'webp' : 'gif';
 
   return `${basename}-${shape}.${extension}`;
 }

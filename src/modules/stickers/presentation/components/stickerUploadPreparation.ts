@@ -4,6 +4,8 @@ import type {
   StickerType,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { AnimatedWebpEncoder } from '../../../../shared/presentation/media/AnimatedWebpEncoder';
+
 const STICKER_MAX_EDGE = 512;
 const STICKER_SIZE_LIMITS: Record<StickerType, number> = {
   animated: 64 * 1024,
@@ -21,13 +23,14 @@ export function stickerTypeFromUpload(upload: PublicFileUpload): StickerType {
 
 export async function prepareStickerFile(
   file: File,
-): Promise<{ dimensions: StickerDimensions; file: File }> {
+): Promise<{ dimensions: StickerDimensions; file: File; type: StickerType }> {
   const originalDimensions = await readMediaDimensions(file);
-  const type = stickerTypeFromFile(file);
-  const preparedFile =
-    type === 'static'
-      ? await prepareStaticStickerImage(file, originalDimensions)
-      : file;
+  const type = await stickerTypeFromFile(file);
+  const preparedFile = await prepareStickerUploadFile(
+    file,
+    originalDimensions,
+    type,
+  );
   const dimensions =
     preparedFile === file
       ? originalDimensions
@@ -50,13 +53,18 @@ export async function prepareStickerFile(
   return {
     dimensions,
     file: preparedFile,
+    type,
   };
 }
 
-function stickerTypeFromFile(file: File): StickerType {
+async function stickerTypeFromFile(file: File): Promise<StickerType> {
   if (file.type.startsWith('video/')) return 'video';
 
-  if (file.type === 'image/gif') return 'animated';
+  if (isGifFile(file)) {
+    return (await new AnimatedWebpEncoder().isAnimatedGif(file))
+      ? 'animated'
+      : 'static';
+  }
 
   return 'static';
 }
@@ -65,6 +73,22 @@ function dimensionsExceedStickerLimit(dimensions: StickerDimensions): boolean {
   return (
     dimensions.width > STICKER_MAX_EDGE || dimensions.height > STICKER_MAX_EDGE
   );
+}
+
+async function prepareStickerUploadFile(
+  file: File,
+  dimensions: StickerDimensions,
+  type: StickerType,
+): Promise<File> {
+  if (type === 'static') {
+    return await prepareStaticStickerImage(file, dimensions);
+  }
+
+  if (type === 'animated' && isGifFile(file)) {
+    return await prepareAnimatedStickerGif(file, dimensions);
+  }
+
+  return file;
 }
 
 async function prepareStaticStickerImage(
@@ -143,10 +167,47 @@ function canvasToBlob(
   });
 }
 
+async function prepareAnimatedStickerGif(
+  file: File,
+  dimensions: StickerDimensions,
+): Promise<File> {
+  const scale = dimensionsExceedStickerLimit(dimensions)
+    ? Math.min(
+        STICKER_MAX_EDGE / dimensions.width,
+        STICKER_MAX_EDGE / dimensions.height,
+      )
+    : 1;
+  const width = Math.max(1, Math.round(dimensions.width * scale));
+  const height = Math.max(1, Math.round(dimensions.height * scale));
+  const blob = await new AnimatedWebpEncoder().encodeGif(file, {
+    drawFrame: ({ outputCanvas, sourceCanvas }) => {
+      const context = outputCanvas.getContext('2d');
+
+      if (!context) throw new Error('Sticker could not be converted.');
+
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+      context.drawImage(sourceCanvas, 0, 0, width, height);
+    },
+    outputHeight: height,
+    outputWidth: width,
+  });
+
+  return new File([blob], webpFilename(file.name), {
+    lastModified: file.lastModified,
+    type: 'image/webp',
+  });
+}
+
 function webpFilename(filename: string): string {
   const basename = filename.replace(/\.[^.]+$/, '') || 'sticker';
 
   return `${basename}.webp`;
+}
+
+function isGifFile(file: File): boolean {
+  return file.type === 'image/gif' || /\.gif$/i.test(file.name);
 }
 
 function stickerTypeLabel(type: StickerType): string {

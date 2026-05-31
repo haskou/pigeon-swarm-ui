@@ -1,8 +1,11 @@
+import { AnimatedWebpEncoder } from '../../../../shared/presentation/media/AnimatedWebpEncoder';
+
 const webpContentType = 'image/webp';
 const webpQuality = 0.88;
 const convertibleImageTypes = new Set([
   'image/avif',
   'image/bmp',
+  'image/gif',
   'image/jpeg',
   'image/png',
 ]);
@@ -64,22 +67,41 @@ async function encodeImageAsWebp(file: File): Promise<Blob> {
   return await canvasToBlob(canvas);
 }
 
+async function encodeGifAsWebp(file: File): Promise<Blob> {
+  const encoder = new AnimatedWebpEncoder();
+
+  if (await encoder.isAnimatedGif(file)) {
+    return await encoder.encodeGif(file, { quality: webpQuality });
+  }
+
+  return await encodeImageAsWebp(file);
+}
+
 export class PublicImageUploadPreparer {
   public constructor(
     private readonly encodeImage: (
       file: File,
     ) => Promise<Blob> = encodeImageAsWebp,
+    private readonly encodeGif: (file: File) => Promise<Blob> = encodeGifAsWebp,
   ) {}
 
   public async prepare(file: File): Promise<File> {
     if (!this.shouldConvert(file)) return file;
 
-    const blob = await this.encodeImage(file);
+    const blob = await this.encode(file);
 
     return new File([blob], this.webpFilename(file.name), {
       lastModified: file.lastModified,
       type: webpContentType,
     });
+  }
+
+  private async encode(file: File): Promise<Blob> {
+    if (this.contentType(file) === 'image/gif') {
+      return await this.encodeGif(file);
+    }
+
+    return await this.encodeImage(file);
   }
 
   private shouldConvert(file: File): boolean {
@@ -98,6 +120,8 @@ export class PublicImageUploadPreparer {
     if (/\.bmp$/i.test(file.name)) return 'image/bmp';
 
     if (/\.avif$/i.test(file.name)) return 'image/avif';
+
+    if (/\.gif$/i.test(file.name)) return 'image/gif';
 
     return '';
   }
