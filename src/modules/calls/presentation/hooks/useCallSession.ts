@@ -1021,8 +1021,8 @@ function callParticipantsMediaStateEqual(
 }
 
 function classifyMicrophoneError(error: unknown): CallMicrophoneErrorCode {
-  if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
   if (!window.isSecureContext) return 'not-secure';
+  if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
 
   if (!(error instanceof Error)) return 'unknown';
 
