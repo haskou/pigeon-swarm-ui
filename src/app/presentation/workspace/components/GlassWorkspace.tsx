@@ -606,12 +606,17 @@ export function GlassWorkspace({
       .then((remoteDrafts) => {
         if (cancelled) return;
 
-        setDrafts((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            remoteDrafts.map((draft) => [draft.conversationId, draft.content]),
-          ),
-        }));
+        setDrafts((current) => {
+          const next = { ...current };
+
+          for (const draft of remoteDrafts) {
+            if (next[draft.conversationId] === undefined) {
+              next[draft.conversationId] = draft.content;
+            }
+          }
+
+          return next;
+        });
       })
       .catch(() => undefined);
 
@@ -2872,7 +2877,7 @@ export function GlassWorkspace({
         if (shouldAutoScroll) {
           markConversationReadUntil(conversationId, [message]);
           if (!isThreadReply) scrollMessagesToBottom('smooth', true);
-        } else if (!isEditMessage) {
+        } else if (!isEditMessage && !isThreadReply) {
           setNewMessageCount((current) => current + 1);
         }
       } catch (caught) {

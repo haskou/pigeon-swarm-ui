@@ -1079,14 +1079,20 @@ export function CommunityWorkspace({
       .then((remoteDrafts) => {
         if (cancelled) return;
 
-        setDrafts((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            remoteDrafts
-              .filter((draft) => draft.communityId === community.id)
-              .map((draft) => [draft.channelId, draft.content]),
-          ),
-        }));
+        setDrafts((current) => {
+          const next = { ...current };
+
+          for (const draft of remoteDrafts) {
+            if (
+              draft.communityId === community.id &&
+              next[draft.channelId] === undefined
+            ) {
+              next[draft.channelId] = draft.content;
+            }
+          }
+
+          return next;
+        });
       })
       .catch(() => undefined);
 
