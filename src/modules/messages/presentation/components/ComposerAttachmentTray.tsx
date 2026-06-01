@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
+import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
 import { cx } from '../../../../shared/presentation/cx';
 import { ImageLightbox, type LightboxImage } from './imageLightbox';
 
@@ -31,13 +31,13 @@ export function ComposerAttachmentTray({
   );
   const imageAttachments = useMemo(
     () =>
-      indexedAttachments.filter(({ file }) => isBrowserPreviewImage(file.type)),
+      indexedAttachments.filter(({ file }) => isBrowserPreviewFile(file)),
     [indexedAttachments],
   );
   const otherAttachments = useMemo(
     () =>
       indexedAttachments.filter(
-        ({ file }) => !isBrowserPreviewImage(file.type),
+        ({ file }) => !isBrowserPreviewFile(file),
       ),
     [indexedAttachments],
   );
@@ -187,7 +187,7 @@ function ComposerImageAlbum({
 }
 
 function AttachmentPreview({ file, url }: { file: File; url: string }) {
-  if (isBrowserPreviewImage(file.type)) {
+  if (isBrowserPreviewFile(file)) {
     return <img src={url} alt="" className="h-28 w-56 object-cover" />;
   }
 

@@ -1,5 +1,6 @@
 import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
 
+import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 
 const largeAttachmentBytes = 50 * 1024 * 1024;
@@ -8,6 +9,14 @@ const animatedImagePreviewBytes = 2 * 1024 * 1024;
 
 export class MessageAttachmentPreview {
   public static isImage(attachment: MessageAttachment): boolean {
+    if (attachment.localFile) {
+      return isBrowserPreviewFile(attachment.localFile);
+    }
+
+    if (attachment.preview) {
+      return isBrowserPreviewImage(attachment.preview.contentType);
+    }
+
     if (MessageAttachmentPreview.isLargeOrChunked(attachment)) return false;
 
     if (!isBrowserPreviewImage(attachment.contentType)) return false;

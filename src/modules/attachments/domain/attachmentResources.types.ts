@@ -42,6 +42,8 @@ export type MessageAttachment = {
   encryptedSize?: number;
   encryption?: MessageAttachmentEncryption;
   filename: string;
+  localFile?: File;
+  preview?: MessageAttachment;
   size: number;
   storage?: 'private' | 'public';
   type?: 'chunked_file';

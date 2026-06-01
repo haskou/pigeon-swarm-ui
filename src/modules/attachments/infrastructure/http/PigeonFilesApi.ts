@@ -16,6 +16,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
+import { MessageAttachmentThumbnailPreparer } from '../media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../media/PublicImageUploadPreparer';
 import { attachmentBlobCacheKey } from './attachmentBlobCacheKey';
 import { PigeonFileRequestCache } from './PigeonFileRequestCache';
@@ -49,6 +50,10 @@ export class PigeonFilesApi {
       PublicImageUploadPreparer,
       'prepare'
     > = new PublicImageUploadPreparer(),
+    private readonly messageAttachmentThumbnailPreparer: Pick<
+      MessageAttachmentThumbnailPreparer,
+      'prepare'
+    > = new MessageAttachmentThumbnailPreparer(),
   ) {
     this.attachmentCipher = attachmentCipher;
     this.privateFiles = new PigeonPrivateFilesClient(http, signer);
@@ -132,6 +137,7 @@ export class PigeonFilesApi {
         continue;
       }
 
+      const preview = await this.uploadPrivateAttachmentPreview(session, file);
       const pending = await this.attachmentCipher.encrypt(file, onProgress);
       const upload = await this.uploadPendingAttachment(
         session,
@@ -139,14 +145,19 @@ export class PigeonFilesApi {
         onProgress,
       );
 
-      uploadedAttachments.push({
-        ...pending.metadata,
-        cid: upload.cid,
-        encrypted: true,
-        ...(upload.chunks ? { chunks: upload.chunks } : {}),
-        encryptedSize: upload.size,
-        ...(upload.type ? { type: upload.type } : {}),
-      });
+      uploadedAttachments.push(
+        this.withPreview(
+          {
+            ...pending.metadata,
+            cid: upload.cid,
+            encrypted: true,
+            ...(upload.chunks ? { chunks: upload.chunks } : {}),
+            encryptedSize: upload.size,
+            ...(upload.type ? { type: upload.type } : {}),
+          },
+          preview,
+        ),
+      );
     }
 
     return uploadedAttachments;
@@ -289,20 +300,24 @@ export class PigeonFilesApi {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment> {
     const preparedFile = await this.publicImageUploadPreparer.prepare(file);
-
-    if (preparedFile.size > ipfsPrivateUploadLimitBytes) {
-      return await this.uploadPublicChunkedAttachment(
-        session,
-        preparedFile,
-        onProgress,
-      );
-    }
-
-    return await this.uploadPublicDirectAttachment(
+    const preview = await this.uploadPublicAttachmentPreview(
       session,
       preparedFile,
-      onProgress,
     );
+    const attachment =
+      preparedFile.size > ipfsPrivateUploadLimitBytes
+        ? await this.uploadPublicChunkedAttachment(
+            session,
+            preparedFile,
+            onProgress,
+          )
+        : await this.uploadPublicDirectAttachment(
+            session,
+            preparedFile,
+            onProgress,
+          );
+
+    return this.withPreview(attachment, preview);
   }
 
   private async uploadPublicDirectAttachment(
@@ -400,6 +415,55 @@ export class PigeonFilesApi {
       size: pending.encryptedBytes.byteLength,
       type: 'chunked_file',
     };
+  }
+
+  private async uploadPublicAttachmentPreview(
+    session: Session,
+    file: File,
+  ): Promise<MessageAttachment | undefined> {
+    const thumbnail = await this.prepareThumbnail(file);
+
+    if (!thumbnail) return undefined;
+
+    return await this.uploadPublicDirectAttachment(session, thumbnail).catch(
+      () => undefined,
+    );
+  }
+
+  private async uploadPrivateAttachmentPreview(
+    session: Session,
+    file: File,
+  ): Promise<MessageAttachment | undefined> {
+    return await (async () => {
+      const thumbnail = await this.prepareThumbnail(file);
+
+      if (!thumbnail) return undefined;
+
+      const pending = await this.attachmentCipher.encrypt(thumbnail);
+      const upload = await this.uploadPendingAttachment(session, pending);
+
+      return {
+        ...pending.metadata,
+        cid: upload.cid,
+        encrypted: true,
+        encryptedSize: upload.size,
+        ...(upload.chunks ? { chunks: upload.chunks } : {}),
+        ...(upload.type ? { type: upload.type } : {}),
+      };
+    })().catch(() => undefined);
+  }
+
+  private async prepareThumbnail(file: File): Promise<File | null> {
+    return await this.messageAttachmentThumbnailPreparer
+      .prepare(file)
+      .catch(() => null);
+  }
+
+  private withPreview(
+    attachment: MessageAttachment,
+    preview?: MessageAttachment,
+  ): MessageAttachment {
+    return preview ? { ...attachment, preview } : attachment;
   }
 
   private async downloadAttachmentChunks(

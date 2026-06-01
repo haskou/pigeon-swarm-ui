@@ -71,6 +71,7 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 
+import { AttachmentExternalIdentifiers } from '../../modules/attachments/domain/AttachmentExternalIdentifiers';
 import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../modules/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../modules/calls/infrastructure/http/PigeonCallsApi';
@@ -1993,9 +1994,8 @@ export class PigeonApiGateway {
       onAttachmentProgress,
       attachmentUpload,
     );
-    const attachmentExternalIdentifiers = messageAttachments.map(
-      (attachment) => attachment.cid,
-    );
+    const attachmentExternalIdentifiers =
+      AttachmentExternalIdentifiers.from(messageAttachments);
     const linkPreview = await this.createLinkPreviewForMessage(
       session,
       content,

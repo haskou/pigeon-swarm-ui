@@ -400,6 +400,7 @@ export function MessageBubble({
         <ImageLightbox
           images={lightbox.images}
           initialIndex={lightbox.index}
+          loadImage={(attachment) => onAttachmentPreview(attachment)}
           onClose={() => setLightbox(null)}
         />
       )}

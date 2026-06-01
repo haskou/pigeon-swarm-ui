@@ -45,6 +45,7 @@ export function ImageAttachmentAlbum({
       ? [
           {
             alt: attachment.filename,
+            attachment,
             filename: attachment.filename,
             url,
           },
@@ -99,7 +100,7 @@ export function ImageAttachmentAlbum({
 
     void Promise.all(
       items.map(({ attachment }, index) =>
-        onPreview(attachment, setProgress)
+        onPreview(attachment.preview ?? attachment, setProgress)
           .then((url) => {
             if (cancelled) {
               URL.revokeObjectURL(url);
@@ -333,7 +334,7 @@ export function AttachmentCard({
       )}
       <button
         type="button"
-        disabled={pending}
+              disabled={pending}
         onClick={pending ? undefined : onClick}
         className={cx(
           'flex w-full max-w-full items-center gap-3 px-3 py-2 text-left',

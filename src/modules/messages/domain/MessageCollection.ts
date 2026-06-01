@@ -94,6 +94,15 @@ export class MessageCollection {
     );
   }
 
+  public static hasUnknownMessages(
+    currentMessages: readonly ChatMessage[],
+    incomingMessages: readonly ChatMessage[],
+  ): boolean {
+    const currentIds = new Set(currentMessages.map((message) => message.id));
+
+    return incomingMessages.some((message) => !currentIds.has(message.id));
+  }
+
   private static applyEdit(
     target: ChatMessage,
     edit: ChatMessage,
