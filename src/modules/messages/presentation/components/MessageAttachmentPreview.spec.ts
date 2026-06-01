@@ -30,6 +30,51 @@ describe(MessageAttachmentPreview.name, () => {
     ).toBe(false);
   });
 
+  it('allows large images when a lightweight preview attachment exists', () => {
+    expect(
+      MessageAttachmentPreview.isImage(
+        attachment({
+          preview: attachment({
+            cid: 'preview-cid',
+            filename: 'preview.webp',
+            size: 32 * 1024,
+          }),
+          size: 6 * 1024 * 1024,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('allows large local pending images because they do not need downloading', () => {
+    const file = new File([new Uint8Array(10 * 1024 * 1024)], 'large.png', {
+      type: 'image/png',
+    });
+
+    expect(
+      MessageAttachmentPreview.isImage(
+        attachment({
+          localFile: file,
+          size: file.size,
+          type: 'chunked_file',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('allows local pending images when the browser omits their mime type', () => {
+    const file = new File([new Uint8Array(10 * 1024 * 1024)], 'large.webp');
+
+    expect(
+      MessageAttachmentPreview.isImage(
+        attachment({
+          localFile: file,
+          size: file.size,
+          type: 'chunked_file',
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it('rejects animated images above the smaller preview budget', () => {
     expect(
       MessageAttachmentPreview.isImage(

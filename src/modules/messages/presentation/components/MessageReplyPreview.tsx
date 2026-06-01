@@ -45,7 +45,7 @@ export function MessageReplyPreview({
     let loadedUrl: string | null = null;
 
     setReplyImageUrl(null);
-    void onAttachmentPreview(replyImage)
+    void onAttachmentPreview(replyImage.preview ?? replyImage)
       .then((url) => {
         if (cancelled) {
           URL.revokeObjectURL(url);

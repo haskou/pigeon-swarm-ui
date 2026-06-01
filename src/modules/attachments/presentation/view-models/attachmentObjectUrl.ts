@@ -9,6 +9,10 @@ export async function attachmentObjectUrl(
   attachment: MessageAttachment,
   onProgress?: (progress: AttachmentProgress) => void,
 ): Promise<string> {
+  if (attachment.localFile) {
+    return URL.createObjectURL(attachment.localFile);
+  }
+
   const blob = await applicationContainer.downloadAttachment(
     attachment,
     onProgress,

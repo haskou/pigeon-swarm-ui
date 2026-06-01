@@ -6,9 +6,11 @@ import { createPortal } from 'react-dom';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
 
 export type LightboxImage = {
   alt: string;
+  attachment?: MessageAttachment;
   filename: string;
   url: string;
 };
@@ -40,12 +42,14 @@ type PinchGesture = {
 interface ImageLightboxProps {
   images: LightboxImage[];
   initialIndex: number;
+  loadImage?: (attachment: MessageAttachment) => Promise<string>;
   onClose: () => void;
 }
 
 export function ImageLightbox({
   images,
   initialIndex,
+  loadImage,
   onClose,
 }: ImageLightboxProps) {
   useCloseOnEscape(onClose);
@@ -53,6 +57,9 @@ export function ImageLightbox({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<PanOffset>({ x: 0, y: 0 });
+  const [loadingOriginal, setLoadingOriginal] = useState(false);
+  const [originalUrls, setOriginalUrls] = useState<Record<number, string>>({});
+  const originalUrlsRef = useRef<Record<number, string>>({});
   const [touchGestureActive, setTouchGestureActive] = useState(false);
   const pointerPositionsRef = useRef<Map<number, PointerPosition>>(new Map());
   const panRef = useRef<PanGesture | null>(null);
@@ -64,6 +71,7 @@ export function ImageLightbox({
     startY: number;
   } | null>(null);
   const activeImage = images[activeIndex];
+  const activeImageUrl = originalUrls[activeIndex] ?? activeImage?.url;
   const hasPrevious = activeIndex > 0;
   const hasNext = activeIndex < images.length - 1;
   const goToPrevious = () => {
@@ -76,6 +84,52 @@ export function ImageLightbox({
   useEffect(() => {
     setActiveIndex(initialIndex);
   }, [initialIndex]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const attachment = activeImage?.attachment;
+
+    if (!attachment || !loadImage || originalUrls[activeIndex]) {
+      setLoadingOriginal(false);
+
+      return undefined;
+    }
+
+    setLoadingOriginal(true);
+    loadImage(attachment)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+
+          return;
+        }
+
+        setOriginalUrls((current) => {
+          const next = { ...current, [activeIndex]: url };
+
+          originalUrlsRef.current = next;
+
+          return next;
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLoadingOriginal(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeImage?.attachment, activeIndex, loadImage, originalUrls]);
+
+  useEffect(
+    () => () => {
+      Object.values(originalUrlsRef.current).forEach((url) =>
+        URL.revokeObjectURL(url),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     setZoom(1);
@@ -296,7 +350,7 @@ export function ImageLightbox({
           </button>
         )}
         <img
-          src={activeImage.url}
+          src={activeImageUrl}
           alt={activeImage.alt}
           onClick={(event) => event.stopPropagation()}
           onWheel={(event) => {
@@ -323,6 +377,11 @@ export function ImageLightbox({
             transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
           }}
         />
+        {loadingOriginal && (
+          <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-2 text-xs font-black text-white/75">
+            {copy.composer.downloadingAttachment}
+          </div>
+        )}
         {hasNext && (
           <button
             type="button"
