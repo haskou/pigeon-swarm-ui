@@ -2,19 +2,14 @@ import type { CallParticipant } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { callParticipantDisplayName } from './callParticipantDisplayName';
-import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
 import { VideoPreview } from './VideoPreview';
 
 export function CallScreenShareStage({
   onExpand,
-  onScreenShareVolumeChange,
   participant,
-  screenShareVolumePercent,
 }: {
   onExpand: () => void;
-  onScreenShareVolumeChange: (volumePercent: number) => void;
   participant: CallParticipant;
-  screenShareVolumePercent: number;
 }) {
   if (!participant.screenStream) return null;
 
@@ -50,11 +45,6 @@ export function CallScreenShareStage({
           {copy.calls.live}
         </span>
       </div>
-      <ScreenShareVolumeControl
-        className="hidden sm:block"
-        onChange={onScreenShareVolumeChange}
-        value={screenShareVolumePercent}
-      />
     </div>
   );
 }

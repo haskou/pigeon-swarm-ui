@@ -1,19 +1,28 @@
-import type { CallParticipant } from '../../domain/callSession.types';
+import type {
+  CallParticipant,
+  ScreenShareQualityPreset,
+} from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { callParticipantDisplayName } from './callParticipantDisplayName';
-import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
+import { ScreenShareStreamControls } from './ScreenShareStreamControls';
 import { VideoPreview } from './VideoPreview';
 
 export function ExpandedScreenShare({
   onClose,
+  onScreenShareQualityChange,
   onScreenShareVolumeChange,
   participant,
+  qualityEditable,
+  screenShareQuality,
   screenShareVolumePercent,
 }: {
   onClose: () => void;
+  onScreenShareQualityChange: (quality: ScreenShareQualityPreset) => void;
   onScreenShareVolumeChange: (volumePercent: number) => void;
   participant: CallParticipant;
+  qualityEditable: boolean;
+  screenShareQuality: ScreenShareQualityPreset;
   screenShareVolumePercent: number;
 }) {
   if (!participant.screenStream) return null;
@@ -48,16 +57,23 @@ export function ExpandedScreenShare({
             x
           </button>
         </header>
-        <div className="relative min-h-0 flex-1 bg-black">
+        <div className="min-h-0 flex-1 bg-black">
           <VideoPreview
             fit="contain"
             label={`${copy.calls.screen} ${participantName}`}
             muted
             stream={participant.screenStream}
           />
-          <ScreenShareVolumeControl
-            onChange={onScreenShareVolumeChange}
-            value={screenShareVolumePercent}
+        </div>
+        <div className="border-t border-white/10 px-4 py-3">
+          <ScreenShareStreamControls
+            className="mx-auto w-full max-w-sm sm:max-w-md"
+            onQualityChange={onScreenShareQualityChange}
+            onVolumeChange={onScreenShareVolumeChange}
+            participant={participant}
+            quality={screenShareQuality}
+            qualityEditable={qualityEditable}
+            volumePercent={screenShareVolumePercent}
           />
         </div>
       </div>

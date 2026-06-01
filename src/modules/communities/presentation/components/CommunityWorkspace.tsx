@@ -114,12 +114,14 @@ interface CommunityWorkspaceProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallScreenShareQualityChange?: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
-  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
@@ -172,12 +174,12 @@ export function CommunityWorkspace({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallRetryMicrophone,
-  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onChannelSelected,
   onChannelViewed,
@@ -1874,12 +1876,12 @@ export function CommunityWorkspace({
                 onCallParticipantScreenShareVolumeChange
               }
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+              onCallScreenShareQualityChange={onCallScreenShareQualityChange}
               onCallToggleCamera={onCallToggleCamera}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}
               onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
               onCallRetryMicrophone={onCallRetryMicrophone}
-              onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}

@@ -417,13 +417,13 @@ export function GlassWorkspace({
     reconcileCall,
     setParticipantScreenShareVolume,
     setParticipantVolume,
+    setScreenShareQuality,
     startCall,
     toggleCamera,
     toggleDeafen,
     toggleMute,
     toggleNoiseCancellation,
     retryMicrophone,
-    toggleScreenShareAudio,
     toggleScreenShare,
   } = useCallSession();
   const {
@@ -3769,12 +3769,12 @@ export function GlassWorkspace({
                     onCallParticipantScreenShareVolumeChange={
                       setParticipantScreenShareVolume
                     }
+                    onCallScreenShareQualityChange={setScreenShareQuality}
                     onCallToggleCamera={toggleCamera}
                     onCallToggleDeafen={toggleDeafen}
                     onCallToggleMute={toggleMute}
                     onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
                     onCallRetryMicrophone={retryMicrophone}
-                    onCallToggleScreenShareAudio={toggleScreenShareAudio}
                     onCallToggleScreenShare={toggleScreenShare}
                     onLogout={logout}
                     onSessionUpdated={(nextSession) => {
@@ -3974,12 +3974,12 @@ export function GlassWorkspace({
               onCallParticipantScreenShareVolumeChange={
                 setParticipantScreenShareVolume
               }
+              onCallScreenShareQualityChange={setScreenShareQuality}
               onCallToggleCamera={toggleCamera}
               onCallToggleDeafen={toggleDeafen}
               onCallToggleMute={toggleMute}
               onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
               onCallRetryMicrophone={retryMicrophone}
-              onCallToggleScreenShareAudio={toggleScreenShareAudio}
               onCallToggleScreenShare={toggleScreenShare}
               realtimeEvent={communityRealtimeEvent}
               presenceByIdentityId={presenceByIdentityId}

@@ -5,7 +5,7 @@ import { CallDataPanel } from './CallDataPanel';
 import { callParticipantHasActiveScreenShare } from './callParticipantHasActiveScreenShare';
 import { CallParticipantTiles } from './CallParticipantTiles';
 import { CallScreenShareStage } from './CallScreenShareStage';
-import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
+import { ScreenShareStreamControls } from './ScreenShareStreamControls';
 
 export function CallStageBody({
   call,
@@ -13,6 +13,7 @@ export function CallStageBody({
   onExpandScreen,
   onParticipantScreenShareVolumeChange,
   onParticipantVolumeChange,
+  onScreenShareQualityChange,
   onToggleMute,
 }: {
   call: CallSession;
@@ -26,6 +27,7 @@ export function CallStageBody({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
   onToggleMute: () => void;
 }) {
   const screenParticipant =
@@ -49,25 +51,23 @@ export function CallStageBody({
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
           <CallScreenShareStage
             onExpand={() => onExpandScreen(screenParticipant)}
-            onScreenShareVolumeChange={(volumePercent) =>
+            participant={screenParticipant}
+          />
+          <ScreenShareStreamControls
+            className="mx-auto w-full max-w-sm sm:max-w-md"
+            onQualityChange={onScreenShareQualityChange}
+            onVolumeChange={(volumePercent) =>
               onParticipantScreenShareVolumeChange(
                 screenParticipant.identityId,
                 volumePercent,
               )
             }
             participant={screenParticipant}
-            screenShareVolumePercent={screenShareVolumePercent}
-          />
-          <ScreenShareVolumeControl
-            className="sm:hidden"
-            placement="inline"
-            onChange={(volumePercent) =>
-              onParticipantScreenShareVolumeChange(
-                screenParticipant.identityId,
-                volumePercent,
-              )
+            quality={call.screenShareQuality}
+            qualityEditable={
+              screenParticipant.identityId === call.currentIdentityId
             }
-            value={screenShareVolumePercent}
+            volumePercent={screenShareVolumePercent}
           />
           <CallParticipantTiles
             call={call}

@@ -28,12 +28,12 @@ interface GlobalCallBarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
   onRetryMicrophone: () => void;
-  onToggleScreenShareAudio: () => void;
   onToggleScreenShare: () => void;
 }
 
@@ -42,12 +42,12 @@ export function GlobalCallBar({
   onEnd,
   onParticipantScreenShareVolumeChange,
   onParticipantVolumeChange,
+  onScreenShareQualityChange,
   onToggleCamera,
   onToggleDeafen,
   onToggleMute,
   onToggleNoiseCancellation,
   onRetryMicrophone,
-  onToggleScreenShareAudio,
   onToggleScreenShare,
 }: GlobalCallBarProps) {
   const [stageOpen, setStageOpen] = useState(false);
@@ -91,12 +91,12 @@ export function GlobalCallBar({
                 onParticipantScreenShareVolumeChange
               }
               onParticipantVolumeChange={onParticipantVolumeChange}
+              onScreenShareQualityChange={onScreenShareQualityChange}
               onToggleCamera={onToggleCamera}
               onToggleDeafen={onToggleDeafen}
               onToggleMute={onToggleMute}
               onToggleNoiseCancellation={onToggleNoiseCancellation}
               onRetryMicrophone={onRetryMicrophone}
-              onToggleScreenShareAudio={onToggleScreenShareAudio}
               onToggleScreenShare={onToggleScreenShare}
               subtitle={subtitle}
             />

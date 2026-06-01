@@ -7,6 +7,7 @@ import type {
   CallResource,
   CallSignalType,
   CallSession,
+  ScreenShareQualityPreset,
 } from '../../domain/callSession.types';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
 
@@ -69,12 +70,12 @@ export function useCallSession(): {
     identityId: string,
     volumePercent: number,
   ) => void;
+  setScreenShareQuality: (quality: ScreenShareQualityPreset) => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
   toggleMute: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   retryMicrophone: () => Promise<void>;
-  toggleScreenShareAudio: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalMediaManager(), []);
@@ -196,6 +197,7 @@ export function useCallSession(): {
       participants: input.participants,
       participantVolumes: {},
       screenShareAudioEnabled: true,
+      screenShareQuality: 'auto',
       screenShareVolumes: {},
       screenSharing: false,
       startedAt: Date.now(),
@@ -549,6 +551,7 @@ export function useCallSession(): {
               localPreviewStream: stream ?? undefined,
               noiseCancellationEnabled: enabled,
               screenShareAudioEnabled: active.screenShareAudioEnabled,
+              screenShareQuality: active.screenShareQuality,
               screenSharing: mediaManager.hasScreenShare(),
               screenStream: mediaManager.screenPreviewStream(),
             })
@@ -587,6 +590,7 @@ export function useCallSession(): {
               localPreviewStream: stream ?? undefined,
               noiseCancellationEnabled: active.noiseCancellationEnabled,
               screenShareAudioEnabled: active.screenShareAudioEnabled,
+              screenShareQuality: active.screenShareQuality,
               screenSharing: mediaManager.hasScreenShare(),
               screenStream: mediaManager.screenPreviewStream(),
             })
@@ -612,7 +616,8 @@ export function useCallSession(): {
       const screenSharing = !current.screenSharing;
       const stream = screenSharing
         ? await mediaManager.enableScreenShare({
-            audioEnabled: current.screenShareAudioEnabled,
+            audioEnabled: true,
+            quality: current.screenShareQuality,
           })
         : mediaManager.disableScreenShare();
 
@@ -623,7 +628,8 @@ export function useCallSession(): {
               cameraEnabled: mediaManager.hasCamera(),
               localPreviewStream: stream ?? undefined,
               noiseCancellationEnabled: active.noiseCancellationEnabled,
-              screenShareAudioEnabled: active.screenShareAudioEnabled,
+              screenShareAudioEnabled: true,
+              screenShareQuality: active.screenShareQuality,
               screenSharing,
               screenStream: mediaManager.screenPreviewStream(),
             })
@@ -632,47 +638,6 @@ export function useCallSession(): {
     } catch (error) {
       logCallError('session:toggle-screen-share:failed', error, {
         callId: current.id,
-      });
-    }
-  };
-
-  const toggleScreenShareAudio = async () => {
-    const current = activeCallRef.current;
-
-    if (!current) {
-      logCallWarning(
-        'session:toggle-screen-share-audio:ignored-no-active-call',
-      );
-
-      return;
-    }
-
-    const screenShareAudioEnabled = !current.screenShareAudioEnabled;
-
-    try {
-      const stream = current.screenSharing
-        ? await mediaManager.enableScreenShare({
-            audioEnabled: screenShareAudioEnabled,
-          })
-        : (mediaManager.previewStream() ?? null);
-
-      if (current.screenSharing) peerManager.setLocalStream(stream);
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? localMediaSession(active, {
-              cameraEnabled: mediaManager.hasCamera(),
-              localPreviewStream: stream ?? undefined,
-              noiseCancellationEnabled: active.noiseCancellationEnabled,
-              screenShareAudioEnabled,
-              screenSharing: mediaManager.hasScreenShare(),
-              screenStream: mediaManager.screenPreviewStream(),
-            })
-          : active,
-      );
-    } catch (error) {
-      logCallError('session:toggle-screen-share-audio:failed', error, {
-        callId: current.id,
-        screenShareAudioEnabled,
       });
     }
   };
@@ -717,11 +682,48 @@ export function useCallSession(): {
     });
   };
 
+  const setScreenShareQuality = async (quality: ScreenShareQualityPreset) => {
+    const current = activeCallRef.current;
+
+    if (!current) return;
+
+    peerManager.setScreenShareQuality(quality);
+
+    try {
+      const stream = await mediaManager.setScreenShareQuality(quality);
+
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? localMediaSession(active, {
+              cameraEnabled: mediaManager.hasCamera(),
+              localPreviewStream: stream ?? undefined,
+              noiseCancellationEnabled: active.noiseCancellationEnabled,
+              screenShareAudioEnabled: active.screenShareAudioEnabled,
+              screenShareQuality: quality,
+              screenSharing: mediaManager.hasScreenShare(),
+              screenStream: mediaManager.screenPreviewStream(),
+            })
+          : active,
+      );
+    } catch (error) {
+      logCallError('session:screen-share-quality:failed', error, {
+        callId: current.id,
+        quality,
+      });
+      setActiveCall((active) =>
+        active?.id === current.id
+          ? { ...active, screenShareQuality: quality }
+          : active,
+      );
+    }
+  };
+
   return {
     activeCall,
     endCall,
     receiveSignal,
     reconcileCall,
+    setScreenShareQuality,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     startCall,
@@ -730,7 +732,6 @@ export function useCallSession(): {
     toggleMute,
     toggleNoiseCancellation,
     retryMicrophone,
-    toggleScreenShareAudio,
     toggleScreenShare,
   };
 
@@ -872,6 +873,7 @@ function callSessionForJoinedPeerConnection(
     participants,
     participantVolumes: activeCall?.participantVolumes ?? {},
     screenShareAudioEnabled: activeCall?.screenShareAudioEnabled ?? true,
+    screenShareQuality: activeCall?.screenShareQuality ?? 'auto',
     screenShareVolumes: activeCall?.screenShareVolumes ?? {},
     screenSharing: activeCall?.screenSharing ?? false,
     startedAt: activeCall?.startedAt ?? Date.now(),
@@ -961,6 +963,7 @@ function localMediaSession(
     | 'localPreviewStream'
     | 'noiseCancellationEnabled'
     | 'screenShareAudioEnabled'
+    | 'screenShareQuality'
     | 'screenSharing'
   > & { screenStream?: MediaStream },
 ): CallSession {

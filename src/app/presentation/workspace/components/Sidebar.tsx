@@ -54,12 +54,14 @@ interface SidebarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallScreenShareQualityChange?: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
-  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
 }
 
@@ -75,12 +77,12 @@ export function Sidebar({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallRetryMicrophone,
-  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onCreate,
   onLogout,
@@ -290,12 +292,12 @@ export function Sidebar({
           onCallParticipantScreenShareVolumeChange
         }
         onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallScreenShareQualityChange={onCallScreenShareQualityChange}
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
-        onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
         onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>
