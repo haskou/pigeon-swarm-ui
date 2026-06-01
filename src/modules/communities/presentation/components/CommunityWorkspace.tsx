@@ -114,6 +114,9 @@ interface CommunityWorkspaceProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallScreenShareQualityChange?: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
@@ -171,6 +174,7 @@ export function CommunityWorkspace({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
@@ -1872,6 +1876,7 @@ export function CommunityWorkspace({
                 onCallParticipantScreenShareVolumeChange
               }
               onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+              onCallScreenShareQualityChange={onCallScreenShareQualityChange}
               onCallToggleCamera={onCallToggleCamera}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMute}

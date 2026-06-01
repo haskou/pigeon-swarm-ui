@@ -64,6 +64,13 @@ export type CallIceServerConfig = {
   iceTransportPolicy?: RTCIceTransportPolicy;
 };
 
+export type ScreenShareQualityPreset =
+  | '1080p30'
+  | '1080p60'
+  | '1440p30'
+  | '1440p60'
+  | 'auto';
+
 export type CallParticipant = {
   audioLevel?: number;
   bitrateKbps?: number;
@@ -107,6 +114,7 @@ export type CallSession = {
   participants: CallParticipant[];
   participantVolumes: Record<string, number>;
   screenShareAudioEnabled: boolean;
+  screenShareQuality: ScreenShareQualityPreset;
   screenShareVolumes: Record<string, number>;
   screenSharing: boolean;
   startedAt: number;

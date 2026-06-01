@@ -1,5 +1,11 @@
+import type { ScreenShareQualityPreset } from '../../domain/callSession.types';
+
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import { CallMicrophoneCapture } from './CallMicrophoneCapture';
+import {
+  screenShareTrackConstraints,
+  screenShareVideoConstraints,
+} from './ScreenShareQuality';
 
 type LocalMediaOptions = {
   noiseCancellationEnabled: boolean;
@@ -7,6 +13,7 @@ type LocalMediaOptions = {
 
 type ScreenShareOptions = {
   audioEnabled: boolean;
+  quality?: ScreenShareQualityPreset;
 };
 
 function describeTrack(track: MediaStreamTrack): Record<string, unknown> {
@@ -54,6 +61,8 @@ export class LocalMediaManager {
   private noiseCancellationEnabled = true;
 
   private screenAudioVolume = 1;
+
+  private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
   public useStream(
     stream: MediaStream,
@@ -126,21 +135,37 @@ export class LocalMediaManager {
     options: ScreenShareOptions = { audioEnabled: true },
   ): Promise<MediaStream> {
     const displayMedia = navigator.mediaDevices.getDisplayMedia;
+    const quality = options.quality ?? this.screenShareQuality;
 
     if (!displayMedia) throw new Error('Screen sharing unavailable.');
 
     const screenStream = await displayMedia.call(navigator.mediaDevices, {
       audio: options.audioEnabled,
-      video: true,
+      video: screenShareVideoConstraints(quality),
     });
     const [track] = screenStream.getVideoTracks();
     const [audioTrack] = screenStream.getAudioTracks();
 
     if (!track) throw new Error('Screen track unavailable.');
 
+    this.screenShareQuality = quality;
     this.replaceScreenTracks(track, audioTrack ?? null);
 
     return this.currentStream();
+  }
+
+  public async setScreenShareQuality(
+    quality: ScreenShareQualityPreset,
+  ): Promise<MediaStream | null> {
+    this.screenShareQuality = quality;
+
+    if (this.screenTrack?.readyState !== 'live') return this.stream;
+
+    await this.screenTrack.applyConstraints(
+      screenShareTrackConstraints(quality),
+    );
+
+    return this.stream;
   }
 
   public disableCamera(): MediaStream | null {

@@ -16,6 +16,7 @@ export function CallStageDialog({
   onEnd,
   onParticipantScreenShareVolumeChange,
   onParticipantVolumeChange,
+  onScreenShareQualityChange,
   onToggleCamera,
   onToggleDeafen,
   onToggleMute,
@@ -37,6 +38,7 @@ export function CallStageDialog({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
@@ -76,6 +78,7 @@ export function CallStageDialog({
             onParticipantScreenShareVolumeChange
           }
           onParticipantVolumeChange={onParticipantVolumeChange}
+          onScreenShareQualityChange={onScreenShareQualityChange}
           onToggleMute={onToggleMute}
         />
         <CallStageFooter
@@ -97,7 +100,9 @@ export function CallStageDialog({
               volumePercent,
             )
           }
+          onScreenShareQualityChange={onScreenShareQualityChange}
           participant={expandedScreen}
+          screenShareQuality={call.screenShareQuality}
           screenShareVolumePercent={
             call.screenShareVolumes[expandedScreen.identityId] ?? 100
           }

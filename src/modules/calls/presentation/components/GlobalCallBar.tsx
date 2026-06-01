@@ -28,6 +28,7 @@ interface GlobalCallBarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
@@ -41,6 +42,7 @@ export function GlobalCallBar({
   onEnd,
   onParticipantScreenShareVolumeChange,
   onParticipantVolumeChange,
+  onScreenShareQualityChange,
   onToggleCamera,
   onToggleDeafen,
   onToggleMute,
@@ -89,6 +91,7 @@ export function GlobalCallBar({
                 onParticipantScreenShareVolumeChange
               }
               onParticipantVolumeChange={onParticipantVolumeChange}
+              onScreenShareQualityChange={onScreenShareQualityChange}
               onToggleCamera={onToggleCamera}
               onToggleDeafen={onToggleDeafen}
               onToggleMute={onToggleMute}

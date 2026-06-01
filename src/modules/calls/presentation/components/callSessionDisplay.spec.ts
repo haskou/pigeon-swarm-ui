@@ -46,6 +46,7 @@ function callSession(input: {
     ],
     participantVolumes: {},
     screenShareAudioEnabled: true,
+    screenShareQuality: 'auto',
     screenShareVolumes: {},
     screenSharing: false,
     startedAt: 1,

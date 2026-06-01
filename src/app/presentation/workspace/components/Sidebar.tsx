@@ -54,6 +54,9 @@ interface SidebarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
+  onCallScreenShareQualityChange?: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
@@ -74,6 +77,7 @@ export function Sidebar({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
@@ -288,6 +292,7 @@ export function Sidebar({
           onCallParticipantScreenShareVolumeChange
         }
         onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallScreenShareQualityChange={onCallScreenShareQualityChange}
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}

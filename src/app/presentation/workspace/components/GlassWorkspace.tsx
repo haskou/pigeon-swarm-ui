@@ -417,6 +417,7 @@ export function GlassWorkspace({
     reconcileCall,
     setParticipantScreenShareVolume,
     setParticipantVolume,
+    setScreenShareQuality,
     startCall,
     toggleCamera,
     toggleDeafen,
@@ -3768,6 +3769,7 @@ export function GlassWorkspace({
                     onCallParticipantScreenShareVolumeChange={
                       setParticipantScreenShareVolume
                     }
+                    onCallScreenShareQualityChange={setScreenShareQuality}
                     onCallToggleCamera={toggleCamera}
                     onCallToggleDeafen={toggleDeafen}
                     onCallToggleMute={toggleMute}
@@ -3972,6 +3974,7 @@ export function GlassWorkspace({
               onCallParticipantScreenShareVolumeChange={
                 setParticipantScreenShareVolume
               }
+              onCallScreenShareQualityChange={setScreenShareQuality}
               onCallToggleCamera={toggleCamera}
               onCallToggleDeafen={toggleDeafen}
               onCallToggleMute={toggleMute}

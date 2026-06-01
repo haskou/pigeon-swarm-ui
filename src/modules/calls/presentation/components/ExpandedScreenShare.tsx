@@ -1,19 +1,26 @@
-import type { CallParticipant } from '../../domain/callSession.types';
+import type {
+  CallParticipant,
+  ScreenShareQualityPreset,
+} from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { callParticipantDisplayName } from './callParticipantDisplayName';
-import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
+import { ScreenShareStreamControls } from './ScreenShareStreamControls';
 import { VideoPreview } from './VideoPreview';
 
 export function ExpandedScreenShare({
   onClose,
+  onScreenShareQualityChange,
   onScreenShareVolumeChange,
   participant,
+  screenShareQuality,
   screenShareVolumePercent,
 }: {
   onClose: () => void;
+  onScreenShareQualityChange: (quality: ScreenShareQualityPreset) => void;
   onScreenShareVolumeChange: (volumePercent: number) => void;
   participant: CallParticipant;
+  screenShareQuality: ScreenShareQualityPreset;
   screenShareVolumePercent: number;
 }) {
   if (!participant.screenStream) return null;
@@ -57,11 +64,13 @@ export function ExpandedScreenShare({
           />
         </div>
         <div className="border-t border-white/10 px-4 py-3">
-          <ScreenShareVolumeControl
+          <ScreenShareStreamControls
             className="mx-auto w-full max-w-sm sm:max-w-md"
-            placement="inline"
-            onChange={onScreenShareVolumeChange}
-            value={screenShareVolumePercent}
+            onQualityChange={onScreenShareQualityChange}
+            onVolumeChange={onScreenShareVolumeChange}
+            participant={participant}
+            quality={screenShareQuality}
+            volumePercent={screenShareVolumePercent}
           />
         </div>
       </div>

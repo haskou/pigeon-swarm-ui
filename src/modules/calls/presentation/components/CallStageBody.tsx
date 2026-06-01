@@ -5,7 +5,7 @@ import { CallDataPanel } from './CallDataPanel';
 import { callParticipantHasActiveScreenShare } from './callParticipantHasActiveScreenShare';
 import { CallParticipantTiles } from './CallParticipantTiles';
 import { CallScreenShareStage } from './CallScreenShareStage';
-import { ScreenShareVolumeControl } from './ScreenShareVolumeControl';
+import { ScreenShareStreamControls } from './ScreenShareStreamControls';
 
 export function CallStageBody({
   call,
@@ -13,6 +13,7 @@ export function CallStageBody({
   onExpandScreen,
   onParticipantScreenShareVolumeChange,
   onParticipantVolumeChange,
+  onScreenShareQualityChange,
   onToggleMute,
 }: {
   call: CallSession;
@@ -26,6 +27,7 @@ export function CallStageBody({
     identityId: string,
     volumePercent: number,
   ) => void;
+  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
   onToggleMute: () => void;
 }) {
   const screenParticipant =
@@ -51,16 +53,18 @@ export function CallStageBody({
             onExpand={() => onExpandScreen(screenParticipant)}
             participant={screenParticipant}
           />
-          <ScreenShareVolumeControl
+          <ScreenShareStreamControls
             className="mx-auto w-full max-w-sm sm:max-w-md"
-            placement="inline"
-            onChange={(volumePercent) =>
+            onQualityChange={onScreenShareQualityChange}
+            onVolumeChange={(volumePercent) =>
               onParticipantScreenShareVolumeChange(
                 screenParticipant.identityId,
                 volumePercent,
               )
             }
-            value={screenShareVolumePercent}
+            participant={screenParticipant}
+            quality={call.screenShareQuality}
+            volumePercent={screenShareVolumePercent}
           />
           <CallParticipantTiles
             call={call}

@@ -1,4 +1,7 @@
-import type { CallSignalType } from '../../domain/callSession.types';
+import type {
+  CallSignalType,
+  ScreenShareQualityPreset,
+} from '../../domain/callSession.types';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
@@ -22,6 +25,7 @@ import {
   needsAudioGraph,
   remoteAudioKey,
 } from './remoteAudioOutput';
+import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './callPeerStats';
 
@@ -90,6 +94,8 @@ export class CallPeerConnectionManager {
   private rtcConfiguration: RTCConfiguration | null = null;
 
   private deafened = false;
+
+  private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
   public configure(rtcConfiguration: RTCConfiguration): void {
     this.rtcConfiguration = rtcConfiguration;
@@ -182,6 +188,11 @@ export class CallPeerConnectionManager {
       peerIdentityId,
       volumePercent,
     });
+  }
+
+  public setScreenShareQuality(quality: ScreenShareQualityPreset): void {
+    this.screenShareQuality = quality;
+    this.syncScreenShareEncodingParameters();
   }
 
   private setRemoteAudioChannelVolume(
@@ -615,7 +626,9 @@ export class CallPeerConnectionManager {
         readyState: track.readyState,
       });
 
-      peer.addTrack(track, this.localTrackStream(track));
+      this.configureLocalSender(
+        peer.addTrack(track, this.localTrackStream(track)),
+      );
     });
   }
 
@@ -910,11 +923,14 @@ export class CallPeerConnectionManager {
     }
 
     syncedTracks.add(replacement);
-    void sender.replaceTrack(replacement).catch((error: unknown) => {
-      logCallError('peer-manager:replace-local-track-failed', error, {
-        kind: replacement.kind,
+    void sender
+      .replaceTrack(replacement)
+      .then(() => this.configureLocalSender(sender))
+      .catch((error: unknown) => {
+        logCallError('peer-manager:replace-local-track-failed', error, {
+          kind: replacement.kind,
+        });
       });
-    });
   }
 
   private addMissingLocalTrack(
@@ -926,7 +942,35 @@ export class CallPeerConnectionManager {
       return;
     }
 
-    peer.addTrack(track, this.localTrackStream(track));
+    this.configureLocalSender(
+      peer.addTrack(track, this.localTrackStream(track)),
+    );
+  }
+
+  private configureLocalSender(sender: RTCRtpSender): void {
+    if (!sender.track || !isScreenShareTrack(sender.track)) return;
+
+    const encoding = screenShareEncodingParameters(this.screenShareQuality);
+    const parameters = sender.getParameters();
+    const [currentEncoding = {}] = parameters.encodings ?? [{}];
+    const nextEncoding = { ...currentEncoding, ...encoding };
+
+    if (encoding.maxBitrate === undefined) delete nextEncoding.maxBitrate;
+
+    if (encoding.maxFramerate === undefined) delete nextEncoding.maxFramerate;
+
+    parameters.encodings = [nextEncoding];
+    void sender.setParameters(parameters).catch((error: unknown) => {
+      logCallWarning('peer-manager:screen-quality:sender-params-failed', {
+        error,
+      });
+    });
+  }
+
+  private syncScreenShareEncodingParameters(): void {
+    for (const peer of this.peers.values()) {
+      peer.getSenders().forEach((sender) => this.configureLocalSender(sender));
+    }
   }
 
   private hasLocalSender(

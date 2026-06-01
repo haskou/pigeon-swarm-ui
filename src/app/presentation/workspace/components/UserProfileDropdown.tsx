@@ -49,6 +49,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
@@ -80,6 +81,9 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallParticipantScreenShareVolumeChange?: (
     identityId: string,
     volumePercent: number,
+  ) => void;
+  onCallScreenShareQualityChange?: (
+    quality: CallSession['screenShareQuality'],
   ) => void;
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
@@ -179,6 +183,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallEnd &&
         onCallParticipantScreenShareVolumeChange &&
         onCallParticipantVolumeChange &&
+        onCallScreenShareQualityChange &&
         onCallToggleCamera &&
         onCallToggleDeafen &&
         onCallToggleMute &&
@@ -194,6 +199,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
                   onCallParticipantScreenShareVolumeChange
                 }
                 onParticipantVolumeChange={onCallParticipantVolumeChange}
+                onScreenShareQualityChange={onCallScreenShareQualityChange}
                 onToggleCamera={onCallToggleCamera}
                 onToggleDeafen={onCallToggleDeafen}
                 onToggleMute={onCallToggleMute}
