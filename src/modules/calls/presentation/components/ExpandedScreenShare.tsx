@@ -13,6 +13,7 @@ export function ExpandedScreenShare({
   onScreenShareQualityChange,
   onScreenShareVolumeChange,
   participant,
+  qualityEditable,
   screenShareQuality,
   screenShareVolumePercent,
 }: {
@@ -20,6 +21,7 @@ export function ExpandedScreenShare({
   onScreenShareQualityChange: (quality: ScreenShareQualityPreset) => void;
   onScreenShareVolumeChange: (volumePercent: number) => void;
   participant: CallParticipant;
+  qualityEditable: boolean;
   screenShareQuality: ScreenShareQualityPreset;
   screenShareVolumePercent: number;
 }) {
@@ -70,6 +72,7 @@ export function ExpandedScreenShare({
             onVolumeChange={onScreenShareVolumeChange}
             participant={participant}
             quality={screenShareQuality}
+            qualityEditable={qualityEditable}
             volumePercent={screenShareVolumePercent}
           />
         </div>

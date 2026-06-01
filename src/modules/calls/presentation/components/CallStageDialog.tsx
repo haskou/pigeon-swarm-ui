@@ -102,6 +102,7 @@ export function CallStageDialog({
           }
           onScreenShareQualityChange={onScreenShareQualityChange}
           participant={expandedScreen}
+          qualityEditable={expandedScreen.identityId === call.currentIdentityId}
           screenShareQuality={call.screenShareQuality}
           screenShareVolumePercent={
             call.screenShareVolumes[expandedScreen.identityId] ?? 100

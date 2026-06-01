@@ -64,6 +64,9 @@ export function CallStageBody({
             }
             participant={screenParticipant}
             quality={call.screenShareQuality}
+            qualityEditable={
+              screenParticipant.identityId === call.currentIdentityId
+            }
             volumePercent={screenShareVolumePercent}
           />
           <CallParticipantTiles

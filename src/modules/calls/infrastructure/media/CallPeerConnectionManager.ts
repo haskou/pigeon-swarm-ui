@@ -950,6 +950,13 @@ export class CallPeerConnectionManager {
   private configureLocalSender(sender: RTCRtpSender): void {
     if (!sender.track || !isScreenShareTrack(sender.track)) return;
 
+    if (
+      typeof sender.getParameters !== 'function' ||
+      typeof sender.setParameters !== 'function'
+    ) {
+      return;
+    }
+
     const encoding = screenShareEncodingParameters(this.screenShareQuality);
     const parameters = sender.getParameters();
     const [currentEncoding = {}] = parameters.encodings ?? [{}];

@@ -19,6 +19,7 @@ export function ScreenShareStreamControls({
   onVolumeChange,
   participant,
   quality,
+  qualityEditable = true,
   volumePercent,
 }: {
   className?: string;
@@ -26,47 +27,60 @@ export function ScreenShareStreamControls({
   onVolumeChange: (volumePercent: number) => void;
   participant: CallParticipant;
   quality: ScreenShareQualityPreset;
+  qualityEditable?: boolean;
   volumePercent: number;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const technicalDetails = useMemo(
-    () => screenShareTechnicalDetails(participant, quality),
-    [participant, quality],
+    () => screenShareTechnicalDetails(participant, quality, qualityEditable),
+    [participant, quality, qualityEditable],
   );
 
   return (
     <div className={cx('space-y-2', className)}>
-      <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <label className="min-w-0">
-          <span className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35">
-            {copy.calls.screenShareQuality}
-          </span>
-          <select
-            aria-label={copy.calls.screenShareQuality}
-            value={quality}
-            onChange={(event) =>
-              onQualityChange(event.target.value as ScreenShareQualityPreset)
-            }
-            className="h-9 w-full rounded-xl border border-white/10 bg-white/8 px-3 text-xs font-black text-white outline-none transition hover:bg-white/12 focus:border-emerald-300/60"
-          >
-            {screenShareQualityPresets.map((preset) => (
-              <option key={preset} value={preset} className="bg-[#151722]">
-                {screenShareQualityLabel(preset)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div
+        className={cx(
+          'grid gap-2 rounded-xl border border-white/10 bg-black/20 p-2',
+          qualityEditable
+            ? 'sm:grid-cols-[minmax(0,1fr)_auto]'
+            : 'sm:grid-cols-1',
+        )}
+      >
+        {qualityEditable && (
+          <label className="min-w-0">
+            <span className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/35">
+              {copy.calls.screenShareQuality}
+            </span>
+            <select
+              aria-label={copy.calls.screenShareQuality}
+              value={quality}
+              onChange={(event) =>
+                onQualityChange(event.target.value as ScreenShareQualityPreset)
+              }
+              className="h-9 w-full rounded-xl border border-white/10 bg-white/8 px-3 text-xs font-black text-white outline-none transition hover:bg-white/12 focus:border-emerald-300/60"
+            >
+              {screenShareQualityPresets.map((preset) => (
+                <option key={preset} value={preset} className="bg-[#151722]">
+                  {screenShareQualityLabel(preset)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           onClick={() => setDetailsOpen((isOpen) => !isOpen)}
-          className="h-9 self-end rounded-xl border border-white/10 bg-white/8 px-3 text-xs font-black text-white/75 transition hover:bg-white/14 hover:text-white"
+          className={cx(
+            'h-9 self-end rounded-xl border border-white/10 bg-white/8 px-3 text-xs font-black text-white/75 transition hover:bg-white/14 hover:text-white',
+            !qualityEditable && 'justify-self-start',
+          )}
         >
           {detailsOpen
             ? copy.calls.hideStreamDetails
             : copy.calls.viewStreamDetails}
         </button>
         <ScreenShareVolumeControl
-          className="sm:col-span-2"
+          className={qualityEditable ? 'sm:col-span-2' : undefined}
           placement="inline"
           onChange={onVolumeChange}
           value={volumePercent}
@@ -96,6 +110,7 @@ export function ScreenShareStreamControls({
 function screenShareTechnicalDetails(
   participant: CallParticipant,
   quality: ScreenShareQualityPreset,
+  qualityEditable: boolean,
 ): Array<{ label: string; value: string }> {
   const videoTrack = participant.screenStream?.getVideoTracks()[0];
   const audioTrack = participant.screenStream?.getAudioTracks()[0];
@@ -104,7 +119,7 @@ function screenShareTechnicalDetails(
   return [
     {
       label: copy.calls.streamPreset,
-      value: screenShareQualityLabel(quality),
+      value: qualityEditable ? screenShareQualityLabel(quality) : '-',
     },
     {
       label: copy.calls.streamResolution,
@@ -123,7 +138,9 @@ function screenShareTechnicalDetails(
     },
     {
       label: copy.calls.streamAudio,
-      value: audioTrack ? copy.calls.streamAudioEnabled : copy.calls.streamAudioDisabled,
+      value: audioTrack
+        ? copy.calls.streamAudioEnabled
+        : copy.calls.streamAudioDisabled,
     },
     {
       label: copy.calls.streamBitrate,
