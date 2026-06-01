@@ -18,6 +18,7 @@ export class PendingMessageAttachments {
         key: '',
       },
       filename: file.name || `attachment-${index + 1}`,
+      localFile: file,
       size: file.size,
       type: 'chunked_file',
     }));

@@ -151,6 +151,74 @@ describe(PigeonFilesApi.name, () => {
     );
   });
 
+  it('adds a public WebP thumbnail for large public image attachments', async () => {
+    const sourceFile = new File([new Uint8Array(200 * 1024)], 'photo.png', {
+      type: 'image/png',
+    });
+    const webpFile = new File([new Uint8Array(180 * 1024)], 'photo.webp', {
+      type: 'image/webp',
+    });
+    const thumbnailFile = new File(['thumb'], 'photo.thumbnail.webp', {
+      type: 'image/webp',
+    });
+    const request = jest.fn().mockImplementation((_path, options) => {
+      const filename = options.headers['X-Filename'];
+
+      return Promise.resolve({
+        cid: filename === 'photo.thumbnail.webp' ? 'preview-cid' : 'public-cid',
+        contentType: 'image/webp',
+        filename,
+        size:
+          filename === 'photo.thumbnail.webp'
+            ? thumbnailFile.size
+            : webpFile.size,
+      });
+    });
+    const signerHeaders = jest
+      .fn()
+      .mockResolvedValue({ 'X-Test-Signature': 'signature' });
+    const cipher = { encrypt: jest.fn() } as unknown as AttachmentCipher;
+    const publicImageUploadPreparer = {
+      prepare: jest.fn().mockResolvedValue(webpFile),
+    };
+    const thumbnailPreparer = {
+      prepare: jest.fn().mockResolvedValue(thumbnailFile),
+    };
+    const api = new PigeonFilesApi(
+      httpClient({ request }),
+      signer({ headers: signerHeaders }),
+      cipher,
+      publicImageUploadPreparer,
+      thumbnailPreparer,
+    );
+
+    await expect(
+      api.publishMessageAttachments(session, [sourceFile], undefined, {
+        encryptSmallAttachments: false,
+      }),
+    ).resolves.toEqual([
+      {
+        cid: 'public-cid',
+        contentType: 'image/webp',
+        encrypted: false,
+        filename: 'photo.webp',
+        preview: {
+          cid: 'preview-cid',
+          contentType: 'image/webp',
+          encrypted: false,
+          filename: 'photo.thumbnail.webp',
+          size: thumbnailFile.size,
+          storage: 'public',
+        },
+        size: webpFile.size,
+        storage: 'public',
+      },
+    ]);
+
+    expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(webpFile);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps small attachments encrypted by default', async () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     const encryption = attachmentEncryption();
@@ -212,5 +280,98 @@ describe(PigeonFilesApi.name, () => {
         method: 'POST',
       }),
     );
+  });
+
+  it('keeps thumbnails private when the original image is encrypted', async () => {
+    const file = new File([new Uint8Array(200 * 1024)], 'secret.png', {
+      type: 'image/png',
+    });
+    const thumbnailFile = new File(['thumb'], 'secret.thumbnail.webp', {
+      type: 'image/webp',
+    });
+    const originalEncryption = attachmentEncryption();
+    const thumbnailEncryption = {
+      ...attachmentEncryption(),
+      key: 'thumbnail-key',
+    };
+    const pendingOriginal: PendingMessageAttachment = {
+      encryptedBytes: new Uint8Array([1, 2, 3]).buffer,
+      metadata: {
+        contentType: 'image/png',
+        encryption: originalEncryption,
+        filename: 'secret.png',
+        size: file.size,
+      },
+      uploadFilename: 'original.bin',
+    };
+    const pendingThumbnail: PendingMessageAttachment = {
+      encryptedBytes: new Uint8Array([4, 5, 6]).buffer,
+      metadata: {
+        contentType: 'image/webp',
+        encryption: thumbnailEncryption,
+        filename: 'secret.thumbnail.webp',
+        size: thumbnailFile.size,
+      },
+      uploadFilename: 'thumbnail.bin',
+    };
+    const request = jest.fn().mockImplementation((_path, options) => {
+      const filename = options.headers['X-Filename'];
+      let cid = 'private-cid';
+
+      if (filename === 'thumbnail.bin') cid = 'private-preview-cid';
+
+      return Promise.resolve({
+        cid,
+        contentType: 'application/octet-stream',
+        encrypted: true,
+        filename,
+        size:
+          filename === 'thumbnail.bin'
+            ? pendingThumbnail.encryptedBytes.byteLength
+            : pendingOriginal.encryptedBytes.byteLength,
+      });
+    });
+    const signerHeaders = jest
+      .fn()
+      .mockResolvedValue({ 'X-Test-Signature': 'signature' });
+    const cipher = {
+      encrypt: jest.fn((input: File) =>
+        Promise.resolve(
+          input === thumbnailFile ? pendingThumbnail : pendingOriginal,
+        ),
+      ),
+    } as unknown as AttachmentCipher;
+    const thumbnailPreparer = {
+      prepare: jest.fn().mockResolvedValue(thumbnailFile),
+    };
+    const api = new PigeonFilesApi(
+      httpClient({ request }),
+      signer({ headers: signerHeaders }),
+      cipher,
+      undefined,
+      thumbnailPreparer,
+    );
+
+    await expect(
+      api.publishMessageAttachments(session, [file]),
+    ).resolves.toEqual([
+      {
+        ...pendingOriginal.metadata,
+        cid: 'private-cid',
+        encrypted: true,
+        encryptedSize: pendingOriginal.encryptedBytes.byteLength,
+        preview: {
+          ...pendingThumbnail.metadata,
+          cid: 'private-preview-cid',
+          encrypted: true,
+          encryptedSize: pendingThumbnail.encryptedBytes.byteLength,
+        },
+      },
+    ]);
+
+    expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(file);
+    expect(cipher.encrypt).toHaveBeenCalledWith(thumbnailFile);
+    expect(cipher.encrypt).toHaveBeenCalledWith(file, undefined);
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });
