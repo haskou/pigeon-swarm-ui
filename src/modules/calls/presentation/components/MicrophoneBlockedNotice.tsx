@@ -36,8 +36,8 @@ export function MicrophoneBlockedNotice({
           type="button"
           onClick={onRetryMicrophone}
           className={cx(
-            'rounded-xl bg-amber-100 font-black text-amber-950 transition hover:bg-white',
-            compact ? 'px-3 py-1.5 text-[0.7rem]' : 'px-4 py-2 text-xs',
+            microphoneNoticeActionClass(compact),
+            'border-amber-100/60 bg-amber-100 text-amber-950 hover:bg-white',
           )}
         >
           {copy.calls.microphoneAllow}
@@ -46,8 +46,8 @@ export function MicrophoneBlockedNotice({
           type="button"
           onClick={onRetryMicrophone}
           className={cx(
-            'rounded-xl bg-white/10 font-black text-white/75 transition hover:bg-white/15 hover:text-white',
-            compact ? 'px-3 py-1.5 text-[0.7rem]' : 'px-4 py-2 text-xs',
+            microphoneNoticeActionClass(compact),
+            'border-white/10 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white',
           )}
         >
           {copy.calls.microphoneRetry}
@@ -57,8 +57,8 @@ export function MicrophoneBlockedNotice({
           target="_blank"
           rel="noreferrer"
           className={cx(
-            'rounded-xl bg-white/10 font-black text-white/75 transition hover:bg-white/15 hover:text-white',
-            compact ? 'px-3 py-1.5 text-[0.7rem]' : 'px-4 py-2 text-xs',
+            microphoneNoticeActionClass(compact),
+            'border-white/10 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white',
           )}
         >
           {copy.calls.microphoneHelp}
@@ -73,6 +73,13 @@ export function MicrophoneBlockedNotice({
         {copy.calls.microphoneTroubleshooting}
       </div>
     </div>
+  );
+}
+
+function microphoneNoticeActionClass(compact: boolean): string {
+  return cx(
+    'inline-flex items-center justify-center rounded-xl border font-black leading-none transition',
+    compact ? 'h-8 px-3 text-[0.7rem]' : 'h-9 px-4 text-xs',
   );
 }
 
