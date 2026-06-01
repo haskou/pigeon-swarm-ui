@@ -12,6 +12,10 @@ import {
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
 import { MessageCollection } from '../../../messages/domain/MessageCollection';
+import {
+  MessageScrollAnchor,
+  type MessageScrollAnchorSnapshot,
+} from '../../../messages/presentation/view-models/MessageScrollAnchor';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 
 export type CommunityChannelMessageLoadState = 'error' | 'idle' | 'loading';
@@ -84,6 +88,8 @@ export function useCommunityChannelMessages({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const keepChannelBottomUntilRef = useRef(0);
+  const messageScrollAnchorRef =
+    useRef<MessageScrollAnchorSnapshot | null>(null);
   const messageStateRef = useRef<CommunityChannelMessageLoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
   const loadChannelMessagesRef = useRef(loadChannelMessages);
@@ -202,20 +208,41 @@ export function useCommunityChannelMessages({
 
     if (messageStateRef.current === 'loading' || !selectedChannelId) return;
 
+    const requestedCursor = messageCursor;
     const previousHeight = scroller.scrollHeight;
     const previousTop = scroller.scrollTop;
+    const anchor = MessageScrollAnchor.capture(scroller);
 
     keepChannelBottomUntilRef.current = 0;
+    messageScrollAnchorRef.current = anchor;
     setMessageLoadState('loading');
     void loadChannelMessagesRef
-      .current(selectedChannelId, messageCursor)
+      .current(selectedChannelId, requestedCursor)
       .then(({ cursor, loadedMessages }) => {
-        setMessages((current) => [...loadedMessages, ...current]);
-        setMessageCursor(cursor);
+        const hasNewMessages = MessageCollection.hasUnknownMessages(
+          messagesRef.current,
+          loadedMessages,
+        );
+
+        if (hasNewMessages) {
+          setMessages((current) => mergeChatMessages(current, loadedMessages));
+        }
+
+        const nextCursor = cursor ?? null;
+
+        setMessageCursor(
+          hasNewMessages && nextCursor !== requestedCursor ? nextCursor : null,
+        );
         requestAnimationFrame(() => {
           if (!scrollerRef.current) return;
 
+          const restoredTop = MessageScrollAnchor.restore(
+            scrollerRef.current,
+            anchor,
+          );
+
           scrollerRef.current.scrollTop =
+            restoredTop ??
             scrollerRef.current.scrollHeight - previousHeight + previousTop;
         });
       })
@@ -234,6 +261,15 @@ export function useCommunityChannelMessages({
     if (!scroller) return undefined;
 
     const handleMediaLayoutChange = () => {
+      const restoredTop = MessageScrollAnchor.restore(
+        scroller,
+        messageScrollAnchorRef.current,
+      );
+
+      if (restoredTop !== null) return;
+
+      messageScrollAnchorRef.current = null;
+
       if (Date.now() > keepChannelBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {

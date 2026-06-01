@@ -51,6 +51,10 @@ import { ConversationTimeline } from '../../../../modules/conversations/domain/C
 import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
 import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
+import {
+  MessageScrollAnchor,
+  type MessageScrollAnchorSnapshot,
+} from '../../../../modules/messages/presentation/view-models/MessageScrollAnchor';
 import { MessageReactions } from '../../../../modules/messages/domain/MessageReactions';
 import { MessageCollectionDialog } from '../../../../modules/messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../../modules/messages/presentation/components/MessageThreadPanel';
@@ -386,6 +390,8 @@ export function GlassWorkspace({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
+  const messageScrollAnchorRef =
+    useRef<MessageScrollAnchorSnapshot | null>(null);
   const messageCursorRef = useRef<string | null>(null);
   const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
@@ -1826,6 +1832,19 @@ export function GlassWorkspace({
     if (!scroller) return undefined;
 
     const handleMediaLayoutChange = () => {
+      const restoredTop = MessageScrollAnchor.restore(
+        scroller,
+        messageScrollAnchorRef.current,
+      );
+
+      if (restoredTop !== null) {
+        lastScrollTopRef.current = restoredTop;
+
+        return;
+      }
+
+      messageScrollAnchorRef.current = null;
+
       if (Date.now() > keepMessageBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {
@@ -2007,29 +2026,50 @@ export function GlassWorkspace({
     )
       return;
 
+    const requestedCursor = messageCursorRef.current;
     const requestId = messageRequestRef.current + 1;
 
     messageRequestRef.current = requestId;
-    const previousHeight = scrollerRef.current?.scrollHeight ?? 0;
-    const previousTop = scrollerRef.current?.scrollTop ?? 0;
+    const scroller = scrollerRef.current;
+    const anchor = scroller ? MessageScrollAnchor.capture(scroller) : null;
+    const previousHeight = scroller?.scrollHeight ?? 0;
+    const previousTop = scroller?.scrollTop ?? 0;
+
+    messageScrollAnchorRef.current = anchor;
     setMessageLoadState('loading');
     try {
       const result = await applicationContainer.loadMessages(
         sessionRef.current,
         activeConversation.id,
-        messageCursorRef.current,
+        requestedCursor,
       );
 
       if (messageRequestRef.current !== requestId) return;
 
-      setMessages((current) =>
-        MessageCollection.merge(current, result.messages),
+      const hasNewMessages = MessageCollection.hasUnknownMessages(
+        messagesRef.current,
+        result.messages,
       );
-      updateMessageCursor(result.nextCursor ?? null);
+      const nextCursor = result.nextCursor ?? null;
+
+      if (hasNewMessages) {
+        setMessages((current) =>
+          MessageCollection.merge(current, result.messages),
+        );
+      }
+
+      updateMessageCursor(
+        hasNewMessages && nextCursor !== requestedCursor ? nextCursor : null,
+      );
       requestAnimationFrame(() => {
         if (!scrollerRef.current) return;
 
+        const restoredTop = MessageScrollAnchor.restore(
+          scrollerRef.current,
+          anchor,
+        );
         const nextTop =
+          restoredTop ??
           scrollerRef.current.scrollHeight - previousHeight + previousTop;
 
         scrollerRef.current.scrollTop = nextTop;
