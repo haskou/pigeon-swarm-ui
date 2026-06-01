@@ -423,7 +423,6 @@ export function GlassWorkspace({
     toggleMute,
     toggleNoiseCancellation,
     retryMicrophone,
-    toggleScreenShareAudio,
     toggleScreenShare,
   } = useCallSession();
   const {
@@ -3774,7 +3773,6 @@ export function GlassWorkspace({
                     onCallToggleMute={toggleMute}
                     onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
                     onCallRetryMicrophone={retryMicrophone}
-                    onCallToggleScreenShareAudio={toggleScreenShareAudio}
                     onCallToggleScreenShare={toggleScreenShare}
                     onLogout={logout}
                     onSessionUpdated={(nextSession) => {
@@ -3979,7 +3977,6 @@ export function GlassWorkspace({
               onCallToggleMute={toggleMute}
               onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
               onCallRetryMicrophone={retryMicrophone}
-              onCallToggleScreenShareAudio={toggleScreenShareAudio}
               onCallToggleScreenShare={toggleScreenShare}
               realtimeEvent={communityRealtimeEvent}
               presenceByIdentityId={presenceByIdentityId}

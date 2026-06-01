@@ -1,7 +1,6 @@
 import type { CallSession } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
 import { CallButton } from './CallButton';
 import {
   CameraIcon,
@@ -9,7 +8,6 @@ import {
   HeadphonesIcon,
   MicrophoneIcon,
   NoiseCancellationIcon,
-  ScreenSoundIcon,
   ScreenShareIcon,
 } from './callIcons';
 
@@ -20,7 +18,6 @@ export function CallStageFooter({
   onToggleDeafen,
   onToggleMute,
   onToggleNoiseCancellation,
-  onToggleScreenShareAudio,
   onToggleScreenShare,
 }: {
   call: CallSession;
@@ -29,7 +26,6 @@ export function CallStageFooter({
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
-  onToggleScreenShareAudio: () => void;
   onToggleScreenShare: () => void;
 }) {
   return (
@@ -70,12 +66,6 @@ export function CallStageFooter({
       >
         <ScreenShareIcon active={call.screenSharing} />
       </CallButton>
-      {call.screenSharing && (
-        <ScreenShareAudioToggle
-          active={call.screenShareAudioEnabled}
-          onToggle={onToggleScreenShareAudio}
-        />
-      )}
       <CallButton
         active={call.noiseCancellationEnabled}
         badge={copy.calls.noiseCancellationBadge}
@@ -99,34 +89,5 @@ export function CallStageFooter({
         <HangUpIcon />
       </button>
     </footer>
-  );
-}
-
-function ScreenShareAudioToggle({
-  active,
-  onToggle,
-}: {
-  active: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={cx(
-        'flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-black transition sm:h-12 sm:gap-2.5 sm:rounded-[1.15rem] sm:px-3.5 [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6',
-        active
-          ? 'bg-emerald-300 text-slate-950 hover:bg-emerald-200'
-          : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white',
-      )}
-      aria-pressed={active}
-      aria-label={
-        active ? copy.calls.stopScreenSound : copy.calls.shareScreenSound
-      }
-      title={active ? copy.calls.stopScreenSound : copy.calls.shareScreenSound}
-    >
-      <ScreenSoundIcon active={active} />
-      <span className="hidden sm:inline">{copy.calls.screenSound}</span>
-    </button>
   );
 }

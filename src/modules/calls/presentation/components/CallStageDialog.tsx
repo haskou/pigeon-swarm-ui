@@ -21,7 +21,6 @@ export function CallStageDialog({
   onToggleMute,
   onToggleNoiseCancellation,
   onRetryMicrophone,
-  onToggleScreenShareAudio,
   onToggleScreenShare,
   subtitle,
 }: {
@@ -43,7 +42,6 @@ export function CallStageDialog({
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
   onRetryMicrophone: () => void;
-  onToggleScreenShareAudio: () => void;
   onToggleScreenShare: () => void;
   subtitle: string;
 }) {
@@ -87,7 +85,6 @@ export function CallStageDialog({
           onToggleDeafen={onToggleDeafen}
           onToggleMute={onToggleMute}
           onToggleNoiseCancellation={onToggleNoiseCancellation}
-          onToggleScreenShareAudio={onToggleScreenShareAudio}
           onToggleScreenShare={onToggleScreenShare}
         />
       </section>

@@ -61,15 +61,19 @@ function installMediaStreamMock(): void {
   });
 }
 
-function installNavigatorMock(screenStream: MediaStream): void {
+function installNavigatorMock(screenStream: MediaStream): jest.Mock {
+  const getDisplayMedia = jest.fn().mockResolvedValue(screenStream);
+
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: {
       mediaDevices: {
-        getDisplayMedia: jest.fn().mockResolvedValue(screenStream),
+        getDisplayMedia,
       },
     },
   });
+
+  return getDisplayMedia;
 }
 
 function installAudioContextMock(
@@ -142,6 +146,22 @@ describe(LocalMediaManager.name, () => {
 
     expect(firstPreview).toBe(secondPreview);
     expect(firstPreview?.getVideoTracks()).toEqual([screenTrack]);
+  });
+
+  it('requests screen audio by default when screen sharing starts', async () => {
+    const screenTrack = mediaTrack('screen-video', 'video');
+    const screenStream = mediaStreamWithTracks([screenTrack]);
+    const manager = new LocalMediaManager();
+
+    installMediaStreamMock();
+    const getDisplayMedia = installNavigatorMock(screenStream);
+
+    await manager.enableScreenShare();
+
+    expect(getDisplayMedia).toHaveBeenCalledWith({
+      audio: true,
+      video: true,
+    });
   });
 
   it('clears the screen preview stream when screen sharing stops', async () => {

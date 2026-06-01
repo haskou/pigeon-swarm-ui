@@ -59,7 +59,6 @@ interface SidebarProps {
   onCallToggleMute?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
-  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
 }
 
@@ -80,7 +79,6 @@ export function Sidebar({
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallRetryMicrophone,
-  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onCreate,
   onLogout,
@@ -295,7 +293,6 @@ export function Sidebar({
         onCallToggleMute={onCallToggleMute}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
-        onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
         onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>

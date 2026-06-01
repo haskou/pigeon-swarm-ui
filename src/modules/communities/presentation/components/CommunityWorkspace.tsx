@@ -119,7 +119,6 @@ interface CommunityWorkspaceProps {
   onCallToggleMute?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
-  onCallToggleScreenShareAudio?: () => void;
   onCallToggleScreenShare?: () => void;
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
@@ -177,7 +176,6 @@ export function CommunityWorkspace({
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallRetryMicrophone,
-  onCallToggleScreenShareAudio,
   onCallToggleScreenShare,
   onChannelSelected,
   onChannelViewed,
@@ -1879,7 +1877,6 @@ export function CommunityWorkspace({
               onCallToggleMute={onCallToggleMute}
               onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
               onCallRetryMicrophone={onCallRetryMicrophone}
-              onCallToggleScreenShareAudio={onCallToggleScreenShareAudio}
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}

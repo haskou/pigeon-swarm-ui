@@ -123,7 +123,7 @@ export class LocalMediaManager {
   }
 
   public async enableScreenShare(
-    options: ScreenShareOptions = { audioEnabled: false },
+    options: ScreenShareOptions = { audioEnabled: true },
   ): Promise<MediaStream> {
     const displayMedia = navigator.mediaDevices.getDisplayMedia;
 
