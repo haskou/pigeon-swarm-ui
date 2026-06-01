@@ -49,17 +49,10 @@ export function CallStageBody({
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
           <CallScreenShareStage
             onExpand={() => onExpandScreen(screenParticipant)}
-            onScreenShareVolumeChange={(volumePercent) =>
-              onParticipantScreenShareVolumeChange(
-                screenParticipant.identityId,
-                volumePercent,
-              )
-            }
             participant={screenParticipant}
-            screenShareVolumePercent={screenShareVolumePercent}
           />
           <ScreenShareVolumeControl
-            className="sm:hidden"
+            className="mx-auto w-full max-w-sm sm:max-w-md"
             placement="inline"
             onChange={(volumePercent) =>
               onParticipantScreenShareVolumeChange(

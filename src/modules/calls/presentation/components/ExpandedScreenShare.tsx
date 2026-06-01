@@ -48,14 +48,18 @@ export function ExpandedScreenShare({
             x
           </button>
         </header>
-        <div className="relative min-h-0 flex-1 bg-black">
+        <div className="min-h-0 flex-1 bg-black">
           <VideoPreview
             fit="contain"
             label={`${copy.calls.screen} ${participantName}`}
             muted
             stream={participant.screenStream}
           />
+        </div>
+        <div className="border-t border-white/10 px-4 py-3">
           <ScreenShareVolumeControl
+            className="mx-auto w-full max-w-sm sm:max-w-md"
+            placement="inline"
             onChange={onScreenShareVolumeChange}
             value={screenShareVolumePercent}
           />

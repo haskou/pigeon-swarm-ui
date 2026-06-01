@@ -21,11 +21,12 @@ export function ScreenShareVolumeControl({
       className={cx(
         overlay
           ? 'absolute bottom-3 right-3 z-30 w-[min(18rem,calc(100%-1.5rem))] rounded-2xl border border-emerald-200/20 bg-black/70 p-3 text-white/70 shadow-xl shadow-black/40 backdrop-blur-md'
-          : 'mt-2 rounded-2xl border border-emerald-300/15 bg-emerald-300/10 p-2',
+          : 'rounded-xl border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-2',
         className,
       )}
       icon={<ScreenSoundIcon active={value > 0} />}
       iconClassName={overlay ? 'text-emerald-200' : undefined}
+      inputClassName={overlay ? undefined : 'mt-1.5 h-1.5'}
       label={copy.calls.screenShareVolume}
       onChange={onChange}
       stopPropagation={overlay}
