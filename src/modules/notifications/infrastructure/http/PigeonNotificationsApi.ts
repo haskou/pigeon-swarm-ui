@@ -1,4 +1,8 @@
 import type {
+  NotificationScopeSetting,
+  NotificationScopeSettingInput,
+  NotificationScopeSettingsResource,
+  NotificationSettingScope,
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -28,6 +32,49 @@ export class PigeonNotificationsApi {
     );
 
     return result.results;
+  }
+
+  public async listSettings(
+    session: Session,
+  ): Promise<NotificationScopeSetting[]> {
+    const path = '/notification-settings/';
+    const result = await this.http.request<NotificationScopeSettingsResource>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
+    );
+
+    return result.scopes;
+  }
+
+  public async saveSetting(
+    session: Session,
+    setting: NotificationScopeSettingInput,
+  ): Promise<NotificationScopeSetting> {
+    const path = '/notification-settings/scopes';
+    const body = setting;
+
+    return await this.http.request<NotificationScopeSetting>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
+  }
+
+  public async resetSetting(
+    session: Session,
+    scope: NotificationSettingScope,
+  ): Promise<void> {
+    const path = '/notification-settings/scopes';
+    const body = { scope };
+
+    await this.http.request<void>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      method: 'DELETE',
+    });
   }
 
   public async update(

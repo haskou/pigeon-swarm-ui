@@ -1,34 +1,46 @@
 import type { ReactNode } from 'react';
 
+import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
+
+import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
+import { notificationSettingSummary } from '../../../notifications/presentation/view-models/notificationSettingSummary';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 type CommunityHeaderActionsMenuProps = {
   communityLeaving: boolean;
   hasCommunityKey: boolean;
+  notificationSetting: NotificationScopeSetting;
   open: boolean;
   showCommunityKeyAction?: boolean;
   onClose: () => void;
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
+  onNotificationSettingsOpen: () => void;
+  onNotificationMuteToggle: () => void;
   onOpenPins?: () => void;
 };
 
 export function CommunityHeaderActionsMenu({
   communityLeaving,
   hasCommunityKey,
+  notificationSetting,
   open,
   showCommunityKeyAction = true,
   onClose,
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
+  onNotificationSettingsOpen,
+  onNotificationMuteToggle,
   onOpenPins,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   useCloseOnEscape(onClose, open);
 
   if (!open) return null;
+
+  const muted = NotificationSettingsPolicy.isMuted(notificationSetting);
 
   return (
     <>
@@ -51,6 +63,31 @@ export function CommunityHeaderActionsMenu({
             {copy.messages.viewPinned}
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            onNotificationMuteToggle();
+            onClose();
+          }}
+          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
+        >
+          {muted ? copy.notifications.unmute : copy.notifications.muteCommunity}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onNotificationSettingsOpen();
+            onClose();
+          }}
+          className="block w-full rounded-2xl px-3 py-2 text-left transition hover:bg-white/10"
+        >
+          <span className="block font-black text-white/80">
+            {copy.notifications.settings}
+          </span>
+          <span className="block text-xs font-bold text-white/40">
+            {notificationSettingSummary(notificationSetting)}
+          </span>
+        </button>
         <button
           type="button"
           onClick={onCommunityDataOpen}

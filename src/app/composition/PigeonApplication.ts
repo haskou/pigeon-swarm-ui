@@ -38,6 +38,9 @@ import type {
   MessagePin,
   MessageResource,
   MyStickersResource,
+  NotificationScopeSetting,
+  NotificationScopeSettingInput,
+  NotificationSettingScope,
   NotificationResource,
   PollResource,
   PublicFileContent,
@@ -103,8 +106,14 @@ import { RemoveNodeNetworkMessage } from '../../modules/networks/application/rem
 import { RemoveNodeNetwork } from '../../modules/networks/application/remove-node-network/RemoveNodeNetwork';
 import { AcceptConversationInvitation } from '../../modules/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
 import { AcceptConversationInvitationMessage } from '../../modules/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
+import { ListNotificationSettings } from '../../modules/notifications/application/list-notification-settings/ListNotificationSettings';
+import { ListNotificationSettingsMessage } from '../../modules/notifications/application/list-notification-settings/messages/ListNotificationSettingsMessage';
 import { ListNotifications } from '../../modules/notifications/application/list-notifications/ListNotifications';
 import { ListNotificationsMessage } from '../../modules/notifications/application/list-notifications/messages/ListNotificationsMessage';
+import { ResetNotificationSettingMessage } from '../../modules/notifications/application/reset-notification-setting/messages/ResetNotificationSettingMessage';
+import { ResetNotificationSetting } from '../../modules/notifications/application/reset-notification-setting/ResetNotificationSetting';
+import { SaveNotificationSettingMessage } from '../../modules/notifications/application/save-notification-setting/messages/SaveNotificationSettingMessage';
+import { SaveNotificationSetting } from '../../modules/notifications/application/save-notification-setting/SaveNotificationSetting';
 import { UpdateNotificationMessage } from '../../modules/notifications/application/update-notification/messages/UpdateNotificationMessage';
 import { UpdateNotification } from '../../modules/notifications/application/update-notification/UpdateNotification';
 import { VotePollMessage } from '../../modules/polls/application/vote-poll/messages/VotePollMessage';
@@ -204,6 +213,8 @@ export class PigeonApplication {
 
   private readonly listNotificationsUseCase: ListNotifications;
 
+  private readonly listNotificationSettingsUseCase: ListNotificationSettings;
+
   private readonly listPeersUseCase: ListPeers;
 
   private readonly listStickerPacksUseCase: ListStickerPacks;
@@ -227,6 +238,10 @@ export class PigeonApplication {
   private readonly votePollUseCase: VotePoll;
 
   private readonly updateNotificationUseCase: UpdateNotification;
+
+  private readonly resetNotificationSettingUseCase: ResetNotificationSetting;
+
+  private readonly saveNotificationSettingUseCase: SaveNotificationSetting;
 
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
@@ -261,6 +276,10 @@ export class PigeonApplication {
       remove: async (networkId, session) =>
         await gateway.removeNetwork(networkId.toString(), session),
     });
+    this.listNotificationSettingsUseCase = new ListNotificationSettings({
+      listNotificationSettings: async (session) =>
+        await gateway.listNotificationSettings(session),
+    });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
     this.listNotificationsUseCase = new ListNotifications(gateway);
@@ -294,6 +313,14 @@ export class PigeonApplication {
         ),
     });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
+    this.resetNotificationSettingUseCase = new ResetNotificationSetting({
+      resetNotificationSetting: async (session, scope) =>
+        await gateway.resetNotificationSetting(session, scope),
+    });
+    this.saveNotificationSettingUseCase = new SaveNotificationSetting({
+      saveNotificationSetting: async (session, setting) =>
+        await gateway.saveNotificationSetting(session, setting),
+    });
     this.sendMessageUseCase = new SendMessage(gateway);
     this.votePollUseCase = new VotePoll({
       vote: async (message) =>
@@ -1376,6 +1403,14 @@ export class PigeonApplication {
     );
   }
 
+  public async listNotificationSettings(
+    session: Session,
+  ): Promise<NotificationScopeSetting[]> {
+    return await this.listNotificationSettingsUseCase.list(
+      new ListNotificationSettingsMessage(session),
+    );
+  }
+
   public async listPeers(): Promise<Peer[]> {
     return await this.listPeersUseCase.list(new ListPeersMessage());
   }
@@ -1543,6 +1578,24 @@ export class PigeonApplication {
         session,
         state,
       }),
+    );
+  }
+
+  public async saveNotificationSetting(
+    session: Session,
+    setting: NotificationScopeSettingInput,
+  ): Promise<NotificationScopeSetting> {
+    return await this.saveNotificationSettingUseCase.save(
+      new SaveNotificationSettingMessage({ session, setting }),
+    );
+  }
+
+  public async resetNotificationSetting(
+    session: Session,
+    scope: NotificationSettingScope,
+  ): Promise<void> {
+    await this.resetNotificationSettingUseCase.reset(
+      new ResetNotificationSettingMessage({ scope, session }),
     );
   }
 }

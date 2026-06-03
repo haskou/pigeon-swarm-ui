@@ -13,6 +13,7 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  NotificationScopeSetting,
   PollResource,
   Session,
   StickerMessageReference,
@@ -131,11 +132,18 @@ interface ChatColumnProps {
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onOpenPins: () => void;
+  notificationSetting: NotificationScopeSetting;
   onCreate: () => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
     identity?: IdentityResource,
   ) => Promise<void>;
+  onNotificationSettingsOpen: (input: {
+    scope: NotificationScopeSetting['scope'];
+    subtitle?: string;
+    title: string;
+  }) => void;
+  onNotificationMuteToggle: (scope: NotificationScopeSetting['scope']) => void;
   onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';
@@ -175,6 +183,7 @@ export function ChatColumn({
   messageState,
   newMessageCount,
   nodeNetworks,
+  notificationSetting,
   onCancelReply,
   onCancelEdit,
   onConversationKeyImported,
@@ -188,6 +197,8 @@ export function ChatColumn({
   onOpenPins,
   onOpenSidebar,
   onReactionToggle,
+  onNotificationSettingsOpen,
+  onNotificationMuteToggle,
   onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
@@ -645,6 +656,7 @@ export function ChatColumn({
             canShareConversationKey={canShareConversationKey}
             hasConversationKey={hasConversationKey}
             isGroupConversation={isGroupConversation}
+            notificationSetting={notificationSetting}
             onClose={() => setConversationMenuOpen(false)}
             onConversationDataOpen={() => setConversationDataOpen(true)}
             onConversationKeyOpen={() => {
@@ -659,6 +671,16 @@ export function ChatColumn({
               setGroupInviteError(null);
               setGroupInviteOpen(true);
             }}
+            onNotificationMuteToggle={() =>
+              onNotificationMuteToggle(notificationSetting.scope)
+            }
+            onNotificationSettingsOpen={() =>
+              onNotificationSettingsOpen({
+                scope: notificationSetting.scope,
+                subtitle: conversationNetworkName,
+                title: activeConversationTitle ?? activeConversation.id,
+              })
+            }
             onOpenPins={onOpenPins}
             onStartCall={onStartCall}
           />

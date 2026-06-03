@@ -55,6 +55,9 @@ import type {
   MessageResource,
   MyStickersResource,
   NotificationResource,
+  NotificationScopeSetting,
+  NotificationScopeSettingInput,
+  NotificationSettingScope,
   PendingMessageAttachment,
   PrivateFileContent,
   PrivateFileUpload,
@@ -1651,6 +1654,26 @@ export class PigeonApiGateway {
     session: Session,
   ): Promise<NotificationResource[]> {
     return await this.notifications.list(session);
+  }
+
+  public async listNotificationSettings(
+    session: Session,
+  ): Promise<NotificationScopeSetting[]> {
+    return await this.notifications.listSettings(session);
+  }
+
+  public async saveNotificationSetting(
+    session: Session,
+    setting: NotificationScopeSettingInput,
+  ): Promise<NotificationScopeSetting> {
+    return await this.notifications.saveSetting(session, setting);
+  }
+
+  public async resetNotificationSetting(
+    session: Session,
+    scope: NotificationSettingScope,
+  ): Promise<void> {
+    await this.notifications.resetSetting(session, scope);
   }
 
   public async createLinkPreview(

@@ -42,6 +42,7 @@ type UseCommunityChannelRealtimeInput = {
   scrollChannelToBottom: (behavior?: ScrollBehavior, keepPinned?: boolean) => void;
   selectedChannelId: null | string;
   session: Session;
+  shouldCountNewChannelMessage: (channelId: string) => boolean;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   upsertPoll: (poll: PollResource) => void;
 };
@@ -67,6 +68,7 @@ export function useCommunityChannelRealtime({
   scrollChannelToBottom,
   selectedChannelId,
   session,
+  shouldCountNewChannelMessage,
   setMessages,
   upsertPoll,
 }: UseCommunityChannelRealtimeInput) {
@@ -214,7 +216,7 @@ export function useCommunityChannelRealtime({
             resetNewChannelMessageCount();
             onChannelViewed?.(channelId);
             scrollChannelToBottom('smooth', true);
-          } else {
+          } else if (shouldCountNewChannelMessage(channelId)) {
             incrementNewChannelMessageCount();
           }
         })
@@ -251,7 +253,7 @@ export function useCommunityChannelRealtime({
           resetNewChannelMessageCount();
           onChannelViewed?.(channelId);
           scrollChannelToBottom('smooth', true);
-        } else {
+        } else if (shouldCountNewChannelMessage(channelId)) {
           incrementNewChannelMessageCount();
         }
       })

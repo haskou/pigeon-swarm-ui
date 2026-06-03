@@ -12,6 +12,8 @@ import type {
   CommunityMembershipRequest,
   ConversationResource,
   IdentityResource,
+  NotificationScopeSetting,
+  NotificationScopeSettingInput,
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -26,6 +28,7 @@ import {
   MessageContextMenu,
   type MessageContextMenuState,
 } from './messageContextMenu';
+import type { NotificationScopeSettingsTarget } from '../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog';
 
 const CommunityDiscoveryDialog = lazy(() =>
   import('../../../../modules/communities/presentation/components/CommunityDiscoveryDialog').then(
@@ -64,6 +67,13 @@ const NotificationsPanel = lazy(() =>
   import('../../../../modules/notifications/presentation/components/NotificationsPanel').then(
     (module) => ({
       default: module.NotificationsPanel,
+    }),
+  ),
+);
+const NotificationScopeSettingsDialog = lazy(() =>
+  import('../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog').then(
+    (module) => ({
+      default: module.NotificationScopeSettingsDialog,
     }),
   ),
 );
@@ -107,6 +117,9 @@ interface WorkspaceDialogsProps {
   nodeSettingsOpen: boolean;
   notificationAction: 'accept' | 'archive' | 'decline' | 'refresh' | null;
   notificationError: string | null;
+  notificationSettingsError: null | string;
+  notificationSettingsSetting: NotificationScopeSetting | null;
+  notificationSettingsTarget: NotificationScopeSettingsTarget | null;
   notificationsOpen: boolean;
   peers: Peer[];
   rawMessage: ChatMessage | null;
@@ -122,6 +135,7 @@ interface WorkspaceDialogsProps {
   onCloseMessageContextMenu: () => void;
   onCloseNodeSettings: () => void;
   onCloseNotifications: () => void;
+  onCloseNotificationSettings: () => void;
   onCloseRawMessage: () => void;
   onCloseRealtimeEvents: () => void;
   onCommunityCreated: (input: {
@@ -137,6 +151,10 @@ interface WorkspaceDialogsProps {
   onDeclineMembershipRequest: (requestId: string) => void;
   onAcceptMembershipRequest: (requestId: string) => void;
   onDeclineNotification: (notificationId: string) => void;
+  onNotificationSettingReset: (
+    scope: NotificationScopeSettingsTarget['scope'],
+  ) => void;
+  onNotificationSettingSave: (setting: NotificationScopeSettingInput) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
@@ -172,6 +190,7 @@ export function WorkspaceDialogs(props: WorkspaceDialogsProps): ReactElement {
         onCommunityEntryModeChange={setCommunityEntryMode}
       />
       <WorkspaceNotificationDialog {...props} />
+      <NotificationSettingsOverlay {...props} />
       <NodeSettingsOverlay {...props} />
       <RealtimeEventsOverlay {...props} />
       <IncomingCallOverlay {...props} />
@@ -413,6 +432,27 @@ function WorkspaceNotificationDialog(
         onClose={props.onCloseNotifications}
         onDeclineMembershipRequest={props.onDeclineMembershipRequest}
         onDecline={props.onDeclineNotification}
+      />
+    </Suspense>
+  );
+}
+
+function NotificationSettingsOverlay(
+  props: WorkspaceDialogsProps,
+): ReactElement | null {
+  if (!props.notificationSettingsTarget || !props.notificationSettingsSetting) {
+    return null;
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <NotificationScopeSettingsDialog
+        error={props.notificationSettingsError}
+        onClose={props.onCloseNotificationSettings}
+        onReset={props.onNotificationSettingReset}
+        onSave={props.onNotificationSettingSave}
+        setting={props.notificationSettingsSetting}
+        target={props.notificationSettingsTarget}
       />
     </Suspense>
   );

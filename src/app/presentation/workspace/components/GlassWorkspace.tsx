@@ -31,6 +31,11 @@ import type {
   ConversationResource,
   IdentityResource,
   MessageResource,
+  NotificationMentionContext,
+  NotificationScopeSetting,
+  NotificationScopeSettingInput,
+  NotificationSettingMap,
+  NotificationSettingScope,
   PollResource,
   Session,
   StickerMessageReference,
@@ -45,6 +50,7 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { PendingMessageAttachments } from '../../../../modules/attachments/domain/PendingMessageAttachments';
+import { CommunityAccessPolicy } from '../../../../modules/communities/domain/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../modules/communities/domain/CommunityChannels';
 import { ConversationKeychain } from '../../../../modules/conversations/domain/ConversationKeychain';
 import { ConversationTimeline } from '../../../../modules/conversations/domain/ConversationTimeline';
@@ -85,6 +91,8 @@ import {
 } from '../../../../modules/notifications/infrastructure/browser/pwaNotifications';
 import { useNotifications } from '../../../../modules/notifications/presentation/hooks/useNotifications';
 import { useNotificationCommunityPreviews } from '../../../../modules/notifications/presentation/hooks/useNotificationCommunityPreviews';
+import { NotificationSettingsPolicy } from '../../../../modules/notifications/domain/NotificationSettingsPolicy';
+import type { NotificationScopeSettingsTarget } from '../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
@@ -190,6 +198,28 @@ function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
 }
 
+function stringArrayAttribute(
+  event: RealtimeDomainEvent,
+  ...names: string[]
+): string[] {
+  for (const name of names) {
+    const value = event.attributes[name];
+
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === 'string');
+    }
+  }
+
+  return [];
+}
+
+function booleanAttribute(
+  event: RealtimeDomainEvent,
+  ...names: string[]
+): boolean {
+  return names.some((name) => event.attributes[name] === true);
+}
+
 function mergeConversationMessageIfTargetExists(
   currentMessages: ChatMessage[],
   incomingMessage: ChatMessage,
@@ -265,6 +295,52 @@ function canActOnMembershipRequest(
       community.id === request.communityId &&
       community.ownerIdentityId === currentIdentityId,
   );
+}
+
+function notificationMentionContext(input: {
+  currentIdentityId: string;
+  currentRoleIds?: string[];
+  event: RealtimeDomainEvent;
+  message?: MessageResource;
+}): NotificationMentionContext {
+  const mentions = input.message?.mentions ?? [];
+  const mentionedIdentityIds = [
+    ...stringArrayAttribute(
+      input.event,
+      'mentionedIdentityIds',
+      'mentioned_identity_ids',
+    ),
+    ...mentions
+      .filter((mention) => mention.type === 'identity')
+      .map((mention) => mention.targetId),
+  ];
+  const mentionedRoleIds = [
+    ...stringArrayAttribute(input.event, 'mentionedRoleIds', 'mentioned_role_ids'),
+    ...mentions
+      .filter((mention) => mention.type === 'role')
+      .map((mention) => mention.targetId),
+  ];
+
+  return {
+    currentIdentityId: input.currentIdentityId,
+    currentRoleIds: input.currentRoleIds,
+    mentionedIdentityIds,
+    mentionedRoleIds,
+    mentionedRoleMemberIds: stringArrayAttribute(
+      input.event,
+      'mentionedRoleMemberIds',
+      'mentioned_role_member_ids',
+    ),
+    mentionsEveryoneOrHere:
+      booleanAttribute(
+        input.event,
+        'mentionsEveryoneOrHere',
+        'mentions_everyone_or_here',
+      ) ||
+      mentions.some(
+        (mention) => mention.type === 'everyone' || mention.type === 'here',
+      ),
+  };
 }
 
 interface GlassWorkspaceProps {
@@ -369,6 +445,13 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationSettingsByScopeKey, setNotificationSettingsByScopeKey] =
+    useState<NotificationSettingMap>({});
+  const [notificationSettingsError, setNotificationSettingsError] = useState<
+    string | null
+  >(null);
+  const [notificationSettingsTarget, setNotificationSettingsTarget] =
+    useState<NotificationScopeSettingsTarget | null>(null);
   const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
     string[]
   >(() => seenCommunityMembershipRequests.get(session.identity.id));
@@ -409,6 +492,7 @@ export function GlassWorkspace({
   );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
+  const notificationSettingsRef = useRef<NotificationSettingMap>({});
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
@@ -438,6 +522,34 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    notificationSettingsRef.current = notificationSettingsByScopeKey;
+  }, [notificationSettingsByScopeKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void applicationContainer
+      .listNotificationSettings(session)
+      .then((settings) => {
+        if (cancelled) return;
+
+        setNotificationSettingsError(null);
+        setNotificationSettingsByScopeKey(
+          NotificationSettingsPolicy.map(settings),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNotificationSettingsError(copy.notifications.settingsError);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
 
   useEffect(() => {
@@ -537,6 +649,73 @@ export function GlassWorkspace({
     setNotificationsOpen(false);
   }, [suppressMessageLoadsBriefly]);
 
+  const saveNotificationSetting = useCallback(
+    (setting: NotificationScopeSettingInput) => {
+      const optimistic = NotificationSettingsPolicy.normalize(setting);
+      const key = NotificationSettingsPolicy.key(optimistic.scope);
+
+      setNotificationSettingsError(null);
+      setNotificationSettingsByScopeKey((current) => ({
+        ...current,
+        [key]: optimistic,
+      }));
+
+      void applicationContainer
+        .saveNotificationSetting(session, setting)
+        .then((saved) => {
+          setNotificationSettingsByScopeKey((current) => ({
+            ...current,
+            [NotificationSettingsPolicy.key(saved.scope)]:
+              NotificationSettingsPolicy.normalize(saved),
+          }));
+        })
+        .catch(() => {
+          setNotificationSettingsError(copy.notifications.settingsError);
+        });
+    },
+    [session],
+  );
+
+  const resetNotificationSetting = useCallback(
+    (scope: NotificationSettingScope) => {
+      const key = NotificationSettingsPolicy.key(scope);
+
+      setNotificationSettingsError(null);
+      setNotificationSettingsByScopeKey((current) => {
+        const next = { ...current };
+
+        delete next[key];
+
+        return next;
+      });
+
+      void applicationContainer
+        .resetNotificationSetting(session, scope)
+        .catch(() => {
+          setNotificationSettingsError(copy.notifications.settingsError);
+        });
+    },
+    [session],
+  );
+
+  const toggleNotificationMute = useCallback(
+    (scope: NotificationSettingScope) => {
+      const current = NotificationSettingsPolicy.resolve(
+        notificationSettingsByScopeKey,
+        scope,
+      );
+      const muted = NotificationSettingsPolicy.isMuted(current);
+
+      saveNotificationSetting({
+        ...current,
+        mutedUntil: muted ? undefined : null,
+        notificationLevel: muted ? 'all' : 'none',
+        scope,
+      });
+    },
+    [notificationSettingsByScopeKey, saveNotificationSetting],
+  );
+
   const openRealtimeEvents = useCallback(() => {
     setRealtimeEventLog([]);
     setRealtimeEventsOpen(true);
@@ -553,6 +732,26 @@ export function GlassWorkspace({
         (conversation) => conversation.id === activeConversationId,
       ) ?? conversations[0],
     [activeConversationId, conversations],
+  );
+  const activeConversationNotificationScope = useMemo(
+    () =>
+      activeConversation
+        ? ({
+            conversationId: activeConversation.id,
+            type: 'conversation',
+          } satisfies NotificationSettingScope)
+        : null,
+    [activeConversation],
+  );
+  const activeConversationNotificationSetting = useMemo(
+    () =>
+      activeConversationNotificationScope
+        ? NotificationSettingsPolicy.resolve(
+            notificationSettingsByScopeKey,
+            activeConversationNotificationScope,
+          )
+        : NotificationSettingsPolicy.defaults,
+    [activeConversationNotificationScope, notificationSettingsByScopeKey],
   );
   const activeConversationDraft = activeConversation?.id
     ? (drafts[activeConversation.id] ?? '')
@@ -670,17 +869,42 @@ export function GlassWorkspace({
     [],
   );
 
-  const communityUnreadCounts = useMemo(
+  const visibleCommunityUnreadCountsById = useMemo(
     () =>
       Object.fromEntries(
         Object.entries(communityUnreadCountsById).map(
+          ([communityId, channelCounts]) => [
+            communityId,
+            Object.fromEntries(
+              Object.entries(channelCounts).filter(([channelId]) => {
+                const setting = NotificationSettingsPolicy.resolve(
+                  notificationSettingsByScopeKey,
+                  {
+                    channelId,
+                    communityId,
+                    type: 'community_channel',
+                  },
+                );
+
+                return !NotificationSettingsPolicy.isMuted(setting);
+              }),
+            ),
+          ],
+        ),
+      ) as Record<string, Record<string, number>>,
+    [communityUnreadCountsById, notificationSettingsByScopeKey],
+  );
+  const communityUnreadCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(visibleCommunityUnreadCountsById).map(
           ([communityId, channels]) => [
             communityId,
             Object.values(channels).reduce((total, count) => total + count, 0),
           ],
         ),
       ) as Record<string, number>,
-    [communityUnreadCountsById],
+    [visibleCommunityUnreadCountsById],
   );
   const clearCommunityChannelUnread = useCallback(
     (communityId: string, channelId: string) => {
@@ -738,8 +962,25 @@ export function GlassWorkspace({
       [activeConversation.id]: previousDraft,
     }));
   }, [activeConversation?.id, editingMessage?.previousDraft, setDrafts]);
+  const notificationAwareConversations = useMemo(
+    () =>
+      conversations.map((conversation) => {
+        const setting = NotificationSettingsPolicy.resolve(
+          notificationSettingsByScopeKey,
+          {
+            conversationId: conversation.id,
+            type: 'conversation',
+          },
+        );
+
+        return NotificationSettingsPolicy.isMuted(setting)
+          ? { ...conversation, unreadCount: 0 }
+          : conversation;
+      }),
+    [conversations, notificationSettingsByScopeKey],
+  );
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
-    useUnreadMessages(conversations);
+    useUnreadMessages(notificationAwareConversations);
   const unreadMessageCount = useMemo(
     () =>
       conversationsWithUnread.reduce(
@@ -2919,7 +3160,17 @@ export function GlassWorkspace({
           markConversationReadUntil(conversationId, [message]);
           if (!isThreadReply) scrollMessagesToBottom('smooth', true);
         } else if (!isEditMessage && !isThreadReply) {
-          setNewMessageCount((current) => current + 1);
+          const setting = NotificationSettingsPolicy.resolve(
+            notificationSettingsRef.current,
+            {
+              conversationId,
+              type: 'conversation',
+            },
+          );
+
+          if (!NotificationSettingsPolicy.isMuted(setting)) {
+            setNewMessageCount((current) => current + 1);
+          }
         }
       } catch (caught) {
         setSendError(
@@ -3131,6 +3382,36 @@ export function GlassWorkspace({
         const channelId = stringAttribute(event, 'channelId');
         const authorIdentityId = stringAttribute(event, 'authorIdentityId');
         const pageVisible = isBrowserPageVisible();
+        const eventCommunity = communityId
+          ? communities.find((community) => community.id === communityId)
+          : undefined;
+        const notificationSetting =
+          communityId && channelId
+            ? NotificationSettingsPolicy.resolve(
+                notificationSettingsRef.current,
+                {
+                  channelId,
+                  communityId,
+                  type: 'community_channel',
+                },
+              )
+            : null;
+        const notificationAllowed =
+          notificationSetting && eventCommunity
+            ? NotificationSettingsPolicy.shouldNotify(
+                notificationSetting,
+                notificationMentionContext({
+                  currentIdentityId: session.identity.id,
+                  currentRoleIds: [
+                    ...CommunityAccessPolicy.assignedRoleIdsFor(
+                      eventCommunity,
+                      session.identity.id,
+                    ),
+                  ],
+                  event,
+                }),
+              )
+            : false;
         const isActiveChannel =
           pageVisible &&
           workspaceMode === 'community' &&
@@ -3141,6 +3422,7 @@ export function GlassWorkspace({
           communityId &&
           channelId &&
           !isActiveChannel &&
+          notificationAllowed &&
           authorIdentityId !== session.identity.id
         ) {
           const preview = communityNotificationPreview(
@@ -3353,6 +3635,25 @@ export function GlassWorkspace({
           conversationId === activeConversation?.id;
         const isActiveConversation =
           isSelectedConversation && isBrowserPageVisible();
+        const notificationSetting = conversationId
+          ? NotificationSettingsPolicy.resolve(
+              notificationSettingsRef.current,
+              {
+                conversationId,
+                type: 'conversation',
+              },
+            )
+          : null;
+        const notificationAllowed = notificationSetting
+          ? NotificationSettingsPolicy.shouldNotify(
+              notificationSetting,
+              notificationMentionContext({
+                currentIdentityId: session.identity.id,
+                event,
+                message: timelineMessage,
+              }),
+            )
+          : false;
 
         if ((!messageId && !timelineMessage) || !conversationId) return;
 
@@ -3369,6 +3670,7 @@ export function GlassWorkspace({
           !isReactionEvent &&
           !isEditEvent &&
           !isPinEvent &&
+          notificationAllowed &&
           authorId !== session.identity.id &&
           timelineMessage?.actorIdentityId !== session.identity.id
         ) {
@@ -3665,6 +3967,16 @@ export function GlassWorkspace({
     },
     [activeCommunity?.id, sendTyping],
   );
+  const notificationSettingsSetting = useMemo(
+    () =>
+      notificationSettingsTarget
+        ? NotificationSettingsPolicy.resolve(
+            notificationSettingsByScopeKey,
+            notificationSettingsTarget.scope,
+          )
+        : null,
+    [notificationSettingsByScopeKey, notificationSettingsTarget],
+  );
   const hasWorkspaceDialogOpen =
     inspectorOpen ||
     isCreateCommunityOpen ||
@@ -3673,6 +3985,7 @@ export function GlassWorkspace({
     !!messageCollection ||
     !!messageContextMenu ||
     nodeSettingsOpen ||
+    !!notificationSettingsTarget ||
     notificationsOpen ||
     !!rawMessage ||
     realtimeEventsOpen;
@@ -3873,6 +4186,7 @@ export function GlassWorkspace({
                   messageState={messageState}
                   newMessageCount={newMessageCount}
                   nodeNetworks={nodeNetworks}
+                  notificationSetting={activeConversationNotificationSetting}
                   pinnedMessageIds={pinnedMessageIds}
                   sendError={sendError}
                   scrollerRef={scrollerRef}
@@ -3898,6 +4212,8 @@ export function GlassWorkspace({
                   }
                   onOpenPins={() => void openPinnedMessages()}
                   onOpenSidebar={() => setSidebarOpen(true)}
+                  onNotificationMuteToggle={toggleNotificationMute}
+                  onNotificationSettingsOpen={setNotificationSettingsTarget}
                   onCreate={() => setIsCreateOpen(true)}
                   onOpenConversationWithIdentity={(identityId, identity) =>
                     openOrCreateConversationWithIdentity(
@@ -3935,9 +4251,10 @@ export function GlassWorkspace({
             <CommunityWorkspace
               activeChannelId={activeCommunityChannelId}
               channelUnreadCounts={
-                communityUnreadCountsById[activeCommunity.id] ?? {}
+                visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}
               }
               community={activeCommunity}
+              notificationSettingsByScopeKey={notificationSettingsByScopeKey}
               mobileMembersOpen={communityMembersOpen}
               mobileSidebarOpen={sidebarOpen}
               mobileRail={
@@ -4011,6 +4328,8 @@ export function GlassWorkspace({
               onLogout={logout}
               onMobileSidebarClose={() => setSidebarOpen(false)}
               onMobileMembersClose={() => setCommunityMembersOpen(false)}
+              onNotificationMuteToggle={toggleNotificationMute}
+              onNotificationSettingsOpen={setNotificationSettingsTarget}
               onOpenMobileSidebar={() => setSidebarOpen(true)}
               onOpenConversationWithIdentity={(identityId, identity) =>
                 openOrCreateConversationWithIdentity(
@@ -4102,6 +4421,9 @@ export function GlassWorkspace({
             nodeSettingsOpen={nodeSettingsOpen}
             notificationAction={notificationAction}
             notificationError={notificationError}
+            notificationSettingsError={notificationSettingsError}
+            notificationSettingsSetting={notificationSettingsSetting}
+            notificationSettingsTarget={notificationSettingsTarget}
             notificationsOpen={notificationsOpen}
             peers={peers}
             rawMessage={rawMessage}
@@ -4118,6 +4440,10 @@ export function GlassWorkspace({
             onCloseInspector={() => setInspectorOpen(false)}
             onCloseMessageContextMenu={() => setMessageContextMenu(null)}
             onCloseNodeSettings={() => setNodeSettingsOpen(false)}
+            onCloseNotificationSettings={() => {
+              setNotificationSettingsError(null);
+              setNotificationSettingsTarget(null);
+            }}
             onCloseNotifications={closeNotificationsPanel}
             onCloseRawMessage={() => setRawMessage(null)}
             onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
@@ -4168,6 +4494,8 @@ export function GlassWorkspace({
             onDeclineNotification={(notificationId) =>
               void declineNotification(notificationId)
             }
+            onNotificationSettingReset={resetNotificationSetting}
+            onNotificationSettingSave={saveNotificationSetting}
             onDeleteMessage={(message) =>
               void (messageContextMenu?.source === 'thread'
                 ? handleDeleteConversationThreadMessage(message)

@@ -5,5 +5,6 @@ export type * from '../../modules/identities/domain/identityResources.types';
 export type * from '../../modules/messages/domain/messageResources.types';
 export type * from '../../modules/networks/domain/networkResources.types';
 export type * from '../../modules/notifications/domain/notificationResources.types';
+export type * from '../../modules/notifications/domain/notificationSettings.types';
 export type * from '../../modules/polls/domain/pollResources.types';
 export type * from '../../modules/stickers/domain/stickerResources.types';
