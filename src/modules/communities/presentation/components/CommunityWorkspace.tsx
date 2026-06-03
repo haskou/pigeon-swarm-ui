@@ -27,6 +27,8 @@ import type {
   IdentityPresence,
   IdentityResource,
   MessageResource,
+  NotificationSettingMap,
+  NotificationSettingScope,
   PollResource,
   SelectablePresenceStatus,
   Session,
@@ -39,6 +41,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { CommunityChannels } from '../../domain/CommunityChannels';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
@@ -74,6 +77,7 @@ import {
   CommunityWorkspaceDialogs,
   type CommunityProfileView,
 } from './CommunityWorkspaceDialogs';
+import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
 import {
   CommunityMentionPanel,
   type CommunityMentionSuggestion,
@@ -105,6 +109,7 @@ interface CommunityWorkspaceProps {
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
+  notificationSettingsByScopeKey: NotificationSettingMap;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
     identityId: string,
@@ -129,6 +134,10 @@ interface CommunityWorkspaceProps {
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
+  onNotificationSettingsOpen: (
+    target: NotificationScopeSettingsTarget,
+  ) => void;
+  onNotificationMuteToggle: (scope: NotificationSettingScope) => void;
   onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
@@ -171,6 +180,7 @@ export function CommunityWorkspace({
   mobileRail,
   mobileSidebarOpen,
   nodeNetworks,
+  notificationSettingsByScopeKey,
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
@@ -189,6 +199,8 @@ export function CommunityWorkspace({
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
+  onNotificationSettingsOpen,
+  onNotificationMuteToggle,
   onOpenConversationWithIdentity,
   onOpenMobileSidebar,
   onPresenceChange,
@@ -218,6 +230,38 @@ export function CommunityWorkspace({
     () =>
       CommunityAccessPolicy.assignedRoleIdsFor(community, session.identity.id),
     [community, session.identity.id],
+  );
+  const communityNotificationScope = useMemo(
+    () =>
+      ({
+        communityId: community.id,
+        type: 'community',
+      }) satisfies NotificationSettingScope,
+    [community.id],
+  );
+  const communityNotificationSetting = useMemo(
+    () =>
+      NotificationSettingsPolicy.resolve(
+        notificationSettingsByScopeKey,
+        communityNotificationScope,
+      ),
+    [communityNotificationScope, notificationSettingsByScopeKey],
+  );
+  const channelNotificationScope = useCallback(
+    (channelId: string): NotificationSettingScope => ({
+      channelId,
+      communityId: community.id,
+      type: 'community_channel',
+    }),
+    [community.id],
+  );
+  const channelNotificationSetting = useCallback(
+    (channel: { id: string }) =>
+      NotificationSettingsPolicy.resolve(
+        notificationSettingsByScopeKey,
+        channelNotificationScope(channel.id),
+      ),
+    [channelNotificationScope, notificationSettingsByScopeKey],
   );
   const accessibleTextChannels = useMemo(
     () =>
@@ -855,10 +899,40 @@ export function CommunityWorkspace({
       : null;
   const visibleTextChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
-    const accessibleChannels = accessibleTextChannels.map(
+    const accessibleChannels = accessibleTextChannels
+      .map(
+        (channel) =>
+          textChannelsWithThreads.find((item) => item.id === channel.id) ??
+          channel,
+      )
+      .filter(
+        (channel) =>
+          channel.id === selectedChannelId ||
+          !NotificationSettingsPolicy.shouldHide(
+            channelNotificationSetting(channel),
+          ),
+      );
+
+    if (!query) return accessibleChannels;
+
+    return accessibleChannels.filter((channel) =>
+      channel.name.toLowerCase().includes(query),
+    );
+  }, [
+    accessibleTextChannels,
+    channelNotificationSetting,
+    channelSearch,
+    selectedChannelId,
+    textChannelsWithThreads,
+  ]);
+  const visibleVoiceChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+    const accessibleChannels = accessibleVoiceChannels.filter(
       (channel) =>
-        textChannelsWithThreads.find((item) => item.id === channel.id) ??
-        channel,
+        channel.id === activeVoiceChannelId ||
+        !NotificationSettingsPolicy.shouldHide(
+          channelNotificationSetting(channel),
+        ),
     );
 
     if (!query) return accessibleChannels;
@@ -866,16 +940,12 @@ export function CommunityWorkspace({
     return accessibleChannels.filter((channel) =>
       channel.name.toLowerCase().includes(query),
     );
-  }, [accessibleTextChannels, channelSearch, textChannelsWithThreads]);
-  const visibleVoiceChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-
-    if (!query) return accessibleVoiceChannels;
-
-    return accessibleVoiceChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [accessibleVoiceChannels, channelSearch]);
+  }, [
+    accessibleVoiceChannels,
+    activeVoiceChannelId,
+    channelNotificationSetting,
+    channelSearch,
+  ]);
   const historicalIdentityIds = useMemo(
     () =>
       communityMessageIdentityIds({
@@ -1759,6 +1829,13 @@ export function CommunityWorkspace({
       current ? removeCommunityThreadMessage(current, messageId) : current,
     );
   }, []);
+  const shouldCountNewChannelMessage = useCallback(
+    (channelId: string) =>
+      !NotificationSettingsPolicy.isMuted(
+        channelNotificationSetting({ id: channelId }),
+      ),
+    [channelNotificationSetting],
+  );
 
   useCommunityChannelRealtime({
     communityId: community.id,
@@ -1775,6 +1852,7 @@ export function CommunityWorkspace({
     scrollChannelToBottom,
     selectedChannelId,
     session,
+    shouldCountNewChannelMessage,
     setMessages,
     upsertPoll,
   });
@@ -1851,6 +1929,16 @@ export function CommunityWorkspace({
               channelUnreadCounts={channelUnreadCounts}
               onChannelSearchChange={setChannelSearch}
               onTextChannelSelected={handleTextChannelSelected}
+              onTextChannelMuteToggle={(channel) =>
+                onNotificationMuteToggle(channelNotificationScope(channel.id))
+              }
+              onTextChannelNotificationSettingsOpen={(channel) =>
+                onNotificationSettingsOpen({
+                  scope: channelNotificationScope(channel.id),
+                  subtitle: community.name,
+                  title: `# ${channel.name}`,
+                })
+              }
               onThreadSelected={(channel, thread) =>
                 void openMessageThreadFromSummary(channel.id, thread)
               }
@@ -1859,6 +1947,7 @@ export function CommunityWorkspace({
               selectedChannelId={selectedChannelId}
               selectedThreadRootMessageId={threadPanel?.root.id}
               textChannels={textChannelsWithThreads}
+              textChannelNotificationSetting={channelNotificationSetting}
               threadLabelByRootMessageId={threadLabelByRootMessageId}
               visibleTextChannels={visibleTextChannels}
               visibleVoiceChannels={visibleVoiceChannels}
@@ -1905,6 +1994,7 @@ export function CommunityWorkspace({
             <CommunityHeaderActionsMenu
               communityLeaving={communityLeaving}
               hasCommunityKey={!!communityKey}
+              notificationSetting={communityNotificationSetting}
               showCommunityKeyAction={!communityIsPublic}
               onClose={() => setCommunityMenuOpen(false)}
               onCommunityDataOpen={() => {
@@ -1922,6 +2012,16 @@ export function CommunityWorkspace({
                 setCommunityMenuOpen(false);
               }}
               onLeaveCommunity={() => void leaveCommunity()}
+              onNotificationMuteToggle={() =>
+                onNotificationMuteToggle(communityNotificationScope)
+              }
+              onNotificationSettingsOpen={() =>
+                onNotificationSettingsOpen({
+                  scope: communityNotificationScope,
+                  subtitle: networkName,
+                  title: community.name,
+                })
+              }
               onOpenPins={
                 selectedChannel ? () => void openPinnedMessages() : undefined
               }

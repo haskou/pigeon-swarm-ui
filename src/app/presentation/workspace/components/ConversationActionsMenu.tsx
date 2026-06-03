@@ -1,5 +1,10 @@
 import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ConversationResource,
+  NotificationScopeSetting,
+} from '../../../../shared/domain/pigeonResources.types';
+
+import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
@@ -11,9 +16,12 @@ interface ConversationActionsMenuProps {
   canShareConversationKey: boolean;
   hasConversationKey: boolean;
   isGroupConversation: boolean;
+  notificationSetting: NotificationScopeSetting;
   onClose: () => void;
   onConversationDataOpen: () => void;
   onConversationKeyOpen: () => void;
+  onNotificationSettingsOpen: () => void;
+  onNotificationMuteToggle: () => void;
   onGroupInviteOpen: () => void;
   onOpenPins: () => void;
   onStartCall?: (input: {
@@ -32,9 +40,12 @@ export function ConversationActionsMenu({
   canShareConversationKey,
   hasConversationKey,
   isGroupConversation,
+  notificationSetting,
   onClose,
   onConversationDataOpen,
   onConversationKeyOpen,
+  onNotificationSettingsOpen,
+  onNotificationMuteToggle,
   onGroupInviteOpen,
   onOpenPins,
   onStartCall,
@@ -80,6 +91,18 @@ export function ConversationActionsMenu({
         >
           {copy.messages.viewPinned}
         </button>
+        <NotificationScopeMenuActions
+          muteLabel={copy.notifications.muteConversation}
+          notificationSetting={notificationSetting}
+          onNotificationMuteToggle={() => {
+            onNotificationMuteToggle();
+            onClose();
+          }}
+          onNotificationSettingsOpen={() => {
+            onNotificationSettingsOpen();
+            onClose();
+          }}
+        />
         <button
           type="button"
           onClick={() => {

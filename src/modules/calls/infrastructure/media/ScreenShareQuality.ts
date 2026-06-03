@@ -12,6 +12,20 @@ const screenShareQualityProfiles: Record<
   ScreenShareQualityPreset,
   ScreenShareQualityProfile
 > = {
+  '720p30': {
+    frameRate: 30,
+    height: 720,
+    maxBitrate: 2_500_000,
+    preset: '720p30',
+    width: 1280,
+  },
+  '720p60': {
+    frameRate: 60,
+    height: 720,
+    maxBitrate: 4_000_000,
+    preset: '720p60',
+    width: 1280,
+  },
   '1080p30': {
     frameRate: 30,
     height: 1080,
@@ -54,20 +68,6 @@ const screenShareQualityProfiles: Record<
     preset: '2160p60',
     width: 3840,
   },
-  '720p30': {
-    frameRate: 30,
-    height: 720,
-    maxBitrate: 2_500_000,
-    preset: '720p30',
-    width: 1280,
-  },
-  '720p60': {
-    frameRate: 60,
-    height: 720,
-    maxBitrate: 4_000_000,
-    preset: '720p60',
-    width: 1280,
-  },
   auto: {
     preset: 'auto',
   },
@@ -86,14 +86,14 @@ export const screenShareQualityPresets: ScreenShareQualityPreset[] = [
 ];
 
 const screenShareQualityLabels: Record<ScreenShareQualityPreset, string> = {
+  '720p30': '720p 30fps',
+  '720p60': '720p 60fps',
   '1080p30': '1080p 30fps',
   '1080p60': '1080p 60fps',
   '1440p30': '2K 30fps',
   '1440p60': '2K 60fps',
   '2160p30': '4K 30fps',
   '2160p60': '4K 60fps',
-  '720p30': '720p 30fps',
-  '720p60': '720p 60fps',
   auto: 'Auto',
 };
 

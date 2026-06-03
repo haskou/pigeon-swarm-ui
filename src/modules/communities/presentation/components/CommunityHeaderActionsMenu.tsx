@@ -1,29 +1,38 @@
 import type { ReactNode } from 'react';
 
+import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
+
+import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 
 type CommunityHeaderActionsMenuProps = {
   communityLeaving: boolean;
   hasCommunityKey: boolean;
+  notificationSetting: NotificationScopeSetting;
   open: boolean;
   showCommunityKeyAction?: boolean;
   onClose: () => void;
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
+  onNotificationSettingsOpen: () => void;
+  onNotificationMuteToggle: () => void;
   onOpenPins?: () => void;
 };
 
 export function CommunityHeaderActionsMenu({
   communityLeaving,
   hasCommunityKey,
+  notificationSetting,
   open,
   showCommunityKeyAction = true,
   onClose,
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
+  onNotificationSettingsOpen,
+  onNotificationMuteToggle,
   onOpenPins,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   useCloseOnEscape(onClose, open);
@@ -51,6 +60,18 @@ export function CommunityHeaderActionsMenu({
             {copy.messages.viewPinned}
           </button>
         ) : null}
+        <NotificationScopeMenuActions
+          muteLabel={copy.notifications.muteCommunity}
+          notificationSetting={notificationSetting}
+          onNotificationMuteToggle={() => {
+            onNotificationMuteToggle();
+            onClose();
+          }}
+          onNotificationSettingsOpen={() => {
+            onNotificationSettingsOpen();
+            onClose();
+          }}
+        />
         <button
           type="button"
           onClick={onCommunityDataOpen}
