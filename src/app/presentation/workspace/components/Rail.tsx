@@ -179,7 +179,7 @@ export function Rail({
                 }}
                 title={community.name}
                 className={cx(
-                  'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition hover:bg-white/15',
+                  'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition',
                   activeCommunityId === community.id && 'bg-white/15',
                   notificationsMuted && 'opacity-60 saturate-75',
                 )}
