@@ -8,7 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
-import { notificationSettingSummary } from '../../../notifications/presentation/view-models/notificationSettingSummary';
+import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
@@ -49,7 +49,9 @@ export function CommunityChannelList({
     channel: CommunityTextChannel,
     thread: CommunityChannelThreadSummary,
   ) => void;
-  onTextChannelNotificationSettingsOpen: (channel: CommunityTextChannel) => void;
+  onTextChannelNotificationSettingsOpen: (
+    channel: CommunityTextChannel,
+  ) => void;
   onTextChannelMuteToggle: (channel: CommunityTextChannel) => void;
   onVoiceChannelJoin: (channel: CommunityVoiceChannel) => void;
   onVoiceParticipantClick: (
@@ -132,8 +134,7 @@ export function CommunityChannelList({
                           key={thread.rootMessageId}
                           active={
                             selectedChannelId === channel.id &&
-                            selectedThreadRootMessageId ===
-                              thread.rootMessageId
+                            selectedThreadRootMessageId === thread.rootMessageId
                           }
                           label={
                             threadLabelByRootMessageId?.[
@@ -279,7 +280,6 @@ function TextChannelButton({
       </button>
       {menuOpen && (
         <ChannelNotificationMenu
-          muted={muted}
           notificationSetting={notificationSetting}
           onClose={onMenuClose}
           onNotificationSettingsOpen={onNotificationSettingsOpen}
@@ -291,13 +291,11 @@ function TextChannelButton({
 }
 
 function ChannelNotificationMenu({
-  muted,
   notificationSetting,
   onClose,
   onNotificationSettingsOpen,
   onNotificationMuteToggle,
 }: {
-  muted: boolean;
   notificationSetting: NotificationScopeSetting;
   onClose: () => void;
   onNotificationSettingsOpen: () => void;
@@ -312,25 +310,12 @@ function ChannelNotificationMenu({
         aria-label={copy.dialog.close}
       />
       <div className="absolute right-0 top-[calc(100%+.25rem)] z-40 min-w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#1f2029] p-1 text-sm shadow-2xl shadow-black/40">
-        <button
-          type="button"
-          onClick={onNotificationMuteToggle}
-          className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-        >
-          {muted ? copy.notifications.unmute : copy.notifications.mute}
-        </button>
-        <button
-          type="button"
-          onClick={onNotificationSettingsOpen}
-          className="block w-full rounded-2xl px-3 py-2 text-left transition hover:bg-white/10"
-        >
-          <span className="block font-black text-white/80">
-            {copy.notifications.settings}
-          </span>
-          <span className="block text-xs font-bold text-white/40">
-            {notificationSettingSummary(notificationSetting)}
-          </span>
-        </button>
+        <NotificationScopeMenuActions
+          muteLabel={copy.notifications.mute}
+          notificationSetting={notificationSetting}
+          onNotificationMuteToggle={onNotificationMuteToggle}
+          onNotificationSettingsOpen={onNotificationSettingsOpen}
+        />
       </div>
     </>
   );

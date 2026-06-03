@@ -32,9 +32,6 @@ import type {
   IdentityResource,
   MessageResource,
   NotificationMentionContext,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationSettingMap,
   NotificationSettingScope,
   PollResource,
   Session,
@@ -90,9 +87,9 @@ import {
   showPwaNotification,
 } from '../../../../modules/notifications/infrastructure/browser/pwaNotifications';
 import { useNotifications } from '../../../../modules/notifications/presentation/hooks/useNotifications';
+import { useNotificationScopeSettings } from '../../../../modules/notifications/presentation/hooks/useNotificationScopeSettings';
 import { useNotificationCommunityPreviews } from '../../../../modules/notifications/presentation/hooks/useNotificationCommunityPreviews';
 import { NotificationSettingsPolicy } from '../../../../modules/notifications/domain/NotificationSettingsPolicy';
-import type { NotificationScopeSettingsTarget } from '../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
@@ -451,13 +448,6 @@ export function GlassWorkspace({
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationSettingsByScopeKey, setNotificationSettingsByScopeKey] =
-    useState<NotificationSettingMap>({});
-  const [notificationSettingsError, setNotificationSettingsError] = useState<
-    string | null
-  >(null);
-  const [notificationSettingsTarget, setNotificationSettingsTarget] =
-    useState<NotificationScopeSettingsTarget | null>(null);
   const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
     string[]
   >(() => seenCommunityMembershipRequests.get(session.identity.id));
@@ -499,7 +489,6 @@ export function GlassWorkspace({
   );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
-  const notificationSettingsRef = useRef<NotificationSettingMap>({});
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
@@ -522,6 +511,18 @@ export function GlassWorkspace({
     handleWorkspacePointerDown,
     handleWorkspacePointerMove,
   } = useSidebarGesture(sidebarOpen, setSidebarOpen);
+  const {
+    close: closeNotificationSettings,
+    error: notificationSettingsError,
+    open: openNotificationSettings,
+    reset: resetNotificationSetting,
+    save: saveNotificationSetting,
+    setting: notificationSettingsSetting,
+    settingsByScopeKey: notificationSettingsByScopeKey,
+    settingsRef: notificationSettingsRef,
+    target: notificationSettingsTarget,
+    toggleMute: toggleNotificationMute,
+  } = useNotificationScopeSettings({ session });
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -529,34 +530,6 @@ export function GlassWorkspace({
 
   useEffect(() => {
     sessionRef.current = session;
-  }, [session]);
-
-  useEffect(() => {
-    notificationSettingsRef.current = notificationSettingsByScopeKey;
-  }, [notificationSettingsByScopeKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void applicationContainer
-      .listNotificationSettings(session)
-      .then((settings) => {
-        if (cancelled) return;
-
-        setNotificationSettingsError(null);
-        setNotificationSettingsByScopeKey(
-          NotificationSettingsPolicy.map(settings),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNotificationSettingsError(copy.notifications.settingsError);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [session]);
 
   useEffect(() => {
@@ -655,73 +628,6 @@ export function GlassWorkspace({
     suppressMessageLoadsBriefly();
     setNotificationsOpen(false);
   }, [suppressMessageLoadsBriefly]);
-
-  const saveNotificationSetting = useCallback(
-    (setting: NotificationScopeSettingInput) => {
-      const optimistic = NotificationSettingsPolicy.normalize(setting);
-      const key = NotificationSettingsPolicy.key(optimistic.scope);
-
-      setNotificationSettingsError(null);
-      setNotificationSettingsByScopeKey((current) => ({
-        ...current,
-        [key]: optimistic,
-      }));
-
-      void applicationContainer
-        .saveNotificationSetting(session, setting)
-        .then((saved) => {
-          setNotificationSettingsByScopeKey((current) => ({
-            ...current,
-            [NotificationSettingsPolicy.key(saved.scope)]:
-              NotificationSettingsPolicy.normalize(saved),
-          }));
-        })
-        .catch(() => {
-          setNotificationSettingsError(copy.notifications.settingsError);
-        });
-    },
-    [session],
-  );
-
-  const resetNotificationSetting = useCallback(
-    (scope: NotificationSettingScope) => {
-      const key = NotificationSettingsPolicy.key(scope);
-
-      setNotificationSettingsError(null);
-      setNotificationSettingsByScopeKey((current) => {
-        const next = { ...current };
-
-        delete next[key];
-
-        return next;
-      });
-
-      void applicationContainer
-        .resetNotificationSetting(session, scope)
-        .catch(() => {
-          setNotificationSettingsError(copy.notifications.settingsError);
-        });
-    },
-    [session],
-  );
-
-  const toggleNotificationMute = useCallback(
-    (scope: NotificationSettingScope) => {
-      const current = NotificationSettingsPolicy.resolve(
-        notificationSettingsByScopeKey,
-        scope,
-      );
-      const muted = NotificationSettingsPolicy.isMuted(current);
-
-      saveNotificationSetting({
-        ...current,
-        mutedUntil: muted ? undefined : null,
-        notificationLevel: muted ? 'all' : 'none',
-        scope,
-      });
-    },
-    [notificationSettingsByScopeKey, saveNotificationSetting],
-  );
 
   const openRealtimeEvents = useCallback(() => {
     setRealtimeEventLog([]);
@@ -4006,7 +3912,7 @@ export function GlassWorkspace({
         (item) => item.id === community.networkId,
       );
 
-      setNotificationSettingsTarget({
+      openNotificationSettings({
         scope: {
           communityId: community.id,
           type: 'community',
@@ -4015,7 +3921,7 @@ export function GlassWorkspace({
         title: community.name,
       });
     },
-    [nodeNetworks],
+    [nodeNetworks, openNotificationSettings],
   );
   const toggleCommunityNotificationMute = useCallback(
     (community: Community) => {
@@ -4025,16 +3931,6 @@ export function GlassWorkspace({
       });
     },
     [toggleNotificationMute],
-  );
-  const notificationSettingsSetting = useMemo(
-    () =>
-      notificationSettingsTarget
-        ? NotificationSettingsPolicy.resolve(
-            notificationSettingsByScopeKey,
-            notificationSettingsTarget.scope,
-          )
-        : null,
-    [notificationSettingsByScopeKey, notificationSettingsTarget],
   );
   const hasWorkspaceDialogOpen =
     inspectorOpen ||
@@ -4286,7 +4182,7 @@ export function GlassWorkspace({
                   onOpenPins={() => void openPinnedMessages()}
                   onOpenSidebar={() => setSidebarOpen(true)}
                   onNotificationMuteToggle={toggleNotificationMute}
-                  onNotificationSettingsOpen={setNotificationSettingsTarget}
+                  onNotificationSettingsOpen={openNotificationSettings}
                   onCreate={() => setIsCreateOpen(true)}
                   onOpenConversationWithIdentity={(identityId, identity) =>
                     openOrCreateConversationWithIdentity(
@@ -4409,7 +4305,7 @@ export function GlassWorkspace({
               onMobileSidebarClose={() => setSidebarOpen(false)}
               onMobileMembersClose={() => setCommunityMembersOpen(false)}
               onNotificationMuteToggle={toggleNotificationMute}
-              onNotificationSettingsOpen={setNotificationSettingsTarget}
+              onNotificationSettingsOpen={openNotificationSettings}
               onOpenMobileSidebar={() => setSidebarOpen(true)}
               onOpenConversationWithIdentity={(identityId, identity) =>
                 openOrCreateConversationWithIdentity(
@@ -4520,10 +4416,7 @@ export function GlassWorkspace({
             onCloseInspector={() => setInspectorOpen(false)}
             onCloseMessageContextMenu={() => setMessageContextMenu(null)}
             onCloseNodeSettings={() => setNodeSettingsOpen(false)}
-            onCloseNotificationSettings={() => {
-              setNotificationSettingsError(null);
-              setNotificationSettingsTarget(null);
-            }}
+            onCloseNotificationSettings={closeNotificationSettings}
             onCloseNotifications={closeNotificationsPanel}
             onCloseRawMessage={() => setRawMessage(null)}
             onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
