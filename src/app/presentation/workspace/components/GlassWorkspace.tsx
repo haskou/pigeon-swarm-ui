@@ -988,6 +988,21 @@ export function GlassWorkspace({
   );
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
     useUnreadMessages(notificationAwareConversations);
+  useEffect(() => {
+    conversations.forEach((conversation) => {
+      const setting = NotificationSettingsPolicy.resolve(
+        notificationSettingsByScopeKey,
+        {
+          conversationId: conversation.id,
+          type: 'conversation',
+        },
+      );
+
+      if (NotificationSettingsPolicy.isMuted(setting)) {
+        clearUnreadMessages(conversation.id);
+      }
+    });
+  }, [clearUnreadMessages, conversations, notificationSettingsByScopeKey]);
   const unreadMessageCount = useMemo(
     () =>
       conversationsWithUnread.reduce(
