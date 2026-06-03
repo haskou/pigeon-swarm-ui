@@ -31,6 +31,7 @@ interface RailProps {
   messageNotificationCount?: number;
   notificationCount?: number;
   onCommunityClick?: (communityId: string) => void;
+  onCommunityLeave?: (community: Community) => Promise<void> | void;
   onCommunityNotificationMuteToggle?: (community: Community) => void;
   onCommunityNotificationSettingsOpen?: (community: Community) => void;
   onCreateCommunityClick?: () => void;
@@ -52,6 +53,7 @@ export function Rail({
   messageNotificationCount = 0,
   notificationCount = 0,
   onCommunityClick,
+  onCommunityLeave,
   onCommunityNotificationMuteToggle,
   onCommunityNotificationSettingsOpen,
   onCreateCommunityClick,
@@ -72,7 +74,7 @@ export function Rail({
 
   const openCommunityMenu = (communityId: string, target: HTMLElement) => {
     const rect = target.getBoundingClientRect();
-    const menuHeight = 132;
+    const menuHeight = 176;
     const menuWidth = 256;
     const top = Math.max(
       12,
@@ -155,6 +157,8 @@ export function Rail({
             !!notificationSetting &&
             !!openNotificationSettings &&
             !!toggleNotificationMute;
+          const canOpenCommunityMenu =
+            canConfigureNotifications || !!onCommunityLeave;
 
           return (
             <div
@@ -168,7 +172,7 @@ export function Rail({
                 type="button"
                 onClick={() => onCommunityClick?.(community.id)}
                 onContextMenu={(event) => {
-                  if (!canConfigureNotifications) return;
+                  if (!canOpenCommunityMenu) return;
 
                   event.preventDefault();
                   openCommunityMenu(community.id, event.currentTarget);
@@ -185,7 +189,7 @@ export function Rail({
                   <CommunityRailAvatar community={community} />
                 </span>
               </button>
-              {canConfigureNotifications ? (
+              {canOpenCommunityMenu ? (
                 <button
                   type="button"
                   onClick={(event) => {
@@ -206,22 +210,37 @@ export function Rail({
                   ⋯
                 </button>
               ) : null}
-              {canConfigureNotifications &&
-              communityMenu?.communityId === community.id ? (
-                <CommunityRailNotificationMenu
+              {canOpenCommunityMenu && communityMenu?.communityId === community.id ? (
+                <CommunityRailMenu
                   communityName={community.name}
                   left={communityMenu.left}
                   notificationSetting={notificationSetting}
                   top={communityMenu.top}
                   onClose={() => setCommunityMenu(null)}
-                  onNotificationMuteToggle={() => {
-                    toggleNotificationMute(community);
-                    setCommunityMenu(null);
-                  }}
-                  onNotificationSettingsOpen={() => {
-                    openNotificationSettings(community);
-                    setCommunityMenu(null);
-                  }}
+                  onCommunityLeave={
+                    onCommunityLeave
+                      ? () => {
+                          void onCommunityLeave(community);
+                          setCommunityMenu(null);
+                        }
+                      : undefined
+                  }
+                  onNotificationMuteToggle={
+                    canConfigureNotifications
+                      ? () => {
+                          toggleNotificationMute(community);
+                          setCommunityMenu(null);
+                        }
+                      : undefined
+                  }
+                  onNotificationSettingsOpen={
+                    canConfigureNotifications
+                      ? () => {
+                          openNotificationSettings(community);
+                          setCommunityMenu(null);
+                        }
+                      : undefined
+                  }
                 />
               ) : null}
               <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
@@ -363,22 +382,24 @@ interface CommunityMenuState {
   top: number;
 }
 
-function CommunityRailNotificationMenu({
+function CommunityRailMenu({
   communityName,
   left,
   notificationSetting,
   top,
   onClose,
+  onCommunityLeave,
   onNotificationMuteToggle,
   onNotificationSettingsOpen,
 }: {
   communityName: string;
   left: number;
-  notificationSetting: NotificationScopeSetting;
+  notificationSetting?: NotificationScopeSetting;
   top: number;
   onClose: () => void;
-  onNotificationMuteToggle: () => void;
-  onNotificationSettingsOpen: () => void;
+  onCommunityLeave?: () => void;
+  onNotificationMuteToggle?: () => void;
+  onNotificationSettingsOpen?: () => void;
 }) {
   return createPortal(
     <>
@@ -393,13 +414,31 @@ function CommunityRailNotificationMenu({
         style={{ left, top }}
         aria-label={communityName}
       >
-        <NotificationScopeMenuActions
-          muteLabel={copy.notifications.muteCommunity}
-          notificationSetting={notificationSetting}
-          onNotificationMuteToggle={onNotificationMuteToggle}
-          onNotificationSettingsOpen={onNotificationSettingsOpen}
-          variant="compact"
-        />
+        {notificationSetting &&
+        onNotificationMuteToggle &&
+        onNotificationSettingsOpen ? (
+          <NotificationScopeMenuActions
+            muteLabel={copy.notifications.muteCommunity}
+            notificationSetting={notificationSetting}
+            onNotificationMuteToggle={onNotificationMuteToggle}
+            onNotificationSettingsOpen={onNotificationSettingsOpen}
+            variant="compact"
+          />
+        ) : null}
+        {onCommunityLeave ? (
+          <>
+            {notificationSetting ? (
+              <div className="my-1 h-px bg-white/10" />
+            ) : null}
+            <button
+              type="button"
+              onClick={onCommunityLeave}
+              className="block w-full rounded-2xl px-3 py-2 text-left text-sm font-black text-rose-100 transition hover:bg-rose-500/10"
+            >
+              {copy.communities.leave}
+            </button>
+          </>
+        ) : null}
       </section>
     </>,
     document.body,
