@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  NotificationScopeSetting,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { NotificationSettingsPolicy } from '../../../../modules/notifications/domain/NotificationSettingsPolicy';
+import { notificationSettingSummary } from '../../../../modules/notifications/presentation/view-models/notificationSettingSummary';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { publicFileObjectUrl } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import {
   type InstallState,
   useInstallPrompt,
@@ -17,11 +23,16 @@ interface RailProps {
   activeMessages?: boolean;
   className?: string;
   communities?: Community[];
+  communityNotificationSetting?: (
+    community: Community,
+  ) => NotificationScopeSetting;
   communityUnreadCounts?: Record<string, number>;
   activeCommunityId?: null | string;
   messageNotificationCount?: number;
   notificationCount?: number;
   onCommunityClick?: (communityId: string) => void;
+  onCommunityNotificationMuteToggle?: (community: Community) => void;
+  onCommunityNotificationSettingsOpen?: (community: Community) => void;
   onCreateCommunityClick?: () => void;
   onInspectorClick?: () => void;
   onMessagesClick?: () => void;
@@ -36,10 +47,13 @@ export function Rail({
   activeMessages = false,
   className,
   communities = [],
+  communityNotificationSetting,
   communityUnreadCounts = {},
   messageNotificationCount = 0,
   notificationCount = 0,
   onCommunityClick,
+  onCommunityNotificationMuteToggle,
+  onCommunityNotificationSettingsOpen,
   onCreateCommunityClick,
   onInspectorClick,
   onMessagesClick,
@@ -49,7 +63,29 @@ export function Rail({
   settingsAttention = false,
 }: RailProps) {
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  const [communityMenu, setCommunityMenu] = useState<null | CommunityMenuState>(
+    null,
+  );
   const { installState, requestInstall } = useInstallPrompt();
+
+  useCloseOnEscape(() => setCommunityMenu(null), !!communityMenu);
+
+  const openCommunityMenu = (communityId: string, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    const menuHeight = 132;
+    const menuWidth = 256;
+    const top = Math.max(
+      12,
+      Math.min(rect.top, window.innerHeight - menuHeight - 12),
+    );
+    const left = Math.min(rect.right + 8, window.innerWidth - menuWidth - 12);
+
+    setCommunityMenu({
+      communityId,
+      left: Math.max(12, left),
+      top,
+    });
+  };
 
   const handleInstallApp = async () => {
     if (installState === 'fallback') {
@@ -108,31 +144,90 @@ export function Rail({
       </div>
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible">
-        {communities.map((community) => (
-          <div
-            key={community.id}
-            className="relative flex w-full justify-center"
-          >
-            <RailSelectionIndicator
-              active={activeCommunityId === community.id}
-            />
-            <button
-              type="button"
-              onClick={() => onCommunityClick?.(community.id)}
-              title={community.name}
-              className={cx(
-                'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition hover:bg-white/15',
-                activeCommunityId === community.id && 'bg-white/15',
-              )}
-              aria-label={community.name}
+        {communities.map((community) => {
+          const notificationSetting = communityNotificationSetting?.(community);
+          const notificationsMuted = notificationSetting
+            ? NotificationSettingsPolicy.isMuted(notificationSetting)
+            : false;
+          const openNotificationSettings = onCommunityNotificationSettingsOpen;
+          const toggleNotificationMute = onCommunityNotificationMuteToggle;
+          const canConfigureNotifications =
+            !!notificationSetting &&
+            !!openNotificationSettings &&
+            !!toggleNotificationMute;
+
+          return (
+            <div
+              key={community.id}
+              className="group relative flex w-full justify-center"
             >
-              <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
-                <CommunityRailAvatar community={community} />
-              </span>
-            </button>
-            <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
-          </div>
-        ))}
+              <RailSelectionIndicator
+                active={activeCommunityId === community.id}
+              />
+              <button
+                type="button"
+                onClick={() => onCommunityClick?.(community.id)}
+                onContextMenu={(event) => {
+                  if (!canConfigureNotifications) return;
+
+                  event.preventDefault();
+                  openCommunityMenu(community.id, event.currentTarget);
+                }}
+                title={community.name}
+                className={cx(
+                  'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition hover:bg-white/15',
+                  activeCommunityId === community.id && 'bg-white/15',
+                  notificationsMuted && 'opacity-60 saturate-75',
+                )}
+                aria-label={community.name}
+              >
+                <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
+                  <CommunityRailAvatar community={community} />
+                </span>
+              </button>
+              {canConfigureNotifications ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+
+                    if (communityMenu?.communityId === community.id) {
+                      setCommunityMenu(null);
+
+                      return;
+                    }
+
+                    openCommunityMenu(community.id, event.currentTarget);
+                  }}
+                  className="absolute -right-0.5 bottom-0 z-30 grid h-5 w-5 place-items-center rounded-full border border-white/10 bg-[#17192e] text-[0.7rem] font-black leading-none text-white/70 opacity-100 shadow-lg shadow-black/35 transition hover:bg-white/15 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label={copy.notifications.settings}
+                  aria-expanded={communityMenu?.communityId === community.id}
+                >
+                  ⋯
+                </button>
+              ) : null}
+              {canConfigureNotifications &&
+              communityMenu?.communityId === community.id ? (
+                <CommunityRailNotificationMenu
+                  communityName={community.name}
+                  left={communityMenu.left}
+                  notificationSetting={notificationSetting}
+                  top={communityMenu.top}
+                  onClose={() => setCommunityMenu(null)}
+                  onNotificationMuteToggle={() => {
+                    toggleNotificationMute(community);
+                    setCommunityMenu(null);
+                  }}
+                  onNotificationSettingsOpen={() => {
+                    openNotificationSettings(community);
+                    setCommunityMenu(null);
+                  }}
+                />
+              ) : null}
+              <RailBadge count={communityUnreadCounts[community.id] ?? 0} />
+            </div>
+          );
+        })}
         <button
           type="button"
           onClick={onCreateCommunityClick}
@@ -262,6 +357,112 @@ export function Rail({
   );
 }
 
+interface CommunityMenuState {
+  communityId: string;
+  left: number;
+  top: number;
+}
+
+function CommunityRailNotificationMenu({
+  communityName,
+  left,
+  notificationSetting,
+  top,
+  onClose,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
+}: {
+  communityName: string;
+  left: number;
+  notificationSetting: NotificationScopeSetting;
+  top: number;
+  onClose: () => void;
+  onNotificationMuteToggle: () => void;
+  onNotificationSettingsOpen: () => void;
+}) {
+  const muted = NotificationSettingsPolicy.isMuted(notificationSetting);
+
+  return createPortal(
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 cursor-default"
+        onClick={onClose}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        className="glass-panel-strong fixed z-50 w-64 rounded-2xl border border-white/10 bg-[#202235]/95 p-1.5 text-left shadow-2xl shadow-black/45 backdrop-blur-xl"
+        style={{ left, top }}
+        aria-label={communityName}
+      >
+        <button
+          type="button"
+          onClick={onNotificationMuteToggle}
+          className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-white/85 transition hover:bg-white/10 hover:text-white"
+        >
+          <span>
+            {muted
+              ? copy.notifications.unmute
+              : copy.notifications.muteCommunity}
+          </span>
+          <MuteIcon muted={muted} />
+        </button>
+        <button
+          type="button"
+          onClick={onNotificationSettingsOpen}
+          className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/10"
+        >
+          <span>
+            <span className="block text-sm font-semibold text-white/85">
+              {copy.notifications.settings}
+            </span>
+            <span className="mt-0.5 block text-xs font-medium text-white/45">
+              {notificationSettingSummary(notificationSetting)}
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-lg text-white/35">
+            ›
+          </span>
+        </button>
+      </section>
+    </>,
+    document.body,
+  );
+}
+
+function MuteIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M4.75 9.5h3.1l4.4-3.7v12.4l-4.4-3.7h-3.1v-5Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      {muted ? (
+        <path
+          d="m16.2 9.2 4 4m0-4-4 4"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.8"
+        />
+      ) : (
+        <path
+          d="M16.6 8.5a4.9 4.9 0 0 1 0 7M18.9 6.2a8.3 8.3 0 0 1 0 11.6"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.8"
+        />
+      )}
+    </svg>
+  );
+}
+
 function isIosBrowser(): boolean {
   return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
 }
@@ -319,12 +520,7 @@ function InstallHelpDialog({
 
 function InstallIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-5 w-5"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
       <path
         d="M8 4.75h8A1.75 1.75 0 0 1 17.75 6.5v11A1.75 1.75 0 0 1 16 19.25H8a1.75 1.75 0 0 1-1.75-1.75v-11A1.75 1.75 0 0 1 8 4.75Z"
         stroke="currentColor"

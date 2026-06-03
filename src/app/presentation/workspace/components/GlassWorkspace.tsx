@@ -275,7 +275,9 @@ function removeConversationThreadMessage(
       : currentThread.draft,
     editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
     replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
-    messages: currentThread.messages.filter((message) => message.id !== messageId),
+    messages: currentThread.messages.filter(
+      (message) => message.id !== messageId,
+    ),
   };
 }
 
@@ -315,7 +317,11 @@ function notificationMentionContext(input: {
       .map((mention) => mention.targetId),
   ];
   const mentionedRoleIds = [
-    ...stringArrayAttribute(input.event, 'mentionedRoleIds', 'mentioned_role_ids'),
+    ...stringArrayAttribute(
+      input.event,
+      'mentionedRoleIds',
+      'mentioned_role_ids',
+    ),
     ...mentions
       .filter((mention) => mention.type === 'role')
       .map((mention) => mention.targetId),
@@ -473,8 +479,9 @@ export function GlassWorkspace({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
-  const messageScrollAnchorRef =
-    useRef<MessageScrollAnchorSnapshot | null>(null);
+  const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
+    null,
+  );
   const messageCursorRef = useRef<string | null>(null);
   const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
@@ -1071,10 +1078,7 @@ export function GlassWorkspace({
     if (requestIds.length === 0) return;
 
     setSeenMembershipRequestIds(
-      seenCommunityMembershipRequests.markSeen(
-        session.identity.id,
-        requestIds,
-      ),
+      seenCommunityMembershipRequests.markSeen(session.identity.id, requestIds),
     );
   }, [actionableMembershipRequests, session.identity.id]);
 
@@ -2685,7 +2689,9 @@ export function GlassWorkspace({
         current
           ? {
               ...current,
-              messages: current.messages.filter((item) => item.id !== message.id),
+              messages: current.messages.filter(
+                (item) => item.id !== message.id,
+              ),
             }
           : current,
       );
@@ -2802,7 +2808,9 @@ export function GlassWorkspace({
     }
   };
 
-  const handleDeleteConversationThreadMessage = async (message: ChatMessage) => {
+  const handleDeleteConversationThreadMessage = async (
+    message: ChatMessage,
+  ) => {
     if (!activeConversation?.id) return;
 
     setMessageContextMenu(null);
@@ -3144,7 +3152,9 @@ export function GlassWorkspace({
 
         if (isThreadReply || isEditMessage) {
           setConversationThread((current) =>
-            current ? mergeConversationThreadMessage(current, message) : current,
+            current
+              ? mergeConversationThreadMessage(current, message)
+              : current,
           );
         }
 
@@ -3967,6 +3977,40 @@ export function GlassWorkspace({
     },
     [activeCommunity?.id, sendTyping],
   );
+  const communityNotificationSettingFor = useCallback(
+    (community: Community) =>
+      NotificationSettingsPolicy.resolve(notificationSettingsByScopeKey, {
+        communityId: community.id,
+        type: 'community',
+      }),
+    [notificationSettingsByScopeKey],
+  );
+  const openCommunityNotificationSettings = useCallback(
+    (community: Community) => {
+      const network = nodeNetworks.find(
+        (item) => item.id === community.networkId,
+      );
+
+      setNotificationSettingsTarget({
+        scope: {
+          communityId: community.id,
+          type: 'community',
+        },
+        subtitle: network?.name ?? community.networkId,
+        title: community.name,
+      });
+    },
+    [nodeNetworks],
+  );
+  const toggleCommunityNotificationMute = useCallback(
+    (community: Community) => {
+      toggleNotificationMute({
+        communityId: community.id,
+        type: 'community',
+      });
+    },
+    [toggleNotificationMute],
+  );
   const notificationSettingsSetting = useMemo(
     () =>
       notificationSettingsTarget
@@ -4008,6 +4052,7 @@ export function GlassWorkspace({
             workspaceMode === 'community' ? activeCommunity?.id : null
           }
           communities={communities}
+          communityNotificationSetting={communityNotificationSettingFor}
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
           notificationCount={inboxNotificationCount}
@@ -4016,6 +4061,10 @@ export function GlassWorkspace({
             setWorkspaceMode('community');
             setSidebarOpen(false);
           }}
+          onCommunityNotificationMuteToggle={toggleCommunityNotificationMute}
+          onCommunityNotificationSettingsOpen={
+            openCommunityNotificationSettings
+          }
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
           onMessagesClick={() => {
             setWorkspaceMode('messages');
@@ -4040,6 +4089,7 @@ export function GlassWorkspace({
                   activeMessages
                   activeCommunityId={null}
                   communities={communities}
+                  communityNotificationSetting={communityNotificationSettingFor}
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
@@ -4048,6 +4098,12 @@ export function GlassWorkspace({
                     setWorkspaceMode('community');
                     setSidebarOpen(false);
                   }}
+                  onCommunityNotificationMuteToggle={
+                    toggleCommunityNotificationMute
+                  }
+                  onCommunityNotificationSettingsOpen={
+                    openCommunityNotificationSettings
+                  }
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');
@@ -4114,7 +4170,9 @@ export function GlassWorkspace({
                 currentIdentityId={session.identity.id}
                 disabled={!activeConversationKey}
                 draft={conversationThread.draft}
-                editingMessage={conversationThread.editingMessage?.message ?? null}
+                editingMessage={
+                  conversationThread.editingMessage?.message ?? null
+                }
                 error={conversationThread.error}
                 identityNames={identityNames}
                 identityPictures={identityPictures}
@@ -4261,6 +4319,7 @@ export function GlassWorkspace({
                 <Rail
                   activeCommunityId={activeCommunity.id}
                   communities={communities}
+                  communityNotificationSetting={communityNotificationSettingFor}
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
@@ -4269,6 +4328,12 @@ export function GlassWorkspace({
                     setWorkspaceMode('community');
                     setSidebarOpen(false);
                   }}
+                  onCommunityNotificationMuteToggle={
+                    toggleCommunityNotificationMute
+                  }
+                  onCommunityNotificationSettingsOpen={
+                    openCommunityNotificationSettings
+                  }
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');
@@ -4380,7 +4445,7 @@ export function GlassWorkspace({
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading
-              : messageCollection.error ?? copy.messages.emptyPins
+              : (messageCollection.error ?? copy.messages.emptyPins)
           }
           identityNames={identityNames}
           identityPictures={identityPictures}
