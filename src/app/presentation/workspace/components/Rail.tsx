@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -68,9 +68,27 @@ export function Rail({
   const [communityMenu, setCommunityMenu] = useState<null | CommunityMenuState>(
     null,
   );
+  const communityLongPressTimerRef = useRef<number | null>(null);
+  const communityLongPressOpenedRef = useRef(false);
   const { installState, requestInstall } = useInstallPrompt();
 
   useCloseOnEscape(() => setCommunityMenu(null), !!communityMenu);
+
+  const clearCommunityLongPressTimer = () => {
+    if (communityLongPressTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(communityLongPressTimerRef.current);
+    communityLongPressTimerRef.current = null;
+  };
+
+  useEffect(
+    () => () => {
+      clearCommunityLongPressTimer();
+    },
+    [],
+  );
 
   const openCommunityMenu = (communityId: string, target: HTMLElement) => {
     const rect = target.getBoundingClientRect();
@@ -87,6 +105,22 @@ export function Rail({
       left: Math.max(12, left),
       top,
     });
+  };
+  const handleCommunityPointerDown = (
+    event: PointerEvent<HTMLButtonElement>,
+    communityId: string,
+    canOpenCommunityMenu: boolean,
+  ) => {
+    if (event.pointerType === 'mouse' || !canOpenCommunityMenu) {
+      return;
+    }
+
+    clearCommunityLongPressTimer();
+    communityLongPressOpenedRef.current = false;
+    communityLongPressTimerRef.current = window.setTimeout(() => {
+      communityLongPressOpenedRef.current = true;
+      openCommunityMenu(communityId, event.currentTarget);
+    }, 450);
   };
 
   const handleInstallApp = async () => {
@@ -170,13 +204,31 @@ export function Rail({
               />
               <button
                 type="button"
-                onClick={() => onCommunityClick?.(community.id)}
+                onClick={(event) => {
+                  if (communityLongPressOpenedRef.current) {
+                    event.preventDefault();
+                    communityLongPressOpenedRef.current = false;
+                    return;
+                  }
+
+                  onCommunityClick?.(community.id);
+                }}
                 onContextMenu={(event) => {
                   if (!canOpenCommunityMenu) return;
 
                   event.preventDefault();
                   openCommunityMenu(community.id, event.currentTarget);
                 }}
+                onPointerCancel={clearCommunityLongPressTimer}
+                onPointerDown={(event) =>
+                  handleCommunityPointerDown(
+                    event,
+                    community.id,
+                    canOpenCommunityMenu,
+                  )
+                }
+                onPointerLeave={clearCommunityLongPressTimer}
+                onPointerUp={clearCommunityLongPressTimer}
                 title={community.name}
                 className={cx(
                   'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition',
@@ -189,27 +241,6 @@ export function Rail({
                   <CommunityRailAvatar community={community} />
                 </span>
               </button>
-              {canOpenCommunityMenu ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-
-                    if (communityMenu?.communityId === community.id) {
-                      setCommunityMenu(null);
-
-                      return;
-                    }
-
-                    openCommunityMenu(community.id, event.currentTarget);
-                  }}
-                  className="absolute -right-0.5 bottom-0 z-30 grid h-5 w-5 place-items-center rounded-full border border-white/10 bg-[#17192e] text-[0.7rem] font-black leading-none text-white/70 opacity-100 shadow-lg shadow-black/35 transition hover:bg-white/15 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
-                  aria-label={copy.notifications.settings}
-                  aria-expanded={communityMenu?.communityId === community.id}
-                >
-                  ⋯
-                </button>
-              ) : null}
               {canOpenCommunityMenu && communityMenu?.communityId === community.id ? (
                 <CommunityRailMenu
                   communityName={community.name}
@@ -433,15 +464,37 @@ function CommunityRailMenu({
             <button
               type="button"
               onClick={onCommunityLeave}
-              className="block w-full rounded-2xl px-3 py-2 text-left text-sm font-black text-rose-100 transition hover:bg-rose-500/10"
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-black text-rose-100 transition hover:bg-rose-500/10"
             >
-              {copy.communities.leave}
+              <RailLeaveIcon />
+              <span className="min-w-0 flex-1 truncate">
+                {copy.communities.leave}
+              </span>
             </button>
           </>
         ) : null}
       </section>
     </>,
     document.body,
+  );
+}
+
+function RailLeaveIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-rose-100/70"
+    >
+      <path
+        d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10M14.5 8.5 18 12m0 0-3.5 3.5M18 12H9"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 

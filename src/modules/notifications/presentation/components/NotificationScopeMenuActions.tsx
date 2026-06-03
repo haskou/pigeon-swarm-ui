@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
+
 import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
 
 import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
-import { notificationSettingSummary } from '../view-models/notificationSettingSummary';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { cx } from '../../../../shared/presentation/cx';
 
 type NotificationScopeMenuActionsVariant = 'block' | 'compact';
 
@@ -23,61 +25,56 @@ export function NotificationScopeMenuActions({
 }: NotificationScopeMenuActionsProps) {
   const muted = NotificationSettingsPolicy.isMuted(notificationSetting);
   const muteActionLabel = muted ? copy.notifications.unmute : muteLabel;
-
-  if (variant === 'compact') {
-    return (
-      <>
-        <button
-          type="button"
-          onClick={onNotificationMuteToggle}
-          className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-white/85 transition hover:bg-white/10 hover:text-white"
-        >
-          <span>{muteActionLabel}</span>
-          <NotificationMuteIcon muted={muted} />
-        </button>
-        <button
-          type="button"
-          onClick={onNotificationSettingsOpen}
-          className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/10"
-        >
-          <span>
-            <span className="block text-sm font-semibold text-white/85">
-              {copy.notifications.settings}
-            </span>
-            <span className="mt-0.5 block text-xs font-medium text-white/45">
-              {notificationSettingSummary(notificationSetting)}
-            </span>
-          </span>
-          <span aria-hidden="true" className="text-lg text-white/35">
-            ›
-          </span>
-        </button>
-      </>
-    );
-  }
+  const actionClassName =
+    variant === 'compact'
+      ? 'rounded-xl px-3 py-2 text-sm font-semibold'
+      : 'rounded-2xl px-3 py-2 font-black';
 
   return (
     <>
-      <button
-        type="button"
+      <NotificationScopeMenuButton
+        className={actionClassName}
+        icon={<NotificationMuteIcon muted={muted} />}
+        label={muteActionLabel}
         onClick={onNotificationMuteToggle}
-        className="block w-full rounded-2xl px-3 py-2 text-left font-black text-white/80 transition hover:bg-white/10"
-      >
-        {muteActionLabel}
-      </button>
-      <button
-        type="button"
+      />
+      <NotificationScopeMenuButton
+        className={cx(actionClassName, variant === 'compact' && 'mt-1')}
+        icon={<NotificationSettingsIcon />}
+        label={copy.notifications.settings}
         onClick={onNotificationSettingsOpen}
-        className="block w-full rounded-2xl px-3 py-2 text-left transition hover:bg-white/10"
-      >
-        <span className="block font-black text-white/80">
-          {copy.notifications.settings}
-        </span>
-        <span className="block text-xs font-bold text-white/40">
-          {notificationSettingSummary(notificationSetting)}
-        </span>
-      </button>
+        trailing={variant === 'compact' ? <MenuChevronIcon /> : undefined}
+      />
     </>
+  );
+}
+
+function NotificationScopeMenuButton({
+  className,
+  icon,
+  label,
+  onClick,
+  trailing,
+}: {
+  className: string;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  trailing?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'flex w-full items-center gap-3 text-left text-white/85 transition hover:bg-white/10 hover:text-white',
+        className,
+      )}
+    >
+      {icon}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {trailing}
+    </button>
   );
 }
 
@@ -111,5 +108,37 @@ function NotificationMuteIcon({ muted }: { muted: boolean }) {
         />
       )}
     </svg>
+  );
+}
+
+function NotificationSettingsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M19.35 13.15v-2.3l-2.05-.42a5.8 5.8 0 0 0-.58-1.4l1.15-1.75-1.62-1.62-1.75 1.15a5.8 5.8 0 0 0-1.4-.58L12.7 4h-2.3l-.4 2.05a5.8 5.8 0 0 0-1.42.58L6.85 5.48 5.23 7.1l1.15 1.75a5.8 5.8 0 0 0-.58 1.4l-2.05.42v2.3l2.05.42c.12.5.32.98.58 1.4l-1.15 1.75 1.62 1.62 1.75-1.15c.44.26.92.46 1.42.58l.4 2.05h2.3l.4-2.05c.5-.12.98-.32 1.4-.58l1.75 1.15 1.62-1.62-1.15-1.75c.26-.44.46-.92.58-1.4l2.03-.24Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function MenuChevronIcon() {
+  return (
+    <span aria-hidden="true" className="text-lg text-white/35">
+      ›
+    </span>
   );
 }
