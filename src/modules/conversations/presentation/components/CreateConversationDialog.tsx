@@ -22,7 +22,12 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { ConversationPeer } from '../../domain/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
-type IdentityLookupState = 'idle' | 'loading' | 'ready';
+type IdentityLookupState =
+  | 'idle'
+  | 'invalid'
+  | 'loading'
+  | 'not_found'
+  | 'ready';
 type ConversationMode = 'direct' | 'group';
 type SelectedIdentity = {
   identity: IdentityResource;
@@ -123,6 +128,11 @@ export function CreateConversationDialog({
     groupParticipants.length > 0 &&
     !!groupNetworkId &&
     state !== 'loading';
+  const remoteIdentityStatus = remoteIdentityLookupStatus({
+    input: peerIdentityId,
+    lookupState,
+    peerIdentity,
+  });
 
   useEffect(() => {
     const trimmed = normalizeIdentityLookup(peerIdentityId);
@@ -134,6 +144,12 @@ export function CreateConversationDialog({
 
     if (!trimmed) {
       setLookupState('idle');
+
+      return undefined;
+    }
+
+    if (!identityLookupIsValid(peerIdentityId)) {
+      setLookupState('invalid');
 
       return undefined;
     }
@@ -162,7 +178,7 @@ export function CreateConversationDialog({
         .catch(() => {
           if (cancelled) return;
 
-          setLookupState('idle');
+          setLookupState('not_found');
         });
     }, 450);
 
@@ -395,17 +411,14 @@ export function CreateConversationDialog({
           </button>
           <button
             type="button"
-            onClick={() => {
-              setMode('group');
-              setError(null);
-            }}
-            className={
-              mode === 'group'
-                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
-                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
-            }
+            disabled
+            title={copy.dialog.groupConversationSoon}
+            className="rounded-2xl px-3 py-2 text-sm font-black text-white/30"
           >
             {copy.dialog.groupConversation}
+            <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[.16em] text-white/45">
+              {copy.dialog.groupConversationSoon}
+            </span>
           </button>
         </div>
 
@@ -417,16 +430,12 @@ export function CreateConversationDialog({
                   value={peerIdentityId}
                   onChange={(event) => setPeerIdentityId(event.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="@ada or MCowBQYDK2VwAyEAWtRH3+ilAHq/szBVS7kQX4CsbE1EOWNu8RDyC9Bax9A="
+                  placeholder={copy.dialog.remoteIdentityPlaceholder}
                   autoComplete="off"
                 />
+                <IdentityLookupStatus status={remoteIdentityStatus} />
               </Field>
             </div>
-            {lookupState === 'loading' && (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
-                {copy.dialog.loadingIdentity}
-              </div>
-            )}
 
             {peerIdentity && peerDisplayName && (
               <IdentityPreview
@@ -450,7 +459,7 @@ export function CreateConversationDialog({
             <div className="mt-2">
               <Field label={copy.dialog.sharedNetwork}>
                 <GlassSelect
-                  ariaLabel={copy.dialog.sharedNetwork}
+                  ariaLabel={copy.dialog.selectSwarm}
                   disabled={!peerIdentity || sharedNetworkIds.length === 0}
                   value={selectedNetworkId}
                   onChange={setSelectedNetworkId}
@@ -582,13 +591,13 @@ export function CreateConversationDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-black text-white/70"
+            className="rounded-2xl px-5 py-3 text-sm font-black text-white/55 transition hover:bg-white/10 hover:text-white/80"
           >
             {copy.dialog.cancel}
           </button>
           <button
             disabled={mode === 'direct' ? !canSubmitDirect : !canSubmitGroup}
-            className="glass-button rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
+            className="rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-fuchsia-950/30 transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
           >
             {state === 'loading'
               ? copy.dialog.createConversationLoading
@@ -598,6 +607,80 @@ export function CreateConversationDialog({
       </form>
     </div>
   );
+}
+
+type IdentityLookupStatusModel = {
+  label: string;
+  tone: 'danger' | 'info' | 'muted' | 'success';
+};
+
+function IdentityLookupStatus({
+  status,
+}: {
+  status: IdentityLookupStatusModel;
+}) {
+  const color =
+    status.tone === 'danger'
+      ? 'text-rose-200'
+      : status.tone === 'info'
+        ? 'text-cyan-100'
+        : status.tone === 'success'
+          ? 'text-emerald-200'
+          : 'text-white/45';
+
+  return (
+    <span className={`mt-2 block text-xs font-bold ${color}`}>
+      {status.label}
+    </span>
+  );
+}
+
+function remoteIdentityLookupStatus(input: {
+  input: string;
+  lookupState: IdentityLookupState;
+  peerIdentity: IdentityResource | null;
+}): IdentityLookupStatusModel {
+  if (!input.input.trim()) {
+    return {
+      label: copy.dialog.remoteIdentityHelp,
+      tone: 'muted',
+    };
+  }
+
+  if (input.lookupState === 'invalid') {
+    return {
+      label: copy.dialog.remoteIdentityInvalid,
+      tone: 'danger',
+    };
+  }
+
+  if (input.lookupState === 'loading') {
+    return {
+      label: copy.dialog.loadingIdentity,
+      tone: 'info',
+    };
+  }
+
+  if (input.lookupState === 'not_found') {
+    return {
+      label: copy.dialog.remoteIdentityNotFound,
+      tone: 'danger',
+    };
+  }
+
+  if (input.lookupState === 'ready' && input.peerIdentity) {
+    return {
+      label: input.input.trim().startsWith('@')
+        ? copy.dialog.remoteIdentityFound
+        : copy.dialog.remoteIdentityValid,
+      tone: 'success',
+    };
+  }
+
+  return {
+    label: copy.dialog.remoteIdentityHelp,
+    tone: 'muted',
+  };
 }
 
 function IdentityPreview({
@@ -655,6 +738,14 @@ function normalizeIdentityLookup(value: string): string {
   const trimmed = value.trim();
 
   return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
+}
+
+function identityLookupIsValid(value: string): boolean {
+  const trimmed = value.trim();
+
+  if (!trimmed || trimmed === '@') return false;
+
+  return !/\s/.test(trimmed);
 }
 
 async function loadDialogIdentityPicture(
