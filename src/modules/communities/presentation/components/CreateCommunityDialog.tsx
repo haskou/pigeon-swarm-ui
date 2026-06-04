@@ -96,7 +96,6 @@ export function CreateCommunityDialog({
     ? channelValidationError(channelName, channels)
     : null;
   const canAddChannel = channelName.trim().length > 0 && !channelInputError;
-  const submitHelp = communitySubmitHelp({ channels, name, networkId });
   const canSubmit =
     name.trim().length > 0 &&
     channels.length > 0 &&
@@ -409,11 +408,6 @@ export function CreateCommunityDialog({
         </div>
 
         <div className="mt-5 shrink-0 border-t border-white/10 bg-[#171827]/95 pt-4">
-          {!canSubmit ? (
-            <p className="mb-3 text-xs font-bold text-white/45">
-              {submitHelp}
-            </p>
-          ) : null}
           <div className="flex justify-end">
             <button
               disabled={!canSubmit}
@@ -498,20 +492,4 @@ function channelNamesAreUnique(channels: InitialChannelDraft[]): boolean {
 
 function normalizeChannelName(name: string): string {
   return name.trim().toLowerCase();
-}
-
-function communitySubmitHelp(input: {
-  channels: InitialChannelDraft[];
-  name: string;
-  networkId: string;
-}): string {
-  if (!input.name.trim()) return copy.communities.createMissingName;
-
-  if (!input.networkId) return copy.communities.createMissingNetwork;
-
-  if (input.channels.length === 0) {
-    return copy.communities.createMissingChannel;
-  }
-
-  return copy.communities.createSubmitHelp;
 }
