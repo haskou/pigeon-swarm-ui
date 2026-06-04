@@ -8,6 +8,8 @@ import {
   type MouseEvent,
   type ReactNode,
   type SetStateAction,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -52,8 +54,6 @@ import { Composer } from '../../../messages/presentation/components/Composer';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
-import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
-import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
 import {
   profileAnchorFromTarget,
@@ -96,6 +96,21 @@ import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 import { communityMessageIdentityIds } from './communityMessageIdentityIds';
+
+const CreatePollDialog = lazy(() =>
+  import('../../../polls/presentation/components/CreatePollDialog').then(
+    (module) => ({
+      default: module.CreatePollDialog,
+    }),
+  ),
+);
+const StickerPackPreviewDialog = lazy(() =>
+  import('../../../stickers/presentation/components/StickerPackPreviewDialog').then(
+    (module) => ({
+      default: module.StickerPackPreviewDialog,
+    }),
+  ),
+);
 
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
@@ -2462,18 +2477,22 @@ export function CommunityWorkspace({
               session={session}
             />
             {stickerPackPreview && (
-              <StickerPackPreviewDialog
-                onClose={() => setStickerPackPreview(null)}
-                onStickerSend={messageComposer.handleSendChannelSticker}
-                session={session}
-                sticker={stickerPackPreview}
-              />
+              <Suspense fallback={null}>
+                <StickerPackPreviewDialog
+                  onClose={() => setStickerPackPreview(null)}
+                  onStickerSend={messageComposer.handleSendChannelSticker}
+                  session={session}
+                  sticker={stickerPackPreview}
+                />
+              </Suspense>
             )}
             {pollDialogOpen && (
-              <CreatePollDialog
-                onClose={() => setPollDialogOpen(false)}
-                onSubmit={handleCreatePoll}
-              />
+              <Suspense fallback={null}>
+                <CreatePollDialog
+                  onClose={() => setPollDialogOpen(false)}
+                  onSubmit={handleCreatePoll}
+                />
+              </Suspense>
             )}
           </>
         )}

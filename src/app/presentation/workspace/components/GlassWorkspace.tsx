@@ -125,7 +125,6 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { CommunityWorkspace } from '../../../../modules/communities/presentation/components/CommunityWorkspace';
 import {
   PushNotificationPrompt,
   type PushNotificationPromptState,
@@ -170,6 +169,13 @@ const Sidebar = lazy(() =>
 const WorkspaceDialogs = lazy(() =>
   import('./WorkspaceDialogs').then((module) => ({
     default: module.WorkspaceDialogs,
+  })),
+);
+const CommunityWorkspace = lazy(() =>
+  import(
+    '../../../../modules/communities/presentation/components/CommunityWorkspace'
+  ).then((module) => ({
+    default: module.CommunityWorkspace,
   })),
 );
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
