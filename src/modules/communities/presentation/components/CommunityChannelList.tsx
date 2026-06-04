@@ -1,4 +1,11 @@
-import { useState, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react';
 
 import type {
   CommunityChannelThreadSummary,
@@ -11,7 +18,6 @@ import { NotificationSettingsPolicy } from '../../../notifications/domain/Notifi
 import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
-import { shortId } from '../../../../shared/presentation/formatting';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import {
@@ -139,7 +145,7 @@ export function CommunityChannelList({
                           label={
                             threadLabelByRootMessageId?.[
                               thread.rootMessageId
-                            ] ?? shortId(thread.rootMessageId)
+                            ] ?? copy.messages.thread
                           }
                           onSelect={() => onThreadSelected(channel, thread)}
                           replyCount={thread.replyCount}
@@ -233,11 +239,63 @@ function TextChannelButton({
   unreadCount: number;
 }) {
   const muted = NotificationSettingsPolicy.isMuted(notificationSetting);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressOpenedRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+
+  useEffect(
+    () => () => {
+      if (longPressTimerRef.current === null) {
+        return;
+      }
+
+      window.clearTimeout(longPressTimerRef.current);
+    },
+    [],
+  );
+
+  const openContextMenu = () => {
+    clearLongPressTimer();
+    onMenuOpen();
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse') {
+      return;
+    }
+
+    clearLongPressTimer();
+    longPressOpenedRef.current = false;
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressOpenedRef.current = true;
+      onMenuOpen();
+    }, 450);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (
+      event.key !== 'ContextMenu' &&
+      !(event.shiftKey && event.key === 'F10')
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    openContextMenu();
+  };
 
   return (
     <div
       className={cx(
-        'group relative flex w-full items-center rounded-2xl transition',
+        'group relative w-full rounded-2xl transition',
         active
           ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
           : muted
@@ -247,12 +305,27 @@ function TextChannelButton({
     >
       <button
         type="button"
-        onClick={() => onSelect(channel.id)}
+        onClick={(event) => {
+          if (longPressOpenedRef.current) {
+            event.preventDefault();
+            longPressOpenedRef.current = false;
+            return;
+          }
+
+          onSelect(channel.id);
+        }}
         onContextMenu={(event) => {
           event.preventDefault();
-          onMenuOpen();
+          openContextMenu();
         }}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-l-2xl px-3 py-1.5 text-left text-sm font-black"
+        onKeyDown={handleKeyDown}
+        onPointerCancel={clearLongPressTimer}
+        onPointerDown={handlePointerDown}
+        onPointerLeave={clearLongPressTimer}
+        onPointerUp={clearLongPressTimer}
+        className="flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-1.5 text-left text-sm font-black"
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
       >
         <span className="min-w-0 flex-1 truncate"># {channel.name}</span>
         {unreadCount > 0 && (
@@ -260,23 +333,6 @@ function TextChannelButton({
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
-      </button>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onMenuOpen();
-        }}
-        className={cx(
-          'mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-xl text-base transition',
-          menuOpen
-            ? 'bg-black/15 text-current'
-            : 'text-current/45 opacity-100 hover:bg-black/10 hover:text-current sm:opacity-0 sm:group-hover:opacity-100',
-        )}
-        aria-label={copy.chat.conversationMenu}
-        aria-expanded={menuOpen}
-      >
-        ⋯
       </button>
       {menuOpen && (
         <ChannelNotificationMenu

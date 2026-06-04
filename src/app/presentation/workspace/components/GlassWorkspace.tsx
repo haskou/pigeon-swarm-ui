@@ -3932,6 +3932,38 @@ export function GlassWorkspace({
     },
     [toggleNotificationMute],
   );
+  const leaveCommunityFromRail = useCallback(
+    async (community: Community) => {
+      if (!window.confirm(copy.communities.leaveConfirm)) return;
+
+      try {
+        const updatedCommunity = await applicationContainer.leaveCommunity(
+          session,
+          community.id,
+        );
+
+        setCommunities((current) =>
+          current.filter((item) => item.id !== updatedCommunity.id),
+        );
+
+        if (activeCommunityId === updatedCommunity.id) {
+          setActiveCommunityId(null);
+          setWorkspaceMode('messages');
+          setSidebarOpen(false);
+        }
+      } catch (caught) {
+        setSendError(toUserErrorMessage(caught, copy.communities.leaveError));
+      }
+    },
+    [
+      activeCommunityId,
+      session,
+      setActiveCommunityId,
+      setCommunities,
+      setSidebarOpen,
+      setWorkspaceMode,
+    ],
+  );
   const hasWorkspaceDialogOpen =
     inspectorOpen ||
     isCreateCommunityOpen ||
@@ -3976,6 +4008,7 @@ export function GlassWorkspace({
           onCommunityNotificationSettingsOpen={
             openCommunityNotificationSettings
           }
+          onCommunityLeave={leaveCommunityFromRail}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
           onMessagesClick={() => {
             setWorkspaceMode('messages');
@@ -4015,6 +4048,7 @@ export function GlassWorkspace({
                   onCommunityNotificationSettingsOpen={
                     openCommunityNotificationSettings
                   }
+                  onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');
@@ -4245,6 +4279,7 @@ export function GlassWorkspace({
                   onCommunityNotificationSettingsOpen={
                     openCommunityNotificationSettings
                   }
+                  onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
                   onMessagesClick={() => {
                     setWorkspaceMode('messages');

@@ -331,11 +331,15 @@ export function CommunityWorkspace({
   const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
     Record<string, CommunityChannelThreadSummary[]>
   >({});
+  const [threadRootLabels, setThreadRootLabels] = useState<
+    Record<string, string>
+  >({});
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
+  const unresolvedThreadRootLabelKeysRef = useRef(new Set<string>());
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const communityMessageDecryptWorkerRef =
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
@@ -352,6 +356,10 @@ export function CommunityWorkspace({
       })),
     [channelThreadsByChannelId, textChannels],
   );
+  useEffect(() => {
+    setThreadRootLabels({});
+    unresolvedThreadRootLabelKeysRef.current.clear();
+  }, [community.id]);
   useEffect(() => {
     let cancelled = false;
 
@@ -925,6 +933,87 @@ export function CommunityWorkspace({
     selectedChannelId,
     textChannelsWithThreads,
   ]);
+  useEffect(() => {
+    const unresolvedKeys = unresolvedThreadRootLabelKeysRef.current;
+    const channelsWithMissingRootLabels = visibleTextChannels
+      .map((channel) => {
+        const rootMessageIds = (channel.threads ?? [])
+          .map((thread) => thread.rootMessageId)
+          .filter(
+            (rootMessageId) =>
+              !threadRootLabels[rootMessageId] &&
+              !unresolvedKeys.has(threadRootLabelKey(channel.id, rootMessageId)),
+          );
+
+        return {
+          channelId: channel.id,
+          rootMessageIds: [...new Set(rootMessageIds)],
+        };
+      })
+      .filter((channel) => channel.rootMessageIds.length > 0);
+
+    if (channelsWithMissingRootLabels.length === 0) return undefined;
+
+    let cancelled = false;
+
+    void (async () => {
+      for (const channel of channelsWithMissingRootLabels) {
+        const remainingRootMessageIds = new Set(channel.rootMessageIds);
+        let beforeMessageId: string | undefined;
+
+        for (
+          let page = 0;
+          page < 8 && remainingRootMessageIds.size > 0 && !cancelled;
+          page += 1
+        ) {
+          const result =
+            await applicationContainer.listCommunityChannelMessages(
+              session,
+              community.id,
+              channel.channelId,
+              { beforeMessageId },
+            );
+          const loadedMessages = await projectChannelMessages(
+            channel.channelId,
+            result.messages,
+          );
+          const labels: Record<string, string> = {};
+
+          for (const message of loadedMessages) {
+            if (
+              remainingRootMessageIds.has(message.id) &&
+              isThreadRootMessage(message)
+            ) {
+              labels[message.id] = threadTitleFromMessage(message);
+              remainingRootMessageIds.delete(message.id);
+            }
+          }
+
+          if (Object.keys(labels).length > 0 && !cancelled) {
+            setThreadRootLabels((current) => ({ ...current, ...labels }));
+          }
+
+          if (!result.nextBeforeMessageId) break;
+
+          beforeMessageId = result.nextBeforeMessageId;
+        }
+
+        for (const rootMessageId of remainingRootMessageIds) {
+          unresolvedKeys.add(threadRootLabelKey(channel.channelId, rootMessageId));
+        }
+      }
+    })().catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    community.id,
+    projectChannelMessages,
+    session,
+    threadRootLabels,
+    visibleTextChannels,
+  ]);
   const visibleVoiceChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
     const accessibleChannels = accessibleVoiceChannels.filter(
@@ -994,11 +1083,53 @@ export function CommunityWorkspace({
       ),
     [memberIdentities],
   );
-  const threadLabelByRootMessageId = useMemo(() => {
-    const labels: Record<string, string> = {};
+  useEffect(() => {
+    const knownRootLabels: Record<string, string> = {};
+    const rememberRootLabel = (message: ChatMessage) => {
+      if (!isThreadRootMessage(message)) return;
+
+      knownRootLabels[message.id] = threadTitleFromMessage(message);
+    };
 
     for (const message of messages) {
-      if (!message.replyToMessageId) {
+      rememberRootLabel(message);
+    }
+
+    if (threadPanel) {
+      rememberRootLabel(threadPanel.root);
+    }
+
+    for (const message of messageCollection?.messages ?? []) {
+      rememberRootLabel(message);
+    }
+
+    for (const result of messageSearch.results) {
+      rememberRootLabel(result.message);
+    }
+
+    const entries = Object.entries(knownRootLabels);
+
+    if (entries.length === 0) return;
+
+    setThreadRootLabels((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const [messageId, label] of entries) {
+        if (next[messageId] === label) continue;
+
+        next[messageId] = label;
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [messageCollection?.messages, messageSearch.results, messages, threadPanel]);
+  const threadLabelByRootMessageId = useMemo(() => {
+    const labels: Record<string, string> = { ...threadRootLabels };
+
+    for (const message of messages) {
+      if (isThreadRootMessage(message)) {
         labels[message.id] = threadTitleFromMessage(message);
       }
     }
@@ -1008,7 +1139,7 @@ export function CommunityWorkspace({
     }
 
     return labels;
-  }, [messages, threadPanel]);
+  }, [messages, threadPanel, threadRootLabels]);
   const mentionSuggestions = useMemo(() => {
     if (!selectedChannel) return [];
 
@@ -2492,7 +2623,15 @@ function threadTitleFromMessage(message: ChatMessage): string {
     return message.attachments[0]?.filename ?? copy.messages.thread;
   }
 
-  return shortId(message.id);
+  return copy.messages.thread;
+}
+
+function isThreadRootMessage(message: ChatMessage): boolean {
+  return !(message.replyToMessageId ?? message.raw.replyToMessageId);
+}
+
+function threadRootLabelKey(channelId: string, rootMessageId: string): string {
+  return `${channelId}:${rootMessageId}`;
 }
 
 function findMentionTrigger(
