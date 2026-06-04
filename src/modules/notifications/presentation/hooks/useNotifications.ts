@@ -12,6 +12,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { ArchivedNotifications } from '../../infrastructure/storage/ArchivedNotifications';
 import { SeenNotifications } from '../../infrastructure/storage/SeenNotifications';
+import { mergeNotificationOverrides } from './notificationListState';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 
@@ -57,6 +58,9 @@ export function useNotifications({
   );
   const [action, setAction] = useState<NotificationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const notificationOverridesRef = useRef(
+    new Map<string, NotificationResource>(),
+  );
   const sessionRef = useRef(session);
 
   useEffect(() => {
@@ -78,11 +82,18 @@ export function useNotifications({
 
   const replaceNotification = useCallback(
     (nextNotification: NotificationResource) => {
+      notificationOverridesRef.current.set(
+        nextNotification.id,
+        nextNotification,
+      );
       setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === nextNotification.id
-            ? nextNotification
-            : notification,
+        mergeNotificationOverrides(
+          current.map((notification) =>
+            notification.id === nextNotification.id
+              ? nextNotification
+              : notification,
+          ),
+          notificationOverridesRef.current,
         ),
       );
     },
@@ -96,7 +107,10 @@ export function useNotifications({
     setError(null);
     try {
       setNotifications(
-        await applicationContainer.listNotifications(currentSession),
+        mergeNotificationOverrides(
+          await applicationContainer.listNotifications(currentSession),
+          notificationOverridesRef.current,
+        ),
       );
       setArchivedNotificationIds(
         archivedNotifications.get(currentSession.identity.id),
@@ -161,6 +175,11 @@ export function useNotifications({
             : undefined;
 
         replaceNotification(result.notification);
+        setSeenNotificationIds(
+          seenNotifications.markSeen(currentSession.identity.id, [
+            notification.id,
+          ]),
+        );
         onAccepted({
           communities,
           communityId,
