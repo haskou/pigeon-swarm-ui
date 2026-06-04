@@ -721,9 +721,8 @@ export const es = {
     communityInviteKeyTitle: 'Te han invitado a esta comunidad',
     conversationInviteKeyTitle: 'Te han invitado a esta conversacion',
     inviteKeyAction: 'Anadir clave y continuar',
-    inviteKeyBadge: 'Clave',
     inviteKeyBody:
-      'La invitacion incluye una clave cifrada para tu identidad. Al aceptarla, Pigeon Swarm anadira la clave a tu llavero local, publicara el llavero actualizado y podras leer y enviar mensajes.',
+      'La invitacion incluye una clave cifrada para tu identidad. Al aceptarla se anadira la clave a tu llavero y podras leer y enviar mensajes.',
     inviteKeyInvitedBy: 'Invitado por',
     inviteKeyManual: 'Introducir clave manualmente',
     inviteKeyWorking: 'Anadiendo clave...',

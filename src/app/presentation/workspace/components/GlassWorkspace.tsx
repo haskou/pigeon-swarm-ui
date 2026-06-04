@@ -75,7 +75,10 @@ import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
-import { identityDisplayName } from '../../../../modules/identities/presentation/view-models/identityDisplay';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -1160,9 +1163,11 @@ export function GlassWorkspace({
     [activeConversation, notificationList, session.identity.id],
   );
   const activeConversationInvitationInviterName = activeConversationInvitation
-    ? identityDisplayName(
-        activeConversationInvitation.payload.inviterIdentityId,
-        identityNames,
+    ? identityPrimaryDisplayName(
+        identityDisplayName(
+          activeConversationInvitation.payload.inviterIdentityId,
+          identityNames,
+        ),
       )
     : undefined;
   const activeCommunityInvitation = useMemo(
@@ -1179,9 +1184,11 @@ export function GlassWorkspace({
     [activeCommunity, notificationList, session.identity.id],
   );
   const activeCommunityInvitationInviterName = activeCommunityInvitation
-    ? identityDisplayName(
-        activeCommunityInvitation.payload.inviterIdentityId,
-        identityNames,
+    ? identityPrimaryDisplayName(
+        identityDisplayName(
+          activeCommunityInvitation.payload.inviterIdentityId,
+          identityNames,
+        ),
       )
     : undefined;
   const {

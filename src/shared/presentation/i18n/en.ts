@@ -830,9 +830,8 @@ export const en = {
     communityInviteKeyTitle: 'You were invited to this community',
     conversationInviteKeyTitle: 'You were invited to this conversation',
     inviteKeyAction: 'Add key and continue',
-    inviteKeyBadge: 'Key',
     inviteKeyBody:
-      'This invitation includes a key encrypted for your identity. Accepting it adds the key to your local keychain, publishes the updated keychain, and lets you read and send messages.',
+      'This invitation includes a key encrypted for your identity. Accepting it adds the key to your keychain so you can read and send messages.',
     inviteKeyInvitedBy: 'Invited by',
     inviteKeyManual: 'Enter key manually',
     inviteKeyWorking: 'Adding key...',

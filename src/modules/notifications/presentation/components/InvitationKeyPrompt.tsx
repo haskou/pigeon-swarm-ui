@@ -27,10 +27,7 @@ export function InvitationKeyPrompt({
   return (
     <div className="grid min-h-[28vh] place-items-center px-2 py-6">
       <div className="w-full max-w-lg rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 text-sm text-white shadow-2xl shadow-cyan-950/20">
-        <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-200/25 bg-cyan-200/15 text-xs font-black uppercase tracking-[0.18em] text-cyan-100">
-            {copy.notifications.inviteKeyBadge}
-          </div>
+        <div>
           <div className="min-w-0">
             <div className="text-base font-black">{title}</div>
             {inviterName ? (
