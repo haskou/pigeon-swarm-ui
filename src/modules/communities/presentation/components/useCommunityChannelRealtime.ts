@@ -235,7 +235,7 @@ export function useCommunityChannelRealtime({
       .then((projected) => {
         if (cancelled) return;
 
-        if (projected.replyToMessageId) {
+        if (projected.threadRootMessageId) {
           onThreadMessageReceived?.(projected);
 
           return;

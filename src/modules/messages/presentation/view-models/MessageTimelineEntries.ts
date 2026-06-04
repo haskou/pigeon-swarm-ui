@@ -41,16 +41,28 @@ export class MessageTimelineEntries {
     polls: PollResource[],
     threadSummaries: MessageThreadSummary[] = [],
   ): MessageTimelineEntry[] {
+    const visibleMessagesById = new Map(
+      messages.map((message) => [message.id, message]),
+    );
+    const visibleThreadSummaries = threadSummaries.filter((summary) =>
+      MessageTimelineEntries.isVisibleThreadSummary(
+        summary,
+        visibleMessagesById,
+      ),
+    );
     const threadSummariesByRootMessageId = new Map(
-      threadSummaries.map((summary) => [summary.rootMessageId, summary]),
+      visibleThreadSummaries.map((summary) => [
+        summary.rootMessageId,
+        summary,
+      ]),
     );
     const threadRootMessageIds = new Set(
-      threadSummaries.map((summary) => summary.rootMessageId),
+      visibleThreadSummaries.map((summary) => summary.rootMessageId),
     );
     const rootMessages = messages.filter(
       (message) =>
         !threadRootMessageIds.has(
-          MessageTimelineEntries.replyToMessageId(message) ?? '',
+          MessageTimelineEntries.threadRootMessageId(message) ?? '',
         ),
     );
     const items = messagePollTimelineItems(rootMessages, polls);
@@ -117,6 +129,25 @@ export class MessageTimelineEntries {
 
   private static replyToMessageId(message: ChatMessage): string | undefined {
     return message.replyToMessageId ?? message.raw.replyToMessageId;
+  }
+
+  private static threadRootMessageId(message: ChatMessage): string | undefined {
+    return message.threadRootMessageId;
+  }
+
+  private static isVisibleThreadSummary(
+    summary: MessageThreadSummary,
+    visibleMessagesById: ReadonlyMap<string, ChatMessage>,
+  ): boolean {
+    if (!summary.lastMessage) return true;
+
+    const visibleLastMessage =
+      visibleMessagesById.get(summary.lastMessage.id) ?? summary.lastMessage;
+
+    return (
+      MessageTimelineEntries.threadRootMessageId(visibleLastMessage) ===
+      summary.rootMessageId
+    );
   }
 
   private static startsTimelineDay(

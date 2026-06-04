@@ -184,13 +184,19 @@ type MessageDecryptWorker = {
 type EncryptMessagePayloadInput = {
   content: string;
   conversationId: string;
-  eventType?: 'MessageEdited' | 'MessageSent' | 'StickerMessageSent';
+  eventType?:
+    | 'MessageEdited'
+    | 'MessageSent'
+    | 'StickerMessageSent'
+    | 'ThreadMessageSent'
+    | 'ThreadStickerMessageSent';
   key: ConversationKeyEntry;
   linkPreview?: MessageLinkPreview;
   messageAttachments: MessageAttachment[];
   replyPreview?: MessageReplyPreview;
   session: Session;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp: number;
 };
 
@@ -1999,6 +2005,7 @@ export class PigeonApiGateway {
       previousMessageIds = [],
       replyPreview,
       replyToMessageId,
+      threadRootMessageId,
     } = options;
     const key = ConversationKeychain.entry(
       session.keychain,
@@ -2033,6 +2040,12 @@ export class PigeonApiGateway {
       replyPreview,
       session,
       sticker: options.sticker,
+      threadRootMessageId,
+      eventType: threadRootMessageId
+        ? options.sticker
+          ? 'ThreadStickerMessageSent'
+          : 'ThreadMessageSent'
+        : undefined,
       timestamp,
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
@@ -2364,6 +2377,9 @@ export class PigeonApiGateway {
           ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
           ...(input.replyPreview ? { reply: input.replyPreview } : {}),
           ...(input.sticker ? { sticker: input.sticker } : {}),
+          ...(input.threadRootMessageId
+            ? { threadRootMessageId: input.threadRootMessageId }
+            : {}),
           timestamp: input.timestamp,
           type:
             input.eventType ??

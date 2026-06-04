@@ -56,6 +56,7 @@ type PlainMessage = {
   linkPreview?: MessageLinkPreview;
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp?: number;
   type?: string;
 };
@@ -216,11 +217,28 @@ async function decryptMessage(
       replyPreview: parsed.reply,
       replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
       sticker: parsed.sticker,
+      threadRootMessageId: threadRootMessageIdFromPayload(parsed, message),
       timestamp: parsed.timestamp ?? base.timestamp,
     };
   } catch {
     return encryptedError(base, message, request.copy.decryptFailed);
   }
+}
+
+function threadRootMessageIdFromPayload(
+  payload: PlainMessage,
+  message: MessageResource,
+): string | undefined {
+  if (payload.threadRootMessageId) return payload.threadRootMessageId;
+
+  if (
+    payload.type === 'ThreadMessageSent' ||
+    payload.type === 'ThreadStickerMessageSent'
+  ) {
+    return message.replyToMessageId;
+  }
+
+  return undefined;
 }
 
 async function cachedProjectedMessage(

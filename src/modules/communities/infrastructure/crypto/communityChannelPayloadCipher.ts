@@ -20,6 +20,7 @@ export type CommunityChannelPlainPayload = {
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp?: number;
   type?: string;
 };
@@ -31,12 +32,16 @@ export type CommunityChannelPayloadInput = {
   communityKey?: ConversationKeyEntry;
   communityId: string;
   content: string;
-  eventType?: 'CommunityChannelMessageEdited';
+  eventType?:
+    | 'CommunityChannelMessageEdited'
+    | 'CommunityChannelThreadMessageSent'
+    | 'CommunityChannelThreadStickerMessageSent';
   linkPreview?: MessageLinkPreview;
   mentions?: CommunityMessageMention[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp: number;
 };
 
@@ -66,6 +71,9 @@ export function serializeCommunityChannelPayload(
       ? { replyToMessageId: input.replyToMessageId }
       : {}),
     ...(input.sticker ? { sticker: input.sticker } : {}),
+    ...(input.threadRootMessageId
+      ? { threadRootMessageId: input.threadRootMessageId }
+      : {}),
     timestamp: input.timestamp,
     type: communityChannelPayloadType(input),
   });

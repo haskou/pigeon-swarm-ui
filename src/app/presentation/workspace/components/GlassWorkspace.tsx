@@ -2906,6 +2906,7 @@ export function GlassWorkspace({
             : [rootMessage.id],
         replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
+        threadRootMessageId: rootMessage.id,
       },
     );
 
@@ -2943,6 +2944,7 @@ export function GlassWorkspace({
         replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
         sticker,
+        threadRootMessageId: rootMessage.id,
       },
     );
 
@@ -3186,7 +3188,7 @@ export function GlassWorkspace({
         if (!message) return;
 
         const isEditMessage = message.raw.type === 'edited';
-        const isThreadReply = Boolean(message.replyToMessageId);
+        const isThreadReply = Boolean(message.threadRootMessageId);
 
         if (isThreadReply || isEditMessage) {
           setConversationThread((current) =>

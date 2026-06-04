@@ -1880,6 +1880,7 @@ export function CommunityWorkspace({
         {
           renderInChannel: false,
           replyPreviewTarget: threadPanel.replyTarget,
+          threadRootMessageId: threadPanel.root.id,
         },
       );
 
@@ -1918,6 +1919,7 @@ export function CommunityWorkspace({
         {
           renderInChannel: false,
           replyPreviewTarget: threadPanel.replyTarget,
+          threadRootMessageId: threadPanel.root.id,
         },
       );
 
@@ -1960,7 +1962,7 @@ export function CommunityWorkspace({
   const handleRealtimeThreadMessage = useCallback(
     (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
-      const rootMessageId = message.replyToMessageId;
+      const rootMessageId = message.threadRootMessageId;
 
       if (!channelId || !rootMessageId) return;
 
