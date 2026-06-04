@@ -56,14 +56,8 @@ export class MessageTimelineEntries {
         summary,
       ]),
     );
-    const threadRootMessageIds = new Set(
-      visibleThreadSummaries.map((summary) => summary.rootMessageId),
-    );
     const rootMessages = messages.filter(
-      (message) =>
-        !threadRootMessageIds.has(
-          MessageTimelineEntries.threadRootMessageId(message) ?? '',
-        ),
+      (message) => !MessageTimelineEntries.threadRootMessageId(message),
     );
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(

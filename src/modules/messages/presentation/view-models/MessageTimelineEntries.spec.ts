@@ -96,6 +96,30 @@ describe(MessageTimelineEntries.name, () => {
     });
   });
 
+  it('hides marked thread messages even when no thread summary is loaded', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const threadReply = chatMessage({
+      content: 'Thread reply',
+      id: 'thread-reply',
+      rawReplyToMessageId: root.id,
+      threadRootMessageId: root.id,
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build([root, threadReply], [], []);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: `message:${root.id}`,
+      threadSummary: undefined,
+      type: 'message',
+    });
+  });
+
   it('hides messages that belong to explicit thread summaries', () => {
     const root = chatMessage({
       content: 'Root',
