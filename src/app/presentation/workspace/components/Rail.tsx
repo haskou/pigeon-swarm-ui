@@ -214,11 +214,14 @@ export function Rail({
                   onCommunityClick?.(community.id);
                 }}
                 onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+
                   if (!canOpenCommunityMenu) return;
 
-                  event.preventDefault();
                   openCommunityMenu(community.id, event.currentTarget);
                 }}
+                onDragStart={(event) => event.preventDefault()}
                 onPointerCancel={clearCommunityLongPressTimer}
                 onPointerDown={(event) =>
                   handleCommunityPointerDown(
@@ -231,13 +234,13 @@ export function Rail({
                 onPointerUp={clearCommunityLongPressTimer}
                 title={community.name}
                 className={cx(
-                  'grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition',
+                  'grid h-12 w-12 shrink-0 select-none place-items-center rounded-2xl bg-white/10 font-black text-white/75 transition [-webkit-touch-callout:none]',
                   activeCommunityId === community.id && 'bg-white/15',
                   notificationsMuted && 'opacity-60 saturate-75',
                 )}
                 aria-label={community.name}
               >
-                <span className="grid h-full w-full place-items-center overflow-hidden rounded-2xl">
+                <span className="pointer-events-none grid h-full w-full select-none place-items-center overflow-hidden rounded-2xl">
                   <CommunityRailAvatar community={community} />
                 </span>
               </button>
@@ -619,7 +622,7 @@ function CommunityRailAvatar({ community }: { community: Community }) {
     <FallbackImage
       src={avatarUrl}
       alt=""
-      className="h-full w-full object-cover"
+      className="pointer-events-none h-full w-full select-none object-cover"
       draggable={false}
       fallback={community.name.slice(0, 1).toUpperCase()}
     />
