@@ -159,7 +159,7 @@ export function UserProfileDialog({
         style={{ left: position.left, top: position.top }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
+        <div className="relative h-24 overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900">
           {bannerUrl && (
             <button
               type="button"
@@ -185,14 +185,14 @@ export function UserProfileDialog({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/45 text-xl font-black text-white/80 backdrop-blur transition hover:bg-black/65"
+            className="absolute right-3 top-3 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/35 text-lg font-black text-white/65 backdrop-blur transition hover:bg-black/55 hover:text-white/90"
             aria-label={copy.dialog.close}
           >
             ×
           </button>
         </div>
 
-        <div className="relative px-5 pb-5">
+        <div className="relative px-6 pb-6">
           <button
             type="button"
             onClick={() => {
@@ -207,7 +207,7 @@ export function UserProfileDialog({
               ]);
             }}
             disabled={!displayPicture}
-            className="relative -mt-10 grid h-20 w-20 place-items-center overflow-visible rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
+            className="relative -mt-9 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-visible rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35 transition enabled:cursor-zoom-in enabled:hover:brightness-110 disabled:cursor-default"
             aria-label={copy.profile.openPicture}
           >
             <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-xl">
@@ -224,14 +224,16 @@ export function UserProfileDialog({
             <PresenceStatusDot
               presence={presence}
               size="lg"
-              className="-bottom-1 -right-1"
+              className="-bottom-0.5 -right-0.5 border-[#202331]"
             />
           </button>
 
-          <div className="mt-3 flex min-w-0 items-start gap-3">
+          <div className="mt-2 flex min-w-0 items-start gap-3">
             <div className="min-w-0 flex-1">
-              <h2 className="truncate text-2xl font-black">{displayName}</h2>
-              <p className="truncate text-sm text-white/45">{displayHandle}</p>
+              <h2 className="truncate text-xl font-black">{displayName}</h2>
+              <p className="truncate text-xs font-bold text-white/45">
+                {displayHandle}
+              </p>
             </div>
             {onOpenConversation && (
               <button
@@ -253,40 +255,36 @@ export function UserProfileDialog({
             </p>
           )}
 
-          <p className="mt-4 max-h-28 overflow-y-auto text-sm leading-6 text-white/70">
+          <p className="mt-2 max-h-24 overflow-y-auto text-sm leading-5 text-white/70">
             {biography}
           </p>
 
           <div className="mt-3 grid gap-3 text-xs">
             <div className="min-w-0">
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.profile.identityId}
-              </div>
-              <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-black/25 p-2">
-                <span className="block min-w-0 flex-1 truncate text-white/70">
+              <ProfileFieldLabel>{copy.profile.identityId}</ProfileFieldLabel>
+              <div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/5 bg-black/15 px-3 py-2">
+                <span className="block min-w-0 flex-1 truncate font-mono text-[0.7rem] text-white/60">
                   {identityId}
                 </span>
                 <button
                   type="button"
                   onClick={copyIdentityId}
-                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/75 transition hover:bg-white/15 hover:text-white"
                 >
                   {copied ? copy.profile.copied : copy.profile.copy}
                 </button>
               </div>
             </div>
-            <ProfileField
+            <ProfilePillField
               label={copy.profile.networks}
-              value={
-                networkNames.length > 0
-                  ? networkNames.join(', ')
-                  : copy.profile.noNetworks
-              }
+              values={networkNames}
+              emptyLabel={copy.profile.noNetworks}
             />
             {communityRoles && (
-              <ProfileRoleField
+              <ProfilePillField
                 label={copy.profile.communityRoles}
-                roles={communityRoles}
+                values={communityRoles}
+                emptyLabel={copy.profile.noCommunityRoles}
               />
             )}
           </div>
@@ -361,45 +359,42 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
-function ProfileField({ label, value }: { label: string; value: string }) {
+function ProfileFieldLabel({ children }: { children: string }) {
   return (
-    <div className="min-w-0">
-      <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-        {label}
-      </div>
-      <div className="min-w-0 break-words rounded-2xl bg-black/25 px-3 py-2 text-white/70">
-        {value}
-      </div>
+    <div className="mb-1.5 font-black uppercase tracking-[0.16em] text-white/45">
+      {children}
     </div>
   );
 }
 
-function ProfileRoleField({
+function ProfilePillField({
+  emptyLabel,
   label,
-  roles,
+  values,
 }: {
+  emptyLabel: string;
   label: string;
-  roles: string[];
+  values: string[];
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-        {label}
-      </div>
-      <div className="flex max-h-24 min-w-0 flex-wrap gap-1.5 overflow-y-auto rounded-2xl bg-black/25 px-3 py-2 text-white/70">
-        {roles.length > 0 ? (
-          roles.map((role) => (
+      <ProfileFieldLabel>{label}</ProfileFieldLabel>
+      {values.length > 0 ? (
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          {values.map((value) => (
             <span
-              key={role}
-              className="min-w-0 max-w-full truncate rounded-full bg-white/10 px-2.5 py-1 font-black text-white/75"
+              key={value}
+              className="min-w-0 max-w-full truncate rounded-full border border-white/5 bg-white/10 px-2.5 py-1 font-black text-white/75"
             >
-              {role}
+              {value}
             </span>
-          ))
-        ) : (
-          <span>{copy.profile.noCommunityRoles}</span>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <span className="inline-flex max-w-full rounded-full border border-white/5 bg-black/15 px-2.5 py-1 font-bold text-white/45">
+          {emptyLabel}
+        </span>
+      )}
     </div>
   );
 }
