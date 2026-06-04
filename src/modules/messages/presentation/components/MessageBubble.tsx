@@ -154,7 +154,6 @@ export function MessageBubble({
   );
   const emojiOnlyMessage =
     Boolean(emojiOnlyClass) &&
-    !hasReply &&
     message.attachments.length === 0 &&
     !linkPreview &&
     !sticker;
