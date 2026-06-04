@@ -54,6 +54,7 @@ type CommunityChannelPlainPayload = {
   reply?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp?: number;
   type?: string;
 };
@@ -187,6 +188,7 @@ function plaintextMessage(
     replyPreview: payload.reply,
     replyToMessageId: payload.replyToMessageId ?? base.replyToMessageId,
     sticker: payload.sticker,
+    threadRootMessageId: threadRootMessageIdFromPayload(payload, base),
     timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
   };
 }
@@ -221,11 +223,28 @@ async function decryptMessage(
       replyPreview: payload.reply,
       replyToMessageId: payload.replyToMessageId ?? base.replyToMessageId,
       sticker: payload.sticker,
+      threadRootMessageId: threadRootMessageIdFromPayload(payload, base),
       timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
     };
   } catch {
     return encryptedError(base, message, request.copy.decryptFailed);
   }
+}
+
+function threadRootMessageIdFromPayload(
+  payload: CommunityChannelPlainPayload,
+  base: Omit<ChatMessage, 'content' | 'encrypted'>,
+): string | undefined {
+  if (payload.threadRootMessageId) return payload.threadRootMessageId;
+
+  if (
+    payload.type === 'CommunityChannelThreadMessageSent' ||
+    payload.type === 'CommunityChannelThreadStickerMessageSent'
+  ) {
+    return payload.replyToMessageId ?? base.replyToMessageId;
+  }
+
+  return undefined;
 }
 
 function isEditedCommunityChannelMessage(

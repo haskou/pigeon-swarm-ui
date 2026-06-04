@@ -12,6 +12,8 @@ import { MessageAttachmentPreview } from './MessageAttachmentPreview';
 import { visibleImageAlbumItems } from './visibleImageAlbumItems';
 
 const previewViewportMargin = 360;
+const albumWidthClass =
+  'w-[min(72vw,24rem)] max-w-full sm:w-[min(42vw,24rem)]';
 
 export type IndexedAttachment = {
   attachment: MessageAttachment;
@@ -134,6 +136,7 @@ export function ImageAttachmentAlbum({
       ref={albumRef}
       className={cx(
         'overflow-hidden rounded-2xl border',
+        albumWidthClass,
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
@@ -159,7 +162,7 @@ export function ImageAttachmentAlbum({
                 onOpen(lightboxImages, lightboxIndex);
               }}
               className={cx(
-                'relative min-h-28 overflow-hidden rounded-2xl bg-black/25 text-left transition hover:opacity-90',
+                'relative w-full min-w-0 overflow-hidden rounded-2xl bg-black/25 text-left transition hover:opacity-90',
                 visibleItems.length === 1 ? 'aspect-[4/3]' : 'aspect-square',
               )}
               aria-label={copy.attachments.openImage}

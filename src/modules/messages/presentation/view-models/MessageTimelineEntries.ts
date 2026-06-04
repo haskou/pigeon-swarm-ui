@@ -41,17 +41,21 @@ export class MessageTimelineEntries {
     polls: PollResource[],
     threadSummaries: MessageThreadSummary[] = [],
   ): MessageTimelineEntry[] {
-    const threadSummariesByRootMessageId = new Map(
-      threadSummaries.map((summary) => [summary.rootMessageId, summary]),
+    const visibleThreadSummaries = threadSummaries.filter((summary) =>
+      MessageTimelineEntries.isVisibleThreadSummary(summary),
     );
-    const threadRootMessageIds = new Set(
-      threadSummaries.map((summary) => summary.rootMessageId),
+    const knownThreadMessageIds =
+      MessageTimelineEntries.knownThreadMessageIds(visibleThreadSummaries);
+    const threadSummariesByRootMessageId = new Map(
+      visibleThreadSummaries.map((summary) => [
+        summary.rootMessageId,
+        summary,
+      ]),
     );
     const rootMessages = messages.filter(
       (message) =>
-        !threadRootMessageIds.has(
-          MessageTimelineEntries.replyToMessageId(message) ?? '',
-        ),
+        !MessageTimelineEntries.threadRootMessageId(message) &&
+        !knownThreadMessageIds.has(message.id),
     );
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
@@ -117,6 +121,49 @@ export class MessageTimelineEntries {
 
   private static replyToMessageId(message: ChatMessage): string | undefined {
     return message.replyToMessageId ?? message.raw.replyToMessageId;
+  }
+
+  private static threadRootMessageId(message: ChatMessage): string | undefined {
+    return message.threadRootMessageId;
+  }
+
+  private static isVisibleThreadSummary(
+    summary: MessageThreadSummary,
+  ): boolean {
+    if (!summary.lastMessage) return true;
+
+    if (
+      MessageTimelineEntries.threadRootMessageId(summary.lastMessage) ===
+      summary.rootMessageId
+    ) {
+      return true;
+    }
+
+    return MessageTimelineEntries.isUnmarkedThreadReply(summary);
+  }
+
+  private static isUnmarkedThreadReply(
+    summary: MessageThreadSummary,
+  ): boolean {
+    const lastMessage = summary.lastMessage;
+
+    if (!lastMessage?.replyPreview) return false;
+
+    return (
+      MessageTimelineEntries.replyToMessageId(lastMessage) ===
+        summary.rootMessageId &&
+      lastMessage.replyPreview.messageId !== summary.rootMessageId
+    );
+  }
+
+  private static knownThreadMessageIds(
+    threadSummaries: MessageThreadSummary[],
+  ): Set<string> {
+    return new Set(
+      threadSummaries
+        .map((summary) => summary.lastMessage?.id)
+        .filter((messageId): messageId is string => Boolean(messageId)),
+    );
   }
 
   private static startsTimelineDay(

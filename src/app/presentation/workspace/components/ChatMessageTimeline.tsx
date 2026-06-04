@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 
 import { Fragment, useMemo } from 'react';
 
@@ -52,6 +52,7 @@ interface ChatMessageTimelineProps {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ) => Promise<string>;
+  missingConversationKeyContent?: ReactNode;
   messageState: LoadState;
   messages: ChatMessage[];
   newMessageCount: number;
@@ -91,6 +92,7 @@ export function ChatMessageTimeline({
   identityPictures,
   isGroupConversation,
   loadAttachmentPreview,
+  missingConversationKeyContent,
   messages,
   messageState,
   newMessageCount,
@@ -134,6 +136,7 @@ export function ChatMessageTimeline({
           identityPictures={identityPictures}
           isGroupConversation={isGroupConversation}
           loadAttachmentPreview={loadAttachmentPreview}
+          missingConversationKeyContent={missingConversationKeyContent}
           messageState={messageState}
           messages={messages}
           onAttachmentOpen={onAttachmentOpen}
@@ -172,6 +175,7 @@ function MessageTimelineContent({
   identityPictures,
   isGroupConversation,
   loadAttachmentPreview,
+  missingConversationKeyContent,
   messages,
   messageState,
   onAttachmentOpen,
@@ -245,7 +249,11 @@ function MessageTimelineContent({
           ),
         )}
         {timelineEntries.length === 0 && messageState !== 'loading' && (
-          <EmptyTimelineState hasConversationKey={hasConversationKey} />
+          missingConversationKeyContent && !hasConversationKey ? (
+            <>{missingConversationKeyContent}</>
+          ) : (
+            <EmptyTimelineState hasConversationKey={hasConversationKey} />
+          )
         )}
         <div ref={bottomRef} />
       </div>

@@ -29,9 +29,12 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
+  ConversationInvitationNotificationResource,
   IdentityResource,
   MessageResource,
   NotificationMentionContext,
+  CommunityInvitationNotificationResource,
+  NotificationResource,
   NotificationSettingScope,
   PollResource,
   Session,
@@ -54,6 +57,7 @@ import { ConversationTimeline } from '../../../../modules/conversations/domain/C
 import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
 import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
+import { ThreadMessageVisibility } from '../../../../modules/messages/presentation/view-models/ThreadMessageVisibility';
 import {
   MessageScrollAnchor,
   type MessageScrollAnchorSnapshot,
@@ -72,7 +76,10 @@ import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/
 import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
-import { identityDisplayName } from '../../../../modules/identities/presentation/view-models/identityDisplay';
+import {
+  identityDisplayName,
+  identityPrimaryDisplayName,
+} from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -195,6 +202,33 @@ function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
 }
 
+function isPendingConversationInvitationFor(
+  notification: NotificationResource,
+  conversationId: string,
+  recipientIdentityId: string,
+): notification is ConversationInvitationNotificationResource {
+  return (
+    notification.state === 'pending' &&
+    notification.recipientIdentityId === recipientIdentityId &&
+    (notification.type === 'conversation_invitation' ||
+      notification.type === 'group_conversation_invitation') &&
+    notification.payload.conversationId === conversationId
+  );
+}
+
+function isPendingCommunityInvitationFor(
+  notification: NotificationResource,
+  communityId: string,
+  recipientIdentityId: string,
+): notification is CommunityInvitationNotificationResource {
+  return (
+    notification.state === 'pending' &&
+    notification.recipientIdentityId === recipientIdentityId &&
+    notification.type === 'community_invitation' &&
+    notification.payload.communityId === communityId
+  );
+}
+
 function stringArrayAttribute(
   event: RealtimeDomainEvent,
   ...names: string[]
@@ -242,13 +276,19 @@ function mergeConversationThreadMessage(
     [currentThread.root],
     incomingMessage,
   );
+  const threadMessages = ThreadMessageVisibility.belongsToRoot(
+    currentThread.root.id,
+    incomingMessage,
+  )
+    ? mergeConversationMessageIfTargetExists(
+        currentThread.messages,
+        incomingMessage,
+      )
+    : currentThread.messages;
 
   return {
     ...currentThread,
-    messages: mergeConversationMessageIfTargetExists(
-      currentThread.messages,
-      incomingMessage,
-    ),
+    messages: threadMessages,
     root:
       rootMessages.find((message) => message.id === currentThread.root.id) ??
       currentThread.root,
@@ -1116,6 +1156,48 @@ export function GlassWorkspace({
     notifications: notificationList,
     session,
   });
+  const activeConversationInvitation = useMemo(
+    () =>
+      activeConversation
+        ? (notificationList.find((notification) =>
+            isPendingConversationInvitationFor(
+              notification,
+              activeConversation.id,
+              session.identity.id,
+            ),
+          ) ?? null)
+        : null,
+    [activeConversation, notificationList, session.identity.id],
+  );
+  const activeConversationInvitationInviterName = activeConversationInvitation
+    ? identityPrimaryDisplayName(
+        identityDisplayName(
+          activeConversationInvitation.payload.inviterIdentityId,
+          identityNames,
+        ),
+      )
+    : undefined;
+  const activeCommunityInvitation = useMemo(
+    () =>
+      activeCommunity
+        ? (notificationList.find((notification) =>
+            isPendingCommunityInvitationFor(
+              notification,
+              activeCommunity.id,
+              session.identity.id,
+            ),
+          ) ?? null)
+        : null,
+    [activeCommunity, notificationList, session.identity.id],
+  );
+  const activeCommunityInvitationInviterName = activeCommunityInvitation
+    ? identityPrimaryDisplayName(
+        identityDisplayName(
+          activeCommunityInvitation.payload.inviterIdentityId,
+          identityNames,
+        ),
+      )
+    : undefined;
   const {
     mergePresence,
     notificationsMutedByPresence,
@@ -2568,7 +2650,7 @@ export function GlassWorkspace({
         draft: '',
         editingMessage: null,
         error: null,
-        messages: result.messages,
+        messages: ThreadMessageVisibility.forRoot(message.id, result.messages),
         replyTarget: null,
         root: message,
         state: 'ready',
@@ -2831,6 +2913,7 @@ export function GlassWorkspace({
             : [rootMessage.id],
         replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
+        threadRootMessageId: rootMessage.id,
       },
     );
 
@@ -2868,6 +2951,7 @@ export function GlassWorkspace({
         replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
         replyToMessageId: rootMessage.id,
         sticker,
+        threadRootMessageId: rootMessage.id,
       },
     );
 
@@ -3111,7 +3195,7 @@ export function GlassWorkspace({
         if (!message) return;
 
         const isEditMessage = message.raw.type === 'edited';
-        const isThreadReply = Boolean(message.replyToMessageId);
+        const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
 
         if (isThreadReply || isEditMessage) {
           setConversationThread((current) =>
@@ -3354,6 +3438,9 @@ export function GlassWorkspace({
           eventAggregateId(event) ?? stringAttribute(event, 'communityId');
         const channelId = stringAttribute(event, 'channelId');
         const authorIdentityId = stringAttribute(event, 'authorIdentityId');
+        const timelineMessage = recordAttribute(event, 'message') as
+          | MessageResource
+          | undefined;
         const pageVisible = isBrowserPageVisible();
         const eventCommunity = communityId
           ? communities.find((community) => community.id === communityId)
@@ -3404,6 +3491,7 @@ export function GlassWorkspace({
             channelId,
             authorIdentityId,
             identityNames,
+            timelineMessage,
           );
 
           playNotificationSoundIfAllowed();
@@ -3654,6 +3742,7 @@ export function GlassWorkspace({
             session,
             identityNames,
             identityProfiles,
+            timelineMessage,
           );
 
           playNotificationSoundIfAllowed();
@@ -4221,6 +4310,9 @@ export function GlassWorkspace({
                   editingMessage={editingMessage?.message ?? null}
                   hasConversationKey={!!activeConversationKey}
                   hasReachedMessageStart={!messageCursor}
+                  invitationAccepting={notificationAction === 'accept'}
+                  invitationError={notificationError}
+                  invitationInviterName={activeConversationInvitationInviterName}
                   peerIdentityId={activeConversationPeerIdentityId}
                   peerIdentity={
                     activeConversationPeerIdentityId
@@ -4251,6 +4343,9 @@ export function GlassWorkspace({
                   onSend={handleSend}
                   onStickerSend={handleSendSticker}
                   onConversationKeyImported={handleConversationKeyImported}
+                  onInvitationAccept={(notification) =>
+                    void acceptNotification(notification)
+                  }
                   onDraftChange={updateActiveConversationDraft}
                   onEscape={closeTransientUi}
                   onJumpToLatest={jumpToLatestMessages}
@@ -4285,6 +4380,7 @@ export function GlassWorkspace({
                   onRetryMessage={retryMessage}
                   onStartCall={startConversationCall}
                   onTypingActive={sendConversationTyping}
+                  pendingInvitation={activeConversationInvitation}
                   typingIdentityIds={conversationTypingIdentityIds}
                 />
               </Suspense>
@@ -4308,6 +4404,9 @@ export function GlassWorkspace({
                 visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}
               }
               community={activeCommunity}
+              invitationAccepting={notificationAction === 'accept'}
+              invitationError={notificationError}
+              invitationInviterName={activeCommunityInvitationInviterName}
               notificationSettingsByScopeKey={notificationSettingsByScopeKey}
               mobileMembersOpen={communityMembersOpen}
               mobileSidebarOpen={sidebarOpen}
@@ -4379,6 +4478,9 @@ export function GlassWorkspace({
                   ),
                 )
               }
+              onInvitationAccept={(notification) =>
+                void acceptNotification(notification)
+              }
               onCommunityLeft={(community) =>
                 setCommunities((current) =>
                   current.filter((item) => item.id !== community.id),
@@ -4409,6 +4511,7 @@ export function GlassWorkspace({
               onTypingActive={sendCommunityTyping}
               realtimeStatus={realtimeStatus}
               onRealtimeEventsOpen={openRealtimeEvents}
+              pendingInvitation={activeCommunityInvitation}
               session={session}
               typingIdentityIds={communityTypingIdentityIds}
               onJoinVoiceChannel={startCommunityVoiceCall}

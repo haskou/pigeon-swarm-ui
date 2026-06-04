@@ -13,6 +13,7 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  ConversationInvitationNotificationResource,
   NotificationScopeSetting,
   PollResource,
   Session,
@@ -32,6 +33,7 @@ import { Composer } from '../../../../modules/messages/presentation/components/C
 import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
 import { memberPrimaryName } from '../../../../modules/communities/presentation/components/communityMemberNames';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
+import { InvitationKeyPrompt } from '../../../../modules/notifications/presentation/components/InvitationKeyPrompt';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
@@ -101,6 +103,9 @@ interface ChatColumnProps {
   editingMessage?: ChatMessage | null;
   hasConversationKey: boolean;
   hasReachedMessageStart: boolean;
+  invitationAccepting?: boolean;
+  invitationError?: null | string;
+  invitationInviterName?: string;
   messages: ChatMessage[];
   messageState: LoadState;
   nodeNetworks: NodeNetwork[];
@@ -118,6 +123,9 @@ interface ChatColumnProps {
   onEditMessage: (content: string) => Promise<void>;
   onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
+  onInvitationAccept?: (
+    notification: ConversationInvitationNotificationResource,
+  ) => void;
   onDraftChange: (value: string) => void;
   onEscape: () => void;
   onJumpToLatest: () => void;
@@ -157,6 +165,7 @@ interface ChatColumnProps {
     title: string;
   }) => void;
   onTypingActive?: (active: boolean) => void;
+  pendingInvitation?: ConversationInvitationNotificationResource | null;
   realtimeEvent?: RealtimeDomainEvent | null;
   typingIdentityIds?: string[];
 }
@@ -178,6 +187,9 @@ export function ChatColumn({
   identityNames,
   identityPictures,
   identityProfiles,
+  invitationAccepting = false,
+  invitationError,
+  invitationInviterName,
   presenceByIdentityId = {},
   messages,
   messageState,
@@ -187,6 +199,7 @@ export function ChatColumn({
   onCancelReply,
   onCancelEdit,
   onConversationKeyImported,
+  onInvitationAccept,
   onCreate,
   onDraftChange,
   onEscape,
@@ -211,6 +224,7 @@ export function ChatColumn({
   peerIdentity,
   peerIdentityId,
   peerPicture,
+  pendingInvitation,
   pinnedMessageIds,
   progress,
   realtimeEvent,
@@ -444,6 +458,22 @@ export function ChatColumn({
     [groupParticipants],
   );
   const canShareConversationKey = !isGroupConversation;
+  const hasPendingInvitation =
+    !hasConversationKey && !!pendingInvitation && !!onInvitationAccept;
+  const invitationPrompt =
+    !hasConversationKey && pendingInvitation && onInvitationAccept ? (
+    <InvitationKeyPrompt
+      accepting={invitationAccepting}
+      error={invitationError}
+      inviterName={invitationInviterName}
+      kind="conversation"
+      onAccept={() => onInvitationAccept(pendingInvitation)}
+      onManualImport={() => {
+        setConversationKeyError(null);
+        setConversationKeyDialog('add');
+      }}
+    />
+  ) : null;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
     setEncryptedConversationKey('');
@@ -702,6 +732,7 @@ export function ChatColumn({
             isGroupConversation={isGroupConversation}
             loadAttachmentPreview={loadAttachmentPreview}
             messageState={messageState}
+            missingConversationKeyContent={invitationPrompt}
             messages={messages}
             newMessageCount={newMessageCount}
             onAttachmentOpen={(attachment) => void openAttachment(attachment)}
@@ -749,7 +780,7 @@ export function ChatColumn({
             onCancelReply={onCancelReply}
             progress={downloadProgress ?? progress}
             placeholder={
-              hasConversationKey
+              hasConversationKey || hasPendingInvitation
                 ? copy.composer.placeholder
                 : copy.messages.missingConversationKey
             }

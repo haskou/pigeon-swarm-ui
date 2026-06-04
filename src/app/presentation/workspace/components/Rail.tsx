@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
   type PointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -96,7 +97,11 @@ export function Rail({
     [],
   );
 
-  const openCommunityMenu = (communityId: string, target: HTMLElement) => {
+  const openCommunityMenu = (
+    communityId: string,
+    target: HTMLElement,
+    ignoreBackdropClicksForMs = 0,
+  ) => {
     const rect = target.getBoundingClientRect();
     const menuHeight = 176;
     const menuWidth = 224;
@@ -108,6 +113,10 @@ export function Rail({
 
     setCommunityMenu({
       communityId,
+      ignoreBackdropClicksUntil:
+        ignoreBackdropClicksForMs > 0
+          ? performance.now() + ignoreBackdropClicksForMs
+          : 0,
       left: Math.max(12, left),
       top,
     });
@@ -126,7 +135,7 @@ export function Rail({
     const target = event.currentTarget;
     communityLongPressTimerRef.current = window.setTimeout(() => {
       communityLongPressOpenedRef.current = true;
-      openCommunityMenu(communityId, target);
+      openCommunityMenu(communityId, target, 650);
     }, 450);
   };
 
@@ -254,6 +263,9 @@ export function Rail({
               {canOpenCommunityMenu && communityMenu?.communityId === community.id ? (
                 <CommunityRailMenu
                   communityName={community.name}
+                  ignoreBackdropClicksUntil={
+                    communityMenu.ignoreBackdropClicksUntil
+                  }
                   left={communityMenu.left}
                   notificationSetting={notificationSetting}
                   top={communityMenu.top}
@@ -419,12 +431,14 @@ export function Rail({
 
 interface CommunityMenuState {
   communityId: string;
+  ignoreBackdropClicksUntil: number;
   left: number;
   top: number;
 }
 
 function CommunityRailMenu({
   communityName,
+  ignoreBackdropClicksUntil,
   left,
   notificationSetting,
   top,
@@ -434,6 +448,7 @@ function CommunityRailMenu({
   onNotificationSettingsOpen,
 }: {
   communityName: string;
+  ignoreBackdropClicksUntil: number;
   left: number;
   notificationSetting?: NotificationScopeSetting;
   top: number;
@@ -442,6 +457,16 @@ function CommunityRailMenu({
   onNotificationMuteToggle?: () => void;
   onNotificationSettingsOpen?: () => void;
 }) {
+  const closeFromBackdrop = (event: MouseEvent<HTMLButtonElement>) => {
+    if (performance.now() < ignoreBackdropClicksUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    onClose();
+  };
   const menuStyle = {
     left,
     top,
@@ -456,7 +481,7 @@ function CommunityRailMenu({
       <button
         type="button"
         className="fixed inset-0 z-[80] cursor-default select-none"
-        onClick={onClose}
+        onClick={closeFromBackdrop}
         onContextMenu={(event) => {
           event.preventDefault();
           onClose();

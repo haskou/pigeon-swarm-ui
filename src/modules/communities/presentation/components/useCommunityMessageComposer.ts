@@ -51,6 +51,7 @@ type CommunityPendingSend = {
   replyTarget: ChatMessage | null;
   renderInChannel?: boolean;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
 };
 
 type EditingMessage = {
@@ -465,6 +466,7 @@ export function useCommunityMessageComposer({
           replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
+          threadRootMessageId: payload.threadRootMessageId,
           timestamp,
         },
       ]);
@@ -493,6 +495,11 @@ export function useCommunityMessageComposer({
         const linkPreview = payload.sticker
           ? undefined
           : await createLinkPreviewForContent(session, payload.content);
+        const eventType = payload.threadRootMessageId
+          ? payload.sticker
+            ? ('CommunityChannelThreadStickerMessageSent' as const)
+            : ('CommunityChannelThreadMessageSent' as const)
+          : undefined;
         const payloadInput = {
           attachments: messageAttachments,
           authorIdentityId: session.identity.id,
@@ -504,6 +511,8 @@ export function useCommunityMessageComposer({
           replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
+          threadRootMessageId: payload.threadRootMessageId,
+          eventType,
           timestamp,
         };
         const messagePayload = communityIsPublic
@@ -581,6 +590,7 @@ export function useCommunityMessageComposer({
     options: {
       renderInChannel?: boolean;
       replyPreviewTarget?: ChatMessage | null;
+      threadRootMessageId?: string;
     } = {},
   ): Promise<ChatMessage | null> => {
     const channelId = message.raw.channelId ?? selectedChannelId;
@@ -596,6 +606,7 @@ export function useCommunityMessageComposer({
       replyPreviewTarget: options.replyPreviewTarget,
       renderInChannel: options.renderInChannel,
       replyTarget: message,
+      threadRootMessageId: options.threadRootMessageId,
     });
   };
 
@@ -605,6 +616,7 @@ export function useCommunityMessageComposer({
     options: {
       renderInChannel?: boolean;
       replyPreviewTarget?: ChatMessage | null;
+      threadRootMessageId?: string;
     } = {},
   ): Promise<ChatMessage | null> => {
     const channelId = message.raw.channelId ?? selectedChannelId;
@@ -621,6 +633,7 @@ export function useCommunityMessageComposer({
       renderInChannel: options.renderInChannel,
       replyTarget: message,
       sticker,
+      threadRootMessageId: options.threadRootMessageId,
     });
   };
 

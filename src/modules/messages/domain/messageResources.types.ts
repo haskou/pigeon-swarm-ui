@@ -39,6 +39,7 @@ export type SendMessageOptions = {
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
 };
 
 export type EditMessageOptions = {
@@ -177,5 +178,6 @@ export type ChatMessage = {
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp: number;
 };

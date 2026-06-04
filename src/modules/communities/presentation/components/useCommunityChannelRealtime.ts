@@ -15,6 +15,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { MessageReactions } from '../../../messages/domain/MessageReactions';
+import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import {
   mergeChatMessages,
   realtimeMessageAttribute,
@@ -235,7 +236,7 @@ export function useCommunityChannelRealtime({
       .then((projected) => {
         if (cancelled) return;
 
-        if (projected.replyToMessageId) {
+        if (ThreadMessageVisibility.isThreadMessage(projected)) {
           onThreadMessageReceived?.(projected);
 
           return;

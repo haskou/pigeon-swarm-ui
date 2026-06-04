@@ -21,6 +21,7 @@ import type {
   Community,
   AttachmentUploadOptions,
   CommunityChannelThreadSummary,
+  CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ChatMessage,
@@ -50,6 +51,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { Composer } from '../../../messages/presentation/components/Composer';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
+import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
@@ -100,6 +102,9 @@ interface CommunityWorkspaceProps {
   activeCall?: CallSession | null;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
+  invitationAccepting?: boolean;
+  invitationError?: null | string;
+  invitationInviterName?: string;
   mobileMembersOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
@@ -109,6 +114,9 @@ interface CommunityWorkspaceProps {
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
+  onInvitationAccept?: (
+    notification: CommunityInvitationNotificationResource,
+  ) => void;
   notificationSettingsByScopeKey: NotificationSettingMap;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
@@ -146,6 +154,7 @@ interface CommunityWorkspaceProps {
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   onTypingActive?: (channelId: string, active: boolean) => void;
+  pendingInvitation?: CommunityInvitationNotificationResource | null;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
@@ -176,6 +185,9 @@ export function CommunityWorkspace({
   activeChannelId,
   channelUnreadCounts = {},
   community,
+  invitationAccepting = false,
+  invitationError,
+  invitationInviterName,
   mobileMembersOpen,
   mobileRail,
   mobileSidebarOpen,
@@ -195,6 +207,7 @@ export function CommunityWorkspace({
   onChannelViewed,
   onCommunityLeft,
   onCommunityUpdated,
+  onInvitationAccept,
   onJoinVoiceChannel,
   onLogout,
   onMobileMembersClose,
@@ -208,6 +221,7 @@ export function CommunityWorkspace({
   onRealtimeEventsOpen,
   onSessionUpdated,
   onTypingActive,
+  pendingInvitation,
   presenceByIdentityId = {},
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -647,24 +661,29 @@ export function CommunityWorkspace({
           channelId,
           result.messages,
         );
+        const visibleThreadMessages = ThreadMessageVisibility.forRoot(
+          message.id,
+          threadMessages,
+        );
 
         setThreadPanel({
           channelId,
           draft: '',
           editingMessage: null,
           error: null,
-          messages: threadMessages,
+          messages: visibleThreadMessages,
           replyTarget: null,
           root: message,
           state: 'ready',
         });
-        if (threadMessages.length > 0) {
-          const lastReply = threadMessages[threadMessages.length - 1];
+        if (visibleThreadMessages.length > 0) {
+          const lastReply =
+            visibleThreadMessages[visibleThreadMessages.length - 1];
 
           upsertChannelThreadSummary(channelId, {
             lastReplyAt: lastReply.timestamp,
             lastReplyMessageId: lastReply.id,
-            replyCount: threadMessages.length,
+            replyCount: visibleThreadMessages.length,
             rootMessageId: message.id,
           });
         }
@@ -1867,6 +1886,7 @@ export function CommunityWorkspace({
         {
           renderInChannel: false,
           replyPreviewTarget: threadPanel.replyTarget,
+          threadRootMessageId: threadPanel.root.id,
         },
       );
 
@@ -1905,6 +1925,7 @@ export function CommunityWorkspace({
         {
           renderInChannel: false,
           replyPreviewTarget: threadPanel.replyTarget,
+          threadRootMessageId: threadPanel.root.id,
         },
       );
 
@@ -1947,7 +1968,7 @@ export function CommunityWorkspace({
   const handleRealtimeThreadMessage = useCallback(
     (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
-      const rootMessageId = message.replyToMessageId;
+      const rootMessageId = ThreadMessageVisibility.rootMessageId(message);
 
       if (!channelId || !rootMessageId) return;
 
@@ -2109,6 +2130,7 @@ export function CommunityWorkspace({
               threadLabelByRootMessageId={threadLabelByRootMessageId}
               visibleTextChannels={visibleTextChannels}
               visibleVoiceChannels={visibleVoiceChannels}
+              voiceChannelNotificationSetting={channelNotificationSetting}
               voiceChannels={voiceChannels}
               voiceParticipantsByChannelId={voiceParticipantsByChannelId}
             />
@@ -2313,11 +2335,15 @@ export function CommunityWorkspace({
               messageCursor={messageCursor}
               messageState={messageState}
               missingCommunityKey={missingCommunityKey}
+              invitationAccepting={invitationAccepting}
+              invitationError={invitationError}
+              invitationInviterName={invitationInviterName}
               newChannelMessageCount={newChannelMessageCount}
               onAddCommunityKey={() => {
                 setCommunityKeyError(null);
                 setCommunityKeyDialog('add');
               }}
+              onInvitationAccept={onInvitationAccept}
               onAttachmentOpen={(attachment) =>
                 void messageComposer.openAttachment(attachment)
               }
@@ -2363,6 +2389,7 @@ export function CommunityWorkspace({
               onStickerClick={handleStickerClick}
               currentRoleIds={currentRoleIds}
               reactionAuthorNames={reactionAuthorNames}
+              pendingInvitation={pendingInvitation}
               polls={selectedChannelPolls}
               pinnedMessageIds={pinnedMessageIds}
               scrollerRef={scrollerRef}
@@ -2616,11 +2643,17 @@ function mergeCommunityThreadMessage(
     currentThread.root.id === incomingMessage.id
       ? mergeChatMessages([currentThread.root], [incomingMessage])
       : [currentThread.root];
-  const threadMessages = currentThread.messages.some(
+  const messageAlreadyInThread = currentThread.messages.some(
     (message) => message.id === incomingMessage.id,
-  )
-    ? mergeChatMessages(currentThread.messages, [incomingMessage])
-    : currentThread.messages;
+  );
+  const messageBelongsToThread = ThreadMessageVisibility.belongsToRoot(
+    currentThread.root.id,
+    incomingMessage,
+  );
+  const threadMessages =
+    messageAlreadyInThread || messageBelongsToThread
+      ? mergeChatMessages(currentThread.messages, [incomingMessage])
+      : currentThread.messages;
 
   return {
     ...currentThread,

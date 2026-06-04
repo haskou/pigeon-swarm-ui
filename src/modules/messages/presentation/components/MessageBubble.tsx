@@ -20,6 +20,7 @@ import { ImageLightbox, type LightboxImage } from './imageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
 import { PinIcon, ThreadIcon } from './messageActionIcons';
+import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import {
   AttachmentCard,
   ImageAttachmentAlbum,
@@ -147,6 +148,16 @@ export function MessageBubble({
       ),
     [currentIdentityId, message.reactions, reactionAuthorNames],
   );
+  const emojiOnlyClass = useMemo(
+    () => EmojiOnlyMessage.sizeClass(message.content),
+    [message.content],
+  );
+  const emojiOnlyMessage =
+    Boolean(emojiOnlyClass) &&
+    message.attachments.length === 0 &&
+    !linkPreview &&
+    !sticker;
+  const transparentMessage = sticker || emojiOnlyMessage;
 
   useEffect(() => clearLongPressTimer, []);
   useEffect(() => {
@@ -247,6 +258,8 @@ export function MessageBubble({
                   message.deliveryStatus === 'pending' && 'opacity-70',
                   sticker
                     ? 'rounded-2xl bg-transparent p-0'
+                    : emojiOnlyMessage
+                      ? 'rounded-2xl bg-transparent py-2.5'
                     : cx(
                         'rounded-2xl p-2.5',
                         mine
@@ -257,7 +270,7 @@ export function MessageBubble({
                       ),
                 )}
               >
-                {pinned && !sticker && <PinnedMessageMarker />}
+                {pinned && !transparentMessage && <PinnedMessageMarker />}
                 {hasReply && replyMessageId && (
                   <MessageReplyPreview
                     mine={mine}
@@ -320,6 +333,7 @@ export function MessageBubble({
                   <div
                     className={cx(
                       'whitespace-pre-wrap break-words',
+                      emojiOnlyMessage && emojiOnlyClass,
                       (hasReply || message.attachments.length > 0) && 'mt-3',
                       message.encrypted && 'text-white/55',
                     )}
