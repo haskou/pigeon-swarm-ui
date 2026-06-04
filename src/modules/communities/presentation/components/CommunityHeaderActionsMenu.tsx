@@ -45,6 +45,10 @@ export function CommunityHeaderActionsMenu({
         type="button"
         className="fixed inset-0 z-30 cursor-default"
         onClick={onClose}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
         aria-label={copy.dialog.close}
       />
       <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">

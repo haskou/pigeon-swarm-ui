@@ -457,7 +457,10 @@ function CommunityRailMenu({
         type="button"
         className="fixed inset-0 z-[80] cursor-default select-none"
         onClick={onClose}
-        onContextMenu={(event) => event.preventDefault()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
         style={{
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
