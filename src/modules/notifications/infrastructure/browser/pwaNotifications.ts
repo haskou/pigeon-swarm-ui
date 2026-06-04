@@ -30,6 +30,10 @@ type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
 };
 
 const notificationBadge = '/favicon/notification-badge.png';
+const explicitSubscriptionPromises = new Map<
+  string,
+  Promise<EnsurePwaPushSubscriptionResult>
+>();
 
 class PushSubscriptionsUnsupportedError extends Error {}
 
@@ -216,7 +220,7 @@ async function subscriptionForRegistration(
   });
 }
 
-export async function ensurePwaPushSubscription(
+async function ensurePwaPushSubscriptionOnce(
   session: Session,
   options: EnsurePwaPushSubscriptionOptions = {},
 ): Promise<EnsurePwaPushSubscriptionResult> {
@@ -253,6 +257,31 @@ export async function ensurePwaPushSubscription(
   );
 
   return 'granted';
+}
+
+export async function ensurePwaPushSubscription(
+  session: Session,
+  options: EnsurePwaPushSubscriptionOptions = {},
+): Promise<EnsurePwaPushSubscriptionResult> {
+  if (!options.requestPermission) {
+    return await ensurePwaPushSubscriptionOnce(session, options);
+  }
+
+  const pendingSubscription = explicitSubscriptionPromises.get(
+    session.identity.id,
+  );
+
+  if (pendingSubscription) return await pendingSubscription;
+
+  const subscription = ensurePwaPushSubscriptionOnce(session, options).finally(
+    () => {
+      explicitSubscriptionPromises.delete(session.identity.id);
+    },
+  );
+
+  explicitSubscriptionPromises.set(session.identity.id, subscription);
+
+  return await subscription;
 }
 
 export async function deletePwaPushSubscription(
