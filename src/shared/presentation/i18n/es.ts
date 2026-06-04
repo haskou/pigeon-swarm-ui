@@ -45,20 +45,20 @@ export const es = {
       'En Safari, toca Compartir y despues Anadir a pantalla de inicio.',
     installAppPrompting: 'Abriendo instalador...',
     installAppReadyHelp: 'Tu navegador esta listo para instalar Pigeon Swarm.',
-    invalidLogin: 'El usuario o la contrasena no son correctos.',
+    invalidLogin: 'El usuario o la contraseña no son correctos.',
     loadingSubmit: 'Derivando claves y llamando a la API...',
     login: 'Iniciar sesion',
     loginSubmit: 'Descifrar y entrar',
     loginSubmitHelp:
-      'Tu contrasena se usa para descifrar tu identidad en este dispositivo.',
+      'Tu contraseña se usa para descifrar tu identidad en este dispositivo.',
     mobileIntro: 'Mensajeria P2P cifrada con identidades en tu nodo.',
     networkLabel: 'Red',
     networksLabel: 'Redes',
-    passwordConfirmLabel: 'Repite la contrasena',
-    passwordLabel: 'Contrasena',
+    passwordConfirmLabel: 'Repite la contraseña',
+    passwordLabel: 'Contraseña',
     passwordRequirementItems: {
       lowercase: 'Minuscula',
-      match: 'Las contrasenas coinciden',
+      match: 'Las contraseñas coinciden',
       maxLength: '256 caracteres o menos',
       minLength: 'Al menos 12 caracteres',
       number: 'Numero',
@@ -71,7 +71,7 @@ export const es = {
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',
     rememberMeHelp:
-      'Guarda usuario y contrasena en este navegador para restaurar la sesion.',
+      'Guarda usuario y contraseña en este navegador para restaurar la sesion.',
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   calls: {
@@ -866,7 +866,7 @@ export const es = {
     openPicture: 'Abrir imagen de perfil',
     passwordRequirements: {
       lowercase: 'Minuscula',
-      match: 'Las contrasenas coinciden',
+      match: 'Las contraseñas coinciden',
       maxLength: '256 caracteres o menos',
       minLength: 'Al menos 12 caracteres',
       number: 'Numero',
