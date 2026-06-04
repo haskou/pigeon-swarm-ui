@@ -411,14 +411,17 @@ export function CreateConversationDialog({
           </button>
           <button
             type="button"
-            disabled
-            title={copy.dialog.groupConversationSoon}
-            className="rounded-2xl px-3 py-2 text-sm font-black text-white/30"
+            onClick={() => {
+              setMode('group');
+              setError(null);
+            }}
+            className={
+              mode === 'group'
+                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
+                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
+            }
           >
             {copy.dialog.groupConversation}
-            <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[.16em] text-white/45">
-              {copy.dialog.groupConversationSoon}
-            </span>
           </button>
         </div>
 

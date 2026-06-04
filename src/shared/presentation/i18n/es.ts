@@ -504,7 +504,7 @@ export const es = {
     groupParticipants: 'Participantes',
     loadingIdentity: 'Buscando identidad...',
     noSharedNetwork:
-      'No hay swarm compartido con esta identidad. Aún no puedes crear esta conversación.',
+      'No hay red compartida con esta identidad. Aún no puedes crear esta conversación.',
     remoteIdentityFound: 'Usuario encontrado.',
     remoteIdentityHelp: 'Introduce un usuario conocido o pega una identidad pública.',
     remoteIdentityId: 'Usuario o identidad',
@@ -513,8 +513,8 @@ export const es = {
     remoteIdentityPlaceholder: '@usuario o ID pública',
     remoteIdentityValid: 'Identidad válida.',
     removeParticipant: 'Quitar participante',
-    selectSwarm: 'Selecciona un swarm',
-    sharedNetwork: 'Swarm',
+    selectSwarm: 'Selecciona una red',
+    sharedNetwork: 'Red',
   },
   errors: {
     fallback: 'El servidor rechazo la solicitud. Intentalo de nuevo.',

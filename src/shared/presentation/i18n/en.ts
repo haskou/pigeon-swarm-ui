@@ -530,8 +530,8 @@ export const en = {
     remoteIdentityPlaceholder: '@user or public ID',
     remoteIdentityValid: 'Valid identity.',
     removeParticipant: 'Remove participant',
-    selectSwarm: 'Select a swarm',
-    sharedNetwork: 'Swarm',
+    selectSwarm: 'Select a network',
+    sharedNetwork: 'Network',
   },
   errors: {
     backend: {
