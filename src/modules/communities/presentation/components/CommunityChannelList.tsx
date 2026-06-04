@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -43,6 +44,7 @@ export function CommunityChannelList({
   textChannelNotificationSetting,
   visibleTextChannels,
   visibleVoiceChannels,
+  voiceChannelNotificationSetting,
   voiceChannels,
   voiceParticipantsByChannelId,
 }: {
@@ -73,12 +75,83 @@ export function CommunityChannelList({
   ) => NotificationScopeSetting;
   visibleTextChannels: CommunityTextChannel[];
   visibleVoiceChannels: CommunityVoiceChannel[];
+  voiceChannelNotificationSetting: (
+    channel: CommunityVoiceChannel,
+  ) => NotificationScopeSetting;
   voiceChannels: CommunityVoiceChannel[];
   voiceParticipantsByChannelId: Map<string, VoiceParticipantView[]>;
 }) {
   const [menuChannelId, setMenuChannelId] = useState<string | null>(null);
+  const [showMutedChannels, setShowMutedChannels] = useState(false);
+  const normalizedChannelSearch = channelSearch.trim().toLowerCase();
+  const hiddenMutedTextChannels = useMemo(
+    () =>
+      hiddenMutedChannels({
+        allChannels: textChannels,
+        channelSearch: normalizedChannelSearch,
+        notificationSetting: textChannelNotificationSetting,
+        visibleChannels: visibleTextChannels,
+      }),
+    [
+      normalizedChannelSearch,
+      textChannelNotificationSetting,
+      textChannels,
+      visibleTextChannels,
+    ],
+  );
+  const hiddenMutedVoiceChannels = useMemo(
+    () =>
+      hiddenMutedChannels({
+        allChannels: voiceChannels,
+        channelSearch: normalizedChannelSearch,
+        notificationSetting: voiceChannelNotificationSetting,
+        visibleChannels: visibleVoiceChannels,
+      }),
+    [
+      normalizedChannelSearch,
+      voiceChannelNotificationSetting,
+      visibleVoiceChannels,
+      voiceChannels,
+    ],
+  );
+  const hiddenMutedChannelCount =
+    hiddenMutedTextChannels.length + hiddenMutedVoiceChannels.length;
+  const displayedTextChannels = useMemo(
+    () =>
+      showMutedChannels
+        ? orderedVisibleChannels(textChannels, [
+            ...visibleTextChannels,
+            ...hiddenMutedTextChannels,
+          ])
+        : visibleTextChannels,
+    [
+      hiddenMutedTextChannels,
+      showMutedChannels,
+      textChannels,
+      visibleTextChannels,
+    ],
+  );
+  const displayedVoiceChannels = useMemo(
+    () =>
+      showMutedChannels
+        ? orderedVisibleChannels(voiceChannels, [
+            ...visibleVoiceChannels,
+            ...hiddenMutedVoiceChannels,
+          ])
+        : visibleVoiceChannels,
+    [
+      hiddenMutedVoiceChannels,
+      showMutedChannels,
+      visibleVoiceChannels,
+      voiceChannels,
+    ],
+  );
 
   useCloseOnEscape(() => setMenuChannelId(null), !!menuChannelId);
+
+  useEffect(() => {
+    if (hiddenMutedChannelCount === 0) setShowMutedChannels(false);
+  }, [hiddenMutedChannelCount]);
 
   return (
     <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
@@ -98,14 +171,29 @@ export function CommunityChannelList({
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
             {copy.communities.noChannels}
           </div>
-        ) : visibleTextChannels.length === 0 &&
-          visibleVoiceChannels.length === 0 ? (
+        ) : displayedTextChannels.length === 0 &&
+          displayedVoiceChannels.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
-            {copy.communities.noMatchingChannels}
+            {hiddenMutedChannelCount > 0 ? (
+              <HiddenMutedChannelsToggle
+                count={hiddenMutedChannelCount}
+                expanded={showMutedChannels}
+                onToggle={() => setShowMutedChannels((current) => !current)}
+              />
+            ) : (
+              copy.communities.noMatchingChannels
+            )}
           </div>
         ) : (
           <>
-            {visibleTextChannels.map((channel) => (
+            {hiddenMutedChannelCount > 0 && (
+              <HiddenMutedChannelsToggle
+                count={hiddenMutedChannelCount}
+                expanded={showMutedChannels}
+                onToggle={() => setShowMutedChannels((current) => !current)}
+              />
+            )}
+            {displayedTextChannels.map((channel) => (
               <div key={channel.id}>
                 <TextChannelButton
                   active={
@@ -155,13 +243,13 @@ export function CommunityChannelList({
                 ) : null}
               </div>
             ))}
-            {visibleVoiceChannels.length > 0 && (
+            {displayedVoiceChannels.length > 0 && (
               <div className="pt-2">
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                   {copy.calls.voiceChannels}
                 </div>
                 <div className="space-y-0.5">
-                  {visibleVoiceChannels.map((channel) => (
+                  {displayedVoiceChannels.map((channel) => (
                     <VoiceChannelButton
                       key={channel.id}
                       active={activeVoiceChannelId === channel.id}
@@ -181,6 +269,67 @@ export function CommunityChannelList({
       </div>
     </div>
   );
+}
+
+function HiddenMutedChannelsToggle({
+  count,
+  expanded,
+  onToggle,
+}: {
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mb-2 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-xs font-black text-white/55 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+    >
+      <span>
+        {expanded
+          ? copy.notifications.hideMutedChannelsAgain
+          : copy.notifications.showMutedChannels}
+      </span>
+      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] leading-none text-white/50">
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function hiddenMutedChannels<T extends { id: string; name: string }>({
+  allChannels,
+  channelSearch,
+  notificationSetting,
+  visibleChannels,
+}: {
+  allChannels: T[];
+  channelSearch: string;
+  notificationSetting: (channel: T) => NotificationScopeSetting;
+  visibleChannels: T[];
+}): T[] {
+  const visibleChannelIds = new Set(
+    visibleChannels.map((channel) => channel.id),
+  );
+
+  return allChannels.filter(
+    (channel) =>
+      (!channelSearch || channel.name.toLowerCase().includes(channelSearch)) &&
+      !visibleChannelIds.has(channel.id) &&
+      NotificationSettingsPolicy.shouldHide(notificationSetting(channel)),
+  );
+}
+
+function orderedVisibleChannels<T extends { id: string }>(
+  allChannels: T[],
+  visibleChannels: T[],
+): T[] {
+  const visibleChannelIds = new Set(
+    visibleChannels.map((channel) => channel.id),
+  );
+
+  return allChannels.filter((channel) => visibleChannelIds.has(channel.id));
 }
 
 function ThreadChannelButton({

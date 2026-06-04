@@ -2130,6 +2130,7 @@ export function CommunityWorkspace({
               threadLabelByRootMessageId={threadLabelByRootMessageId}
               visibleTextChannels={visibleTextChannels}
               visibleVoiceChannels={visibleVoiceChannels}
+              voiceChannelNotificationSetting={channelNotificationSetting}
               voiceChannels={voiceChannels}
               voiceParticipantsByChannelId={voiceParticipantsByChannelId}
             />
