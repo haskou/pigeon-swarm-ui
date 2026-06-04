@@ -489,6 +489,7 @@ export function GlassWorkspace({
   );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
+  const pushEnableInFlightRef = useRef(false);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
@@ -574,6 +575,9 @@ export function GlassWorkspace({
     setPushPermission(currentPwaNotificationPermission());
   }, []);
   const enablePushNotifications = useCallback(async () => {
+    if (pushEnableInFlightRef.current) return;
+
+    pushEnableInFlightRef.current = true;
     setPushEnableState('loading');
     setPushEnableError(null);
 
@@ -581,9 +585,17 @@ export function GlassWorkspace({
       const registrationState = await ensurePwaPushSubscription(session, {
         requestPermission: true,
       });
-      const nextPermission = currentPwaNotificationPermission();
 
-      setPushPermission(nextPermission);
+      if (registrationState === 'granted') {
+        setPushPermission('granted');
+        setPushPromptDismissed(true);
+        setPushEnableState('idle');
+        setPushEnableError(null);
+
+        return;
+      }
+
+      refreshPushPermission();
 
       if (registrationState === 'permission_denied') {
         setPushEnableState('error');
@@ -592,25 +604,20 @@ export function GlassWorkspace({
         return;
       }
 
-      if (registrationState !== 'granted') {
-        setPushEnableState('error');
-        setPushEnableError(
-          registrationState === 'server_disabled'
-            ? copy.notifications.enablePushServerDisabled
-            : copy.notifications.enablePushUnsupported,
-        );
-
-        return;
-      }
-
-      setPushEnableState('idle');
-      setPushEnableError(null);
+      setPushEnableState('error');
+      setPushEnableError(
+        registrationState === 'server_disabled'
+          ? copy.notifications.enablePushServerDisabled
+          : copy.notifications.enablePushUnsupported,
+      );
     } catch (caught) {
       refreshPushPermission();
       setPushEnableState('error');
       setPushEnableError(
         toUserErrorMessage(caught, copy.notifications.enablePushError),
       );
+    } finally {
+      pushEnableInFlightRef.current = false;
     }
   }, [refreshPushPermission, session]);
 

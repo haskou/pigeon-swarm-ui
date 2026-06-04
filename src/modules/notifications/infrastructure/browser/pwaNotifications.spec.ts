@@ -251,6 +251,27 @@ describe(ensurePwaPushSubscription.name, () => {
     ).toHaveBeenCalledWith(session(), subscriptionJson);
   });
 
+  it('reuses the same explicit enable flow when activation is requested twice at once', async () => {
+    const { requestPermission, subscribe } = installPushBrowser({
+      permission: 'default',
+      requestedPermission: 'granted',
+    });
+    mockCurrentVapidPublicKey();
+
+    await expect(
+      Promise.all([
+        ensurePwaPushSubscription(session(), { requestPermission: true }),
+        ensurePwaPushSubscription(session(), { requestPermission: true }),
+      ]),
+    ).resolves.toEqual(['granted', 'granted']);
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(
+      mockedApplicationContainer.registerPushSubscription,
+    ).toHaveBeenCalledTimes(1);
+  });
+
   it('does not register a subscription when the explicit permission request is denied', async () => {
     const { requestPermission } = installPushBrowser({
       permission: 'default',
