@@ -2366,8 +2366,10 @@ export function GlassWorkspace({
       );
       requestAnimationFrame(() => {
         restorePreviousViewport();
+        messageScrollAnchorRef.current = null;
       });
     } catch (caught) {
+      messageScrollAnchorRef.current = null;
       setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
     }
 
@@ -2386,9 +2388,17 @@ export function GlassWorkspace({
 
     if (Date.now() < suppressMessageLoadsUntilRef.current) return;
 
-    if (isScrolledNearBottom()) setNewMessageCount(0);
+    if (isScrolledNearBottom()) {
+      setNewMessageCount(0);
+    } else {
+      keepMessageBottomUntilRef.current = 0;
+      messageScrollAnchorRef.current = null;
+    }
 
-    if (isScrollingUp) keepMessageBottomUntilRef.current = 0;
+    if (isScrollingUp) {
+      keepMessageBottomUntilRef.current = 0;
+      messageScrollAnchorRef.current = null;
+    }
 
     if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
   };

@@ -92,6 +92,7 @@ export function useCommunityChannelMessages({
     useRef<MessageScrollAnchorSnapshot | null>(null);
   const messageStateRef = useRef<CommunityChannelMessageLoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const lastScrollTopRef = useRef(0);
   const loadChannelMessagesRef = useRef(loadChannelMessages);
   const onChannelSelectedRef = useRef(onChannelSelected);
   const onChannelViewedRef = useRef(onChannelViewed);
@@ -194,17 +195,31 @@ export function useCommunityChannelMessages({
 
   const handleMessagesScroll = useCallback(() => {
     const scroller = scrollerRef.current;
+
+    if (!scroller) return;
+
+    const scrollTop = scroller.scrollTop;
+    const isScrollingUp = scrollTop < lastScrollTopRef.current;
     const nearBottom = isScrolledNearBottom();
 
+    lastScrollTopRef.current = scrollTop;
     setIsAwayFromBottom(!nearBottom);
 
     if (nearBottom) {
       setNewChannelMessageCount(0);
 
       if (selectedChannelId) onChannelViewedRef.current?.(selectedChannelId);
+    } else {
+      keepChannelBottomUntilRef.current = 0;
+      messageScrollAnchorRef.current = null;
     }
 
-    if (!scroller || scroller.scrollTop > 80 || !messageCursor) return;
+    if (isScrollingUp) {
+      keepChannelBottomUntilRef.current = 0;
+      messageScrollAnchorRef.current = null;
+    }
+
+    if (scrollTop > 80 || !messageCursor) return;
 
     if (messageStateRef.current === 'loading' || !selectedChannelId) return;
 
@@ -246,9 +261,13 @@ export function useCommunityChannelMessages({
         );
         requestAnimationFrame(() => {
           restorePreviousViewport();
+          messageScrollAnchorRef.current = null;
         });
       })
-      .catch(() => setMessageLoadState('error'))
+      .catch(() => {
+        messageScrollAnchorRef.current = null;
+        setMessageLoadState('error');
+      })
       .finally(() => setMessageLoadState('idle'));
   }, [
     isScrolledNearBottom,
