@@ -327,3 +327,25 @@ textarea:disabled,
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.subtle-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar {
+  height: 0.45rem;
+  width: 0.45rem;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border: 0;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}

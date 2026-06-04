@@ -57,7 +57,7 @@ export function CommunityVisibilitySelector({
                 className={cx(
                   'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border transition',
                   selected
-                    ? 'border-cyan-200 bg-cyan-300'
+                    ? 'border-fuchsia-200 bg-fuchsia-300'
                     : 'border-white/20 bg-white/10',
                 )}
               >

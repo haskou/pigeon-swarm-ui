@@ -42,9 +42,9 @@ export function CommunityAutoJoinSwitch({
         <span
           aria-hidden="true"
           className={cx(
-            'block h-8 w-14 rounded-full border transition peer-focus-visible:ring-2 peer-focus-visible:ring-amber-200/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-slate-950',
+            'block h-8 w-14 rounded-full border transition peer-focus-visible:ring-2 peer-focus-visible:ring-fuchsia-200/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-slate-950',
             checked
-              ? 'border-amber-200/55 bg-amber-300/85'
+              ? 'border-fuchsia-200/55 bg-fuchsia-400/85'
               : 'border-white/10 bg-white/10',
           )}
         >

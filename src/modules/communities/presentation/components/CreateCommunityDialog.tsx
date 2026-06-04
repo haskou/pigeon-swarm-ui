@@ -46,6 +46,9 @@ type InitialChannelDraft = {
   type: 'text' | 'voice';
 };
 
+const maxChannelNameLength = 32;
+const channelNamePattern = /^[a-z0-9][a-z0-9_-]*$/;
+
 export function CreateCommunityDialog({
   headerControl,
   nodeNetworks,
@@ -72,7 +75,7 @@ export function CreateCommunityDialog({
     file: File;
     shape: 'avatar' | 'banner';
   } | null>(null);
-  const [channelName, setChannelName] = useState('general');
+  const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState<'text' | 'voice'>('text');
   const [channels, setChannels] = useState<InitialChannelDraft[]>([
     { name: 'general', type: 'text' },
@@ -89,9 +92,16 @@ export function CreateCommunityDialog({
       })),
     [nodeNetworks, session.identity.networks],
   );
+  const channelInputError = channelName.trim()
+    ? channelValidationError(channelName, channels)
+    : null;
+  const canAddChannel = channelName.trim().length > 0 && !channelInputError;
+  const submitHelp = communitySubmitHelp({ channels, name, networkId });
   const canSubmit =
     name.trim().length > 0 &&
-    description.trim().length > 0 &&
+    channels.length > 0 &&
+    channels.every((channel) => channelNameIsValid(channel.name)) &&
+    channelNamesAreUnique(channels) &&
     networkId.length > 0 &&
     state !== 'loading';
 
@@ -141,9 +151,13 @@ export function CreateCommunityDialog({
 
     if (!trimmed) return;
 
+    const validationError = channelValidationError(trimmed, channels);
+
+    if (validationError) return;
+
     setChannels((current) => [
       ...current,
-      { name: trimmed, type: channelType },
+      { name: normalizeChannelName(trimmed), type: channelType },
     ]);
     setChannelName('');
   };
@@ -221,14 +235,17 @@ export function CreateCommunityDialog({
         </div>
         {headerControl}
 
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="subtle-scrollbar mt-5 min-h-0 flex-1 overflow-y-auto pr-3">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
             <div className="grid gap-4">
               <div className="overflow-hidden rounded-2xl bg-black/25">
+                <div className="px-4 pt-4 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.communities.preview}
+                </div>
                 <button
                   type="button"
                   onClick={() => bannerInputRef.current?.click()}
-                  className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                  className="group relative mt-3 block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
                   aria-label={copy.communities.banner}
                 >
                   {bannerPreview ? (
@@ -311,7 +328,7 @@ export function CreateCommunityDialog({
                   options={networkOptions}
                 />
                 <p className="mt-3 text-xs leading-relaxed text-white/45">
-                  {copy.communities.createBody}
+                  {copy.communities.networkCreateHelp}
                 </p>
               </div>
               <CommunityPublicSettingsPanel
@@ -347,18 +364,24 @@ export function CreateCommunityDialog({
                       setChannelType(value === 'voice' ? 'voice' : 'text')
                     }
                     options={[
-                      { label: 'Text', value: 'text' },
-                      { label: 'Voice', value: 'voice' },
+                      { label: copy.communities.textChannel, value: 'text' },
+                      { label: copy.communities.voiceChannel, value: 'voice' },
                     ]}
                   />
                   <button
                     type="button"
                     onClick={addChannel}
-                    className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15"
+                    disabled={!canAddChannel}
+                    className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {copy.communities.addInitialChannel}
                   </button>
                 </div>
+                {channelInputError ? (
+                  <p className="text-xs font-bold text-rose-200">
+                    {channelInputError}
+                  </p>
+                ) : null}
               </div>
               {channels.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -370,8 +393,7 @@ export function CreateCommunityDialog({
                       className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70 transition hover:bg-rose-500/15 hover:text-rose-100"
                       title={copy.messages.delete}
                     >
-                      {channel.type === 'voice' ? 'Voice' : 'Text'} #
-                      {channel.name} ×
+                      {channelTypeLabel(channel.type)} · #{channel.name} ×
                     </button>
                   ))}
                 </div>
@@ -386,20 +408,27 @@ export function CreateCommunityDialog({
           )}
         </div>
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            disabled={!canSubmit}
-            className={cx(
-              'rounded-2xl px-5 py-3 text-sm font-black transition',
-              canSubmit
-                ? 'glass-button bg-fuchsia-500 text-white hover:bg-fuchsia-400'
-                : 'cursor-not-allowed bg-white/10 text-white/35',
-            )}
-          >
-            {state === 'loading'
-              ? copy.communities.creating
-              : copy.communities.create}
-          </button>
+        <div className="mt-5 shrink-0 border-t border-white/10 bg-[#171827]/95 pt-4">
+          {!canSubmit ? (
+            <p className="mb-3 text-xs font-bold text-white/45">
+              {submitHelp}
+            </p>
+          ) : null}
+          <div className="flex justify-end">
+            <button
+              disabled={!canSubmit}
+              className={cx(
+                'w-full rounded-2xl px-5 py-3 text-sm font-black transition sm:w-auto',
+                canSubmit
+                  ? 'glass-button bg-fuchsia-500 text-white hover:bg-fuchsia-400'
+                  : 'cursor-not-allowed bg-white/10 text-white/35',
+              )}
+            >
+              {state === 'loading'
+                ? copy.communities.creating
+                : copy.communities.create}
+            </button>
+          </div>
         </div>
         {imageEditor && (
           <Suspense fallback={null}>
@@ -422,4 +451,67 @@ export function CreateCommunityDialog({
       </form>
     </div>
   );
+}
+
+function channelTypeLabel(type: InitialChannelDraft['type']): string {
+  return type === 'voice'
+    ? copy.communities.voiceChannel
+    : copy.communities.textChannel;
+}
+
+function channelValidationError(
+  name: string,
+  channels: InitialChannelDraft[],
+): string | null {
+  const normalized = normalizeChannelName(name);
+
+  if (!channelNameIsValid(normalized)) {
+    return copy.communities.invalidChannelName;
+  }
+
+  if (
+    channels.some((channel) => normalizeChannelName(channel.name) === normalized)
+  ) {
+    return copy.communities.duplicateChannelName;
+  }
+
+  return null;
+}
+
+function channelNameIsValid(name: string): boolean {
+  const normalized = normalizeChannelName(name);
+
+  return (
+    normalized.length > 0 &&
+    normalized.length <= maxChannelNameLength &&
+    channelNamePattern.test(normalized)
+  );
+}
+
+function channelNamesAreUnique(channels: InitialChannelDraft[]): boolean {
+  const uniqueNames = new Set(
+    channels.map((channel) => normalizeChannelName(channel.name)),
+  );
+
+  return uniqueNames.size === channels.length;
+}
+
+function normalizeChannelName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function communitySubmitHelp(input: {
+  channels: InitialChannelDraft[];
+  name: string;
+  networkId: string;
+}): string {
+  if (!input.name.trim()) return copy.communities.createMissingName;
+
+  if (!input.networkId) return copy.communities.createMissingNetwork;
+
+  if (input.channels.length === 0) {
+    return copy.communities.createMissingChannel;
+  }
+
+  return copy.communities.createSubmitHelp;
 }
