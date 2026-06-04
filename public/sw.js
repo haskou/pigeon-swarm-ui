@@ -139,6 +139,11 @@ self.addEventListener('push', (event) => {
 
   if (!payload) return;
 
+  if (isNotificationsClearedPayload(payload)) {
+    event.waitUntil(closeNotificationsByTags(payload.tags));
+    return;
+  }
+
   event.waitUntil(showPushNotification(payload));
 });
 
@@ -179,8 +184,10 @@ function pushPayload(data) {
       body: notificationBody(payload, payloadDataValue, body),
       data: payloadDataValue,
       icon: typeof payload.icon === 'string' ? payload.icon : undefined,
-      tag: typeof payload.tag === 'string' ? payload.tag : undefined,
+      tag: notificationTag(payload, payloadDataValue),
+      tags: notificationTags(payload, payloadDataValue),
       title: notificationTitle(payload, payloadDataValue, title),
+      type: typeof payload.type === 'string' ? payload.type : undefined,
       url: typeof payload.url === 'string' ? payload.url : '/',
     };
   } catch {
@@ -192,10 +199,49 @@ function pushPayload(data) {
   }
 }
 
+async function closeNotificationsByTags(tags) {
+  if (tags.length === 0) return;
+
+  const notifications = await self.registration.getNotifications();
+
+  notifications.forEach((notification) => {
+    if (tags.includes(notification.tag)) notification.close();
+  });
+}
+
+function isNotificationsClearedPayload(payload) {
+  return payload.type === 'notifications_cleared';
+}
+
 function payloadData(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 
   return value;
+}
+
+function notificationTag(payload, data) {
+  const tag = stringValue(payload.tag);
+
+  if (tag) return tag;
+
+  if (!isMessagePayload(payload)) return undefined;
+
+  const conversationId =
+    stringValue(data.conversationId) || stringValue(data.conversation_id);
+
+  return conversationId ? `conversation:${conversationId}` : undefined;
+}
+
+function notificationTags(payload, data) {
+  const tags = new Set([
+    ...arrayValue(payload.tags).filter(isString),
+    ...arrayValue(data.tags).filter(isString),
+  ]);
+  const tag = notificationTag(payload, data);
+
+  if (tag) tags.add(tag);
+
+  return [...tags];
 }
 
 function notificationBody(payload, data, body) {
@@ -370,6 +416,10 @@ function stringValue(value) {
 
 function arrayValue(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function isString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function recordValue(value) {
