@@ -363,6 +363,10 @@ function ChannelNotificationMenu({
         type="button"
         className="fixed inset-0 z-30 cursor-default"
         onClick={onClose}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
         aria-label={copy.dialog.close}
       />
       <div className="absolute right-0 top-[calc(100%+.25rem)] z-40 min-w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#1f2029] p-1 text-sm shadow-2xl shadow-black/40">
