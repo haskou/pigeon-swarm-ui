@@ -256,8 +256,10 @@ export function MessageBubble({
                   'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                   onMessageClick && 'cursor-pointer',
                   message.deliveryStatus === 'pending' && 'opacity-70',
-                  transparentMessage
+                  sticker
                     ? 'rounded-2xl bg-transparent p-0'
+                    : emojiOnlyMessage
+                      ? 'rounded-2xl bg-transparent py-2.5'
                     : cx(
                         'rounded-2xl p-2.5',
                         mine
