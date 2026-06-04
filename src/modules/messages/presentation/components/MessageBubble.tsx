@@ -152,6 +152,13 @@ export function MessageBubble({
     () => EmojiOnlyMessage.sizeClass(message.content),
     [message.content],
   );
+  const emojiOnlyMessage =
+    Boolean(emojiOnlyClass) &&
+    !hasReply &&
+    message.attachments.length === 0 &&
+    !linkPreview &&
+    !sticker;
+  const transparentMessage = sticker || emojiOnlyMessage;
 
   useEffect(() => clearLongPressTimer, []);
   useEffect(() => {
@@ -250,7 +257,7 @@ export function MessageBubble({
                   'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
                   onMessageClick && 'cursor-pointer',
                   message.deliveryStatus === 'pending' && 'opacity-70',
-                  sticker
+                  transparentMessage
                     ? 'rounded-2xl bg-transparent p-0'
                     : cx(
                         'rounded-2xl p-2.5',
@@ -262,7 +269,7 @@ export function MessageBubble({
                       ),
                 )}
               >
-                {pinned && !sticker && <PinnedMessageMarker />}
+                {pinned && !transparentMessage && <PinnedMessageMarker />}
                 {hasReply && replyMessageId && (
                   <MessageReplyPreview
                     mine={mine}
@@ -325,7 +332,7 @@ export function MessageBubble({
                   <div
                     className={cx(
                       'whitespace-pre-wrap break-words',
-                      emojiOnlyClass,
+                      emojiOnlyMessage && emojiOnlyClass,
                       (hasReply || message.attachments.length > 0) && 'mt-3',
                       message.encrypted && 'text-white/55',
                     )}
