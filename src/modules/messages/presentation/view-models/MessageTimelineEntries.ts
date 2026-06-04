@@ -41,15 +41,11 @@ export class MessageTimelineEntries {
     polls: PollResource[],
     threadSummaries: MessageThreadSummary[] = [],
   ): MessageTimelineEntry[] {
-    const visibleMessagesById = new Map(
-      messages.map((message) => [message.id, message]),
-    );
     const visibleThreadSummaries = threadSummaries.filter((summary) =>
-      MessageTimelineEntries.isVisibleThreadSummary(
-        summary,
-        visibleMessagesById,
-      ),
+      MessageTimelineEntries.isVisibleThreadSummary(summary),
     );
+    const knownThreadMessageIds =
+      MessageTimelineEntries.knownThreadMessageIds(visibleThreadSummaries);
     const threadSummariesByRootMessageId = new Map(
       visibleThreadSummaries.map((summary) => [
         summary.rootMessageId,
@@ -57,7 +53,9 @@ export class MessageTimelineEntries {
       ]),
     );
     const rootMessages = messages.filter(
-      (message) => !MessageTimelineEntries.threadRootMessageId(message),
+      (message) =>
+        !MessageTimelineEntries.threadRootMessageId(message) &&
+        !knownThreadMessageIds.has(message.id),
     );
     const items = messagePollTimelineItems(rootMessages, polls);
     const messagesById = new Map(
@@ -131,16 +129,40 @@ export class MessageTimelineEntries {
 
   private static isVisibleThreadSummary(
     summary: MessageThreadSummary,
-    visibleMessagesById: ReadonlyMap<string, ChatMessage>,
   ): boolean {
     if (!summary.lastMessage) return true;
 
-    const visibleLastMessage =
-      visibleMessagesById.get(summary.lastMessage.id) ?? summary.lastMessage;
+    if (
+      MessageTimelineEntries.threadRootMessageId(summary.lastMessage) ===
+      summary.rootMessageId
+    ) {
+      return true;
+    }
+
+    return MessageTimelineEntries.isUnmarkedThreadReply(summary);
+  }
+
+  private static isUnmarkedThreadReply(
+    summary: MessageThreadSummary,
+  ): boolean {
+    const lastMessage = summary.lastMessage;
+
+    if (!lastMessage?.replyPreview) return false;
 
     return (
-      MessageTimelineEntries.threadRootMessageId(visibleLastMessage) ===
-      summary.rootMessageId
+      MessageTimelineEntries.replyToMessageId(lastMessage) ===
+        summary.rootMessageId &&
+      lastMessage.replyPreview.messageId !== summary.rootMessageId
+    );
+  }
+
+  private static knownThreadMessageIds(
+    threadSummaries: MessageThreadSummary[],
+  ): Set<string> {
+    return new Set(
+      threadSummaries
+        .map((summary) => summary.lastMessage?.id)
+        .filter((messageId): messageId is string => Boolean(messageId)),
     );
   }
 

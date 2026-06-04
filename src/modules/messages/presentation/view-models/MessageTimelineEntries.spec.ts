@@ -153,12 +153,47 @@ describe(MessageTimelineEntries.name, () => {
       type: 'message',
     });
   });
+
+  it('hides thread summary last messages even when they are missing the thread marker', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const threadReply = chatMessage({
+      content: 'Thread reply',
+      id: 'thread-reply',
+      rawReplyToMessageId: root.id,
+      replyPreviewMessageId: 'thread-parent-message',
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build([root, threadReply], [], [
+      {
+        count: 1,
+        lastMessage: threadReply,
+        rootMessageId: root.id,
+      },
+    ]);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: `message:${root.id}`,
+      threadSummary: {
+        count: 1,
+        lastMessage: threadReply,
+        rootMessageId: root.id,
+      },
+      type: 'message',
+    });
+  });
 });
 
 function chatMessage(input: {
   content: string;
   id: string;
   rawReplyToMessageId?: string;
+  replyPreviewMessageId?: string;
   threadRootMessageId?: string;
   timestamp: number;
 }): ChatMessage {
@@ -175,6 +210,13 @@ function chatMessage(input: {
       type: 'sent',
     },
     reactions: [],
+    replyPreview: input.replyPreviewMessageId
+      ? {
+          authorIdentityId: 'identity-id',
+          content: 'Reply parent',
+          messageId: input.replyPreviewMessageId,
+        }
+      : undefined,
     threadRootMessageId: input.threadRootMessageId,
     timestamp: input.timestamp,
   };
