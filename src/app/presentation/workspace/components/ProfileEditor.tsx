@@ -43,6 +43,9 @@ const ImageCropEditor = lazy(() =>
   ),
 );
 
+const profileEditorInputClass =
+  'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/50 focus:bg-black/25';
+
 export function ProfileEditor({
   currentPicture,
   nodeNetworks,
@@ -56,8 +59,6 @@ export function ProfileEditor({
   onClose: () => void;
   onUpdated: (session: Session) => void;
 }) {
-  useCloseOnEscape(onClose);
-
   const [name, setName] = useState(session.identity.profile.name);
   const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
   const [biography, setBiography] = useState(
@@ -66,6 +67,7 @@ export function ProfileEditor({
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [identityNetworkIds, setIdentityNetworkIds] = useState(
     session.identity.networks,
   );
@@ -95,7 +97,17 @@ export function ProfileEditor({
     newPassword.length > 0 && newPassword === newPasswordConfirmation;
   const canChangePassword =
     !wantsPasswordChange || (isValidPassword(newPassword) && passwordsMatch);
+  const hasChanges =
+    name.trim() !== session.identity.profile.name.trim() ||
+    (normalizedHandle ?? '') !== (session.identity.profile.handle ?? '') ||
+    (biography.trim() || undefined) !==
+      (session.identity.profile.biography?.trim() || undefined) ||
+    pictureFile !== null ||
+    bannerFile !== null ||
+    !sameStringArray(identityNetworkIds, session.identity.networks) ||
+    wantsPasswordChange;
   const canSubmit =
+    hasChanges &&
     name.trim().length > 0 &&
     identityNetworkIds.length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
@@ -111,6 +123,21 @@ export function ProfileEditor({
   const networkNamesById = useMemo(
     () => new Map(nodeNetworks.map((network) => [network.id, network.name])),
     [nodeNetworks],
+  );
+  const requestClose = () => {
+    if (state === 'loading') return;
+
+    if (hasChanges) {
+      setDiscardConfirmOpen(true);
+
+      return;
+    }
+
+    onClose();
+  };
+
+  useCloseOnEscape(
+    discardConfirmOpen ? () => setDiscardConfirmOpen(false) : requestClose,
   );
 
   useEffect(() => {
@@ -214,22 +241,22 @@ export function ProfileEditor({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={requestClose}
         aria-label={copy.dialog.close}
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-5xl sm:p-6 lg:p-8"
+        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:p-6"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
             aria-label={copy.dialog.close}
           >
@@ -237,8 +264,8 @@ export function ProfileEditor({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-start xl:gap-6">
-          <div className="overflow-hidden rounded-2xl bg-black/25">
+        <div className="profile-editor-scroll mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/10">
             <button
               type="button"
               onClick={() => bannerInputRef.current?.click()}
@@ -256,11 +283,11 @@ export function ProfileEditor({
                 ✎
               </span>
             </button>
-            <div className="relative px-4 pb-4">
+            <div className="relative px-5 pb-5">
               <button
                 type="button"
                 onClick={() => pictureInputRef.current?.click()}
-                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
                 aria-label={copy.profile.changePicture}
               >
                 {picturePreview ? (
@@ -276,14 +303,14 @@ export function ProfileEditor({
                   ✎
                 </span>
               </button>
-              <div className="mt-4 grid gap-3">
+              <div className="mt-2 grid gap-3">
                 <ProfileEditorField label={copy.profile.name}>
                   <input
                     aria-label={copy.profile.name}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     maxLength={ProfileName.MAX_LENGTH}
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    className={cx(profileEditorInputClass, 'text-lg font-black')}
                   />
                 </ProfileEditorField>
                 <ProfileEditorField label={copy.profile.handle}>
@@ -295,7 +322,10 @@ export function ProfileEditor({
                     }
                     maxLength={ProfileHandle.MAX_LENGTH}
                     placeholder="@ada"
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    className={cx(
+                      profileEditorInputClass,
+                      'text-sm font-bold text-white/70',
+                    )}
                   />
                 </ProfileEditorField>
                 <ProfileEditorField label={copy.profile.biography}>
@@ -304,7 +334,10 @@ export function ProfileEditor({
                     value={biography}
                     onChange={(event) => setBiography(event.target.value)}
                     maxLength={ProfileBiography.MAX_LENGTH}
-                    className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    className={cx(
+                      profileEditorInputClass,
+                      'min-h-[4.75rem] resize-y text-sm font-normal',
+                    )}
                   />
                 </ProfileEditorField>
               </div>
@@ -324,18 +357,18 @@ export function ProfileEditor({
               className="sr-only"
             />
           </div>
-          <div className="grid min-w-0 gap-4">
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+            <section className="rounded-2xl border border-white/[0.06] bg-black/10 px-4 py-3">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {identityNetworkIds.length > 0 ? (
                   identityNetworkIds.map((networkId) => (
                     <span
                       key={networkId}
                       title={networkId}
-                      className="min-w-0 max-w-full truncate rounded-2xl bg-white/10 px-3 py-2 text-xs font-black text-white/70"
+                      className="min-w-0 max-w-full truncate rounded-full border border-white/[0.06] bg-white/10 px-2.5 py-1 text-xs font-black text-white/70"
                     >
                       {networkNamesById.get(networkId) ?? shortId(networkId)}
                     </span>
@@ -346,7 +379,7 @@ export function ProfileEditor({
                   </span>
                 )}
               </div>
-              <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <GlassSelect
                   ariaLabel={copy.profile.availableNetwork}
                   className="min-w-0"
@@ -369,13 +402,16 @@ export function ProfileEditor({
                   type="button"
                   onClick={addNetwork}
                   disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
                 >
                   {copy.profile.addNetwork}
                 </button>
               </div>
             </section>
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            <section className="rounded-2xl border border-white/[0.06] bg-black/10">
+              <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
+                {copy.profile.security}
+              </div>
               <button
                 type="button"
                 onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
@@ -394,7 +430,7 @@ export function ProfileEditor({
                 </span>
               </button>
               {passwordSectionOpen && (
-                <div className="border-t border-white/10 p-4">
+                <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
                   <p className="text-xs font-bold text-white/45">
                     {copy.profile.newPasswordHelp}
                   </p>
@@ -424,21 +460,29 @@ export function ProfileEditor({
               )}
             </section>
           </div>
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+              {error}
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-            {error}
-          </div>
-        )}
-
-        <button
-          disabled={!canSubmit}
-          className="mt-5 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {state === 'loading' ? copy.profile.saving : copy.profile.save}
-        </button>
+        <div className="mt-5 flex shrink-0 justify-end border-t border-white/[0.06] pt-4">
+          <button
+            disabled={!canSubmit}
+            className="rounded-2xl border border-fuchsia-300/30 bg-fuchsia-500 px-5 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-white/45 disabled:hover:bg-white/[0.08]"
+          >
+            {state === 'loading' ? copy.profile.saving : copy.profile.save}
+          </button>
+        </div>
       </form>
+      {discardConfirmOpen && (
+        <DiscardProfileChangesDialog
+          onCancel={() => setDiscardConfirmOpen(false)}
+          onDiscard={onClose}
+        />
+      )}
       {imageEditor && (
         <Suspense fallback={null}>
           <ImageCropEditor
@@ -483,9 +527,56 @@ function ProfileInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
-        className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+        className={cx(profileEditorInputClass, 'text-sm font-normal')}
       />
     </label>
+  );
+}
+
+function DiscardProfileChangesDialog({
+  onCancel,
+  onDiscard,
+}: {
+  onCancel: () => void;
+  onDiscard: () => void;
+}) {
+  useCloseOnEscape(onCancel);
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={onCancel}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        className="glass-panel-strong relative w-full max-w-sm rounded-2xl p-5 text-left shadow-2xl shadow-black/40"
+        role="dialog"
+        aria-modal="true"
+        aria-label={copy.profile.discardChangesBody}
+      >
+        <p className="text-sm font-bold leading-6 text-white/75">
+          {copy.profile.discardChangesBody}
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
+          >
+            {copy.profile.discardChanges}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90"
+          >
+            {copy.profile.keepEditing}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -497,11 +588,17 @@ function ProfileEditorField({
   label: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/40">
+    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/55">
       {label}
       {children}
     </label>
   );
+}
+
+function sameStringArray(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+
+  return left.every((value, index) => value === right[index]);
 }
 
 function PasswordChecklist({
@@ -528,12 +625,12 @@ function PasswordChecklist({
   ] as const;
 
   return (
-    <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
+    <div className="mt-4 grid grid-cols-1 gap-1.5 text-xs font-black">
       {items.map(([label, complete]) => (
         <div
           key={label}
           className={cx(
-            'flex items-center gap-2 rounded-2xl px-3 py-2',
+            'flex min-h-8 items-center gap-2 rounded-xl px-3 py-1.5',
             complete
               ? 'bg-emerald-400/10 text-emerald-200'
               : 'bg-white/5 text-white/45',

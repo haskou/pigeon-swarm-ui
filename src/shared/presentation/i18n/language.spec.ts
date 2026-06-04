@@ -85,7 +85,7 @@ describe('i18n language selection', () => {
     const { copy } = await import('./copy');
 
     expect(copy.profile.newPasswordHelp).toBe(
-      'Deja ambos campos vacios para mantener tu contrasena actual.',
+      'Deja ambos campos vacíos para mantener tu contraseña actual.',
     );
   });
 
