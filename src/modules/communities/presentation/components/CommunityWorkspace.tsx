@@ -21,6 +21,7 @@ import type {
   Community,
   AttachmentUploadOptions,
   CommunityChannelThreadSummary,
+  CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
   ConversationKeyEntry,
   ChatMessage,
@@ -100,6 +101,9 @@ interface CommunityWorkspaceProps {
   activeCall?: CallSession | null;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
+  invitationAccepting?: boolean;
+  invitationError?: null | string;
+  invitationInviterName?: string;
   mobileMembersOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
@@ -109,6 +113,9 @@ interface CommunityWorkspaceProps {
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
+  onInvitationAccept?: (
+    notification: CommunityInvitationNotificationResource,
+  ) => void;
   notificationSettingsByScopeKey: NotificationSettingMap;
   onCallEnd?: () => void;
   onCallParticipantVolumeChange?: (
@@ -146,6 +153,7 @@ interface CommunityWorkspaceProps {
   onRealtimeEventsOpen?: () => void;
   onSessionUpdated: (session: Session) => void;
   onTypingActive?: (channelId: string, active: boolean) => void;
+  pendingInvitation?: CommunityInvitationNotificationResource | null;
   realtimeEvent?: null | RealtimeDomainEvent;
   realtimeStatus?: 'connected' | 'reconnecting';
   session: Session;
@@ -176,6 +184,9 @@ export function CommunityWorkspace({
   activeChannelId,
   channelUnreadCounts = {},
   community,
+  invitationAccepting = false,
+  invitationError,
+  invitationInviterName,
   mobileMembersOpen,
   mobileRail,
   mobileSidebarOpen,
@@ -195,6 +206,7 @@ export function CommunityWorkspace({
   onChannelViewed,
   onCommunityLeft,
   onCommunityUpdated,
+  onInvitationAccept,
   onJoinVoiceChannel,
   onLogout,
   onMobileMembersClose,
@@ -208,6 +220,7 @@ export function CommunityWorkspace({
   onRealtimeEventsOpen,
   onSessionUpdated,
   onTypingActive,
+  pendingInvitation,
   presenceByIdentityId = {},
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -2313,11 +2326,15 @@ export function CommunityWorkspace({
               messageCursor={messageCursor}
               messageState={messageState}
               missingCommunityKey={missingCommunityKey}
+              invitationAccepting={invitationAccepting}
+              invitationError={invitationError}
+              invitationInviterName={invitationInviterName}
               newChannelMessageCount={newChannelMessageCount}
               onAddCommunityKey={() => {
                 setCommunityKeyError(null);
                 setCommunityKeyDialog('add');
               }}
+              onInvitationAccept={onInvitationAccept}
               onAttachmentOpen={(attachment) =>
                 void messageComposer.openAttachment(attachment)
               }
@@ -2363,6 +2380,7 @@ export function CommunityWorkspace({
               onStickerClick={handleStickerClick}
               currentRoleIds={currentRoleIds}
               reactionAuthorNames={reactionAuthorNames}
+              pendingInvitation={pendingInvitation}
               polls={selectedChannelPolls}
               pinnedMessageIds={pinnedMessageIds}
               scrollerRef={scrollerRef}

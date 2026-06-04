@@ -5,6 +5,7 @@ import type {
   AttachmentProgress,
   ChatMessage,
   CommunityChannelThreadSummary,
+  CommunityInvitationNotificationResource,
   IdentityResource,
   MessageAttachment,
   PollResource,
@@ -20,6 +21,7 @@ import { DateSeparator } from '../../../messages/presentation/components/DateSep
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
 import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
+import { InvitationKeyPrompt } from '../../../notifications/presentation/components/InvitationKeyPrompt';
 import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
 import {
   messageReplyImage,
@@ -44,8 +46,14 @@ interface CommunityMessageTimelineProps {
   messageCursor: null | string;
   messageState: LoadState;
   missingCommunityKey: boolean;
+  invitationAccepting?: boolean;
+  invitationError?: null | string;
+  invitationInviterName?: string;
   newChannelMessageCount: number;
   onAddCommunityKey: () => void;
+  onInvitationAccept?: (
+    notification: CommunityInvitationNotificationResource,
+  ) => void;
   onAttachmentOpen: (attachment?: MessageAttachment) => void;
   onAuthorProfileOpen: (message: ChatMessage, target: HTMLElement) => void;
   onIdentityProfileOpen?: (identityId: string, target: HTMLElement) => void;
@@ -69,6 +77,7 @@ interface CommunityMessageTimelineProps {
   pinnedMessageIds: ReadonlySet<string>;
   currentRoleIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
+  pendingInvitation?: CommunityInvitationNotificationResource | null;
   polls?: PollResource[];
   scrollerRef: RefObject<HTMLDivElement | null>;
   session: Session;
@@ -84,8 +93,12 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   messageCursor,
   messageState,
   missingCommunityKey,
+  invitationAccepting = false,
+  invitationError,
+  invitationInviterName,
   newChannelMessageCount,
   onAddCommunityKey,
+  onInvitationAccept,
   onAttachmentOpen,
   onAuthorProfileOpen,
   onIdentityProfileOpen,
@@ -103,6 +116,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onStickerClick,
   channelThreadSummaries = [],
   pinnedMessageIds,
+  pendingInvitation,
   polls = [],
   currentRoleIds,
   reactionAuthorNames,
@@ -125,6 +139,17 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
       ),
     [channelThreadSummaries, polls, visibleMessages],
   );
+  const invitationPrompt =
+    missingCommunityKey && pendingInvitation && onInvitationAccept ? (
+      <InvitationKeyPrompt
+        accepting={invitationAccepting}
+        error={invitationError}
+        inviterName={invitationInviterName}
+        kind="community"
+        onAccept={() => onInvitationAccept(pendingInvitation)}
+        onManualImport={onAddCommunityKey}
+      />
+    ) : null;
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -149,24 +174,28 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
               </div>
             )}
           {missingCommunityKey && (
-            <div className="grid min-h-[28vh] place-items-center">
-              <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-                  <LockIcon locked={false} />
+            <>
+              {invitationPrompt ?? (
+                <div className="grid min-h-[28vh] place-items-center">
+                  <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+                    <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                      <LockIcon locked={false} />
+                    </div>
+                    <div className="font-black">{copy.chat.e2eMissing}</div>
+                    <div className="mt-2 text-rose-100/65">
+                      {copy.messages.missingCommunityKey}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onAddCommunityKey}
+                      className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
+                    >
+                      {copy.chat.addPrivateKey}
+                    </button>
+                  </div>
                 </div>
-                <div className="font-black">{copy.chat.e2eMissing}</div>
-                <div className="mt-2 text-rose-100/65">
-                  {copy.messages.missingCommunityKey}
-                </div>
-                <button
-                  type="button"
-                  onClick={onAddCommunityKey}
-                  className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-                >
-                  {copy.chat.addPrivateKey}
-                </button>
-              </div>
-            </div>
+              )}
+            </>
           )}
           {!missingCommunityKey &&
             timelineEntries.map((entry) => {
