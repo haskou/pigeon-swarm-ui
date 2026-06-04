@@ -12,7 +12,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { ArchivedNotifications } from '../../infrastructure/storage/ArchivedNotifications';
 import { SeenNotifications } from '../../infrastructure/storage/SeenNotifications';
-import { mergeNotificationOverrides } from './notificationListState';
+import { mergeNotificationOverrides } from './mergeNotificationOverrides';
 
 type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
 

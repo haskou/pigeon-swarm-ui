@@ -1,6 +1,6 @@
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { mergeNotificationOverrides } from './notificationListState';
+import { mergeNotificationOverrides } from './mergeNotificationOverrides';
 
 function notification(
   overrides: Partial<NotificationResource> = {},
