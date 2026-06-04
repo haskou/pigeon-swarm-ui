@@ -117,9 +117,10 @@ export function Rail({
 
     clearCommunityLongPressTimer();
     communityLongPressOpenedRef.current = false;
+    const target = event.currentTarget;
     communityLongPressTimerRef.current = window.setTimeout(() => {
       communityLongPressOpenedRef.current = true;
-      openCommunityMenu(communityId, event.currentTarget);
+      openCommunityMenu(communityId, target);
     }, 450);
   };
 
