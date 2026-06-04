@@ -108,17 +108,31 @@ self.addEventListener('notificationclick', (event) => {
   const url = new URL(targetUrl, self.location.origin).toString();
 
   event.waitUntil(
-    self.clients
-      .matchAll({ includeUncontrolled: true, type: 'window' })
-      .then((clients) => {
-        const focusedClient = clients.find((client) => client.url === url);
-
-        if (focusedClient) return focusedClient.focus();
-
-        return self.clients.openWindow(url);
-      }),
+    Promise.all([closeVisibleNotifications(), openOrFocusClient(url)]),
   );
 });
+
+async function closeVisibleNotifications() {
+  try {
+    const notifications = await self.registration.getNotifications();
+
+    notifications.forEach((notification) => notification.close());
+  } catch {
+    // The clicked notification should still be closed even if listing fails.
+  }
+}
+
+async function openOrFocusClient(url) {
+  const clients = await self.clients.matchAll({
+    includeUncontrolled: true,
+    type: 'window',
+  });
+  const focusedClient = clients.find((client) => client.url === url);
+
+  if (focusedClient) return await focusedClient.focus();
+
+  return await self.clients.openWindow(url);
+}
 
 self.addEventListener('push', (event) => {
   const payload = pushPayload(event.data);
