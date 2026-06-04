@@ -27,13 +27,43 @@ describe(ListConversations.name, () => {
     expect(loadMessages).not.toHaveBeenCalled();
   });
 
-  it('keeps conversations without activity timestamps without loading messages', async () => {
+  it('recovers latest activity for conversations without timestamps', async () => {
     const session = { identity: { id: 'me' } } as unknown as Session;
-    const loadMessages = jest.fn();
+    const loadMessages = jest.fn().mockResolvedValue({
+      messages: [{ id: 'message-1', raw: { createdAt: 30 } }],
+    });
+    const gateway = {
+      listConversations: jest.fn().mockResolvedValue([
+        { id: 'with-activity', latestMessageAt: 20, networkId: 'net' },
+        { id: 'without-timestamp', networkId: 'net' },
+      ]),
+      loadMessages,
+    } as unknown as ListConversationsPort;
+
+    await expect(
+      new ListConversations(gateway).list(
+        new ListConversationsMessage(session),
+      ),
+    ).resolves.toEqual([
+      { id: 'without-timestamp', latestMessageAt: 30, networkId: 'net' },
+      { id: 'with-activity', latestMessageAt: 20, networkId: 'net' },
+    ]);
+    expect(loadMessages).toHaveBeenCalledTimes(1);
+    expect(loadMessages).toHaveBeenCalledWith(
+      session,
+      'without-timestamp',
+      null,
+      { limit: 1 },
+    );
+  });
+
+  it('keeps conversations without activity timestamps when legacy recovery has no messages', async () => {
+    const session = { identity: { id: 'me' } } as unknown as Session;
+    const loadMessages = jest.fn().mockResolvedValue({ messages: [] });
     const gateway = {
       listConversations: jest.fn().mockResolvedValue([
         { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
-        { id: 'without-key', networkId: 'net' },
+        { id: 'without-timestamp', networkId: 'net' },
       ]),
       loadMessages,
     } as unknown as ListConversationsPort;
@@ -44,8 +74,8 @@ describe(ListConversations.name, () => {
       ),
     ).resolves.toEqual([
       { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
-      { id: 'without-key', networkId: 'net' },
+      { id: 'without-timestamp', networkId: 'net' },
     ]);
-    expect(loadMessages).not.toHaveBeenCalled();
+    expect(loadMessages).toHaveBeenCalledTimes(1);
   });
 });
