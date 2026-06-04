@@ -70,10 +70,10 @@ describe('i18n language selection', () => {
 
     expect(copy.communities.addMemberFindIdentity).toBe('Buscar identidad');
     expect(copy.communities.addMemberCreateInviteLink).toBe(
-      'Crear enlace de invitacion',
+      'Crear enlace de invitación',
     );
     expect(copy.communities.linkHelp).toBe(
-      'Crea un enlace de un solo uso. La clave de la comunidad se guarda en el fragmento de la URL y no se envia al servidor.',
+      'Crea un enlace de un solo uso. La clave de la comunidad se guarda en el fragmento de la URL y no se envía al servidor.',
     );
   });
 
