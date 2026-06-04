@@ -212,10 +212,21 @@ export function useCommunityChannelMessages({
     const previousHeight = scroller.scrollHeight;
     const previousTop = scroller.scrollTop;
     const anchor = MessageScrollAnchor.capture(scroller);
+    const restorePreviousViewport = () => {
+      if (scrollerRef.current !== scroller) return;
+
+      MessageScrollAnchor.restoreOrPreserveOffset(
+        scroller,
+        anchor,
+        previousHeight,
+        previousTop,
+      );
+    };
 
     keepChannelBottomUntilRef.current = 0;
     messageScrollAnchorRef.current = anchor;
     setMessageLoadState('loading');
+    requestAnimationFrame(restorePreviousViewport);
     void loadChannelMessagesRef
       .current(selectedChannelId, requestedCursor)
       .then(({ cursor, loadedMessages }) => {
@@ -234,16 +245,7 @@ export function useCommunityChannelMessages({
           hasNewMessages && nextCursor !== requestedCursor ? nextCursor : null,
         );
         requestAnimationFrame(() => {
-          if (!scrollerRef.current) return;
-
-          const restoredTop = MessageScrollAnchor.restore(
-            scrollerRef.current,
-            anchor,
-          );
-
-          scrollerRef.current.scrollTop =
-            restoredTop ??
-            scrollerRef.current.scrollHeight - previousHeight + previousTop;
+          restorePreviousViewport();
         });
       })
       .catch(() => setMessageLoadState('error'))

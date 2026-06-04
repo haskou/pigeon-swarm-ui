@@ -49,6 +49,21 @@ export class MessageScrollAnchor {
     return nextTop;
   }
 
+  public static restoreOrPreserveOffset(
+    scroller: HTMLElement,
+    anchor: MessageScrollAnchorSnapshot | null,
+    previousHeight: number,
+    previousTop: number,
+  ): number {
+    const restoredTop = MessageScrollAnchor.restore(scroller, anchor);
+    const nextTop =
+      restoredTop ?? scroller.scrollHeight - previousHeight + previousTop;
+
+    scroller.scrollTop = nextTop;
+
+    return nextTop;
+  }
+
   private static messageElements(scroller: HTMLElement): HTMLElement[] {
     return Array.from(scroller.querySelectorAll<HTMLElement>(messageSelector));
   }

@@ -2324,9 +2324,22 @@ export function GlassWorkspace({
     const anchor = scroller ? MessageScrollAnchor.capture(scroller) : null;
     const previousHeight = scroller?.scrollHeight ?? 0;
     const previousTop = scroller?.scrollTop ?? 0;
+    const restorePreviousViewport = () => {
+      if (!scroller || scrollerRef.current !== scroller) return;
+
+      const nextTop = MessageScrollAnchor.restoreOrPreserveOffset(
+        scroller,
+        anchor,
+        previousHeight,
+        previousTop,
+      );
+
+      lastScrollTopRef.current = nextTop;
+    };
 
     messageScrollAnchorRef.current = anchor;
     setMessageLoadState('loading');
+    requestAnimationFrame(restorePreviousViewport);
     try {
       const result = await applicationContainer.loadMessages(
         sessionRef.current,
@@ -2352,18 +2365,7 @@ export function GlassWorkspace({
         hasNewMessages && nextCursor !== requestedCursor ? nextCursor : null,
       );
       requestAnimationFrame(() => {
-        if (!scrollerRef.current) return;
-
-        const restoredTop = MessageScrollAnchor.restore(
-          scrollerRef.current,
-          anchor,
-        );
-        const nextTop =
-          restoredTop ??
-          scrollerRef.current.scrollHeight - previousHeight + previousTop;
-
-        scrollerRef.current.scrollTop = nextTop;
-        lastScrollTopRef.current = nextTop;
+        restorePreviousViewport();
       });
     } catch (caught) {
       setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
