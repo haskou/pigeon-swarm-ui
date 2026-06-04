@@ -43,6 +43,9 @@ const ImageCropEditor = lazy(() =>
   ),
 );
 
+const profileEditorInputClass =
+  'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/50 focus:bg-black/25';
+
 export function ProfileEditor({
   currentPicture,
   nodeNetworks,
@@ -238,7 +241,7 @@ export function ProfileEditor({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0"
@@ -247,9 +250,9 @@ export function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/35 sm:max-w-3xl sm:p-6"
+        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:p-6"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>
           <button
             type="button"
@@ -261,8 +264,8 @@ export function ProfileEditor({
           </button>
         </div>
 
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="overflow-hidden rounded-2xl bg-white/[0.04]">
+        <div className="profile-editor-scroll mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/10">
             <button
               type="button"
               onClick={() => bannerInputRef.current?.click()}
@@ -280,11 +283,11 @@ export function ProfileEditor({
                 ✎
               </span>
             </button>
-            <div className="relative px-4 pb-4">
+            <div className="relative px-5 pb-5">
               <button
                 type="button"
                 onClick={() => pictureInputRef.current?.click()}
-                className="group relative -mt-9 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
                 aria-label={copy.profile.changePicture}
               >
                 {picturePreview ? (
@@ -300,14 +303,14 @@ export function ProfileEditor({
                   ✎
                 </span>
               </button>
-              <div className="mt-3 grid gap-3">
+              <div className="mt-2 grid gap-3">
                 <ProfileEditorField label={copy.profile.name}>
                   <input
                     aria-label={copy.profile.name}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     maxLength={ProfileName.MAX_LENGTH}
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-fuchsia-300/60"
+                    className={cx(profileEditorInputClass, 'text-lg font-black')}
                   />
                 </ProfileEditorField>
                 <ProfileEditorField label={copy.profile.handle}>
@@ -319,7 +322,10 @@ export function ProfileEditor({
                     }
                     maxLength={ProfileHandle.MAX_LENGTH}
                     placeholder="@ada"
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white/70 outline-none placeholder:text-white/30 focus:border-fuchsia-300/60"
+                    className={cx(
+                      profileEditorInputClass,
+                      'text-sm font-bold text-white/70',
+                    )}
                   />
                 </ProfileEditorField>
                 <ProfileEditorField label={copy.profile.biography}>
@@ -328,7 +334,10 @@ export function ProfileEditor({
                     value={biography}
                     onChange={(event) => setBiography(event.target.value)}
                     maxLength={ProfileBiography.MAX_LENGTH}
-                    className="min-h-20 w-full resize-y rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-fuchsia-300/60"
+                    className={cx(
+                      profileEditorInputClass,
+                      'min-h-[4.75rem] resize-y text-sm font-normal',
+                    )}
                   />
                 </ProfileEditorField>
               </div>
@@ -349,17 +358,17 @@ export function ProfileEditor({
             />
           </div>
           <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <section className="rounded-2xl border border-white/[0.06] bg-black/10 px-4 py-3">
               <div className="text-sm font-black text-white/70">
                 {copy.profile.networks}
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {identityNetworkIds.length > 0 ? (
                   identityNetworkIds.map((networkId) => (
                     <span
                       key={networkId}
                       title={networkId}
-                      className="min-w-0 max-w-full truncate rounded-2xl bg-white/10 px-3 py-2 text-xs font-black text-white/70"
+                      className="min-w-0 max-w-full truncate rounded-full border border-white/[0.06] bg-white/10 px-2.5 py-1 text-xs font-black text-white/70"
                     >
                       {networkNamesById.get(networkId) ?? shortId(networkId)}
                     </span>
@@ -370,7 +379,7 @@ export function ProfileEditor({
                   </span>
                 )}
               </div>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <GlassSelect
                   ariaLabel={copy.profile.availableNetwork}
                   className="min-w-0"
@@ -393,14 +402,14 @@ export function ProfileEditor({
                   type="button"
                   onClick={addNetwork}
                   disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
+                  className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
                 >
                   {copy.profile.addNetwork}
                 </button>
               </div>
             </section>
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-              <div className="border-b border-white/10 px-4 py-3 text-sm font-black text-white/70">
+            <section className="rounded-2xl border border-white/[0.06] bg-black/10">
+              <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
                 {copy.profile.security}
               </div>
               <button
@@ -421,7 +430,7 @@ export function ProfileEditor({
                 </span>
               </button>
               {passwordSectionOpen && (
-                <div className="border-t border-white/10 p-4">
+                <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
                   <p className="text-xs font-bold text-white/45">
                     {copy.profile.newPasswordHelp}
                   </p>
@@ -459,10 +468,10 @@ export function ProfileEditor({
           )}
         </div>
 
-        <div className="mt-5 flex shrink-0 justify-end border-t border-white/10 pt-4">
+        <div className="mt-5 flex shrink-0 justify-end border-t border-white/[0.06] pt-4">
           <button
             disabled={!canSubmit}
-            className="rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:hover:bg-white/10"
+            className="rounded-2xl border border-fuchsia-300/30 bg-fuchsia-500 px-5 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-white/45 disabled:hover:bg-white/[0.08]"
           >
             {state === 'loading' ? copy.profile.saving : copy.profile.save}
           </button>
@@ -518,7 +527,7 @@ function ProfileInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
-        className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-normal text-white outline-none placeholder:text-white/30 focus:border-fuchsia-300/60"
+        className={cx(profileEditorInputClass, 'text-sm font-normal')}
       />
     </label>
   );
@@ -616,12 +625,12 @@ function PasswordChecklist({
   ] as const;
 
   return (
-    <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-black sm:grid-cols-2">
+    <div className="mt-4 grid grid-cols-1 gap-1.5 text-xs font-black">
       {items.map(([label, complete]) => (
         <div
           key={label}
           className={cx(
-            'flex items-center gap-2 rounded-2xl px-3 py-2',
+            'flex min-h-8 items-center gap-2 rounded-xl px-3 py-1.5',
             complete
               ? 'bg-emerald-400/10 text-emerald-200'
               : 'bg-white/5 text-white/45',
