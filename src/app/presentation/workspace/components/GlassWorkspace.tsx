@@ -3429,6 +3429,9 @@ export function GlassWorkspace({
           eventAggregateId(event) ?? stringAttribute(event, 'communityId');
         const channelId = stringAttribute(event, 'channelId');
         const authorIdentityId = stringAttribute(event, 'authorIdentityId');
+        const timelineMessage = recordAttribute(event, 'message') as
+          | MessageResource
+          | undefined;
         const pageVisible = isBrowserPageVisible();
         const eventCommunity = communityId
           ? communities.find((community) => community.id === communityId)
@@ -3479,6 +3482,7 @@ export function GlassWorkspace({
             channelId,
             authorIdentityId,
             identityNames,
+            timelineMessage,
           );
 
           playNotificationSoundIfAllowed();
@@ -3729,6 +3733,7 @@ export function GlassWorkspace({
             session,
             identityNames,
             identityProfiles,
+            timelineMessage,
           );
 
           playNotificationSoundIfAllowed();
