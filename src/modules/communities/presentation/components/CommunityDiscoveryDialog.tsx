@@ -182,7 +182,7 @@ export function CommunityDiscoveryDialog({
           </div>
         )}
 
-        <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+        <div className="subtle-scrollbar mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-3">
           {state === 'loading' ? (
             <CommunityDiscoverySkeleton />
           ) : communities.length === 0 ? (
@@ -200,6 +200,7 @@ export function CommunityDiscoveryDialog({
                   shortId(community.networkId)
                 }
                 onRequestJoin={() => void requestJoin(community)}
+                showNetworkBadge={!networkId}
               />
             ))
           )}
@@ -267,11 +268,13 @@ function CommunityDiscoveryRow({
   disabled,
   networkName,
   onRequestJoin,
+  showNetworkBadge,
 }: {
   community: CommunityDiscoveryResource;
   disabled: boolean;
   networkName: string;
   onRequestJoin: () => void;
+  showNetworkBadge: boolean;
 }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -298,9 +301,10 @@ function CommunityDiscoveryRow({
   }, [community.avatar]);
 
   const canRequest = community.membershipStatus === 'none';
+  const showActionButton = community.membershipStatus === 'none';
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+    <article className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-white/18 hover:bg-white/5">
       <div className="flex gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
           <FallbackImage
@@ -314,12 +318,16 @@ function CommunityDiscoveryRow({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate font-black text-white">{community.name}</h3>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-black text-white/55">
-              {community.memberCount} {copy.communities.members}
+              {formatMemberCount(community.memberCount)}
             </span>
-            <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-xs font-black text-cyan-100/80">
-              <span className="text-cyan-100/45">{copy.communities.network}</span>
-              <span className="max-w-40 truncate">{networkName}</span>
-            </span>
+            {showNetworkBadge ? (
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-fuchsia-300/10 px-2 py-0.5 text-xs font-black text-fuchsia-100/80">
+                <span className="text-fuchsia-100/45">
+                  {copy.communities.network}
+                </span>
+                <span className="max-w-40 truncate">{networkName}</span>
+              </span>
+            ) : null}
             {community.autoJoinEnabled && community.membershipStatus === 'none' ? (
               <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-xs font-black text-amber-100">
                 {copy.communities.discoverJoinInstantly}
@@ -330,27 +338,40 @@ function CommunityDiscoveryRow({
             {community.description}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRequestJoin}
-          disabled={!canRequest || disabled}
-          className={cx(
-            'h-11 shrink-0 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55',
-            canRequest
-              ? 'bg-white text-slate-950 hover:bg-cyan-100'
-              : 'bg-white/10 text-white/70',
-          )}
-        >
-          {membershipStatusLabel(community)}
-        </button>
+        {showActionButton ? (
+          <button
+            type="button"
+            onClick={onRequestJoin}
+            disabled={!canRequest || disabled}
+            className={cx(
+              'h-11 shrink-0 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55',
+              canRequest
+                ? 'bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-950/30 hover:bg-fuchsia-400'
+                : 'bg-white/10 text-white/70',
+            )}
+          >
+            {membershipStatusLabel(community)}
+          </button>
+        ) : (
+          <span className="inline-flex h-8 shrink-0 items-center rounded-full border border-white/10 bg-white/8 px-3 text-xs font-black text-white/65">
+            {membershipStatusLabel(community)}
+          </span>
+        )}
       </div>
     </article>
   );
 }
 
+function formatMemberCount(count: number): string {
+  const template =
+    count === 1 ? copy.communities.memberCount : copy.communities.membersCount;
+
+  return template.replace('{count}', String(count));
+}
+
 function membershipStatusLabel(community: CommunityDiscoveryResource): string {
   if (community.membershipStatus === 'member') {
-    return copy.communities.discoverJoined;
+    return `✓ ${copy.communities.discoverJoined}`;
   }
 
   if (community.membershipStatus === 'requested') {

@@ -213,8 +213,8 @@ function CommunityEntryModeControl({
       onChange={onChange}
       value={mode}
       options={[
-        { label: copy.communities.discover, value: 'discover' },
-        { label: copy.communities.create, value: 'create' },
+        { label: copy.communities.discoverTab, value: 'discover' },
+        { label: copy.communities.createTab, value: 'create' },
       ]}
     />
   );
