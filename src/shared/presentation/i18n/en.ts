@@ -1,3 +1,9 @@
+const identityLookup = {
+  help: 'Enter a known username or paste a public identity.',
+  label: 'User or identity',
+  placeholder: '@user or public ID',
+};
+
 export const en = {
   app: {
     loading: 'Loading...',
@@ -13,6 +19,7 @@ export const en = {
     today: 'Today',
     yesterday: 'Yesterday',
   },
+  identityLookup,
   auth: {
     apiLabel: 'API',
     createIdentity: 'Create identity',
@@ -22,8 +29,8 @@ export const en = {
     heroBody:
       'Your conversations travel through shared networks, not a central server. Your identity is decrypted on your device. Your keys do not leave it.',
     heroTitle: 'P2P messaging for private communities.',
-    identityIdHelp: 'You can use @username or the full identity ID.',
-    identityIdLabel: 'Username or identity ID',
+    identityIdHelp: identityLookup.help,
+    identityIdLabel: identityLookup.label,
     installApp: 'Install app',
     installAppChecking: 'Checking install support...',
     installAppDevHelp:
@@ -299,8 +306,8 @@ export const en = {
     loadMoreModerationLogs: 'Load more',
     manage: 'Manage community',
     memberError: 'The member could not be added.',
-    memberIdentity: 'Identity ID or username',
-    memberIdentityPlaceholder: '@ada or identity id',
+    memberIdentity: identityLookup.label,
+    memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'Member roles could not be saved.',
     members: 'Members',
     membershipError: 'The membership request could not be updated.',
@@ -517,17 +524,17 @@ export const en = {
     groupName: 'Group name',
     groupNamePlaceholder: 'Mi grupo',
     groupNeedsParticipant: 'Add at least one participant.',
-    groupParticipant: 'Add identity',
+    groupParticipant: identityLookup.label,
     groupParticipants: 'Participants',
     loadingIdentity: 'Looking up identity...',
     noSharedNetwork:
       'No shared network with this identity. You cannot create this conversation yet.',
     remoteIdentityFound: 'User found.',
-    remoteIdentityHelp: 'Enter a known username or paste a public identity.',
-    remoteIdentityId: 'User or identity',
+    remoteIdentityHelp: identityLookup.help,
+    remoteIdentityId: identityLookup.label,
     remoteIdentityInvalid: 'Invalid identity ID.',
     remoteIdentityNotFound: 'User not found.',
-    remoteIdentityPlaceholder: '@user or public ID',
+    remoteIdentityPlaceholder: identityLookup.placeholder,
     remoteIdentityValid: 'Valid identity.',
     removeParticipant: 'Remove participant',
     selectSwarm: 'Select a network',

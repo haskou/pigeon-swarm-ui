@@ -1,5 +1,11 @@
 import type { Copy, CopyOverrides } from './en';
 
+const identityLookup = {
+  help: 'Introduce un usuario conocido o pega una identidad pública.',
+  label: 'Usuario o identidad',
+  placeholder: '@usuario o ID pública',
+};
+
 export const es = {
   app: {
     loading: 'Cargando...',
@@ -15,6 +21,7 @@ export const es = {
     today: 'Hoy',
     yesterday: 'Ayer',
   },
+  identityLookup,
   auth: {
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
@@ -23,8 +30,8 @@ export const es = {
     heroBody:
       'Tus conversaciones viajan por redes compartidas, no por un servidor central. Tu identidad se descifra en tu dispositivo. Tus claves no salen de ahi.',
     heroTitle: 'Mensajeria P2P para comunidades privadas.',
-    identityIdHelp: 'Puedes usar @usuario o el ID completo de identidad.',
-    identityIdLabel: 'Usuario o ID de identidad',
+    identityIdHelp: identityLookup.help,
+    identityIdLabel: identityLookup.label,
     installApp: 'Instalar app',
     installAppChecking: 'Comprobando soporte de instalacion...',
     installAppDevHelp:
@@ -281,8 +288,8 @@ export const es = {
     loadMoreModerationLogs: 'Cargar mas',
     manage: 'Gestionar comunidad',
     memberError: 'No se pudo anadir el miembro.',
-    memberIdentity: 'ID de identidad o usuario',
-    memberIdentityPlaceholder: '@ada o ID de identidad',
+    memberIdentity: identityLookup.label,
+    memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'No se pudieron guardar los roles del miembro.',
     members: 'Miembros',
     membershipError: 'No se pudo actualizar la solicitud.',
@@ -500,17 +507,17 @@ export const es = {
     groupName: 'Nombre del grupo',
     groupNamePlaceholder: 'Mi grupo',
     groupNeedsParticipant: 'Anade al menos un participante.',
-    groupParticipant: 'Anadir identidad',
+    groupParticipant: identityLookup.label,
     groupParticipants: 'Participantes',
     loadingIdentity: 'Buscando identidad...',
     noSharedNetwork:
       'No hay red compartida con esta identidad. Aún no puedes crear esta conversación.',
     remoteIdentityFound: 'Usuario encontrado.',
-    remoteIdentityHelp: 'Introduce un usuario conocido o pega una identidad pública.',
-    remoteIdentityId: 'Usuario o identidad',
+    remoteIdentityHelp: identityLookup.help,
+    remoteIdentityId: identityLookup.label,
     remoteIdentityInvalid: 'ID inválida.',
     remoteIdentityNotFound: 'Usuario no encontrado.',
-    remoteIdentityPlaceholder: '@usuario o ID pública',
+    remoteIdentityPlaceholder: identityLookup.placeholder,
     remoteIdentityValid: 'Identidad válida.',
     removeParticipant: 'Quitar participante',
     selectSwarm: 'Selecciona una red',

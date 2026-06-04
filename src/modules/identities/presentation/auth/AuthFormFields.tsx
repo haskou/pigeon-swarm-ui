@@ -27,16 +27,16 @@ interface AuthFormFieldsProps {
 export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
   if (props.mode === 'login') {
     return (
-      <Field label={copy.auth.identityIdLabel}>
+      <Field label={copy.identityLookup.label}>
         <input
           value={props.identityId}
           onChange={(event) => props.onIdentityIdChange(event.target.value)}
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="@ada"
+          placeholder={copy.identityLookup.placeholder}
           autoComplete="username"
         />
         <p className="mt-2 text-xs leading-relaxed text-white/40">
-          {copy.auth.identityIdHelp}
+          {copy.identityLookup.help}
         </p>
       </Field>
     );

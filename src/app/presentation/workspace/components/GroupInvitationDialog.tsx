@@ -59,7 +59,7 @@ export function GroupInvitationDialog({
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder={copy.communities.memberIdentity}
+          placeholder={copy.identityLookup.placeholder}
         />
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">

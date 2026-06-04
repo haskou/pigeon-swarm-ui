@@ -428,12 +428,12 @@ export function CreateConversationDialog({
         {mode === 'direct' ? (
           <>
             <div className="mt-2">
-              <Field label={copy.dialog.remoteIdentityId}>
+              <Field label={copy.identityLookup.label}>
                 <input
                   value={peerIdentityId}
                   onChange={(event) => setPeerIdentityId(event.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.dialog.remoteIdentityPlaceholder}
+                  placeholder={copy.identityLookup.placeholder}
                   autoComplete="off"
                 />
                 <IdentityLookupStatus status={remoteIdentityStatus} />
@@ -483,7 +483,7 @@ export function CreateConversationDialog({
               />
             </Field>
 
-            <Field label={copy.dialog.groupParticipant}>
+            <Field label={copy.identityLookup.label}>
               <div className="flex gap-2">
                 <input
                   value={groupIdentityInput}
@@ -496,7 +496,7 @@ export function CreateConversationDialog({
                     void addGroupParticipant();
                   }}
                   className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder="@ada or identity id"
+                  placeholder={copy.identityLookup.placeholder}
                   autoComplete="off"
                 />
                 <button
@@ -645,7 +645,7 @@ function remoteIdentityLookupStatus(input: {
 }): IdentityLookupStatusModel {
   if (!input.input.trim()) {
     return {
-      label: copy.dialog.remoteIdentityHelp,
+      label: copy.identityLookup.help,
       tone: 'muted',
     };
   }
@@ -681,7 +681,7 @@ function remoteIdentityLookupStatus(input: {
   }
 
   return {
-    label: copy.dialog.remoteIdentityHelp,
+    label: copy.identityLookup.help,
     tone: 'muted',
   };
 }
