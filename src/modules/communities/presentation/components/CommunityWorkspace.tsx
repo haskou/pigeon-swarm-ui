@@ -1968,7 +1968,7 @@ export function CommunityWorkspace({
   const handleRealtimeThreadMessage = useCallback(
     (message: ChatMessage) => {
       const channelId = message.raw.channelId ?? selectedChannelId;
-      const rootMessageId = message.threadRootMessageId;
+      const rootMessageId = ThreadMessageVisibility.rootMessageId(message);
 
       if (!channelId || !rootMessageId) return;
 

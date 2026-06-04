@@ -24,6 +24,8 @@ describe(ThreadMessageVisibility.name, () => {
     expect(ThreadMessageVisibility.forRoot('root-message', [message])).toEqual([
       message,
     ]);
+    expect(ThreadMessageVisibility.isThreadMessage(message)).toBe(true);
+    expect(ThreadMessageVisibility.rootMessageId(message)).toBe('root-message');
   });
 
   it('excludes normal replies with a reply preview from the thread panel', () => {
@@ -36,6 +38,8 @@ describe(ThreadMessageVisibility.name, () => {
     expect(ThreadMessageVisibility.forRoot('root-message', [reply])).toEqual(
       [],
     );
+    expect(ThreadMessageVisibility.isThreadMessage(reply)).toBe(false);
+    expect(ThreadMessageVisibility.rootMessageId(reply)).toBeUndefined();
   });
 
   it('excludes messages marked for another thread root', () => {

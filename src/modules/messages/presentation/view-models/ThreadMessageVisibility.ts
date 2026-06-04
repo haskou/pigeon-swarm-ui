@@ -14,13 +14,20 @@ export class ThreadMessageVisibility {
     rootMessageId: string,
     message: ChatMessage,
   ): boolean {
-    if (message.threadRootMessageId) {
-      return message.threadRootMessageId === rootMessageId;
-    }
+    const messageRootId = ThreadMessageVisibility.rootMessageId(message);
 
-    return (
-      (message.replyToMessageId ?? message.raw.replyToMessageId) ===
-        rootMessageId && !message.replyPreview
-    );
+    return Boolean(messageRootId && messageRootId === rootMessageId);
+  }
+
+  public static isThreadMessage(message: ChatMessage): boolean {
+    return Boolean(ThreadMessageVisibility.rootMessageId(message));
+  }
+
+  public static rootMessageId(message: ChatMessage): string | undefined {
+    if (message.threadRootMessageId) return message.threadRootMessageId;
+
+    if (message.replyPreview) return undefined;
+
+    return message.replyToMessageId ?? message.raw.replyToMessageId;
   }
 }

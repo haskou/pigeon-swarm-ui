@@ -3195,7 +3195,7 @@ export function GlassWorkspace({
         if (!message) return;
 
         const isEditMessage = message.raw.type === 'edited';
-        const isThreadReply = Boolean(message.threadRootMessageId);
+        const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
 
         if (isThreadReply || isEditMessage) {
           setConversationThread((current) =>
