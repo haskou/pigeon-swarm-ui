@@ -892,6 +892,41 @@ export function GlassWorkspace({
       }),
     [conversations, notificationSettingsByScopeKey],
   );
+  const conversationNotificationSettingFor = useCallback(
+    (conversation: ConversationResource) =>
+      NotificationSettingsPolicy.resolve(notificationSettingsByScopeKey, {
+        conversationId: conversation.id,
+        type: 'conversation',
+      }),
+    [notificationSettingsByScopeKey],
+  );
+  const openConversationNotificationSettings = useCallback(
+    (conversation: ConversationResource, title: string) => {
+      const networkName = conversation.networkId
+        ? (nodeNetworks.find((network) => network.id === conversation.networkId)
+            ?.name ?? conversation.networkId)
+        : copy.profile.noNetworks;
+
+      openNotificationSettings({
+        scope: {
+          conversationId: conversation.id,
+          type: 'conversation',
+        },
+        subtitle: networkName,
+        title,
+      });
+    },
+    [nodeNetworks, openNotificationSettings],
+  );
+  const toggleConversationNotificationMute = useCallback(
+    (conversation: ConversationResource) => {
+      toggleNotificationMute({
+        conversationId: conversation.id,
+        type: 'conversation',
+      });
+    },
+    [toggleNotificationMute],
+  );
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
     useUnreadMessages(notificationAwareConversations);
   useEffect(() => {
@@ -4065,6 +4100,9 @@ export function GlassWorkspace({
                     activeCall={activeCall}
                     session={session}
                     conversations={conversationsWithUnread}
+                    conversationNotificationSetting={
+                      conversationNotificationSettingFor
+                    }
                     identityNames={identityNames}
                     identityPictures={identityPictures}
                     identityProfiles={identityProfiles}
@@ -4077,6 +4115,12 @@ export function GlassWorkspace({
                       setActiveConversationId(id);
                       setSidebarOpen(false);
                     }}
+                    onConversationNotificationMuteToggle={
+                      toggleConversationNotificationMute
+                    }
+                    onConversationNotificationSettingsOpen={
+                      openConversationNotificationSettings
+                    }
                     onCreate={() => setIsCreateOpen(true)}
                     onCallEnd={leaveActiveCall}
                     onCallParticipantVolumeChange={setParticipantVolume}

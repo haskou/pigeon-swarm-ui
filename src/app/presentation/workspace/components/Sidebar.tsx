@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallSession } from '../../../../modules/calls/domain/callSession.types';
@@ -6,6 +14,7 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  NotificationScopeSetting,
   SelectablePresenceStatus,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -27,6 +36,8 @@ import { PresenceStatusDot } from '../../../../modules/identities/presentation/c
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
 import { loadPublicImage } from '../../../../modules/communities/presentation/components/communityImages';
+import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
@@ -39,9 +50,19 @@ interface SidebarProps {
   presenceByIdentityId?: Record<string, IdentityPresence>;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
+  conversationNotificationSetting?: (
+    conversation: ConversationResource,
+  ) => NotificationScopeSetting;
   onCreate: () => void;
   onLogout: () => void;
   onSessionUpdated: (session: Session) => void;
+  onConversationNotificationMuteToggle?: (
+    conversation: ConversationResource,
+  ) => void;
+  onConversationNotificationSettingsOpen?: (
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
   onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
   activeCall?: CallSession | null;
@@ -68,6 +89,7 @@ interface SidebarProps {
 export function Sidebar({
   activeCall,
   activeConversationId,
+  conversationNotificationSetting,
   conversations,
   identityNames,
   identityPictures,
@@ -84,6 +106,8 @@ export function Sidebar({
   onCallToggleNoiseCancellation,
   onCallRetryMicrophone,
   onCallToggleScreenShare,
+  onConversationNotificationMuteToggle,
+  onConversationNotificationSettingsOpen,
   onCreate,
   onLogout,
   onSelect,
@@ -93,6 +117,11 @@ export function Sidebar({
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
+  const [conversationMenu, setConversationMenu] =
+    useState<ConversationMenuState | null>(null);
+  const conversationLongPressTimerRef = useRef<number | null>(null);
+  const conversationLongPressOpenedRef = useRef(false);
+  useCloseOnEscape(() => setConversationMenu(null), !!conversationMenu);
   const conversationBannerUrls = useIdentityBannerUrls(
     identityProfiles,
     filteredConversationPeerIdentityIds(
@@ -172,6 +201,60 @@ export function Sidebar({
       return searchable.includes(query);
     });
   }, [conversationSearch, conversations, identityNames, identityProfiles]);
+  const clearConversationLongPressTimer = () => {
+    if (conversationLongPressTimerRef.current === null) return;
+
+    window.clearTimeout(conversationLongPressTimerRef.current);
+    conversationLongPressTimerRef.current = null;
+  };
+  const canOpenConversationMenu =
+    !!conversationNotificationSetting &&
+    !!onConversationNotificationMuteToggle &&
+    !!onConversationNotificationSettingsOpen;
+  const openConversationMenu = (
+    conversation: ConversationResource,
+    title: string,
+    target: HTMLElement,
+  ) => {
+    if (!canOpenConversationMenu) return;
+
+    const rect = target.getBoundingClientRect();
+    const menuHeight = 96;
+    const menuWidth = 224;
+    const top = Math.max(
+      12,
+      Math.min(rect.top, window.innerHeight - menuHeight - 12),
+    );
+    const left = Math.min(rect.right + 8, window.innerWidth - menuWidth - 12);
+
+    setConversationMenu({
+      conversation,
+      left: Math.max(12, left),
+      title,
+      top,
+    });
+  };
+  const handleConversationPointerDown = (
+    event: PointerEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+    title: string,
+  ) => {
+    if (event.pointerType === 'mouse' || !canOpenConversationMenu) return;
+
+    clearConversationLongPressTimer();
+    conversationLongPressOpenedRef.current = false;
+    conversationLongPressTimerRef.current = window.setTimeout(() => {
+      conversationLongPressOpenedRef.current = true;
+      openConversationMenu(conversation, title, event.currentTarget);
+    }, 450);
+  };
+
+  useEffect(
+    () => () => {
+      clearConversationLongPressTimer();
+    },
+    [],
+  );
 
   return (
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
@@ -198,17 +281,45 @@ export function Sidebar({
               {copy.sidebar.emptyConversations}
             </div>
           )}
-          {filteredConversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              onClick={() => onSelect(conversation.id)}
-              className={cx(
-                'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
-                activeConversationId === conversation.id
-                  ? 'bg-white text-slate-950'
-                  : 'bg-white/8 text-white hover:bg-white/14',
-              )}
-            >
+          {filteredConversations.map((conversation) => {
+            const title = conversationName(conversation);
+            const notificationSetting =
+              conversationNotificationSetting?.(conversation);
+
+            return (
+              <div key={conversation.id} className="relative">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    if (conversationLongPressOpenedRef.current) {
+                      event.preventDefault();
+                      conversationLongPressOpenedRef.current = false;
+
+                      return;
+                    }
+
+                    setConversationMenu(null);
+                    onSelect(conversation.id);
+                  }}
+                  onContextMenu={(event) => {
+                    if (!canOpenConversationMenu) return;
+
+                    event.preventDefault();
+                    openConversationMenu(conversation, title, event.currentTarget);
+                  }}
+                  onPointerCancel={clearConversationLongPressTimer}
+                  onPointerDown={(event) =>
+                    handleConversationPointerDown(event, conversation, title)
+                  }
+                  onPointerLeave={clearConversationLongPressTimer}
+                  onPointerUp={clearConversationLongPressTimer}
+                  className={cx(
+                    'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
+                    activeConversationId === conversation.id
+                      ? 'bg-white text-slate-950'
+                      : 'bg-white/8 text-white hover:bg-white/14',
+                  )}
+                >
               {conversationBannerUrls[conversation.id] && (
                 <span
                   aria-hidden="true"
@@ -238,7 +349,7 @@ export function Sidebar({
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      conversationName(conversation).slice(0, 1).toUpperCase()
+                      title.slice(0, 1).toUpperCase()
                     )}
                   </span>
                   {conversationPeerId(conversation) && (
@@ -252,7 +363,7 @@ export function Sidebar({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-black">
-                    {conversationName(conversation)}
+                    {title}
                   </div>
                   <div
                     className={cx(
@@ -271,8 +382,33 @@ export function Sidebar({
                   </span>
                 )}
               </div>
-            </button>
-          ))}
+                </button>
+                {conversationMenu?.conversation.id === conversation.id &&
+                notificationSetting &&
+                onConversationNotificationMuteToggle &&
+                onConversationNotificationSettingsOpen ? (
+                  <SidebarConversationMenu
+                    left={conversationMenu.left}
+                    notificationSetting={notificationSetting}
+                    title={conversationMenu.title}
+                    top={conversationMenu.top}
+                    onClose={() => setConversationMenu(null)}
+                    onNotificationMuteToggle={() => {
+                      onConversationNotificationMuteToggle(conversation);
+                      setConversationMenu(null);
+                    }}
+                    onNotificationSettingsOpen={() => {
+                      onConversationNotificationSettingsOpen(
+                        conversation,
+                        conversationMenu.title,
+                      );
+                      setConversationMenu(null);
+                    }}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -301,6 +437,74 @@ export function Sidebar({
         onCallToggleScreenShare={onCallToggleScreenShare}
       />
     </aside>
+  );
+}
+
+type ConversationMenuState = {
+  conversation: ConversationResource;
+  left: number;
+  title: string;
+  top: number;
+};
+
+function SidebarConversationMenu({
+  left,
+  notificationSetting,
+  title,
+  top,
+  onClose,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
+}: {
+  left: number;
+  notificationSetting: NotificationScopeSetting;
+  title: string;
+  top: number;
+  onClose: () => void;
+  onNotificationMuteToggle: () => void;
+  onNotificationSettingsOpen: () => void;
+}) {
+  const menuStyle = {
+    left,
+    top,
+    touchAction: 'manipulation',
+    userSelect: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitUserSelect: 'none',
+  } as CSSProperties;
+
+  return createPortal(
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[80] cursor-default select-none"
+        onClick={onClose}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
+        style={{
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        style={menuStyle}
+        onContextMenu={(event) => event.preventDefault()}
+        aria-label={title}
+      >
+        <NotificationScopeMenuActions
+          muteLabel={copy.notifications.muteConversation}
+          notificationSetting={notificationSetting}
+          onNotificationMuteToggle={onNotificationMuteToggle}
+          onNotificationSettingsOpen={onNotificationSettingsOpen}
+        />
+      </section>
+    </>,
+    document.body,
   );
 }
 
