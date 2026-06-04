@@ -116,6 +116,7 @@ import {
 } from '../useWorkspacePreferences';
 import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -749,19 +750,22 @@ export function GlassWorkspace({
 
     let cancelled = false;
 
-    void applicationContainer
-      .listMessagePins(session, activeConversation.id)
-      .then((pins) => {
-        if (!cancelled) {
-          setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPinnedMessageIds(new Set());
-      });
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void applicationContainer
+        .listMessagePins(session, activeConversation.id)
+        .then((pins) => {
+          if (!cancelled) {
+            setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setPinnedMessageIds(new Set());
+        });
+    });
 
     return () => {
       cancelled = true;
+      cancelIdleWork();
     };
   }, [activeConversation?.id, session]);
 
@@ -1124,9 +1128,19 @@ export function GlassWorkspace({
   });
 
   useEffect(() => {
-    void ensurePwaPushSubscription(session)
-      .catch(() => undefined)
-      .finally(refreshPushPermission);
+    let cancelled = false;
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void ensurePwaPushSubscription(session)
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) refreshPushPermission();
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdleWork();
+    };
   }, [refreshPushPermission, session]);
 
   const logout = () => {

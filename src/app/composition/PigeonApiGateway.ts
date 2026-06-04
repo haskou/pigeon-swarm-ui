@@ -2064,17 +2064,17 @@ export class PigeonApiGateway {
     const encryptedPayload = this.encryptMessagePayload({
       content,
       conversationId,
+      eventType: threadRootMessageId
+        ? options.sticker
+          ? 'ThreadStickerMessageSent'
+          : 'ThreadMessageSent'
+        : undefined,
       key,
       linkPreview,
       messageAttachments,
       replyPreview,
       session,
       sticker: options.sticker,
-      eventType: threadRootMessageId
-        ? options.sticker
-          ? 'ThreadStickerMessageSent'
-          : 'ThreadMessageSent'
-        : undefined,
       threadRootMessageId,
       timestamp,
     });
