@@ -94,7 +94,7 @@ input[type='submit'] {
 }
 
 .profile-editor-scroll {
-  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.035);
+  scrollbar-color: rgba(217, 70, 239, 0.7) rgba(255, 255, 255, 0.06);
   scrollbar-width: thin;
 }
 
@@ -103,17 +103,25 @@ input[type='submit'] {
 }
 
 .profile-editor-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .profile-editor-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(103, 232, 249, 0.72),
+    rgba(217, 70, 239, 0.78)
+  );
   border: 1px solid rgba(8, 10, 37, 0.65);
   border-radius: 999px;
 }
 
 .profile-editor-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: linear-gradient(
+    180deg,
+    rgba(165, 243, 252, 0.9),
+    rgba(232, 121, 249, 0.95)
+  );
 }
 
 .app-viewport {
