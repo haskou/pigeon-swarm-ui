@@ -20,6 +20,7 @@ import { ImageLightbox, type LightboxImage } from './imageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
 import { PinIcon, ThreadIcon } from './messageActionIcons';
+import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import {
   AttachmentCard,
   ImageAttachmentAlbum,
@@ -146,6 +147,10 @@ export function MessageBubble({
         reactionAuthorNames,
       ),
     [currentIdentityId, message.reactions, reactionAuthorNames],
+  );
+  const emojiOnlyClass = useMemo(
+    () => EmojiOnlyMessage.sizeClass(message.content),
+    [message.content],
   );
 
   useEffect(() => clearLongPressTimer, []);
@@ -320,6 +325,7 @@ export function MessageBubble({
                   <div
                     className={cx(
                       'whitespace-pre-wrap break-words',
+                      emojiOnlyClass,
                       (hasReply || message.attachments.length > 0) && 'mt-3',
                       message.encrypted && 'text-white/55',
                     )}
