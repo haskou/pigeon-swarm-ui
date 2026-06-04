@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -93,7 +99,7 @@ export function Rail({
   const openCommunityMenu = (communityId: string, target: HTMLElement) => {
     const rect = target.getBoundingClientRect();
     const menuHeight = 176;
-    const menuWidth = 256;
+    const menuWidth = 224;
     const top = Math.max(
       12,
       Math.min(rect.top, window.innerHeight - menuHeight - 12),
@@ -436,17 +442,36 @@ function CommunityRailMenu({
   onNotificationMuteToggle?: () => void;
   onNotificationSettingsOpen?: () => void;
 }) {
+  const menuStyle = {
+    left,
+    top,
+    touchAction: 'manipulation',
+    userSelect: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitUserSelect: 'none',
+  } as CSSProperties;
+
   return createPortal(
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 cursor-default"
+        className="fixed inset-0 z-[80] cursor-default select-none"
         onClick={onClose}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
+        style={{
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
         aria-label={copy.dialog.close}
       />
       <section
-        className="glass-panel-strong fixed z-50 w-64 rounded-2xl border border-white/10 bg-[#202235]/95 p-1.5 text-left shadow-2xl shadow-black/45 backdrop-blur-xl"
-        style={{ left, top }}
+        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        style={menuStyle}
+        onContextMenu={(event) => event.preventDefault()}
         aria-label={communityName}
       >
         {notificationSetting &&
@@ -457,7 +482,6 @@ function CommunityRailMenu({
             notificationSetting={notificationSetting}
             onNotificationMuteToggle={onNotificationMuteToggle}
             onNotificationSettingsOpen={onNotificationSettingsOpen}
-            variant="compact"
           />
         ) : null}
         {onCommunityLeave ? (
@@ -468,9 +492,11 @@ function CommunityRailMenu({
             <button
               type="button"
               onClick={onCommunityLeave}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-black text-rose-100 transition hover:bg-rose-500/10"
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15 active:bg-rose-400/25 active:text-white"
             >
-              <RailLeaveIcon />
+              <span className="grid h-5 w-5 shrink-0 place-items-center text-rose-100/70">
+                <RailLeaveIcon />
+              </span>
               <span className="min-w-0 flex-1 truncate">
                 {copy.communities.leave}
               </span>
