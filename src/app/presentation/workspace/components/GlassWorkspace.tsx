@@ -3748,7 +3748,7 @@ export function GlassWorkspace({
           playNotificationSoundIfAllowed();
           void showPwaNotification({
             body: preview.body,
-            tag: `conversation-${conversationId}`,
+            tag: `conversation:${conversationId}`,
             title: preview.title,
           });
 
