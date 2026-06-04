@@ -1,5 +1,11 @@
 import type { Copy, CopyOverrides } from './en';
 
+const identityLookup = {
+  help: 'Introduce un usuario conocido o pega una identidad pública.',
+  label: 'Usuario o identidad',
+  placeholder: '@usuario o ID pública',
+};
+
 export const es = {
   app: {
     loading: 'Cargando...',
@@ -15,6 +21,7 @@ export const es = {
     today: 'Hoy',
     yesterday: 'Ayer',
   },
+  identityLookup,
   auth: {
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
@@ -23,8 +30,8 @@ export const es = {
     heroBody:
       'Tus conversaciones viajan por redes compartidas, no por un servidor central. Tu identidad se descifra en tu dispositivo. Tus claves no salen de ahi.',
     heroTitle: 'Mensajeria P2P para comunidades privadas.',
-    identityIdHelp: 'Puedes usar @usuario o el ID completo de identidad.',
-    identityIdLabel: 'Usuario o ID de identidad',
+    identityIdHelp: identityLookup.help,
+    identityIdLabel: identityLookup.label,
     installApp: 'Instalar app',
     installAppChecking: 'Comprobando soporte de instalacion...',
     installAppDevHelp:
@@ -281,8 +288,8 @@ export const es = {
     loadMoreModerationLogs: 'Cargar mas',
     manage: 'Gestionar comunidad',
     memberError: 'No se pudo anadir el miembro.',
-    memberIdentity: 'ID de identidad o usuario',
-    memberIdentityPlaceholder: '@ada o ID de identidad',
+    memberIdentity: identityLookup.label,
+    memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'No se pudieron guardar los roles del miembro.',
     members: 'Miembros',
     membershipError: 'No se pudo actualizar la solicitud.',
@@ -485,27 +492,35 @@ export const es = {
     addParticipant: 'Anadir',
     cancel: 'Cancelar',
     close: 'Cerrar diálogo',
-    createConversation: 'Crear conversacion',
+    createConversation: 'Crear conversación',
     createConversationBody:
-      'Se invitara al usuario a unirse a la conversacion y recibira una notificacion. Las conversaciones directas estan cifradas de extremo a extremo, asi que se creara un llavero y se publicara en el swarm como parte del proceso.',
+      'Invita a alguien a iniciar una conversación segura dentro de Pigeon Swarm. Los mensajes directos están cifrados de extremo a extremo y solo sus participantes pueden leerlos.',
     createConversationError:
-      'No se pudo crear la conversacion. Revisa los datos e intentalo de nuevo.',
-    createConversationLoading: 'Creando y publicando llavero...',
-    createConversationTitle: 'Crear nueva conversacion',
+      'No se pudo crear la conversación. Revisa los datos e inténtalo de nuevo.',
+    createConversationLoading: 'Creando conversación...',
+    createConversationTitle: 'Crear nueva conversación',
     directConversationAlreadyExists:
-      'Ya tienes una conversacion directa con este usuario.',
+      'Ya tienes una conversación directa con este usuario.',
     directConversation: 'Mensaje directo',
     groupConversation: 'Grupo',
+    groupConversationSoon: 'Próximamente',
     groupName: 'Nombre del grupo',
     groupNamePlaceholder: 'Mi grupo',
     groupNeedsParticipant: 'Anade al menos un participante.',
-    groupParticipant: 'Anadir identidad',
+    groupParticipant: identityLookup.label,
     groupParticipants: 'Participantes',
-    loadingIdentity: 'Buscando redes compartidas...',
+    loadingIdentity: 'Buscando identidad...',
     noSharedNetwork:
-      'No hay red compartida con esta identidad. Aun no puedes crear esta conversacion.',
-    remoteIdentityId: 'ID de identidad o usuario',
+      'No hay red compartida con esta identidad. Aún no puedes crear esta conversación.',
+    remoteIdentityFound: 'Usuario encontrado.',
+    remoteIdentityHelp: identityLookup.help,
+    remoteIdentityId: identityLookup.label,
+    remoteIdentityInvalid: 'ID inválida.',
+    remoteIdentityNotFound: 'Usuario no encontrado.',
+    remoteIdentityPlaceholder: identityLookup.placeholder,
+    remoteIdentityValid: 'Identidad válida.',
     removeParticipant: 'Quitar participante',
+    selectSwarm: 'Selecciona una red',
     sharedNetwork: 'Red',
   },
   errors: {

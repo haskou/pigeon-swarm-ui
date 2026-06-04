@@ -192,7 +192,7 @@ export function AddCommunityMemberDialog({
         {mode === 'identity' ? (
           <>
             <div className="mt-4">
-              <Field label={copy.communities.memberIdentity}>
+              <Field label={copy.identityLookup.label}>
                 <input
                   autoFocus
                   value={identityInput}
@@ -203,7 +203,7 @@ export function AddCommunityMemberDialog({
                     void addMember();
                   }}
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.communities.memberIdentityPlaceholder}
+                  placeholder={copy.identityLookup.placeholder}
                 />
               </Field>
             </div>

@@ -54,7 +54,7 @@ export function CommunityInvitationsPanel({
                 onInvite();
               }}
               className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-              placeholder={copy.communities.memberIdentity}
+              placeholder={copy.identityLookup.placeholder}
             />
             <button
               type="button"
