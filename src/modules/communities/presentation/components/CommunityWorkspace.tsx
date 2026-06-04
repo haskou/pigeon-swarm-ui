@@ -345,6 +345,10 @@ export function CommunityWorkspace({
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
   const pendingSearchResultRef =
     useRef<CommunityMessageSearchResultItem | null>(null);
+  const pendingFocusedMessageRef = useRef<{
+    channelId: string;
+    message: ChatMessage;
+  } | null>(null);
   const communityKey = session.keychain.conversations[community.id];
   const communityIsPublic = community.visibility === 'public';
   const textChannelsWithThreads = useMemo(
@@ -534,12 +538,18 @@ export function CommunityWorkspace({
   );
   const scrollToChannelMessage = useCallback(
     (messageId: string) => {
-      requestAnimationFrame(() => {
+      const scroll = (attempt = 0) => {
         const element = scrollerRef.current?.querySelector<HTMLElement>(
           `[data-message-id="${CSS.escape(messageId)}"]`,
         );
 
-        if (!element) return;
+        if (!element) {
+          if (attempt < 8) {
+            window.setTimeout(() => scroll(attempt + 1), 60);
+          }
+
+          return;
+        }
 
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         const focusTarget =
@@ -551,7 +561,9 @@ export function CommunityWorkspace({
           () => focusTarget.classList.remove('message-focus-ring'),
           1600,
         );
-      });
+      };
+
+      requestAnimationFrame(() => scroll());
     },
     [scrollerRef],
   );
@@ -1317,17 +1329,32 @@ export function CommunityWorkspace({
   useEffect(() => {
     const pending = pendingSearchResultRef.current;
 
+    if (pending) {
+      if (selectedChannelId !== pending.channelId || messageState === 'loading') {
+        return;
+      }
+
+      setMessages((current) => mergeChatMessages(current, [pending.message]));
+      scrollToChannelMessage(pending.message.id);
+      pendingSearchResultRef.current = null;
+    }
+
+    const pendingFocusedMessage = pendingFocusedMessageRef.current;
+
+    if (!pendingFocusedMessage) return;
+
     if (
-      !pending ||
-      selectedChannelId !== pending.channelId ||
+      selectedChannelId !== pendingFocusedMessage.channelId ||
       messageState === 'loading'
     ) {
       return;
     }
 
-    setMessages((current) => mergeChatMessages(current, [pending.message]));
-    scrollToChannelMessage(pending.message.id);
-    pendingSearchResultRef.current = null;
+    setMessages((current) =>
+      mergeChatMessages(current, [pendingFocusedMessage.message]),
+    );
+    scrollToChannelMessage(pendingFocusedMessage.message.id);
+    pendingFocusedMessageRef.current = null;
   }, [messageState, scrollToChannelMessage, selectedChannelId, setMessages]);
 
   const channelEncryptionTooltip = communityIsPublic
@@ -2226,9 +2253,20 @@ export function CommunityWorkspace({
               setMessageContextMenu({ message, source: 'thread', x, y })
             }
             onRootMessageOpen={(message) => {
+              pendingFocusedMessageRef.current = {
+                channelId: threadPanel.channelId,
+                message,
+              };
               setMessages((current) => mergeChatMessages(current, [message]));
+              handleChannelSelected(threadPanel.channelId);
               setThreadPanel(null);
-              window.setTimeout(() => scrollToChannelMessage(message.id), 0);
+
+              if (
+                threadPanel.channelId === selectedChannelId &&
+                messageState !== 'loading'
+              ) {
+                window.setTimeout(() => scrollToChannelMessage(message.id), 0);
+              }
             }}
             onSend={sendThreadMessage}
             onStickerSend={
