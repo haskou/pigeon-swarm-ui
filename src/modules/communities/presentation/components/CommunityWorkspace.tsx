@@ -51,6 +51,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { Composer } from '../../../messages/presentation/components/Composer';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
+import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { CreatePollDialog } from '../../../polls/presentation/components/CreatePollDialog';
 import { StickerPackPreviewDialog } from '../../../stickers/presentation/components/StickerPackPreviewDialog';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
@@ -660,24 +661,29 @@ export function CommunityWorkspace({
           channelId,
           result.messages,
         );
+        const visibleThreadMessages = ThreadMessageVisibility.forRoot(
+          message.id,
+          threadMessages,
+        );
 
         setThreadPanel({
           channelId,
           draft: '',
           editingMessage: null,
           error: null,
-          messages: threadMessages,
+          messages: visibleThreadMessages,
           replyTarget: null,
           root: message,
           state: 'ready',
         });
-        if (threadMessages.length > 0) {
-          const lastReply = threadMessages[threadMessages.length - 1];
+        if (visibleThreadMessages.length > 0) {
+          const lastReply =
+            visibleThreadMessages[visibleThreadMessages.length - 1];
 
           upsertChannelThreadSummary(channelId, {
             lastReplyAt: lastReply.timestamp,
             lastReplyMessageId: lastReply.id,
-            replyCount: threadMessages.length,
+            replyCount: visibleThreadMessages.length,
             rootMessageId: message.id,
           });
         }
@@ -2636,11 +2642,17 @@ function mergeCommunityThreadMessage(
     currentThread.root.id === incomingMessage.id
       ? mergeChatMessages([currentThread.root], [incomingMessage])
       : [currentThread.root];
-  const threadMessages = currentThread.messages.some(
+  const messageAlreadyInThread = currentThread.messages.some(
     (message) => message.id === incomingMessage.id,
-  )
-    ? mergeChatMessages(currentThread.messages, [incomingMessage])
-    : currentThread.messages;
+  );
+  const messageBelongsToThread = ThreadMessageVisibility.belongsToRoot(
+    currentThread.root.id,
+    incomingMessage,
+  );
+  const threadMessages =
+    messageAlreadyInThread || messageBelongsToThread
+      ? mergeChatMessages(currentThread.messages, [incomingMessage])
+      : currentThread.messages;
 
   return {
     ...currentThread,

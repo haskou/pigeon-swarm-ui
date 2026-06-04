@@ -57,6 +57,7 @@ import { ConversationTimeline } from '../../../../modules/conversations/domain/C
 import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
 import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
+import { ThreadMessageVisibility } from '../../../../modules/messages/presentation/view-models/ThreadMessageVisibility';
 import {
   MessageScrollAnchor,
   type MessageScrollAnchorSnapshot,
@@ -275,13 +276,19 @@ function mergeConversationThreadMessage(
     [currentThread.root],
     incomingMessage,
   );
+  const threadMessages = ThreadMessageVisibility.belongsToRoot(
+    currentThread.root.id,
+    incomingMessage,
+  )
+    ? mergeConversationMessageIfTargetExists(
+        currentThread.messages,
+        incomingMessage,
+      )
+    : currentThread.messages;
 
   return {
     ...currentThread,
-    messages: mergeConversationMessageIfTargetExists(
-      currentThread.messages,
-      incomingMessage,
-    ),
+    messages: threadMessages,
     root:
       rootMessages.find((message) => message.id === currentThread.root.id) ??
       currentThread.root,
@@ -2643,7 +2650,7 @@ export function GlassWorkspace({
         draft: '',
         editingMessage: null,
         error: null,
-        messages: result.messages,
+        messages: ThreadMessageVisibility.forRoot(message.id, result.messages),
         replyTarget: null,
         root: message,
         state: 'ready',
