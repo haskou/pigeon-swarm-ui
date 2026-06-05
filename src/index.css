@@ -392,6 +392,39 @@ textarea:disabled,
   }
 }
 
+@keyframes message-timeline-enter-incoming {
+  0% {
+    opacity: 0;
+    transform: translateX(-18px) translateY(8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes message-timeline-enter-outgoing {
+  0% {
+    opacity: 0;
+    transform: translateX(18px) translateY(8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes message-timeline-enter-neutral {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .pulse-dot {
   animation: pulse-dot 1.8s ease-in-out infinite;
 }
@@ -504,6 +537,26 @@ textarea:disabled,
 
 .app-drawer-right[data-state='closing'] {
   animation: app-drawer-right-out 170ms ease-in both;
+}
+
+.message-timeline-enter {
+  animation-delay: var(--message-enter-delay, 0ms);
+  animation-duration: 230ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.message-timeline-enter-incoming {
+  animation-name: message-timeline-enter-incoming;
+}
+
+.message-timeline-enter-outgoing {
+  animation-name: message-timeline-enter-outgoing;
+}
+
+.message-timeline-enter-neutral {
+  animation-name: message-timeline-enter-neutral;
 }
 
 @supports (view-transition-name: root) {

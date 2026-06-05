@@ -48,7 +48,6 @@ import { NotificationSettingsPolicy } from '../../../notifications/domain/Notifi
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { startViewTransition } from '../../../../shared/presentation/viewTransition/startViewTransition';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Composer } from '../../../messages/presentation/components/Composer';
@@ -1742,17 +1741,15 @@ export function CommunityWorkspace({
   });
   const handleTextChannelSelected = useCallback(
     (channelId: string) => {
-      startViewTransition(() => {
-        const leavingThreadInCurrentChannel =
-          !!threadPanel && channelId === selectedChannelId;
+      const leavingThreadInCurrentChannel =
+        !!threadPanel && channelId === selectedChannelId;
 
-        setThreadPanel(null);
-        handleChannelSelected(channelId);
+      setThreadPanel(null);
+      handleChannelSelected(channelId);
 
-        if (leavingThreadInCurrentChannel) {
-          requestAnimationFrame(() => scrollChannelToBottom('auto', true));
-        }
-      });
+      if (leavingThreadInCurrentChannel) {
+        requestAnimationFrame(() => scrollChannelToBottom('auto', true));
+      }
     },
     [
       handleChannelSelected,

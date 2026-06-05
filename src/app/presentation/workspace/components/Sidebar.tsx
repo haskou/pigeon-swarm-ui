@@ -39,7 +39,6 @@ import { loadPublicImage } from '../../../../modules/communities/presentation/co
 import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { startViewTransition } from '../../../../shared/presentation/viewTransition/startViewTransition';
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
@@ -300,10 +299,8 @@ export function Sidebar({
                       return;
                     }
 
-                    startViewTransition(() => {
-                      setConversationMenu(null);
-                      onSelect(conversation.id);
-                    });
+                    setConversationMenu(null);
+                    onSelect(conversation.id);
                   }}
                   onContextMenu={(event) => {
                     if (!canOpenConversationMenu) return;

@@ -30,6 +30,10 @@ import {
   messageReplySticker,
 } from '../../../../modules/messages/presentation/components/messageTimelineHelpers';
 import {
+  messageTimelineEnterClassName,
+  messageTimelineEnterStyle,
+} from '../../../../modules/messages/presentation/components/messageTimelineMotion';
+import {
   MessageTimelineEntries,
   type MessageThreadSummary,
 } from '../../../../modules/messages/presentation/view-models/MessageTimelineEntries';
@@ -200,11 +204,12 @@ function MessageTimelineContent({
         {hasReachedMessageStart &&
           messages.length > 0 &&
           messageState !== 'loading' && <ReachedMessageStart />}
-        {timelineEntries.map((entry) =>
+        {timelineEntries.map((entry, index) =>
           entry.type === 'poll' ? (
             <PollTimelineItem
               key={entry.id}
               currentIdentityId={currentIdentityId}
+              enterOrder={timelineEntries.length - index - 1}
               message={entry.item.message}
               onClose={onPollClose}
               onMessageMenuOpen={onMessageMenuOpen}
@@ -221,6 +226,7 @@ function MessageTimelineContent({
               identityNames={identityNames}
               identityPictures={identityPictures}
               isGroupConversation={isGroupConversation}
+              enterOrder={timelineEntries.length - index - 1}
               loadAttachmentPreview={loadAttachmentPreview}
               message={entry.item.message}
               onAttachmentOpen={onAttachmentOpen}
@@ -259,6 +265,7 @@ function MessageTimelineItem({
   identityNames,
   identityPictures,
   isGroupConversation,
+  enterOrder,
   loadAttachmentPreview,
   message,
   onAttachmentOpen,
@@ -281,6 +288,7 @@ function MessageTimelineItem({
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   isGroupConversation: boolean;
+  enterOrder: number;
   loadAttachmentPreview: ChatMessageTimelineProps['loadAttachmentPreview'];
   message: ChatMessage;
   onAttachmentOpen: ChatMessageTimelineProps['onAttachmentOpen'];
@@ -304,66 +312,73 @@ function MessageTimelineItem({
         <DateSeparator label={formatDateSeparator(message.timestamp)} />
       )}
       <div className={startsNewDay || startsNewAuthorRun ? 'mt-3' : 'mt-0.5'}>
-        <MessageBubble
-          message={message}
-          currentIdentityId={currentIdentityId}
-          authorName={messageAuthorName(
-            message,
-            currentIdentityName,
-            identityNames,
+        <div
+          className={messageTimelineEnterClassName(
+            message.mine ? 'outgoing' : 'incoming',
           )}
-          authorPicture={messageAuthorPicture(
-            message,
-            currentIdentityId,
-            identityPictures,
-          )}
-          onAttachmentOpen={(attachmentIndex) =>
-            onAttachmentOpen(message.attachments[attachmentIndex])
-          }
-          onAttachmentPreview={loadAttachmentPreview}
-          onAvatarClick={(event) =>
-            onAuthorProfileOpen(message, event.currentTarget)
-          }
-          onMessageMenuOpen={onMessageMenuOpen}
-          onReactionToggle={onReactionToggle}
-          onReplyReferenceClick={onReplyReferenceClick}
-          onRetryMessage={onRetryMessage}
-          onStickerClick={onStickerClick}
-          onThreadOpen={onOpenThread}
-          pinned={pinnedMessageIds.has(message.id)}
-          reactionAuthorNames={reactionAuthorNames}
-          replyImage={messageReplyImage(message, replyMessage)}
-          replySticker={messageReplySticker(message, replyMessage)}
-          replyAuthorName={replyAuthorName(
-            message,
-            replyMessage,
-            identityNames,
-          )}
-          replyPreview={replyMessage?.content ?? message.replyPreview?.content}
-          reserveAvatarSpace={false}
-          showAvatar={isGroupConversation && startsNewAuthorRun}
-          threadAuthorName={
-            threadSummary?.lastMessage
-              ? identityPrimaryDisplayName(
-                  messageAuthorName(
+          style={messageTimelineEnterStyle(enterOrder)}
+        >
+          <MessageBubble
+            message={message}
+            currentIdentityId={currentIdentityId}
+            authorName={messageAuthorName(
+              message,
+              currentIdentityName,
+              identityNames,
+            )}
+            authorPicture={messageAuthorPicture(
+              message,
+              currentIdentityId,
+              identityPictures,
+            )}
+            onAttachmentOpen={(attachmentIndex) =>
+              onAttachmentOpen(message.attachments[attachmentIndex])
+            }
+            onAttachmentPreview={loadAttachmentPreview}
+            onAvatarClick={(event) =>
+              onAuthorProfileOpen(message, event.currentTarget)
+            }
+            onMessageMenuOpen={onMessageMenuOpen}
+            onReactionToggle={onReactionToggle}
+            onReplyReferenceClick={onReplyReferenceClick}
+            onRetryMessage={onRetryMessage}
+            onStickerClick={onStickerClick}
+            onThreadOpen={onOpenThread}
+            pinned={pinnedMessageIds.has(message.id)}
+            reactionAuthorNames={reactionAuthorNames}
+            replyImage={messageReplyImage(message, replyMessage)}
+            replySticker={messageReplySticker(message, replyMessage)}
+            replyAuthorName={replyAuthorName(
+              message,
+              replyMessage,
+              identityNames,
+            )}
+            replyPreview={replyMessage?.content ?? message.replyPreview?.content}
+            reserveAvatarSpace={false}
+            showAvatar={isGroupConversation && startsNewAuthorRun}
+            threadAuthorName={
+              threadSummary?.lastMessage
+                ? identityPrimaryDisplayName(
+                    messageAuthorName(
+                      threadSummary.lastMessage,
+                      currentIdentityName,
+                      identityNames,
+                    ),
+                  )
+                : undefined
+            }
+            threadAuthorPicture={
+              threadSummary?.lastMessage
+                ? messageAuthorPicture(
                     threadSummary.lastMessage,
-                    currentIdentityName,
-                    identityNames,
-                  ),
-                )
-              : undefined
-          }
-          threadAuthorPicture={
-            threadSummary?.lastMessage
-              ? messageAuthorPicture(
-                  threadSummary.lastMessage,
-                  currentIdentityId,
-                  identityPictures,
-                )
-              : undefined
-          }
-          threadCount={threadSummary?.count}
-        />
+                    currentIdentityId,
+                    identityPictures,
+                  )
+                : undefined
+            }
+            threadCount={threadSummary?.count}
+          />
+        </div>
       </div>
     </Fragment>
   );
@@ -371,6 +386,7 @@ function MessageTimelineItem({
 
 function PollTimelineItem({
   currentIdentityId,
+  enterOrder,
   message,
   onClose,
   onMessageMenuOpen,
@@ -380,6 +396,7 @@ function PollTimelineItem({
   startsNewDay,
 }: {
   currentIdentityId: string;
+  enterOrder: number;
   message: ChatMessage;
   onClose?: (poll: PollResource) => Promise<void>;
   onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
@@ -399,7 +416,13 @@ function PollTimelineItem({
         data-message-id={message.id}
         className={cx('mt-4 flex', mine ? 'justify-end' : 'justify-start')}
       >
-        <div className="w-full max-w-xl">
+        <div
+          className={cx(
+            'w-full max-w-xl',
+            messageTimelineEnterClassName(mine ? 'outgoing' : 'incoming'),
+          )}
+          style={messageTimelineEnterStyle(enterOrder)}
+        >
           <PollCard
             currentIdentityId={currentIdentityId}
             onClose={mine ? onClose : undefined}

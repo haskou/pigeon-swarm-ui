@@ -117,7 +117,6 @@ import {
 import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
-import { startViewTransition } from '../../../../shared/presentation/viewTransition/startViewTransition';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -4190,25 +4189,21 @@ export function GlassWorkspace({
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
           notificationCount={inboxNotificationCount}
-          onCommunityClick={(communityId) =>
-            startViewTransition(() => {
-              setActiveCommunityId(communityId);
-              setWorkspaceMode('community');
-              setSidebarOpen(false);
-            })
-          }
+          onCommunityClick={(communityId) => {
+            setActiveCommunityId(communityId);
+            setWorkspaceMode('community');
+            setSidebarOpen(false);
+          }}
           onCommunityNotificationMuteToggle={toggleCommunityNotificationMute}
           onCommunityNotificationSettingsOpen={
             openCommunityNotificationSettings
           }
           onCommunityLeave={leaveCommunityFromRail}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-          onMessagesClick={() =>
-            startViewTransition(() => {
-              setWorkspaceMode('messages');
-              setSidebarOpen(false);
-            })
-          }
+          onMessagesClick={() => {
+            setWorkspaceMode('messages');
+            setSidebarOpen(false);
+          }}
           onNotificationsClick={openNotificationsPanel}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
@@ -4234,13 +4229,11 @@ export function GlassWorkspace({
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) =>
-                    startViewTransition(() => {
-                      setActiveCommunityId(communityId);
-                      setWorkspaceMode('community');
-                      setSidebarOpen(false);
-                    })
-                  }
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
                   onCommunityNotificationMuteToggle={
                     toggleCommunityNotificationMute
                   }
@@ -4249,12 +4242,10 @@ export function GlassWorkspace({
                   }
                   onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() =>
-                    startViewTransition(() => {
-                      setWorkspaceMode('messages');
-                      setSidebarOpen(false);
-                    })
-                  }
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
                   onNotificationsClick={openNotificationsPanel}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => setInspectorOpen(true)}
@@ -4276,12 +4267,10 @@ export function GlassWorkspace({
                     nodeNetworks={nodeNetworks}
                     activeConversationId={activeConversation?.id ?? null}
                     onSelect={(id) => {
-                      startViewTransition(() => {
-                        clearUnreadMessages(id);
-                        setNewMessageCount(0);
-                        setActiveConversationId(id);
-                        setSidebarOpen(false);
-                      });
+                      clearUnreadMessages(id);
+                      setNewMessageCount(0);
+                      setActiveConversationId(id);
+                      setSidebarOpen(false);
                     }}
                     onConversationNotificationMuteToggle={
                       toggleConversationNotificationMute
@@ -4507,13 +4496,11 @@ export function GlassWorkspace({
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) =>
-                    startViewTransition(() => {
-                      setActiveCommunityId(communityId);
-                      setWorkspaceMode('community');
-                      setSidebarOpen(false);
-                    })
-                  }
+                  onCommunityClick={(communityId) => {
+                    setActiveCommunityId(communityId);
+                    setWorkspaceMode('community');
+                    setSidebarOpen(false);
+                  }}
                   onCommunityNotificationMuteToggle={
                     toggleCommunityNotificationMute
                   }
@@ -4522,12 +4509,10 @@ export function GlassWorkspace({
                   }
                   onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() =>
-                    startViewTransition(() => {
-                      setWorkspaceMode('messages');
-                      setSidebarOpen(false);
-                    })
-                  }
+                  onMessagesClick={() => {
+                    setWorkspaceMode('messages');
+                    setSidebarOpen(false);
+                  }}
                   onNotificationsClick={openNotificationsPanel}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => {
