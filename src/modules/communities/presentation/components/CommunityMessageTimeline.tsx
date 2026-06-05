@@ -157,7 +157,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
         onScroll={onScroll}
         className="h-full overflow-y-auto p-4 sm:p-6"
       >
-        {messageState === 'loading' && visibleMessages.length > 0 ? (
+        {messageState === 'loading' ? (
           <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
             {copy.chat.loadingEvents}
           </div>

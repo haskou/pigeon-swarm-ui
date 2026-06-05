@@ -195,9 +195,7 @@ function MessageTimelineContent({
 
   return (
     <>
-      {messageState === 'loading' && messages.length > 0 && (
-        <LoadingOlderMessages />
-      )}
+      {messageState === 'loading' && <LoadingOlderMessages />}
       <div>
         {hasReachedMessageStart &&
           messages.length > 0 &&
