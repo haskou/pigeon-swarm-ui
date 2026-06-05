@@ -19,6 +19,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import type { LightboxImage } from '../../../messages/presentation/components/imageLightbox';
 import { LazyImageLightbox } from '../../../messages/presentation/components/LazyImageLightbox';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { PresenceStatusDot } from './presenceStatusDot';
 
 type ProfilePopoverAnchor = {
@@ -55,7 +56,9 @@ export function UserProfileDialog({
   picture,
   presence,
 }: UserProfileDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [copied, setCopied] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(
@@ -134,7 +137,7 @@ export function UserProfileDialog({
 
     try {
       await onOpenConversation();
-      onClose();
+      close();
     } catch (caught) {
       setConversationError(
         toUserErrorMessage(caught, copy.dialog.createConversationError),
@@ -148,12 +151,14 @@ export function UserProfileDialog({
     <div className="fixed inset-0 z-[100]">
       <button
         type="button"
-        className="absolute inset-0 cursor-default"
-        onClick={onClose}
+        className="app-overlay-scrim absolute inset-0 cursor-default"
+        data-state={state}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
       <section
-        className="glass-panel-strong fixed z-10 w-[min(22.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl p-0 shadow-2xl shadow-black/50"
+        className="app-context-menu glass-panel-strong fixed z-10 w-[min(22.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl p-0 shadow-2xl shadow-black/50"
+        data-state={state}
         style={{ left: position.left, top: position.top }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -182,7 +187,7 @@ export function UserProfileDialog({
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="absolute right-3 top-3 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/35 text-lg font-black text-white/65 backdrop-blur transition hover:bg-black/55 hover:text-white/90"
             aria-label={copy.dialog.close}
           >

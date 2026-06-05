@@ -11,6 +11,7 @@ import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPol
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 export type NotificationScopeSettingsTarget = {
   scope: NotificationSettingScope;
@@ -43,7 +44,9 @@ export function NotificationScopeSettingsDialog({
   setting,
   target,
 }: NotificationScopeSettingsDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const current = NotificationSettingsPolicy.normalize({
     ...setting,
@@ -68,15 +71,17 @@ export function NotificationScopeSettingsDialog({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[120] bg-black/55 backdrop-blur-sm"
-        onClick={onClose}
+        className="app-overlay-scrim fixed inset-0 z-[120] bg-black/55 backdrop-blur-sm"
+        data-state={state}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label={copy.notifications.settingsTitle}
-        className="fixed left-1/2 top-1/2 z-[130] max-h-[86vh] w-[min(92vw,500px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#1f2029] p-5 text-white shadow-2xl shadow-black/50"
+        className="app-overlay-surface fixed left-1/2 top-1/2 z-[130] max-h-[86vh] w-[min(92vw,500px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#1f2029] p-5 text-white shadow-2xl shadow-black/50"
+        data-state={state}
       >
         <header className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -95,7 +100,7 @@ export function NotificationScopeSettingsDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/6 text-lg font-black leading-none text-white/50 transition hover:bg-white/12 hover:text-white"
             aria-label={copy.dialog.close}
           >

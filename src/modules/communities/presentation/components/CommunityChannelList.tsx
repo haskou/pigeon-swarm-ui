@@ -21,6 +21,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
   VoiceChannelButton,
   type VoiceParticipantView,
@@ -506,24 +507,36 @@ function ChannelNotificationMenu({
   onNotificationSettingsOpen: () => void;
   onNotificationMuteToggle: () => void;
 }) {
+  const { close, state } = useCloseTransition(onClose);
+
   return (
     <>
       <button
         type="button"
-        className="fixed inset-0 z-30 cursor-default"
-        onClick={onClose}
+        className="app-overlay-scrim fixed inset-0 z-30 cursor-default"
+        data-state={state}
+        onClick={close}
         onContextMenu={(event) => {
           event.preventDefault();
-          onClose();
+          close();
         }}
         aria-label={copy.dialog.close}
       />
-      <div className="absolute right-0 top-[calc(100%+.25rem)] z-40 min-w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#1f2029] p-1 text-sm shadow-2xl shadow-black/40">
+      <div
+        className="app-context-menu absolute right-0 top-[calc(100%+.25rem)] z-40 min-w-56 overflow-hidden rounded-2xl border border-white/10 bg-[#1f2029] p-1 text-sm shadow-2xl shadow-black/40"
+        data-state={state}
+      >
         <NotificationScopeMenuActions
           muteLabel={copy.notifications.mute}
           notificationSetting={notificationSetting}
-          onNotificationMuteToggle={onNotificationMuteToggle}
-          onNotificationSettingsOpen={onNotificationSettingsOpen}
+          onNotificationMuteToggle={() => {
+            onNotificationMuteToggle();
+            close();
+          }}
+          onNotificationSettingsOpen={() => {
+            onNotificationSettingsOpen();
+            close();
+          }}
         />
       </div>
     </>

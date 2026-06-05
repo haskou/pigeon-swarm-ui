@@ -17,6 +17,7 @@ import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 interface NodeSettingsDialogProps {
   node: { id: string; owner: null | string } | null;
@@ -37,7 +38,9 @@ export function NodeSettingsDialog({
   peers,
   session,
 }: NodeSettingsDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [joinCode, setJoinCode] = useState('');
   const [createName, setCreateName] = useState('');
@@ -250,14 +253,20 @@ export function NodeSettingsDialog({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40">
+      <section
+        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40"
+        data-state={transitionState}
+      >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
           <div>
             <h2 className="text-xl font-black">{copy.nodeSettings.title}</h2>
@@ -267,7 +276,7 @@ export function NodeSettingsDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
             aria-label={copy.dialog.close}
           >

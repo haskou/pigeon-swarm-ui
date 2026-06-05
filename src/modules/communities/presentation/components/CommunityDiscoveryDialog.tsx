@@ -22,6 +22,7 @@ import { ClearableSearchInput } from '../../../../shared/presentation/components
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { shortId } from '../../../../shared/presentation/formatting';
 
 type CommunityDiscoveryDialogProps = {
@@ -39,7 +40,9 @@ export function CommunityDiscoveryDialog({
   onJoinRequested,
   session,
 }: CommunityDiscoveryDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [query, setQuery] = useState('');
   const [networkId, setNetworkId] = useState(
@@ -128,14 +131,20 @@ export function CommunityDiscoveryDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-4xl sm:rounded-2xl">
+      <section
+        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-4xl sm:rounded-2xl"
+        data-state={transitionState}
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black tracking-tight">
@@ -147,7 +156,7 @@ export function CommunityDiscoveryDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label={copy.dialog.close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
           >

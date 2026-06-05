@@ -34,6 +34,7 @@ import {
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -88,6 +89,7 @@ export function ProfileEditor({
   const pictureInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
+  const { close, state: transitionState } = useCloseTransition(onClose);
   const [error, setError] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
   const wantsPasswordChange =
@@ -133,7 +135,7 @@ export function ProfileEditor({
       return;
     }
 
-    onClose();
+    close();
   };
 
   useCloseOnEscape(
@@ -241,7 +243,10 @@ export function ProfileEditor({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
@@ -250,7 +255,8 @@ export function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:p-6"
+        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:p-6"
+        data-state={transitionState}
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
           <h2 className="text-xl font-black">{copy.profile.edit}</h2>

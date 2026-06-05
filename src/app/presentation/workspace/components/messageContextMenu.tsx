@@ -25,6 +25,7 @@ import {
 } from '../../../../modules/messages/presentation/components/messageActionIcons';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -66,7 +67,9 @@ export function MessageContextMenu({
   onViewRaw: () => void;
   pinned?: boolean;
 }) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
   const emojiSearchRef = useRef<HTMLDivElement | null>(null);
@@ -100,10 +103,10 @@ export function MessageContextMenu({
 
     setRecentEmojis(saveRecentReactionEmoji(currentIdentityId, emoji));
     onReactionToggle?.(menu.message, emoji, reacted);
-    onClose();
+    close();
   };
   const runAction = (action: () => void) => {
-    onClose();
+    close();
     action();
   };
   const anchorStyle = {
@@ -194,11 +197,12 @@ export function MessageContextMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[80] cursor-default select-none"
-        onClick={onClose}
+        className="app-overlay-scrim fixed inset-0 z-[80] cursor-default select-none"
+        data-state={state}
+        onClick={close}
         onContextMenu={(event) => {
           event.preventDefault();
-          onClose();
+          close();
         }}
         style={{
           WebkitTouchCallout: 'none',
@@ -214,7 +218,8 @@ export function MessageContextMenu({
       />
       <div
         ref={menuRef}
-        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        className="message-context-menu app-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        data-state={state}
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
       >

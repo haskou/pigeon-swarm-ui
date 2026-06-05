@@ -23,6 +23,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
@@ -56,7 +57,9 @@ export function CreateCommunityDialog({
   onCreated,
   session,
 }: CreateCommunityDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -203,16 +206,20 @@ export function CreateCommunityDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
+        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
+        data-state={transitionState}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -225,7 +232,7 @@ export function CreateCommunityDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label={copy.dialog.close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
           >

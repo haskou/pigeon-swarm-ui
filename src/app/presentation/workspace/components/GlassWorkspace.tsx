@@ -117,6 +117,7 @@ import {
 import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
+import { startViewTransition } from '../../../../shared/presentation/viewTransition/startViewTransition';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -4189,21 +4190,25 @@ export function GlassWorkspace({
           communityUnreadCounts={communityUnreadCounts}
           messageNotificationCount={unreadMessageCount}
           notificationCount={inboxNotificationCount}
-          onCommunityClick={(communityId) => {
-            setActiveCommunityId(communityId);
-            setWorkspaceMode('community');
-            setSidebarOpen(false);
-          }}
+          onCommunityClick={(communityId) =>
+            startViewTransition(() => {
+              setActiveCommunityId(communityId);
+              setWorkspaceMode('community');
+              setSidebarOpen(false);
+            })
+          }
           onCommunityNotificationMuteToggle={toggleCommunityNotificationMute}
           onCommunityNotificationSettingsOpen={
             openCommunityNotificationSettings
           }
           onCommunityLeave={leaveCommunityFromRail}
           onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-          onMessagesClick={() => {
-            setWorkspaceMode('messages');
-            setSidebarOpen(false);
-          }}
+          onMessagesClick={() =>
+            startViewTransition(() => {
+              setWorkspaceMode('messages');
+              setSidebarOpen(false);
+            })
+          }
           onNotificationsClick={openNotificationsPanel}
           onSettingsClick={() => setNodeSettingsOpen(true)}
           settingsAttention={nodeUnclaimed}
@@ -4213,8 +4218,10 @@ export function GlassWorkspace({
           <>
             <div
               className={cx(
-                'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-[92vw] max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:block lg:w-auto lg:max-w-none',
-                sidebarOpen ? 'block' : 'hidden lg:block',
+                'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 block w-[92vw] max-w-[430px] p-0 transition-transform duration-200 ease-out sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:block lg:w-auto lg:max-w-none lg:translate-x-0',
+                sidebarOpen
+                  ? 'translate-x-0'
+                  : 'pointer-events-none -translate-x-full lg:pointer-events-auto',
               )}
             >
               <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
@@ -4227,11 +4234,13 @@ export function GlassWorkspace({
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) => {
-                    setActiveCommunityId(communityId);
-                    setWorkspaceMode('community');
-                    setSidebarOpen(false);
-                  }}
+                  onCommunityClick={(communityId) =>
+                    startViewTransition(() => {
+                      setActiveCommunityId(communityId);
+                      setWorkspaceMode('community');
+                      setSidebarOpen(false);
+                    })
+                  }
                   onCommunityNotificationMuteToggle={
                     toggleCommunityNotificationMute
                   }
@@ -4240,10 +4249,12 @@ export function GlassWorkspace({
                   }
                   onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() => {
-                    setWorkspaceMode('messages');
-                    setSidebarOpen(false);
-                  }}
+                  onMessagesClick={() =>
+                    startViewTransition(() => {
+                      setWorkspaceMode('messages');
+                      setSidebarOpen(false);
+                    })
+                  }
                   onNotificationsClick={openNotificationsPanel}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => setInspectorOpen(true)}
@@ -4265,10 +4276,12 @@ export function GlassWorkspace({
                     nodeNetworks={nodeNetworks}
                     activeConversationId={activeConversation?.id ?? null}
                     onSelect={(id) => {
-                      clearUnreadMessages(id);
-                      setNewMessageCount(0);
-                      setActiveConversationId(id);
-                      setSidebarOpen(false);
+                      startViewTransition(() => {
+                        clearUnreadMessages(id);
+                        setNewMessageCount(0);
+                        setActiveConversationId(id);
+                        setSidebarOpen(false);
+                      });
                     }}
                     onConversationNotificationMuteToggle={
                       toggleConversationNotificationMute
@@ -4301,13 +4314,16 @@ export function GlassWorkspace({
               </div>
             </div>
 
-            {sidebarOpen && (
-              <button
-                className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-                onClick={() => setSidebarOpen(false)}
-                aria-label={copy.workspace.closeSidebar}
-              />
-            )}
+            <button
+              className={cx(
+                'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
+                sidebarOpen
+                  ? 'opacity-100'
+                  : 'pointer-events-none opacity-0',
+              )}
+              onClick={() => setSidebarOpen(false)}
+              aria-label={copy.workspace.closeSidebar}
+            />
 
             {conversationThread && activeConversation ? (
               <MessageThreadPanel
@@ -4491,11 +4507,13 @@ export function GlassWorkspace({
                   communityUnreadCounts={communityUnreadCounts}
                   messageNotificationCount={unreadMessageCount}
                   notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) => {
-                    setActiveCommunityId(communityId);
-                    setWorkspaceMode('community');
-                    setSidebarOpen(false);
-                  }}
+                  onCommunityClick={(communityId) =>
+                    startViewTransition(() => {
+                      setActiveCommunityId(communityId);
+                      setWorkspaceMode('community');
+                      setSidebarOpen(false);
+                    })
+                  }
                   onCommunityNotificationMuteToggle={
                     toggleCommunityNotificationMute
                   }
@@ -4504,10 +4522,12 @@ export function GlassWorkspace({
                   }
                   onCommunityLeave={leaveCommunityFromRail}
                   onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() => {
-                    setWorkspaceMode('messages');
-                    setSidebarOpen(false);
-                  }}
+                  onMessagesClick={() =>
+                    startViewTransition(() => {
+                      setWorkspaceMode('messages');
+                      setSidebarOpen(false);
+                    })
+                  }
                   onNotificationsClick={openNotificationsPanel}
                   onSettingsClick={() => setNodeSettingsOpen(true)}
                   onInspectorClick={() => {
