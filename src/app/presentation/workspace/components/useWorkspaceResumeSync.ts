@@ -22,6 +22,24 @@ type UseWorkspaceResumeSyncInput = {
   workspaceMode: WorkspaceMode;
 };
 
+type WorkspaceResumeSyncPlan = {
+  reloadCommunities: boolean;
+  refreshConversations: boolean;
+};
+
+export function workspaceResumeSyncPlan({
+  workspaceMode,
+  workspaceWasHidden,
+}: {
+  workspaceMode: WorkspaceMode;
+  workspaceWasHidden: boolean;
+}): WorkspaceResumeSyncPlan {
+  return {
+    refreshConversations: workspaceMode === 'messages',
+    reloadCommunities: workspaceMode === 'community' && workspaceWasHidden,
+  };
+}
+
 export function useWorkspaceResumeSync({
   activeConversationId,
   activeConversationKeyId,
@@ -53,9 +71,13 @@ export function useWorkspaceResumeSync({
     workspaceResumeSyncAtRef.current = now;
 
     void (async () => {
-      const nextConversations = await refreshConversations().catch(
-        () => null,
-      );
+      const plan = workspaceResumeSyncPlan({
+        workspaceMode,
+        workspaceWasHidden,
+      });
+      const nextConversations = plan.refreshConversations
+        ? await refreshConversations().catch(() => null)
+        : null;
 
       if (
         workspaceMode === 'messages' &&
@@ -78,7 +100,7 @@ export function useWorkspaceResumeSync({
         }
       }
 
-      if (workspaceMode === 'community' && workspaceWasHidden) {
+      if (plan.reloadCommunities) {
         await onCommunitiesReload().catch(() => undefined);
       }
     })();
