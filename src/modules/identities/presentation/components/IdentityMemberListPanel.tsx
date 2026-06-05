@@ -7,7 +7,6 @@ import type {
 
 import { cx } from '../../../../shared/presentation/cx';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
-import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { PresenceStatusDot } from './presenceStatusDot';
 
@@ -23,7 +22,6 @@ export type IdentityMemberListItem = {
 export function IdentityMemberListPanel({
   action,
   className,
-  count,
   emptyLabel,
   items,
   listClassName,
@@ -36,7 +34,6 @@ export function IdentityMemberListPanel({
     onClick: () => void;
   };
   className?: string;
-  count?: number;
   emptyLabel: string;
   items: IdentityMemberListItem[];
   listClassName?: string;
@@ -45,29 +42,25 @@ export function IdentityMemberListPanel({
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
   ownerLabel?: string;
-  title: string;
+  title?: string;
 }) {
   return (
     <div className={cx('flex min-h-0 flex-col', className)}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <SectionTitle title={title} />
-          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[0.68rem] font-black text-white/45">
-            {count ?? items.length}
-          </span>
-        </div>
-      </div>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+          className="w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
         >
           {action.label}
         </button>
       )}
       <div
-        className={cx('mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1', listClassName)}
+        className={cx(
+          'min-h-0 flex-1 space-y-2 overflow-y-auto pr-1',
+          action && 'mt-4',
+          listClassName,
+        )}
       >
         {items.map((item) => (
           <IdentityMemberRow

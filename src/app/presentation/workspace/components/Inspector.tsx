@@ -126,7 +126,6 @@ export function Inspector({
           emptyLabel={copy.communities.noMatchingMembers}
           items={participants}
           onItemClick={openProfile}
-          title={copy.communities.members}
         />
         {onClose && (
           <button

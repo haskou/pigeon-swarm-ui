@@ -118,7 +118,6 @@ export function GroupProfileDialog({
               event,
             )
           }
-          title={copy.communities.members}
         />
       </section>
     </div>,

@@ -120,7 +120,6 @@ function MembersAside({
         } satisfies IdentityMemberListItem))}
         onItemClick={onMemberClick}
         ownerLabel={copy.communities.owner}
-        title={copy.communities.members}
       />
     </aside>
   );
