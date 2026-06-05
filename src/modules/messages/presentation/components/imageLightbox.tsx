@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
 
 export type LightboxImage = {
@@ -39,6 +40,8 @@ type PinchGesture = {
   startZoom: number;
 };
 
+type SwipeDirection = 'horizontal' | 'vertical';
+
 interface ImageLightboxProps {
   images: LightboxImage[];
   initialIndex: number;
@@ -52,11 +55,16 @@ export function ImageLightbox({
   loadImage,
   onClose,
 }: ImageLightboxProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose, 160);
+
+  useCloseOnEscape(close);
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<PanOffset>({ x: 0, y: 0 });
+  const [swipeOffset, setSwipeOffset] = useState<PanOffset>({ x: 0, y: 0 });
+  const [swipeDirection, setSwipeDirection] =
+    useState<SwipeDirection | null>(null);
   const [loadingOriginal, setLoadingOriginal] = useState(false);
   const [originalUrls, setOriginalUrls] = useState<Record<number, string>>({});
   const originalUrlsRef = useRef<Record<number, string>>({});
@@ -66,6 +74,7 @@ export function ImageLightbox({
   const pinchRef = useRef<PinchGesture | null>(null);
   const swipeRef = useRef<{
     dragging: boolean;
+    direction: SwipeDirection | null;
     pointerId: number;
     startX: number;
     startY: number;
@@ -134,6 +143,8 @@ export function ImageLightbox({
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setSwipeOffset({ x: 0, y: 0 });
+    setSwipeDirection(null);
     setTouchGestureActive(false);
     pointerPositionsRef.current.clear();
     panRef.current = null;
@@ -197,10 +208,9 @@ export function ImageLightbox({
       return;
     }
 
-    if (images.length < 2) return;
-
     swipeRef.current = {
       dragging: false,
+      direction: null,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -267,9 +277,30 @@ export function ImageLightbox({
 
     const deltaX = event.clientX - swipe.startX;
     const deltaY = event.clientY - swipe.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
 
-    if (Math.abs(deltaX) > 12 && Math.abs(deltaX) > Math.abs(deltaY)) {
+    if (!swipe.direction && Math.max(absX, absY) > 12) {
+      swipe.direction = absX > absY ? 'horizontal' : 'vertical';
       swipe.dragging = true;
+      setSwipeDirection(swipe.direction);
+    }
+
+    if (swipe.direction === 'horizontal') {
+      const boundedDeltaX =
+        (deltaX > 0 && !hasPrevious) || (deltaX < 0 && !hasNext)
+          ? deltaX * 0.28
+          : deltaX;
+
+      setSwipeOffset({ x: boundedDeltaX, y: 0 });
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    if (swipe.direction === 'vertical') {
+      setSwipeOffset({ x: 0, y: deltaY });
       event.preventDefault();
       event.stopPropagation();
     }
@@ -299,11 +330,27 @@ export function ImageLightbox({
     event.stopPropagation();
 
     const deltaX = event.clientX - swipe.startX;
-    const swipeThreshold = Math.min(96, window.innerWidth * 0.18);
+    const deltaY = event.clientY - swipe.startY;
+    const horizontalThreshold = Math.min(96, window.innerWidth * 0.18);
+    const verticalThreshold = Math.min(120, window.innerHeight * 0.16);
 
-    if (deltaX <= -swipeThreshold && hasNext) goToNext();
+    setSwipeOffset({ x: 0, y: 0 });
+    setSwipeDirection(null);
 
-    if (deltaX >= swipeThreshold && hasPrevious) goToPrevious();
+    if (
+      swipe.direction === 'vertical' &&
+      Math.abs(deltaY) >= verticalThreshold
+    ) {
+      close();
+
+      return;
+    }
+
+    if (swipe.direction !== 'horizontal') return;
+
+    if (deltaX <= -horizontalThreshold && hasNext) goToNext();
+
+    if (deltaX >= horizontalThreshold && hasPrevious) goToPrevious();
   };
   const handlePointerCancel = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch') {
@@ -316,17 +363,22 @@ export function ImageLightbox({
 
     const swipe = swipeRef.current;
 
-    if (swipe?.pointerId === event.pointerId) swipeRef.current = null;
+    if (swipe?.pointerId === event.pointerId) {
+      swipeRef.current = null;
+      setSwipeOffset({ x: 0, y: 0 });
+      setSwipeDirection(null);
+    }
   };
 
   if (!activeImage) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000] grid place-items-center bg-black/92 p-4 backdrop-blur-xl"
+      className="image-lightbox-scrim fixed inset-0 z-[1000] grid place-items-center bg-black/92 p-4 backdrop-blur-xl"
+      data-state={transitionState}
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      onClick={close}
     >
       <div
         className="relative z-10 flex h-full w-full touch-none items-center justify-center overflow-hidden"
@@ -369,12 +421,22 @@ export function ImageLightbox({
             });
           }}
           className={cx(
-            'max-h-full max-w-full touch-none select-none object-contain',
-            touchGestureActive ? '' : 'transition-transform',
+            'image-lightbox-media max-h-full max-w-full touch-none select-none object-contain',
+            touchGestureActive
+              ? ''
+              : 'transition-transform duration-200 ease-out',
             zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in',
           )}
+          data-state={transitionState}
           style={{
-            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+            opacity:
+              swipeDirection === 'vertical'
+                ? Math.max(
+                    0.45,
+                    1 - Math.abs(swipeOffset.y) / window.innerHeight,
+                  )
+                : undefined,
+            transform: `translate3d(${pan.x + swipeOffset.x}px, ${pan.y + swipeOffset.y}px, 0) scale(${zoom})`,
           }}
         />
         {loadingOriginal && (
@@ -409,11 +471,11 @@ export function ImageLightbox({
       </div>
       <button
         type="button"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-        }}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }}
         className={cx(
           'absolute right-4 top-4 z-30 grid h-11 w-11 place-items-center',
           'rounded-2xl bg-white/10 text-2xl font-black text-white transition hover:bg-white/20',

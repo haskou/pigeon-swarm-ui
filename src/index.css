@@ -425,6 +425,46 @@ textarea:disabled,
   }
 }
 
+@keyframes image-lightbox-scrim-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes image-lightbox-scrim-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes image-lightbox-media-in {
+  0% {
+    opacity: 0;
+    scale: 0.82;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes image-lightbox-media-out {
+  0% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
 .pulse-dot {
   animation: pulse-dot 1.8s ease-in-out infinite;
 }
@@ -557,6 +597,23 @@ textarea:disabled,
 
 .message-timeline-enter-neutral {
   animation-name: message-timeline-enter-neutral;
+}
+
+.image-lightbox-scrim {
+  animation: image-lightbox-scrim-in 180ms ease-out both;
+}
+
+.image-lightbox-scrim[data-state='closing'] {
+  animation: image-lightbox-scrim-out 150ms ease-in both;
+}
+
+.image-lightbox-media {
+  animation: image-lightbox-media-in 220ms cubic-bezier(0.16, 1, 0.3, 1)
+    both;
+}
+
+.image-lightbox-media[data-state='closing'] {
+  animation: image-lightbox-media-out 150ms ease-in both;
 }
 
 @supports (view-transition-name: root) {
