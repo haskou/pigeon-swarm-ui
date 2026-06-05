@@ -300,10 +300,7 @@ export class PigeonFilesApi {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment> {
     const preparedFile = await this.publicImageUploadPreparer.prepare(file);
-    const preview = await this.uploadPublicAttachmentPreview(
-      session,
-      preparedFile,
-    );
+    const preview = await this.uploadPublicAttachmentPreview(session, file);
     const attachment =
       preparedFile.size > ipfsPrivateUploadLimitBytes
         ? await this.uploadPublicChunkedAttachment(
