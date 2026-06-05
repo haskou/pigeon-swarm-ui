@@ -12,7 +12,10 @@ import type {
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { MemberRow } from '../../../../modules/communities/presentation/components/MemberRow';
+import {
+  IdentityMemberListPanel,
+  type IdentityMemberListItem,
+} from '../../../../modules/identities/presentation/components/IdentityMemberListPanel';
 
 type GroupParticipant = {
   identity?: IdentityResource;
@@ -93,25 +96,30 @@ export function GroupProfileDialog({
           </div>
         </div>
 
-        <div className="mt-4">
-          <div className="mb-2 font-black uppercase tracking-[0.16em] text-white/35">
-            {copy.dialog.groupParticipants}
-          </div>
-          <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
-            {participants.map((participant) => (
-              <MemberRow
-                key={participant.identityId}
-                identity={participant.identity}
-                identityId={participant.identityId}
-                name={participant.name}
-                onClick={(event) => onIdentityClick(participant, event)}
-                pictureUrl={participant.picture ?? null}
-                presence={presenceByIdentityId[participant.identityId]}
-                showBanner={false}
-              />
-            ))}
-          </div>
-        </div>
+        <IdentityMemberListPanel
+          className="mt-4"
+          emptyLabel={copy.communities.noMatchingMembers}
+          items={participants.map((participant) => ({
+            identity: participant.identity,
+            identityId: participant.identityId,
+            name: participant.name,
+            pictureUrl: participant.picture ?? null,
+            presence: presenceByIdentityId[participant.identityId],
+          } satisfies IdentityMemberListItem))}
+          listClassName="max-h-[45vh] flex-none"
+          onItemClick={(participant, event) =>
+            onIdentityClick(
+              {
+                identity: participant.identity,
+                identityId: participant.identityId,
+                name: participant.name ?? participant.identityId,
+                picture: participant.pictureUrl,
+              },
+              event,
+            )
+          }
+          title={copy.communities.members}
+        />
       </section>
     </div>,
     document.body,
