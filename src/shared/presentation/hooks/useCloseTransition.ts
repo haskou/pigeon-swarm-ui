@@ -18,6 +18,7 @@ export function useCloseTransition(
     setState('closing');
     timeoutRef.current = window.setTimeout(() => {
       timeoutRef.current = null;
+      setState('open');
       onClose();
     }, durationMs);
   }, [durationMs, onClose]);
@@ -27,6 +28,7 @@ export function useCloseTransition(
       if (timeoutRef.current === null) return;
 
       window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     },
     [],
   );
