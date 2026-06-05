@@ -16,6 +16,6 @@ export function sidePanelListEnterStyle(
   index: number,
 ): SidePanelListEnterStyle {
   return {
-    '--side-panel-enter-delay': `${Math.min(index * 24, 180)}ms`,
+    '--side-panel-enter-delay': `${Math.min(index * 32, 220)}ms`,
   };
 }

@@ -33,6 +33,7 @@ import {
 
 export function CommunityChannelList({
   activeVoiceChannelId,
+  animationScopeKey,
   channelSearch,
   channelUnreadCounts,
   onChannelSearchChange,
@@ -54,6 +55,7 @@ export function CommunityChannelList({
   voiceParticipantsByChannelId,
 }: {
   activeVoiceChannelId: null | string;
+  animationScopeKey?: string;
   channelSearch: string;
   channelUnreadCounts: Record<string, number>;
   onChannelSearchChange: (value: string) => void;
@@ -200,7 +202,7 @@ export function CommunityChannelList({
             )}
             {displayedTextChannels.map((channel, index) => (
               <div
-                key={channel.id}
+                key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
                 className={sidePanelListEnterClassName('left')}
                 style={sidePanelListEnterStyle(index)}
               >
@@ -234,7 +236,7 @@ export function CommunityChannelList({
                       )
                       .map((thread, threadIndex) => (
                         <ThreadChannelButton
-                          key={thread.rootMessageId}
+                          key={`${animationScopeKey ?? 'channels'}:${channel.id}:${thread.rootMessageId}`}
                           active={
                             selectedChannelId === channel.id &&
                             selectedThreadRootMessageId === thread.rootMessageId
@@ -261,7 +263,7 @@ export function CommunityChannelList({
                 <div className="space-y-0.5">
                   {displayedVoiceChannels.map((channel, index) => (
                     <div
-                      key={channel.id}
+                      key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
                       className={sidePanelListEnterClassName('left')}
                       style={sidePanelListEnterStyle(
                         displayedTextChannels.length + index,

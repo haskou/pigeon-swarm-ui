@@ -32,6 +32,7 @@ export type IdentityMemberListItem = {
 
 export function IdentityMemberListPanel({
   action,
+  animationScopeKey,
   className,
   emptyLabel,
   items,
@@ -44,6 +45,7 @@ export function IdentityMemberListPanel({
     label: string;
     onClick: () => void;
   };
+  animationScopeKey?: string;
   className?: string;
   emptyLabel: string;
   items: IdentityMemberListItem[];
@@ -76,7 +78,7 @@ export function IdentityMemberListPanel({
         {items.map((item, index) => (
           <div
             className={sidePanelListEnterClassName('right')}
-            key={item.identityId}
+            key={`${animationScopeKey ?? 'members'}:${item.identityId}`}
             style={sidePanelListEnterStyle(index)}
           >
             <IdentityMemberRow

@@ -4255,6 +4255,7 @@ export function GlassWorkspace({
                 <Suspense fallback={null}>
                   <Sidebar
                     activeCall={activeCall}
+                    animationScopeKey={sidebarOpen ? 'open' : 'closed'}
                     session={session}
                     conversations={conversationsWithUnread}
                     conversationNotificationSetting={

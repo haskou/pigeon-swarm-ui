@@ -46,6 +46,7 @@ import {
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
+  animationScopeKey?: string;
   session: Session;
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
@@ -94,6 +95,7 @@ interface SidebarProps {
 export function Sidebar({
   activeCall,
   activeConversationId,
+  animationScopeKey,
   conversationNotificationSetting,
   conversations,
   identityNames,
@@ -293,7 +295,7 @@ export function Sidebar({
 
             return (
               <div
-                key={conversation.id}
+                key={`${animationScopeKey ?? 'conversations'}:${conversation.id}`}
                 className={cx(sidePanelListEnterClassName('left'), 'relative')}
                 style={sidePanelListEnterStyle(index)}
               >

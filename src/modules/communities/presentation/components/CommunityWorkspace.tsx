@@ -2124,6 +2124,7 @@ export function CommunityWorkspace({
 
             <CommunityChannelList
               activeVoiceChannelId={activeVoiceChannelId}
+              animationScopeKey={community.id}
               channelSearch={channelSearch}
               channelUnreadCounts={channelUnreadCounts}
               onChannelSearchChange={setChannelSearch}
@@ -2505,6 +2506,7 @@ export function CommunityWorkspace({
 
       <CommunityMembersPanel
         community={community}
+        animationScopeKey={community.id}
         canInvite={owner || currentPermissions.has('create_invites')}
         members={members}
         onAddMember={() => setMemberOpen(true)}
