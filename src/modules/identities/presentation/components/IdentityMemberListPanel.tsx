@@ -16,6 +16,10 @@ import {
 } from '../view-models/identityDisplay';
 import { PresenceStatusDot } from './presenceStatusDot';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import {
+  sidePanelListEnterClassName,
+  sidePanelListEnterStyle,
+} from '../../../../shared/presentation/sidePanelListMotion';
 
 export type IdentityMemberListItem = {
   identity?: IdentityResource;
@@ -69,13 +73,18 @@ export function IdentityMemberListPanel({
           listClassName,
         )}
       >
-        {items.map((item) => (
-          <IdentityMemberRow
-            item={item}
+        {items.map((item, index) => (
+          <div
+            className={sidePanelListEnterClassName('right')}
             key={item.identityId}
-            onClick={(event) => onItemClick(item, event)}
-            ownerLabel={ownerLabel}
-          />
+            style={sidePanelListEnterStyle(index)}
+          >
+            <IdentityMemberRow
+              item={item}
+              onClick={(event) => onItemClick(item, event)}
+              ownerLabel={ownerLabel}
+            />
+          </div>
         ))}
         {items.length === 0 && (
           <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">

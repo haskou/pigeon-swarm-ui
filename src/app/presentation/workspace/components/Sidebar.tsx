@@ -39,6 +39,10 @@ import { loadPublicImage } from '../../../../modules/communities/presentation/co
 import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import {
+  sidePanelListEnterClassName,
+  sidePanelListEnterStyle,
+} from '../../../../shared/presentation/sidePanelListMotion';
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
@@ -282,13 +286,17 @@ export function Sidebar({
               {copy.sidebar.emptyConversations}
             </div>
           )}
-          {filteredConversations.map((conversation) => {
+          {filteredConversations.map((conversation, index) => {
             const title = conversationName(conversation);
             const notificationSetting =
               conversationNotificationSetting?.(conversation);
 
             return (
-              <div key={conversation.id} className="relative">
+              <div
+                key={conversation.id}
+                className={cx(sidePanelListEnterClassName('left'), 'relative')}
+                style={sidePanelListEnterStyle(index)}
+              >
                 <button
                   type="button"
                   onClick={(event) => {
