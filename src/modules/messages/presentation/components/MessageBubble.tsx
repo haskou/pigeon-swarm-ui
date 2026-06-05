@@ -138,6 +138,7 @@ export function MessageBubble({
   );
   const linkPreview = message.linkPreview;
   const sticker = message.sticker;
+  const hasTextContent = message.content.trim().length > 0;
   const stickerWithReply = Boolean(sticker && hasReply);
   const canViewOriginalMessage = Boolean(message.originalContent && !sticker);
   const reactionGroups = useMemo(
@@ -158,7 +159,13 @@ export function MessageBubble({
     message.attachments.length === 0 &&
     !linkPreview &&
     !sticker;
-  const transparentMessage = sticker || emojiOnlyMessage;
+  const imageOnlyMessage =
+    imageAttachments.length > 0 &&
+    otherAttachments.length === 0 &&
+    !hasTextContent &&
+    !linkPreview &&
+    !sticker;
+  const transparentMessage = sticker || emojiOnlyMessage || imageOnlyMessage;
 
   useEffect(() => clearLongPressTimer, []);
   useEffect(() => {
@@ -261,14 +268,16 @@ export function MessageBubble({
                     ? 'rounded-2xl bg-transparent p-0'
                     : emojiOnlyMessage
                       ? 'rounded-2xl bg-transparent py-2.5'
-                    : cx(
-                        'rounded-2xl p-2.5',
-                        mine
-                          ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
-                          : mentionHighlighted
-                            ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
-                            : 'border border-white/10 bg-black/25 text-white',
-                      ),
+                      : imageOnlyMessage
+                        ? 'rounded-2xl bg-transparent p-0'
+                        : cx(
+                            'rounded-2xl p-2.5',
+                            mine
+                              ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
+                              : mentionHighlighted
+                                ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
+                                : 'border border-white/10 bg-black/25 text-white',
+                          ),
                 )}
               >
                 {pinned && !transparentMessage && <PinnedMessageMarker />}

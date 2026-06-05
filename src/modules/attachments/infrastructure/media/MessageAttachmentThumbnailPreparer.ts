@@ -1,4 +1,5 @@
 import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
+import { AnimatedWebpEncoder } from '../../../../shared/presentation/media/AnimatedWebpEncoder';
 
 const thumbnailContentType = 'image/webp';
 const thumbnailQuality = 0.72;
@@ -10,9 +11,21 @@ type ThumbnailDimensions = {
   width: number;
 };
 
+function createGifEncoder(): AnimatedWebpEncoder {
+  return new AnimatedWebpEncoder();
+}
+
 export class MessageAttachmentThumbnailPreparer {
+  public constructor(
+    private readonly gifEncoder: AnimatedWebpEncoder = createGifEncoder(),
+  ) {}
+
   public async prepare(file: File): Promise<File | null> {
     if (!this.shouldPrepare(file)) return null;
+
+    if (await this.isAnimatedGif(file)) {
+      return await this.prepareAnimatedGif(file);
+    }
 
     const image = await this.loadImage(file);
     const dimensions = this.thumbnailDimensions(image);
@@ -35,6 +48,12 @@ export class MessageAttachmentThumbnailPreparer {
     if ((file.type ?? '').toLowerCase() === 'image/svg+xml') return false;
 
     return isBrowserPreviewFile(file);
+  }
+
+  private async isAnimatedGif(file: File): Promise<boolean> {
+    if (!this.isGif(file)) return false;
+
+    return await this.gifEncoder.isAnimatedGif(file);
   }
 
   private loadImage(file: File): Promise<HTMLImageElement> {
@@ -114,5 +133,49 @@ export class MessageAttachmentThumbnailPreparer {
     const basename = filename.replace(/\.[^.]+$/, '') || 'image';
 
     return `${basename}.thumbnail.webp`;
+  }
+
+  private async prepareAnimatedGif(file: File): Promise<File | null> {
+    const image = await this.loadImage(file);
+    const dimensions = this.thumbnailDimensions(image);
+
+    if (!dimensions) return null;
+
+    const blob = await this.gifEncoder.encodeGif(file, {
+      drawFrame: ({ outputCanvas, sourceCanvas }) => {
+        const context = outputCanvas.getContext('2d');
+
+        if (!context) {
+          throw new Error('Animated image thumbnail could not be rendered.');
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        context.drawImage(
+          sourceCanvas,
+          0,
+          0,
+          outputCanvas.width,
+          outputCanvas.height,
+        );
+      },
+      outputHeight: dimensions.height,
+      outputWidth: dimensions.width,
+      quality: thumbnailQuality,
+    });
+
+    if (blob.size >= file.size) return null;
+
+    return new File([blob], this.thumbnailFilename(file.name), {
+      lastModified: file.lastModified,
+      type: thumbnailContentType,
+    });
+  }
+
+  private isGif(file: File): boolean {
+    const contentType = (file.type ?? '').toLowerCase();
+
+    return contentType === 'image/gif' || /\.gif$/i.test(file.name);
   }
 }

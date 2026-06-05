@@ -4457,6 +4457,7 @@ export function GlassWorkspace({
         ) : activeCommunity ? (
           <Suspense fallback={null}>
             <CommunityWorkspace
+              key={activeCommunity.id}
               activeChannelId={activeCommunityChannelId}
               channelUnreadCounts={
                 visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}

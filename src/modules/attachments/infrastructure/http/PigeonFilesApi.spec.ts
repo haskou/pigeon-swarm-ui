@@ -215,8 +215,81 @@ describe(PigeonFilesApi.name, () => {
       },
     ]);
 
-    expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(webpFile);
+    expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(sourceFile);
+    expect(thumbnailPreparer.prepare).not.toHaveBeenCalledWith(webpFile);
     expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps public animated gif previews based on the original file', async () => {
+    const sourceFile = new File([new Uint8Array(200 * 1024)], 'dance.gif', {
+      type: 'image/gif',
+    });
+    const webpFile = new File([new Uint8Array(180 * 1024)], 'dance.webp', {
+      type: 'image/webp',
+    });
+    const thumbnailFile = new File(['animated-thumb'], 'dance.thumbnail.webp', {
+      type: 'image/webp',
+    });
+    const request = jest.fn().mockImplementation((_path, options) => {
+      const filename = options.headers['X-Filename'];
+
+      return Promise.resolve({
+        cid:
+          filename === 'dance.thumbnail.webp'
+            ? 'animated-preview-cid'
+            : 'public-cid',
+        contentType: 'image/webp',
+        filename,
+        size:
+          filename === 'dance.thumbnail.webp'
+            ? thumbnailFile.size
+            : webpFile.size,
+      });
+    });
+    const signerHeaders = jest
+      .fn()
+      .mockResolvedValue({ 'X-Test-Signature': 'signature' });
+    const cipher = { encrypt: jest.fn() } as unknown as AttachmentCipher;
+    const publicImageUploadPreparer = {
+      prepare: jest.fn().mockResolvedValue(webpFile),
+    };
+    const thumbnailPreparer = {
+      prepare: jest.fn().mockResolvedValue(thumbnailFile),
+    };
+    const api = new PigeonFilesApi(
+      httpClient({ request }),
+      signer({ headers: signerHeaders }),
+      cipher,
+      publicImageUploadPreparer,
+      thumbnailPreparer,
+    );
+
+    await expect(
+      api.publishMessageAttachments(session, [sourceFile], undefined, {
+        encryptSmallAttachments: false,
+      }),
+    ).resolves.toEqual([
+      {
+        cid: 'public-cid',
+        contentType: 'image/webp',
+        encrypted: false,
+        filename: 'dance.webp',
+        preview: {
+          cid: 'animated-preview-cid',
+          contentType: 'image/webp',
+          encrypted: false,
+          filename: 'dance.thumbnail.webp',
+          size: thumbnailFile.size,
+          storage: 'public',
+        },
+        size: webpFile.size,
+        storage: 'public',
+      },
+    ]);
+
+    expect(publicImageUploadPreparer.prepare).toHaveBeenCalledWith(sourceFile);
+    expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(sourceFile);
+    expect(thumbnailPreparer.prepare).not.toHaveBeenCalledWith(webpFile);
   });
 
   it('keeps small attachments encrypted by default', async () => {
