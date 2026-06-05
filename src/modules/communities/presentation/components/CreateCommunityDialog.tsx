@@ -212,7 +212,7 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
+        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -234,7 +234,7 @@ export function CreateCommunityDialog({
         </div>
         {headerControl}
 
-        <div className="subtle-scrollbar mt-5 min-h-0 flex-1 overflow-y-auto pr-3">
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
             <div className="grid gap-4">
               <div className="overflow-hidden rounded-2xl bg-black/25">
@@ -407,7 +407,7 @@ export function CreateCommunityDialog({
           )}
         </div>
 
-        <div className="mt-5 shrink-0 border-t border-white/10 bg-[#171827]/95 pt-4">
+        <div className="mt-5 shrink-0 border-t border-white/10 pt-4">
           <div className="flex justify-end">
             <button
               disabled={!canSubmit}
