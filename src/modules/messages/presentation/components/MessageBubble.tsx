@@ -36,6 +36,9 @@ import {
 import { groupMessageReactions, MessageReactions } from './messageReactions';
 import { MessageReplyPreview } from './MessageReplyPreview';
 
+const TOUCH_TAP_MAX_MS = 450;
+const TOUCH_TAP_MAX_DISTANCE = 12;
+
 interface MessageBubbleProps {
   message: ChatMessage;
   currentIdentityId: string;
@@ -117,7 +120,11 @@ export function MessageBubble({
     index: number;
   } | null>(null);
   const [originalMessageOpen, setOriginalMessageOpen] = useState(false);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchTapRef = useRef<{
+    startedAt: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const indexedAttachments = useMemo(
     () =>
       message.attachments.map((attachment, index) => ({ attachment, index })),
@@ -168,43 +175,59 @@ export function MessageBubble({
     !sticker;
   const transparentMessage = sticker || emojiOnlyMessage || imageOnlyMessage;
 
-  useEffect(() => clearLongPressTimer, []);
   useEffect(() => {
     setOriginalMessageOpen(false);
   }, [message.editMessageId, message.id]);
 
-  const clearLongPressTimer = () => {
-    if (!longPressTimerRef.current) return;
-
-    clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
+  const clearTouchTap = () => {
+    touchTapRef.current = null;
   };
   const handleContextMenu = (event: MouseEvent) => {
+    if (isCoarsePointer()) return;
+
     event.preventDefault();
     onMessageMenuOpen(message, event.clientX, event.clientY);
   };
   const handleMessageClick = (event: MouseEvent<HTMLElement>) => {
-    if (!onMessageClick) return;
-
-    const target = event.target;
-    const interactiveElement =
-      target instanceof HTMLElement
-        ? target.closest('a,button,input,textarea,select,[role="button"]')
-        : null;
-
-    if (interactiveElement && interactiveElement !== event.currentTarget) {
+    if (isInteractiveMessageTarget(event)) {
+      clearTouchTap();
       return;
     }
 
-    onMessageClick(message);
+    if (isTouchTap(touchTapRef.current, event)) {
+      clearTouchTap();
+
+      if (!onMessageClick) {
+        event.preventDefault();
+        onMessageMenuOpen(message, event.clientX, event.clientY);
+        return;
+      }
+    }
+
+    clearTouchTap();
+    onMessageClick?.(message);
   };
   const handlePointerDown = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') {
+      clearTouchTap();
+      return;
+    }
+
+    touchTapRef.current = {
+      startedAt: Date.now(),
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+  const handlePointerMove = (event: PointerEvent) => {
     if (event.pointerType !== 'touch') return;
 
-    clearLongPressTimer();
-    longPressTimerRef.current = setTimeout(() => {
-      onMessageMenuOpen(message, event.clientX, event.clientY);
-    }, 550);
+    const touchTap = touchTapRef.current;
+    if (!touchTap) return;
+
+    if (touchDistance(touchTap, event) > TOUCH_TAP_MAX_DISTANCE) {
+      clearTouchTap();
+    }
   };
 
   if (callEvent) {
@@ -253,16 +276,12 @@ export function MessageBubble({
                 data-message-bubble
                 onClick={handleMessageClick}
                 onContextMenu={handleContextMenu}
-                style={{
-                  WebkitTouchCallout: 'none',
-                }}
-                onPointerCancel={clearLongPressTimer}
+                onPointerCancel={clearTouchTap}
                 onPointerDown={handlePointerDown}
-                onPointerLeave={clearLongPressTimer}
-                onPointerMove={clearLongPressTimer}
-                onPointerUp={clearLongPressTimer}
+                onPointerLeave={clearTouchTap}
+                onPointerMove={handlePointerMove}
                 className={cx(
-                  'min-w-0 max-w-full select-text text-sm leading-6 [@media(pointer:coarse)]:select-none',
+                  'min-w-0 max-w-full select-text text-sm leading-6',
                   onMessageClick && 'cursor-pointer',
                   message.deliveryStatus === 'pending' && 'opacity-70',
                   sticker
@@ -546,6 +565,44 @@ function MessageTimestamp({ timestamp }: { timestamp: number }) {
       {formatTime(timestamp)}
     </span>
   );
+}
+
+function isCoarsePointer(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(pointer: coarse)').matches
+  );
+}
+
+function isInteractiveMessageTarget(event: MouseEvent<HTMLElement>): boolean {
+  const target = event.target;
+  const interactiveElement =
+    target instanceof HTMLElement
+      ? target.closest('a,button,input,textarea,select,[role="button"]')
+      : null;
+
+  return Boolean(
+    interactiveElement && interactiveElement !== event.currentTarget,
+  );
+}
+
+function isTouchTap(
+  touchTap: { startedAt: number; x: number; y: number } | null,
+  event: MouseEvent<HTMLElement>,
+): boolean {
+  if (!touchTap) return false;
+
+  return (
+    Date.now() - touchTap.startedAt <= TOUCH_TAP_MAX_MS &&
+    touchDistance(touchTap, event) <= TOUCH_TAP_MAX_DISTANCE
+  );
+}
+
+function touchDistance(
+  touchTap: { x: number; y: number },
+  event: MouseEvent<HTMLElement> | PointerEvent,
+): number {
+  return Math.hypot(event.clientX - touchTap.x, event.clientY - touchTap.y);
 }
 
 function MessageAvatarColumn({
