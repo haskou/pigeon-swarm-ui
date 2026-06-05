@@ -50,6 +50,7 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { PendingMessageAttachments } from '../../../../modules/attachments/domain/PendingMessageAttachments';
+import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
 import { CommunityAccessPolicy } from '../../../../modules/communities/domain/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../modules/communities/domain/CommunityChannels';
 import { ConversationKeychain } from '../../../../modules/conversations/domain/ConversationKeychain';
@@ -468,6 +469,11 @@ export function GlassWorkspace({
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
+  const { openAttachment: downloadContextAttachment } = useAttachmentDownload({
+    errorMessage: copy.composer.attachmentDownloadError,
+    onErrorChange: setSendError,
+    onProgressChange: setAttachmentProgress,
+  });
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
@@ -4747,6 +4753,9 @@ export function GlassWorkspace({
               void (messageContextMenu?.source === 'thread'
                 ? handleDeleteConversationThreadMessage(message)
                 : handleDeleteMessage(message))
+            }
+            onDownloadAttachment={(attachment) =>
+              void downloadContextAttachment(attachment)
             }
             onEditMessage={(message) =>
               messageContextMenu?.source === 'thread'

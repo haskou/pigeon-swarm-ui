@@ -13,6 +13,7 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  MessageAttachment,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationResource,
@@ -166,6 +167,7 @@ interface WorkspaceDialogsProps {
   ) => void;
   onNotificationSettingSave: (setting: NotificationScopeSettingInput) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onDownloadAttachment: (attachment: MessageAttachment) => void;
   onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
@@ -311,6 +313,7 @@ function MessageActionDialogs(
             ? () => props.onDeleteMessage(contextMenuMessage)
             : undefined
         }
+        onDownloadAttachment={props.onDownloadAttachment}
         onEdit={
           contextMenuMessage &&
           !contextMenuFromThread &&

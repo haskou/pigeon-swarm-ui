@@ -352,8 +352,201 @@ export function AttachmentCard({
   );
 }
 
+export function VideoAttachmentCard({
+  attachment,
+  contained = false,
+  mine,
+  onPreview,
+  pending,
+}: {
+  attachment: MessageAttachment;
+  contained?: boolean;
+  mine: boolean;
+  onPreview: (
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ) => Promise<string>;
+  pending?: boolean;
+}) {
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState<AttachmentProgress | null>(null);
+  const [shouldLoadPreview, setShouldLoadPreview] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const largeOrChunked = MessageAttachmentPreview.isLargeOrChunked(attachment);
+  const posterAttachment = largeOrChunked ? attachment.preview : undefined;
+
+  useEffect(() => {
+    const card = cardRef.current;
+
+    if (!card || shouldLoadPreview) return undefined;
+
+    if (isNearPreviewViewport(card)) {
+      setShouldLoadPreview(true);
+
+      return undefined;
+    }
+
+    if (!('IntersectionObserver' in window)) {
+      setShouldLoadPreview(true);
+
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+
+        setShouldLoadPreview(true);
+        observer.disconnect();
+      },
+      { rootMargin: `${previewViewportMargin}px 0px` },
+    );
+
+    observer.observe(card);
+
+    return () => observer.disconnect();
+  }, [shouldLoadPreview]);
+
+  useEffect(() => {
+    if (!shouldLoadPreview) return undefined;
+
+    let cancelled = false;
+
+    if (largeOrChunked) {
+      if (!posterAttachment) return undefined;
+
+      void onPreview(posterAttachment)
+        .then((url) => {
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+
+            return;
+          }
+
+          setPosterUrl(url);
+        })
+        .catch(() => undefined);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void onPreview(attachment, setProgress)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+
+          return;
+        }
+
+        setVideoUrl(url);
+        setProgress(null);
+      })
+      .catch(() => setProgress(null));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment, largeOrChunked, onPreview, posterAttachment, shouldLoadPreview]);
+
+  useEffect(
+    () => () => {
+      if (posterUrl) URL.revokeObjectURL(posterUrl);
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+    },
+    [posterUrl, videoUrl],
+  );
+
+  const loadVideo = () => {
+    if (pending || videoUrl) return;
+
+    setProgress(null);
+    void onPreview(attachment, setProgress)
+      .then((url) => {
+        setVideoUrl(url);
+        setProgress(null);
+      })
+      .catch(() => setProgress(null));
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      className={cx(
+        'overflow-hidden rounded-2xl border',
+        contained ? 'w-full max-w-full' : imageAttachmentAlbumWidthClass,
+        mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
+      )}
+    >
+      {videoUrl ? (
+        <video
+          autoPlay={largeOrChunked}
+          controls
+          poster={posterUrl ?? undefined}
+          preload="metadata"
+          src={videoUrl}
+          className="max-h-80 w-full bg-black object-contain"
+        />
+      ) : largeOrChunked ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={loadVideo}
+          className={cx(
+            'group relative aspect-video w-full overflow-hidden bg-black/25 text-left',
+            pending ? 'cursor-wait opacity-70' : 'cursor-pointer',
+          )}
+          aria-label={copy.attachments.previewVideo}
+        >
+          {posterUrl ? (
+            <img
+              alt=""
+              decoding="async"
+              loading="lazy"
+              src={posterUrl}
+              className="h-full w-full object-cover opacity-80 transition group-hover:opacity-95"
+            />
+          ) : (
+            <AttachmentPreviewSkeleton mediaType="video" progress={progress} />
+          )}
+          <span className="absolute inset-0 grid place-items-center bg-black/25">
+            <span className="flex items-center gap-3 rounded-full bg-black/65 px-4 py-2 text-sm font-black text-white shadow-xl shadow-black/40">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-950">
+                ▶
+              </span>
+              <span>
+                {copy.attachments.previewVideo}
+                <span className="block text-xs text-white/60">
+                  {formatFileSize(attachment.size)}
+                </span>
+              </span>
+            </span>
+          </span>
+          {progress && (
+            <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-1 text-[0.65rem] font-black text-white/75">
+              {progress.percent}%
+            </span>
+          )}
+        </button>
+      ) : (
+        <AttachmentPreviewSkeleton mediaType="video" progress={progress} />
+      )}
+    </div>
+  );
+}
+
 export function isImageAttachment(attachment: MessageAttachment): boolean {
   return MessageAttachmentPreview.isImage(attachment);
+}
+
+export function isAudioAttachment(attachment: MessageAttachment): boolean {
+  return attachment.contentType.toLowerCase().startsWith('audio/');
+}
+
+export function isVideoAttachment(attachment: MessageAttachment): boolean {
+  return attachment.contentType.toLowerCase().startsWith('video/');
 }
 
 function ImageAttachmentSkeleton({
@@ -416,7 +609,7 @@ function AttachmentPreviewSkeleton({
   );
 }
 
-function formatFileSize(bytes: number): string {
+export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
 
   const kilobytes = bytes / 1024;

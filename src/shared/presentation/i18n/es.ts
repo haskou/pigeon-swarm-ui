@@ -13,8 +13,12 @@ export const es = {
   attachments: {
     closeViewer: 'Cerrar visor de imagen',
     download: 'Descargar adjunto',
+    downloadAudioWithSize: 'Descargar audio ({size})',
+    downloadImageWithSize: 'Descargar imagen ({size})',
+    downloadVideoWithSize: 'Descargar video ({size})',
     nextImage: 'Siguiente imagen',
     openImage: 'Abrir imagen',
+    previewVideo: 'Previsualizar video',
     previousImage: 'Imagen anterior',
   },
   date: {
