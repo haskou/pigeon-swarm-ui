@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 
 import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
 import type {
@@ -54,8 +54,15 @@ export function ConversationActionsMenu({
   onStartCall,
 }: ConversationActionsMenuProps) {
   const { close, state } = useCloseTransition(onClose);
+  const openedAtRef = useRef(Date.now());
 
   useCloseOnEscape(close);
+
+  const closeAfterOpeningSettles = () => {
+    if (Date.now() - openedAtRef.current < 250) return;
+
+    close();
+  };
 
   return (
     <>
@@ -63,10 +70,10 @@ export function ConversationActionsMenu({
         type="button"
         className="app-overlay-scrim fixed inset-0 z-30 cursor-default"
         data-state={state}
-        onClick={close}
+        onClick={closeAfterOpeningSettles}
         onContextMenu={(event) => {
           event.preventDefault();
-          close();
+          closeAfterOpeningSettles();
         }}
         aria-label={copy.dialog.close}
       />
