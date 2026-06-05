@@ -98,20 +98,8 @@ export function PollCard({
     event.preventDefault();
     openContextMenu(event.clientX, event.clientY);
   };
-  const handleClick = (event: MouseEvent<HTMLElement>) => {
-    if (!onMenuOpen || isInteractivePollTarget(event)) {
-      clearTouchTap();
-      return;
-    }
-
-    if (!isTouchTap(touchTapRef.current, event)) {
-      clearTouchTap();
-      return;
-    }
-
+  const handleClick = () => {
     clearTouchTap();
-    event.preventDefault();
-    openContextMenu(event.clientX, event.clientY);
   };
   const handlePointerDown = (event: PointerEvent) => {
     if (event.pointerType !== 'touch' || !onMenuOpen) return;
@@ -132,6 +120,29 @@ export function PollCard({
       clearTouchTap();
     }
   };
+  const handlePointerLeave = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') clearTouchTap();
+  };
+  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'touch') {
+      clearTouchTap();
+      return;
+    }
+
+    if (!onMenuOpen || isInteractivePollTarget(event)) {
+      clearTouchTap();
+      return;
+    }
+
+    if (!isTouchTap(touchTapRef.current, event)) {
+      clearTouchTap();
+      return;
+    }
+
+    clearTouchTap();
+    event.preventDefault();
+    openContextMenu(event.clientX, event.clientY);
+  };
 
   return (
     <div
@@ -139,8 +150,9 @@ export function PollCard({
       onContextMenu={handleContextMenu}
       onPointerCancel={clearTouchTap}
       onPointerDown={handlePointerDown}
-      onPointerLeave={clearTouchTap}
+      onPointerLeave={handlePointerLeave}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
       className={cx(
         'w-full max-w-xl select-text rounded-2xl border p-3 text-white shadow-xl sm:p-4',
         mine
@@ -277,7 +289,9 @@ function isCoarsePointer(): boolean {
   );
 }
 
-function isInteractivePollTarget(event: MouseEvent<HTMLElement>): boolean {
+function isInteractivePollTarget(
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
+): boolean {
   const target = event.target;
   const interactiveElement =
     target instanceof HTMLElement
@@ -291,7 +305,7 @@ function isInteractivePollTarget(event: MouseEvent<HTMLElement>): boolean {
 
 function isTouchTap(
   touchTap: { startedAt: number; x: number; y: number } | null,
-  event: MouseEvent<HTMLElement>,
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
 ): boolean {
   if (!touchTap) return false;
 

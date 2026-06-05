@@ -194,16 +194,6 @@ export function MessageBubble({
       return;
     }
 
-    if (isTouchTap(touchTapRef.current, event)) {
-      clearTouchTap();
-
-      if (!onMessageClick) {
-        event.preventDefault();
-        onMessageMenuOpen(message, event.clientX, event.clientY);
-        return;
-      }
-    }
-
     clearTouchTap();
     onMessageClick?.(message);
   };
@@ -228,6 +218,32 @@ export function MessageBubble({
     if (touchDistance(touchTap, event) > TOUCH_TAP_MAX_DISTANCE) {
       clearTouchTap();
     }
+  };
+  const handlePointerLeave = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') clearTouchTap();
+  };
+  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'touch') {
+      clearTouchTap();
+      return;
+    }
+
+    if (isInteractiveMessageTarget(event)) {
+      clearTouchTap();
+      return;
+    }
+
+    if (isTouchTap(touchTapRef.current, event)) {
+      clearTouchTap();
+
+      if (!onMessageClick) {
+        event.preventDefault();
+        onMessageMenuOpen(message, event.clientX, event.clientY);
+        return;
+      }
+    }
+
+    clearTouchTap();
   };
 
   if (callEvent) {
@@ -278,8 +294,9 @@ export function MessageBubble({
                 onContextMenu={handleContextMenu}
                 onPointerCancel={clearTouchTap}
                 onPointerDown={handlePointerDown}
-                onPointerLeave={clearTouchTap}
+                onPointerLeave={handlePointerLeave}
                 onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
                 className={cx(
                   'min-w-0 max-w-full select-text text-sm leading-6',
                   onMessageClick && 'cursor-pointer',
@@ -574,7 +591,9 @@ function isCoarsePointer(): boolean {
   );
 }
 
-function isInteractiveMessageTarget(event: MouseEvent<HTMLElement>): boolean {
+function isInteractiveMessageTarget(
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
+): boolean {
   const target = event.target;
   const interactiveElement =
     target instanceof HTMLElement
@@ -588,7 +607,7 @@ function isInteractiveMessageTarget(event: MouseEvent<HTMLElement>): boolean {
 
 function isTouchTap(
   touchTap: { startedAt: number; x: number; y: number } | null,
-  event: MouseEvent<HTMLElement>,
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
 ): boolean {
   if (!touchTap) return false;
 
