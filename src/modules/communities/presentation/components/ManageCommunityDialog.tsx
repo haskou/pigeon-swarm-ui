@@ -992,7 +992,7 @@ export function ManageCommunityDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
         data-state={transitionState}
       >
         <DialogHeader title={copy.communities.manage} onClose={close} />
