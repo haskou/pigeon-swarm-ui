@@ -62,24 +62,6 @@ select {
   }
 }
 
-@media (max-width: 768px) {
-  .side-panel-list-enter {
-    animation-delay: var(--side-panel-enter-delay, 0ms);
-    animation-duration: 260ms;
-    animation-fill-mode: both;
-    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: opacity, transform;
-  }
-
-  .side-panel-list-enter-left {
-    animation-name: side-panel-list-enter-left;
-  }
-
-  .side-panel-list-enter-right {
-    animation-name: side-panel-list-enter-right;
-  }
-}
-
 button,
 [role='button'],
 input[type='button'],
@@ -661,6 +643,22 @@ textarea:disabled,
 
 .message-timeline-enter-neutral {
   animation-name: message-timeline-enter-neutral;
+}
+
+.side-panel-list-enter {
+  animation-delay: var(--side-panel-enter-delay, 0ms);
+  animation-duration: 260ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.side-panel-list-enter-left {
+  animation-name: side-panel-list-enter-left;
+}
+
+.side-panel-list-enter-right {
+  animation-name: side-panel-list-enter-right;
 }
 
 .image-lightbox-scrim {
