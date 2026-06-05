@@ -38,6 +38,7 @@ import { SectionTitle } from '../../../../shared/presentation/components/Section
 import { loadPublicImage } from '../../../../modules/communities/presentation/components/communityImages';
 import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
@@ -395,14 +396,12 @@ export function Sidebar({
                     onClose={() => setConversationMenu(null)}
                     onNotificationMuteToggle={() => {
                       onConversationNotificationMuteToggle(conversation);
-                      setConversationMenu(null);
                     }}
                     onNotificationSettingsOpen={() => {
                       onConversationNotificationSettingsOpen(
                         conversation,
                         conversationMenu.title,
                       );
-                      setConversationMenu(null);
                     }}
                   />
                 ) : null}
@@ -464,6 +463,9 @@ function SidebarConversationMenu({
   onNotificationMuteToggle: () => void;
   onNotificationSettingsOpen: () => void;
 }) {
+  const { close, state } = useCloseTransition(onClose);
+  useCloseOnEscape(close);
+
   const menuStyle = {
     left,
     top,
@@ -477,11 +479,12 @@ function SidebarConversationMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[80] cursor-default select-none"
-        onClick={onClose}
+        className="app-overlay-scrim fixed inset-0 z-[80] cursor-default select-none"
+        data-state={state}
+        onClick={close}
         onContextMenu={(event) => {
           event.preventDefault();
-          onClose();
+          close();
         }}
         style={{
           WebkitTouchCallout: 'none',
@@ -491,7 +494,8 @@ function SidebarConversationMenu({
         aria-label={copy.dialog.close}
       />
       <section
-        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        className="message-context-menu app-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        data-state={state}
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
         aria-label={title}
@@ -499,8 +503,14 @@ function SidebarConversationMenu({
         <NotificationScopeMenuActions
           muteLabel={copy.notifications.muteConversation}
           notificationSetting={notificationSetting}
-          onNotificationMuteToggle={onNotificationMuteToggle}
-          onNotificationSettingsOpen={onNotificationSettingsOpen}
+          onNotificationMuteToggle={() => {
+            onNotificationMuteToggle();
+            close();
+          }}
+          onNotificationSettingsOpen={() => {
+            onNotificationSettingsOpen();
+            close();
+          }}
         />
       </section>
     </>,

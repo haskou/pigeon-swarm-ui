@@ -24,6 +24,7 @@ import { MessageEditPolicy } from '../../../../modules/messages/domain/MessageEd
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { Inspector } from './Inspector';
 import {
   MessageContextMenu,
@@ -232,18 +233,24 @@ function CommunityEntryModeControl({
 function MobileInspectorDialog(
   props: WorkspaceDialogsProps,
 ): ReactElement | null {
-  useCloseOnEscape(props.onCloseInspector, props.inspectorOpen);
+  const { close, state } = useCloseTransition(props.onCloseInspector);
+
+  useCloseOnEscape(close, props.inspectorOpen);
 
   if (!props.inspectorOpen) return null;
 
   return (
     <>
       <button
-        className="fixed inset-0 z-40 bg-black/50 xl:hidden"
-        onClick={props.onCloseInspector}
+        className="app-overlay-scrim fixed inset-0 z-40 bg-black/50 xl:hidden"
+        data-state={state}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <div className="app-safe-area-drawer-until-xl fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden">
+      <div
+        className="app-safe-area-drawer-until-xl app-drawer-right fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden"
+        data-state={state}
+      >
         <Inspector
           className="h-full overflow-y-auto"
           session={props.session}
@@ -255,7 +262,7 @@ function MobileInspectorDialog(
           identityPictures={props.identityPictures}
           identityProfiles={props.identityProfiles}
           nodeNetworks={props.nodeNetworks}
-          onClose={props.onCloseInspector}
+          onClose={close}
           onGroupInviteOpen={props.onGroupInviteOpen}
           onOpenConversationWithIdentity={
             props.onOpenConversationWithIdentity

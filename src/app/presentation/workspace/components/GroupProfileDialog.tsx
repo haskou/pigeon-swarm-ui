@@ -12,6 +12,7 @@ import type {
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
   IdentityMemberListPanel,
   type IdentityMemberListItem,
@@ -46,7 +47,9 @@ export function GroupProfileDialog({
   participants,
   presenceByIdentityId = {},
 }: GroupProfileDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const groupName = conversation.name ?? conversation.title ?? conversation.id;
   const networkName = networkId
@@ -55,14 +58,20 @@ export function GroupProfileDialog({
     : copy.profile.noNetworks;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md"
+      data-state={state}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full max-w-md overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40">
+      <section
+        className="app-overlay-surface glass-panel-strong relative z-10 w-full max-w-md overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40"
+        data-state={state}
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950">
@@ -77,7 +86,7 @@ export function GroupProfileDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
             aria-label={copy.dialog.close}
           >

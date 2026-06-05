@@ -26,6 +26,10 @@ import {
   messageReplyImage,
   messageReplySticker,
 } from '../../../messages/presentation/components/messageTimelineHelpers';
+import {
+  messageTimelineEnterClassName,
+  messageTimelineEnterStyle,
+} from '../../../messages/presentation/components/messageTimelineMotion';
 import { MessageTimelineEntries } from '../../../messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../polls/presentation/components/pollCard';
 import { LockIcon } from '../../../../app/presentation/workspace/components/LockIcon';
@@ -155,7 +159,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        className="h-full overflow-y-auto p-4 sm:p-6"
+        className="h-full overflow-x-hidden overflow-y-auto p-4 sm:p-6"
       >
         {messageState === 'loading' ? (
           <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
@@ -195,9 +199,12 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
             </>
           )}
           {!missingCommunityKey &&
-            timelineEntries.map((entry) => {
+            timelineEntries.map((entry, index) => {
+              const enterOrder = timelineEntries.length - index - 1;
+
               if (entry.type === 'poll') {
                 const { item } = entry;
+                const mine = item.poll.creatorIdentityId === session.identity.id;
 
                 return (
                   <Fragment key={entry.id}>
@@ -210,12 +217,18 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                       data-message-id={item.message.id}
                       className={cx(
                         'mt-4 flex',
-                        item.poll.creatorIdentityId === session.identity.id
-                          ? 'justify-end'
-                          : 'justify-start',
+                        mine ? 'justify-end' : 'justify-start',
                       )}
                     >
-                      <div className="w-full max-w-xl">
+                      <div
+                        className={cx(
+                          'w-full max-w-xl',
+                          messageTimelineEnterClassName(
+                            mine ? 'outgoing' : 'incoming',
+                          ),
+                        )}
+                        style={messageTimelineEnterStyle(enterOrder)}
+                      >
                         <PollCard
                           currentIdentityId={session.identity.id}
                           onClose={
@@ -266,88 +279,95 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                         : 'mt-1'
                     }
                   >
-                    <MessageBubble
-                      message={message}
-                      currentIdentityId={session.identity.id}
-                      authorName={
-                        message.mine
-                          ? session.identity.profile.name
-                          : memberDisplayName(
-                              memberIdentities[message.authorIdentityId],
-                              message.authorIdentityId,
-                            )
-                      }
-                      authorPicture={
-                        message.mine
-                          ? memberPictures[session.identity.id]
-                          : memberPictures[message.authorIdentityId]
-                      }
-                      onAttachmentOpen={(attachmentIndex) =>
-                        onAttachmentOpen(message.attachments[attachmentIndex])
-                      }
-                      onAttachmentPreview={loadAttachmentPreview}
-                      onAvatarClick={(event) =>
-                        onAuthorProfileOpen(message, event.currentTarget)
-                      }
-                      onMessageMenuOpen={onMessageMenuOpen}
-                      onMentionClick={onIdentityProfileOpen}
-                      onThreadOpen={onOpenThread}
-                      onReactionToggle={onReactionToggle}
-                      onReplyReferenceClick={onReplyReferenceClick}
-                      onRetryMessage={onRetryMessage}
-                      onStickerClick={onStickerClick}
-                      pinned={pinnedMessageIds.has(message.id)}
-                      reactionAuthorNames={reactionAuthorNames}
-                      mentionHighlighted={CommunityMentionHighlightPolicy.mentionsIdentity(
-                        message,
-                        session.identity.id,
-                        currentRoleIds,
+                    <div
+                      className={messageTimelineEnterClassName(
+                        message.mine ? 'outgoing' : 'incoming',
                       )}
-                      mentionTokens={messageMentionTokens(
-                        message,
-                        memberIdentities,
-                      )}
-                      replyImage={messageReplyImage(message, replyMessage)}
-                      replySticker={messageReplySticker(message, replyMessage)}
-                      replyAuthorName={
-                        replyMessage
-                          ? memberPrimaryName(
-                              memberIdentities[replyMessage.authorIdentityId],
-                              replyMessage.authorIdentityId,
-                            )
-                          : message.replyPreview
+                      style={messageTimelineEnterStyle(enterOrder)}
+                    >
+                      <MessageBubble
+                        message={message}
+                        currentIdentityId={session.identity.id}
+                        authorName={
+                          message.mine
+                            ? session.identity.profile.name
+                            : memberDisplayName(
+                                memberIdentities[message.authorIdentityId],
+                                message.authorIdentityId,
+                              )
+                        }
+                        authorPicture={
+                          message.mine
+                            ? memberPictures[session.identity.id]
+                            : memberPictures[message.authorIdentityId]
+                        }
+                        onAttachmentOpen={(attachmentIndex) =>
+                          onAttachmentOpen(message.attachments[attachmentIndex])
+                        }
+                        onAttachmentPreview={loadAttachmentPreview}
+                        onAvatarClick={(event) =>
+                          onAuthorProfileOpen(message, event.currentTarget)
+                        }
+                        onMessageMenuOpen={onMessageMenuOpen}
+                        onMentionClick={onIdentityProfileOpen}
+                        onThreadOpen={onOpenThread}
+                        onReactionToggle={onReactionToggle}
+                        onReplyReferenceClick={onReplyReferenceClick}
+                        onRetryMessage={onRetryMessage}
+                        onStickerClick={onStickerClick}
+                        pinned={pinnedMessageIds.has(message.id)}
+                        reactionAuthorNames={reactionAuthorNames}
+                        mentionHighlighted={CommunityMentionHighlightPolicy.mentionsIdentity(
+                          message,
+                          session.identity.id,
+                          currentRoleIds,
+                        )}
+                        mentionTokens={messageMentionTokens(
+                          message,
+                          memberIdentities,
+                        )}
+                        replyImage={messageReplyImage(message, replyMessage)}
+                        replySticker={messageReplySticker(message, replyMessage)}
+                        replyAuthorName={
+                          replyMessage
+                            ? memberPrimaryName(
+                                memberIdentities[replyMessage.authorIdentityId],
+                                replyMessage.authorIdentityId,
+                              )
+                            : message.replyPreview
+                              ? memberPrimaryName(
+                                  memberIdentities[
+                                    message.replyPreview.authorIdentityId
+                                  ],
+                                  message.replyPreview.authorIdentityId,
+                                )
+                              : undefined
+                        }
+                        replyPreview={
+                          replyMessage?.content ?? message.replyPreview?.content
+                        }
+                        showAvatar={entry.endsAuthorRun}
+                        threadAuthorName={
+                          entry.threadSummary?.lastMessage
                             ? memberPrimaryName(
                                 memberIdentities[
-                                  message.replyPreview.authorIdentityId
+                                  entry.threadSummary.lastMessage
+                                    .authorIdentityId
                                 ],
-                                message.replyPreview.authorIdentityId,
+                                entry.threadSummary.lastMessage.authorIdentityId,
                               )
                             : undefined
-                      }
-                      replyPreview={
-                        replyMessage?.content ?? message.replyPreview?.content
-                      }
-                      showAvatar={entry.endsAuthorRun}
-                      threadAuthorName={
-                        entry.threadSummary?.lastMessage
-                          ? memberPrimaryName(
-                              memberIdentities[
-                                entry.threadSummary.lastMessage
-                                  .authorIdentityId
-                              ],
-                              entry.threadSummary.lastMessage.authorIdentityId,
-                            )
-                          : undefined
-                      }
-                      threadAuthorPicture={
-                        entry.threadSummary?.lastMessage
-                          ? memberPictures[
-                              entry.threadSummary.lastMessage.authorIdentityId
-                            ]
-                          : undefined
-                      }
-                      threadCount={entry.threadSummary?.count}
-                    />
+                        }
+                        threadAuthorPicture={
+                          entry.threadSummary?.lastMessage
+                            ? memberPictures[
+                                entry.threadSummary.lastMessage.authorIdentityId
+                              ]
+                            : undefined
+                        }
+                        threadCount={entry.threadSummary?.count}
+                      />
+                    </div>
                   </div>
                 </Fragment>
               );

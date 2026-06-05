@@ -24,6 +24,7 @@ import { PinIcon, ThreadIcon } from './messageActionIcons';
 import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import {
   AttachmentCard,
+  imageAttachmentAlbumWidthClass,
   ImageAttachmentAlbum,
   isImageAttachment,
 } from './messageAttachments';
@@ -272,6 +273,8 @@ export function MessageBubble({
                         ? 'rounded-2xl bg-transparent p-0'
                         : cx(
                             'rounded-2xl p-2.5',
+                            imageAttachments.length > 0 &&
+                              imageAttachmentAlbumWidthClass,
                             mine
                               ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
                               : mentionHighlighted
@@ -297,6 +300,7 @@ export function MessageBubble({
                   <div className="grid gap-2">
                     {imageAttachments.length > 0 && (
                       <ImageAttachmentAlbum
+                        contained={!imageOnlyMessage}
                         items={imageAttachments}
                         mine={mine}
                         onOpen={(images, index) =>

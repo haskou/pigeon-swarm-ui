@@ -21,6 +21,7 @@ import { IdentityId } from '../../../identities/domain/value-objects/IdentityId'
 import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import { DialogHeader } from './communityDialogPrimitives';
@@ -60,7 +61,9 @@ export function ManageCommunityDialog({
   onCommunityUpdated,
   session,
 }: ManageCommunityDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
@@ -978,15 +981,21 @@ export function ManageCommunityDialog({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl">
-        <DialogHeader title={copy.communities.manage} onClose={onClose} />
+      <section
+        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
+        data-state={transitionState}
+      >
+        <DialogHeader title={copy.communities.manage} onClose={close} />
         <CommunityManagementContextHeader community={community} />
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
           <CommunitySettingsNavigation

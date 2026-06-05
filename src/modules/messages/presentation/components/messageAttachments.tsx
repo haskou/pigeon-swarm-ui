@@ -12,7 +12,7 @@ import { MessageAttachmentPreview } from './MessageAttachmentPreview';
 import { visibleImageAlbumItems } from './visibleImageAlbumItems';
 
 const previewViewportMargin = 360;
-const albumWidthClass =
+export const imageAttachmentAlbumWidthClass =
   'w-[min(72vw,24rem)] max-w-full sm:w-[min(42vw,24rem)]';
 
 export type IndexedAttachment = {
@@ -21,11 +21,13 @@ export type IndexedAttachment = {
 };
 
 export function ImageAttachmentAlbum({
+  contained = false,
   items,
   mine,
   onOpen,
   onPreview,
 }: {
+  contained?: boolean;
   items: IndexedAttachment[];
   mine: boolean;
   onOpen: (images: LightboxImage[], index: number) => void;
@@ -136,7 +138,7 @@ export function ImageAttachmentAlbum({
       ref={albumRef}
       className={cx(
         'overflow-hidden rounded-2xl border',
-        albumWidthClass,
+        contained ? 'w-full max-w-full' : imageAttachmentAlbumWidthClass,
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
@@ -187,17 +189,6 @@ export function ImageAttachmentAlbum({
           );
         })}
       </div>
-      {progress && (
-        <div className="px-3 py-2 text-xs font-black opacity-75">
-          {progress.percent}%
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-fuchsia-400"
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { ConversationPeer } from '../../domain/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -49,7 +50,9 @@ export function CreateConversationDialog({
   onCreated,
   session,
 }: CreateConversationDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [mode, setMode] = useState<ConversationMode>('direct');
   const [peerIdentityId, setPeerIdentityId] = useState('');
@@ -370,10 +373,14 @@ export function CreateConversationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-50 grid place-items-stretch bg-black/60 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-2xl sm:p-6"
+        className="app-overlay-surface glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-2xl sm:p-6"
+        data-state={transitionState}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -386,7 +393,7 @@ export function CreateConversationDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label={copy.dialog.close}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
           >

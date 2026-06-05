@@ -2,6 +2,7 @@ import type { ChatMessage } from '../../../../shared/domain/pigeonResources.type
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 export function RawMessageDialog({
   message,
@@ -10,22 +11,30 @@ export function RawMessageDialog({
   message: ChatMessage;
   onClose: () => void;
 }) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md"
+      data-state={state}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40">
+      <section
+        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40"
+        data-state={state}
+      >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-2xl font-black">{copy.messages.rawTitle}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
             aria-label={copy.dialog.close}
           >

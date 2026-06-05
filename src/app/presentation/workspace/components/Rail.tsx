@@ -21,6 +21,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { publicFileObjectUrl } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
   type InstallState,
   useInstallPrompt,
@@ -457,6 +458,7 @@ function CommunityRailMenu({
   onNotificationMuteToggle?: () => void;
   onNotificationSettingsOpen?: () => void;
 }) {
+  const { close, state } = useCloseTransition(onClose);
   const closeFromBackdrop = (event: MouseEvent<HTMLButtonElement>) => {
     if (performance.now() < ignoreBackdropClicksUntil) {
       event.preventDefault();
@@ -465,7 +467,7 @@ function CommunityRailMenu({
       return;
     }
 
-    onClose();
+    close();
   };
   const menuStyle = {
     left,
@@ -480,11 +482,12 @@ function CommunityRailMenu({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[80] cursor-default select-none"
+        className="app-overlay-scrim fixed inset-0 z-[80] cursor-default select-none"
+        data-state={state}
         onClick={closeFromBackdrop}
         onContextMenu={(event) => {
           event.preventDefault();
-          onClose();
+          close();
         }}
         style={{
           WebkitTouchCallout: 'none',
@@ -494,7 +497,8 @@ function CommunityRailMenu({
         aria-label={copy.dialog.close}
       />
       <section
-        className="message-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        className="message-context-menu app-context-menu fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-56 max-w-[calc(100vw-1rem)] select-none overflow-y-auto rounded-2xl border border-white/10 bg-[#15172d] p-1 text-left text-sm shadow-2xl shadow-black/40"
+        data-state={state}
         style={menuStyle}
         onContextMenu={(event) => event.preventDefault()}
         aria-label={communityName}
@@ -505,8 +509,14 @@ function CommunityRailMenu({
           <NotificationScopeMenuActions
             muteLabel={copy.notifications.muteCommunity}
             notificationSetting={notificationSetting}
-            onNotificationMuteToggle={onNotificationMuteToggle}
-            onNotificationSettingsOpen={onNotificationSettingsOpen}
+            onNotificationMuteToggle={() => {
+              onNotificationMuteToggle();
+              close();
+            }}
+            onNotificationSettingsOpen={() => {
+              onNotificationSettingsOpen();
+              close();
+            }}
           />
         ) : null}
         {onCommunityLeave ? (
@@ -516,7 +526,10 @@ function CommunityRailMenu({
             ) : null}
             <button
               type="button"
-              onClick={onCommunityLeave}
+              onClick={() => {
+                onCommunityLeave();
+                close();
+              }}
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left font-black text-rose-200 transition hover:bg-rose-500/15 active:bg-rose-400/25 active:text-white"
             >
               <span className="grid h-5 w-5 shrink-0 place-items-center text-rose-100/70">

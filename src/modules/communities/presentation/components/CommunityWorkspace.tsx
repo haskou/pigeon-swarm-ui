@@ -2053,17 +2053,22 @@ export function CommunityWorkspace({
 
   return (
     <>
-      {mobileSidebarOpen && (
-        <button
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-          onClick={onMobileSidebarClose}
-          aria-label={copy.workspace.closeSidebar}
-        />
-      )}
+      <button
+        className={cx(
+          'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
+          mobileSidebarOpen
+            ? 'opacity-100'
+            : 'pointer-events-none opacity-0',
+        )}
+        onClick={onMobileSidebarClose}
+        aria-label={copy.workspace.closeSidebar}
+      />
       <aside
         className={cx(
-          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 w-[92vw] max-w-[430px] p-0 transition sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none',
-          mobileSidebarOpen ? 'block' : 'hidden lg:block',
+          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 block w-[92vw] max-w-[430px] p-0 transition-transform duration-200 ease-out sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:translate-x-0',
+          mobileSidebarOpen
+            ? 'translate-x-0'
+            : 'pointer-events-none -translate-x-full lg:pointer-events-auto',
         )}
       >
         <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">

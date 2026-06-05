@@ -8,6 +8,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import type {
   IdentityNames,
   IdentityPictures,
@@ -61,7 +62,9 @@ export function NotificationsPanel({
   onDecline,
   onDeclineMembershipRequest,
 }: NotificationsPanelProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const pendingMembershipRequests = membershipRequests.filter(
     (request) => request.status === 'pending',
@@ -78,11 +81,13 @@ export function NotificationsPanel({
 
   return (
     <div
-      className="app-safe-area-popup fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
-      onClick={onClose}
+      className="app-overlay-scrim app-safe-area-popup fixed inset-0 z-50 bg-black/45 p-3 backdrop-blur-sm sm:p-5 lg:bg-transparent lg:backdrop-blur-none"
+      data-state={state}
+      onClick={close}
     >
       <section
-        className="glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        className="app-overlay-surface glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        data-state={state}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
@@ -96,7 +101,7 @@ export function NotificationsPanel({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
             aria-label={copy.notifications.close}
           >

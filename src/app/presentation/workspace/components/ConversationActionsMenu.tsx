@@ -9,6 +9,7 @@ import type {
 import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 interface ConversationActionsMenuProps {
   activeConversation: ConversationResource;
@@ -52,21 +53,27 @@ export function ConversationActionsMenu({
   onOpenPins,
   onStartCall,
 }: ConversationActionsMenuProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   return (
     <>
       <button
         type="button"
-        className="fixed inset-0 z-30 cursor-default"
-        onClick={onClose}
+        className="app-overlay-scrim fixed inset-0 z-30 cursor-default"
+        data-state={state}
+        onClick={close}
         onContextMenu={(event) => {
           event.preventDefault();
-          onClose();
+          close();
         }}
         aria-label={copy.dialog.close}
       />
-      <div className="absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40">
+      <div
+        className="app-context-menu absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        data-state={state}
+      >
         {onStartCall && !isGroupConversation ? (
           <ConversationHeaderMenuAction
             icon={<CallMenuIcon />}
@@ -81,7 +88,7 @@ export function ConversationActionsMenu({
                   activeConversationName ??
                   activeConversation.id,
               });
-              onClose();
+              close();
             }}
           />
         ) : null}
@@ -90,7 +97,7 @@ export function ConversationActionsMenu({
           label={copy.messages.viewPinned}
           onClick={() => {
             onOpenPins();
-            onClose();
+            close();
           }}
           className="sm:hidden"
         />
@@ -99,11 +106,11 @@ export function ConversationActionsMenu({
           notificationSetting={notificationSetting}
           onNotificationMuteToggle={() => {
             onNotificationMuteToggle();
-            onClose();
+            close();
           }}
           onNotificationSettingsOpen={() => {
             onNotificationSettingsOpen();
-            onClose();
+            close();
           }}
         />
         <ConversationHeaderMenuAction
@@ -111,7 +118,7 @@ export function ConversationActionsMenu({
           label={copy.chat.viewData}
           onClick={() => {
             onConversationDataOpen();
-            onClose();
+            close();
           }}
         />
         {canShareConversationKey ? (
@@ -124,7 +131,7 @@ export function ConversationActionsMenu({
             }
             onClick={() => {
               onConversationKeyOpen();
-              onClose();
+              close();
             }}
           />
         ) : null}
@@ -134,7 +141,7 @@ export function ConversationActionsMenu({
             label={copy.chat.invite}
             onClick={() => {
               onGroupInviteOpen();
-              onClose();
+              close();
             }}
           />
         ) : null}
