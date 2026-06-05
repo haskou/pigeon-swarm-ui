@@ -21,6 +21,7 @@ export type CommunityMemberListItem = {
 };
 
 export function CommunityMembersPanel({
+  animationScopeKey,
   canInvite,
   community,
   members,
@@ -30,6 +31,7 @@ export function CommunityMembersPanel({
   openMobile,
   presenceByIdentityId,
 }: {
+  animationScopeKey?: string;
   canInvite: boolean;
   community: Community;
   members: CommunityMemberListItem[];
@@ -49,6 +51,7 @@ export function CommunityMembersPanel({
   return (
     <>
       <MembersAside
+        animationScopeKey={animationScopeKey}
         canInvite={canInvite}
         community={community}
         members={members}
@@ -66,6 +69,7 @@ export function CommunityMembersPanel({
             aria-label={copy.dialog.close}
           />
           <MembersAside
+            animationScopeKey={animationScopeKey}
             canInvite={canInvite}
             community={community}
             members={members}
@@ -82,6 +86,7 @@ export function CommunityMembersPanel({
 }
 
 function MembersAside({
+  animationScopeKey,
   canInvite,
   community,
   members,
@@ -91,6 +96,7 @@ function MembersAside({
   transitionState = 'open',
   variant,
 }: {
+  animationScopeKey?: string;
   canInvite: boolean;
   community: Community;
   members: CommunityMemberListItem[];
@@ -120,6 +126,7 @@ function MembersAside({
             : undefined
         }
         emptyLabel={copy.communities.noMatchingMembers}
+        animationScopeKey={animationScopeKey}
         items={members.map((member) => ({
           ...member,
           owner: member.identityId === community.ownerIdentityId,

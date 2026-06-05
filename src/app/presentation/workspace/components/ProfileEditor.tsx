@@ -255,7 +255,7 @@ export function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:p-6"
+        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl"
         data-state={transitionState}
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">

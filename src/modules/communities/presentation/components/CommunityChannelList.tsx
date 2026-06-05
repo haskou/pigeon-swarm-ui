@@ -23,12 +23,17 @@ import { ClearableSearchInput } from '../../../../shared/presentation/components
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
+  sidePanelListEnterClassName,
+  sidePanelListEnterStyle,
+} from '../../../../shared/presentation/sidePanelListMotion';
+import {
   VoiceChannelButton,
   type VoiceParticipantView,
 } from './VoiceParticipantView';
 
 export function CommunityChannelList({
   activeVoiceChannelId,
+  animationScopeKey,
   channelSearch,
   channelUnreadCounts,
   onChannelSearchChange,
@@ -50,6 +55,7 @@ export function CommunityChannelList({
   voiceParticipantsByChannelId,
 }: {
   activeVoiceChannelId: null | string;
+  animationScopeKey?: string;
   channelSearch: string;
   channelUnreadCounts: Record<string, number>;
   onChannelSearchChange: (value: string) => void;
@@ -194,8 +200,12 @@ export function CommunityChannelList({
                 onToggle={() => setShowMutedChannels((current) => !current)}
               />
             )}
-            {displayedTextChannels.map((channel) => (
-              <div key={channel.id}>
+            {displayedTextChannels.map((channel, index) => (
+              <div
+                key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
+                className={sidePanelListEnterClassName('left')}
+                style={sidePanelListEnterStyle(index)}
+              >
                 <TextChannelButton
                   active={
                     selectedChannelId === channel.id &&
@@ -224,13 +234,14 @@ export function CommunityChannelList({
                       .sort(
                         (left, right) => right.lastReplyAt - left.lastReplyAt,
                       )
-                      .map((thread) => (
+                      .map((thread, threadIndex) => (
                         <ThreadChannelButton
-                          key={thread.rootMessageId}
+                          key={`${animationScopeKey ?? 'channels'}:${channel.id}:${thread.rootMessageId}`}
                           active={
                             selectedChannelId === channel.id &&
                             selectedThreadRootMessageId === thread.rootMessageId
                           }
+                          enterIndex={index + threadIndex + 1}
                           label={
                             threadLabelByRootMessageId?.[
                               thread.rootMessageId
@@ -250,17 +261,24 @@ export function CommunityChannelList({
                   {copy.calls.voiceChannels}
                 </div>
                 <div className="space-y-0.5">
-                  {displayedVoiceChannels.map((channel) => (
-                    <VoiceChannelButton
-                      key={channel.id}
-                      active={activeVoiceChannelId === channel.id}
-                      channel={channel}
-                      onJoin={onVoiceChannelJoin}
-                      onParticipantClick={onVoiceParticipantClick}
-                      participants={
-                        voiceParticipantsByChannelId.get(channel.id) ?? []
-                      }
-                    />
+                  {displayedVoiceChannels.map((channel, index) => (
+                    <div
+                      key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
+                      className={sidePanelListEnterClassName('left')}
+                      style={sidePanelListEnterStyle(
+                        displayedTextChannels.length + index,
+                      )}
+                    >
+                      <VoiceChannelButton
+                        active={activeVoiceChannelId === channel.id}
+                        channel={channel}
+                        onJoin={onVoiceChannelJoin}
+                        onParticipantClick={onVoiceParticipantClick}
+                        participants={
+                          voiceParticipantsByChannelId.get(channel.id) ?? []
+                        }
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -335,11 +353,13 @@ function orderedVisibleChannels<T extends { id: string }>(
 
 function ThreadChannelButton({
   active,
+  enterIndex,
   label,
   onSelect,
   replyCount,
 }: {
   active: boolean;
+  enterIndex: number;
   label: string;
   onSelect: () => void;
   replyCount: number;
@@ -348,7 +368,9 @@ function ThreadChannelButton({
     <button
       type="button"
       onClick={onSelect}
+      style={sidePanelListEnterStyle(enterIndex)}
       className={cx(
+        sidePanelListEnterClassName('left'),
         'flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-black transition',
         active
           ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'

@@ -7,6 +7,9 @@ import type { PollResource } from '../../../../shared/domain/pigeonResources.typ
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 
+const TOUCH_TAP_MAX_MS = 450;
+const TOUCH_TAP_MAX_DISTANCE = 12;
+
 export function PollCard({
   currentIdentityId,
   onClose,
@@ -32,12 +35,15 @@ export function PollCard({
     currentVote?.optionIds ?? [],
   );
   const [busy, setBusy] = useState(false);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchTapRef = useRef<{
+    startedAt: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     setSelectedOptionIds(currentVote?.optionIds ?? []);
   }, [currentVote?.optionIds]);
-  useEffect(() => clearLongPressTimer, []);
 
   const toggleOption = (optionId: string) => {
     setSelectedOptionIds((current) =>
@@ -77,11 +83,8 @@ export function PollCard({
       setBusy(false);
     }
   };
-  const clearLongPressTimer = () => {
-    if (!longPressTimerRef.current) return;
-
-    clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
+  const clearTouchTap = () => {
+    touchTapRef.current = null;
   };
   const openContextMenu = (x: number, y: number) => {
     if (!onMenuOpen) return;
@@ -90,32 +93,68 @@ export function PollCard({
   };
   const handleContextMenu = (event: MouseEvent) => {
     if (!onMenuOpen) return;
+    if (isCoarsePointer()) return;
 
     event.preventDefault();
     openContextMenu(event.clientX, event.clientY);
   };
+  const handleClick = () => {
+    clearTouchTap();
+  };
   const handlePointerDown = (event: PointerEvent) => {
     if (event.pointerType !== 'touch' || !onMenuOpen) return;
 
-    clearLongPressTimer();
-    longPressTimerRef.current = setTimeout(() => {
-      openContextMenu(event.clientX, event.clientY);
-    }, 550);
+    touchTapRef.current = {
+      startedAt: Date.now(),
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+  const handlePointerMove = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') return;
+
+    const touchTap = touchTapRef.current;
+    if (!touchTap) return;
+
+    if (touchDistance(touchTap, event) > TOUCH_TAP_MAX_DISTANCE) {
+      clearTouchTap();
+    }
+  };
+  const handlePointerLeave = (event: PointerEvent) => {
+    if (event.pointerType !== 'touch') clearTouchTap();
+  };
+  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'touch') {
+      clearTouchTap();
+      return;
+    }
+
+    if (!onMenuOpen || isInteractivePollTarget(event)) {
+      clearTouchTap();
+      return;
+    }
+
+    if (!isTouchTap(touchTapRef.current, event)) {
+      clearTouchTap();
+      return;
+    }
+
+    clearTouchTap();
+    event.preventDefault();
+    openContextMenu(event.clientX, event.clientY);
   };
 
   return (
     <div
+      onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onPointerCancel={clearLongPressTimer}
+      onPointerCancel={clearTouchTap}
       onPointerDown={handlePointerDown}
-      onPointerLeave={clearLongPressTimer}
-      onPointerMove={clearLongPressTimer}
-      onPointerUp={clearLongPressTimer}
-      style={{
-        WebkitTouchCallout: 'none',
-      }}
+      onPointerLeave={handlePointerLeave}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
       className={cx(
-        'w-full max-w-xl rounded-2xl border p-3 text-white shadow-xl [@media(pointer:coarse)]:select-none sm:p-4',
+        'w-full max-w-xl select-text rounded-2xl border p-3 text-white shadow-xl sm:p-4',
         mine
           ? 'border-[#6f99aa]/35 bg-[#274279] shadow-[#102938]/25'
           : 'border-white/10 bg-black/25 shadow-black/20',
@@ -241,4 +280,44 @@ export function countPollVotes(poll: PollResource): Record<string, number> {
   }
 
   return counts;
+}
+
+function isCoarsePointer(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(pointer: coarse)').matches
+  );
+}
+
+function isInteractivePollTarget(
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
+): boolean {
+  const target = event.target;
+  const interactiveElement =
+    target instanceof HTMLElement
+      ? target.closest('a,button,input,textarea,select,label,[role="button"]')
+      : null;
+
+  return Boolean(
+    interactiveElement && interactiveElement !== event.currentTarget,
+  );
+}
+
+function isTouchTap(
+  touchTap: { startedAt: number; x: number; y: number } | null,
+  event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>,
+): boolean {
+  if (!touchTap) return false;
+
+  return (
+    Date.now() - touchTap.startedAt <= TOUCH_TAP_MAX_MS &&
+    touchDistance(touchTap, event) <= TOUCH_TAP_MAX_DISTANCE
+  );
+}
+
+function touchDistance(
+  touchTap: { x: number; y: number },
+  event: MouseEvent<HTMLElement> | PointerEvent,
+): number {
+  return Math.hypot(event.clientX - touchTap.x, event.clientY - touchTap.y);
 }

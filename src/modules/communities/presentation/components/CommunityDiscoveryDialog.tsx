@@ -142,7 +142,7 @@ export function CommunityDiscoveryDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-screen min-h-screen w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:min-h-0 sm:max-h-[88vh] sm:max-w-4xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-auto sm:min-h-0 sm:max-h-[88vh] sm:max-w-4xl sm:rounded-2xl"
         data-state={transitionState}
       >
         <div className="flex items-start justify-between gap-4">

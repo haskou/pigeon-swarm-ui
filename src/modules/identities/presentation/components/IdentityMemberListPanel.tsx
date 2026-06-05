@@ -16,6 +16,10 @@ import {
 } from '../view-models/identityDisplay';
 import { PresenceStatusDot } from './presenceStatusDot';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import {
+  sidePanelListEnterClassName,
+  sidePanelListEnterStyle,
+} from '../../../../shared/presentation/sidePanelListMotion';
 
 export type IdentityMemberListItem = {
   identity?: IdentityResource;
@@ -28,6 +32,7 @@ export type IdentityMemberListItem = {
 
 export function IdentityMemberListPanel({
   action,
+  animationScopeKey,
   className,
   emptyLabel,
   items,
@@ -40,6 +45,7 @@ export function IdentityMemberListPanel({
     label: string;
     onClick: () => void;
   };
+  animationScopeKey?: string;
   className?: string;
   emptyLabel: string;
   items: IdentityMemberListItem[];
@@ -64,18 +70,23 @@ export function IdentityMemberListPanel({
       )}
       <div
         className={cx(
-          'min-h-0 flex-1 space-y-2 overflow-y-auto pr-1',
+          'min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto pr-1',
           action && 'mt-4',
           listClassName,
         )}
       >
-        {items.map((item) => (
-          <IdentityMemberRow
-            item={item}
-            key={item.identityId}
-            onClick={(event) => onItemClick(item, event)}
-            ownerLabel={ownerLabel}
-          />
+        {items.map((item, index) => (
+          <div
+            className={cx(sidePanelListEnterClassName('right'), 'w-full')}
+            key={`${animationScopeKey ?? 'members'}:${item.identityId}`}
+            style={sidePanelListEnterStyle(index)}
+          >
+            <IdentityMemberRow
+              item={item}
+              onClick={(event) => onItemClick(item, event)}
+              ownerLabel={ownerLabel}
+            />
+          </div>
         ))}
         {items.length === 0 && (
           <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">
@@ -96,9 +107,32 @@ function IdentityMemberRow({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   ownerLabel?: string;
 }) {
-  const displayName = item.name ?? memberName(item.identity, item.identityId);
+  const loadingProfile = !item.identity && !item.name;
+  const displayName = loadingProfile
+    ? ''
+    : item.name ?? memberName(item.identity, item.identityId);
   const handle = item.identity?.profile.handle?.trim();
   const bannerUrl = useIdentityBannerUrl(item.identity);
+
+  if (loadingProfile) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
+      >
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-white/8 via-white/4 to-transparent"
+        />
+        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-white/12" />
+        <span className="relative min-w-0 flex-1">
+          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-white/14" />
+          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-white/10" />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button

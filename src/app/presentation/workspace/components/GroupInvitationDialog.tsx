@@ -34,7 +34,7 @@ export function GroupInvitationDialog({
       />
       <form
         onSubmit={onSubmit}
-        className="glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none p-5 shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-3xl sm:rounded-2xl"
+        className="app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-3xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

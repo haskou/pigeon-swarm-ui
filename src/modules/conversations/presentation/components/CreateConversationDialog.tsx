@@ -379,7 +379,7 @@ export function CreateConversationDialog({
     >
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface glass-panel-strong flex min-h-screen w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-xl sm:rounded-2xl sm:p-6"
+        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong flex h-[100dvh] w-full flex-col justify-center rounded-none [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-auto sm:min-h-0 sm:max-w-xl sm:rounded-2xl"
         data-state={transitionState}
       >
         <div className="flex items-start justify-between gap-4">
