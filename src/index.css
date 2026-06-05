@@ -156,7 +156,6 @@ input[type='submit'] {
 }
 
 .app-safe-area-panel {
-  padding-bottom: env(safe-area-inset-bottom);
   padding-top: env(safe-area-inset-top);
 }
 
