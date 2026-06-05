@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
 import { cx } from '../../../../shared/presentation/cx';
-import { ImageLightbox, type LightboxImage } from './imageLightbox';
+import type { LightboxImage } from './imageLightbox';
+import { LazyImageLightbox } from './LazyImageLightbox';
 
 interface ComposerAttachment {
   file: File;
@@ -93,7 +94,7 @@ export function ComposerAttachmentTray({
         ))}
       </div>
       {lightbox && (
-        <ImageLightbox
+        <LazyImageLightbox
           images={lightbox.images}
           initialIndex={lightbox.index}
           onClose={() => setLightbox(null)}

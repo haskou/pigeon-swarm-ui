@@ -4,7 +4,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { ListConversationsPort } from '../ports/ListConversationsPort';
 
-import { MessageCollection } from '../../../messages/domain/MessageCollection';
 import { ConversationTimeline } from '../../domain/ConversationTimeline';
 import { ListConversationsMessage } from './messages/ListConversationsMessage';
 
@@ -14,41 +13,61 @@ export class ListConversations {
   public async list(
     message: ListConversationsMessage,
   ): Promise<ConversationResource[]> {
-    const session = message.getSession();
-
     return ConversationTimeline.sortByLatestMessage(
-      await this.withLatestMessageActivity(
-        session,
-        await this.conversations.listConversations(session),
+      await this.withRecoveredActivityTimestamps(
+        message.getSession(),
+        await this.conversations.listConversations(message.getSession()),
       ),
     );
   }
 
-  private async withLatestMessageActivity(
+  private async withRecoveredActivityTimestamps(
     session: Session,
     conversations: ConversationResource[],
   ): Promise<ConversationResource[]> {
-    return await Promise.all(
-      conversations.map(async (conversation) => {
-        if (conversation.latestMessageAt) return conversation;
-
-        try {
-          const { messages } = await this.conversations.loadMessages(
-            session,
-            conversation.id,
-            null,
-            1,
-          );
-          const latestMessageAt =
-            MessageCollection.latestDeliveredTimestamp(messages);
-
-          return latestMessageAt !== undefined
-            ? { ...conversation, latestMessageAt }
-            : conversation;
-        } catch {
-          return conversation;
-        }
-      }),
+    const conversationsWithoutTimestamp = conversations.filter(
+      (conversation) => conversation.latestMessageAt === undefined,
     );
+
+    if (conversationsWithoutTimestamp.length === 0) return conversations;
+
+    const recoveredTimestamps = new Map(
+      await Promise.all(
+        conversationsWithoutTimestamp.map(
+          async (
+            conversation,
+          ): Promise<readonly [string, number | undefined]> => [
+            conversation.id,
+            await this.latestMessageAt(session, conversation.id),
+          ],
+        ),
+      ),
+    );
+
+    return conversations.map((conversation) => {
+      const latestMessageAt = recoveredTimestamps.get(conversation.id);
+
+      return latestMessageAt === undefined
+        ? conversation
+        : { ...conversation, latestMessageAt };
+    });
+  }
+
+  private async latestMessageAt(
+    session: Session,
+    conversationId: string,
+  ): Promise<number | undefined> {
+    try {
+      const latestMessages = await this.conversations.loadMessages(
+        session,
+        conversationId,
+        null,
+        { limit: 1 },
+      );
+
+      return latestMessages.messages[0]?.raw.createdAt;
+    } catch {
+      return undefined;
+    }
   }
 }

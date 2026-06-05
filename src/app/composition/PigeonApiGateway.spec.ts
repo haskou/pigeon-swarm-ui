@@ -1704,6 +1704,81 @@ describe(PigeonApiGateway.name, () => {
     expect(signedPassword).toBe(session.password);
   });
 
+  it('caches identity reads during the startup window', async () => {
+    const identity = {
+      id: 'identity-1',
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+    const http = {
+      request: jest.fn().mockResolvedValue(identity),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/identities/identity-1');
+  });
+
+  it('refreshes the identity cache after updating the profile', async () => {
+    const currentIdentity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      id: 'identity-1',
+      identityExternalIdentifier: 'current-identity-cid',
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      signature: 'current-signature',
+      timestamp: 1,
+      version: 7,
+    } satisfies IdentityResource;
+    const updatedIdentity = {
+      ...currentIdentity,
+      identityExternalIdentifier: 'next-identity-cid',
+      profile: { name: 'Ada Next' },
+      version: 8,
+    } satisfies IdentityResource;
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce(currentIdentity)
+        .mockResolvedValueOnce(updatedIdentity),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      encryptedKeyPair: {
+        sign: jest.fn().mockResolvedValue({
+          toString: () => 'identity-signature',
+        }),
+      },
+      identity: currentIdentity,
+      keychain: { conversations: {}, version: 0 },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(
+      currentIdentity,
+    );
+    await expect(
+      gateway.updateIdentityProfile(session, { name: 'Ada Next' }),
+    ).resolves.toBe(updatedIdentity);
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(
+      updatedIdentity,
+    );
+
+    expect(http.request).toHaveBeenCalledTimes(2);
+  });
+
   it('uploads public profile files as signed binary bodies', async () => {
     const bytes = new Uint8Array([1, 2, 3]).buffer;
     const upload = {

@@ -11,6 +11,6 @@ export interface ListConversationsPort {
     session: Session,
     conversationId: string,
     before?: null | string,
-    limit?: number,
+    options?: { limit?: number; signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }>;
 }

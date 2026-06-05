@@ -5,25 +5,15 @@ import { ListConversations } from './ListConversations';
 import { ListConversationsMessage } from './messages/ListConversationsMessage';
 
 describe(ListConversations.name, () => {
-  it('orders conversations by latest loaded message when the list has no activity timestamp', async () => {
+  it('orders conversations by latest activity without loading message history', async () => {
     const session = { identity: { id: 'me' } } as unknown as Session;
+    const loadMessages = jest.fn();
     const gateway = {
       listConversations: jest.fn().mockResolvedValue([
-        { id: 'older', networkId: 'net' },
-        { id: 'newer', networkId: 'net' },
+        { id: 'older', latestMessageAt: 10, networkId: 'net' },
+        { id: 'newer', latestMessageAt: 20, networkId: 'net' },
       ]),
-      loadMessages: jest.fn((_session: Session, conversationId: string) =>
-        Promise.resolve(
-          conversationId === 'newer'
-            ? {
-                messages: [
-                  { id: '2', timestamp: 20 },
-                  { id: '1', timestamp: 5 },
-                ],
-              }
-            : { messages: [{ id: '1', timestamp: 10 }] },
-        ),
-      ),
+      loadMessages,
     } as unknown as ListConversationsPort;
 
     await expect(
@@ -34,22 +24,20 @@ describe(ListConversations.name, () => {
       { id: 'newer', latestMessageAt: 20, networkId: 'net' },
       { id: 'older', latestMessageAt: 10, networkId: 'net' },
     ]);
+    expect(loadMessages).not.toHaveBeenCalled();
   });
 
-  it('keeps conversations without readable messages in the list', async () => {
+  it('recovers latest activity for conversations without timestamps', async () => {
     const session = { identity: { id: 'me' } } as unknown as Session;
+    const loadMessages = jest.fn().mockResolvedValue({
+      messages: [{ id: 'message-1', raw: { createdAt: 30 } }],
+    });
     const gateway = {
       listConversations: jest.fn().mockResolvedValue([
-        { id: 'with-key', networkId: 'net' },
-        { id: 'without-key', networkId: 'net' },
+        { id: 'with-activity', latestMessageAt: 20, networkId: 'net' },
+        { id: 'without-timestamp', networkId: 'net' },
       ]),
-      loadMessages: jest.fn((_session: Session, conversationId: string) => {
-        if (conversationId === 'without-key') {
-          return Promise.reject(new Error('missing key'));
-        }
-
-        return Promise.resolve({ messages: [{ id: '1', timestamp: 10 }] });
-      }),
+      loadMessages,
     } as unknown as ListConversationsPort;
 
     await expect(
@@ -57,8 +45,37 @@ describe(ListConversations.name, () => {
         new ListConversationsMessage(session),
       ),
     ).resolves.toEqual([
-      { id: 'with-key', latestMessageAt: 10, networkId: 'net' },
-      { id: 'without-key', networkId: 'net' },
+      { id: 'without-timestamp', latestMessageAt: 30, networkId: 'net' },
+      { id: 'with-activity', latestMessageAt: 20, networkId: 'net' },
     ]);
+    expect(loadMessages).toHaveBeenCalledTimes(1);
+    expect(loadMessages).toHaveBeenCalledWith(
+      session,
+      'without-timestamp',
+      null,
+      { limit: 1 },
+    );
+  });
+
+  it('keeps conversations without activity timestamps when legacy recovery has no messages', async () => {
+    const session = { identity: { id: 'me' } } as unknown as Session;
+    const loadMessages = jest.fn().mockResolvedValue({ messages: [] });
+    const gateway = {
+      listConversations: jest.fn().mockResolvedValue([
+        { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
+        { id: 'without-timestamp', networkId: 'net' },
+      ]),
+      loadMessages,
+    } as unknown as ListConversationsPort;
+
+    await expect(
+      new ListConversations(gateway).list(
+        new ListConversationsMessage(session),
+      ),
+    ).resolves.toEqual([
+      { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
+      { id: 'without-timestamp', networkId: 'net' },
+    ]);
+    expect(loadMessages).toHaveBeenCalledTimes(1);
   });
 });

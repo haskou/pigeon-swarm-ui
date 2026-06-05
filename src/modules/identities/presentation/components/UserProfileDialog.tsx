@@ -16,10 +16,8 @@ import {
   publicFileObjectUrl,
 } from '../view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import {
-  ImageLightbox,
-  type LightboxImage,
-} from '../../../messages/presentation/components/imageLightbox';
+import type { LightboxImage } from '../../../messages/presentation/components/imageLightbox';
+import { LazyImageLightbox } from '../../../messages/presentation/components/LazyImageLightbox';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { PresenceStatusDot } from './presenceStatusDot';
 
@@ -291,7 +289,7 @@ export function UserProfileDialog({
         </div>
       </section>
       {lightboxImages && (
-        <ImageLightbox
+        <LazyImageLightbox
           images={lightboxImages}
           initialIndex={0}
           onClose={() => setLightboxImages(null)}

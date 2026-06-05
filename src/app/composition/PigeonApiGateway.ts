@@ -121,10 +121,16 @@ const defaultKeychain: LocalKeychain = {
 };
 
 const messageDecryptBatchSize = 8;
+const identityCacheTtlMs = 2 * 60 * 1000;
 
 type MessageLoadOptions = {
   limit?: number;
   signal?: AbortSignal;
+};
+
+type CachedIdentity = {
+  expiresAt: number;
+  identity: IdentityResource;
 };
 
 type CommunityChannelMessagePayloadInput =
@@ -274,6 +280,8 @@ export class PigeonApiGateway {
   private readonly push: PigeonPushApi;
 
   private readonly requestCache = new Map<string, Promise<unknown>>();
+
+  private readonly identityCache = new Map<string, CachedIdentity>();
 
   private readonly signer: RequestSigner;
 
@@ -1430,11 +1438,22 @@ export class PigeonApiGateway {
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.cachedRequest(`GET /identities/${identityId}`, () =>
-      this.http.request<IdentityResource>(
-        `/identities/${encodeURIComponent(identityId)}`,
-      ),
+    const normalizedIdentityId = IdentityId.normalize(identityId);
+    const cached = this.identityCache.get(normalizedIdentityId);
+
+    if (cached && Date.now() < cached.expiresAt) return cached.identity;
+
+    const identity = await this.cachedRequest(
+      `GET /identities/${normalizedIdentityId}`,
+      () =>
+        this.http.request<IdentityResource>(
+          `/identities/${encodeURIComponent(normalizedIdentityId)}`,
+        ),
     );
+
+    this.cacheIdentity(identity);
+
+    return identity;
   }
 
   public async updateIdentityProfile(
@@ -1474,10 +1493,21 @@ export class PigeonApiGateway {
       signature: signature.toString(),
     };
 
-    return await this.http.request<IdentityResource>(path, {
+    const updatedIdentity = await this.http.request<IdentityResource>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
+    });
+
+    this.cacheIdentity(updatedIdentity);
+
+    return updatedIdentity;
+  }
+
+  private cacheIdentity(identity: IdentityResource): void {
+    this.identityCache.set(IdentityId.normalize(identity.id), {
+      expiresAt: Date.now() + identityCacheTtlMs,
+      identity,
     });
   }
 
@@ -2034,6 +2064,11 @@ export class PigeonApiGateway {
     const encryptedPayload = this.encryptMessagePayload({
       content,
       conversationId,
+      eventType: threadRootMessageId
+        ? options.sticker
+          ? 'ThreadStickerMessageSent'
+          : 'ThreadMessageSent'
+        : undefined,
       key,
       linkPreview,
       messageAttachments,
@@ -2041,11 +2076,6 @@ export class PigeonApiGateway {
       session,
       sticker: options.sticker,
       threadRootMessageId,
-      eventType: threadRootMessageId
-        ? options.sticker
-          ? 'ThreadStickerMessageSent'
-          : 'ThreadMessageSent'
-        : undefined,
       timestamp,
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;

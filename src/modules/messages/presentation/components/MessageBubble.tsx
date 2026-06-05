@@ -16,7 +16,8 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
-import { ImageLightbox, type LightboxImage } from './imageLightbox';
+import type { LightboxImage } from './imageLightbox';
+import { LazyImageLightbox } from './LazyImageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
 import { PinIcon, ThreadIcon } from './messageActionIcons';
@@ -411,7 +412,7 @@ export function MessageBubble({
         )}
       </div>
       {lightbox && (
-        <ImageLightbox
+        <LazyImageLightbox
           images={lightbox.images}
           initialIndex={lightbox.index}
           loadImage={(attachment) => onAttachmentPreview(attachment)}

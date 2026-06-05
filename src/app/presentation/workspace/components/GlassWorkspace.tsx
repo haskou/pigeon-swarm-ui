@@ -116,6 +116,7 @@ import {
 } from '../useWorkspacePreferences';
 import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import {
   playAnsweredCallSound,
   playEndedCallSound,
@@ -124,7 +125,6 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { CommunityWorkspace } from '../../../../modules/communities/presentation/components/CommunityWorkspace';
 import {
   PushNotificationPrompt,
   type PushNotificationPromptState,
@@ -169,6 +169,13 @@ const Sidebar = lazy(() =>
 const WorkspaceDialogs = lazy(() =>
   import('./WorkspaceDialogs').then((module) => ({
     default: module.WorkspaceDialogs,
+  })),
+);
+const CommunityWorkspace = lazy(() =>
+  import(
+    '../../../../modules/communities/presentation/components/CommunityWorkspace'
+  ).then((module) => ({
+    default: module.CommunityWorkspace,
   })),
 );
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
@@ -524,6 +531,7 @@ export function GlassWorkspace({
   >({});
   const notifiedIncomingCallIdsRef = useRef(new Set<string>());
   const callStartupSyncIdentityRef = useRef<string | null>(null);
+  const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -572,6 +580,24 @@ export function GlassWorkspace({
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  const listCallsForWorkspace = useCallback(() => {
+    const activeRequest = callListRequestRef.current;
+
+    if (activeRequest) return activeRequest;
+
+    const request = applicationContainer
+      .listCalls(sessionRef.current)
+      .finally(() => {
+        if (callListRequestRef.current === request) {
+          callListRequestRef.current = null;
+        }
+      });
+
+    callListRequestRef.current = request;
+
+    return request;
+  }, []);
 
   useEffect(() => {
     setSeenMembershipRequestIds(
@@ -730,19 +756,22 @@ export function GlassWorkspace({
 
     let cancelled = false;
 
-    void applicationContainer
-      .listMessagePins(session, activeConversation.id)
-      .then((pins) => {
-        if (!cancelled) {
-          setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPinnedMessageIds(new Set());
-      });
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void applicationContainer
+        .listMessagePins(session, activeConversation.id)
+        .then((pins) => {
+          if (!cancelled) {
+            setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setPinnedMessageIds(new Set());
+        });
+    });
 
     return () => {
       cancelled = true;
+      cancelIdleWork();
     };
   }, [activeConversation?.id, session]);
 
@@ -1105,9 +1134,19 @@ export function GlassWorkspace({
   });
 
   useEffect(() => {
-    void ensurePwaPushSubscription(session)
-      .catch(() => undefined)
-      .finally(refreshPushPermission);
+    let cancelled = false;
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void ensurePwaPushSubscription(session)
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) refreshPushPermission();
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdleWork();
+    };
   }, [refreshPushPermission, session]);
 
   const logout = () => {
@@ -1525,7 +1564,7 @@ export function GlassWorkspace({
   const cleanupJoinedCalls = useCallback(
     async (exceptCallId?: string): Promise<void> => {
       const identityId = sessionRef.current.identity.id;
-      const calls = await applicationContainer.listCalls(sessionRef.current);
+      const calls = await listCallsForWorkspace();
       const joinedCalls = calls.filter(
         (call) =>
           call.status === 'active' &&
@@ -1546,7 +1585,11 @@ export function GlassWorkspace({
       );
       removeCurrentIdentityFromVoicePresence();
     },
-    [leaveCallResource, removeCurrentIdentityFromVoicePresence],
+    [
+      leaveCallResource,
+      listCallsForWorkspace,
+      removeCurrentIdentityFromVoicePresence,
+    ],
   );
   const leaveCurrentCallForSwitch = useCallback(async (): Promise<void> => {
     const current = activeCall;
@@ -1970,8 +2013,7 @@ export function GlassWorkspace({
 
     let cancelled = false;
 
-    void applicationContainer
-      .listCalls(session)
+    void listCallsForWorkspace()
       .then((calls) => {
         if (cancelled) return;
 
@@ -1984,7 +2026,7 @@ export function GlassWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [communityVoiceTopologyKey, session, setCommunities]);
+  }, [communityVoiceTopologyKey, listCallsForWorkspace, setCommunities]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1994,8 +2036,7 @@ export function GlassWorkspace({
 
     callStartupSyncIdentityRef.current = identityId;
 
-    void applicationContainer
-      .listCalls(session)
+    void listCallsForWorkspace()
       .then(async (calls) => {
         if (cancelled) return;
 
@@ -2035,7 +2076,12 @@ export function GlassWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [onCommunitiesReload, removeCurrentIdentityFromVoicePresence, session]);
+  }, [
+    listCallsForWorkspace,
+    onCommunitiesReload,
+    removeCurrentIdentityFromVoicePresence,
+    session.identity.id,
+  ]);
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
