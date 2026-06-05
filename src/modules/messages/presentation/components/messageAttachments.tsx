@@ -189,17 +189,6 @@ export function ImageAttachmentAlbum({
           );
         })}
       </div>
-      {progress && (
-        <div className="px-3 py-2 text-xs font-black opacity-75">
-          {progress.percent}%
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-fuchsia-400"
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
