@@ -1,5 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 
+import { useEffect, useState } from 'react';
+
 import type {
   IdentityPresence,
   IdentityResource,
@@ -8,7 +10,12 @@ import type {
 import { cx } from '../../../../shared/presentation/cx';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { shortId } from '../../../../shared/presentation/formatting';
+import {
+  identityBanner,
+  publicFileObjectUrl,
+} from '../view-models/identityDisplay';
 import { PresenceStatusDot } from './presenceStatusDot';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
 export type IdentityMemberListItem = {
   identity?: IdentityResource;
@@ -91,6 +98,7 @@ function IdentityMemberRow({
 }) {
   const displayName = item.name ?? memberName(item.identity, item.identityId);
   const handle = item.identity?.profile.handle?.trim();
+  const bannerUrl = useIdentityBannerUrl(item.identity);
 
   return (
     <button
@@ -98,6 +106,19 @@ function IdentityMemberRow({
       onClick={onClick}
       className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
     >
+      {bannerUrl && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${bannerUrl})`,
+            maskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+            WebkitMaskImage:
+              'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+          }}
+        />
+      )}
       <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
         <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
           <FallbackImage
@@ -147,4 +168,43 @@ function memberName(
   const handle = identity?.profile.handle?.trim();
 
   return handle ? `@${handle}` : shortId(identityId);
+}
+
+function useIdentityBannerUrl(identity?: IdentityResource): string | null {
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!identity?.profile.banner) {
+      setBannerUrl(null);
+
+      return;
+    }
+
+    const directBanner = identityBanner(identity);
+
+    if (directBanner) {
+      setBannerUrl(directBanner);
+
+      return;
+    }
+
+    let cancelled = false;
+    const bannerCid = identity.profile.banner.trim();
+
+    setBannerUrl(null);
+    void applicationContainer
+      .getPublicFile(bannerCid)
+      .then((content) => {
+        if (!cancelled) {
+          setBannerUrl(publicFileObjectUrl(content));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
+  return bannerUrl;
 }
