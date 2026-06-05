@@ -41,6 +41,11 @@ select {
     background: rgb(47, 48, 74);
   }
 
+  .app-safe-area-drawer-until-lg,
+  .app-safe-area-drawer-until-xl {
+    background: rgb(47, 48, 74);
+  }
+
   input,
   select,
   textarea {
