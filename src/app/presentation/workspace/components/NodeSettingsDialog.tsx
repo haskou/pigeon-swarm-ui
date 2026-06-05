@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
+import type { Peer } from '../../../../modules/networks/application/list-peers/ListPeers';
 import type {
   IdentityResource,
   IpfsReplicationStatus,
@@ -22,6 +23,7 @@ interface NodeSettingsDialogProps {
   networks: NodeNetwork[];
   onClose: () => void;
   onNetworksUpdated: () => Promise<void>;
+  peers: Peer[];
   session: Session;
 }
 
@@ -32,6 +34,7 @@ export function NodeSettingsDialog({
   node,
   onClose,
   onNetworksUpdated,
+  peers,
   session,
 }: NodeSettingsDialogProps) {
   useCloseOnEscape(onClose);
@@ -287,7 +290,7 @@ export function NodeSettingsDialog({
                   <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                     {copy.nodeSettings.owner}
                   </div>
-                  <div className="rounded-2xl bg-black/25 px-3 py-2">
+                  <div className="border-l border-white/10 py-1 pl-3">
                     <div className="truncate text-sm font-black text-white">
                       {ownerLabel}
                     </div>
@@ -464,6 +467,8 @@ export function NodeSettingsDialog({
             )}
           </div>
 
+          <PeerStatusPanel peers={peers} />
+
           {isOwner && (
             <ReplicationStatusPanel
               error={replicationError}
@@ -601,11 +606,101 @@ function ServerField({ label, value }: { label: string; value: string }) {
       <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
         {label}
       </div>
-      <div className="truncate rounded-2xl bg-black/25 px-3 py-2 text-sm text-white/70">
+      <div className="truncate border-l border-white/10 py-1 pl-3 text-sm text-white/70">
         {value}
       </div>
     </div>
   );
+}
+
+function PeerStatusPanel({ peers }: { peers: Peer[] }) {
+  return (
+    <section className="border-t border-white/10 p-5">
+      <div className="mb-4">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
+          {copy.peers.title}
+        </div>
+        <p className="mt-1 text-sm text-white/50">{copy.peers.body}</p>
+      </div>
+      {peers.length === 0 ? (
+        <div className="border-l border-white/10 py-1 pl-3 text-sm text-white/55">
+          {copy.peers.empty}
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {peers.map((peer) => (
+            <PeerSummary key={peer.id} peer={peer} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PeerSummary({ peer }: { peer: Peer }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/20 p-3 text-xs">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-black text-white">
+            {copy.peers.node} · {shortId(peer.id)}
+          </div>
+          <div className="mt-1 truncate text-white/40" title={peer.id}>
+            {peer.id}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-fuchsia-500/15 px-2 py-1 font-black text-fuchsia-100">
+          {formatPeerLastSeen(peer.lastSeenAt)}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2">
+        <PeerField
+          label={copy.peers.owner}
+          value={peer.owner ? shortId(peer.owner) : copy.peers.unclaimed}
+          title={peer.owner}
+        />
+        <PeerField
+          label={copy.peers.networks}
+          value={
+            peer.networks.length > 0
+              ? peer.networks.map((network) => network.name).join(', ')
+              : copy.peers.noNetworks
+          }
+        />
+      </div>
+    </article>
+  );
+}
+
+function PeerField({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl bg-white/6 px-3 py-2">
+      <div className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-white/65" title={title ?? value}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function formatPeerLastSeen(lastSeenAt: number): string {
+  const elapsedMs = Math.max(0, Date.now() - lastSeenAt);
+  const elapsedMinutes = Math.floor(elapsedMs / 60000);
+
+  if (elapsedMinutes <= 0) return copy.peers.justNow;
+  if (elapsedMinutes === 1) return copy.peers.minuteAgo;
+
+  return copy.peers.minutesAgo.replace('{count}', String(elapsedMinutes));
 }
 
 function ReplicationStatusPanel({

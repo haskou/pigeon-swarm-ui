@@ -11,6 +11,7 @@ import type {
   Community,
   CommunityMembershipRequest,
   ConversationResource,
+  IdentityPresence,
   IdentityResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
@@ -90,6 +91,7 @@ const RealtimeEventsDialog = lazy(() =>
 
 interface WorkspaceDialogsProps {
   activeConversation?: ConversationResource;
+  activeConversationPeerIdentityId?: string;
   archiveNotification: (notificationId: string) => void;
   communities: Community[];
   communityAvatarUrls: Record<string, string>;
@@ -122,6 +124,7 @@ interface WorkspaceDialogsProps {
   notificationSettingsTarget: NotificationScopeSettingsTarget | null;
   notificationsOpen: boolean;
   peers: Peer[];
+  presenceByIdentityId: Record<string, IdentityPresence>;
   rawMessage: ChatMessage | null;
   realtimeEventLog: RealtimeDomainEvent[];
   realtimeEventsOpen: boolean;
@@ -147,6 +150,12 @@ interface WorkspaceDialogsProps {
     nextSession: Session,
     conversation: ConversationResource,
   ) => void;
+  onGroupInviteOpen: () => void;
+  onOpenConversationWithIdentity?: (
+    identityId: string,
+    identity?: IdentityResource,
+    networkId?: string,
+  ) => Promise<void>;
   onDeclineIncomingCall: () => void;
   onDeclineMembershipRequest: (requestId: string) => void;
   onAcceptMembershipRequest: (requestId: string) => void;
@@ -239,9 +248,19 @@ function MobileInspectorDialog(
           className="h-full overflow-y-auto"
           session={props.session}
           activeConversation={props.activeConversation}
-          loadedMessageCount={props.messages.length}
+          activeConversationPeerIdentityId={
+            props.activeConversationPeerIdentityId
+          }
+          identityNames={props.identityNames}
+          identityPictures={props.identityPictures}
+          identityProfiles={props.identityProfiles}
+          nodeNetworks={props.nodeNetworks}
           onClose={props.onCloseInspector}
-          peers={props.peers}
+          onGroupInviteOpen={props.onGroupInviteOpen}
+          onOpenConversationWithIdentity={
+            props.onOpenConversationWithIdentity
+          }
+          presenceByIdentityId={props.presenceByIdentityId}
         />
       </div>
     </>
@@ -470,6 +489,7 @@ function NodeSettingsOverlay(
         node={props.node}
         onClose={props.onCloseNodeSettings}
         onNetworksUpdated={props.onNetworksUpdated}
+        peers={props.peers}
         session={props.session}
       />
     </Suspense>

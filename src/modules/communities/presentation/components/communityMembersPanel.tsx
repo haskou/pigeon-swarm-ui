@@ -8,7 +8,10 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { MemberRow } from './MemberRow';
+import {
+  IdentityMemberListPanel,
+  type IdentityMemberListItem,
+} from '../../../identities/presentation/components/IdentityMemberListPanel';
 
 export type CommunityMemberListItem = {
   identity?: IdentityResource;
@@ -100,31 +103,24 @@ function MembersAside({
 
   return (
     <aside className={className}>
-      {canInvite && (
-        <button
-          type="button"
-          onClick={onAddMember}
-          className="mb-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-        >
-          {copy.communities.addMember}
-        </button>
-      )}
-      <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-        {copy.communities.members}
-      </div>
-      <div className="space-y-2">
-        {members.map((member) => (
-          <MemberRow
-            key={member.identityId}
-            identity={member.identity}
-            identityId={member.identityId}
-            onClick={(event) => onMemberClick(member, event)}
-            owner={member.identityId === community.ownerIdentityId}
-            pictureUrl={member.pictureUrl}
-            presence={presenceByIdentityId[member.identityId]}
-          />
-        ))}
-      </div>
+      <IdentityMemberListPanel
+        action={
+          canInvite
+            ? {
+                label: copy.communities.addMember,
+                onClick: onAddMember,
+              }
+            : undefined
+        }
+        emptyLabel={copy.communities.noMatchingMembers}
+        items={members.map((member) => ({
+          ...member,
+          owner: member.identityId === community.ownerIdentityId,
+          presence: presenceByIdentityId[member.identityId],
+        } satisfies IdentityMemberListItem))}
+        onItemClick={onMemberClick}
+        ownerLabel={copy.communities.owner}
+      />
     </aside>
   );
 }

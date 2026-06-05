@@ -780,6 +780,7 @@ export const es = {
     visibilityOptions: 'Visibilidad',
   },
   peers: {
+    body: 'Nodos visibles ahora mismo desde este nodo local.',
     empty: 'Aun no hay pares activos descubiertos.',
     error: 'No se pudieron cargar los pares.',
     justNow: 'ahora',
