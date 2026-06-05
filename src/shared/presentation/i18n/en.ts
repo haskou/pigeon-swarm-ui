@@ -889,6 +889,7 @@ export const en = {
     visibilityOptions: 'Visibility',
   },
   peers: {
+    body: 'Nodes currently visible from this local node.',
     empty: 'No active peers discovered yet.',
     error: 'Peers could not be loaded.',
     justNow: 'just now',

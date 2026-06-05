@@ -290,7 +290,7 @@ export function NodeSettingsDialog({
                   <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
                     {copy.nodeSettings.owner}
                   </div>
-                  <div className="rounded-2xl bg-black/25 px-3 py-2">
+                  <div className="border-l border-white/10 py-1 pl-3">
                     <div className="truncate text-sm font-black text-white">
                       {ownerLabel}
                     </div>
@@ -606,7 +606,7 @@ function ServerField({ label, value }: { label: string; value: string }) {
       <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-white/35">
         {label}
       </div>
-      <div className="truncate rounded-2xl bg-black/25 px-3 py-2 text-sm text-white/70">
+      <div className="truncate border-l border-white/10 py-1 pl-3 text-sm text-white/70">
         {value}
       </div>
     </div>
@@ -620,10 +620,10 @@ function PeerStatusPanel({ peers }: { peers: Peer[] }) {
         <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
           {copy.peers.title}
         </div>
-        <p className="mt-1 text-sm text-white/50">{copy.peers.kicker}</p>
+        <p className="mt-1 text-sm text-white/50">{copy.peers.body}</p>
       </div>
       {peers.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+        <div className="border-l border-white/10 py-1 pl-3 text-sm text-white/55">
           {copy.peers.empty}
         </div>
       ) : (
