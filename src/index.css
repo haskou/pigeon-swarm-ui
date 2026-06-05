@@ -9,6 +9,7 @@ body,
   height: 100%;
   min-height: 100%;
   overscroll-behavior: none;
+  overflow-x: clip;
   touch-action: pan-x pan-y;
 }
 body {
@@ -24,6 +25,7 @@ body {
   background: #080a25;
   color: white;
   overflow: hidden;
+  overflow-x: clip;
 }
 button,
 input,
@@ -155,6 +157,7 @@ input[type='submit'] {
   height: 100dvh;
   height: calc(100dvh + env(safe-area-inset-bottom));
   overflow: hidden;
+  overflow-x: clip;
   overscroll-behavior: none;
 }
 
