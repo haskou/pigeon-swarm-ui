@@ -167,6 +167,7 @@ input[type='submit'] {
 }
 
 .app-safe-area-panel {
+  padding-bottom: env(safe-area-inset-bottom);
   padding-top: env(safe-area-inset-top);
 }
 
@@ -187,7 +188,6 @@ input[type='submit'] {
 
 .app-safe-area-drawer-flush {
   --app-safe-area-drawer-padding-y: 0rem;
-  padding-bottom: 0;
 }
 
 .app-safe-area-fullscreen-surface {
