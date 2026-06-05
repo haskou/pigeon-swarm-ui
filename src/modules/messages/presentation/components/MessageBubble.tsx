@@ -125,6 +125,7 @@ export function MessageBubble({
     x: number;
     y: number;
   } | null>(null);
+  const ignoreNextClickRef = useRef(false);
   const indexedAttachments = useMemo(
     () =>
       message.attachments.map((attachment, index) => ({ attachment, index })),
@@ -189,6 +190,13 @@ export function MessageBubble({
     onMessageMenuOpen(message, event.clientX, event.clientY);
   };
   const handleMessageClick = (event: MouseEvent<HTMLElement>) => {
+    if (ignoreNextClickRef.current) {
+      ignoreNextClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     if (isInteractiveMessageTarget(event)) {
       clearTouchTap();
       return;
@@ -235,12 +243,14 @@ export function MessageBubble({
 
     if (isTouchTap(touchTapRef.current, event)) {
       clearTouchTap();
+      ignoreNextClickRef.current = true;
+      window.setTimeout(() => {
+        ignoreNextClickRef.current = false;
+      }, 350);
 
-      if (!onMessageClick) {
-        event.preventDefault();
-        onMessageMenuOpen(message, event.clientX, event.clientY);
-        return;
-      }
+      event.preventDefault();
+      onMessageMenuOpen(message, event.clientX, event.clientY);
+      return;
     }
 
     clearTouchTap();
