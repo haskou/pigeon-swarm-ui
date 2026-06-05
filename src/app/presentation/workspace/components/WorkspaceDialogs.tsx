@@ -489,6 +489,7 @@ function NodeSettingsOverlay(
         node={props.node}
         onClose={props.onCloseNodeSettings}
         onNetworksUpdated={props.onNetworksUpdated}
+        peers={props.peers}
         session={props.session}
       />
     </Suspense>
