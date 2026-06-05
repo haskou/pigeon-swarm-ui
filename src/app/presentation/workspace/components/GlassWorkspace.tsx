@@ -7,6 +7,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -2135,10 +2136,7 @@ export function GlassWorkspace({
 
         if (!scroller) return;
 
-        scroller.scrollTo({
-          behavior,
-          top: scroller.scrollHeight,
-        });
+        MessageScrollAnchor.scrollToBottom(scroller, behavior);
         lastScrollTopRef.current = scroller.scrollTop;
       };
 
@@ -2191,8 +2189,7 @@ export function GlassWorkspace({
       if (Date.now() > keepMessageBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {
-        scroller.scrollTop = scroller.scrollHeight;
-        lastScrollTopRef.current = scroller.scrollTop;
+        lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
       });
     };
 
@@ -2210,6 +2207,30 @@ export function GlassWorkspace({
       scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (Date.now() > keepMessageBottomUntilRef.current) return undefined;
+
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const scroll = () => {
+      if (
+        scrollerRef.current !== scroller ||
+        Date.now() > keepMessageBottomUntilRef.current
+      ) {
+        return;
+      }
+
+      lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
+    };
+    const frame = requestAnimationFrame(scroll);
+
+    scroll();
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeConversation?.id, messageState, messages.length]);
 
   const closeTransientUi = useCallback(() => {
     setMessageContextMenu(null);

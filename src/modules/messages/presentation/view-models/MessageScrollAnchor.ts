@@ -8,6 +8,18 @@ const messageSelector = '[data-message-id]';
 const defaultAnchorTtlMs = 5000;
 
 export class MessageScrollAnchor {
+  public static scrollToBottom(
+    scroller: HTMLElement,
+    behavior: ScrollBehavior = 'auto',
+  ): number {
+    scroller.scrollTo({
+      behavior,
+      top: scroller.scrollHeight,
+    });
+
+    return scroller.scrollTop;
+  }
+
   public static capture(
     scroller: HTMLElement,
     ttlMs = defaultAnchorTtlMs,
