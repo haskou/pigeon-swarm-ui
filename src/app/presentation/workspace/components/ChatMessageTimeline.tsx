@@ -24,7 +24,6 @@ import {
 } from '../../../../modules/identities/presentation/view-models/identityDisplay';
 import { DateSeparator } from '../../../../modules/messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../../modules/messages/presentation/components/MessageBubble';
-import { MessageListSkeleton } from '../../../../modules/messages/presentation/components/MessageListSkeleton';
 import { TimelineJumpButton } from '../../../../modules/messages/presentation/components/TimelineJumpButton';
 import {
   messageReplyImage,
@@ -114,47 +113,40 @@ export function ChatMessageTimeline({
   reactionAuthorNames,
   scrollerRef,
 }: ChatMessageTimelineProps) {
-  const loadingInitialMessages =
-    messageState === 'loading' && messages.length === 0;
-
   return (
     <div
       ref={scrollerRef}
       onScroll={onScroll}
       className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-2 py-3 [overflow-anchor:none] sm:p-6"
     >
-      {loadingInitialMessages ? (
-        <MessageListSkeleton />
-      ) : (
-        <MessageTimelineContent
-          bottomRef={bottomRef}
-          currentIdentityId={currentIdentityId}
-          currentIdentityName={currentIdentityName}
-          hasConversationKey={hasConversationKey}
-          hasReachedMessageStart={hasReachedMessageStart}
-          identityNames={identityNames}
-          identityPictures={identityPictures}
-          isGroupConversation={isGroupConversation}
-          loadAttachmentPreview={loadAttachmentPreview}
-          missingConversationKeyContent={missingConversationKeyContent}
-          messageState={messageState}
-          messages={messages}
-          onAttachmentOpen={onAttachmentOpen}
-          onAuthorProfileOpen={onAuthorProfileOpen}
-          onMessageMenuOpen={onMessageMenuOpen}
-          onOpenThread={onOpenThread}
-          onReactionToggle={onReactionToggle}
-          onReplyReferenceClick={onReplyReferenceClick}
-          onRetryMessage={onRetryMessage}
-          onPollClose={onPollClose}
-          onPollRemoveVote={onPollRemoveVote}
-          onPollVote={onPollVote}
-          onStickerClick={onStickerClick}
-          pinnedMessageIds={pinnedMessageIds}
-          polls={polls}
-          reactionAuthorNames={reactionAuthorNames}
-        />
-      )}
+      <MessageTimelineContent
+        bottomRef={bottomRef}
+        currentIdentityId={currentIdentityId}
+        currentIdentityName={currentIdentityName}
+        hasConversationKey={hasConversationKey}
+        hasReachedMessageStart={hasReachedMessageStart}
+        identityNames={identityNames}
+        identityPictures={identityPictures}
+        isGroupConversation={isGroupConversation}
+        loadAttachmentPreview={loadAttachmentPreview}
+        missingConversationKeyContent={missingConversationKeyContent}
+        messageState={messageState}
+        messages={messages}
+        onAttachmentOpen={onAttachmentOpen}
+        onAuthorProfileOpen={onAuthorProfileOpen}
+        onMessageMenuOpen={onMessageMenuOpen}
+        onOpenThread={onOpenThread}
+        onReactionToggle={onReactionToggle}
+        onReplyReferenceClick={onReplyReferenceClick}
+        onRetryMessage={onRetryMessage}
+        onPollClose={onPollClose}
+        onPollRemoveVote={onPollRemoveVote}
+        onPollVote={onPollVote}
+        onStickerClick={onStickerClick}
+        pinnedMessageIds={pinnedMessageIds}
+        polls={polls}
+        reactionAuthorNames={reactionAuthorNames}
+      />
       {newMessageCount > 0 && (
         <TimelineJumpButton mode="sticky" onClick={onJumpToLatest}>
           {copy.workspace.newMessages}
@@ -203,7 +195,9 @@ function MessageTimelineContent({
 
   return (
     <>
-      {messageState === 'loading' && <LoadingOlderMessages />}
+      {messageState === 'loading' && messages.length > 0 && (
+        <LoadingOlderMessages />
+      )}
       <div>
         {hasReachedMessageStart &&
           messages.length > 0 &&

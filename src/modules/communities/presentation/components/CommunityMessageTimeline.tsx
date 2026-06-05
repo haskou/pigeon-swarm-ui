@@ -19,7 +19,6 @@ import { formatDateSeparator } from '../../../../shared/presentation/formatting'
 import { cx } from '../../../../shared/presentation/cx';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
-import { MessageListSkeleton } from '../../../messages/presentation/components/MessageListSkeleton';
 import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
 import { InvitationKeyPrompt } from '../../../notifications/presentation/components/InvitationKeyPrompt';
 import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
@@ -158,9 +157,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
         onScroll={onScroll}
         className="h-full overflow-y-auto p-4 sm:p-6"
       >
-        {messageState === 'loading' && visibleMessages.length === 0 ? (
-          <MessageListSkeleton />
-        ) : messageState === 'loading' ? (
+        {messageState === 'loading' && visibleMessages.length > 0 ? (
           <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
             {copy.chat.loadingEvents}
           </div>
