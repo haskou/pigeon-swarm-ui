@@ -463,11 +463,11 @@ textarea:disabled,
 @keyframes side-panel-list-enter-right {
   0% {
     opacity: 0;
-    transform: translateX(28px) translateY(4px) scale(0.985);
+    transform: translateX(28px) scale(0.985);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) translateY(0) scale(1);
+    transform: translateX(0) scale(1);
   }
 }
 

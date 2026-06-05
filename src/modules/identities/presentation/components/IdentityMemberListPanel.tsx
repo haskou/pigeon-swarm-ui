@@ -70,14 +70,14 @@ export function IdentityMemberListPanel({
       )}
       <div
         className={cx(
-          'min-h-0 flex-1 space-y-2 overflow-y-auto pr-1',
+          'min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto pr-1',
           action && 'mt-4',
           listClassName,
         )}
       >
         {items.map((item, index) => (
           <div
-            className={sidePanelListEnterClassName('right')}
+            className={cx(sidePanelListEnterClassName('right'), 'w-full')}
             key={`${animationScopeKey ?? 'members'}:${item.identityId}`}
             style={sidePanelListEnterStyle(index)}
           >
