@@ -107,9 +107,32 @@ function IdentityMemberRow({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   ownerLabel?: string;
 }) {
-  const displayName = item.name ?? memberName(item.identity, item.identityId);
+  const loadingProfile = !item.identity && !item.name;
+  const displayName = loadingProfile
+    ? ''
+    : item.name ?? memberName(item.identity, item.identityId);
   const handle = item.identity?.profile.handle?.trim();
   const bannerUrl = useIdentityBannerUrl(item.identity);
+
+  if (loadingProfile) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
+      >
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-white/8 via-white/4 to-transparent"
+        />
+        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-white/12" />
+        <span className="relative min-w-0 flex-1">
+          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-white/14" />
+          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-white/10" />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button
