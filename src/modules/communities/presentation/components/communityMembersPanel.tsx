@@ -122,6 +122,7 @@ function MembersAside({
             owner={member.identityId === community.ownerIdentityId}
             pictureUrl={member.pictureUrl}
             presence={presenceByIdentityId[member.identityId]}
+            showBanner={false}
           />
         ))}
       </div>

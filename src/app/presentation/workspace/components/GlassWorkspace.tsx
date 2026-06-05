@@ -486,6 +486,7 @@ export function GlassWorkspace({
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [groupInviteRequest, setGroupInviteRequest] = useState(0);
   const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
   const [incomingCall, setIncomingCall] = useState<{
     call: CallResource;
@@ -4366,6 +4367,7 @@ export function GlassWorkspace({
                   conversationKey={activeConversationKey}
                   draft={activeConversationDraft}
                   editingMessage={editingMessage?.message ?? null}
+                  groupInviteRequest={groupInviteRequest}
                   hasConversationKey={!!activeConversationKey}
                   hasReachedMessageStart={!messageCursor}
                   invitationAccepting={notificationAction === 'accept'}
@@ -4449,8 +4451,20 @@ export function GlassWorkspace({
                 className="hidden xl:block"
                 session={session}
                 activeConversation={activeConversation}
-                loadedMessageCount={messages.length}
-                peers={peers}
+                activeConversationPeerIdentityId={
+                  activeConversationPeerIdentityId
+                }
+                identityNames={identityNames}
+                identityPictures={identityPictures}
+                identityProfiles={identityProfiles}
+                nodeNetworks={nodeNetworks}
+                onGroupInviteOpen={() =>
+                  setGroupInviteRequest((request) => request + 1)
+                }
+                onOpenConversationWithIdentity={
+                  openOrCreateConversationWithIdentity
+                }
+                presenceByIdentityId={presenceByIdentityId}
               />
             </Suspense>
           </>
@@ -4623,6 +4637,7 @@ export function GlassWorkspace({
         <Suspense fallback={null}>
           <WorkspaceDialogs
             activeConversation={activeConversation}
+            activeConversationPeerIdentityId={activeConversationPeerIdentityId}
             archiveNotification={archiveNotification}
             communities={communities}
             communityAvatarUrls={notificationCommunityAvatarUrls}
@@ -4650,6 +4665,7 @@ export function GlassWorkspace({
             notificationSettingsTarget={notificationSettingsTarget}
             notificationsOpen={notificationsOpen}
             peers={peers}
+            presenceByIdentityId={presenceByIdentityId}
             rawMessage={rawMessage}
             realtimeEventLog={realtimeEventLog}
             realtimeEventsOpen={realtimeEventsOpen}
@@ -4705,6 +4721,10 @@ export function GlassWorkspace({
               setIsCreateCommunityOpen(false);
             }}
             onConversationCreated={handleConversationCreated}
+            onGroupInviteOpen={() =>
+              setGroupInviteRequest((request) => request + 1)
+            }
+            onOpenConversationWithIdentity={openOrCreateConversationWithIdentity}
             onAcceptMembershipRequest={(requestId) =>
               void acceptMembershipRequest(requestId)
             }

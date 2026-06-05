@@ -140,6 +140,7 @@ interface ChatColumnProps {
   onRetryMessage: (message: ChatMessage) => void;
   onOpenSidebar: () => void;
   onOpenPins: () => void;
+  groupInviteRequest?: number;
   notificationSetting: NotificationScopeSetting;
   onCreate: () => void;
   onOpenConversationWithIdentity?: (
@@ -184,6 +185,7 @@ export function ChatColumn({
   editingMessage,
   hasConversationKey,
   hasReachedMessageStart,
+  groupInviteRequest = 0,
   identityNames,
   identityPictures,
   identityProfiles,
@@ -369,6 +371,12 @@ export function ChatColumn({
     (activeConversation.type === 'group' ||
       activeConversation.id.startsWith('group:'))
   );
+  useEffect(() => {
+    if (!groupInviteRequest || !isGroupConversation) return;
+
+    setGroupInviteError(null);
+    setGroupInviteOpen(true);
+  }, [groupInviteRequest, isGroupConversation]);
   const activeConversationPolls = useMemo(
     () =>
       activeConversation

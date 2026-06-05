@@ -107,6 +107,7 @@ export function GroupProfileDialog({
                 onClick={(event) => onIdentityClick(participant, event)}
                 pictureUrl={participant.picture ?? null}
                 presence={presenceByIdentityId[participant.identityId]}
+                showBanner={false}
               />
             ))}
           </div>
