@@ -3,9 +3,9 @@ import type {
   RealtimeHeartbeatActivityMode,
   RealtimeMessage,
   RealtimeTypingInput,
-} from '../../shared/infrastructure/realtime/realtimeGateway';
+} from '../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { RealtimeGateway } from '../../shared/infrastructure/realtime/realtimeGateway';
+import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 
 export class PigeonRealtimeApplication {
   public constructor(private readonly realtime: RealtimeGateway) {}

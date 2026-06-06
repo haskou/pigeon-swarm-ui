@@ -4,7 +4,7 @@ import type { ChatMessage } from '../../../shared/domain/pigeonResources.types';
 
 import { Message } from './aggregates/Message';
 import { MessageAuthorId } from './value-objects/MessageAuthorId';
-import { MessageReactionAction } from './value-objects/messageReactionAction';
+import { MessageReactionAction } from './value-objects/MessageReactionAction';
 import { MessageReactionEmoji } from './value-objects/MessageReactionEmoji';
 
 export class MessageReactions {

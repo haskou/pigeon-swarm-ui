@@ -10,17 +10,6 @@ import { ListConversationsMessage } from './messages/ListConversationsMessage';
 export class ListConversations {
   public constructor(private readonly conversations: ListConversationsPort) {}
 
-  public async list(
-    message: ListConversationsMessage,
-  ): Promise<ConversationResource[]> {
-    return ConversationTimeline.sortByLatestMessage(
-      await this.withRecoveredActivityTimestamps(
-        message.getSession(),
-        await this.conversations.listConversations(message.getSession()),
-      ),
-    );
-  }
-
   private async withRecoveredActivityTimestamps(
     session: Session,
     conversations: ConversationResource[],
@@ -69,5 +58,16 @@ export class ListConversations {
     } catch {
       return undefined;
     }
+  }
+
+  public async list(
+    message: ListConversationsMessage,
+  ): Promise<ConversationResource[]> {
+    return ConversationTimeline.sortByLatestMessage(
+      await this.withRecoveredActivityTimestamps(
+        message.getSession(),
+        await this.conversations.listConversations(message.getSession()),
+      ),
+    );
   }
 }

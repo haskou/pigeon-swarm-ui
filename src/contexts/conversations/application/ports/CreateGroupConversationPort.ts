@@ -3,7 +3,7 @@ import type {
   LocalKeychain,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { CreateGroupConversationInput } from '../create-group-conversation/messages/createGroupConversationMessage';
+import type { CreateGroupConversationInput } from '../create-group-conversation/messages/CreateGroupConversationMessage';
 
 export interface CreateGroupConversationPort {
   createGroupConversation(

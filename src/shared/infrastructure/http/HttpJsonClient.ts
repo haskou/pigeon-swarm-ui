@@ -1,62 +1,10 @@
+import type { BlobRequestInit } from './BlobRequestInit';
+
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 import { HttpJsonError } from './HttpJsonError';
 
-type BlobRequestInit = RequestInit & {
-  onDownloadProgress?: (progress: {
-    loadedBytes: number;
-    totalBytes?: number;
-  }) => void;
-};
-
 export class HttpJsonClient {
   public constructor(private readonly urls: ApiUrlBuilder) {}
-
-  public async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(this.urls.build(path), {
-      ...init,
-      cache: init.cache ?? 'no-store',
-      headers: this.headers(init, 'application/json'),
-    });
-
-    if (!response.ok) {
-      throw await this.error(response);
-    }
-
-    if (response.status === 204 || response.status === 304) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
-  }
-
-  public async requestBlob(
-    path: string,
-    init: BlobRequestInit = {},
-  ): Promise<Blob> {
-    const { onDownloadProgress, ...requestInit } = init;
-    const response = await fetch(this.urls.build(path), {
-      ...requestInit,
-      cache: requestInit.cache ?? 'no-store',
-      headers: this.headers(requestInit, '*/*'),
-    });
-
-    if (!response.ok) {
-      throw await this.error(response);
-    }
-
-    if (!onDownloadProgress || !response.body) {
-      const blob = await response.blob();
-
-      onDownloadProgress?.({
-        loadedBytes: blob.size,
-        totalBytes: blob.size,
-      });
-
-      return blob;
-    }
-
-    return await this.blobWithProgress(response, onDownloadProgress);
-  }
 
   private async blobWithProgress(
     response: Response,
@@ -138,5 +86,52 @@ export class HttpJsonClient {
     return Object.keys(headers).some(
       (key) => key.toLowerCase() === normalizedName,
     );
+  }
+
+  public async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const response = await fetch(this.urls.build(path), {
+      ...init,
+      cache: init.cache ?? 'no-store',
+      headers: this.headers(init, 'application/json'),
+    });
+
+    if (!response.ok) {
+      throw await this.error(response);
+    }
+
+    if (response.status === 204 || response.status === 304) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  }
+
+  public async requestBlob(
+    path: string,
+    init: BlobRequestInit = {},
+  ): Promise<Blob> {
+    const { onDownloadProgress, ...requestInit } = init;
+    const response = await fetch(this.urls.build(path), {
+      ...requestInit,
+      cache: requestInit.cache ?? 'no-store',
+      headers: this.headers(requestInit, '*/*'),
+    });
+
+    if (!response.ok) {
+      throw await this.error(response);
+    }
+
+    if (!onDownloadProgress || !response.body) {
+      const blob = await response.blob();
+
+      onDownloadProgress?.({
+        loadedBytes: blob.size,
+        totalBytes: blob.size,
+      });
+
+      return blob;
+    }
+
+    return await this.blobWithProgress(response, onDownloadProgress);
   }
 }

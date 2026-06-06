@@ -1,10 +1,6 @@
 import { DomainError, StringValueObject } from '@haskou/value-objects';
 
 export class PollOptionId extends StringValueObject {
-  private constructor(value: string) {
-    super(value);
-  }
-
   public static fromString(value: string): PollOptionId {
     const trimmedValue = value.trim();
 
@@ -13,5 +9,9 @@ export class PollOptionId extends StringValueObject {
     }
 
     return new PollOptionId(trimmedValue);
+  }
+
+  private constructor(value: string) {
+    super(value);
   }
 }

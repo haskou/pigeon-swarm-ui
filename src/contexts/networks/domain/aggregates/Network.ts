@@ -1,7 +1,7 @@
 import { DomainError } from '@haskou/value-objects';
 
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
-import type { NetworkInvite } from '../networkInviteCode';
+import type { NetworkInvite } from '../NetworkInviteCode';
 
 import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
 import { NetworkId } from '../value-objects/NetworkId';
@@ -9,20 +9,20 @@ import { NetworkKey } from '../value-objects/NetworkKey';
 import { NetworkName } from '../value-objects/NetworkName';
 
 export class Network extends AggregateRoot {
-  private constructor(
-    private readonly id: NetworkId,
-    private name: NetworkName,
-    private readonly key?: NetworkKey,
-  ) {
-    super();
-  }
-
   public static fromNodeNetwork(resource: NodeNetwork): Network {
     return new Network(
       NetworkId.fromString(resource.id),
       NetworkName.fromString(resource.name),
       resource.key ? NetworkKey.fromString(resource.key) : undefined,
     );
+  }
+
+  private constructor(
+    private readonly id: NetworkId,
+    private name: NetworkName,
+    private readonly key?: NetworkKey,
+  ) {
+    super();
   }
 
   public canIssueInvite(): boolean {

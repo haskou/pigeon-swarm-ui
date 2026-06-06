@@ -1,49 +1,8 @@
+import type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInput';
+
+export type { CommunityChannelPlainPayload } from './CommunityChannelPlainPayload';
+export type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInput';
 import { PublicKey } from '@haskou/value-objects';
-
-import type {
-  ConversationKeyEntry,
-  CommunityMessageMention,
-  MessageAttachment,
-  MessageLinkPreview,
-  MessageReplyPreview,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
-
-export type CommunityChannelPlainPayload = {
-  attachments?: MessageAttachment[];
-  authorIdentityId?: string;
-  channelId?: string;
-  communityId?: string;
-  content?: string;
-  linkPreview?: MessageLinkPreview;
-  mentions?: CommunityMessageMention[];
-  reply?: MessageReplyPreview;
-  replyToMessageId?: string;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp?: number;
-  type?: string;
-};
-
-export type CommunityChannelPayloadInput = {
-  attachments: MessageAttachment[];
-  authorIdentityId: string;
-  channelId: string;
-  communityKey?: ConversationKeyEntry;
-  communityId: string;
-  content: string;
-  eventType?:
-    | 'CommunityChannelMessageEdited'
-    | 'CommunityChannelThreadMessageSent'
-    | 'CommunityChannelThreadStickerMessageSent';
-  linkPreview?: MessageLinkPreview;
-  mentions?: CommunityMessageMention[];
-  replyPreview?: MessageReplyPreview;
-  replyToMessageId?: string;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp: number;
-};
 
 function communityChannelPayloadType(
   input: CommunityChannelPayloadInput,

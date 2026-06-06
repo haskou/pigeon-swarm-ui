@@ -1,45 +1,9 @@
+import type { FakePeerConnection } from './FakePeerConnection';
+import type { FakeSender } from './FakeSender';
+import type { MockAudioContext } from './MockAudioContext';
+import type { PeerConnectionManagerInternals } from './PeerConnectionManagerInternals';
+
 import { CallPeerConnectionManager } from './CallPeerConnectionManager';
-
-type FakeSender = Pick<RTCRtpSender, 'replaceTrack' | 'track'> & {
-  replaceTrack: jest.MockedFunction<
-    (track: MediaStreamTrack | null) => Promise<void>
-  >;
-};
-
-type FakePeerConnection = Pick<
-  RTCPeerConnection,
-  | 'addEventListener'
-  | 'addTrack'
-  | 'addTransceiver'
-  | 'close'
-  | 'getSenders'
-  | 'removeTrack'
-> & {
-  connectionState: RTCPeerConnectionState;
-  iceConnectionState: RTCIceConnectionState;
-  localDescription: RTCSessionDescriptionInit | null;
-  senders: RTCRtpSender[];
-  signalingState: RTCSignalingState;
-};
-
-type PeerConnectionManagerInternals = {
-  handleRemoteTrack(peerIdentityId: string, event: RTCTrackEvent): void;
-  remoteAudio: Map<string, HTMLAudioElement>;
-  remoteAudioContexts: Map<string, AudioContext>;
-  remoteAudioGains: Map<string, GainNode>;
-  remoteAudioOutputSources: Map<string, MediaStreamAudioSourceNode>;
-  remoteAudioOutputStreams: Map<string, MediaStream>;
-  remoteAudioStreams: Map<string, MediaStream>;
-  remoteScreenAudioTrackIds: Map<string, Set<string>>;
-  remoteScreenStreams: Map<string, MediaStream>;
-  remoteScreenStreamIds: Map<string, Set<string>>;
-  remoteStreams: Map<string, MediaStream>;
-};
-
-type MockAudioContext = AudioContext & {
-  createdGain: GainNode;
-  createdSource: MediaStreamAudioSourceNode;
-};
 
 const originalMediaStream = Object.getOwnPropertyDescriptor(
   globalThis,

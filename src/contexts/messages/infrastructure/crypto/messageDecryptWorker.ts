@@ -1,65 +1,18 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
-  MessageAttachment,
-  MessageLinkPreview,
   MessageReaction,
-  MessageReplyPreview,
   MessageResource,
-  StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageDecryptCancelRequest } from './MessageDecryptCancelRequest';
+import type { MessageDecryptRequest } from './MessageDecryptRequest';
+import type { MessageDecryptResponse } from './MessageDecryptResponse';
+/* eslint-disable @typescript-eslint/no-use-before-define */
+import type { MessageReactionRecord } from './MessageReactionRecord';
+import type { PlainMessage } from './PlainMessage';
 
 import { PollMessageProjection } from '../../domain/PollMessageProjection';
-
-type MessageDecryptRequest = {
-  conversationId: string;
-  copy: {
-    decryptFailed: string;
-    missingKey: string;
-  };
-  currentIdentityId: string;
-  messages: MessageResource[];
-  privateKey?: string;
-  requestId: number;
-};
-
-type MessageDecryptCancelRequest = {
-  requestId: number;
-  type: 'cancel';
-};
-
-type MessageDecryptResponse =
-  | {
-      messages: ChatMessage[];
-      requestId: number;
-      type: 'success';
-    }
-  | {
-      message: string;
-      requestId: number;
-      type: 'error';
-    };
-
-type MessageReactionRecord = {
-  authorId?: unknown;
-  authorIdentityId?: unknown;
-  createdAt?: unknown;
-  emoji?: unknown;
-};
-
-type PlainMessage = {
-  attachments?: MessageAttachment[];
-  authorIdentityId?: string;
-  content?: string;
-  linkPreview?: MessageLinkPreview;
-  reply?: MessageReplyPreview;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp?: number;
-  type?: string;
-};
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();

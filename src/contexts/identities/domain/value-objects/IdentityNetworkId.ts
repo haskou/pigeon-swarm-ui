@@ -1,10 +1,6 @@
 import { DomainError, StringValueObject } from '@haskou/value-objects';
 
 export class IdentityNetworkId extends StringValueObject {
-  private constructor(value: string) {
-    super(value);
-  }
-
   public static fromString(value: string): IdentityNetworkId {
     const trimmedValue = value.trim();
 
@@ -13,5 +9,9 @@ export class IdentityNetworkId extends StringValueObject {
     }
 
     return new IdentityNetworkId(trimmedValue);
+  }
+
+  private constructor(value: string) {
+    super(value);
   }
 }

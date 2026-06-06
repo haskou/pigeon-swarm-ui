@@ -3,10 +3,6 @@ import { DomainError, StringValueObject } from '@haskou/value-objects';
 export class NetworkName extends StringValueObject {
   public static readonly MAX_LENGTH = 80;
 
-  private constructor(value: string) {
-    super(value, NetworkName.MAX_LENGTH);
-  }
-
   public static fromString(value: string): NetworkName {
     const trimmedValue = value.trim();
 
@@ -15,5 +11,9 @@ export class NetworkName extends StringValueObject {
     }
 
     return new NetworkName(trimmedValue);
+  }
+
+  private constructor(value: string) {
+    super(value, NetworkName.MAX_LENGTH);
   }
 }

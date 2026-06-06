@@ -1,11 +1,7 @@
-import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
+import type { EncryptedCommunityKey } from './EncryptedCommunityKey';
 
-export type EncryptedCommunityKey = {
-  algorithm: 'AES-GCM';
-  ciphertext: string;
-  nonce: string;
-  version: 1;
-};
+export type { EncryptedCommunityKey } from './EncryptedCommunityKey';
+import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
 
 export type CommunityInviteKeyEnvelope = {
   encryptedCommunityKey: EncryptedCommunityKey;

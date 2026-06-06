@@ -4,7 +4,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { Field } from '../../../identities/presentation/auth/Field';
 import { HeroMetric } from '../../../identities/presentation/auth/HeroMetric';
-import { NetworkInviteCode } from '../../domain/networkInviteCode';
+import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';

@@ -1,12 +1,12 @@
 import { StringValueObject } from '@haskou/value-objects';
 
 export class ConversationId extends StringValueObject {
-  private constructor(value: string) {
-    super(value.trim());
-  }
-
   public static fromString(value: string): ConversationId {
     return new ConversationId(value);
+  }
+
+  private constructor(value: string) {
+    super(value.trim());
   }
 
   public isGroupConversation(): boolean {

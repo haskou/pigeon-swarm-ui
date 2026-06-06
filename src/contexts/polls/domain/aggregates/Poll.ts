@@ -12,6 +12,15 @@ import { PollStatus } from '../value-objects/PollStatus';
 import { PollVoterId } from '../value-objects/PollVoterId';
 
 export class Poll extends AggregateRoot {
+  public static fromResource(resource: PollResource): Poll {
+    return new Poll(
+      PollId.fromString(resource.id),
+      PollStatus.fromPrimitive(resource.status),
+      resource,
+      resource.votes,
+    );
+  }
+
   private constructor(
     private readonly id: PollId,
     private status: PollStatus,
@@ -21,13 +30,16 @@ export class Poll extends AggregateRoot {
     super();
   }
 
-  public static fromResource(resource: PollResource): Poll {
-    return new Poll(
-      PollId.fromString(resource.id),
-      PollStatus.fromPrimitive(resource.status),
-      resource,
-      resource.votes,
+  private assertOptionsExist(optionIds: PollOptionId[]): void {
+    const missingOption = optionIds.find((optionId) =>
+      this.resource.options.every((option) =>
+        PollOptionId.fromString(option.id).isNotEqual(optionId),
+      ),
     );
+
+    if (missingOption) {
+      throw new DomainError('Poll option does not exist.');
+    }
   }
 
   public close(): void {
@@ -102,17 +114,5 @@ export class Poll extends AggregateRoot {
       occurredAt: Date.now(),
       type: 'PollVoteCast',
     });
-  }
-
-  private assertOptionsExist(optionIds: PollOptionId[]): void {
-    const missingOption = optionIds.find((optionId) =>
-      this.resource.options.every((option) =>
-        PollOptionId.fromString(option.id).isNotEqual(optionId),
-      ),
-    );
-
-    if (missingOption) {
-      throw new DomainError('Poll option does not exist.');
-    }
   }
 }

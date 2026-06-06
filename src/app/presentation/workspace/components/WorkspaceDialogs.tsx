@@ -19,7 +19,7 @@ import type {
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { MessageEditPolicy } from '../../../../contexts/messages/domain/MessageEditPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';

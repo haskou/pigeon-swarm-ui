@@ -41,7 +41,7 @@ import type {
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
-} from '../../../../shared/infrastructure/realtime/realtimeGateway';
+} from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';

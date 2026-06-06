@@ -4,9 +4,9 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { CreateGroupConversationPort } from '../ports/CreateGroupConversationPort';
 
-import { CreateGroupConversationMessage } from './messages/createGroupConversationMessage';
+import { CreateGroupConversationMessage } from './messages/CreateGroupConversationMessage';
 
-export type { CreateGroupConversationInput } from './messages/createGroupConversationMessage';
+export type { CreateGroupConversationInput } from './messages/CreateGroupConversationMessage';
 
 export class CreateGroupConversation {
   public constructor(

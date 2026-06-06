@@ -1,12 +1,7 @@
 import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationListEnvelope } from './ConversationListEnvelope';
 
 import { ConversationIdFactory } from '../../domain/ConversationIdFactory';
-
-type ConversationListEnvelope = {
-  conversations?: ConversationResource[];
-  data?: ConversationResource[];
-  items?: ConversationResource[];
-};
 
 function conversationId(
   input: ConversationResource,

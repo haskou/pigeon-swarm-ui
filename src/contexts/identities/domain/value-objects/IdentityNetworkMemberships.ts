@@ -1,10 +1,6 @@
 import { IdentityNetworkId } from './IdentityNetworkId';
 
 export class IdentityNetworkMemberships {
-  // prettier-ignore
-  private constructor(private readonly networkIds: IdentityNetworkId[]) {
-  }
-
   public static fromPrimitives(
     networkIds: string[],
   ): IdentityNetworkMemberships {
@@ -23,6 +19,10 @@ export class IdentityNetworkMemberships {
         return [...uniqueNetworkIds, candidate];
       }, []),
     );
+  }
+
+  // prettier-ignore
+  private constructor(private readonly networkIds: IdentityNetworkId[]) {
   }
 
   public add(networkId: IdentityNetworkId): IdentityNetworkMemberships {

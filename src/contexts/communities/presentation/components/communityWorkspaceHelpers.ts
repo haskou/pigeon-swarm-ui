@@ -3,7 +3,7 @@ import type {
   CommunityTextChannel,
   MessageResource,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export function resolveCommunityChannelId(
   channelId: null | string | undefined,

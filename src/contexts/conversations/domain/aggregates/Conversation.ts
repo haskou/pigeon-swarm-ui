@@ -10,12 +10,12 @@ import { ConversationId } from '../value-objects/ConversationId';
 import { ConversationParticipantId } from '../value-objects/ConversationParticipantId';
 
 export class Conversation extends AggregateRoot {
-  private constructor(private readonly resource: ConversationResource) {
-    super();
-  }
-
   public static fromResource(resource: ConversationResource): Conversation {
     return new Conversation(resource);
+  }
+
+  private constructor(private readonly resource: ConversationResource) {
+    super();
   }
 
   public bumpActivity(timestamp: Timestamp): ConversationResource {

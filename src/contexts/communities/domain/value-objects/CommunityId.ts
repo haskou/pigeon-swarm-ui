@@ -1,10 +1,6 @@
 import { DomainError, StringValueObject } from '@haskou/value-objects';
 
 export class CommunityId extends StringValueObject {
-  private constructor(value: string) {
-    super(value);
-  }
-
   public static fromString(value: string): CommunityId {
     const trimmedValue = value.trim();
 
@@ -13,5 +9,9 @@ export class CommunityId extends StringValueObject {
     }
 
     return new CommunityId(trimmedValue);
+  }
+
+  private constructor(value: string) {
+    super(value);
   }
 }

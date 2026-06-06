@@ -8,15 +8,9 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { NotificationDecision } from '../../domain/notificationDecision';
+import type { NotificationDecision } from '../../domain/NotificationDecision';
 import type { NotificationId } from '../../domain/NotificationId';
-
-type CachedRequestOptions = { ttlMs?: number };
-type CachedGetRequest = <T>(
-  key: string,
-  loader: () => Promise<T>,
-  options?: CachedRequestOptions,
-) => Promise<T>;
+import type { CachedGetRequest } from './CachedGetRequest';
 
 const startupReadCacheTtlMs = 1500;
 

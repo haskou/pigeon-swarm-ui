@@ -12,6 +12,16 @@ import { CallIdentityId } from '../value-objects/CallIdentityId';
 import { CallStatus } from '../value-objects/CallStatus';
 
 export class Call extends AggregateRoot {
+  public static fromResource(resource: CallResource): Call {
+    return new Call(
+      CallId.fromString(resource.id),
+      CallStatus.fromPrimitive(resource.status),
+      resource,
+      resource.participants,
+      resource.endedAt ? new Timestamp(resource.endedAt) : undefined,
+    );
+  }
+
   private constructor(
     private readonly id: CallId,
     private status: CallStatus,
@@ -22,14 +32,30 @@ export class Call extends AggregateRoot {
     super();
   }
 
-  public static fromResource(resource: CallResource): Call {
-    return new Call(
-      CallId.fromString(resource.id),
-      CallStatus.fromPrimitive(resource.status),
-      resource,
-      resource.participants,
-      resource.endedAt ? new Timestamp(resource.endedAt) : undefined,
-    );
+  private withParticipantStatus(
+    identityId: CallIdentityId,
+    status: CallParticipantStatus,
+    timestamp: Timestamp,
+  ): CallResourceParticipant[] {
+    return this.participants.map((participant) => {
+      if (
+        CallIdentityId.fromString(participant.identityId).isNotEqual(identityId)
+      ) {
+        return participant;
+      }
+
+      return {
+        ...participant,
+        declinedAt:
+          status === 'declined' ? timestamp.valueOf() : participant.declinedAt,
+        joinedAt:
+          status === 'joined' ? timestamp.valueOf() : participant.joinedAt,
+        leftAt: status === 'left' ? timestamp.valueOf() : participant.leftAt,
+        missedAt:
+          status === 'missed' ? timestamp.valueOf() : participant.missedAt,
+        status,
+      };
+    });
   }
 
   public end(endedAt: Timestamp): void {
@@ -106,31 +132,5 @@ export class Call extends AggregateRoot {
       participants: this.participants,
       status: this.status.toString() as CallResource['status'],
     };
-  }
-
-  private withParticipantStatus(
-    identityId: CallIdentityId,
-    status: CallParticipantStatus,
-    timestamp: Timestamp,
-  ): CallResourceParticipant[] {
-    return this.participants.map((participant) => {
-      if (
-        CallIdentityId.fromString(participant.identityId).isNotEqual(identityId)
-      ) {
-        return participant;
-      }
-
-      return {
-        ...participant,
-        declinedAt:
-          status === 'declined' ? timestamp.valueOf() : participant.declinedAt,
-        joinedAt:
-          status === 'joined' ? timestamp.valueOf() : participant.joinedAt,
-        leftAt: status === 'left' ? timestamp.valueOf() : participant.leftAt,
-        missedAt:
-          status === 'missed' ? timestamp.valueOf() : participant.missedAt,
-        status,
-      };
-    });
   }
 }

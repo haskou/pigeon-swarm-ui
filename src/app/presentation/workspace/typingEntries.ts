@@ -1,4 +1,4 @@
-import type { RealtimeTypingInput } from '../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeTypingInput } from '../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export type TypingEntries = Record<string, Record<string, number>>;
 

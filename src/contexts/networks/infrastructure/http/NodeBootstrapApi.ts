@@ -1,15 +1,34 @@
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
+import type { NodeInfo } from './NodeInfo';
 
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 
-type NodeInfo = { id: string; owner: string | null };
-
 export class NodeBootstrapApi {
   private readonly http = new HttpJsonClient(new ApiUrlBuilder(API_SERVER_URL));
+
   private readonly requestCache = new Map<string, Promise<unknown>>();
+
+  private async cachedRequest<T>(
+    key: string,
+    requestFactory: () => Promise<T>,
+  ): Promise<T> {
+    const cached = this.requestCache.get(key) as Promise<T> | undefined;
+
+    if (cached) return await cached;
+
+    const request = requestFactory().catch((caught: unknown) => {
+      this.requestCache.delete(key);
+
+      throw caught;
+    });
+
+    this.requestCache.set(key, request);
+
+    return await request;
+  }
 
   public async getInfo(): Promise<NodeInfo> {
     return await this.cachedRequest('GET /node/', () =>
@@ -35,24 +54,5 @@ export class NodeBootstrapApi {
     );
 
     return result.peers;
-  }
-
-  private async cachedRequest<T>(
-    key: string,
-    requestFactory: () => Promise<T>,
-  ): Promise<T> {
-    const cached = this.requestCache.get(key) as Promise<T> | undefined;
-
-    if (cached) return await cached;
-
-    const request = requestFactory().catch((caught: unknown) => {
-      this.requestCache.delete(key);
-
-      throw caught;
-    });
-
-    this.requestCache.set(key, request);
-
-    return await request;
   }
 }

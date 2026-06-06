@@ -7,7 +7,7 @@ import type {
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
-} from '../../../shared/infrastructure/realtime/realtimeGateway';
+} from '../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { applicationContainer } from '../../composition/applicationContainer';
 

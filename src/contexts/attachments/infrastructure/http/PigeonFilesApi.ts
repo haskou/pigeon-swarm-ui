@@ -60,109 +60,6 @@ export class PigeonFilesApi {
     this.publicFiles = new PigeonPublicFilesClient(http, signer);
   }
 
-  public async getPublicFile(
-    cid: string,
-    onDownloadProgress?: (percent: number) => void,
-  ): Promise<PublicFileContent> {
-    if (onDownloadProgress) {
-      return await this.publicFiles.fetch(cid, onDownloadProgress);
-    }
-
-    return await this.publicFileCache.getOrCreate(cid, () =>
-      this.publicFiles.fetch(cid),
-    );
-  }
-
-  public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    return await this.privateFileCache.getOrCreate(cid, () =>
-      this.privateFiles.fetch(cid),
-    );
-  }
-
-  public async uploadPublicFile(
-    session: Session,
-    file: File,
-  ): Promise<PublicFileUpload> {
-    const preparedFile = await this.publicImageUploadPreparer.prepare(file);
-    const bytes = await preparedFile.arrayBuffer();
-
-    return await this.publicFiles.upload(
-      session,
-      bytes,
-      preparedFile.name || 'upload',
-      preparedFile.type || 'application/octet-stream',
-    );
-  }
-
-  public async uploadPrivateFile(
-    session: Session,
-    attachment: PendingMessageAttachment,
-  ): Promise<PrivateFileUpload> {
-    return await this.privateFiles.upload(
-      session,
-      attachment.encryptedBytes,
-      attachment.uploadFilename,
-    );
-  }
-
-  public async downloadAttachment(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<Blob> {
-    const cacheKey = attachmentBlobCacheKey(attachment);
-
-    return await this.attachmentBlobCache.getOrCreate(cacheKey, () =>
-      this.attachmentIsEncrypted(attachment)
-        ? this.decryptAttachment(attachment, onProgress)
-        : this.downloadPublicAttachment(attachment, onProgress),
-    );
-  }
-
-  public async publishMessageAttachments(
-    session: Session,
-    attachments: File[],
-    onProgress?: (progress: AttachmentProgress) => void,
-    options: AttachmentUploadOptions = {},
-  ): Promise<MessageAttachment[]> {
-    if (attachments.length === 0) return [];
-
-    const uploadedAttachments: MessageAttachment[] = [];
-
-    for (const file of attachments) {
-      if (!this.shouldEncryptAttachment(file, options)) {
-        uploadedAttachments.push(
-          await this.uploadPublicAttachment(session, file, onProgress),
-        );
-
-        continue;
-      }
-
-      const preview = await this.uploadPrivateAttachmentPreview(session, file);
-      const pending = await this.attachmentCipher.encrypt(file, onProgress);
-      const upload = await this.uploadPendingAttachment(
-        session,
-        pending,
-        onProgress,
-      );
-
-      uploadedAttachments.push(
-        this.withPreview(
-          {
-            ...pending.metadata,
-            cid: upload.cid,
-            encrypted: true,
-            ...(upload.chunks ? { chunks: upload.chunks } : {}),
-            encryptedSize: upload.size,
-            ...(upload.type ? { type: upload.type } : {}),
-          },
-          preview,
-        ),
-      );
-    }
-
-    return uploadedAttachments;
-  }
-
   private shouldEncryptAttachment(
     file: File,
     options: AttachmentUploadOptions,
@@ -548,5 +445,108 @@ export class PigeonFilesApi {
     await new Promise<void>((resolve) => {
       globalThis.setTimeout(resolve, delayMs);
     });
+  }
+
+  public async getPublicFile(
+    cid: string,
+    onDownloadProgress?: (percent: number) => void,
+  ): Promise<PublicFileContent> {
+    if (onDownloadProgress) {
+      return await this.publicFiles.fetch(cid, onDownloadProgress);
+    }
+
+    return await this.publicFileCache.getOrCreate(cid, () =>
+      this.publicFiles.fetch(cid),
+    );
+  }
+
+  public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
+    return await this.privateFileCache.getOrCreate(cid, () =>
+      this.privateFiles.fetch(cid),
+    );
+  }
+
+  public async uploadPublicFile(
+    session: Session,
+    file: File,
+  ): Promise<PublicFileUpload> {
+    const preparedFile = await this.publicImageUploadPreparer.prepare(file);
+    const bytes = await preparedFile.arrayBuffer();
+
+    return await this.publicFiles.upload(
+      session,
+      bytes,
+      preparedFile.name || 'upload',
+      preparedFile.type || 'application/octet-stream',
+    );
+  }
+
+  public async uploadPrivateFile(
+    session: Session,
+    attachment: PendingMessageAttachment,
+  ): Promise<PrivateFileUpload> {
+    return await this.privateFiles.upload(
+      session,
+      attachment.encryptedBytes,
+      attachment.uploadFilename,
+    );
+  }
+
+  public async downloadAttachment(
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<Blob> {
+    const cacheKey = attachmentBlobCacheKey(attachment);
+
+    return await this.attachmentBlobCache.getOrCreate(cacheKey, () =>
+      this.attachmentIsEncrypted(attachment)
+        ? this.decryptAttachment(attachment, onProgress)
+        : this.downloadPublicAttachment(attachment, onProgress),
+    );
+  }
+
+  public async publishMessageAttachments(
+    session: Session,
+    attachments: File[],
+    onProgress?: (progress: AttachmentProgress) => void,
+    options: AttachmentUploadOptions = {},
+  ): Promise<MessageAttachment[]> {
+    if (attachments.length === 0) return [];
+
+    const uploadedAttachments: MessageAttachment[] = [];
+
+    for (const file of attachments) {
+      if (!this.shouldEncryptAttachment(file, options)) {
+        uploadedAttachments.push(
+          await this.uploadPublicAttachment(session, file, onProgress),
+        );
+
+        continue;
+      }
+
+      const preview = await this.uploadPrivateAttachmentPreview(session, file);
+      const pending = await this.attachmentCipher.encrypt(file, onProgress);
+      const upload = await this.uploadPendingAttachment(
+        session,
+        pending,
+        onProgress,
+      );
+
+      uploadedAttachments.push(
+        this.withPreview(
+          {
+            ...pending.metadata,
+            cid: upload.cid,
+            encrypted: true,
+            ...(upload.chunks ? { chunks: upload.chunks } : {}),
+            encryptedSize: upload.size,
+            ...(upload.type ? { type: upload.type } : {}),
+          },
+          preview,
+        ),
+      );
+    }
+
+    return uploadedAttachments;
   }
 }

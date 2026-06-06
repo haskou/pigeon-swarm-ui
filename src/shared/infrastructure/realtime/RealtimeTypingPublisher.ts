@@ -1,4 +1,4 @@
-import type { RealtimeTypingInput } from './realtimeGateway';
+import type { RealtimeTypingInput } from './RealtimeGateway';
 
 export class RealtimeTypingPublisher {
   public send(

@@ -85,17 +85,6 @@ export class PublicImageUploadPreparer {
     private readonly encodeGif: (file: File) => Promise<Blob> = encodeGifAsWebp,
   ) {}
 
-  public async prepare(file: File): Promise<File> {
-    if (!this.shouldConvert(file)) return file;
-
-    const blob = await this.encode(file);
-
-    return new File([blob], this.webpFilename(file.name), {
-      lastModified: file.lastModified,
-      type: webpContentType,
-    });
-  }
-
   private async encode(file: File): Promise<Blob> {
     if (this.contentType(file) === 'image/gif') {
       return await this.encodeGif(file);
@@ -130,5 +119,16 @@ export class PublicImageUploadPreparer {
     const basename = filename.replace(/\.[^.]+$/, '') || 'image';
 
     return `${basename}.webp`;
+  }
+
+  public async prepare(file: File): Promise<File> {
+    if (!this.shouldConvert(file)) return file;
+
+    const blob = await this.encode(file);
+
+    return new File([blob], this.webpFilename(file.name), {
+      lastModified: file.lastModified,
+      type: webpContentType,
+    });
   }
 }

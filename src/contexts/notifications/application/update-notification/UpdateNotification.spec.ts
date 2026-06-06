@@ -4,7 +4,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { UpdateNotificationPort } from '../ports/UpdateNotificationPort';
 
-import { NotificationDecision } from '../../domain/notificationDecision';
+import { NotificationDecision } from '../../domain/NotificationDecision';
 import { NotificationId } from '../../domain/NotificationId';
 import { UpdateNotificationMessage } from './messages/UpdateNotificationMessage';
 import { UpdateNotification } from './UpdateNotification';

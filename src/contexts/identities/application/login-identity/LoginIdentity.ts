@@ -10,6 +10,12 @@ import { LoginIdentityMessage } from './messages/LoginIdentityMessage';
 export class LoginIdentity {
   public constructor(private readonly identities: LoginIdentityPort) {}
 
+  private sortConversations(
+    conversations: ConversationResource[],
+  ): ConversationResource[] {
+    return ConversationTimeline.sortByLatestMessage(conversations);
+  }
+
   public async login(message: LoginIdentityMessage): Promise<LoginResult> {
     const result = await this.identities.login(
       message.getIdentityId(),
@@ -20,11 +26,5 @@ export class LoginIdentity {
       ...result,
       conversations: this.sortConversations(result.conversations),
     };
-  }
-
-  private sortConversations(
-    conversations: ConversationResource[],
-  ): ConversationResource[] {
-    return ConversationTimeline.sortByLatestMessage(conversations);
   }
 }

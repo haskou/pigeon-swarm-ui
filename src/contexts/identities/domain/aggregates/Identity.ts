@@ -8,20 +8,20 @@ import { IdentityNetworkId } from '../value-objects/IdentityNetworkId';
 import { IdentityNetworkMemberships } from '../value-objects/IdentityNetworkMemberships';
 
 export class Identity extends AggregateRoot {
-  private constructor(
-    private readonly id: IdentityId,
-    private profile: IdentityProfile,
-    private networkMemberships: IdentityNetworkMemberships,
-  ) {
-    super();
-  }
-
   public static fromResource(resource: IdentityResource): Identity {
     return new Identity(
       IdentityId.fromString(resource.id),
       IdentityProfile.fromPrimitives(resource.profile),
       IdentityNetworkMemberships.fromPrimitives(resource.networks),
     );
+  }
+
+  private constructor(
+    private readonly id: IdentityId,
+    private profile: IdentityProfile,
+    private networkMemberships: IdentityNetworkMemberships,
+  ) {
+    super();
   }
 
   public belongsToNetwork(networkId: IdentityNetworkId): boolean {

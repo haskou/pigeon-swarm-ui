@@ -38,7 +38,7 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
