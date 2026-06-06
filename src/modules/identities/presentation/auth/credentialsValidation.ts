@@ -1,17 +1,11 @@
-import { ProfileHandle } from '../../domain/profile/ProfileHandle';
+import { isIdentityProfileHandleValueValid } from '../../domain/profile/IdentityProfileConstraints';
 
 export function normalizeHandleInput(value: string): string {
   return value.trim().replace(/^@+/, '').toLowerCase();
 }
 
 export function isValidHandle(value: string): boolean {
-  try {
-    new ProfileHandle(normalizeHandleInput(value));
-
-    return true;
-  } catch {
-    return false;
-  }
+  return isIdentityProfileHandleValueValid(normalizeHandleInput(value));
 }
 
 export function passwordValidationError(value: string): string | null {

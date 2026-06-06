@@ -1,10 +1,14 @@
 import { assert, StringValueObject } from '@haskou/value-objects';
 
-export class ProfileHandle extends StringValueObject {
-  public static readonly MAX_LENGTH = 32;
-  public static readonly MIN_LENGTH = 3;
+import {
+  IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
+  IDENTITY_PROFILE_HANDLE_MIN_LENGTH,
+  isIdentityProfileHandleValueValid,
+} from './IdentityProfileConstraints';
 
-  private static readonly VALID_HANDLE = /^[a-z0-9._-]+$/;
+export class ProfileHandle extends StringValueObject {
+  public static readonly MAX_LENGTH = IDENTITY_PROFILE_HANDLE_MAX_LENGTH;
+  public static readonly MIN_LENGTH = IDENTITY_PROFILE_HANDLE_MIN_LENGTH;
 
   private static normalize(value: string | StringValueObject): string {
     return value.valueOf().toLowerCase();
@@ -21,9 +25,6 @@ export class ProfileHandle extends StringValueObject {
   }
 
   private isValid(): boolean {
-    return (
-      this.value.length >= ProfileHandle.MIN_LENGTH &&
-      ProfileHandle.VALID_HANDLE.test(this.value)
-    );
+    return isIdentityProfileHandleValueValid(this.value);
   }
 }

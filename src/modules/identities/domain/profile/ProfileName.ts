@@ -1,7 +1,9 @@
 import { StringValueObject } from '@haskou/value-objects';
 
+import { IDENTITY_PROFILE_NAME_MAX_LENGTH } from './IdentityProfileConstraints';
+
 export class ProfileName extends StringValueObject {
-  public static readonly MAX_LENGTH = 20;
+  public static readonly MAX_LENGTH = IDENTITY_PROFILE_NAME_MAX_LENGTH;
 
   public static fromString(value: string | StringValueObject): ProfileName {
     return new ProfileName(value);
