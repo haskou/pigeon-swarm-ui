@@ -22,7 +22,6 @@ import type {
   CommunityChannel,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
-  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
@@ -51,7 +50,6 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessagePin,
-  MessageReplyPreview,
   MessageResource,
   MyStickersResource,
   NotificationResource,
@@ -68,20 +66,28 @@ import type {
   Session,
   SelectablePresenceStatus,
   StickerInput,
-  StickerMessageReference,
   StickerPackInput,
   StickerPackResource,
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
+import type { CachedIdentity } from './PigeonApiGateway/CachedIdentity';
+import type { CachedRequestEntry } from './PigeonApiGateway/CachedRequestEntry';
+import type { CachedRequestOptions } from './PigeonApiGateway/CachedRequestOptions';
+import type { CommunityChannelMessageEditInput } from './PigeonApiGateway/CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from './PigeonApiGateway/CommunityChannelMessageInput';
+import type { CommunityInviteLinkBody } from './PigeonApiGateway/CommunityInviteLinkBody';
+import type { CommunityInviteLinkInput } from './PigeonApiGateway/CommunityInviteLinkInput';
+import type { ConversationInvitationType } from './PigeonApiGateway/ConversationInvitationType';
+import type { EncryptMessagePayloadInput } from './PigeonApiGateway/EncryptMessagePayloadInput';
+import type { MessageDecryptWorker } from './PigeonApiGateway/MessageDecryptWorker';
+import type { MessageLoadOptions } from './PigeonApiGateway/MessageLoadOptions';
+import type { PublishedCommunityKey } from './PigeonApiGateway/PublishedCommunityKey';
 
 import { AttachmentExternalIdentifiers } from '../../contexts/attachments/domain/AttachmentExternalIdentifiers';
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
-import {
-  encryptCommunityInviteKey,
-  type EncryptedCommunityKey,
-} from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { encryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
@@ -116,6 +122,11 @@ import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
 import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
+import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
+import { hasEncryptedPayload } from './PigeonApiGateway/hasEncryptedPayload';
+import { throwIfMessageLoadAborted } from './PigeonApiGateway/throwIfMessageLoadAborted';
+import { uniqueSorted } from './PigeonApiGateway/uniqueSorted';
+import { yieldAfterMessageDecryptBatch } from './PigeonApiGateway/yieldAfterMessageDecryptBatch';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -125,135 +136,6 @@ const defaultKeychain: LocalKeychain = {
 const messageDecryptBatchSize = 8;
 const identityCacheTtlMs = 2 * 60 * 1000;
 const startupReadCacheTtlMs = 1500;
-
-type MessageLoadOptions = {
-  limit?: number;
-  signal?: AbortSignal;
-};
-
-type CachedRequestOptions = {
-  ttlMs?: number;
-};
-
-type CachedRequestEntry<T> = {
-  expiresAt: number;
-  promise: Promise<T>;
-  settled: boolean;
-};
-
-type CachedIdentity = {
-  expiresAt: number;
-  identity: IdentityResource;
-};
-
-type CommunityChannelMessagePayloadInput =
-  | {
-      encryptedPayload: string;
-      plaintextPayload?: never;
-    }
-  | {
-      encryptedPayload?: never;
-      plaintextPayload: string;
-    };
-
-type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  id?: string;
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
-
-type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
-
-type CommunityInviteLinkInput = {
-  expiresAt?: number;
-  maxUses?: number;
-};
-
-type CommunityInviteLinkBody = CommunityInviteLinkInput & {
-  encryptedCommunityKey?: EncryptedCommunityKey;
-};
-
-type PublishedCommunityKey = {
-  keyEntry: ConversationKeyEntry;
-  keychain: LocalKeychain;
-  keychainExternalIdentifier: string;
-};
-
-type MessageDecryptWorker = {
-  decrypt(
-    request: {
-      conversationId: string;
-      copy: {
-        decryptFailed: string;
-        missingKey: string;
-      };
-      currentIdentityId: string;
-      messages: MessageResource[];
-      privateKey?: string;
-    },
-    signal?: AbortSignal,
-  ): Promise<ChatMessage[]>;
-};
-
-type EncryptMessagePayloadInput = {
-  content: string;
-  conversationId: string;
-  eventType?:
-    | 'MessageEdited'
-    | 'MessageSent'
-    | 'StickerMessageSent'
-    | 'ThreadMessageSent'
-    | 'ThreadStickerMessageSent';
-  key: ConversationKeyEntry;
-  linkPreview?: MessageLinkPreview;
-  messageAttachments: MessageAttachment[];
-  replyPreview?: MessageReplyPreview;
-  session: Session;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp: number;
-};
-
-function throwIfMessageLoadAborted(signal?: AbortSignal): void {
-  if (!signal?.aborted) return;
-
-  const error = new Error('Message load aborted');
-
-  error.name = 'AbortError';
-  throw error;
-}
-
-function hasEncryptedPayload(message: MessageResource): boolean {
-  return Boolean(message.encryptedPayload ?? message.payload);
-}
-
-async function yieldAfterMessageDecryptBatch(): Promise<void> {
-  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort();
-}
-
-function communityInviteLinkBody(
-  input: CommunityInviteLinkInput,
-  encryptedCommunityKey?: EncryptedCommunityKey,
-): CommunityInviteLinkBody {
-  return {
-    ...(encryptedCommunityKey ? { encryptedCommunityKey } : {}),
-    ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
-    ...(input.maxUses !== undefined ? { maxUses: input.maxUses } : {}),
-  };
-}
-
-type ConversationInvitationType =
-  | 'conversation_invitation'
-  | 'group_conversation_invitation';
 
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsGateway;
@@ -1264,7 +1146,7 @@ export class PigeonApiGateway {
       existingKeyEntry,
     );
     const encryptedKey = await encryptCommunityInviteKey(published.keyEntry);
-    const body = communityInviteLinkBody(
+    const body = buildCommunityInviteLinkBody(
       input,
       encryptedKey.encryptedCommunityKey,
     );
@@ -1355,7 +1237,7 @@ export class PigeonApiGateway {
     const invite = await this.postCommunityInviteLink(
       session,
       path,
-      communityInviteLinkBody(input),
+      buildCommunityInviteLinkBody(input),
     );
 
     return {

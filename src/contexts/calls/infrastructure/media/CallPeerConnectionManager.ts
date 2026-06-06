@@ -2,6 +2,8 @@ import type {
   CallSignalType,
   ScreenShareQualityPreset,
 } from '../../domain/callSession.types';
+import type { BrowserWindowWithWebkitAudioContext } from './BrowserWindowWithWebkitAudioContext';
+import type { PeerNegotiationState } from './PeerNegotiationState';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
@@ -28,17 +30,6 @@ import {
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './callPeerStats';
-
-type BrowserWindowWithWebkitAudioContext = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-type PeerNegotiationState = {
-  ignoreOffer: boolean;
-  makingOffer: boolean;
-  polite: boolean;
-};
 
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
