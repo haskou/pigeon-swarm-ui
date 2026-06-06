@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Peer } from '../../application/list-peers/ListPeers';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { NodeBootstrapApi } from '../../infrastructure/http/NodeBootstrapApi';
 
@@ -17,11 +18,15 @@ type PeersState = {
 
 type UsePeersInput = {
   autoLoad?: boolean;
+  deferAutoLoad?: boolean;
 };
 
-export function usePeers({ autoLoad = true }: UsePeersInput = {}): PeersState {
+export function usePeers({
+  autoLoad = true,
+  deferAutoLoad = false,
+}: UsePeersInput = {}): PeersState {
   const [peers, setPeers] = useState<Peer[]>([]);
-  const [loading, setLoading] = useState(autoLoad);
+  const [loading, setLoading] = useState(autoLoad && !deferAutoLoad);
   const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
@@ -40,8 +45,14 @@ export function usePeers({ autoLoad = true }: UsePeersInput = {}): PeersState {
   useEffect(() => {
     if (!autoLoad) return;
 
-    void reload();
-  }, [autoLoad, reload]);
+    if (!deferAutoLoad) {
+      void reload();
+
+      return;
+    }
+
+    return runWhenBrowserIdle(() => void reload());
+  }, [autoLoad, deferAutoLoad, reload]);
 
   return { error, loading, peers, reload };
 }
