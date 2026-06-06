@@ -9,7 +9,7 @@ import {
   writeJsonToLocalStorage,
   writeStringToLocalStorage,
 } from '../../../shared/infrastructure/storage/jsonLocalStorage';
-import { DraftPayloadCipher } from '../../../modules/messages/infrastructure/crypto/DraftPayloadCipher';
+import { DraftPayloadCipher } from '../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import {
   communityUnreadStorageKey,
   type CommunityUnreadCounts,

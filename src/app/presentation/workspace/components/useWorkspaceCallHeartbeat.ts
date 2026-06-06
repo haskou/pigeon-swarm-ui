@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 
-import type { CallSession } from '../../../../modules/calls/domain/callSession.types';
+import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
 
-import { logCallWarning } from '../../../../modules/calls/infrastructure/media/callDebugLogger';
+import { logCallWarning } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 
 type WorkspaceCallHeartbeatInput = {
   activeCall: Pick<CallSession, 'id' | 'status'> | null;

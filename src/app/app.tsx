@@ -12,7 +12,7 @@ import { useAppBootstrap } from './presentation/useAppBootstrap';
 import { loadGlassWorkspaceModule } from './presentation/workspace/loadGlassWorkspaceModule';
 
 const AuthScreen = lazy(() =>
-  import('../modules/identities/presentation/auth/AuthScreen').then(
+  import('../contexts/identities/presentation/auth/AuthScreen').then(
     (module) => ({
       default: module.AuthScreen,
     }),
@@ -24,7 +24,7 @@ const GlassWorkspace = lazy(() =>
   })),
 );
 const NetworkCreationScreen = lazy(() =>
-  import('../modules/networks/presentation/components/NetworkCreationScreen').then(
+  import('../contexts/networks/presentation/components/NetworkCreationScreen').then(
     (module) => ({
       default: module.NetworkCreationScreen,
     }),

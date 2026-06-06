@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
-import { IdentityId } from '../../../modules/identities/domain/value-objects/IdentityId';
+import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
 type Clock = () => number;

@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../modules/networks/application/list-peers/ListPeers';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type {
   CallParticipant,
   CallResource,
-} from '../../../../modules/calls/domain/callSession.types';
+} from '../../../../contexts/calls/domain/callSession.types';
 import type {
   ChatMessage,
   Community,
@@ -21,7 +21,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
 
-import { MessageEditPolicy } from '../../../../modules/messages/domain/MessageEditPolicy';
+import { MessageEditPolicy } from '../../../../contexts/messages/domain/MessageEditPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -31,31 +31,31 @@ import {
   MessageContextMenu,
   type MessageContextMenuState,
 } from './messageContextMenu';
-import type { NotificationScopeSettingsTarget } from '../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog';
+import type { NotificationScopeSettingsTarget } from '../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog';
 
 const CommunityDiscoveryDialog = lazy(() =>
-  import('../../../../modules/communities/presentation/components/CommunityDiscoveryDialog').then(
+  import('../../../../contexts/communities/presentation/components/CommunityDiscoveryDialog').then(
     (module) => ({
       default: module.CommunityDiscoveryDialog,
     }),
   ),
 );
 const CreateCommunityDialog = lazy(() =>
-  import('../../../../modules/communities/presentation/components/CreateCommunityDialog').then(
+  import('../../../../contexts/communities/presentation/components/CreateCommunityDialog').then(
     (module) => ({
       default: module.CreateCommunityDialog,
     }),
   ),
 );
 const CreateConversationDialog = lazy(() =>
-  import('../../../../modules/conversations/presentation/components/CreateConversationDialog').then(
+  import('../../../../contexts/conversations/presentation/components/CreateConversationDialog').then(
     (module) => ({
       default: module.CreateConversationDialog,
     }),
   ),
 );
 const IncomingCallDialog = lazy(() =>
-  import('../../../../modules/calls/presentation/components/IncomingCallDialog').then(
+  import('../../../../contexts/calls/presentation/components/IncomingCallDialog').then(
     (module) => ({
       default: module.IncomingCallDialog,
     }),
@@ -67,14 +67,14 @@ const NodeSettingsDialog = lazy(() =>
   })),
 );
 const NotificationsPanel = lazy(() =>
-  import('../../../../modules/notifications/presentation/components/NotificationsPanel').then(
+  import('../../../../contexts/notifications/presentation/components/NotificationsPanel').then(
     (module) => ({
       default: module.NotificationsPanel,
     }),
   ),
 );
 const NotificationScopeSettingsDialog = lazy(() =>
-  import('../../../../modules/notifications/presentation/components/NotificationScopeSettingsDialog').then(
+  import('../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog').then(
     (module) => ({
       default: module.NotificationScopeSettingsDialog,
     }),

@@ -8,18 +8,18 @@ import type {
 } from '../../shared/domain/pigeonResources.types';
 import type { PreloadedConversationMessages } from './workspace/PreloadedConversationMessages';
 
-import { useCommunities } from '../../modules/communities/presentation/hooks/useCommunities';
+import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
 import {
   clearCommunityInviteUrl,
   parseCommunityInviteUrl,
   type PendingCommunityInviteLink,
-} from '../../modules/communities/presentation/view-models/communityInviteLink';
+} from '../../contexts/communities/presentation/view-models/communityInviteLink';
 import {
   clearSavedCredentials,
   loadSavedCredentials,
-} from '../../modules/identities/infrastructure/storage/savedCredentials';
-import { useNodeNetworks } from '../../modules/networks/presentation/hooks/useNodeNetworks';
-import { usePeers } from '../../modules/networks/presentation/hooks/usePeers';
+} from '../../contexts/identities/infrastructure/storage/savedCredentials';
+import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
+import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { loadApplicationContainer } from '../composition/loadApplicationContainer';
 import {
   initialConversationId,

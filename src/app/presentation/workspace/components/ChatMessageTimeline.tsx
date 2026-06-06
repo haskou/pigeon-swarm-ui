@@ -13,7 +13,7 @@ import type {
 import type {
   IdentityNames,
   IdentityPictures,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatDateSeparator } from '../../../../shared/presentation/formatting';
@@ -21,23 +21,23 @@ import { cx } from '../../../../shared/presentation/cx';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
-import { DateSeparator } from '../../../../modules/messages/presentation/components/DateSeparator';
-import { MessageBubble } from '../../../../modules/messages/presentation/components/MessageBubble';
-import { TimelineJumpButton } from '../../../../modules/messages/presentation/components/TimelineJumpButton';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { DateSeparator } from '../../../../contexts/messages/presentation/components/DateSeparator';
+import { MessageBubble } from '../../../../contexts/messages/presentation/components/MessageBubble';
+import { TimelineJumpButton } from '../../../../contexts/messages/presentation/components/TimelineJumpButton';
 import {
   messageReplyImage,
   messageReplySticker,
-} from '../../../../modules/messages/presentation/components/messageTimelineHelpers';
+} from '../../../../contexts/messages/presentation/components/messageTimelineHelpers';
 import {
   messageTimelineEnterClassName,
   messageTimelineEnterStyle,
-} from '../../../../modules/messages/presentation/components/messageTimelineMotion';
+} from '../../../../contexts/messages/presentation/components/messageTimelineMotion';
 import {
   MessageTimelineEntries,
   type MessageThreadSummary,
-} from '../../../../modules/messages/presentation/view-models/MessageTimelineEntries';
-import { PollCard } from '../../../../modules/polls/presentation/components/pollCard';
+} from '../../../../contexts/messages/presentation/view-models/MessageTimelineEntries';
+import { PollCard } from '../../../../contexts/polls/presentation/components/pollCard';
 import { LockIcon } from './LockIcon';
 
 type LoadState = 'idle' | 'loading' | 'error';

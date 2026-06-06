@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   ConversationResource,
   IdentityPresence,
@@ -16,7 +16,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import {
   IdentityMemberListPanel,
   type IdentityMemberListItem,
-} from '../../../../modules/identities/presentation/components/IdentityMemberListPanel';
+} from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 
 type GroupParticipant = {
   identity?: IdentityResource;

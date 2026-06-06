@@ -1,4 +1,4 @@
-import type { CallResource } from '../../../../modules/calls/domain/callSession.types';
+import type { CallResource } from '../../../../contexts/calls/domain/callSession.types';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
 import {

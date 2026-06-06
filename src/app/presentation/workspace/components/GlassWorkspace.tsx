@@ -1,9 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
-  type ReactElement,
   type SetStateAction,
-  lazy,
   startTransition,
   Suspense,
   useCallback,
@@ -14,15 +12,15 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../modules/networks/application/list-peers/ListPeers';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type {
   CallParticipant,
   CallParticipantStatus,
   CallResource,
   CallSignalType,
   CallSession,
-} from '../../../../modules/calls/domain/callSession.types';
+} from '../../../../contexts/calls/domain/callSession.types';
 import type {
   ChatMessage,
   AttachmentProgress,
@@ -31,11 +29,8 @@ import type {
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
-  ConversationInvitationNotificationResource,
   IdentityResource,
   MessageResource,
-  NotificationMentionContext,
-  CommunityInvitationNotificationResource,
   NotificationResource,
   NotificationSettingScope,
   PollResource,
@@ -47,64 +42,64 @@ import type {
   RealtimeTypingInput,
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/realtimeGateway';
-import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
+import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../../modules/attachments/domain/PendingMessageAttachments';
-import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
-import { CommunityAccessPolicy } from '../../../../modules/communities/domain/CommunityAccessPolicy';
-import { CommunityChannels } from '../../../../modules/communities/domain/CommunityChannels';
-import { ConversationKeychain } from '../../../../modules/conversations/domain/ConversationKeychain';
-import { ConversationTimeline } from '../../../../modules/conversations/domain/ConversationTimeline';
-import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
-import { MessageCollection } from '../../../../modules/messages/domain/MessageCollection';
-import { replyPreviewFromMessage } from '../../../../modules/messages/presentation/view-models/replyPreviewFromMessage';
-import { ThreadMessageVisibility } from '../../../../modules/messages/presentation/view-models/ThreadMessageVisibility';
+import { PendingMessageAttachments } from '../../../../contexts/attachments/domain/PendingMessageAttachments';
+import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { CommunityAccessPolicy } from '../../../../contexts/communities/domain/CommunityAccessPolicy';
+import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { ConversationKeychain } from '../../../../contexts/conversations/domain/ConversationKeychain';
+import { ConversationTimeline } from '../../../../contexts/conversations/domain/ConversationTimeline';
+import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
+import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
+import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import {
   MessageScrollAnchor,
   type MessageScrollAnchorSnapshot,
-} from '../../../../modules/messages/presentation/view-models/MessageScrollAnchor';
-import { MessageReactions } from '../../../../modules/messages/domain/MessageReactions';
-import { MessageCollectionDialog } from '../../../../modules/messages/presentation/components/MessageCollectionDialog';
-import { MessageThreadPanel } from '../../../../modules/messages/presentation/components/MessageThreadPanel';
-import { SharedNetworkSelection } from '../../../../modules/networks/domain/SharedNetworkSelection';
+} from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
+import { MessageReactions } from '../../../../contexts/messages/domain/MessageReactions';
+import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
+import { SharedNetworkSelection } from '../../../../contexts/networks/domain/SharedNetworkSelection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   logCallDebug,
   logCallError,
   logCallWarning,
-} from '../../../../modules/calls/infrastructure/media/callDebugLogger';
-import { CallMicrophoneCapture } from '../../../../modules/calls/infrastructure/media/CallMicrophoneCapture';
-import { useCallSession } from '../../../../modules/calls/presentation/hooks/useCallSession';
-import { SeenCommunityMembershipRequests } from '../../../../modules/communities/infrastructure/storage/SeenCommunityMembershipRequests';
-import { useCommunityMembershipRequests } from '../../../../modules/communities/presentation/hooks/useCommunityMembershipRequests';
+} from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
+import { CallMicrophoneCapture } from '../../../../contexts/calls/infrastructure/media/CallMicrophoneCapture';
+import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
+import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
-import { useIdentityDirectory } from '../../../../modules/identities/presentation/hooks/useIdentityDirectory';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
-import { useUnreadMessages } from '../../../../modules/messages/presentation/hooks/useUnreadMessages';
+import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
 import {
   currentPwaNotificationPermission,
   deletePwaPushSubscription,
   ensurePwaPushSubscription,
   type PwaNotificationPermission,
   showPwaNotification,
-} from '../../../../modules/notifications/infrastructure/browser/pwaNotifications';
-import { useNotifications } from '../../../../modules/notifications/presentation/hooks/useNotifications';
-import { useNotificationScopeSettings } from '../../../../modules/notifications/presentation/hooks/useNotificationScopeSettings';
-import { useNotificationCommunityPreviews } from '../../../../modules/notifications/presentation/hooks/useNotificationCommunityPreviews';
-import { NotificationSettingsPolicy } from '../../../../modules/notifications/domain/NotificationSettingsPolicy';
+} from '../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
+import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
+import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
+import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
-} from '../../../../modules/notifications/presentation/view-models/notificationPreviews';
+} from '../../../../contexts/notifications/presentation/view-models/notificationPreviews';
 import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
 import {
   activeTypingIdentityIds,
@@ -160,58 +155,30 @@ import {
   communitiesWithCallVoicePresence,
   communityVoiceChannelTopologyKey,
 } from './communityVoicePresence';
-
-let inspectorModulePromise: Promise<typeof import('./Inspector')> | null = null;
-let sidebarModulePromise: Promise<typeof import('./Sidebar')> | null = null;
-let communityWorkspaceModulePromise: Promise<
-  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
-> | null = null;
-
-function loadInspectorModule(): Promise<typeof import('./Inspector')> {
-  inspectorModulePromise ??= import('./Inspector');
-
-  return inspectorModulePromise;
-}
-
-function loadSidebarModule(): Promise<typeof import('./Sidebar')> {
-  sidebarModulePromise ??= import('./Sidebar');
-
-  return sidebarModulePromise;
-}
-
-function loadCommunityWorkspaceModule(): Promise<
-  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
-> {
-  communityWorkspaceModulePromise ??= import(
-    '../../../../modules/communities/presentation/components/CommunityWorkspace'
-  );
-
-  return communityWorkspaceModulePromise;
-}
-
-void loadInspectorModule();
-void loadSidebarModule();
-
-const Inspector = lazy(() =>
-  loadInspectorModule().then((module) => ({
-    default: module.Inspector,
-  })),
-);
-const Sidebar = lazy(() =>
-  loadSidebarModule().then((module) => ({
-    default: module.Sidebar,
-  })),
-);
-const WorkspaceDialogs = lazy(() =>
-  import('./WorkspaceDialogs').then((module) => ({
-    default: module.WorkspaceDialogs,
-  })),
-);
-const CommunityWorkspace = lazy(() =>
-  loadCommunityWorkspaceModule().then((module) => ({
-    default: module.CommunityWorkspace,
-  })),
-);
+import {
+  type ConversationThreadState,
+  type EditingMessage,
+  type MessageCollectionState,
+  mergeConversationMessageIfTargetExists,
+  mergeConversationThreadMessage,
+  removeConversationThreadMessage,
+} from './conversationThreadState';
+import {
+  CommunityWorkspace,
+  Inspector,
+  InspectorStartupFallback,
+  preloadCommunityWorkspace,
+  Sidebar,
+  SidebarStartupFallback,
+  WorkspaceDialogs,
+} from './workspaceLazyComponents';
+import {
+  canActOnMembershipRequest,
+  isPendingCommunityInvitationFor,
+  isPendingConversationInvitationFor,
+  notificationMentionContext,
+  stableUniqueKey,
+} from './workspaceNotificationState';
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -223,267 +190,6 @@ type PendingSend = {
   sticker?: StickerMessageReference;
 };
 type FailedSends = Record<string, PendingSend>;
-type MessageCollectionState = {
-  error: null | string;
-  messages: ChatMessage[];
-  state: 'loading' | 'ready';
-};
-type ConversationThreadState = MessageCollectionState & {
-  draft: string;
-  editingMessage: EditingMessage | null;
-  replyTarget: ChatMessage | null;
-  root: ChatMessage;
-};
-type EditingMessage = {
-  message: ChatMessage;
-  previousDraft: string;
-};
-
-function stableUniqueKey(values: string[]): string {
-  return [...new Set(values.filter(Boolean))].sort().join('\u0000');
-}
-
-function isPendingConversationInvitationFor(
-  notification: NotificationResource,
-  conversationId: string,
-  recipientIdentityId: string,
-): notification is ConversationInvitationNotificationResource {
-  return (
-    notification.state === 'pending' &&
-    notification.recipientIdentityId === recipientIdentityId &&
-    (notification.type === 'conversation_invitation' ||
-      notification.type === 'group_conversation_invitation') &&
-    notification.payload.conversationId === conversationId
-  );
-}
-
-function SidebarStartupFallback(): ReactElement {
-  return (
-    <aside
-      aria-hidden="true"
-      className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4"
-    >
-      <div className="h-12 rounded-2xl bg-fuchsia-500/70 shadow-xl shadow-fuchsia-950/20" />
-      <div className="mt-5 h-3 w-40 rounded-full bg-white/18" />
-      <div className="mt-4 h-11 rounded-2xl bg-black/18" />
-      <div className="mt-4 space-y-2">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center gap-3 rounded-2xl bg-white/8 p-3"
-          >
-            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-cyan-300/75 to-fuchsia-400/75" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-28 rounded-full bg-white/20" />
-              <div className="h-3 w-20 rounded-full bg-white/12" />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-auto flex items-center gap-3 rounded-2xl bg-white/10 p-3">
-        <div className="h-12 w-12 rounded-2xl bg-white/18" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-4 w-24 rounded-full bg-white/20" />
-          <div className="h-3 w-16 rounded-full bg-white/12" />
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function InspectorStartupFallback(): ReactElement {
-  return (
-    <aside
-      aria-hidden="true"
-      className="inspector-panel hidden h-full min-h-0 flex-col gap-3 border-l border-white/10 p-4 xl:flex"
-    >
-      {Array.from({ length: 2 }).map((_, index) => (
-        <div
-          key={index}
-          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3"
-        >
-          <div className="absolute inset-y-0 right-0 w-32 bg-white/10" />
-          <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
-          <div className="relative min-w-0 flex-1 space-y-2">
-            <div className="h-4 w-24 rounded-full bg-white/20" />
-            <div className="h-3 w-16 rounded-full bg-white/12" />
-          </div>
-        </div>
-      ))}
-    </aside>
-  );
-}
-
-function isPendingCommunityInvitationFor(
-  notification: NotificationResource,
-  communityId: string,
-  recipientIdentityId: string,
-): notification is CommunityInvitationNotificationResource {
-  return (
-    notification.state === 'pending' &&
-    notification.recipientIdentityId === recipientIdentityId &&
-    notification.type === 'community_invitation' &&
-    notification.payload.communityId === communityId
-  );
-}
-
-function stringArrayAttribute(
-  event: RealtimeDomainEvent,
-  ...names: string[]
-): string[] {
-  for (const name of names) {
-    const value = event.attributes[name];
-
-    if (Array.isArray(value)) {
-      return value.filter((item): item is string => typeof item === 'string');
-    }
-  }
-
-  return [];
-}
-
-function booleanAttribute(
-  event: RealtimeDomainEvent,
-  ...names: string[]
-): boolean {
-  return names.some((name) => event.attributes[name] === true);
-}
-
-function mergeConversationMessageIfTargetExists(
-  currentMessages: ChatMessage[],
-  incomingMessage: ChatMessage,
-): ChatMessage[] {
-  const targetMessageId = incomingMessage.raw.targetMessageId;
-
-  if (
-    incomingMessage.raw.type === 'edited' &&
-    targetMessageId &&
-    !currentMessages.some((message) => message.id === targetMessageId)
-  ) {
-    return currentMessages;
-  }
-
-  return MessageCollection.merge(currentMessages, [incomingMessage]);
-}
-
-function mergeConversationThreadMessage(
-  currentThread: ConversationThreadState,
-  incomingMessage: ChatMessage,
-): ConversationThreadState {
-  const rootMessages = mergeConversationMessageIfTargetExists(
-    [currentThread.root],
-    incomingMessage,
-  );
-  const threadMessages = ThreadMessageVisibility.belongsToRoot(
-    currentThread.root.id,
-    incomingMessage,
-  )
-    ? mergeConversationMessageIfTargetExists(
-        currentThread.messages,
-        incomingMessage,
-      )
-    : currentThread.messages;
-
-  return {
-    ...currentThread,
-    messages: threadMessages,
-    root:
-      rootMessages.find((message) => message.id === currentThread.root.id) ??
-      currentThread.root,
-  };
-}
-
-function removeConversationThreadMessage(
-  currentThread: ConversationThreadState,
-  messageId: string,
-): ConversationThreadState | null {
-  if (currentThread.root.id === messageId) return null;
-
-  const deletingEditedMessage =
-    currentThread.editingMessage?.message.id === messageId;
-  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
-
-  return {
-    ...currentThread,
-    draft: deletingEditedMessage
-      ? (currentThread.editingMessage?.previousDraft ?? '')
-      : currentThread.draft,
-    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
-    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
-    messages: currentThread.messages.filter(
-      (message) => message.id !== messageId,
-    ),
-  };
-}
-
-function canActOnMembershipRequest(
-  request: CommunityMembershipRequest,
-  communities: Community[],
-  currentIdentityId: string,
-): boolean {
-  if (request.status !== 'pending') return false;
-
-  if (request.type === 'invitation') {
-    return request.identityId === currentIdentityId;
-  }
-
-  return communities.some(
-    (community) =>
-      community.id === request.communityId &&
-      community.ownerIdentityId === currentIdentityId,
-  );
-}
-
-function notificationMentionContext(input: {
-  currentIdentityId: string;
-  currentRoleIds?: string[];
-  event: RealtimeDomainEvent;
-  message?: MessageResource;
-}): NotificationMentionContext {
-  const mentions = input.message?.mentions ?? [];
-  const mentionedIdentityIds = [
-    ...stringArrayAttribute(
-      input.event,
-      'mentionedIdentityIds',
-      'mentioned_identity_ids',
-    ),
-    ...mentions
-      .filter((mention) => mention.type === 'identity')
-      .map((mention) => mention.targetId),
-  ];
-  const mentionedRoleIds = [
-    ...stringArrayAttribute(
-      input.event,
-      'mentionedRoleIds',
-      'mentioned_role_ids',
-    ),
-    ...mentions
-      .filter((mention) => mention.type === 'role')
-      .map((mention) => mention.targetId),
-  ];
-
-  return {
-    currentIdentityId: input.currentIdentityId,
-    currentRoleIds: input.currentRoleIds,
-    mentionedIdentityIds,
-    mentionedRoleIds,
-    mentionedRoleMemberIds: stringArrayAttribute(
-      input.event,
-      'mentionedRoleMemberIds',
-      'mentioned_role_member_ids',
-    ),
-    mentionsEveryoneOrHere:
-      booleanAttribute(
-        input.event,
-        'mentionsEveryoneOrHere',
-        'mentions_everyone_or_here',
-      ) ||
-      mentions.some(
-        (mention) => mention.type === 'everyone' || mention.type === 'here',
-      ),
-  };
-}
-
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -930,7 +636,7 @@ export function GlassWorkspace({
   useEffect(() => {
     if (workspaceMode !== 'community') return;
 
-    void loadCommunityWorkspaceModule();
+    void preloadCommunityWorkspace();
   }, [workspaceMode]);
 
   useEffect(() => {

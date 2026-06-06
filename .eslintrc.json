@@ -171,7 +171,24 @@
       "error",
       8
     ],
-    "@typescript-eslint/member-ordering": "off",
+    "@typescript-eslint/member-ordering": [
+      "warn",
+      {
+        "default": [
+          "field",
+          "static-field",
+          "private-static-field",
+          "public-static-field",
+          "private-instance-field",
+          "public-instance-field",
+          "private-static-method",
+          "public-static-method",
+          "constructor",
+          "private-method",
+          "public-method"
+        ]
+      }
+    ],
     "max-params": [
       "warn",
       7
@@ -230,6 +247,13 @@
             "message": "Domain layer cannot import infrastructure."
           }
         ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Program > :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']) ~ :matches(ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExportNamedDeclaration[declaration.type='ClassDeclaration'], ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration'], ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration'])",
+        "message": "Keep one top-level class, type, or interface per file. Move additional declarations to their own file when touching this code."
       }
     ]
   },

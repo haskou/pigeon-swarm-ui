@@ -12,11 +12,11 @@ import { cx } from '../../../../shared/presentation/cx';
 import {
   type EmojiSuggestion,
   searchEmojiSuggestions,
-} from '../../../../modules/messages/presentation/emoji/emojiShortcodes';
+} from '../../../../contexts/messages/presentation/emoji/emojiShortcodes';
 import {
   loadRecentReactionEmojis,
   saveRecentReactionEmoji,
-} from '../../../../modules/messages/presentation/emoji/recentReactionEmojis';
+} from '../../../../contexts/messages/presentation/emoji/recentReactionEmojis';
 import {
   CopyIcon,
   DataIcon,
@@ -26,13 +26,13 @@ import {
   ReplyIcon,
   ThreadIcon,
   TrashIcon,
-} from '../../../../modules/messages/presentation/components/messageActionIcons';
+} from '../../../../contexts/messages/presentation/components/messageActionIcons';
 import {
   formatFileSize,
   isAudioAttachment,
   isImageAttachment,
   isVideoAttachment,
-} from '../../../../modules/messages/presentation/components/messageAttachments';
+} from '../../../../contexts/messages/presentation/components/messageAttachments';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';

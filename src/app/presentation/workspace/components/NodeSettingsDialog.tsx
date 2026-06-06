@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../modules/networks/application/list-peers/ListPeers';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type {
   IdentityResource,
   IpfsReplicationStatus,
@@ -10,7 +10,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { NetworkInviteCode } from '../../../../modules/networks/domain/networkInviteCode';
+import { NetworkInviteCode } from '../../../../contexts/networks/domain/networkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';

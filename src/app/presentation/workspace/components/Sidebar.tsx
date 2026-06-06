@@ -8,8 +8,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { CallSession } from '../../../../modules/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
 import type {
   ConversationResource,
   IdentityPresence,
@@ -19,7 +19,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import {
@@ -31,12 +31,12 @@ import {
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
-import { PresenceStatusDot } from '../../../../modules/identities/presentation/components/presenceStatusDot';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
-import { loadPublicImage } from '../../../../modules/communities/presentation/components/communityImages';
-import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
+import { loadPublicImage } from '../../../../contexts/communities/presentation/components/communityImages';
+import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {

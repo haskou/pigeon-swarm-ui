@@ -2,7 +2,7 @@ import type {
   CallParticipant,
   CallResource,
   CallSession,
-} from '../../../../modules/calls/domain/callSession.types';
+} from '../../../../contexts/calls/domain/callSession.types';
 import type {
   Community,
   ConversationResource,
@@ -12,10 +12,10 @@ import type {
 import type {
   IdentityNames,
   IdentityPictures,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
-import { CommunityChannels } from '../../../../modules/communities/domain/CommunityChannels';
-import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
+import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
 import { shortId } from '../../../../shared/presentation/formatting';
 
 export type WorkspaceCallDetails = {
