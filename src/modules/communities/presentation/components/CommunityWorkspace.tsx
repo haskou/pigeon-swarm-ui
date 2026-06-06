@@ -2590,6 +2590,9 @@ export function CommunityWorkspace({
             ? deleteThreadMessage(message)
             : messageComposer.handleDeleteChannelMessage(message))
         }
+        onDownloadAttachment={(attachment) =>
+          void messageComposer.openAttachment(attachment)
+        }
         onEditMessage={(message) =>
           messageContextMenu?.source === 'thread'
             ? startEditingThreadMessage(message)

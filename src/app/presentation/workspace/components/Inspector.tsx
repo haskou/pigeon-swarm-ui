@@ -11,12 +11,14 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
 import { memberPrimaryName } from '../../../../modules/communities/presentation/components/communityMemberNames';
 import {
-  IdentityMemberListPanel,
   type IdentityMemberListItem,
 } from '../../../../modules/identities/presentation/components/IdentityMemberListPanel';
+import {
+  IdentityMembersAside,
+  type IdentityMembersAsideVariant,
+} from '../../../../modules/identities/presentation/components/IdentityMembersAside';
 import { profileAnchorFromTarget } from '../../../../modules/identities/presentation/view-models/profilePopoverAnchor';
 
 const UserProfileDialog = lazy(() =>
@@ -36,7 +38,6 @@ interface InspectorProps {
   identityPictures: Record<string, string>;
   identityProfiles: Record<string, IdentityResource>;
   nodeNetworks: NodeNetwork[];
-  onClose?: () => void;
   onGroupInviteOpen?: () => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
@@ -44,6 +45,8 @@ interface InspectorProps {
     networkId?: string,
   ) => Promise<void>;
   presenceByIdentityId?: Record<string, IdentityPresence>;
+  transitionState?: 'closing' | 'open';
+  variant?: IdentityMembersAsideVariant;
 }
 
 export function Inspector({
@@ -54,11 +57,12 @@ export function Inspector({
   identityPictures,
   identityProfiles,
   nodeNetworks,
-  onClose,
   onGroupInviteOpen,
   onOpenConversationWithIdentity,
   presenceByIdentityId = {},
   session,
+  transitionState = 'open',
+  variant = 'desktop',
 }: InspectorProps) {
   const [profileViewer, setProfileViewer] = useState<{
     anchor?: ReturnType<typeof profileAnchorFromTarget>;
@@ -88,9 +92,16 @@ export function Inspector({
           name:
             identityNames[identityId] ?? memberPrimaryName(identity, identityId),
           pictureUrl: identityPictures[identityId] ?? null,
+          presence: presenceByIdentityId[identityId],
         };
       }),
-    [identityNames, identityPictures, identityProfiles, participantIds],
+    [
+      identityNames,
+      identityPictures,
+      identityProfiles,
+      participantIds,
+      presenceByIdentityId,
+    ],
   );
   const openProfile = (
     participant: IdentityMemberListItem,
@@ -106,38 +117,23 @@ export function Inspector({
   };
 
   return (
-    <aside
-      className={cx(
-        'glass-panel inspector-panel flex flex-col rounded-none p-4',
-        className,
-      )}
-    >
-      <div className="flex min-h-0 flex-1 items-start justify-between gap-3">
-        <IdentityMemberListPanel
-          action={
-            isGroupConversation && onGroupInviteOpen
-              ? {
-                  label: copy.communities.addMember,
-                  onClick: onGroupInviteOpen,
-                }
-              : undefined
-          }
-          className="h-full min-h-0 flex-1"
-          emptyLabel={copy.communities.noMatchingMembers}
-          items={participants}
-          onItemClick={openProfile}
-        />
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15 xl:hidden"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        )}
-      </div>
+    <>
+      <IdentityMembersAside
+        action={
+          isGroupConversation && onGroupInviteOpen
+            ? {
+                label: copy.communities.addMember,
+                onClick: onGroupInviteOpen,
+              }
+            : undefined
+        }
+        className={className}
+        emptyLabel={copy.communities.noMatchingMembers}
+        items={participants}
+        onItemClick={openProfile}
+        transitionState={transitionState}
+        variant={variant}
+      />
 
       {profileViewer && (
         <Suspense fallback={null}>
@@ -164,7 +160,7 @@ export function Inspector({
           />
         </Suspense>
       )}
-    </aside>
+    </>
   );
 }
 

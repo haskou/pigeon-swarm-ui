@@ -4,6 +4,7 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -148,7 +149,14 @@ export function useCommunityChannelMessages({
           return;
         }
 
-        bottomRef.current?.scrollIntoView({ behavior });
+        const scroller = scrollerRef.current;
+
+        if (!scroller) return;
+
+        lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(
+          scroller,
+          behavior,
+        );
       };
 
       if (keepPinned) {
@@ -179,8 +187,8 @@ export function useCommunityChannelMessages({
 
     if (selectedChannelId) onChannelViewedRef.current?.(selectedChannelId);
 
-    bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [selectedChannelId]);
+    scrollChannelToBottom();
+  }, [scrollChannelToBottom, selectedChannelId]);
 
   const handleChannelSelected = useCallback(
     (channelId: string) => {
@@ -294,7 +302,7 @@ export function useCommunityChannelMessages({
       if (Date.now() > keepChannelBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ block: 'end' });
+        lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
       });
     };
 
@@ -312,6 +320,31 @@ export function useCommunityChannelMessages({
       scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (Date.now() > keepChannelBottomUntilRef.current) return undefined;
+
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const scroll = () => {
+      if (
+        scrollerRef.current !== scroller ||
+        Date.now() > keepChannelBottomUntilRef.current
+      ) {
+        return;
+      }
+
+      lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
+      setIsAwayFromBottom(false);
+    };
+    const frame = requestAnimationFrame(scroll);
+
+    scroll();
+
+    return () => cancelAnimationFrame(frame);
+  }, [messageState, messages.length, selectedChannelId]);
 
   useEffect(() => {
     if (!selectedChannelId) {

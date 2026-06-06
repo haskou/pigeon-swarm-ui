@@ -2,7 +2,10 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  MessageAttachment,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
@@ -17,12 +20,19 @@ import {
 import {
   CopyIcon,
   DataIcon,
+  DownloadIcon,
   EditIcon,
   PinIcon,
   ReplyIcon,
   ThreadIcon,
   TrashIcon,
 } from '../../../../modules/messages/presentation/components/messageActionIcons';
+import {
+  formatFileSize,
+  isAudioAttachment,
+  isImageAttachment,
+  isVideoAttachment,
+} from '../../../../modules/messages/presentation/components/messageAttachments';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
@@ -40,6 +50,7 @@ export function MessageContextMenu({
   onClose,
   onCopy,
   onDelete,
+  onDownloadAttachment,
   onEdit,
   onOpenThread,
   onPin,
@@ -54,6 +65,7 @@ export function MessageContextMenu({
   onClose: () => void;
   onCopy?: () => void;
   onDelete?: () => void;
+  onDownloadAttachment?: (attachment: MessageAttachment) => void;
   onEdit?: () => void;
   onOpenThread?: () => void;
   onPin?: () => void;
@@ -90,6 +102,10 @@ export function MessageContextMenu({
   const quickReactions = useMemo(
     () => quickReactionOptions(menu.message, recentEmojis),
     [menu.message, recentEmojis],
+  );
+  const downloadableAttachment = useMemo(
+    () => menu.message.attachments.find(isDownloadableAttachment),
+    [menu.message.attachments],
   );
   const toggleReaction = (emoji: string) => {
     const reacted = Boolean(
@@ -294,6 +310,15 @@ export function MessageContextMenu({
             onClick={() => runAction(onCopy)}
           />
         ) : null}
+        {downloadableAttachment && onDownloadAttachment ? (
+          <MessageMenuAction
+            icon={<DownloadIcon />}
+            label={downloadAttachmentLabel(downloadableAttachment)}
+            onClick={() =>
+              runAction(() => onDownloadAttachment(downloadableAttachment))
+            }
+          />
+        ) : null}
         {onEdit ? (
           <MessageMenuAction
             icon={<EditIcon />}
@@ -407,6 +432,24 @@ function hasReacted(
     (reaction) =>
       reaction.authorIdentityId === currentIdentityId &&
       reaction.emoji === emoji,
+  );
+}
+
+function downloadAttachmentLabel(attachment: MessageAttachment): string {
+  const template = isAudioAttachment(attachment)
+    ? copy.attachments.downloadAudioWithSize
+    : isImageAttachment(attachment)
+      ? copy.attachments.downloadImageWithSize
+      : copy.attachments.downloadVideoWithSize;
+
+  return template.replace('{size}', formatFileSize(attachment.size));
+}
+
+function isDownloadableAttachment(attachment: MessageAttachment): boolean {
+  return (
+    isAudioAttachment(attachment) ||
+    isImageAttachment(attachment) ||
+    isVideoAttachment(attachment)
   );
 }
 

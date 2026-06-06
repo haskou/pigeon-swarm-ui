@@ -10,9 +10,9 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
-  IdentityMemberListPanel,
   type IdentityMemberListItem,
 } from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { IdentityMembersAside } from '../../../identities/presentation/components/IdentityMembersAside';
 
 export type CommunityMemberListItem = {
   identity?: IdentityResource;
@@ -109,32 +109,27 @@ function MembersAside({
   transitionState?: 'closing' | 'open';
   variant: 'desktop' | 'mobile';
 }) {
-  const className =
-    variant === 'desktop'
-      ? 'glass-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block'
-      : 'app-safe-area-drawer-until-xl app-safe-area-drawer-py-4 app-drawer-right glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden';
-
   return (
-    <aside className={className} data-state={transitionState}>
-      <IdentityMemberListPanel
-        action={
-          canInvite
-            ? {
-                label: copy.communities.addMember,
-                onClick: onAddMember,
-              }
-            : undefined
-        }
-        emptyLabel={copy.communities.noMatchingMembers}
-        animationScopeKey={animationScopeKey}
-        items={members.map((member) => ({
-          ...member,
-          owner: member.identityId === community.ownerIdentityId,
-          presence: presenceByIdentityId[member.identityId],
-        } satisfies IdentityMemberListItem))}
-        onItemClick={onMemberClick}
-        ownerLabel={copy.communities.owner}
-      />
-    </aside>
+    <IdentityMembersAside
+      action={
+        canInvite
+          ? {
+              label: copy.communities.addMember,
+              onClick: onAddMember,
+            }
+          : undefined
+      }
+      animationScopeKey={animationScopeKey}
+      emptyLabel={copy.communities.noMatchingMembers}
+      items={members.map((member) => ({
+        ...member,
+        owner: member.identityId === community.ownerIdentityId,
+        presence: presenceByIdentityId[member.identityId],
+      } satisfies IdentityMemberListItem))}
+      onItemClick={onMemberClick}
+      ownerLabel={copy.communities.owner}
+      transitionState={transitionState}
+      variant={variant}
+    />
   );
 }

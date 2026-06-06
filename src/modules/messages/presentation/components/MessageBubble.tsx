@@ -27,6 +27,8 @@ import {
   imageAttachmentAlbumWidthClass,
   ImageAttachmentAlbum,
   isImageAttachment,
+  isVideoAttachment,
+  VideoAttachmentCard,
 } from './messageAttachments';
 import {
   MessageAttachmentProgress,
@@ -138,10 +140,18 @@ export function MessageBubble({
       ),
     [indexedAttachments],
   );
+  const videoAttachments = useMemo(
+    () =>
+      indexedAttachments.filter(({ attachment }) =>
+        isVideoAttachment(attachment),
+      ),
+    [indexedAttachments],
+  );
   const otherAttachments = useMemo(
     () =>
       indexedAttachments.filter(
-        ({ attachment }) => !isImageAttachment(attachment),
+        ({ attachment }) =>
+          !isImageAttachment(attachment) && !isVideoAttachment(attachment),
       ),
     [indexedAttachments],
   );
@@ -170,11 +180,20 @@ export function MessageBubble({
     !sticker;
   const imageOnlyMessage =
     imageAttachments.length > 0 &&
+    videoAttachments.length === 0 &&
     otherAttachments.length === 0 &&
     !hasTextContent &&
     !linkPreview &&
     !sticker;
-  const transparentMessage = sticker || emojiOnlyMessage || imageOnlyMessage;
+  const videoOnlyMessage =
+    videoAttachments.length > 0 &&
+    imageAttachments.length === 0 &&
+    otherAttachments.length === 0 &&
+    !hasTextContent &&
+    !linkPreview &&
+    !sticker;
+  const transparentMessage =
+    sticker || emojiOnlyMessage || imageOnlyMessage || videoOnlyMessage;
 
   useEffect(() => {
     setOriginalMessageOpen(false);
@@ -317,16 +336,19 @@ export function MessageBubble({
                       ? 'rounded-2xl bg-transparent py-2.5'
                       : imageOnlyMessage
                         ? 'rounded-2xl bg-transparent p-0'
-                        : cx(
-                            'rounded-2xl p-2.5',
-                            imageAttachments.length > 0 &&
-                              imageAttachmentAlbumWidthClass,
-                            mine
-                              ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
-                              : mentionHighlighted
-                                ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
-                                : 'border border-white/10 bg-black/25 text-white',
-                          ),
+                        : videoOnlyMessage
+                          ? 'rounded-2xl bg-transparent p-0'
+                          : cx(
+                              'rounded-2xl p-2.5',
+                              (imageAttachments.length > 0 ||
+                                videoAttachments.length > 0) &&
+                                imageAttachmentAlbumWidthClass,
+                              mine
+                                ? 'bg-[#274279] text-left text-white shadow-xl shadow-[#102938]/25'
+                                : mentionHighlighted
+                                  ? 'border border-fuchsia-300/45 bg-fuchsia-600/90 text-white shadow-xl shadow-fuchsia-950/30'
+                                  : 'border border-white/10 bg-black/25 text-white',
+                            ),
                 )}
               >
                 {pinned && !transparentMessage && <PinnedMessageMarker />}
@@ -355,6 +377,16 @@ export function MessageBubble({
                         onPreview={onAttachmentPreview}
                       />
                     )}
+                    {videoAttachments.map(({ attachment }) => (
+                      <VideoAttachmentCard
+                        attachment={attachment}
+                        contained={!videoOnlyMessage}
+                        key={`${message.id}-${attachment.cid}`}
+                        mine={mine}
+                        onPreview={onAttachmentPreview}
+                        pending={message.deliveryStatus === 'pending'}
+                      />
+                    ))}
                     {otherAttachments.map(({ attachment, index }) => (
                       <AttachmentCard
                         attachment={attachment}
@@ -607,7 +639,9 @@ function isInteractiveMessageTarget(
   const target = event.target;
   const interactiveElement =
     target instanceof HTMLElement
-      ? target.closest('a,button,input,textarea,select,[role="button"]')
+      ? target.closest(
+          'a,audio,button,input,select,textarea,video,[role="button"]',
+        )
       : null;
 
   return Boolean(

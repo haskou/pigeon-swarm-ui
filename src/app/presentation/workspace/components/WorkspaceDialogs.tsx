@@ -13,6 +13,7 @@ import type {
   ConversationResource,
   IdentityPresence,
   IdentityResource,
+  MessageAttachment,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationResource,
@@ -166,6 +167,7 @@ interface WorkspaceDialogsProps {
   ) => void;
   onNotificationSettingSave: (setting: NotificationScopeSettingInput) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onDownloadAttachment: (attachment: MessageAttachment) => void;
   onEditMessage: (message: ChatMessage) => void;
   onNetworksUpdated: () => Promise<void>;
   onCopyMessage: (message: ChatMessage) => void;
@@ -247,29 +249,20 @@ function MobileInspectorDialog(
         onClick={close}
         aria-label={copy.dialog.close}
       />
-      <div
-        className="app-safe-area-drawer-until-xl app-drawer-right fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] p-3 xl:hidden"
-        data-state={state}
-      >
-        <Inspector
-          className="h-full overflow-y-auto"
-          session={props.session}
-          activeConversation={props.activeConversation}
-          activeConversationPeerIdentityId={
-            props.activeConversationPeerIdentityId
-          }
-          identityNames={props.identityNames}
-          identityPictures={props.identityPictures}
-          identityProfiles={props.identityProfiles}
-          nodeNetworks={props.nodeNetworks}
-          onClose={close}
-          onGroupInviteOpen={props.onGroupInviteOpen}
-          onOpenConversationWithIdentity={
-            props.onOpenConversationWithIdentity
-          }
-          presenceByIdentityId={props.presenceByIdentityId}
-        />
-      </div>
+      <Inspector
+        session={props.session}
+        activeConversation={props.activeConversation}
+        activeConversationPeerIdentityId={props.activeConversationPeerIdentityId}
+        identityNames={props.identityNames}
+        identityPictures={props.identityPictures}
+        identityProfiles={props.identityProfiles}
+        nodeNetworks={props.nodeNetworks}
+        onGroupInviteOpen={props.onGroupInviteOpen}
+        onOpenConversationWithIdentity={props.onOpenConversationWithIdentity}
+        presenceByIdentityId={props.presenceByIdentityId}
+        transitionState={state}
+        variant="mobile"
+      />
     </>
   );
 }
@@ -311,6 +304,7 @@ function MessageActionDialogs(
             ? () => props.onDeleteMessage(contextMenuMessage)
             : undefined
         }
+        onDownloadAttachment={props.onDownloadAttachment}
         onEdit={
           contextMenuMessage &&
           !contextMenuFromThread &&

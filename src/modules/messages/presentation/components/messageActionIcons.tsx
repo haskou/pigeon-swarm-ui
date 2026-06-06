@@ -46,6 +46,26 @@ export function DataIcon({ className = 'h-4 w-4' }: IconProps) {
   );
 }
 
+export function DownloadIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M12 3v11m0 0 4-4m-4 4-4-4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <path
+        d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
 export function EditIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>

@@ -7,6 +7,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -50,6 +51,7 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { PendingMessageAttachments } from '../../../../modules/attachments/domain/PendingMessageAttachments';
+import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
 import { CommunityAccessPolicy } from '../../../../modules/communities/domain/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../modules/communities/domain/CommunityChannels';
 import { ConversationKeychain } from '../../../../modules/conversations/domain/ConversationKeychain';
@@ -468,6 +470,11 @@ export function GlassWorkspace({
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
+  const { openAttachment: downloadContextAttachment } = useAttachmentDownload({
+    errorMessage: copy.composer.attachmentDownloadError,
+    onErrorChange: setSendError,
+    onProgressChange: setAttachmentProgress,
+  });
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
@@ -2129,10 +2136,7 @@ export function GlassWorkspace({
 
         if (!scroller) return;
 
-        scroller.scrollTo({
-          behavior,
-          top: scroller.scrollHeight,
-        });
+        MessageScrollAnchor.scrollToBottom(scroller, behavior);
         lastScrollTopRef.current = scroller.scrollTop;
       };
 
@@ -2185,8 +2189,7 @@ export function GlassWorkspace({
       if (Date.now() > keepMessageBottomUntilRef.current) return;
 
       requestAnimationFrame(() => {
-        scroller.scrollTop = scroller.scrollHeight;
-        lastScrollTopRef.current = scroller.scrollTop;
+        lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
       });
     };
 
@@ -2204,6 +2207,30 @@ export function GlassWorkspace({
       scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (Date.now() > keepMessageBottomUntilRef.current) return undefined;
+
+    const scroller = scrollerRef.current;
+
+    if (!scroller) return undefined;
+
+    const scroll = () => {
+      if (
+        scrollerRef.current !== scroller ||
+        Date.now() > keepMessageBottomUntilRef.current
+      ) {
+        return;
+      }
+
+      lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
+    };
+    const frame = requestAnimationFrame(scroll);
+
+    scroll();
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeConversation?.id, messageState, messages.length]);
 
   const closeTransientUi = useCallback(() => {
     setMessageContextMenu(null);
@@ -4747,6 +4774,9 @@ export function GlassWorkspace({
               void (messageContextMenu?.source === 'thread'
                 ? handleDeleteConversationThreadMessage(message)
                 : handleDeleteMessage(message))
+            }
+            onDownloadAttachment={(attachment) =>
+              void downloadContextAttachment(attachment)
             }
             onEditMessage={(message) =>
               messageContextMenu?.source === 'thread'

@@ -7,6 +7,7 @@ import type {
   CommunityPermission,
   IdentityPresence,
   IdentityResource,
+  MessageAttachment,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
@@ -113,6 +114,7 @@ type CommunityWorkspaceDialogsProps = {
   onCommunityKeyInputChange: (value: string) => void;
   onCommunityUpdated: (community: Community) => void;
   onDeleteMessage: (message: ChatMessage) => void;
+  onDownloadAttachment: (attachment: MessageAttachment) => void;
   onEditMessage: (message: ChatMessage) => void;
   onOpenMessageThread: (message: ChatMessage) => void;
   onOpenConversationWithIdentity?: (
@@ -170,6 +172,7 @@ export function CommunityWorkspaceDialogs({
   onCommunityKeyInputChange,
   onCommunityUpdated,
   onDeleteMessage,
+  onDownloadAttachment,
   onEditMessage,
   onOpenConversationWithIdentity,
   onOpenMessageThread,
@@ -275,6 +278,7 @@ export function CommunityWorkspaceDialogs({
               ? () => onDeleteMessage(messageContextMenu.message)
               : undefined
           }
+          onDownloadAttachment={onDownloadAttachment}
           onEdit={
             !contextMenuFromThread &&
             CommunityWorkspaceDialogActions.canEditMessage(
