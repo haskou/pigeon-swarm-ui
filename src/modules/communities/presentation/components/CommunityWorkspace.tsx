@@ -89,6 +89,16 @@ import {
   mergeChatMessages,
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
+import { findMentionTrigger } from './communityMentionTrigger';
+import {
+  type CommunityThreadState,
+  isThreadRootMessage,
+  mergeCommunityThreadMessage,
+  placeholderThreadRootMessage,
+  removeCommunityThreadMessage,
+  threadRootLabelKey,
+  threadTitleFromMessage,
+} from './communityThreadState';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
@@ -182,19 +192,6 @@ type MessageCollectionState = {
   error: null | string;
   messages: ChatMessage[];
   state: 'loading' | 'ready';
-};
-
-type CommunityThreadState = MessageCollectionState & {
-  channelId: string;
-  draft: string;
-  editingMessage: CommunityThreadEditingMessage | null;
-  replyTarget: ChatMessage | null;
-  root: ChatMessage;
-};
-
-type CommunityThreadEditingMessage = {
-  message: ChatMessage;
-  previousDraft: string;
 };
 
 type ChannelThreadCacheEntry = {
@@ -2627,120 +2624,4 @@ export function CommunityWorkspace({
       />
     </>
   );
-}
-
-function placeholderThreadRootMessage({
-  channelId,
-  communityId,
-  currentIdentityId,
-  rootMessageId,
-}: {
-  channelId: string;
-  communityId: string;
-  currentIdentityId: string;
-  rootMessageId: string;
-}): ChatMessage {
-  return {
-    attachments: [],
-    authorIdentityId: currentIdentityId,
-    content: copy.messages.originalMessage,
-    encrypted: false,
-    id: rootMessageId,
-    mine: false,
-    raw: {
-      channelId,
-      communityId,
-      id: rootMessageId,
-      type: 'sent',
-    },
-    reactions: [],
-    timestamp: Date.now(),
-  };
-}
-
-function mergeCommunityThreadMessage(
-  currentThread: CommunityThreadState,
-  incomingMessage: ChatMessage,
-): CommunityThreadState {
-  const rootMessages =
-    currentThread.root.id === incomingMessage.id
-      ? mergeChatMessages([currentThread.root], [incomingMessage])
-      : [currentThread.root];
-  const messageAlreadyInThread = currentThread.messages.some(
-    (message) => message.id === incomingMessage.id,
-  );
-  const messageBelongsToThread = ThreadMessageVisibility.belongsToRoot(
-    currentThread.root.id,
-    incomingMessage,
-  );
-  const threadMessages =
-    messageAlreadyInThread || messageBelongsToThread
-      ? mergeChatMessages(currentThread.messages, [incomingMessage])
-      : currentThread.messages;
-
-  return {
-    ...currentThread,
-    messages: threadMessages,
-    root:
-      rootMessages.find((message) => message.id === currentThread.root.id) ??
-      currentThread.root,
-  };
-}
-
-function removeCommunityThreadMessage(
-  currentThread: CommunityThreadState,
-  messageId: string,
-): CommunityThreadState | null {
-  if (currentThread.root.id === messageId) return null;
-
-  const deletingEditedMessage =
-    currentThread.editingMessage?.message.id === messageId;
-  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
-
-  return {
-    ...currentThread,
-    draft: deletingEditedMessage
-      ? (currentThread.editingMessage?.previousDraft ?? '')
-      : currentThread.draft,
-    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
-    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
-    messages: currentThread.messages.filter((message) => message.id !== messageId),
-  };
-}
-
-function threadTitleFromMessage(message: ChatMessage): string {
-  if (message.content.trim()) return message.content.trim().slice(0, 64);
-
-  if (message.sticker) return copy.stickers.stickerAlt;
-
-  if (message.attachments.length > 0) {
-    return message.attachments[0]?.filename ?? copy.messages.thread;
-  }
-
-  return copy.messages.thread;
-}
-
-function isThreadRootMessage(message: ChatMessage): boolean {
-  return !(message.replyToMessageId ?? message.raw.replyToMessageId);
-}
-
-function threadRootLabelKey(channelId: string, rootMessageId: string): string {
-  return `${channelId}:${rootMessageId}`;
-}
-
-function findMentionTrigger(
-  value: string,
-): { end: number; query: string; start: number } | null {
-  const match = /(^|\s)@([^\s@]*)$/.exec(value);
-
-  if (!match || match.index === undefined) return null;
-
-  const prefixLength = match[1]?.length ?? 0;
-  const start = match.index + prefixLength;
-
-  return {
-    end: value.length,
-    query: match[2] ?? '',
-    start,
-  };
 }
