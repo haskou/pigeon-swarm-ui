@@ -1,8 +1,15 @@
-import { lazy, Suspense, type ReactElement, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 
 import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';
 import { useAppBootstrap } from './presentation/useAppBootstrap';
+import { loadGlassWorkspaceModule } from './presentation/workspace/loadGlassWorkspaceModule';
 
 const AuthScreen = lazy(() =>
   import('../modules/identities/presentation/auth/AuthScreen').then(
@@ -12,11 +19,9 @@ const AuthScreen = lazy(() =>
   ),
 );
 const GlassWorkspace = lazy(() =>
-  import('./presentation/workspace/components/GlassWorkspace').then(
-    (module) => ({
-      default: module.GlassWorkspace,
-    }),
-  ),
+  loadGlassWorkspaceModule().then((module) => ({
+    default: module.GlassWorkspace,
+  })),
 );
 const NetworkCreationScreen = lazy(() =>
   import('../modules/networks/presentation/components/NetworkCreationScreen').then(
@@ -117,6 +122,7 @@ function App(): ReactElement {
     nodeNetworks,
     peers,
     pendingCommunityInvite,
+    preloadedConversationMessages,
     session,
     setCommunities,
     setConversations,
@@ -131,6 +137,12 @@ function App(): ReactElement {
     networkCount: nodeNetworks.networks.length,
     sessionPresent: !!session,
   });
+
+  useEffect(() => {
+    if (!isRestoringSession) return;
+
+    void loadGlassWorkspaceModule();
+  }, [isRestoringSession]);
 
   if (screen === 'server-connection' && nodeNetworks.error) {
     return (
@@ -187,10 +199,13 @@ function App(): ReactElement {
             }}
             conversations={conversations}
             communities={communities.communities}
+            communitiesError={communities.error}
+            communitiesLoading={communities.loading}
             onCommunitiesReload={communities.reload}
             setCommunities={setCommunities}
             setConversations={setConversations}
             pendingCommunityInvite={pendingCommunityInvite}
+            preloadedConversationMessages={preloadedConversationMessages}
             onPendingCommunityInviteHandled={setPendingCommunityInviteHandled}
           />
         )}

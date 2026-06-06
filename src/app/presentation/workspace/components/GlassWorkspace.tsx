@@ -1,6 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
+  type ReactElement,
   type SetStateAction,
   lazy,
   startTransition,
@@ -47,6 +48,7 @@ import type {
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/realtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
+import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -148,6 +150,7 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { ChatColumn } from './ChatColumn';
+import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import {
   callAudioStorageKey,
   loadCallNoiseCancellationEnabled,
@@ -158,13 +161,44 @@ import {
   communityVoiceChannelTopologyKey,
 } from './communityVoicePresence';
 
+let inspectorModulePromise: Promise<typeof import('./Inspector')> | null = null;
+let sidebarModulePromise: Promise<typeof import('./Sidebar')> | null = null;
+let communityWorkspaceModulePromise: Promise<
+  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
+> | null = null;
+
+function loadInspectorModule(): Promise<typeof import('./Inspector')> {
+  inspectorModulePromise ??= import('./Inspector');
+
+  return inspectorModulePromise;
+}
+
+function loadSidebarModule(): Promise<typeof import('./Sidebar')> {
+  sidebarModulePromise ??= import('./Sidebar');
+
+  return sidebarModulePromise;
+}
+
+function loadCommunityWorkspaceModule(): Promise<
+  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
+> {
+  communityWorkspaceModulePromise ??= import(
+    '../../../../modules/communities/presentation/components/CommunityWorkspace'
+  );
+
+  return communityWorkspaceModulePromise;
+}
+
+void loadInspectorModule();
+void loadSidebarModule();
+
 const Inspector = lazy(() =>
-  import('./Inspector').then((module) => ({
+  loadInspectorModule().then((module) => ({
     default: module.Inspector,
   })),
 );
 const Sidebar = lazy(() =>
-  import('./Sidebar').then((module) => ({
+  loadSidebarModule().then((module) => ({
     default: module.Sidebar,
   })),
 );
@@ -174,9 +208,7 @@ const WorkspaceDialogs = lazy(() =>
   })),
 );
 const CommunityWorkspace = lazy(() =>
-  import(
-    '../../../../modules/communities/presentation/components/CommunityWorkspace'
-  ).then((module) => ({
+  loadCommunityWorkspaceModule().then((module) => ({
     default: module.CommunityWorkspace,
   })),
 );
@@ -222,6 +254,63 @@ function isPendingConversationInvitationFor(
     (notification.type === 'conversation_invitation' ||
       notification.type === 'group_conversation_invitation') &&
     notification.payload.conversationId === conversationId
+  );
+}
+
+function SidebarStartupFallback(): ReactElement {
+  return (
+    <aside
+      aria-hidden="true"
+      className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4"
+    >
+      <div className="h-12 rounded-2xl bg-fuchsia-500/70 shadow-xl shadow-fuchsia-950/20" />
+      <div className="mt-5 h-3 w-40 rounded-full bg-white/18" />
+      <div className="mt-4 h-11 rounded-2xl bg-black/18" />
+      <div className="mt-4 space-y-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-3 rounded-2xl bg-white/8 p-3"
+          >
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-cyan-300/75 to-fuchsia-400/75" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-28 rounded-full bg-white/20" />
+              <div className="h-3 w-20 rounded-full bg-white/12" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-auto flex items-center gap-3 rounded-2xl bg-white/10 p-3">
+        <div className="h-12 w-12 rounded-2xl bg-white/18" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-4 w-24 rounded-full bg-white/20" />
+          <div className="h-3 w-16 rounded-full bg-white/12" />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function InspectorStartupFallback(): ReactElement {
+  return (
+    <aside
+      aria-hidden="true"
+      className="inspector-panel hidden h-full min-h-0 flex-col gap-3 border-l border-white/10 p-4 xl:flex"
+    >
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div
+          key={index}
+          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3"
+        >
+          <div className="absolute inset-y-0 right-0 w-32 bg-white/10" />
+          <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
+          <div className="relative min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-24 rounded-full bg-white/20" />
+            <div className="h-3 w-16 rounded-full bg-white/12" />
+          </div>
+        </div>
+      ))}
+    </aside>
   );
 }
 
@@ -400,6 +489,8 @@ interface GlassWorkspaceProps {
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
   communities: Community[];
+  communitiesError: Error | null;
+  communitiesLoading: boolean;
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
   onCommunitiesReload: () => Promise<void>;
@@ -408,12 +499,15 @@ interface GlassWorkspaceProps {
   onPendingCommunityInviteHandled?: () => void;
   pendingCommunityInvite?: PendingCommunityInviteLink | null;
   peers: Peer[];
+  preloadedConversationMessages: PreloadedConversationMessages | null;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
 
 export function GlassWorkspace({
   communities,
+  communitiesError,
+  communitiesLoading,
   conversations,
   node,
   nodeNetworks,
@@ -423,6 +517,7 @@ export function GlassWorkspace({
   onPendingCommunityInviteHandled,
   peers,
   pendingCommunityInvite,
+  preloadedConversationMessages,
   session,
   setCommunities,
   setConversations,
@@ -443,9 +538,24 @@ export function GlassWorkspace({
     setWorkspaceMode,
     workspaceMode,
   } = useWorkspacePreferenceState(conversations, session);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [messageCursor, setMessageCursor] = useState<string | null>(null);
-  const [messageState, setMessageState] = useState<LoadState>('idle');
+  const preloadedConversationMessagesRef = useRef(
+    preloadedConversationMessages,
+  );
+  const initialPreloadedMessages = preloadedConversationMessages
+    ? MessageCollection.merge([], preloadedConversationMessages.messages)
+    : [];
+  const loadedMessagesConversationIdRef = useRef<string | null>(
+    preloadedConversationMessages?.conversationId ?? null,
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    () => initialPreloadedMessages,
+  );
+  const [messageCursor, setMessageCursor] = useState<string | null>(
+    preloadedConversationMessages?.nextCursor ?? null,
+  );
+  const [messageState, setMessageState] = useState<LoadState>(
+    preloadedConversationMessages ? 'idle' : 'loading',
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
@@ -514,6 +624,7 @@ export function GlassWorkspace({
     useState<PushNotificationPromptState>('idle');
   const [pushEnableError, setPushEnableError] = useState<string | null>(null);
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
+  const [pushPromptReady, setPushPromptReady] = useState(false);
   const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
     useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
   const communityVoiceTopologyKey = useMemo(
@@ -522,16 +633,21 @@ export function GlassWorkspace({
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const initialRenderedCommunityIdRef = useRef<string | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
   const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
     null,
   );
-  const messageCursorRef = useRef<string | null>(null);
+  const messageCursorRef = useRef<string | null>(
+    preloadedConversationMessages?.nextCursor ?? null,
+  );
   const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
-  const messageStateRef = useRef<LoadState>('idle');
-  const messagesRef = useRef<ChatMessage[]>([]);
+  const messageStateRef = useRef<LoadState>(
+    preloadedConversationMessages ? 'idle' : 'loading',
+  );
+  const messagesRef = useRef<ChatMessage[]>(initialPreloadedMessages);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -792,6 +908,12 @@ export function GlassWorkspace({
     communities,
     communityChannelById,
   });
+  if (!initialRenderedCommunityIdRef.current && activeCommunity?.id) {
+    initialRenderedCommunityIdRef.current = activeCommunity.id;
+  }
+  const animateCommunitySidePanelEntries =
+    !!activeCommunity?.id &&
+    activeCommunity.id !== initialRenderedCommunityIdRef.current;
 
   useWorkspacePreferences({
     activeCommunityId: activeCommunity?.id ?? activeCommunityId,
@@ -804,6 +926,12 @@ export function GlassWorkspace({
     session,
     workspaceMode,
   });
+
+  useEffect(() => {
+    if (workspaceMode !== 'community') return;
+
+    void loadCommunityWorkspaceModule();
+  }, [workspaceMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1160,6 +1288,13 @@ export function GlassWorkspace({
       cancelIdleWork();
     };
   }, [refreshPushPermission, session]);
+
+  useEffect(() => {
+    setPushPromptReady(false);
+    const timeoutId = window.setTimeout(() => setPushPromptReady(true), 2800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [session.identity.id]);
 
   const logout = () => {
     void deletePwaPushSubscription(session).catch(() => undefined);
@@ -2294,6 +2429,7 @@ export function GlassWorkspace({
       messageAbortRef.current?.abort();
       messageAbortRef.current = controller;
       messageRequestRef.current = requestId;
+      loadedMessagesConversationIdRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
       setMessageLoadState('loading');
@@ -2312,6 +2448,7 @@ export function GlassWorkspace({
           setMessages(MessageCollection.merge([], result.messages));
           updateMessageCursor(result.nextCursor ?? null);
           setMessageLoadState('idle');
+          loadedMessagesConversationIdRef.current = conversationId;
         });
         markConversationReadUntil(conversationId, result.messages);
         scrollMessagesToBottom('auto', true);
@@ -2320,6 +2457,7 @@ export function GlassWorkspace({
 
         if (controller.signal.aborted) return;
 
+        loadedMessagesConversationIdRef.current = null;
         setMessages([]);
         setMessageLoadState('error');
         setSendError(
@@ -2355,6 +2493,7 @@ export function GlassWorkspace({
     if (!activeConversationKeyId) {
       messageAbortRef.current?.abort();
       messageAbortRef.current = null;
+      loadedMessagesConversationIdRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;
@@ -2363,11 +2502,33 @@ export function GlassWorkspace({
       return;
     }
 
+    const preloaded = preloadedConversationMessagesRef.current;
+
+    if (preloaded?.conversationId === activeConversation.id) {
+      preloadedConversationMessagesRef.current = null;
+      loadedMessagesConversationIdRef.current = activeConversation.id;
+      setMessages(MessageCollection.merge([], preloaded.messages));
+      updateMessageCursor(preloaded.nextCursor ?? null);
+      setMessageLoadState('idle');
+      markConversationReadUntil(activeConversation.id, preloaded.messages);
+      scrollMessagesToBottom('auto', true);
+
+      return;
+    }
+
+    if (loadedMessagesConversationIdRef.current === activeConversation.id) {
+      return;
+    }
+
     void loadActiveMessages(activeConversation.id);
   }, [
     activeConversation?.id,
     activeConversationKeyId,
     loadActiveMessages,
+    markConversationReadUntil,
+    scrollMessagesToBottom,
+    setMessageLoadState,
+    updateMessageCursor,
     workspaceMode,
   ]);
 
@@ -4198,7 +4359,7 @@ export function GlassWorkspace({
     !!rawMessage ||
     realtimeEventsOpen;
   const showPushEnablePrompt =
-    pushPermission === 'default' && !pushPromptDismissed;
+    pushPromptReady && pushPermission === 'default' && !pushPromptDismissed;
 
   return (
     <section
@@ -4283,7 +4444,7 @@ export function GlassWorkspace({
                   peerCount={peers.length}
                   settingsAttention={nodeUnclaimed}
                 />
-                <Suspense fallback={null}>
+                <Suspense fallback={<SidebarStartupFallback />}>
                   <Sidebar
                     activeCall={activeCall}
                     animationScopeKey={sidebarOpen ? 'open' : 'closed'}
@@ -4483,7 +4644,7 @@ export function GlassWorkspace({
               </Suspense>
             )}
 
-            <Suspense fallback={null}>
+            <Suspense fallback={<InspectorStartupFallback />}>
               <Inspector
                 className="hidden xl:block"
                 session={session}
@@ -4505,11 +4666,14 @@ export function GlassWorkspace({
               />
             </Suspense>
           </>
+        ) : communitiesLoading && !activeCommunity ? (
+          <CommunityWorkspaceStartupFallback />
         ) : activeCommunity ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<CommunityWorkspaceStartupFallback />}>
             <CommunityWorkspace
               key={activeCommunity.id}
               activeChannelId={activeCommunityChannelId}
+              animateSidePanelEntries={animateCommunitySidePanelEntries}
               channelUnreadCounts={
                 visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}
               }
@@ -4629,7 +4793,7 @@ export function GlassWorkspace({
           </Suspense>
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
-            {copy.communities.empty}
+            {communitiesError?.message ?? copy.communities.empty}
           </div>
         )}
       </div>

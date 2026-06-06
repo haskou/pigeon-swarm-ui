@@ -23,6 +23,7 @@ import type {
   Community,
   AttachmentUploadOptions,
   CommunityChannelThreadSummary,
+  CommunityTextChannel,
   CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -47,6 +48,7 @@ import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -60,8 +62,7 @@ import {
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
-import { CommunityChannelList } from './CommunityChannelList';
+import { CommunitySidebar } from './CommunitySidebar';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
 import { loadPublicImage } from './communityImages';
@@ -88,6 +89,16 @@ import {
   mergeChatMessages,
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
+import { findMentionTrigger } from './communityMentionTrigger';
+import {
+  type CommunityThreadState,
+  isThreadRootMessage,
+  mergeCommunityThreadMessage,
+  placeholderThreadRootMessage,
+  removeCommunityThreadMessage,
+  threadRootLabelKey,
+  threadTitleFromMessage,
+} from './communityThreadState';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
@@ -115,6 +126,7 @@ const StickerPackPreviewDialog = lazy(() =>
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
   activeCall?: CallSession | null;
+  animateSidePanelEntries?: boolean;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
   invitationAccepting?: boolean;
@@ -182,22 +194,45 @@ type MessageCollectionState = {
   state: 'loading' | 'ready';
 };
 
-type CommunityThreadState = MessageCollectionState & {
-  channelId: string;
-  draft: string;
-  editingMessage: CommunityThreadEditingMessage | null;
-  replyTarget: ChatMessage | null;
-  root: ChatMessage;
+type ChannelThreadCacheEntry = {
+  storedAt: number;
+  threadsByChannelId: Record<string, CommunityChannelThreadSummary[]>;
 };
 
-type CommunityThreadEditingMessage = {
-  message: ChatMessage;
-  previousDraft: string;
-};
+const CHANNEL_THREAD_CACHE_TTL_MS = 15_000;
+const channelThreadCacheByCommunityId = new Map<
+  string,
+  ChannelThreadCacheEntry
+>();
+
+function threadSummariesByChannelId(
+  channels: CommunityTextChannel[],
+): Record<string, CommunityChannelThreadSummary[]> {
+  return Object.fromEntries(
+    channels.map((channel) => [channel.id, channel.threads ?? []]),
+  );
+}
+
+function cachedChannelThreadsFor(
+  communityId: string,
+): Record<string, CommunityChannelThreadSummary[]> | null {
+  const entry = channelThreadCacheByCommunityId.get(communityId);
+
+  if (!entry) return null;
+
+  if (Date.now() - entry.storedAt > CHANNEL_THREAD_CACHE_TTL_MS) {
+    channelThreadCacheByCommunityId.delete(communityId);
+
+    return null;
+  }
+
+  return entry.threadsByChannelId;
+}
 
 export function CommunityWorkspace({
   activeCall,
   activeChannelId,
+  animateSidePanelEntries = true,
   channelUnreadCounts = {},
   community,
   invitationAccepting = false,
@@ -359,7 +394,7 @@ export function CommunityWorkspace({
   );
   const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
     Record<string, CommunityChannelThreadSummary[]>
-  >({});
+  >(() => threadSummariesByChannelId(textChannels));
   const [threadRootLabels, setThreadRootLabels] = useState<
     Record<string, string>
   >({});
@@ -394,27 +429,41 @@ export function CommunityWorkspace({
     unresolvedThreadRootLabelKeysRef.current.clear();
   }, [community.id]);
   useEffect(() => {
+    setChannelThreadsByChannelId(threadSummariesByChannelId(textChannels));
+  }, [community.id, textChannels]);
+  useEffect(() => {
+    const cached = cachedChannelThreadsFor(community.id);
+
+    if (cached) {
+      setChannelThreadsByChannelId(cached);
+    }
+
     let cancelled = false;
 
-    void applicationContainer
-      .listCommunityChannels(session, community.id)
-      .then((channels) => {
-        if (cancelled) return;
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void applicationContainer
+        .listCommunityChannels(session, community.id)
+        .then((channels) => {
+          if (cancelled) return;
 
-        setChannelThreadsByChannelId(
-          Object.fromEntries(
-            channels
-              .filter((channel) => channel.type === 'text')
-              .map((channel) => [channel.id, channel.threads ?? []]),
-          ),
-        );
-      })
-      .catch(() => undefined);
+          const threadsByChannelId = threadSummariesByChannelId(
+            channels.filter((channel) => channel.type === 'text'),
+          );
+
+          channelThreadCacheByCommunityId.set(community.id, {
+            storedAt: Date.now(),
+            threadsByChannelId,
+          });
+          setChannelThreadsByChannelId(threadsByChannelId);
+        })
+        .catch(() => undefined);
+    });
 
     return () => {
       cancelled = true;
+      cancelIdleWork();
     };
-  }, [community.id, session]);
+  }, [community.id, session, textChannels]);
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
@@ -2053,134 +2102,75 @@ export function CommunityWorkspace({
 
   return (
     <>
-      <button
-        className={cx(
-          'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-          mobileSidebarOpen
-            ? 'opacity-100'
-            : 'pointer-events-none opacity-0',
-        )}
-        onClick={onMobileSidebarClose}
-        aria-label={copy.workspace.closeSidebar}
+      <CommunitySidebar
+        activeCall={activeCall}
+        activeVoiceChannelId={activeVoiceChannelId}
+        animateEntries={animateSidePanelEntries}
+        animationScopeKey={community.id}
+        bannerUrl={bannerUrl}
+        canManageCommunity={
+          owner ||
+          currentPermissions.has('manage_channels') ||
+          currentPermissions.has('manage_roles') ||
+          currentPermissions.has('ban_members')
+        }
+        channelSearch={channelSearch}
+        channelUnreadCounts={channelUnreadCounts}
+        community={community}
+        communityIsPublic={communityIsPublic}
+        mobileRail={mobileRail}
+        mobileSidebarOpen={mobileSidebarOpen}
+        nodeNetworks={nodeNetworks}
+        onBannerOpen={() => setBannerViewerOpen(true)}
+        onCallEnd={onCallEnd}
+        onCallParticipantScreenShareVolumeChange={
+          onCallParticipantScreenShareVolumeChange
+        }
+        onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallScreenShareQualityChange={onCallScreenShareQualityChange}
+        onCallToggleCamera={onCallToggleCamera}
+        onCallToggleDeafen={onCallToggleDeafen}
+        onCallToggleMicrophone={onCallToggleMute}
+        onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+        onCallRetryMicrophone={onCallRetryMicrophone}
+        onCallToggleScreenShare={onCallToggleScreenShare}
+        onChannelSearchChange={setChannelSearch}
+        onManageOpen={() => setManageOpen(true)}
+        onMobileSidebarClose={onMobileSidebarClose}
+        onPresenceChange={onPresenceChange}
+        onPresenceStatusSelected={onPresenceStatusSelected}
+        onTextChannelSelected={handleTextChannelSelected}
+        onTextChannelMuteToggle={(channel) =>
+          onNotificationMuteToggle(channelNotificationScope(channel.id))
+        }
+        onTextChannelNotificationSettingsOpen={(channel) =>
+          onNotificationSettingsOpen({
+            scope: channelNotificationScope(channel.id),
+            subtitle: community.name,
+            title: `# ${channel.name}`,
+          })
+        }
+        onThreadSelected={(channel, thread) =>
+          void openMessageThreadFromSummary(channel.id, thread)
+        }
+        onVoiceChannelJoin={joinVoiceChannel}
+        onVoiceParticipantClick={openVoiceParticipantProfile}
+        onLogout={onLogout}
+        onSessionUpdated={onSessionUpdated}
+        ownIdentityPictures={ownIdentityPictures}
+        presence={presenceByIdentityId[session.identity.id]}
+        selectedChannelId={selectedChannelId}
+        selectedThreadRootMessageId={threadPanel?.root.id}
+        session={session}
+        textChannels={textChannelsWithThreads}
+        textChannelNotificationSetting={channelNotificationSetting}
+        threadLabelByRootMessageId={threadLabelByRootMessageId}
+        visibleTextChannels={visibleTextChannels}
+        visibleVoiceChannels={visibleVoiceChannels}
+        voiceChannelNotificationSetting={channelNotificationSetting}
+        voiceChannels={voiceChannels}
+        voiceParticipantsByChannelId={voiceParticipantsByChannelId}
       />
-      <aside
-        className={cx(
-          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 block w-[92vw] max-w-[430px] p-0 transition-transform duration-200 ease-out sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:translate-x-0',
-          mobileSidebarOpen
-            ? 'translate-x-0'
-            : 'pointer-events-none -translate-x-full lg:pointer-events-auto',
-        )}
-      >
-        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
-          <div className="lg:hidden">{mobileRail}</div>
-          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
-            <div className="min-w-0">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {communityIsPublic
-                  ? copy.communities.publicCommunity
-                  : copy.communities.privateCommunity}
-              </div>
-              <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
-                {bannerUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => setBannerViewerOpen(true)}
-                    className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
-                    aria-label={copy.communities.openBanner}
-                  >
-                    <img
-                      src={bannerUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ) : (
-                  <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
-                    {community.name.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div className="p-4">
-                  <h2 className="truncate text-xl font-black">
-                    {community.name}
-                  </h2>
-                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
-                    {community.description}
-                  </p>
-                  {(owner ||
-                    currentPermissions.has('manage_channels') ||
-                    currentPermissions.has('manage_roles') ||
-                    currentPermissions.has('ban_members')) && (
-                    <button
-                      type="button"
-                      onClick={() => setManageOpen(true)}
-                      className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
-                    >
-                      {copy.communities.manage}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <CommunityChannelList
-              activeVoiceChannelId={activeVoiceChannelId}
-              animationScopeKey={community.id}
-              channelSearch={channelSearch}
-              channelUnreadCounts={channelUnreadCounts}
-              onChannelSearchChange={setChannelSearch}
-              onTextChannelSelected={handleTextChannelSelected}
-              onTextChannelMuteToggle={(channel) =>
-                onNotificationMuteToggle(channelNotificationScope(channel.id))
-              }
-              onTextChannelNotificationSettingsOpen={(channel) =>
-                onNotificationSettingsOpen({
-                  scope: channelNotificationScope(channel.id),
-                  subtitle: community.name,
-                  title: `# ${channel.name}`,
-                })
-              }
-              onThreadSelected={(channel, thread) =>
-                void openMessageThreadFromSummary(channel.id, thread)
-              }
-              onVoiceChannelJoin={joinVoiceChannel}
-              onVoiceParticipantClick={openVoiceParticipantProfile}
-              selectedChannelId={selectedChannelId}
-              selectedThreadRootMessageId={threadPanel?.root.id}
-              textChannels={textChannelsWithThreads}
-              textChannelNotificationSetting={channelNotificationSetting}
-              threadLabelByRootMessageId={threadLabelByRootMessageId}
-              visibleTextChannels={visibleTextChannels}
-              visibleVoiceChannels={visibleVoiceChannels}
-              voiceChannelNotificationSetting={channelNotificationSetting}
-              voiceChannels={voiceChannels}
-              voiceParticipantsByChannelId={voiceParticipantsByChannelId}
-            />
-            <UserProfileDropdown
-              activeCall={activeCall}
-              identityPictures={ownIdentityPictures}
-              nodeNetworks={nodeNetworks}
-              onPresenceChange={onPresenceChange}
-              onPresenceStatusSelected={onPresenceStatusSelected}
-              onCallEnd={onCallEnd}
-              onCallParticipantScreenShareVolumeChange={
-                onCallParticipantScreenShareVolumeChange
-              }
-              onCallParticipantVolumeChange={onCallParticipantVolumeChange}
-              onCallScreenShareQualityChange={onCallScreenShareQualityChange}
-              onCallToggleCamera={onCallToggleCamera}
-              onCallToggleDeafen={onCallToggleDeafen}
-              onCallToggleMute={onCallToggleMute}
-              onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
-              onCallRetryMicrophone={onCallRetryMicrophone}
-              onCallToggleScreenShare={onCallToggleScreenShare}
-              onLogout={onLogout}
-              onSessionUpdated={onSessionUpdated}
-              presence={presenceByIdentityId[session.identity.id]}
-              session={session}
-            />
-          </div>
-        </div>
-      </aside>
 
       <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
         <CommunityHeader
@@ -2506,6 +2496,7 @@ export function CommunityWorkspace({
 
       <CommunityMembersPanel
         community={community}
+        animateEntries={animateSidePanelEntries}
         animationScopeKey={community.id}
         canInvite={owner || currentPermissions.has('create_invites')}
         members={members}
@@ -2633,120 +2624,4 @@ export function CommunityWorkspace({
       />
     </>
   );
-}
-
-function placeholderThreadRootMessage({
-  channelId,
-  communityId,
-  currentIdentityId,
-  rootMessageId,
-}: {
-  channelId: string;
-  communityId: string;
-  currentIdentityId: string;
-  rootMessageId: string;
-}): ChatMessage {
-  return {
-    attachments: [],
-    authorIdentityId: currentIdentityId,
-    content: copy.messages.originalMessage,
-    encrypted: false,
-    id: rootMessageId,
-    mine: false,
-    raw: {
-      channelId,
-      communityId,
-      id: rootMessageId,
-      type: 'sent',
-    },
-    reactions: [],
-    timestamp: Date.now(),
-  };
-}
-
-function mergeCommunityThreadMessage(
-  currentThread: CommunityThreadState,
-  incomingMessage: ChatMessage,
-): CommunityThreadState {
-  const rootMessages =
-    currentThread.root.id === incomingMessage.id
-      ? mergeChatMessages([currentThread.root], [incomingMessage])
-      : [currentThread.root];
-  const messageAlreadyInThread = currentThread.messages.some(
-    (message) => message.id === incomingMessage.id,
-  );
-  const messageBelongsToThread = ThreadMessageVisibility.belongsToRoot(
-    currentThread.root.id,
-    incomingMessage,
-  );
-  const threadMessages =
-    messageAlreadyInThread || messageBelongsToThread
-      ? mergeChatMessages(currentThread.messages, [incomingMessage])
-      : currentThread.messages;
-
-  return {
-    ...currentThread,
-    messages: threadMessages,
-    root:
-      rootMessages.find((message) => message.id === currentThread.root.id) ??
-      currentThread.root,
-  };
-}
-
-function removeCommunityThreadMessage(
-  currentThread: CommunityThreadState,
-  messageId: string,
-): CommunityThreadState | null {
-  if (currentThread.root.id === messageId) return null;
-
-  const deletingEditedMessage =
-    currentThread.editingMessage?.message.id === messageId;
-  const deletingReplyTarget = currentThread.replyTarget?.id === messageId;
-
-  return {
-    ...currentThread,
-    draft: deletingEditedMessage
-      ? (currentThread.editingMessage?.previousDraft ?? '')
-      : currentThread.draft,
-    editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
-    replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
-    messages: currentThread.messages.filter((message) => message.id !== messageId),
-  };
-}
-
-function threadTitleFromMessage(message: ChatMessage): string {
-  if (message.content.trim()) return message.content.trim().slice(0, 64);
-
-  if (message.sticker) return copy.stickers.stickerAlt;
-
-  if (message.attachments.length > 0) {
-    return message.attachments[0]?.filename ?? copy.messages.thread;
-  }
-
-  return copy.messages.thread;
-}
-
-function isThreadRootMessage(message: ChatMessage): boolean {
-  return !(message.replyToMessageId ?? message.raw.replyToMessageId);
-}
-
-function threadRootLabelKey(channelId: string, rootMessageId: string): string {
-  return `${channelId}:${rootMessageId}`;
-}
-
-function findMentionTrigger(
-  value: string,
-): { end: number; query: string; start: number } | null {
-  const match = /(^|\s)@([^\s@]*)$/.exec(value);
-
-  if (!match || match.index === undefined) return null;
-
-  const prefixLength = match[1]?.length ?? 0;
-  const start = match.index + prefixLength;
-
-  return {
-    end: value.length,
-    query: match[2] ?? '',
-    start,
-  };
 }

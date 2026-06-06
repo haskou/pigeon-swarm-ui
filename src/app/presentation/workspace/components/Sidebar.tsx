@@ -46,6 +46,7 @@ import {
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
+  animateEntries?: boolean;
   animationScopeKey?: string;
   session: Session;
   conversations: ConversationResource[];
@@ -95,6 +96,7 @@ interface SidebarProps {
 export function Sidebar({
   activeCall,
   activeConversationId,
+  animateEntries = true,
   animationScopeKey,
   conversationNotificationSetting,
   conversations,
@@ -272,7 +274,7 @@ export function Sidebar({
         {copy.sidebar.createConversation}
       </button>
 
-      <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="mt-5 min-h-0 flex-1 overflow-x-clip overflow-y-auto pr-1">
         <SectionTitle title={copy.sidebar.oneToOneTitle} />
         <ClearableSearchInput
           ariaLabel={copy.sidebar.searchConversations}
@@ -296,8 +298,11 @@ export function Sidebar({
             return (
               <div
                 key={`${animationScopeKey ?? 'conversations'}:${conversation.id}`}
-                className={cx(sidePanelListEnterClassName('left'), 'relative')}
-                style={sidePanelListEnterStyle(index)}
+                className={cx(
+                  sidePanelListEnterClassName('left', animateEntries),
+                  'relative',
+                )}
+                style={sidePanelListEnterStyle(index, animateEntries)}
               >
                 <button
                   type="button"

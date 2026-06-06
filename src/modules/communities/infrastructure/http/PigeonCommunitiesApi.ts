@@ -25,7 +25,14 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
-type CachedRequest = <T>(key: string, loader: () => Promise<T>) => Promise<T>;
+type CachedRequestOptions = { ttlMs?: number };
+type CachedRequest = <T>(
+  key: string,
+  loader: () => Promise<T>,
+  options?: CachedRequestOptions,
+) => Promise<T>;
+
+const startupReadCacheTtlMs = 1500;
 
 type CommunityChannelMessagePayloadInput =
   | {
@@ -89,6 +96,7 @@ export class PigeonCommunitiesApi {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
         }),
+      { ttlMs: startupReadCacheTtlMs },
     );
 
     return result.communities;
@@ -104,6 +112,7 @@ export class PigeonCommunitiesApi {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
         }),
+      { ttlMs: startupReadCacheTtlMs },
     );
   }
 
@@ -303,12 +312,17 @@ export class PigeonCommunitiesApi {
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
     const path = '/communities/membership-requests';
-    const result = await this.http.request<{
-      requests: CommunityMembershipRequest[];
-    }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    const result = await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () =>
+        await this.http.request<{
+          requests: CommunityMembershipRequest[];
+        }>(path, {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        }),
+      { ttlMs: startupReadCacheTtlMs },
+    );
 
     return result.requests;
   }
@@ -484,12 +498,17 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<CommunityChannel[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/channels`;
-    const result = await this.http.request<{
-      channels: CommunityChannel[];
-    }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    const result = await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () =>
+        await this.http.request<{
+          channels: CommunityChannel[];
+        }>(path, {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        }),
+      { ttlMs: startupReadCacheTtlMs },
+    );
 
     return result.channels;
   }
@@ -624,6 +643,7 @@ export class PigeonCommunitiesApi {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
         }),
+      { ttlMs: startupReadCacheTtlMs },
     );
     const messages = Array.isArray(result) ? result : (result.messages ?? []);
     const responseLimit = options.limit ?? 50;
@@ -677,10 +697,15 @@ export class PigeonCommunitiesApi {
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/pins`;
 
-    return await this.http.request<CommunityChannelMessagePinsResource>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    return await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () =>
+        await this.http.request<CommunityChannelMessagePinsResource>(path, {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        }),
+      { ttlMs: startupReadCacheTtlMs },
+    );
   }
 
   public async pinChannelMessage(
@@ -721,22 +746,29 @@ export class PigeonCommunitiesApi {
 
   public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
     const path = '/communities/me/drafts';
-    const result = await this.http.request<CommunityChannelDraftsResource>(
-      path,
-      {
-        headers: await this.signer.headers(session, 'GET', path),
-        method: 'GET',
-      },
-    );
 
-    return await Promise.all(
-      result.drafts.map(async (draft) => ({
-        ...draft,
-        content: await this.draftPayloads.decrypt(
-          session,
-          draft.encryptedPayload,
-        ),
-      })),
+    return await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () => {
+        const result = await this.http.request<CommunityChannelDraftsResource>(
+          path,
+          {
+            headers: await this.signer.headers(session, 'GET', path),
+            method: 'GET',
+          },
+        );
+
+        return await Promise.all(
+          result.drafts.map(async (draft) => ({
+            ...draft,
+            content: await this.draftPayloads.decrypt(
+              session,
+              draft.encryptedPayload,
+            ),
+          })),
+        );
+      },
+      { ttlMs: startupReadCacheTtlMs },
     );
   }
 

@@ -257,6 +257,104 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('deduplicates repeated startup conversation list reads', async () => {
+    const response = {
+      conversations: [
+        {
+          id: 'conversation-1',
+          networkId: 'network-1',
+          participantIdentityIds: ['identity-1', 'identity-2'],
+        },
+      ],
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.listConversations(session)).resolves.toHaveLength(1);
+    await expect(gateway.listConversations(session)).resolves.toHaveLength(1);
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/conversations/?limit=30', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
+  it('deduplicates repeated startup draft reads', async () => {
+    const response = { drafts: [] };
+    const http = {
+      request: jest.fn().mockResolvedValue(response),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await expect(gateway.listConversationDrafts(session)).resolves.toEqual([]);
+    await expect(gateway.listConversationDrafts(session)).resolves.toEqual([]);
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/conversations/me/drafts', {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
+  it('invalidates cached conversation pins after pinning', async () => {
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({ pins: [] })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ pins: [] }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const pinsPath = '/conversations/conversation-1/pins';
+    const pinPath = '/conversations/conversation-1/messages/message-1/pin';
+
+    await expect(
+      gateway.listMessagePins(session, 'conversation-1'),
+    ).resolves.toEqual([]);
+    await expect(
+      gateway.listMessagePins(session, 'conversation-1'),
+    ).resolves.toEqual([]);
+    await gateway.pinMessage(session, 'conversation-1', 'message-1');
+    await expect(
+      gateway.listMessagePins(session, 'conversation-1'),
+    ).resolves.toEqual([]);
+
+    expect(http.request).toHaveBeenCalledTimes(3);
+    expect(http.request).toHaveBeenNthCalledWith(1, pinsPath, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(2, pinPath, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'POST',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(3, pinsPath, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
   it('stores conversation drafts as encrypted local payloads', async () => {
     const http = {
       request: jest.fn().mockResolvedValue({

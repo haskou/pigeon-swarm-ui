@@ -50,7 +50,7 @@ export function useWorkspaceResumeSync({
   workspaceMode,
 }: UseWorkspaceResumeSyncInput): void {
   const workspaceWasHiddenRef = useRef(!isBrowserPageVisible());
-  const workspaceResumeSyncAtRef = useRef(0);
+  const workspaceResumeSyncAtRef = useRef(Date.now());
 
   const syncVisibleWorkspace = useCallback(() => {
     if (!isBrowserPageVisible()) {

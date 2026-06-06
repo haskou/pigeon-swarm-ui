@@ -8,6 +8,7 @@
     "dev": "vite --host 0.0.0.0",
     "lint": "eslint \"src/{app/composition,modules/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\"",
     "lint:fix": "eslint \"src/{app/composition,modules/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\" --fix",
+    "measure:startup": "node scripts/measure-startup.cjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest --runInBand",
     "typecheck": "tsc -b"
