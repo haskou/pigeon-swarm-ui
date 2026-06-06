@@ -322,6 +322,7 @@ export class PigeonApiGateway {
         options?: CachedRequestOptions,
       ) => this.cachedRequest(key, loader, options),
       new DraftPayloadCipher(),
+      (key: string) => this.invalidateCachedRequest(key),
     );
     this.conversations = conversations;
     this.draftPayloads = new DraftPayloadCipher();
@@ -2821,6 +2822,10 @@ export class PigeonApiGateway {
 
   private invalidateSessionCacheKey(path: string, session: Session): void {
     this.requestCache.delete(this.sessionCacheKey('GET', path, session));
+  }
+
+  private invalidateCachedRequest(key: string): void {
+    this.requestCache.delete(key);
   }
 
   private invalidateConversationPinsCache(
