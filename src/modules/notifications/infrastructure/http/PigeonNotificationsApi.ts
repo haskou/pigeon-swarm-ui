@@ -11,13 +11,20 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { NotificationDecision } from '../../domain/notificationDecision';
 import type { NotificationId } from '../../domain/NotificationId';
 
-type CachedRequest = <T>(key: string, loader: () => Promise<T>) => Promise<T>;
+type CachedRequestOptions = { ttlMs?: number };
+type CachedGetRequest = <T>(
+  key: string,
+  loader: () => Promise<T>,
+  options?: CachedRequestOptions,
+) => Promise<T>;
+
+const startupReadCacheTtlMs = 1500;
 
 export class PigeonNotificationsApi {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
-    private readonly cachedRequest: CachedRequest,
+    private readonly cachedRequest: CachedGetRequest,
   ) {}
 
   public async list(session: Session): Promise<NotificationResource[]> {
@@ -38,12 +45,14 @@ export class PigeonNotificationsApi {
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
     const path = '/notification-settings/';
-    const result = await this.http.request<NotificationScopeSettingsResource>(
-      path,
-      {
-        headers: await this.signer.headers(session, 'GET', path),
-        method: 'GET',
-      },
+    const result = await this.cachedRequest(
+      `GET ${path} ${session.identity.id}`,
+      async () =>
+        await this.http.request<NotificationScopeSettingsResource>(path, {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        }),
+      { ttlMs: startupReadCacheTtlMs },
     );
 
     return result.scopes;

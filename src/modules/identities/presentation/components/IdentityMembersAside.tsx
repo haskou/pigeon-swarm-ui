@@ -58,8 +58,8 @@ function identityMembersAsideClassName(
   variant: IdentityMembersAsideVariant,
 ): string {
   if (variant === 'desktop') {
-    return 'glass-panel community-members-panel hidden h-full min-h-0 overflow-y-auto rounded-none p-4 xl:block';
+    return 'glass-panel community-members-panel hidden h-full min-h-0 overflow-hidden rounded-none p-4 xl:block';
   }
 
-  return 'app-safe-area-drawer-until-xl app-safe-area-drawer-py-4 app-drawer-right glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-y-auto rounded-none p-4 xl:hidden';
+  return 'app-safe-area-drawer-until-xl app-safe-area-drawer-py-4 app-drawer-right glass-panel fixed inset-y-0 right-0 z-50 w-[86vw] max-w-[360px] overflow-hidden rounded-none p-4 xl:hidden';
 }

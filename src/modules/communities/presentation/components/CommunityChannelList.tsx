@@ -163,7 +163,7 @@ export function CommunityChannelList({
   }, [hiddenMutedChannelCount]);
 
   return (
-    <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+    <div className="mt-5 min-h-0 flex-1 overflow-x-clip overflow-y-auto pr-1">
       <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.textChannels}
       </div>

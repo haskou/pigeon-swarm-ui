@@ -274,7 +274,7 @@ export function Sidebar({
         {copy.sidebar.createConversation}
       </button>
 
-      <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="mt-5 min-h-0 flex-1 overflow-x-clip overflow-y-auto pr-1">
         <SectionTitle title={copy.sidebar.oneToOneTitle} />
         <ClearableSearchInput
           ariaLabel={copy.sidebar.searchConversations}

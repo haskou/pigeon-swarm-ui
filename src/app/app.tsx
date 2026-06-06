@@ -9,6 +9,7 @@ import {
 import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';
 import { useAppBootstrap } from './presentation/useAppBootstrap';
+import { loadGlassWorkspaceModule } from './presentation/workspace/loadGlassWorkspaceModule';
 
 const AuthScreen = lazy(() =>
   import('../modules/identities/presentation/auth/AuthScreen').then(
@@ -17,20 +18,6 @@ const AuthScreen = lazy(() =>
     }),
   ),
 );
-let glassWorkspaceModulePromise: Promise<
-  typeof import('./presentation/workspace/components/GlassWorkspace')
-> | null = null;
-
-function loadGlassWorkspaceModule(): Promise<
-  typeof import('./presentation/workspace/components/GlassWorkspace')
-> {
-  glassWorkspaceModulePromise ??= import(
-    './presentation/workspace/components/GlassWorkspace'
-  );
-
-  return glassWorkspaceModulePromise;
-}
-
 const GlassWorkspace = lazy(() =>
   loadGlassWorkspaceModule().then((module) => ({
     default: module.GlassWorkspace,

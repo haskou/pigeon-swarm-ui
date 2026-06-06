@@ -25,6 +25,7 @@ import {
   initialConversationId,
   loadWorkspacePreference,
 } from './workspace/components/workspacePersistence';
+import { preloadGlassWorkspaceModule } from './workspace/loadGlassWorkspaceModule';
 
 type RestoreState = 'done' | 'loading';
 
@@ -97,10 +98,13 @@ export function useAppBootstrap(): {
 
     void loadApplicationContainer()
       .then(async (applicationContainer) => {
-        const result = await applicationContainer.login(
-          savedCredentials.identityId,
-          savedCredentials.password,
-        );
+        const [result] = await Promise.all([
+          applicationContainer.login(
+            savedCredentials.identityId,
+            savedCredentials.password,
+          ),
+          preloadGlassWorkspaceModule(),
+        ]);
         const preloadedConversationMessages =
           await preloadInitialConversationMessages(
             applicationContainer,
