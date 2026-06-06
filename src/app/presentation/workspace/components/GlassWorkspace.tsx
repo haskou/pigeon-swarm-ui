@@ -47,6 +47,7 @@ import type {
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/realtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
+import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -408,6 +409,7 @@ interface GlassWorkspaceProps {
   onPendingCommunityInviteHandled?: () => void;
   pendingCommunityInvite?: PendingCommunityInviteLink | null;
   peers: Peer[];
+  preloadedConversationMessages: PreloadedConversationMessages | null;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
@@ -423,6 +425,7 @@ export function GlassWorkspace({
   onPendingCommunityInviteHandled,
   peers,
   pendingCommunityInvite,
+  preloadedConversationMessages,
   session,
   setCommunities,
   setConversations,
@@ -443,9 +446,24 @@ export function GlassWorkspace({
     setWorkspaceMode,
     workspaceMode,
   } = useWorkspacePreferenceState(conversations, session);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [messageCursor, setMessageCursor] = useState<string | null>(null);
-  const [messageState, setMessageState] = useState<LoadState>('idle');
+  const preloadedConversationMessagesRef = useRef(
+    preloadedConversationMessages,
+  );
+  const initialPreloadedMessages = preloadedConversationMessages
+    ? MessageCollection.merge([], preloadedConversationMessages.messages)
+    : [];
+  const loadedMessagesConversationIdRef = useRef<string | null>(
+    preloadedConversationMessages?.conversationId ?? null,
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    () => initialPreloadedMessages,
+  );
+  const [messageCursor, setMessageCursor] = useState<string | null>(
+    preloadedConversationMessages?.nextCursor ?? null,
+  );
+  const [messageState, setMessageState] = useState<LoadState>(
+    preloadedConversationMessages ? 'idle' : 'loading',
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
@@ -527,11 +545,15 @@ export function GlassWorkspace({
   const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
     null,
   );
-  const messageCursorRef = useRef<string | null>(null);
+  const messageCursorRef = useRef<string | null>(
+    preloadedConversationMessages?.nextCursor ?? null,
+  );
   const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
-  const messageStateRef = useRef<LoadState>('idle');
-  const messagesRef = useRef<ChatMessage[]>([]);
+  const messageStateRef = useRef<LoadState>(
+    preloadedConversationMessages ? 'idle' : 'loading',
+  );
+  const messagesRef = useRef<ChatMessage[]>(initialPreloadedMessages);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
   const callParticipantStatusesRef = useRef<
@@ -2294,6 +2316,7 @@ export function GlassWorkspace({
       messageAbortRef.current?.abort();
       messageAbortRef.current = controller;
       messageRequestRef.current = requestId;
+      loadedMessagesConversationIdRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
       setMessageLoadState('loading');
@@ -2312,6 +2335,7 @@ export function GlassWorkspace({
           setMessages(MessageCollection.merge([], result.messages));
           updateMessageCursor(result.nextCursor ?? null);
           setMessageLoadState('idle');
+          loadedMessagesConversationIdRef.current = conversationId;
         });
         markConversationReadUntil(conversationId, result.messages);
         scrollMessagesToBottom('auto', true);
@@ -2320,6 +2344,7 @@ export function GlassWorkspace({
 
         if (controller.signal.aborted) return;
 
+        loadedMessagesConversationIdRef.current = null;
         setMessages([]);
         setMessageLoadState('error');
         setSendError(
@@ -2355,6 +2380,7 @@ export function GlassWorkspace({
     if (!activeConversationKeyId) {
       messageAbortRef.current?.abort();
       messageAbortRef.current = null;
+      loadedMessagesConversationIdRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
       lastScrollTopRef.current = 0;
@@ -2363,11 +2389,33 @@ export function GlassWorkspace({
       return;
     }
 
+    const preloaded = preloadedConversationMessagesRef.current;
+
+    if (preloaded?.conversationId === activeConversation.id) {
+      preloadedConversationMessagesRef.current = null;
+      loadedMessagesConversationIdRef.current = activeConversation.id;
+      setMessages(MessageCollection.merge([], preloaded.messages));
+      updateMessageCursor(preloaded.nextCursor ?? null);
+      setMessageLoadState('idle');
+      markConversationReadUntil(activeConversation.id, preloaded.messages);
+      scrollMessagesToBottom('auto', true);
+
+      return;
+    }
+
+    if (loadedMessagesConversationIdRef.current === activeConversation.id) {
+      return;
+    }
+
     void loadActiveMessages(activeConversation.id);
   }, [
     activeConversation?.id,
     activeConversationKeyId,
     loadActiveMessages,
+    markConversationReadUntil,
+    scrollMessagesToBottom,
+    setMessageLoadState,
+    updateMessageCursor,
     workspaceMode,
   ]);
 

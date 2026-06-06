@@ -1,4 +1,10 @@
-import { lazy, Suspense, type ReactElement, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 
 import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';
@@ -11,12 +17,24 @@ const AuthScreen = lazy(() =>
     }),
   ),
 );
+let glassWorkspaceModulePromise: Promise<
+  typeof import('./presentation/workspace/components/GlassWorkspace')
+> | null = null;
+
+function loadGlassWorkspaceModule(): Promise<
+  typeof import('./presentation/workspace/components/GlassWorkspace')
+> {
+  glassWorkspaceModulePromise ??= import(
+    './presentation/workspace/components/GlassWorkspace'
+  );
+
+  return glassWorkspaceModulePromise;
+}
+
 const GlassWorkspace = lazy(() =>
-  import('./presentation/workspace/components/GlassWorkspace').then(
-    (module) => ({
-      default: module.GlassWorkspace,
-    }),
-  ),
+  loadGlassWorkspaceModule().then((module) => ({
+    default: module.GlassWorkspace,
+  })),
 );
 const NetworkCreationScreen = lazy(() =>
   import('../modules/networks/presentation/components/NetworkCreationScreen').then(
@@ -117,6 +135,7 @@ function App(): ReactElement {
     nodeNetworks,
     peers,
     pendingCommunityInvite,
+    preloadedConversationMessages,
     session,
     setCommunities,
     setConversations,
@@ -131,6 +150,12 @@ function App(): ReactElement {
     networkCount: nodeNetworks.networks.length,
     sessionPresent: !!session,
   });
+
+  useEffect(() => {
+    if (!isRestoringSession) return;
+
+    void loadGlassWorkspaceModule();
+  }, [isRestoringSession]);
 
   if (screen === 'server-connection' && nodeNetworks.error) {
     return (
@@ -191,6 +216,7 @@ function App(): ReactElement {
             setCommunities={setCommunities}
             setConversations={setConversations}
             pendingCommunityInvite={pendingCommunityInvite}
+            preloadedConversationMessages={preloadedConversationMessages}
             onPendingCommunityInviteHandled={setPendingCommunityInviteHandled}
           />
         )}
