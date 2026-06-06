@@ -60,8 +60,7 @@ import {
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { UserProfileDropdown } from '../../../../app/presentation/workspace/components/UserProfileDropdown';
-import { CommunityChannelList } from './CommunityChannelList';
+import { CommunitySidebar } from './CommunitySidebar';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
 import { loadPublicImage } from './communityImages';
@@ -2053,134 +2052,74 @@ export function CommunityWorkspace({
 
   return (
     <>
-      <button
-        className={cx(
-          'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-          mobileSidebarOpen
-            ? 'opacity-100'
-            : 'pointer-events-none opacity-0',
-        )}
-        onClick={onMobileSidebarClose}
-        aria-label={copy.workspace.closeSidebar}
+      <CommunitySidebar
+        activeCall={activeCall}
+        activeVoiceChannelId={activeVoiceChannelId}
+        animationScopeKey={community.id}
+        bannerUrl={bannerUrl}
+        canManageCommunity={
+          owner ||
+          currentPermissions.has('manage_channels') ||
+          currentPermissions.has('manage_roles') ||
+          currentPermissions.has('ban_members')
+        }
+        channelSearch={channelSearch}
+        channelUnreadCounts={channelUnreadCounts}
+        community={community}
+        communityIsPublic={communityIsPublic}
+        mobileRail={mobileRail}
+        mobileSidebarOpen={mobileSidebarOpen}
+        nodeNetworks={nodeNetworks}
+        onBannerOpen={() => setBannerViewerOpen(true)}
+        onCallEnd={onCallEnd}
+        onCallParticipantScreenShareVolumeChange={
+          onCallParticipantScreenShareVolumeChange
+        }
+        onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallScreenShareQualityChange={onCallScreenShareQualityChange}
+        onCallToggleCamera={onCallToggleCamera}
+        onCallToggleDeafen={onCallToggleDeafen}
+        onCallToggleMicrophone={onCallToggleMute}
+        onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+        onCallRetryMicrophone={onCallRetryMicrophone}
+        onCallToggleScreenShare={onCallToggleScreenShare}
+        onChannelSearchChange={setChannelSearch}
+        onManageOpen={() => setManageOpen(true)}
+        onMobileSidebarClose={onMobileSidebarClose}
+        onPresenceChange={onPresenceChange}
+        onPresenceStatusSelected={onPresenceStatusSelected}
+        onTextChannelSelected={handleTextChannelSelected}
+        onTextChannelMuteToggle={(channel) =>
+          onNotificationMuteToggle(channelNotificationScope(channel.id))
+        }
+        onTextChannelNotificationSettingsOpen={(channel) =>
+          onNotificationSettingsOpen({
+            scope: channelNotificationScope(channel.id),
+            subtitle: community.name,
+            title: `# ${channel.name}`,
+          })
+        }
+        onThreadSelected={(channel, thread) =>
+          void openMessageThreadFromSummary(channel.id, thread)
+        }
+        onVoiceChannelJoin={joinVoiceChannel}
+        onVoiceParticipantClick={openVoiceParticipantProfile}
+        onLogout={onLogout}
+        onSessionUpdated={onSessionUpdated}
+        ownIdentityPictures={ownIdentityPictures}
+        presence={presenceByIdentityId[session.identity.id]}
+        selectedChannelId={selectedChannelId}
+        selectedThreadRootMessageId={threadPanel?.root.id}
+        session={session}
+        textChannels={textChannelsWithThreads}
+        textChannelNotificationSetting={channelNotificationSetting}
+        threadLabelByRootMessageId={threadLabelByRootMessageId}
+        visibleTextChannels={visibleTextChannels}
+        visibleVoiceChannels={visibleVoiceChannels}
+        voiceChannelNotificationSetting={channelNotificationSetting}
+        voiceChannels={voiceChannels}
+        voiceParticipantsByChannelId={voiceParticipantsByChannelId}
       />
-      <aside
-        className={cx(
-          'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 block w-[92vw] max-w-[430px] p-0 transition-transform duration-200 ease-out sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:z-auto lg:block lg:w-auto lg:max-w-none lg:translate-x-0',
-          mobileSidebarOpen
-            ? 'translate-x-0'
-            : 'pointer-events-none -translate-x-full lg:pointer-events-auto',
-        )}
-      >
-        <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
-          <div className="lg:hidden">{mobileRail}</div>
-          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
-            <div className="min-w-0">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {communityIsPublic
-                  ? copy.communities.publicCommunity
-                  : copy.communities.privateCommunity}
-              </div>
-              <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
-                {bannerUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => setBannerViewerOpen(true)}
-                    className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
-                    aria-label={copy.communities.openBanner}
-                  >
-                    <img
-                      src={bannerUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ) : (
-                  <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
-                    {community.name.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div className="p-4">
-                  <h2 className="truncate text-xl font-black">
-                    {community.name}
-                  </h2>
-                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
-                    {community.description}
-                  </p>
-                  {(owner ||
-                    currentPermissions.has('manage_channels') ||
-                    currentPermissions.has('manage_roles') ||
-                    currentPermissions.has('ban_members')) && (
-                    <button
-                      type="button"
-                      onClick={() => setManageOpen(true)}
-                      className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
-                    >
-                      {copy.communities.manage}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <CommunityChannelList
-              activeVoiceChannelId={activeVoiceChannelId}
-              animationScopeKey={community.id}
-              channelSearch={channelSearch}
-              channelUnreadCounts={channelUnreadCounts}
-              onChannelSearchChange={setChannelSearch}
-              onTextChannelSelected={handleTextChannelSelected}
-              onTextChannelMuteToggle={(channel) =>
-                onNotificationMuteToggle(channelNotificationScope(channel.id))
-              }
-              onTextChannelNotificationSettingsOpen={(channel) =>
-                onNotificationSettingsOpen({
-                  scope: channelNotificationScope(channel.id),
-                  subtitle: community.name,
-                  title: `# ${channel.name}`,
-                })
-              }
-              onThreadSelected={(channel, thread) =>
-                void openMessageThreadFromSummary(channel.id, thread)
-              }
-              onVoiceChannelJoin={joinVoiceChannel}
-              onVoiceParticipantClick={openVoiceParticipantProfile}
-              selectedChannelId={selectedChannelId}
-              selectedThreadRootMessageId={threadPanel?.root.id}
-              textChannels={textChannelsWithThreads}
-              textChannelNotificationSetting={channelNotificationSetting}
-              threadLabelByRootMessageId={threadLabelByRootMessageId}
-              visibleTextChannels={visibleTextChannels}
-              visibleVoiceChannels={visibleVoiceChannels}
-              voiceChannelNotificationSetting={channelNotificationSetting}
-              voiceChannels={voiceChannels}
-              voiceParticipantsByChannelId={voiceParticipantsByChannelId}
-            />
-            <UserProfileDropdown
-              activeCall={activeCall}
-              identityPictures={ownIdentityPictures}
-              nodeNetworks={nodeNetworks}
-              onPresenceChange={onPresenceChange}
-              onPresenceStatusSelected={onPresenceStatusSelected}
-              onCallEnd={onCallEnd}
-              onCallParticipantScreenShareVolumeChange={
-                onCallParticipantScreenShareVolumeChange
-              }
-              onCallParticipantVolumeChange={onCallParticipantVolumeChange}
-              onCallScreenShareQualityChange={onCallScreenShareQualityChange}
-              onCallToggleCamera={onCallToggleCamera}
-              onCallToggleDeafen={onCallToggleDeafen}
-              onCallToggleMute={onCallToggleMute}
-              onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
-              onCallRetryMicrophone={onCallRetryMicrophone}
-              onCallToggleScreenShare={onCallToggleScreenShare}
-              onLogout={onLogout}
-              onSessionUpdated={onSessionUpdated}
-              presence={presenceByIdentityId[session.identity.id]}
-              session={session}
-            />
-          </div>
-        </div>
-      </aside>
 
       <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
         <CommunityHeader
