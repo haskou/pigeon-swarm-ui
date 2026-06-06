@@ -197,7 +197,6 @@ Commercial use requires a separate commercial license from the author.
 ## Notice
 
 Additional usage notices are available in [NOTICE](NOTICE).
-
 ## Disclaimer
 
 Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc.
