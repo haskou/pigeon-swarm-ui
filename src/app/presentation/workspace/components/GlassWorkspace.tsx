@@ -150,6 +150,7 @@ import {
   stringAttribute,
 } from './realtimeEventAttributes';
 import { ChatColumn } from './ChatColumn';
+import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import {
   callAudioStorageKey,
   loadCallNoiseCancellationEnabled,
@@ -162,6 +163,9 @@ import {
 
 let inspectorModulePromise: Promise<typeof import('./Inspector')> | null = null;
 let sidebarModulePromise: Promise<typeof import('./Sidebar')> | null = null;
+let communityWorkspaceModulePromise: Promise<
+  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
+> | null = null;
 
 function loadInspectorModule(): Promise<typeof import('./Inspector')> {
   inspectorModulePromise ??= import('./Inspector');
@@ -173,6 +177,16 @@ function loadSidebarModule(): Promise<typeof import('./Sidebar')> {
   sidebarModulePromise ??= import('./Sidebar');
 
   return sidebarModulePromise;
+}
+
+function loadCommunityWorkspaceModule(): Promise<
+  typeof import('../../../../modules/communities/presentation/components/CommunityWorkspace')
+> {
+  communityWorkspaceModulePromise ??= import(
+    '../../../../modules/communities/presentation/components/CommunityWorkspace'
+  );
+
+  return communityWorkspaceModulePromise;
 }
 
 void loadInspectorModule();
@@ -194,9 +208,7 @@ const WorkspaceDialogs = lazy(() =>
   })),
 );
 const CommunityWorkspace = lazy(() =>
-  import(
-    '../../../../modules/communities/presentation/components/CommunityWorkspace'
-  ).then((module) => ({
+  loadCommunityWorkspaceModule().then((module) => ({
     default: module.CommunityWorkspace,
   })),
 );
@@ -477,6 +489,8 @@ interface GlassWorkspaceProps {
   setSession: (session: Session | null) => void;
   conversations: ConversationResource[];
   communities: Community[];
+  communitiesError: Error | null;
+  communitiesLoading: boolean;
   node: { id: string; owner: null | string } | null;
   nodeNetworks: NodeNetwork[];
   onCommunitiesReload: () => Promise<void>;
@@ -492,6 +506,8 @@ interface GlassWorkspaceProps {
 
 export function GlassWorkspace({
   communities,
+  communitiesError,
+  communitiesLoading,
   conversations,
   node,
   nodeNetworks,
@@ -903,6 +919,12 @@ export function GlassWorkspace({
     session,
     workspaceMode,
   });
+
+  useEffect(() => {
+    if (workspaceMode !== 'community') return;
+
+    void loadCommunityWorkspaceModule();
+  }, [workspaceMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4637,8 +4659,10 @@ export function GlassWorkspace({
               />
             </Suspense>
           </>
+        ) : communitiesLoading && !activeCommunity ? (
+          <CommunityWorkspaceStartupFallback />
         ) : activeCommunity ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<CommunityWorkspaceStartupFallback />}>
             <CommunityWorkspace
               key={activeCommunity.id}
               activeChannelId={activeCommunityChannelId}
@@ -4761,7 +4785,7 @@ export function GlassWorkspace({
           </Suspense>
         ) : (
           <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
-            {copy.communities.empty}
+            {communitiesError?.message ?? copy.communities.empty}
           </div>
         )}
       </div>

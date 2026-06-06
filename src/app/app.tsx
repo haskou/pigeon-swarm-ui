@@ -212,6 +212,8 @@ function App(): ReactElement {
             }}
             conversations={conversations}
             communities={communities.communities}
+            communitiesError={communities.error}
+            communitiesLoading={communities.loading}
             onCommunitiesReload={communities.reload}
             setCommunities={setCommunities}
             setConversations={setConversations}

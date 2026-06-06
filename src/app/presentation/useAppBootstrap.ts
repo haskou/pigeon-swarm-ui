@@ -107,7 +107,6 @@ export function useAppBootstrap(): {
             result.session,
             result.conversations,
           );
-
         return { ...result, preloadedConversationMessages };
       })
       .then((result) => {
@@ -126,6 +125,7 @@ export function useAppBootstrap(): {
   const clearSession = useCallback(() => {
     clearSavedCredentials();
     setSession(null);
+    setPreloadedConversationMessages(null);
   }, []);
 
   const handleNetworkCreated = useCallback(() => {
