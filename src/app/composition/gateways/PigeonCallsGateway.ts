@@ -2,10 +2,10 @@ import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
-} from '../../../modules/calls/domain/callSession.types';
+} from '../../../contexts/calls/domain/callSession.types';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonCallsApi } from '../../../modules/calls/infrastructure/http/PigeonCallsApi';
+import { PigeonCallsApi } from '../../../contexts/calls/infrastructure/http/PigeonCallsApi';
 
 export class PigeonCallsGateway {
   public constructor(private readonly calls: PigeonCallsApi) {}

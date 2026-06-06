@@ -12,10 +12,10 @@ import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
-} from '../../modules/calls/domain/callSession.types';
-import type { IdentityUpdateProfileInput } from '../../modules/identities/domain/identitySignaturePayloadFactory';
-import type { NodeNetwork } from '../../modules/networks/application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../modules/networks/application/list-peers/ListPeers';
+} from '../../contexts/calls/domain/callSession.types';
+import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
+import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
+import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
   ChatMessage,
   Community,
@@ -74,37 +74,37 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 
-import { AttachmentExternalIdentifiers } from '../../modules/attachments/domain/AttachmentExternalIdentifiers';
-import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
-import { PigeonFilesApi } from '../../modules/attachments/infrastructure/http/PigeonFilesApi';
-import { PigeonCallsApi } from '../../modules/calls/infrastructure/http/PigeonCallsApi';
+import { AttachmentExternalIdentifiers } from '../../contexts/attachments/domain/AttachmentExternalIdentifiers';
+import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
+import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
+import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import {
   encryptCommunityInviteKey,
   type EncryptedCommunityKey,
-} from '../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
-import { PigeonCommunitiesApi } from '../../modules/communities/infrastructure/http/PigeonCommunitiesApi';
-import { ConversationIdFactory } from '../../modules/conversations/domain/ConversationIdFactory';
-import { ConversationKeychain } from '../../modules/conversations/domain/ConversationKeychain';
-import { ConversationMapper } from '../../modules/conversations/infrastructure/http/ConversationMapper';
-import { IdentitySignaturePayloadFactory } from '../../modules/identities/domain/identitySignaturePayloadFactory';
-import { IdentityId } from '../../modules/identities/domain/value-objects/IdentityId';
-import { KeychainCipher } from '../../modules/identities/infrastructure/crypto/KeychainCipher';
-import { PigeonPresenceApi } from '../../modules/identities/infrastructure/http/PigeonPresenceApi';
-import { MessageLinkPreviews } from '../../modules/messages/domain/MessageLinkPreviews';
-import { MessageProjector } from '../../modules/messages/domain/messageProjector';
-import { MessageSignaturePayloadFactory } from '../../modules/messages/domain/MessageSignaturePayloadFactory';
-import { DraftPayloadCipher } from '../../modules/messages/infrastructure/crypto/DraftPayloadCipher';
-import { PigeonLinkPreviewsApi } from '../../modules/messages/infrastructure/http/PigeonLinkPreviewsApi';
-import { PigeonNodeApi } from '../../modules/networks/infrastructure/http/PigeonNodeApi';
-import { NotificationDecision } from '../../modules/notifications/domain/notificationDecision';
-import { NotificationId } from '../../modules/notifications/domain/NotificationId';
-import { PigeonNotificationsApi } from '../../modules/notifications/infrastructure/http/PigeonNotificationsApi';
+} from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
+import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
+import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
+import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
+import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
+import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
+import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
+import { MessageProjector } from '../../contexts/messages/domain/messageProjector';
+import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
+import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
+import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import { NotificationDecision } from '../../contexts/notifications/domain/notificationDecision';
+import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
+import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import {
   PigeonPushApi,
   type PushSubscriptionPayload,
-} from '../../modules/notifications/infrastructure/http/pigeonPushApi';
-import { PigeonPollsApi } from '../../modules/polls/infrastructure/http/PigeonPollsApi';
-import { PigeonStickersApi } from '../../modules/stickers/infrastructure/http/PigeonStickersApi';
+} from '../../contexts/notifications/infrastructure/http/pigeonPushApi';
+import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
+import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
@@ -113,6 +113,8 @@ import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
 import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
 import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
+import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
+import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
 
 const defaultKeychain: LocalKeychain = {
@@ -280,7 +282,7 @@ export class PigeonApiGateway {
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
-  private readonly node: PigeonNodeApi;
+  private readonly node: PigeonNodeGateway;
 
   private readonly notifications: PigeonNotificationsApi;
 
@@ -288,7 +290,7 @@ export class PigeonApiGateway {
 
   private readonly polls: PigeonPollsApi;
 
-  private readonly push: PigeonPushApi;
+  private readonly push: PigeonPushGateway;
 
   private readonly requestCache = new Map<
     string,
@@ -336,7 +338,7 @@ export class PigeonApiGateway {
     this.linkPreviews = new PigeonLinkPreviewsApi(http, signer);
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
-    this.node = new PigeonNodeApi(http, signer);
+    this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsApi(
       http,
       signer,
@@ -348,7 +350,7 @@ export class PigeonApiGateway {
     );
     this.presence = new PigeonPresenceApi(http, signer);
     this.polls = new PigeonPollsApi(http, signer);
-    this.push = new PigeonPushApi(http, signer);
+    this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
     this.signer = signer;
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
@@ -2526,7 +2528,7 @@ export class PigeonApiGateway {
     if (this.messageDecryptWorker) return this.messageDecryptWorker;
 
     const { MessageDecryptWorkerClient } =
-      await import('../../modules/messages/infrastructure/crypto/MessageDecryptWorkerClient');
+      await import('../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerClient');
 
     this.messageDecryptWorker = new MessageDecryptWorkerClient();
 

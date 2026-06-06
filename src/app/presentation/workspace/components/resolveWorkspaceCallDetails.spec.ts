@@ -1,7 +1,7 @@
 import type {
   CallResource,
   CallSession,
-} from '../../../../modules/calls/domain/callSession.types';
+} from '../../../../contexts/calls/domain/callSession.types';
 import type {
   Community,
   IdentityResource,

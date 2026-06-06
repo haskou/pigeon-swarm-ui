@@ -2,11 +2,11 @@ import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
-} from '../../modules/calls/domain/callSession.types';
+} from '../../contexts/calls/domain/callSession.types';
 import type { Session } from '../../shared/domain/pigeonResources.types';
 
-import { ListCalls } from '../../modules/calls/application/list-calls/ListCalls';
-import { ListCallsMessage } from '../../modules/calls/application/list-calls/messages/ListCallsMessage';
+import { ListCalls } from '../../contexts/calls/application/list-calls/ListCalls';
+import { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 export class PigeonCallsApplication {

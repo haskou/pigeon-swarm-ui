@@ -68,18 +68,17 @@ a tiny distributed hostage negotiation.
 
 ## Architecture
 
-The frontend is organized around a small application layer over domain and
-infrastructure modules:
+The frontend is organized around bounded frontend contexts plus shared
+application composition:
 
-* `src/application`: use-case classes that coordinate UI actions.
-* `src/domain`: client-side domain logic for identities, keychains,
-  conversations, messages, attachments, communities and network invite codes.
-* `src/infrastructure`: HTTP, request signing, API mapping and realtime
-  gateways.
-* `src/presentation`: reusable hooks and browser persistence helpers.
-* `src/components`: React UI for auth, conversations, communities, settings,
-  notifications, profiles and chat primitives.
-* `src/i18n`: copy and language selection.
+* `src/contexts`: feature contexts such as identities, conversations,
+  communities, messages, attachments, calls, polls, stickers, notifications and
+  networks. Each context owns its application, domain, infrastructure and
+  presentation slices where they are needed.
+* `src/app`: application composition, workspace orchestration and high-level
+  presentation shell.
+* `src/shared`: cross-context domain primitives, HTTP/realtime infrastructure,
+  media helpers, shared UI components, hooks and i18n.
 * `docs/api`: checked-in API specs used by the frontend.
 
 The UI uses `@haskou/value-objects` for cryptographic value objects and signing
@@ -96,7 +95,7 @@ http://localhost:8080/
 
 The default API URL is currently configured in:
 
-* [`src/config.ts`](./src/config.ts)
+* [`src/app/API_SERVER_URL.ts`](./src/app/API_SERVER_URL.ts)
 
 Important backend docs live in the node repository:
 
@@ -190,8 +189,14 @@ the project grows.
 
 ## License
 
-Pigeon Swarm is licensed under the PolyForm Noncommercial License 1.0.0.
+Pigeon Swarm is licensed under the PolyForm Noncommercial License 1.0.0. See
+[LICENSE](LICENSE) for the full license text.
+
 Commercial use requires a separate commercial license from the author.
+
+## Notice
+
+Additional usage notices are available in [NOTICE](NOTICE).
 
 ## Disclaimer
 

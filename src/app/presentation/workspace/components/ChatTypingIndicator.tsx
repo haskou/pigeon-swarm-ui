@@ -2,8 +2,8 @@ import {
   identityDisplayName,
   identityPrimaryDisplayName,
   type IdentityNames,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
-import { TypingIndicator } from '../../../../modules/messages/presentation/components/TypingIndicator';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { TypingIndicator } from '../../../../contexts/messages/presentation/components/TypingIndicator';
 
 interface ChatTypingIndicatorProps {
   identityIds: string[];

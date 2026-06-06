@@ -8,7 +8,7 @@ import type {
   StickerResource,
 } from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonStickersApi } from '../../../modules/stickers/infrastructure/http/PigeonStickersApi';
+import { PigeonStickersApi } from '../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 
 export class PigeonStickersGateway {
   public constructor(private readonly stickers: PigeonStickersApi) {}

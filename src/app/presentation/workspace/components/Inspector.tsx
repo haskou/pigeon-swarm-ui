@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 
 import { lazy, Suspense, useMemo, useState } from 'react';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   ConversationResource,
   IdentityPresence,
@@ -11,18 +11,18 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { memberPrimaryName } from '../../../../modules/communities/presentation/components/communityMemberNames';
+import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import {
   type IdentityMemberListItem,
-} from '../../../../modules/identities/presentation/components/IdentityMemberListPanel';
+} from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import {
   IdentityMembersAside,
   type IdentityMembersAsideVariant,
-} from '../../../../modules/identities/presentation/components/IdentityMembersAside';
-import { profileAnchorFromTarget } from '../../../../modules/identities/presentation/view-models/profilePopoverAnchor';
+} from '../../../../contexts/identities/presentation/components/IdentityMembersAside';
+import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 
 const UserProfileDialog = lazy(() =>
-  import('../../../../modules/identities/presentation/components/UserProfileDialog').then(
+  import('../../../../contexts/identities/presentation/components/UserProfileDialog').then(
     (module) => ({
       default: module.UserProfileDialog,
     }),

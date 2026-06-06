@@ -8,8 +8,8 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { CallSession } from '../../../../modules/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
 import type {
   IdentityPresence,
   SelectablePresenceStatus,
@@ -31,14 +31,14 @@ import {
   identityPicture,
   type IdentityNames,
   type IdentityPictures,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
-import { PresenceStatusDot } from '../../../../modules/identities/presentation/components/presenceStatusDot';
+import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { useCloseOnOutsidePointerDown } from '../../../../shared/presentation/hooks/useCloseOnOutsidePointerDown';
 
 const GlobalCallBar = lazy(() =>
-  import('../../../../modules/calls/presentation/components/GlobalCallBar').then(
+  import('../../../../contexts/calls/presentation/components/GlobalCallBar').then(
     (module) => ({
       default: module.GlobalCallBar,
     }),

@@ -3,8 +3,8 @@ import type { FormEvent, MouseEvent } from 'react';
 import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -28,16 +28,16 @@ import {
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
-import { Composer } from '../../../../modules/messages/presentation/components/Composer';
-import { useAttachmentDownload } from '../../../../modules/attachments/presentation/hooks/useAttachmentDownload';
-import { memberPrimaryName } from '../../../../modules/communities/presentation/components/communityMemberNames';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
+import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
-import { InvitationKeyPrompt } from '../../../../modules/notifications/presentation/components/InvitationKeyPrompt';
+import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
-} from '../../../../modules/identities/presentation/view-models/profilePopoverAnchor';
+} from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatConversationHeader } from './ChatConversationHeader';
 import { ChatMessageTimeline } from './ChatMessageTimeline';
@@ -55,7 +55,7 @@ const ConversationKeyDialog = lazy(() =>
   })),
 );
 const CreatePollDialog = lazy(() =>
-  import('../../../../modules/polls/presentation/components/CreatePollDialog').then(
+  import('../../../../contexts/polls/presentation/components/CreatePollDialog').then(
     (module) => ({
       default: module.CreatePollDialog,
     }),
@@ -72,14 +72,14 @@ const GroupProfileDialog = lazy(() =>
   })),
 );
 const StickerPackPreviewDialog = lazy(() =>
-  import('../../../../modules/stickers/presentation/components/StickerPackPreviewDialog').then(
+  import('../../../../contexts/stickers/presentation/components/StickerPackPreviewDialog').then(
     (module) => ({
       default: module.StickerPackPreviewDialog,
     }),
   ),
 );
 const UserProfileDialog = lazy(() =>
-  import('../../../../modules/identities/presentation/components/UserProfileDialog').then(
+  import('../../../../contexts/identities/presentation/components/UserProfileDialog').then(
     (module) => ({
       default: module.UserProfileDialog,
     }),

@@ -1,7 +1,7 @@
 import type {
   CallResource,
   CallResourceParticipant,
-} from '../../../../modules/calls/domain/callSession.types';
+} from '../../../../contexts/calls/domain/callSession.types';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
 const keySeparator = '\u0000';

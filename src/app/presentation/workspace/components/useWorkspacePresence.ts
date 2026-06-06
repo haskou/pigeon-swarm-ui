@@ -9,7 +9,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { ConversationPeer } from '../../../../modules/conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
 import {
   readPresencePreference,
   writePresencePreference,

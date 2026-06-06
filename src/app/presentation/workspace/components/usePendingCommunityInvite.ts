@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 
-import type { PendingCommunityInviteLink } from '../../../../modules/communities/presentation/view-models/communityInviteLink';
+import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type {
   Community,
   CommunityInviteLinkResource,
@@ -9,7 +9,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { decryptCommunityInviteKey } from '../../../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { decryptCommunityInviteKey } from '../../../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 

@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -19,20 +19,20 @@ import {
   IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH,
   IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
   IDENTITY_PROFILE_NAME_MAX_LENGTH,
-} from '../../../../modules/identities/domain/profile/IdentityProfileConstraints';
+} from '../../../../contexts/identities/domain/profile/IdentityProfileConstraints';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import {
   isValidPassword,
   passwordValidationChecks,
-} from '../../../../modules/identities/presentation/auth/credentialsValidation';
+} from '../../../../contexts/identities/presentation/auth/credentialsValidation';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle,
   normalizeHandle,
   profilePictureUrl,
   publicFileObjectUrl,
-} from '../../../../modules/identities/presentation/view-models/identityDisplay';
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';

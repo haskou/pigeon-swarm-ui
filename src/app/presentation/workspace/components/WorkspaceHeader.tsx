@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
-import { PinIcon } from '../../../../modules/messages/presentation/components/messageActionIcons';
+import { PinIcon } from '../../../../contexts/messages/presentation/components/messageActionIcons';
 
 export function WorkspaceHeader({
   avatar,

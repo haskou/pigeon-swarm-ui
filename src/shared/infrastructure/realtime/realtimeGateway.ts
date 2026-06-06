@@ -3,7 +3,7 @@ import { UUID } from '@haskou/value-objects';
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
-import { IdentityId } from '../../../modules/identities/domain/value-objects/IdentityId';
+import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';

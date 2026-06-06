@@ -22,8 +22,8 @@ import type {
   Session,
 } from '../../shared/domain/pigeonResources.types';
 
-import { ListCommunities } from '../../modules/communities/application/list-communities/ListCommunities';
-import { ListCommunitiesMessage } from '../../modules/communities/application/list-communities/messages/ListCommunitiesMessage';
+import { ListCommunities } from '../../contexts/communities/application/list-communities/ListCommunities';
+import { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 type CommunityChannelMessagePayloadInput =

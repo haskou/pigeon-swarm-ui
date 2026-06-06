@@ -10,7 +10,7 @@ import type {
   Session,
 } from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonFilesApi } from '../../../modules/attachments/infrastructure/http/PigeonFilesApi';
+import { PigeonFilesApi } from '../../../contexts/attachments/infrastructure/http/PigeonFilesApi';
 
 export class PigeonFilesGateway {
   public constructor(private readonly files: PigeonFilesApi) {}

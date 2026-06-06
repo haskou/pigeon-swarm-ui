@@ -1,12 +1,12 @@
 import { type ReactNode, useRef } from 'react';
 
-import type { CallParticipant } from '../../../../modules/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
 import type {
   ConversationResource,
   NotificationScopeSetting,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationScopeMenuActions } from '../../../../modules/notifications/presentation/components/NotificationScopeMenuActions';
+import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';

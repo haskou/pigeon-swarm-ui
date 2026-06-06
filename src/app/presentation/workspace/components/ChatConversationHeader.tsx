@@ -8,7 +8,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
-import { PresenceStatusDot } from '../../../../modules/identities/presentation/components/presenceStatusDot';
+import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { LockIcon } from './LockIcon';
 import { WorkspaceHeader } from './WorkspaceHeader';
 

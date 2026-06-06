@@ -2,8 +2,8 @@ import type {
   CallIceServerConfig,
   CallResource,
   CallSignalPayload,
-} from '../../modules/calls/domain/callSession.types';
-import type { IdentityUpdateProfileInput } from '../../modules/identities/domain/identitySignaturePayloadFactory';
+} from '../../contexts/calls/domain/callSession.types';
+import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -55,71 +55,71 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 
-import { PublishMessageAttachmentsMessage } from '../../modules/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
-import { PublishMessageAttachments } from '../../modules/attachments/application/publish-message-attachments/PublishMessageAttachments';
-import { CreateConversation } from '../../modules/conversations/application/create-conversation/CreateConversation';
-import { CreateConversationMessage } from '../../modules/conversations/application/create-conversation/messages/CreateConversationMessage';
+import { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
+import { PublishMessageAttachments } from '../../contexts/attachments/application/publish-message-attachments/PublishMessageAttachments';
+import { CreateConversation } from '../../contexts/conversations/application/create-conversation/CreateConversation';
+import { CreateConversationMessage } from '../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
 import {
   CreateGroupConversation,
   type CreateGroupConversationInput,
-} from '../../modules/conversations/application/create-group-conversation/CreateGroupConversation';
-import { CreateGroupConversationMessage } from '../../modules/conversations/application/create-group-conversation/messages/createGroupConversationMessage';
-import { ListConversations } from '../../modules/conversations/application/list-conversations/ListConversations';
-import { ListConversationsMessage } from '../../modules/conversations/application/list-conversations/messages/ListConversationsMessage';
-import { LoginIdentity } from '../../modules/identities/application/login-identity/LoginIdentity';
-import { LoginIdentityMessage } from '../../modules/identities/application/login-identity/messages/LoginIdentityMessage';
-import { RegisterIdentityMessage } from '../../modules/identities/application/register-identity/messages/RegisterIdentityMessage';
-import { RegisterIdentity } from '../../modules/identities/application/register-identity/RegisterIdentity';
-import { AddMessageReaction } from '../../modules/messages/application/add-message-reaction/AddMessageReaction';
-import { AddMessageReactionMessage } from '../../modules/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
-import { DeleteMessage } from '../../modules/messages/application/delete-message/DeleteMessage';
-import { DeleteMessageMessage } from '../../modules/messages/application/delete-message/messages/DeleteMessageMessage';
-import { EditMessage } from '../../modules/messages/application/edit-message/EditMessage';
-import { EditMessageMessage } from '../../modules/messages/application/edit-message/messages/EditMessageMessage';
-import { LoadMessage } from '../../modules/messages/application/load-message/LoadMessage';
-import { LoadMessageMessage } from '../../modules/messages/application/load-message/messages/LoadMessageMessage';
-import { LoadMessagesAround } from '../../modules/messages/application/load-messages-around/LoadMessagesAround';
-import { LoadMessagesAroundMessage } from '../../modules/messages/application/load-messages-around/messages/LoadMessagesAroundMessage';
-import { LoadMessages } from '../../modules/messages/application/load-messages/LoadMessages';
-import { LoadMessagesMessage } from '../../modules/messages/application/load-messages/messages/LoadMessagesMessage';
-import { RemoveMessageReactionMessage } from '../../modules/messages/application/remove-message-reaction/messages/RemoveMessageReactionMessage';
-import { RemoveMessageReaction } from '../../modules/messages/application/remove-message-reaction/RemoveMessageReaction';
-import { SendMessageMessage } from '../../modules/messages/application/send-message/messages/SendMessageMessage';
-import { SendMessage } from '../../modules/messages/application/send-message/SendMessage';
-import { CreateNetwork } from '../../modules/networks/application/create-network/CreateNetwork';
-import { CreateNetworkMessage } from '../../modules/networks/application/create-network/messages/CreateNetworkMessage';
-import { CreatePublicNetwork } from '../../modules/networks/application/create-public-network/CreatePublicNetwork';
-import { CreatePublicNetworkMessage } from '../../modules/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
-import { JoinNetwork } from '../../modules/networks/application/join-network/JoinNetwork';
-import { JoinNetworkMessage } from '../../modules/networks/application/join-network/messages/JoinNetworkMessage';
+} from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
+import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/createGroupConversationMessage';
+import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
+import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
+import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
+import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
+import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
+import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
+import { AddMessageReaction } from '../../contexts/messages/application/add-message-reaction/AddMessageReaction';
+import { AddMessageReactionMessage } from '../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
+import { DeleteMessage } from '../../contexts/messages/application/delete-message/DeleteMessage';
+import { DeleteMessageMessage } from '../../contexts/messages/application/delete-message/messages/DeleteMessageMessage';
+import { EditMessage } from '../../contexts/messages/application/edit-message/EditMessage';
+import { EditMessageMessage } from '../../contexts/messages/application/edit-message/messages/EditMessageMessage';
+import { LoadMessage } from '../../contexts/messages/application/load-message/LoadMessage';
+import { LoadMessageMessage } from '../../contexts/messages/application/load-message/messages/LoadMessageMessage';
+import { LoadMessagesAround } from '../../contexts/messages/application/load-messages-around/LoadMessagesAround';
+import { LoadMessagesAroundMessage } from '../../contexts/messages/application/load-messages-around/messages/LoadMessagesAroundMessage';
+import { LoadMessages } from '../../contexts/messages/application/load-messages/LoadMessages';
+import { LoadMessagesMessage } from '../../contexts/messages/application/load-messages/messages/LoadMessagesMessage';
+import { RemoveMessageReactionMessage } from '../../contexts/messages/application/remove-message-reaction/messages/RemoveMessageReactionMessage';
+import { RemoveMessageReaction } from '../../contexts/messages/application/remove-message-reaction/RemoveMessageReaction';
+import { SendMessageMessage } from '../../contexts/messages/application/send-message/messages/SendMessageMessage';
+import { SendMessage } from '../../contexts/messages/application/send-message/SendMessage';
+import { CreateNetwork } from '../../contexts/networks/application/create-network/CreateNetwork';
+import { CreateNetworkMessage } from '../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
+import { CreatePublicNetwork } from '../../contexts/networks/application/create-public-network/CreatePublicNetwork';
+import { CreatePublicNetworkMessage } from '../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
+import { JoinNetwork } from '../../contexts/networks/application/join-network/JoinNetwork';
+import { JoinNetworkMessage } from '../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
 import {
   ListNodeNetworks,
   type NodeNetwork,
-} from '../../modules/networks/application/list-node-networks/ListNodeNetworks';
-import { ListNodeNetworksMessage } from '../../modules/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
+} from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import { ListNodeNetworksMessage } from '../../contexts/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
 import {
   ListPeers,
   type Peer,
-} from '../../modules/networks/application/list-peers/ListPeers';
-import { ListPeersMessage } from '../../modules/networks/application/list-peers/messages/ListPeersMessage';
-import { RemoveNodeNetworkMessage } from '../../modules/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
-import { RemoveNodeNetwork } from '../../modules/networks/application/remove-node-network/RemoveNodeNetwork';
-import { AcceptConversationInvitation } from '../../modules/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
-import { AcceptConversationInvitationMessage } from '../../modules/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
-import { ListNotificationSettings } from '../../modules/notifications/application/list-notification-settings/ListNotificationSettings';
-import { ListNotificationSettingsMessage } from '../../modules/notifications/application/list-notification-settings/messages/ListNotificationSettingsMessage';
-import { ListNotifications } from '../../modules/notifications/application/list-notifications/ListNotifications';
-import { ListNotificationsMessage } from '../../modules/notifications/application/list-notifications/messages/ListNotificationsMessage';
-import { ResetNotificationSettingMessage } from '../../modules/notifications/application/reset-notification-setting/messages/ResetNotificationSettingMessage';
-import { ResetNotificationSetting } from '../../modules/notifications/application/reset-notification-setting/ResetNotificationSetting';
-import { SaveNotificationSettingMessage } from '../../modules/notifications/application/save-notification-setting/messages/SaveNotificationSettingMessage';
-import { SaveNotificationSetting } from '../../modules/notifications/application/save-notification-setting/SaveNotificationSetting';
-import { UpdateNotificationMessage } from '../../modules/notifications/application/update-notification/messages/UpdateNotificationMessage';
-import { UpdateNotification } from '../../modules/notifications/application/update-notification/UpdateNotification';
-import { VotePollMessage } from '../../modules/polls/application/vote-poll/messages/VotePollMessage';
-import { VotePoll } from '../../modules/polls/application/vote-poll/VotePoll';
-import { ListStickerPacks } from '../../modules/stickers/application/list-sticker-packs/ListStickerPacks';
-import { ListStickerPacksMessage } from '../../modules/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
+} from '../../contexts/networks/application/list-peers/ListPeers';
+import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
+import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
+import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import { AcceptConversationInvitation } from '../../contexts/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
+import { AcceptConversationInvitationMessage } from '../../contexts/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
+import { ListNotificationSettings } from '../../contexts/notifications/application/list-notification-settings/ListNotificationSettings';
+import { ListNotificationSettingsMessage } from '../../contexts/notifications/application/list-notification-settings/messages/ListNotificationSettingsMessage';
+import { ListNotifications } from '../../contexts/notifications/application/list-notifications/ListNotifications';
+import { ListNotificationsMessage } from '../../contexts/notifications/application/list-notifications/messages/ListNotificationsMessage';
+import { ResetNotificationSettingMessage } from '../../contexts/notifications/application/reset-notification-setting/messages/ResetNotificationSettingMessage';
+import { ResetNotificationSetting } from '../../contexts/notifications/application/reset-notification-setting/ResetNotificationSetting';
+import { SaveNotificationSettingMessage } from '../../contexts/notifications/application/save-notification-setting/messages/SaveNotificationSettingMessage';
+import { SaveNotificationSetting } from '../../contexts/notifications/application/save-notification-setting/SaveNotificationSetting';
+import { UpdateNotificationMessage } from '../../contexts/notifications/application/update-notification/messages/UpdateNotificationMessage';
+import { UpdateNotification } from '../../contexts/notifications/application/update-notification/UpdateNotification';
+import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
+import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
+import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
+import { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 import {
   RealtimeGateway,
   type RealtimeHeartbeatActivityMode,

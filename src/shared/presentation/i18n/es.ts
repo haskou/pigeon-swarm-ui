@@ -33,7 +33,7 @@ export const es = {
     handleLabel: 'usuario',
     heroBody:
       'Tus conversaciones viajan por redes compartidas, no por un servidor central. Tu identidad se descifra en tu dispositivo. Tus claves no salen de ahi.',
-    heroTitle: 'Mensajeria P2P para comunidades privadas.',
+    heroTitle: 'Mensajeria P2P para todos.',
     identityIdHelp: identityLookup.help,
     identityIdLabel: identityLookup.label,
     installApp: 'Instalar app',

@@ -1,4 +1,4 @@
-import type { CallSignalType } from '../../../../modules/calls/domain/callSession.types';
+import type { CallSignalType } from '../../../../contexts/calls/domain/callSession.types';
 import type {
   Community,
   CommunityChannel,

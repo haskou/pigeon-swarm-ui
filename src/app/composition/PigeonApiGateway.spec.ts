@@ -11,8 +11,8 @@ import type {
 import type { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 
-import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
-import { decryptCommunityInviteKey } from '../../modules/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
+import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {

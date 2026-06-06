@@ -1,5 +1,5 @@
-import { AttachmentCipher } from '../../modules/attachments/infrastructure/crypto/AttachmentCipher';
-import { browserAttachmentWorkerFactory } from '../../modules/attachments/infrastructure/crypto/browserAttachmentWorkerFactory';
+import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
+import { browserAttachmentWorkerFactory } from '../../contexts/attachments/infrastructure/crypto/browserAttachmentWorkerFactory';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonApplication } from './PigeonApplication';
 
