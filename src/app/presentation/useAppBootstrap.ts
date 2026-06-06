@@ -51,7 +51,7 @@ export function useAppBootstrap(): {
     hasSavedCredentials ? 'loading' : 'done',
   );
   const nodeNetworks = useNodeNetworks(session);
-  const peers = usePeers();
+  const peers = usePeers({ autoLoad: false });
   const communities = useCommunities(session);
   const [pendingCommunityInvite, setPendingCommunityInvite] =
     useState<PendingCommunityInviteLink | null>(() =>

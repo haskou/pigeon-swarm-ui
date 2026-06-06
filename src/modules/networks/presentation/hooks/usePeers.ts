@@ -15,9 +15,13 @@ type PeersState = {
   reload: () => Promise<void>;
 };
 
-export function usePeers(): PeersState {
+type UsePeersInput = {
+  autoLoad?: boolean;
+};
+
+export function usePeers({ autoLoad = true }: UsePeersInput = {}): PeersState {
   const [peers, setPeers] = useState<Peer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(autoLoad);
   const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
@@ -34,8 +38,10 @@ export function usePeers(): PeersState {
   }, []);
 
   useEffect(() => {
+    if (!autoLoad) return;
+
     void reload();
-  }, [reload]);
+  }, [autoLoad, reload]);
 
   return { error, loading, peers, reload };
 }
