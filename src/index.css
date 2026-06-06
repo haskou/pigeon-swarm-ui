@@ -451,7 +451,7 @@ textarea:disabled,
 
 @keyframes side-panel-list-enter-left {
   0% {
-    opacity: 0;
+    opacity: 1;
     transform: translateX(-28px) translateY(4px) scale(0.985);
   }
   100% {
@@ -462,7 +462,7 @@ textarea:disabled,
 
 @keyframes side-panel-list-enter-right {
   0% {
-    opacity: 0;
+    opacity: 1;
     transform: translateX(28px) scale(0.985);
   }
   100% {
