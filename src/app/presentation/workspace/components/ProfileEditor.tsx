@@ -15,9 +15,11 @@ import type { NodeNetwork } from '../../../../modules/networks/application/list-
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { ProfileBiography } from '../../../../modules/identities/domain/profile/ProfileBiography';
-import { ProfileHandle } from '../../../../modules/identities/domain/profile/ProfileHandle';
-import { ProfileName } from '../../../../modules/identities/domain/profile/ProfileName';
+import {
+  IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH,
+  IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
+  IDENTITY_PROFILE_NAME_MAX_LENGTH,
+} from '../../../../modules/identities/domain/profile/IdentityProfileConstraints';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import {
@@ -315,7 +317,7 @@ export function ProfileEditor({
                     aria-label={copy.profile.name}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    maxLength={ProfileName.MAX_LENGTH}
+                    maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
                     className={cx(profileEditorInputClass, 'text-lg font-black')}
                   />
                 </ProfileEditorField>
@@ -326,7 +328,7 @@ export function ProfileEditor({
                     onChange={(event) =>
                       setHandle(normalizeHandle(event.target.value))
                     }
-                    maxLength={ProfileHandle.MAX_LENGTH}
+                    maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
                     placeholder="@ada"
                     className={cx(
                       profileEditorInputClass,
@@ -339,7 +341,7 @@ export function ProfileEditor({
                     aria-label={copy.profile.biography}
                     value={biography}
                     onChange={(event) => setBiography(event.target.value)}
-                    maxLength={ProfileBiography.MAX_LENGTH}
+                    maxLength={IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH}
                     className={cx(
                       profileEditorInputClass,
                       'min-h-[4.75rem] resize-y text-sm font-normal',

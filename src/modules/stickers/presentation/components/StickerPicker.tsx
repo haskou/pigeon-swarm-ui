@@ -24,6 +24,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
+import { useCloseOnOutsidePointerDown } from '../../../../shared/presentation/hooks/useCloseOnOutsidePointerDown';
 import {
   type EmojiSuggestion,
   preloadEmojiSuggestions,
@@ -84,6 +85,7 @@ export function StickerPicker({
   const pickerRef = useRef<HTMLDivElement>(null);
   const stickerScrollerRef = useRef<HTMLDivElement>(null);
   const stickerSectionRefs = useRef(new Map<string, HTMLDivElement>());
+  const closePicker = useCallback(() => setOpen(false), []);
   const savedPackIds = useMemo(
     () => new Set(library?.savedPacks.map((pack) => pack.id) ?? []),
     [library],
@@ -120,25 +122,11 @@ export function StickerPicker({
     warmEmojiCatalog();
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-
-      if (target instanceof Node && pickerRef.current?.contains(target)) {
-        return;
-      }
-
-      setOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [open]);
+  useCloseOnOutsidePointerDown({
+    active: open,
+    onClose: closePicker,
+    ref: pickerRef,
+  });
 
   useEffect(() => {
     if (!open || tab !== 'emoji') return;

@@ -1,4 +1,12 @@
-import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../../../modules/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallSession } from '../../../../modules/calls/domain/callSession.types';
@@ -27,6 +35,7 @@ import {
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { PresenceStatusDot } from '../../../../modules/identities/presentation/components/presenceStatusDot';
+import { useCloseOnOutsidePointerDown } from '../../../../shared/presentation/hooks/useCloseOnOutsidePointerDown';
 
 const GlobalCallBar = lazy(() =>
   import('../../../../modules/calls/presentation/components/GlobalCallBar').then(
@@ -101,6 +110,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   const [presenceError, setPresenceError] = useState<string | null>(null);
   const [presenceSaving, setPresenceSaving] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
   const ownDisplayName = identityDisplayName(
     session.identity.id,
     identityNames,
@@ -161,21 +171,11 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     }
   };
 
-  useEffect(() => {
-    if (!profileOpen) return;
-
-    const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      if (!profileRef.current?.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', closeOnOutsidePointerDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
-    };
-  }, [profileOpen]);
+  useCloseOnOutsidePointerDown({
+    active: profileOpen,
+    onClose: closeProfile,
+    ref: profileRef,
+  });
 
   return (
     <div ref={profileRef} className="relative mt-4 shrink-0">

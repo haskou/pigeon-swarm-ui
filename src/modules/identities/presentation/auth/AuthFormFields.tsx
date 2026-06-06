@@ -3,8 +3,10 @@ import type { ReactElement } from 'react';
 import type { AuthMode } from './authFormRules';
 
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
-import { ProfileHandle } from '../../domain/profile/ProfileHandle';
-import { ProfileName } from '../../domain/profile/ProfileName';
+import {
+  IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
+  IDENTITY_PROFILE_NAME_MAX_LENGTH,
+} from '../../domain/profile/IdentityProfileConstraints';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { normalizeHandleInput } from './credentialsValidation';
 import { Field } from './Field';
@@ -48,7 +50,7 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
         <input
           value={props.name}
           onChange={(event) => props.onNameChange(event.target.value)}
-          maxLength={ProfileName.MAX_LENGTH}
+          maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
           placeholder="Ada"
           autoComplete="name"
@@ -60,7 +62,7 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
           onChange={(event) =>
             props.onHandleChange(normalizeHandleInput(event.target.value))
           }
-          maxLength={ProfileHandle.MAX_LENGTH}
+          maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
           placeholder="@ada"
           autoComplete="username"

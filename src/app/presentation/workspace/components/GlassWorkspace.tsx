@@ -709,6 +709,10 @@ export function GlassWorkspace({
     suppressMessageLoadsBriefly();
     setNotificationsOpen(false);
   }, [suppressMessageLoadsBriefly]);
+  const openNodeSettings = useCallback(() => {
+    setNodeSettingsOpen(true);
+    void onPeersReload();
+  }, [onPeersReload]);
 
   const openRealtimeEvents = useCallback(() => {
     setRealtimeEventLog([]);
@@ -4232,7 +4236,7 @@ export function GlassWorkspace({
             setSidebarOpen(false);
           }}
           onNotificationsClick={openNotificationsPanel}
-          onSettingsClick={() => setNodeSettingsOpen(true)}
+          onSettingsClick={openNodeSettings}
           settingsAttention={nodeUnclaimed}
         />
 
@@ -4274,7 +4278,7 @@ export function GlassWorkspace({
                     setSidebarOpen(false);
                   }}
                   onNotificationsClick={openNotificationsPanel}
-                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onSettingsClick={openNodeSettings}
                   onInspectorClick={() => setInspectorOpen(true)}
                   peerCount={peers.length}
                   settingsAttention={nodeUnclaimed}
@@ -4542,7 +4546,7 @@ export function GlassWorkspace({
                     setSidebarOpen(false);
                   }}
                   onNotificationsClick={openNotificationsPanel}
-                  onSettingsClick={() => setNodeSettingsOpen(true)}
+                  onSettingsClick={openNodeSettings}
                   onInspectorClick={() => {
                     setSidebarOpen(false);
                     setCommunityMembersOpen(true);
