@@ -31,6 +31,7 @@ type CachedRequest = <T>(
   loader: () => Promise<T>,
   options?: CachedRequestOptions,
 ) => Promise<T>;
+type CachedRequestInvalidator = (key: string) => void;
 
 const startupReadCacheTtlMs = 1500;
 
@@ -83,6 +84,8 @@ export class PigeonCommunitiesApi {
     private readonly signer: RequestSigner,
     private readonly cachedRequest: CachedRequest,
     draftPayloads?: DraftPayloadCipher,
+    private readonly invalidateCachedRequest: CachedRequestInvalidator = () =>
+      undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
   }
@@ -469,11 +472,15 @@ export class PigeonCommunitiesApi {
     )}/channels/text`;
     const body = { name };
 
-    return await this.http.request<CommunityTextChannel>(path, {
+    const channel = await this.http.request<CommunityTextChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
+
+    this.invalidateChannelListCache(session, communityId);
+
+    return channel;
   }
 
   public async createVoiceChannel(
@@ -486,11 +493,15 @@ export class PigeonCommunitiesApi {
     )}/channels/voice`;
     const body = { name };
 
-    return await this.http.request<CommunityVoiceChannel>(path, {
+    const channel = await this.http.request<CommunityVoiceChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
+
+    this.invalidateChannelListCache(session, communityId);
+
+    return channel;
   }
 
   public async listChannels(
@@ -499,7 +510,7 @@ export class PigeonCommunitiesApi {
   ): Promise<CommunityChannel[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/channels`;
     const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
+      this.channelListCacheKey(session, communityId),
       async () =>
         await this.http.request<{
           channels: CommunityChannel[];
@@ -524,11 +535,15 @@ export class PigeonCommunitiesApi {
     )}/channels/${encodeURIComponent(channelId)}`;
     const body = { name };
 
-    return await this.http.request<CommunityChannel>(path, {
+    const channel = await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PATCH', path, body),
       method: 'PATCH',
     });
+
+    this.invalidateChannelListCache(session, communityId);
+
+    return channel;
   }
 
   public async deleteChannel(
@@ -540,10 +555,14 @@ export class PigeonCommunitiesApi {
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
 
-    return await this.http.request<Community>(path, {
+    const community = await this.http.request<Community>(path, {
       headers: await this.signer.headers(session, 'DELETE', path),
       method: 'DELETE',
     });
+
+    this.invalidateChannelListCache(session, communityId);
+
+    return community;
   }
 
   public async updateChannelPermissions(
@@ -557,11 +576,15 @@ export class PigeonCommunitiesApi {
     )}/channels/${encodeURIComponent(channelId)}/permissions`;
     const body = { visibleRoleIds };
 
-    return await this.http.request<CommunityChannel>(path, {
+    const channel = await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PATCH', path, body),
       method: 'PATCH',
     });
+
+    this.invalidateChannelListCache(session, communityId);
+
+    return channel;
   }
 
   public async createChannelMessage(
@@ -1027,6 +1050,21 @@ export class PigeonCommunitiesApi {
         : {}),
       signature: signature.toString(),
     };
+  }
+
+  private channelListCacheKey(session: Session, communityId: string): string {
+    return `GET /communities/${encodeURIComponent(communityId)}/channels ${
+      session.identity.id
+    }`;
+  }
+
+  private invalidateChannelListCache(
+    session: Session,
+    communityId: string,
+  ): void {
+    this.invalidateCachedRequest(
+      this.channelListCacheKey(session, communityId),
+    );
   }
 
   private async createPlaintextChannelMessageBody(

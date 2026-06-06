@@ -791,6 +791,75 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('invalidates cached community channel lists after channel mutations', async () => {
+    const initialChannels = [
+      {
+        createdAt: 1,
+        id: 'channel-1',
+        name: 'general',
+        type: 'text',
+      },
+    ];
+    const renamedChannel = {
+      createdAt: 1,
+      id: 'channel-1',
+      name: 'updates',
+      type: 'text',
+    } as const;
+    const updatedChannels = [renamedChannel];
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({ channels: initialChannels })
+        .mockResolvedValueOnce(renamedChannel)
+        .mockResolvedValueOnce({ channels: updatedChannels }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const listPath = '/communities/community-1/channels';
+    const renamePath = '/communities/community-1/channels/channel-1';
+    const renameBody = { name: 'updates' };
+
+    await expect(
+      gateway.listCommunityChannels(session, 'community-1'),
+    ).resolves.toEqual(initialChannels);
+    await expect(
+      gateway.listCommunityChannels(session, 'community-1'),
+    ).resolves.toEqual(initialChannels);
+    await expect(
+      gateway.renameCommunityChannel(
+        session,
+        'community-1',
+        'channel-1',
+        'updates',
+      ),
+    ).resolves.toBe(renamedChannel);
+    await expect(
+      gateway.listCommunityChannels(session, 'community-1'),
+    ).resolves.toEqual(updatedChannels);
+
+    expect(http.request).toHaveBeenCalledTimes(3);
+    expect(http.request).toHaveBeenNthCalledWith(1, listPath, {
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'GET',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(2, renamePath, {
+      body: JSON.stringify(renameBody),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'PATCH',
+    });
+    expect(http.request).toHaveBeenNthCalledWith(3, listPath, {
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'GET',
+    });
+  });
+
   it('creates community channel messages with the canonical domain signature', async () => {
     const createdMessage = {
       attachmentExternalIdentifiers: ['bafy-private'],

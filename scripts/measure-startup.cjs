@@ -22,7 +22,7 @@ if (!identityId || !password) {
 
 const configPath = path.join(outDir, 'playwright.config.cjs');
 const specPath = path.join(outDir, 'startup.spec.cjs');
-const playwrightNodePath = findPlaywrightNodePath();
+const playwrightNodePath = resolvePlaywrightNodePath();
 
 fs.writeFileSync(
   configPath,
@@ -144,6 +144,38 @@ const result = spawnSync(
 
 console.log(`Startup report written to ${outDir}`);
 process.exit(result.status ?? 1);
+
+function resolvePlaywrightNodePath() {
+  const fromCurrentProcess = findPlaywrightNodePath();
+  if (fromCurrentProcess) return fromCurrentProcess;
+
+  const resolved = spawnSync(
+    'npx',
+    [
+      '-y',
+      '-p',
+      '@playwright/test',
+      '-c',
+      `node -e "${[
+        "const path = require('path')",
+        "const binDir = process.env.PATH.split(path.delimiter).find((entry) => entry.includes('_npx') && entry.endsWith(path.join('node_modules', '.bin')))",
+        'if (!binDir) process.exit(2)',
+        'console.log(path.dirname(binDir))',
+      ].join('; ')}"`,
+    ],
+    { encoding: 'utf8' },
+  );
+
+  if (resolved.status !== 0) {
+    console.error(
+      resolved.stderr ||
+        'Unable to resolve @playwright/test through npx.',
+    );
+    process.exit(resolved.status ?? 1);
+  }
+
+  return resolved.stdout.trim();
+}
 
 function findPlaywrightNodePath() {
   const npxCacheDir = path.join(os.homedir(), '.npm', '_npx');
