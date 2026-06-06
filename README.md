@@ -2,6 +2,15 @@
   <img src="./public/logo.png" alt="pigeon-swarm logo">
 </p>
 
+<p align="center">
+  <a href="https://github.com/haskou/pigeon-swarm-ui/actions/workflows/ci.yml">
+    <img src="https://github.com/haskou/pigeon-swarm-ui/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status">
+  </a>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="License: PolyForm Noncommercial 1.0.0">
+  </a>
+</p>
+
 # pigeon-swarm-ui
 
 `pigeon-swarm-ui` is the browser client for `pigeon-swarm-node`, the backend
