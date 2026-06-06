@@ -633,6 +633,7 @@ export function GlassWorkspace({
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const initialRenderedCommunityIdRef = useRef<string | null>(null);
   const lastScrollTopRef = useRef(0);
   const keepMessageBottomUntilRef = useRef(0);
   const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
@@ -907,6 +908,12 @@ export function GlassWorkspace({
     communities,
     communityChannelById,
   });
+  if (!initialRenderedCommunityIdRef.current && activeCommunity?.id) {
+    initialRenderedCommunityIdRef.current = activeCommunity.id;
+  }
+  const animateCommunitySidePanelEntries =
+    !!activeCommunity?.id &&
+    activeCommunity.id !== initialRenderedCommunityIdRef.current;
 
   useWorkspacePreferences({
     activeCommunityId: activeCommunity?.id ?? activeCommunityId,
@@ -4666,6 +4673,7 @@ export function GlassWorkspace({
             <CommunityWorkspace
               key={activeCommunity.id}
               activeChannelId={activeCommunityChannelId}
+              animateSidePanelEntries={animateCommunitySidePanelEntries}
               channelUnreadCounts={
                 visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}
               }

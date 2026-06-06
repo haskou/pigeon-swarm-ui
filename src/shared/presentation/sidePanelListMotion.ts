@@ -8,14 +8,20 @@ type SidePanelListEnterStyle = CSSProperties & {
 
 export function sidePanelListEnterClassName(
   direction: SidePanelListEnterDirection,
+  enabled = true,
 ): string {
+  if (!enabled) return '';
+
   return `side-panel-list-enter side-panel-list-enter-${direction}`;
 }
 
 export function sidePanelListEnterStyle(
   index: number,
+  enabled = true,
 ): SidePanelListEnterStyle {
   return {
-    '--side-panel-enter-delay': `${Math.min(index * 32, 220)}ms`,
+    '--side-panel-enter-delay': enabled
+      ? `${Math.min(index * 32, 220)}ms`
+      : '0ms',
   };
 }

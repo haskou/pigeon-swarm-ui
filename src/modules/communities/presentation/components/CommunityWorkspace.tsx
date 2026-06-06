@@ -116,6 +116,7 @@ const StickerPackPreviewDialog = lazy(() =>
 interface CommunityWorkspaceProps {
   activeChannelId?: null | string;
   activeCall?: CallSession | null;
+  animateSidePanelEntries?: boolean;
   channelUnreadCounts?: Record<string, number>;
   community: Community;
   invitationAccepting?: boolean;
@@ -234,6 +235,7 @@ function cachedChannelThreadsFor(
 export function CommunityWorkspace({
   activeCall,
   activeChannelId,
+  animateSidePanelEntries = true,
   channelUnreadCounts = {},
   community,
   invitationAccepting = false,
@@ -2106,6 +2108,7 @@ export function CommunityWorkspace({
       <CommunitySidebar
         activeCall={activeCall}
         activeVoiceChannelId={activeVoiceChannelId}
+        animateEntries={animateSidePanelEntries}
         animationScopeKey={community.id}
         bannerUrl={bannerUrl}
         canManageCommunity={
@@ -2496,6 +2499,7 @@ export function CommunityWorkspace({
 
       <CommunityMembersPanel
         community={community}
+        animateEntries={animateSidePanelEntries}
         animationScopeKey={community.id}
         canInvite={owner || currentPermissions.has('create_invites')}
         members={members}

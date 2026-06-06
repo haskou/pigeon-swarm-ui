@@ -33,6 +33,7 @@ import {
 
 export function CommunityChannelList({
   activeVoiceChannelId,
+  animateEntries = true,
   animationScopeKey,
   channelSearch,
   channelUnreadCounts,
@@ -55,6 +56,7 @@ export function CommunityChannelList({
   voiceParticipantsByChannelId,
 }: {
   activeVoiceChannelId: null | string;
+  animateEntries?: boolean;
   animationScopeKey?: string;
   channelSearch: string;
   channelUnreadCounts: Record<string, number>;
@@ -203,8 +205,11 @@ export function CommunityChannelList({
             {displayedTextChannels.map((channel, index) => (
               <div
                 key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
-                className={sidePanelListEnterClassName('left')}
-                style={sidePanelListEnterStyle(index)}
+                className={sidePanelListEnterClassName(
+                  'left',
+                  animateEntries,
+                )}
+                style={sidePanelListEnterStyle(index, animateEntries)}
               >
                 <TextChannelButton
                   active={
@@ -237,6 +242,7 @@ export function CommunityChannelList({
                       .map((thread, threadIndex) => (
                         <ThreadChannelButton
                           key={`${animationScopeKey ?? 'channels'}:${channel.id}:${thread.rootMessageId}`}
+                          animateEntry={animateEntries}
                           active={
                             selectedChannelId === channel.id &&
                             selectedThreadRootMessageId === thread.rootMessageId
@@ -264,9 +270,13 @@ export function CommunityChannelList({
                   {displayedVoiceChannels.map((channel, index) => (
                     <div
                       key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
-                      className={sidePanelListEnterClassName('left')}
+                      className={sidePanelListEnterClassName(
+                        'left',
+                        animateEntries,
+                      )}
                       style={sidePanelListEnterStyle(
                         displayedTextChannels.length + index,
+                        animateEntries,
                       )}
                     >
                       <VoiceChannelButton
@@ -353,12 +363,14 @@ function orderedVisibleChannels<T extends { id: string }>(
 
 function ThreadChannelButton({
   active,
+  animateEntry,
   enterIndex,
   label,
   onSelect,
   replyCount,
 }: {
   active: boolean;
+  animateEntry: boolean;
   enterIndex: number;
   label: string;
   onSelect: () => void;
@@ -368,9 +380,9 @@ function ThreadChannelButton({
     <button
       type="button"
       onClick={onSelect}
-      style={sidePanelListEnterStyle(enterIndex)}
+      style={sidePanelListEnterStyle(enterIndex, animateEntry)}
       className={cx(
-        sidePanelListEnterClassName('left'),
+        sidePanelListEnterClassName('left', animateEntry),
         'flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-black transition',
         active
           ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'

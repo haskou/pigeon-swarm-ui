@@ -21,6 +21,7 @@ import type { VoiceParticipantView } from './VoiceParticipantView';
 type CommunitySidebarProps = {
   activeCall?: CallSession | null;
   activeVoiceChannelId: null | string;
+  animateEntries?: boolean;
   animationScopeKey?: string;
   bannerUrl: null | string;
   canManageCommunity: boolean;
@@ -93,6 +94,7 @@ type CommunitySidebarProps = {
 export function CommunitySidebar({
   activeCall,
   activeVoiceChannelId,
+  animateEntries = true,
   animationScopeKey,
   bannerUrl,
   canManageCommunity,
@@ -203,6 +205,7 @@ export function CommunitySidebar({
 
             <CommunityChannelList
               activeVoiceChannelId={activeVoiceChannelId}
+              animateEntries={animateEntries}
               animationScopeKey={animationScopeKey}
               channelSearch={channelSearch}
               channelUnreadCounts={channelUnreadCounts}

@@ -9,6 +9,7 @@ export type IdentityMembersAsideVariant = 'desktop' | 'mobile';
 
 export function IdentityMembersAside({
   action,
+  animateEntries = true,
   animationScopeKey,
   className,
   emptyLabel,
@@ -22,6 +23,7 @@ export function IdentityMembersAside({
     label: string;
     onClick: () => void;
   };
+  animateEntries?: boolean;
   animationScopeKey?: string;
   className?: string;
   emptyLabel: string;
@@ -41,6 +43,7 @@ export function IdentityMembersAside({
     >
       <IdentityMemberListPanel
         action={action}
+        animateEntries={animateEntries}
         animationScopeKey={animationScopeKey}
         emptyLabel={emptyLabel}
         items={items}
