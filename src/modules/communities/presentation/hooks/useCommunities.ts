@@ -23,6 +23,14 @@ type CommunitiesState = {
   setCommunities: Dispatch<SetStateAction<Community[]>>;
 };
 
+type CommunityCacheEntry = {
+  communities: Community[];
+  storedAt: number;
+};
+
+const COMMUNITY_CACHE_TTL_MS = 15_000;
+const communityCacheByIdentityId = new Map<string, CommunityCacheEntry>();
+
 export function useCommunities(session?: null | Session): CommunitiesState {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +38,26 @@ export function useCommunities(session?: null | Session): CommunitiesState {
   const [loadedIdentityId, setLoadedIdentityId] = useState<string | null>(null);
 
   const sessionIdentityId = session?.identity.id ?? null;
+  const rememberCommunities = useCallback(
+    (next: SetStateAction<Community[]>) => {
+      setCommunities((current) => {
+        const resolved =
+          typeof next === 'function'
+            ? (next as (current: Community[]) => Community[])(current)
+            : next;
+
+        if (sessionIdentityId) {
+          communityCacheByIdentityId.set(sessionIdentityId, {
+            communities: resolved,
+            storedAt: Date.now(),
+          });
+        }
+
+        return resolved;
+      });
+    },
+    [sessionIdentityId],
+  );
 
   const reload = useCallback(async () => {
     if (!session) {
@@ -41,24 +69,37 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     }
 
     const identityId = session.identity.id;
+    const cached = cachedCommunitiesFor(identityId);
 
-    setLoading(true);
+    if (cached) {
+      setCommunities(cached);
+      setLoadedIdentityId(identityId);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
 
     try {
       const applicationContainer = await loadApplicationContainer();
+      const nextCommunities =
+        await applicationContainer.listCommunities(session);
 
-      setCommunities(await applicationContainer.listCommunities(session));
+      rememberCommunities(nextCommunities);
       setLoadedIdentityId(identityId);
     } catch (caught) {
-      setError(
-        new Error(toUserErrorMessage(caught, copy.communities.loadError)),
-      );
+      if (!cached) {
+        setError(
+          new Error(toUserErrorMessage(caught, copy.communities.loadError)),
+        );
+      }
+
       setLoadedIdentityId(identityId);
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [rememberCommunities, session]);
 
   useEffect(() => {
     void reload();
@@ -71,6 +112,20 @@ export function useCommunities(session?: null | Session): CommunitiesState {
       loading ||
       (!!sessionIdentityId && loadedIdentityId !== sessionIdentityId && !error),
     reload,
-    setCommunities,
+    setCommunities: rememberCommunities,
   };
+}
+
+function cachedCommunitiesFor(identityId: string): Community[] | null {
+  const entry = communityCacheByIdentityId.get(identityId);
+
+  if (!entry) return null;
+
+  if (Date.now() - entry.storedAt > COMMUNITY_CACHE_TTL_MS) {
+    communityCacheByIdentityId.delete(identityId);
+
+    return null;
+  }
+
+  return entry.communities;
 }

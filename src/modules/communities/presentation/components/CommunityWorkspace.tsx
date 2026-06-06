@@ -23,6 +23,7 @@ import type {
   Community,
   AttachmentUploadOptions,
   CommunityChannelThreadSummary,
+  CommunityTextChannel,
   CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
   ConversationKeyEntry,
@@ -47,6 +48,7 @@ import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
 import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -193,6 +195,41 @@ type CommunityThreadEditingMessage = {
   message: ChatMessage;
   previousDraft: string;
 };
+
+type ChannelThreadCacheEntry = {
+  storedAt: number;
+  threadsByChannelId: Record<string, CommunityChannelThreadSummary[]>;
+};
+
+const CHANNEL_THREAD_CACHE_TTL_MS = 15_000;
+const channelThreadCacheByCommunityId = new Map<
+  string,
+  ChannelThreadCacheEntry
+>();
+
+function threadSummariesByChannelId(
+  channels: CommunityTextChannel[],
+): Record<string, CommunityChannelThreadSummary[]> {
+  return Object.fromEntries(
+    channels.map((channel) => [channel.id, channel.threads ?? []]),
+  );
+}
+
+function cachedChannelThreadsFor(
+  communityId: string,
+): Record<string, CommunityChannelThreadSummary[]> | null {
+  const entry = channelThreadCacheByCommunityId.get(communityId);
+
+  if (!entry) return null;
+
+  if (Date.now() - entry.storedAt > CHANNEL_THREAD_CACHE_TTL_MS) {
+    channelThreadCacheByCommunityId.delete(communityId);
+
+    return null;
+  }
+
+  return entry.threadsByChannelId;
+}
 
 export function CommunityWorkspace({
   activeCall,
@@ -358,7 +395,7 @@ export function CommunityWorkspace({
   );
   const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
     Record<string, CommunityChannelThreadSummary[]>
-  >({});
+  >(() => threadSummariesByChannelId(textChannels));
   const [threadRootLabels, setThreadRootLabels] = useState<
     Record<string, string>
   >({});
@@ -393,27 +430,41 @@ export function CommunityWorkspace({
     unresolvedThreadRootLabelKeysRef.current.clear();
   }, [community.id]);
   useEffect(() => {
+    setChannelThreadsByChannelId(threadSummariesByChannelId(textChannels));
+  }, [community.id, textChannels]);
+  useEffect(() => {
+    const cached = cachedChannelThreadsFor(community.id);
+
+    if (cached) {
+      setChannelThreadsByChannelId(cached);
+    }
+
     let cancelled = false;
 
-    void applicationContainer
-      .listCommunityChannels(session, community.id)
-      .then((channels) => {
-        if (cancelled) return;
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void applicationContainer
+        .listCommunityChannels(session, community.id)
+        .then((channels) => {
+          if (cancelled) return;
 
-        setChannelThreadsByChannelId(
-          Object.fromEntries(
-            channels
-              .filter((channel) => channel.type === 'text')
-              .map((channel) => [channel.id, channel.threads ?? []]),
-          ),
-        );
-      })
-      .catch(() => undefined);
+          const threadsByChannelId = threadSummariesByChannelId(
+            channels.filter((channel) => channel.type === 'text'),
+          );
+
+          channelThreadCacheByCommunityId.set(community.id, {
+            storedAt: Date.now(),
+            threadsByChannelId,
+          });
+          setChannelThreadsByChannelId(threadsByChannelId);
+        })
+        .catch(() => undefined);
+    });
 
     return () => {
       cancelled = true;
+      cancelIdleWork();
     };
-  }, [community.id, session]);
+  }, [community.id, session, textChannels]);
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
