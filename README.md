@@ -214,3 +214,4 @@ This project may include or reference third-party assets. See [ATTRIBUTIONS.md](
 ## Disclaimer
 
 Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc, NEXON, NEXON Games, Yostar, or the Blue Archive team.
+Discord is a trademark of Discord Inc.
