@@ -4,6 +4,83 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 
 export class MessageCollection {
+  private static applyEdit(
+    target: ChatMessage,
+    edit: ChatMessage,
+  ): ChatMessage {
+    return {
+      ...target,
+      content: edit.content,
+      edited: true,
+      editedAt: edit.timestamp,
+      editMessageId: edit.id,
+      encrypted: edit.encrypted,
+      linkPreview: edit.linkPreview,
+      mentions: edit.mentions,
+      originalContent: target.originalContent ?? target.content,
+    };
+  }
+
+  private static isEditMessage(message: ChatMessage): boolean {
+    return message.raw.type === 'edited' && !!message.raw.targetMessageId;
+  }
+
+  private static isSameDeliveredMessage(
+    left: ChatMessage,
+    right: ChatMessage,
+  ): boolean {
+    return (
+      left.id === right.id &&
+      left.timestamp === right.timestamp &&
+      left.content === right.content &&
+      left.encrypted === right.encrypted &&
+      left.edited === right.edited &&
+      this.messageEditedAt(left) === this.messageEditedAt(right) &&
+      this.messageAttachmentKey(left) === this.messageAttachmentKey(right) &&
+      this.messageReactionKey(left) === this.messageReactionKey(right)
+    );
+  }
+
+  private static messageEditedAt(message: ChatMessage): number | undefined {
+    return message.editedAt ?? message.raw.editedAt;
+  }
+
+  private static messageAttachmentKey(message: ChatMessage): string {
+    return message.attachments
+      .map(
+        (attachment) =>
+          `${attachment.cid}:${attachment.filename}:${attachment.size}:${attachment.contentType}`,
+      )
+      .join('\u0000');
+  }
+
+  private static messageReactionKey(message: ChatMessage): string {
+    return message.reactions
+      .map(
+        (reaction) =>
+          `${reaction.authorIdentityId}:${reaction.emoji}:${reaction.createdAt}`,
+      )
+      .sort()
+      .join('\u0000');
+  }
+
+  private static indexMessages(
+    byId: Map<string, ChatMessage>,
+    messages: ChatMessage[],
+  ): ChatMessage[] {
+    const edits: ChatMessage[] = [];
+
+    for (const message of messages) {
+      if (this.isEditMessage(message)) {
+        edits.push(message);
+      } else {
+        byId.set(message.id, message);
+      }
+    }
+
+    return edits;
+  }
+
   public static lastDelivered(
     messages: readonly ChatMessage[],
   ): ChatMessage | undefined {
@@ -101,82 +178,5 @@ export class MessageCollection {
     const currentIds = new Set(currentMessages.map((message) => message.id));
 
     return incomingMessages.some((message) => !currentIds.has(message.id));
-  }
-
-  private static applyEdit(
-    target: ChatMessage,
-    edit: ChatMessage,
-  ): ChatMessage {
-    return {
-      ...target,
-      content: edit.content,
-      edited: true,
-      editedAt: edit.timestamp,
-      editMessageId: edit.id,
-      encrypted: edit.encrypted,
-      linkPreview: edit.linkPreview,
-      mentions: edit.mentions,
-      originalContent: target.originalContent ?? target.content,
-    };
-  }
-
-  private static isEditMessage(message: ChatMessage): boolean {
-    return message.raw.type === 'edited' && !!message.raw.targetMessageId;
-  }
-
-  private static isSameDeliveredMessage(
-    left: ChatMessage,
-    right: ChatMessage,
-  ): boolean {
-    return (
-      left.id === right.id &&
-      left.timestamp === right.timestamp &&
-      left.content === right.content &&
-      left.encrypted === right.encrypted &&
-      left.edited === right.edited &&
-      this.messageEditedAt(left) === this.messageEditedAt(right) &&
-      this.messageAttachmentKey(left) === this.messageAttachmentKey(right) &&
-      this.messageReactionKey(left) === this.messageReactionKey(right)
-    );
-  }
-
-  private static messageEditedAt(message: ChatMessage): number | undefined {
-    return message.editedAt ?? message.raw.editedAt;
-  }
-
-  private static messageAttachmentKey(message: ChatMessage): string {
-    return message.attachments
-      .map(
-        (attachment) =>
-          `${attachment.cid}:${attachment.filename}:${attachment.size}:${attachment.contentType}`,
-      )
-      .join('\u0000');
-  }
-
-  private static messageReactionKey(message: ChatMessage): string {
-    return message.reactions
-      .map(
-        (reaction) =>
-          `${reaction.authorIdentityId}:${reaction.emoji}:${reaction.createdAt}`,
-      )
-      .sort()
-      .join('\u0000');
-  }
-
-  private static indexMessages(
-    byId: Map<string, ChatMessage>,
-    messages: ChatMessage[],
-  ): ChatMessage[] {
-    const edits: ChatMessage[] = [];
-
-    for (const message of messages) {
-      if (this.isEditMessage(message)) {
-        edits.push(message);
-      } else {
-        byId.set(message.id, message);
-      }
-    }
-
-    return edits;
   }
 }

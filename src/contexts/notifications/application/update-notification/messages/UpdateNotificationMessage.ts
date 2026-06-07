@@ -1,6 +1,6 @@
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
-import { NotificationDecision } from '../../../domain/notificationDecision';
+import { NotificationDecision } from '../../../domain/NotificationDecision';
 import { NotificationId } from '../../../domain/NotificationId';
 
 export class UpdateNotificationMessage {

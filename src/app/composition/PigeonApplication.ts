@@ -3,7 +3,7 @@ import type {
   CallResource,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
-import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
+import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -14,7 +14,6 @@ import type {
   CommunityChannelMessagePinsResource,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
-  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
@@ -54,6 +53,8 @@ import type {
   StickerPackResource,
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
+import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 
 import { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
 import { PublishMessageAttachments } from '../../contexts/attachments/application/publish-message-attachments/PublishMessageAttachments';
@@ -63,7 +64,7 @@ import {
   CreateGroupConversation,
   type CreateGroupConversationInput,
 } from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
-import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/createGroupConversationMessage';
+import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
 import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
 import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
@@ -125,35 +126,11 @@ import {
   type RealtimeHeartbeatActivityMode,
   type RealtimeMessage,
   type RealtimeTypingInput,
-} from '../../shared/infrastructure/realtime/realtimeGateway';
+} from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
-
-type CommunityChannelMessagePayloadInput =
-  | {
-      encryptedPayload: string;
-      plaintextPayload?: never;
-    }
-  | {
-      encryptedPayload?: never;
-      plaintextPayload: string;
-    };
-
-type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  id?: string;
-  mentions?: CommunityMessageMention[];
-  replyToMessageId?: string;
-  timestamp?: number;
-};
-
-type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
 
 function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
   endpoint: string;

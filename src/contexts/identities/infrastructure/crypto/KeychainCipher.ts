@@ -5,24 +5,10 @@ import type {
   LocalKeychain,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { KeychainDomainSignaturePayload } from './KeychainDomainSignaturePayload';
+import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-
-type PublishedKeychainPayload = {
-  encryptedPayload: string;
-  previousKeychainExternalIdentifier: null | string;
-  signature: string;
-  timestamp: number;
-  version: number;
-};
-
-type KeychainDomainSignaturePayload = {
-  encryptedPayload: string;
-  ownerIdentityId: string;
-  previousKeychainExternalIdentifier?: string;
-  timestamp: number;
-  version: number;
-};
 
 export class KeychainCipher {
   public async decrypt(

@@ -1,10 +1,7 @@
 import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-
-type DraftPlainPayload = {
-  content: string;
-};
+import type { DraftPlainPayload } from './DraftPlainPayload';
 
 export class DraftPayloadCipher {
   public async decrypt(

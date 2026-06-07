@@ -1,4 +1,4 @@
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatTime } from '../../../../shared/presentation/formatting';

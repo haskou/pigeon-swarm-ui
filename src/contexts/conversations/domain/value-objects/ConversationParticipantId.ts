@@ -1,8 +1,17 @@
 import { DomainError, StringValueObject } from '@haskou/value-objects';
 
 export class ConversationParticipantId extends StringValueObject {
-  private constructor(value: string) {
-    super(ConversationParticipantId.normalize(value));
+  private static normalize(value: string): string {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue.includes('-----BEGIN PUBLIC KEY-----')) {
+      return trimmedValue;
+    }
+
+    return trimmedValue
+      .replace('-----BEGIN PUBLIC KEY-----', '')
+      .replace('-----END PUBLIC KEY-----', '')
+      .replace(/\s+/g, '');
   }
 
   public static fromString(value: string): ConversationParticipantId {
@@ -15,16 +24,7 @@ export class ConversationParticipantId extends StringValueObject {
     return new ConversationParticipantId(normalizedValue);
   }
 
-  private static normalize(value: string): string {
-    const trimmedValue = value.trim();
-
-    if (!trimmedValue.includes('-----BEGIN PUBLIC KEY-----')) {
-      return trimmedValue;
-    }
-
-    return trimmedValue
-      .replace('-----BEGIN PUBLIC KEY-----', '')
-      .replace('-----END PUBLIC KEY-----', '')
-      .replace(/\s+/g, '');
+  private constructor(value: string) {
+    super(ConversationParticipantId.normalize(value));
   }
 }

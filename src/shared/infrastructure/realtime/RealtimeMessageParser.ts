@@ -1,4 +1,4 @@
-import type { RealtimeMessage } from './realtimeGateway';
+import type { RealtimeMessage } from './RealtimeGateway';
 
 export class RealtimeMessageParser {
   public parse(data: unknown): RealtimeMessage | null {

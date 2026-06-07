@@ -4,69 +4,17 @@ import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
 import type {
   ChatMessage,
   ConversationKeyEntry,
-  CommunityMessageMention,
-  MessageAttachment,
-  MessageLinkPreview,
   MessageReaction,
-  MessageReplyPreview,
   MessageResource,
-  StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { CacheDatabase } from './communityMessageDecryptWorker/CacheDatabase';
+import type { CommunityChannelPlainPayload } from './communityMessageDecryptWorker/CommunityChannelPlainPayload';
+import type { CommunityMessageDecryptCancelRequest } from './communityMessageDecryptWorker/CommunityMessageDecryptCancelRequest';
+import type { CommunityMessageDecryptRequest } from './communityMessageDecryptWorker/CommunityMessageDecryptRequest';
+import type { CommunityMessageDecryptResponse } from './communityMessageDecryptWorker/CommunityMessageDecryptResponse';
+import type { MessageReactionRecord } from './communityMessageDecryptWorker/MessageReactionRecord';
 
 import { PollMessageProjection } from '../../../messages/domain/PollMessageProjection';
-
-type CommunityMessageDecryptRequest = {
-  communityId: string;
-  channelId: string;
-  communityKey?: ConversationKeyEntry;
-  copy: {
-    decryptFailed: string;
-    missingKey: string;
-  };
-  currentIdentityId: string;
-  messages: MessageResource[];
-  requestId: number;
-};
-
-type CommunityMessageDecryptCancelRequest = {
-  requestId: number;
-  type: 'cancel';
-};
-
-type CommunityMessageDecryptResponse =
-  | {
-      messages: ChatMessage[];
-      requestId: number;
-      type: 'success';
-    }
-  | {
-      message: string;
-      requestId: number;
-      type: 'error';
-    };
-
-type CommunityChannelPlainPayload = {
-  attachments?: MessageAttachment[];
-  authorIdentityId?: string;
-  content?: string;
-  linkPreview?: MessageLinkPreview;
-  mentions?: CommunityMessageMention[];
-  reply?: MessageReplyPreview;
-  replyToMessageId?: string;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp?: number;
-  type?: string;
-};
-
-type MessageReactionRecord = {
-  authorId?: unknown;
-  authorIdentityId?: unknown;
-  createdAt?: unknown;
-  emoji?: unknown;
-};
-
-type CacheDatabase = IDBDatabase | null;
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();

@@ -11,7 +11,7 @@ import type {
   PollResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { MessageReactions } from '../../../messages/domain/MessageReactions';

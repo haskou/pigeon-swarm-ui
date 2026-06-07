@@ -10,7 +10,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { NetworkInviteCode } from '../../../../contexts/networks/domain/networkInviteCode';
+import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
@@ -239,7 +239,7 @@ export function NodeSettingsDialog({
   };
 
   const copyNetworkCode = async (network: NodeNetwork) => {
-    const code = networkInviteCode(network);
+    const code = networkInviteCodeFor(network);
 
     if (!code || !navigator.clipboard) return;
 
@@ -348,7 +348,7 @@ export function NodeSettingsDialog({
               <div className="space-y-2">
                 {networks.map((network) => {
                   const publicNetwork = isPublicNodeNetwork(network);
-                  const inviteCode = networkInviteCode(network);
+                  const inviteCode = networkInviteCodeFor(network);
 
                   return (
                     <div
@@ -502,7 +502,7 @@ function networkDisplayName(network: NodeNetwork): string {
     : network.name;
 }
 
-function networkInviteCode(network: NodeNetwork): string {
+function networkInviteCodeFor(network: NodeNetwork): string {
   const key = network.key?.trim();
 
   if (!key) return '';

@@ -1,4 +1,6 @@
 import type { ScreenShareQualityPreset } from '../../domain/callSession.types';
+import type { LocalMediaOptions } from './LocalMediaOptions';
+import type { ScreenShareOptions } from './ScreenShareOptions';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import { CallMicrophoneCapture } from './CallMicrophoneCapture';
@@ -6,15 +8,6 @@ import {
   screenShareTrackConstraints,
   screenShareVideoConstraints,
 } from './ScreenShareQuality';
-
-type LocalMediaOptions = {
-  noiseCancellationEnabled: boolean;
-};
-
-type ScreenShareOptions = {
-  audioEnabled: boolean;
-  quality?: ScreenShareQualityPreset;
-};
 
 function describeTrack(track: MediaStreamTrack): Record<string, unknown> {
   return {
@@ -64,137 +57,6 @@ export class LocalMediaManager {
 
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
-  public useStream(
-    stream: MediaStream,
-    options: LocalMediaOptions = { noiseCancellationEnabled: true },
-  ): MediaStream {
-    this.stop();
-    this.noiseCancellationEnabled = options.noiseCancellationEnabled;
-    this.microphoneStream = stream.getAudioTracks().length > 0 ? stream : null;
-    this.stream = new MediaStream(stream.getTracks());
-    this.configureAudioAnalyser();
-    logCallDebug('local-media:use-existing-stream', {
-      noiseCancellationEnabled: this.noiseCancellationEnabled,
-      tracks: describeTracks(this.stream),
-    });
-
-    return this.stream;
-  }
-
-  public async startAudio(
-    options: LocalMediaOptions = { noiseCancellationEnabled: true },
-  ): Promise<MediaStream> {
-    this.noiseCancellationEnabled = options.noiseCancellationEnabled;
-    logCallDebug('local-media:start-audio:requesting-permission', {
-      hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
-      hasMediaDevices: Boolean(navigator.mediaDevices),
-      isSecureContext: window.isSecureContext,
-      noiseCancellationEnabled: this.noiseCancellationEnabled,
-      permissionApiAvailable: Boolean(navigator.permissions?.query),
-    });
-
-    try {
-      const microphoneStream = await CallMicrophoneCapture.capture(
-        navigator.mediaDevices,
-        { noiseCancellationEnabled: this.noiseCancellationEnabled },
-      );
-
-      this.replaceMicrophoneStream(microphoneStream);
-    } catch (error) {
-      logCallError('local-media:start-audio:failed', error, {
-        hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
-        hasMediaDevices: Boolean(navigator.mediaDevices),
-        isSecureContext: window.isSecureContext,
-      });
-      throw error;
-    }
-
-    logCallDebug('local-media:start-audio:granted', {
-      tracks: this.stream ? describeTracks(this.stream) : [],
-    });
-    this.configureAudioAnalyser();
-
-    return this.currentStream();
-  }
-
-  public async enableCamera(): Promise<MediaStream> {
-    const cameraStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: true,
-    });
-    const [track] = cameraStream.getVideoTracks();
-
-    if (!track) throw new Error('Camera track unavailable.');
-
-    this.replaceManagedTrack('camera', track);
-
-    return this.currentStream();
-  }
-
-  public async enableScreenShare(
-    options: ScreenShareOptions = { audioEnabled: true },
-  ): Promise<MediaStream> {
-    const displayMedia = navigator.mediaDevices.getDisplayMedia;
-    const quality = options.quality ?? this.screenShareQuality;
-
-    if (!displayMedia) throw new Error('Screen sharing unavailable.');
-
-    const screenStream = await displayMedia.call(navigator.mediaDevices, {
-      audio: options.audioEnabled,
-      video: screenShareVideoConstraints(quality),
-    });
-    const [track] = screenStream.getVideoTracks();
-    const [audioTrack] = screenStream.getAudioTracks();
-
-    if (!track) throw new Error('Screen track unavailable.');
-
-    this.screenShareQuality = quality;
-    this.replaceScreenTracks(track, audioTrack ?? null);
-
-    return this.currentStream();
-  }
-
-  public async setScreenShareQuality(
-    quality: ScreenShareQualityPreset,
-  ): Promise<MediaStream | null> {
-    this.screenShareQuality = quality;
-
-    if (this.screenTrack?.readyState !== 'live') return this.stream;
-
-    await this.screenTrack.applyConstraints(
-      screenShareTrackConstraints(quality),
-    );
-
-    return this.stream;
-  }
-
-  public disableCamera(): MediaStream | null {
-    this.cameraTrack?.stop();
-    this.removeTrack(this.cameraTrack);
-    this.cameraTrack = null;
-
-    return this.stream;
-  }
-
-  public disableScreenShare(): MediaStream | null {
-    this.stopScreenShareTracks();
-
-    return this.stream;
-  }
-
-  public setScreenShareAudioVolume(volumePercent: number): void {
-    const volume = Math.min(3, Math.max(0, volumePercent / 100));
-
-    this.screenAudioVolume = volume;
-
-    if (!this.screenAudioGain || !this.screenAudioContext) return;
-
-    this.screenAudioGain.gain.setValueAtTime(
-      volume,
-      this.screenAudioContext.currentTime,
-    );
-  }
-
   private stopScreenShareTracks(): void {
     this.removeTrack(this.screenTrack);
     this.removeTrack(this.screenAudioTrack);
@@ -213,95 +75,6 @@ export class LocalMediaManager {
     this.screenAudioSourceTrack = null;
     this.screenPreviewStreamCache = null;
     this.resetScreenAudioGraph();
-  }
-
-  public hasCamera(): boolean {
-    return this.cameraTrack?.readyState === 'live';
-  }
-
-  public hasScreenShare(): boolean {
-    return this.screenTrack?.readyState === 'live';
-  }
-
-  public localAudioLevel(): number {
-    if (!this.analyser || !this.audioSamples) return 0;
-
-    this.analyser.getByteTimeDomainData(this.audioSamples);
-
-    let total = 0;
-
-    for (const sample of this.audioSamples) {
-      const normalized = (sample - 128) / 128;
-
-      total += normalized * normalized;
-    }
-
-    return Math.sqrt(total / this.audioSamples.length);
-  }
-
-  public setMicrophoneMuted(muted: boolean): void {
-    const audioTracks = this.microphoneStream?.getAudioTracks() ?? [];
-
-    logCallDebug('local-media:set-microphone-muted', {
-      muted,
-      trackCount: audioTracks.length,
-      tracks: audioTracks.map(describeTrack),
-    });
-
-    for (const audioTrack of audioTracks) audioTrack.enabled = !muted;
-  }
-
-  public async setNoiseCancellationEnabled(
-    enabled: boolean,
-  ): Promise<MediaStream | null> {
-    if (!this.stream || !this.microphoneStream?.getAudioTracks().length) {
-      this.noiseCancellationEnabled = enabled;
-
-      return this.stream;
-    }
-
-    const microphoneEnabled =
-      this.microphoneStream.getAudioTracks().some((track) => track.enabled) ||
-      this.microphoneStream.getAudioTracks().length === 0;
-    const microphoneStream = await CallMicrophoneCapture.capture(
-      navigator.mediaDevices,
-      { noiseCancellationEnabled: enabled },
-    );
-
-    for (const track of microphoneStream.getAudioTracks()) {
-      track.enabled = microphoneEnabled;
-    }
-
-    this.replaceMicrophoneStream(microphoneStream);
-    this.noiseCancellationEnabled = enabled;
-    this.resetAudioAnalyser();
-    this.configureAudioAnalyser();
-
-    return this.stream;
-  }
-
-  public previewStream(): MediaStream | undefined {
-    return this.stream ?? undefined;
-  }
-
-  public screenPreviewStream(): MediaStream | undefined {
-    return this.screenTrack?.readyState === 'live'
-      ? (this.screenPreviewStreamCache ??= new MediaStream([this.screenTrack]))
-      : undefined;
-  }
-
-  public stop(): void {
-    logCallDebug('local-media:stop', {
-      hadStream: Boolean(this.stream),
-      tracks: this.stream ? describeTracks(this.stream) : [],
-    });
-    CallMicrophoneCapture.stop(this.microphoneStream);
-    this.stopScreenShareTracks();
-    this.stream?.getTracks().forEach((track) => track.stop());
-    this.stream = null;
-    this.microphoneStream = null;
-    this.cameraTrack = null;
-    this.resetAudioAnalyser();
   }
 
   private currentStream(): MediaStream {
@@ -473,5 +246,225 @@ export class LocalMediaManager {
     this.screenAudioSource = null;
     this.screenAudioGain = null;
     this.screenAudioContext = null;
+  }
+
+  public useStream(
+    stream: MediaStream,
+    options: LocalMediaOptions = { noiseCancellationEnabled: true },
+  ): MediaStream {
+    this.stop();
+    this.noiseCancellationEnabled = options.noiseCancellationEnabled;
+    this.microphoneStream = stream.getAudioTracks().length > 0 ? stream : null;
+    this.stream = new MediaStream(stream.getTracks());
+    this.configureAudioAnalyser();
+    logCallDebug('local-media:use-existing-stream', {
+      noiseCancellationEnabled: this.noiseCancellationEnabled,
+      tracks: describeTracks(this.stream),
+    });
+
+    return this.stream;
+  }
+
+  public async startAudio(
+    options: LocalMediaOptions = { noiseCancellationEnabled: true },
+  ): Promise<MediaStream> {
+    this.noiseCancellationEnabled = options.noiseCancellationEnabled;
+    logCallDebug('local-media:start-audio:requesting-permission', {
+      hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+      hasMediaDevices: Boolean(navigator.mediaDevices),
+      isSecureContext: window.isSecureContext,
+      noiseCancellationEnabled: this.noiseCancellationEnabled,
+      permissionApiAvailable: Boolean(navigator.permissions?.query),
+    });
+
+    try {
+      const microphoneStream = await CallMicrophoneCapture.capture(
+        navigator.mediaDevices,
+        { noiseCancellationEnabled: this.noiseCancellationEnabled },
+      );
+
+      this.replaceMicrophoneStream(microphoneStream);
+    } catch (error) {
+      logCallError('local-media:start-audio:failed', error, {
+        hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+        hasMediaDevices: Boolean(navigator.mediaDevices),
+        isSecureContext: window.isSecureContext,
+      });
+      throw error;
+    }
+
+    logCallDebug('local-media:start-audio:granted', {
+      tracks: this.stream ? describeTracks(this.stream) : [],
+    });
+    this.configureAudioAnalyser();
+
+    return this.currentStream();
+  }
+
+  public async enableCamera(): Promise<MediaStream> {
+    const cameraStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: true,
+    });
+    const [track] = cameraStream.getVideoTracks();
+
+    if (!track) throw new Error('Camera track unavailable.');
+
+    this.replaceManagedTrack('camera', track);
+
+    return this.currentStream();
+  }
+
+  public async enableScreenShare(
+    options: ScreenShareOptions = { audioEnabled: true },
+  ): Promise<MediaStream> {
+    const displayMedia = navigator.mediaDevices.getDisplayMedia;
+    const quality = options.quality ?? this.screenShareQuality;
+
+    if (!displayMedia) throw new Error('Screen sharing unavailable.');
+
+    const screenStream = await displayMedia.call(navigator.mediaDevices, {
+      audio: options.audioEnabled,
+      video: screenShareVideoConstraints(quality),
+    });
+    const [track] = screenStream.getVideoTracks();
+    const [audioTrack] = screenStream.getAudioTracks();
+
+    if (!track) throw new Error('Screen track unavailable.');
+
+    this.screenShareQuality = quality;
+    this.replaceScreenTracks(track, audioTrack ?? null);
+
+    return this.currentStream();
+  }
+
+  public async setScreenShareQuality(
+    quality: ScreenShareQualityPreset,
+  ): Promise<MediaStream | null> {
+    this.screenShareQuality = quality;
+
+    if (this.screenTrack?.readyState !== 'live') return this.stream;
+
+    await this.screenTrack.applyConstraints(
+      screenShareTrackConstraints(quality),
+    );
+
+    return this.stream;
+  }
+
+  public disableCamera(): MediaStream | null {
+    this.cameraTrack?.stop();
+    this.removeTrack(this.cameraTrack);
+    this.cameraTrack = null;
+
+    return this.stream;
+  }
+
+  public disableScreenShare(): MediaStream | null {
+    this.stopScreenShareTracks();
+
+    return this.stream;
+  }
+
+  public setScreenShareAudioVolume(volumePercent: number): void {
+    const volume = Math.min(3, Math.max(0, volumePercent / 100));
+
+    this.screenAudioVolume = volume;
+
+    if (!this.screenAudioGain || !this.screenAudioContext) return;
+
+    this.screenAudioGain.gain.setValueAtTime(
+      volume,
+      this.screenAudioContext.currentTime,
+    );
+  }
+
+  public hasCamera(): boolean {
+    return this.cameraTrack?.readyState === 'live';
+  }
+
+  public hasScreenShare(): boolean {
+    return this.screenTrack?.readyState === 'live';
+  }
+
+  public localAudioLevel(): number {
+    if (!this.analyser || !this.audioSamples) return 0;
+
+    this.analyser.getByteTimeDomainData(this.audioSamples);
+
+    let total = 0;
+
+    for (const sample of this.audioSamples) {
+      const normalized = (sample - 128) / 128;
+
+      total += normalized * normalized;
+    }
+
+    return Math.sqrt(total / this.audioSamples.length);
+  }
+
+  public setMicrophoneMuted(muted: boolean): void {
+    const audioTracks = this.microphoneStream?.getAudioTracks() ?? [];
+
+    logCallDebug('local-media:set-microphone-muted', {
+      muted,
+      trackCount: audioTracks.length,
+      tracks: audioTracks.map(describeTrack),
+    });
+
+    for (const audioTrack of audioTracks) audioTrack.enabled = !muted;
+  }
+
+  public async setNoiseCancellationEnabled(
+    enabled: boolean,
+  ): Promise<MediaStream | null> {
+    if (!this.stream || !this.microphoneStream?.getAudioTracks().length) {
+      this.noiseCancellationEnabled = enabled;
+
+      return this.stream;
+    }
+
+    const microphoneEnabled =
+      this.microphoneStream.getAudioTracks().some((track) => track.enabled) ||
+      this.microphoneStream.getAudioTracks().length === 0;
+    const microphoneStream = await CallMicrophoneCapture.capture(
+      navigator.mediaDevices,
+      { noiseCancellationEnabled: enabled },
+    );
+
+    for (const track of microphoneStream.getAudioTracks()) {
+      track.enabled = microphoneEnabled;
+    }
+
+    this.replaceMicrophoneStream(microphoneStream);
+    this.noiseCancellationEnabled = enabled;
+    this.resetAudioAnalyser();
+    this.configureAudioAnalyser();
+
+    return this.stream;
+  }
+
+  public previewStream(): MediaStream | undefined {
+    return this.stream ?? undefined;
+  }
+
+  public screenPreviewStream(): MediaStream | undefined {
+    return this.screenTrack?.readyState === 'live'
+      ? (this.screenPreviewStreamCache ??= new MediaStream([this.screenTrack]))
+      : undefined;
+  }
+
+  public stop(): void {
+    logCallDebug('local-media:stop', {
+      hadStream: Boolean(this.stream),
+      tracks: this.stream ? describeTracks(this.stream) : [],
+    });
+    CallMicrophoneCapture.stop(this.microphoneStream);
+    this.stopScreenShareTracks();
+    this.stream?.getTracks().forEach((track) => track.stop());
+    this.stream = null;
+    this.microphoneStream = null;
+    this.cameraTrack = null;
+    this.resetAudioAnalyser();
   }
 }

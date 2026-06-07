@@ -9,15 +9,6 @@ import { StickerPackId } from '../value-objects/StickerPackId';
 import { StickerPackName } from '../value-objects/StickerPackName';
 
 export class StickerPack extends AggregateRoot {
-  private constructor(
-    private readonly id: StickerPackId,
-    private name: StickerPackName,
-    private readonly resource: StickerPackResource,
-    private stickers: StickerResource[],
-  ) {
-    super();
-  }
-
   public static fromResource(resource: StickerPackResource): StickerPack {
     return new StickerPack(
       StickerPackId.fromString(resource.id),
@@ -25,6 +16,15 @@ export class StickerPack extends AggregateRoot {
       resource,
       resource.stickers,
     );
+  }
+
+  private constructor(
+    private readonly id: StickerPackId,
+    private name: StickerPackName,
+    private readonly resource: StickerPackResource,
+    private stickers: StickerResource[],
+  ) {
+    super();
   }
 
   public contains(stickerId: StickerId): boolean {

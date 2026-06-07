@@ -28,6 +28,16 @@ export class PigeonStickersApi {
     this.publicFiles = publicFiles ?? new PigeonPublicFilesClient(http, signer);
   }
 
+  private stickerCollectionPath(packId: string): string {
+    return `/stickers/packs/${encodeURIComponent(packId)}/stickers`;
+  }
+
+  private stickerPath(packId: string, stickerId: string): string {
+    return `${this.stickerCollectionPath(packId)}/${encodeURIComponent(
+      stickerId,
+    )}`;
+  }
+
   public async uploadAsset(
     session: Session,
     file: File,
@@ -205,15 +215,5 @@ export class PigeonStickersApi {
       headers: await this.signer.headers(session, 'POST', path),
       method: 'POST',
     });
-  }
-
-  private stickerCollectionPath(packId: string): string {
-    return `/stickers/packs/${encodeURIComponent(packId)}/stickers`;
-  }
-
-  private stickerPath(packId: string, stickerId: string): string {
-    return `${this.stickerCollectionPath(packId)}/${encodeURIComponent(
-      stickerId,
-    )}`;
   }
 }

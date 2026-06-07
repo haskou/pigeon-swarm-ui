@@ -3,7 +3,7 @@ import type { Session } from '../../../shared/domain/pigeonResources.types';
 import {
   PigeonPushApi,
   type PushSubscriptionPayload,
-} from '../../../contexts/notifications/infrastructure/http/pigeonPushApi';
+} from '../../../contexts/notifications/infrastructure/http/PigeonPushApi';
 
 export class PigeonPushGateway {
   public constructor(private readonly push: PigeonPushApi) {}

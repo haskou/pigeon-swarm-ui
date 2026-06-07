@@ -1,17 +1,14 @@
-import type { Session } from '../../domain/pigeonResources.types';
+import type { ActivityTracker } from './ActivityTracker';
+import type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeatActivityMode';
 
-export type RealtimeHeartbeatActivityMode = 'auto' | 'inactive';
+export type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeatActivityMode';
+import type { Session } from '../../domain/pigeonResources.types';
 
 const heartbeatIntervalMs = 10000;
 const heartbeatTimeoutMs = heartbeatIntervalMs * 3;
 const heartbeatTimeoutCloseCode = 4000;
 const recentActivityWindowMs = 5 * 60 * 1000;
 const activeActivityRefreshMs = 1000;
-
-type ActivityTracker = {
-  isActive: () => boolean;
-  stop: () => void;
-};
 
 export class RealtimeHeartbeat {
   private readonly acknowledgements = new WeakMap<WebSocket, number>();
@@ -20,51 +17,6 @@ export class RealtimeHeartbeat {
     string,
     RealtimeHeartbeatActivityMode
   >();
-
-  public setActivityMode(
-    session: Session,
-    mode: RealtimeHeartbeatActivityMode,
-  ): void {
-    this.activityModes.set(session.identity.id, mode);
-  }
-
-  public acknowledge(socket: WebSocket): void {
-    this.acknowledgements.set(socket, Date.now());
-  }
-
-  public start(
-    socket: WebSocket,
-    session: Session,
-    send: (active: boolean) => void,
-    logTimeout: (data: unknown) => void,
-  ): () => void {
-    this.acknowledge(socket);
-    const activity = this.trackActivity(() => {
-      send(this.isIdentityActive(session.identity.id, activity));
-    });
-
-    const timer = globalThis.setInterval(() => {
-      if (
-        Date.now() - this.lastAcknowledgementAt(socket) >=
-        heartbeatTimeoutMs
-      ) {
-        logTimeout({
-          intervalMs: heartbeatIntervalMs,
-          timeoutMs: heartbeatTimeoutMs,
-        });
-        socket.close(heartbeatTimeoutCloseCode, 'Realtime heartbeat timed out');
-
-        return;
-      }
-
-      send(this.isIdentityActive(session.identity.id, activity));
-    }, heartbeatIntervalMs);
-
-    return () => {
-      activity.stop();
-      globalThis.clearInterval(timer);
-    };
-  }
 
   private isIdentityActive(
     identityId: string,
@@ -159,5 +111,50 @@ export class RealtimeHeartbeat {
 
   private lastAcknowledgementAt(socket: WebSocket): number {
     return this.acknowledgements.get(socket) ?? 0;
+  }
+
+  public setActivityMode(
+    session: Session,
+    mode: RealtimeHeartbeatActivityMode,
+  ): void {
+    this.activityModes.set(session.identity.id, mode);
+  }
+
+  public acknowledge(socket: WebSocket): void {
+    this.acknowledgements.set(socket, Date.now());
+  }
+
+  public start(
+    socket: WebSocket,
+    session: Session,
+    send: (active: boolean) => void,
+    logTimeout: (data: unknown) => void,
+  ): () => void {
+    this.acknowledge(socket);
+    const activity = this.trackActivity(() => {
+      send(this.isIdentityActive(session.identity.id, activity));
+    });
+
+    const timer = globalThis.setInterval(() => {
+      if (
+        Date.now() - this.lastAcknowledgementAt(socket) >=
+        heartbeatTimeoutMs
+      ) {
+        logTimeout({
+          intervalMs: heartbeatIntervalMs,
+          timeoutMs: heartbeatTimeoutMs,
+        });
+        socket.close(heartbeatTimeoutCloseCode, 'Realtime heartbeat timed out');
+
+        return;
+      }
+
+      send(this.isIdentityActive(session.identity.id, activity));
+    }, heartbeatIntervalMs);
+
+    return () => {
+      activity.stop();
+      globalThis.clearInterval(timer);
+    };
   }
 }

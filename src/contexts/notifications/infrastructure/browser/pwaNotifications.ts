@@ -1,33 +1,18 @@
+import type { ApplicationServerKey } from './ApplicationServerKey';
+import type { DeliverablePushSubscriptionJson } from './DeliverablePushSubscriptionJson';
+import type { EnsurePwaPushSubscriptionOptions } from './EnsurePwaPushSubscriptionOptions';
+import type { EnsurePwaPushSubscriptionResult } from './EnsurePwaPushSubscriptionResult';
+import type { OptionalApplicationServerKey } from './OptionalApplicationServerKey';
+import type { Permission } from './Permission';
+import type { PermissionRequester } from './PermissionRequester';
+import type { PwaNotificationPayload } from './PwaNotificationPayload';
+import type { PwaNotificationPermission } from './PwaNotificationPermission';
+
+export type { EnsurePwaPushSubscriptionResult } from './EnsurePwaPushSubscriptionResult';
+export type { PwaNotificationPermission } from './PwaNotificationPermission';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-
-type PwaNotificationPayload = {
-  body: string;
-  tag: string;
-  title: string;
-  url?: string;
-};
-type EnsurePwaPushSubscriptionOptions = {
-  requestPermission?: boolean;
-};
-export type EnsurePwaPushSubscriptionResult =
-  | 'granted'
-  | 'permission_denied'
-  | 'server_disabled'
-  | 'unsupported';
-type Permission = NotificationPermission;
-type PermissionRequester = () => Promise<Permission>;
-type ApplicationServerKey = Uint8Array<ArrayBuffer>;
-type OptionalApplicationServerKey = ApplicationServerKey | null;
-export type PwaNotificationPermission = NotificationPermission | 'unsupported';
-type DeliverablePushSubscriptionJson = PushSubscriptionJSON & {
-  endpoint: string;
-  keys: {
-    auth: string;
-    p256dh: string;
-  };
-};
 
 const notificationBadge = '/favicon/notification-badge.png';
 const explicitSubscriptionPromises = new Map<

@@ -1,10 +1,6 @@
 import { DomainError, StringValueObject } from '@haskou/value-objects';
 
 export class MessageReactionEmoji extends StringValueObject {
-  private constructor(value: string) {
-    super(value);
-  }
-
   public static fromString(value: string): MessageReactionEmoji {
     const trimmedValue = value.trim();
 
@@ -13,5 +9,9 @@ export class MessageReactionEmoji extends StringValueObject {
     }
 
     return new MessageReactionEmoji(trimmedValue);
+  }
+
+  private constructor(value: string) {
+    super(value);
   }
 }

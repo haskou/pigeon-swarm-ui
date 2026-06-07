@@ -16,6 +16,31 @@ export class NotificationSettingsPolicy {
     suppressRoleMentions: false,
   };
 
+  private static isMentioned(
+    setting: NotificationScopeSetting,
+    context: NotificationMentionContext,
+  ): boolean {
+    if (context.mentionedIdentityIds?.includes(context.currentIdentityId)) {
+      return true;
+    }
+
+    if (!setting.suppressEveryoneAndHere && context.mentionsEveryoneOrHere) {
+      return true;
+    }
+
+    if (setting.suppressRoleMentions) return false;
+
+    if (context.mentionedRoleMemberIds?.includes(context.currentIdentityId)) {
+      return true;
+    }
+
+    const currentRoleIds = context.currentRoleIds ?? [];
+
+    return currentRoleIds.some((roleId) =>
+      context.mentionedRoleIds?.includes(roleId),
+    );
+  }
+
   public static key(scope: NotificationSettingScope): string {
     if (scope.type === 'conversation') {
       return `conversation:${scope.conversationId}`;
@@ -110,30 +135,5 @@ export class NotificationSettingsPolicy {
     if (setting.notificationLevel === 'none') return false;
 
     return NotificationSettingsPolicy.isMentioned(setting, context);
-  }
-
-  private static isMentioned(
-    setting: NotificationScopeSetting,
-    context: NotificationMentionContext,
-  ): boolean {
-    if (context.mentionedIdentityIds?.includes(context.currentIdentityId)) {
-      return true;
-    }
-
-    if (!setting.suppressEveryoneAndHere && context.mentionsEveryoneOrHere) {
-      return true;
-    }
-
-    if (setting.suppressRoleMentions) return false;
-
-    if (context.mentionedRoleMemberIds?.includes(context.currentIdentityId)) {
-      return true;
-    }
-
-    const currentRoleIds = context.currentRoleIds ?? [];
-
-    return currentRoleIds.some((roleId) =>
-      context.mentionedRoleIds?.includes(roleId),
-    );
   }
 }

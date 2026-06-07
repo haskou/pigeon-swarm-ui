@@ -12,15 +12,6 @@ import { CommunityIdentityId } from '../value-objects/CommunityIdentityId';
 import { CommunityName } from '../value-objects/CommunityName';
 
 export class Community extends AggregateRoot {
-  private constructor(
-    private readonly id: CommunityId,
-    private name: CommunityName,
-    private readonly ownerIdentityId: CommunityIdentityId,
-    private readonly resource: CommunityResource,
-  ) {
-    super();
-  }
-
   public static fromResource(resource: CommunityResource): Community {
     return new Community(
       CommunityId.fromString(resource.id),
@@ -28,6 +19,15 @@ export class Community extends AggregateRoot {
       CommunityIdentityId.fromString(resource.ownerIdentityId),
       resource,
     );
+  }
+
+  private constructor(
+    private readonly id: CommunityId,
+    private name: CommunityName,
+    private readonly ownerIdentityId: CommunityIdentityId,
+    private readonly resource: CommunityResource,
+  ) {
+    super();
   }
 
   public canSeeChannel(channel: CommunityChannel, identityId: string): boolean {

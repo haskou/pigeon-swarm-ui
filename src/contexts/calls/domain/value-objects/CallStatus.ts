@@ -3,8 +3,8 @@ import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
 import type { CallResource } from '../callSession.types';
 
 export class CallStatus extends StringValueObject {
-  private constructor(value: CallResource['status']) {
-    super(value);
+  private static isValid(value: string): value is CallResource['status'] {
+    return value === 'active' || value === 'ended' || value === 'missed';
   }
 
   public static active(): CallStatus {
@@ -27,6 +27,10 @@ export class CallStatus extends StringValueObject {
     return new CallStatus('missed');
   }
 
+  private constructor(value: CallResource['status']) {
+    super(value);
+  }
+
   public isActive(): boolean {
     return this.isEqual(CallStatus.active());
   }
@@ -37,9 +41,5 @@ export class CallStatus extends StringValueObject {
 
   public isMissed(): boolean {
     return this.isEqual(CallStatus.missed());
-  }
-
-  private static isValid(value: string): value is CallResource['status'] {
-    return value === 'active' || value === 'ended' || value === 'missed';
   }
 }

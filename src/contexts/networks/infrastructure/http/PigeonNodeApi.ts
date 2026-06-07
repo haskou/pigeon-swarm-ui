@@ -17,6 +17,31 @@ export class PigeonNodeApi {
     private readonly signer: RequestSigner,
   ) {}
 
+  private async cachedRequest<T>(
+    key: string,
+    requestFactory: () => Promise<T>,
+  ): Promise<T> {
+    const cached = this.requestCache.get(key) as Promise<T> | undefined;
+
+    if (cached) return await cached;
+
+    const request = requestFactory().catch((caught: unknown) => {
+      this.requestCache.delete(key);
+
+      throw caught;
+    });
+
+    this.requestCache.set(key, request);
+
+    return await request;
+  }
+
+  private invalidateNetworksCache(): void {
+    for (const key of this.requestCache.keys()) {
+      if (key.startsWith('GET /node/networks/')) this.requestCache.delete(key);
+    }
+  }
+
   public async getInfo(): Promise<{ id: string; owner: string | null }> {
     return await this.cachedRequest('GET /node/', () =>
       this.http.request<{ id: string; owner: string | null }>('/node/'),
@@ -137,30 +162,5 @@ export class PigeonNodeApi {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
     });
-  }
-
-  private async cachedRequest<T>(
-    key: string,
-    requestFactory: () => Promise<T>,
-  ): Promise<T> {
-    const cached = this.requestCache.get(key) as Promise<T> | undefined;
-
-    if (cached) return await cached;
-
-    const request = requestFactory().catch((caught: unknown) => {
-      this.requestCache.delete(key);
-
-      throw caught;
-    });
-
-    this.requestCache.set(key, request);
-
-    return await request;
-  }
-
-  private invalidateNetworksCache(): void {
-    for (const key of this.requestCache.keys()) {
-      if (key.startsWith('GET /node/networks/')) this.requestCache.delete(key);
-    }
   }
 }

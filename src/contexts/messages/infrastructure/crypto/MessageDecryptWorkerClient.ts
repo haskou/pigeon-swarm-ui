@@ -1,36 +1,7 @@
-import type {
-  ChatMessage,
-  MessageResource,
-} from '../../../../shared/domain/pigeonResources.types';
-
-type MessageDecryptWorkerRequest = {
-  conversationId: string;
-  copy: {
-    decryptFailed: string;
-    missingKey: string;
-  };
-  currentIdentityId: string;
-  messages: MessageResource[];
-  privateKey?: string;
-  requestId: number;
-};
-
-type MessageDecryptWorkerResponse =
-  | {
-      messages: ChatMessage[];
-      requestId: number;
-      type: 'success';
-    }
-  | {
-      message: string;
-      requestId: number;
-      type: 'error';
-    };
-
-type PendingRequest = {
-  reject: (reason?: unknown) => void;
-  resolve: (messages: ChatMessage[]) => void;
-};
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageDecryptWorkerRequest } from './MessageDecryptWorkerRequest';
+import type { MessageDecryptWorkerResponse } from './MessageDecryptWorkerResponse';
+import type { PendingRequest } from './PendingRequest';
 
 function abortError(): Error {
   const error = new Error('Message decrypt aborted');
@@ -42,7 +13,9 @@ function abortError(): Error {
 
 export class MessageDecryptWorkerClient {
   private nextRequestId = 0;
+
   private readonly pending = new Map<number, PendingRequest>();
+
   private readonly worker: Worker;
 
   public constructor() {
@@ -58,6 +31,30 @@ export class MessageDecryptWorkerClient {
     this.worker.onerror = (event) => {
       this.rejectAll(new Error(event.message));
     };
+  }
+
+  private handleMessage(response: MessageDecryptWorkerResponse): void {
+    const pendingRequest = this.pending.get(response.requestId);
+
+    if (!pendingRequest) return;
+
+    this.pending.delete(response.requestId);
+
+    if (response.type === 'success') {
+      pendingRequest.resolve(response.messages);
+
+      return;
+    }
+
+    pendingRequest.reject(new Error(response.message));
+  }
+
+  private rejectAll(error: Error): void {
+    for (const pendingRequest of this.pending.values()) {
+      pendingRequest.reject(error);
+    }
+
+    this.pending.clear();
   }
 
   public async decrypt(
@@ -91,29 +88,5 @@ export class MessageDecryptWorkerClient {
     } finally {
       signal?.removeEventListener('abort', abort);
     }
-  }
-
-  private handleMessage(response: MessageDecryptWorkerResponse): void {
-    const pendingRequest = this.pending.get(response.requestId);
-
-    if (!pendingRequest) return;
-
-    this.pending.delete(response.requestId);
-
-    if (response.type === 'success') {
-      pendingRequest.resolve(response.messages);
-
-      return;
-    }
-
-    pendingRequest.reject(new Error(response.message));
-  }
-
-  private rejectAll(error: Error): void {
-    for (const pendingRequest of this.pending.values()) {
-      pendingRequest.reject(error);
-    }
-
-    this.pending.clear();
   }
 }

@@ -2,7 +2,7 @@ import type {
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NotificationDecision } from '../../domain/notificationDecision';
+import type { NotificationDecision } from '../../domain/NotificationDecision';
 import type { NotificationId } from '../../domain/NotificationId';
 
 export interface UpdateNotificationPort {

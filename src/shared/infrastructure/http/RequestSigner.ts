@@ -2,13 +2,12 @@ import { SHA256Hash, UUID } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/pigeonResources.types';
+import type { Clock } from './Clock';
+import type { NonceFactory } from './NonceFactory';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
-
-type Clock = () => number;
-type NonceFactory = () => string;
 
 export class RequestSigner {
   public constructor(
@@ -16,43 +15,6 @@ export class RequestSigner {
     private readonly nonceFactory: NonceFactory = () =>
       UUID.generate().toString(),
   ) {}
-
-  public async headers(
-    session: Session,
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<Record<string, string>> {
-    const timestamp = `${this.clock()}`;
-    const nonce = this.nonceFactory();
-    const signature = await session.encryptedKeyPair.sign(
-      this.payload(method, path, timestamp, nonce, body),
-      session.password,
-    );
-
-    return {
-      'X-Identity-Id': IdentityId.normalize(session.identity.id),
-      'X-Nonce': nonce,
-      'X-Signature': signature.toString(),
-      'X-Timestamp': timestamp,
-    };
-  }
-
-  public payload(
-    method: string,
-    path: string,
-    timestamp: string,
-    nonce: string,
-    body?: unknown,
-  ): string {
-    return JSON.stringify({
-      bodyHash: this.bodyHash(body),
-      method: method.toUpperCase(),
-      nonce,
-      path: this.signablePath(path),
-      timestamp,
-    });
-  }
 
   private signablePath(path: string): string {
     const requestPath = ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path);
@@ -103,5 +65,42 @@ export class RequestSigner {
     if (typeof body === 'string') return body;
 
     return JSON.stringify(body);
+  }
+
+  public async headers(
+    session: Session,
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Record<string, string>> {
+    const timestamp = `${this.clock()}`;
+    const nonce = this.nonceFactory();
+    const signature = await session.encryptedKeyPair.sign(
+      this.payload(method, path, timestamp, nonce, body),
+      session.password,
+    );
+
+    return {
+      'X-Identity-Id': IdentityId.normalize(session.identity.id),
+      'X-Nonce': nonce,
+      'X-Signature': signature.toString(),
+      'X-Timestamp': timestamp,
+    };
+  }
+
+  public payload(
+    method: string,
+    path: string,
+    timestamp: string,
+    nonce: string,
+    body?: unknown,
+  ): string {
+    return JSON.stringify({
+      bodyHash: this.bodyHash(body),
+      method: method.toUpperCase(),
+      nonce,
+      path: this.signablePath(path),
+      timestamp,
+    });
   }
 }

@@ -5,14 +5,6 @@ import { ProfileHandle } from './ProfileHandle';
 import { ProfileName } from './ProfileName';
 
 export class IdentityProfile {
-  // prettier-ignore
-  private constructor(
-    private readonly name: ProfileName,
-    private readonly handle?: ProfileHandle,
-    private readonly biography?: ProfileBiography,
-  ) {
-  }
-
   public static fromPrimitives(
     profile: IdentityProfilePrimitives,
   ): IdentityProfile {
@@ -23,6 +15,14 @@ export class IdentityProfile {
         ? ProfileBiography.fromString(profile.biography)
         : undefined,
     );
+  }
+
+  // prettier-ignore
+  private constructor(
+    private readonly name: ProfileName,
+    private readonly handle?: ProfileHandle,
+    private readonly biography?: ProfileBiography,
+  ) {
   }
 
   public getHandle(): ProfileHandle | undefined {

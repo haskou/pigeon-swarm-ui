@@ -3,11 +3,19 @@ import { DomainError } from '@haskou/value-objects';
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
 
 import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
-import { NotificationDecision } from '../notificationDecision';
+import { NotificationDecision } from '../NotificationDecision';
 import { NotificationId } from '../NotificationId';
-import { NotificationState } from '../notificationState';
+import { NotificationState } from '../NotificationState';
 
 export class Notification extends AggregateRoot {
+  public static fromResource(resource: NotificationResource): Notification {
+    return new Notification(
+      NotificationId.fromString(resource.id),
+      NotificationState.fromPrimitive(resource.state),
+      resource.type,
+    );
+  }
+
   private constructor(
     private readonly id: NotificationId,
     private state: NotificationState,
@@ -16,12 +24,22 @@ export class Notification extends AggregateRoot {
     super();
   }
 
-  public static fromResource(resource: NotificationResource): Notification {
-    return new Notification(
-      NotificationId.fromString(resource.id),
-      NotificationState.fromPrimitive(resource.state),
-      resource.type,
-    );
+  private applyDecision(decision: NotificationDecision): void {
+    if (!this.isRespondable() || !this.state.acceptsDecision(decision)) {
+      throw new DomainError('Notification cannot be answered.');
+    }
+
+    this.state = decision.isAccepted()
+      ? NotificationState.accepted()
+      : NotificationState.declined();
+
+    this.record({
+      aggregateId: this.id.toString(),
+      occurredAt: Date.now(),
+      type: decision.isAccepted()
+        ? 'NotificationAccepted'
+        : 'NotificationDeclined',
+    });
   }
 
   public accept(): void {
@@ -42,23 +60,5 @@ export class Notification extends AggregateRoot {
 
   public isRespondable(): boolean {
     return this.state.isPending() && this.type !== 'missed_call';
-  }
-
-  private applyDecision(decision: NotificationDecision): void {
-    if (!this.isRespondable() || !this.state.acceptsDecision(decision)) {
-      throw new DomainError('Notification cannot be answered.');
-    }
-
-    this.state = decision.isAccepted()
-      ? NotificationState.accepted()
-      : NotificationState.declined();
-
-    this.record({
-      aggregateId: this.id.toString(),
-      occurredAt: Date.now(),
-      type: decision.isAccepted()
-        ? 'NotificationAccepted'
-        : 'NotificationDeclined',
-    });
   }
 }

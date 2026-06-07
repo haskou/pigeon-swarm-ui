@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import { UUID } from '@haskou/value-objects';
 
 import type {
@@ -22,59 +21,17 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { CachedRequest } from './CachedRequest';
+import type { CachedRequestInvalidator } from './CachedRequestInvalidator';
+/* eslint-disable @typescript-eslint/no-use-before-define */
+import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
+import type { CommunityChannelMessageRequestBody } from './CommunityChannelMessageRequestBody';
+import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
-type CachedRequestOptions = { ttlMs?: number };
-type CachedRequest = <T>(
-  key: string,
-  loader: () => Promise<T>,
-  options?: CachedRequestOptions,
-) => Promise<T>;
-type CachedRequestInvalidator = (key: string) => void;
-
 const startupReadCacheTtlMs = 1500;
-
-type CommunityChannelMessagePayloadInput =
-  | {
-      encryptedPayload: string;
-      plaintextPayload?: never;
-    }
-  | {
-      encryptedPayload?: never;
-      plaintextPayload: string;
-    };
-
-type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  id?: string;
-  mentions?: CommunityMessageMention[];
-  replyToMessageId?: string;
-  timestamp?: number;
-};
-
-type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
-
-type CommunityChannelMessageSearchResult = {
-  channelId?: string;
-  messages: MessageResource[];
-  nextBeforeMessageId?: null | string;
-};
-
-type CommunityChannelMessageRequestBody = {
-  attachmentExternalIdentifiers: string[];
-  createdAt: number;
-  encryptedPayload?: string;
-  id?: string;
-  mentions: CommunityMessageMention[];
-  plaintextPayload?: string;
-  replyToMessageId?: string;
-  signature: string;
-};
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
@@ -88,6 +45,189 @@ export class PigeonCommunitiesApi {
       undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+  }
+
+  private async createEncryptedChannelMessageBody(
+    session: Session,
+    input: {
+      attachmentExternalIdentifiers: string[];
+      channelId: string;
+      communityId: string;
+      createdAt: number;
+      encryptedPayload: string;
+      id: string;
+      mentions: CommunityMessageMention[];
+      replyToMessageId?: string;
+    },
+  ): Promise<CommunityChannelMessageRequestBody> {
+    const signaturePayload = {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      authorIdentityId: session.identity.id,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      createdAt: input.createdAt,
+      encryptedPayload: input.encryptedPayload,
+      id: input.id,
+      mentions: input.mentions,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
+      type: 'sent',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+
+    return {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      createdAt: input.createdAt,
+      encryptedPayload: input.encryptedPayload,
+      id: input.id,
+      mentions: input.mentions,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
+      signature: signature.toString(),
+    };
+  }
+
+  private channelListCacheKey(session: Session, communityId: string): string {
+    return `GET /communities/${encodeURIComponent(communityId)}/channels ${
+      session.identity.id
+    }`;
+  }
+
+  private invalidateChannelListCache(
+    session: Session,
+    communityId: string,
+  ): void {
+    this.invalidateCachedRequest(
+      this.channelListCacheKey(session, communityId),
+    );
+  }
+
+  private async createPlaintextChannelMessageBody(
+    session: Session,
+    input: {
+      attachmentExternalIdentifiers: string[];
+      channelId: string;
+      communityId: string;
+      createdAt: number;
+      id: string;
+      mentions: CommunityMessageMention[];
+      plaintextPayload: string;
+      replyToMessageId?: string;
+    },
+  ): Promise<CommunityChannelMessageRequestBody> {
+    const signaturePayload = {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      authorIdentityId: session.identity.id,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      createdAt: input.createdAt,
+      id: input.id,
+      mentions: input.mentions,
+      plaintextPayload: input.plaintextPayload,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
+      type: 'sent',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+
+    return {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      createdAt: input.createdAt,
+      id: input.id,
+      mentions: input.mentions,
+      plaintextPayload: input.plaintextPayload,
+      ...(input.replyToMessageId
+        ? { replyToMessageId: input.replyToMessageId }
+        : {}),
+      signature: signature.toString(),
+    };
+  }
+
+  private async editEncryptedChannelMessageBody(
+    session: Session,
+    input: {
+      attachmentExternalIdentifiers: string[];
+      channelId: string;
+      communityId: string;
+      createdAt: number;
+      encryptedPayload: string;
+      id: string;
+      mentions: CommunityMessageMention[];
+    },
+  ): Promise<CommunityChannelMessageRequestBody> {
+    const signaturePayload = {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      authorIdentityId: session.identity.id,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      createdAt: input.createdAt,
+      encryptedPayload: input.encryptedPayload,
+      id: input.id,
+      mentions: input.mentions,
+      type: 'edited',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+
+    /* eslint-disable perfectionist/sort-objects */
+    return {
+      createdAt: input.createdAt,
+      encryptedPayload: input.encryptedPayload,
+      signature: signature.toString(),
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      mentions: input.mentions,
+    };
+    /* eslint-enable perfectionist/sort-objects */
+  }
+
+  private async editPlaintextChannelMessageBody(
+    session: Session,
+    input: {
+      attachmentExternalIdentifiers: string[];
+      channelId: string;
+      communityId: string;
+      createdAt: number;
+      id: string;
+      mentions: CommunityMessageMention[];
+      plaintextPayload: string;
+    },
+  ): Promise<CommunityChannelMessageRequestBody> {
+    const signaturePayload = {
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      authorIdentityId: session.identity.id,
+      channelId: input.channelId,
+      communityId: input.communityId,
+      createdAt: input.createdAt,
+      id: input.id,
+      mentions: input.mentions,
+      plaintextPayload: input.plaintextPayload,
+      type: 'edited',
+    };
+    const signature = await session.encryptedKeyPair.sign(
+      JSON.stringify(signaturePayload),
+      session.password,
+    );
+
+    /* eslint-disable perfectionist/sort-objects */
+    return {
+      createdAt: input.createdAt,
+      plaintextPayload: input.plaintextPayload,
+      signature: signature.toString(),
+      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
+      mentions: input.mentions,
+    };
+    /* eslint-enable perfectionist/sort-objects */
   }
 
   public async list(session: Session): Promise<Community[]> {
@@ -1005,189 +1145,6 @@ export class PigeonCommunitiesApi {
       headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
-  }
-
-  private async createEncryptedChannelMessageBody(
-    session: Session,
-    input: {
-      attachmentExternalIdentifiers: string[];
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      encryptedPayload: string;
-      id: string;
-      mentions: CommunityMessageMention[];
-      replyToMessageId?: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      type: 'sent',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
-    );
-
-    return {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      signature: signature.toString(),
-    };
-  }
-
-  private channelListCacheKey(session: Session, communityId: string): string {
-    return `GET /communities/${encodeURIComponent(communityId)}/channels ${
-      session.identity.id
-    }`;
-  }
-
-  private invalidateChannelListCache(
-    session: Session,
-    communityId: string,
-  ): void {
-    this.invalidateCachedRequest(
-      this.channelListCacheKey(session, communityId),
-    );
-  }
-
-  private async createPlaintextChannelMessageBody(
-    session: Session,
-    input: {
-      attachmentExternalIdentifiers: string[];
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      id: string;
-      mentions: CommunityMessageMention[];
-      plaintextPayload: string;
-      replyToMessageId?: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      id: input.id,
-      mentions: input.mentions,
-      plaintextPayload: input.plaintextPayload,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      type: 'sent',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
-    );
-
-    return {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      createdAt: input.createdAt,
-      id: input.id,
-      mentions: input.mentions,
-      plaintextPayload: input.plaintextPayload,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      signature: signature.toString(),
-    };
-  }
-
-  private async editEncryptedChannelMessageBody(
-    session: Session,
-    input: {
-      attachmentExternalIdentifiers: string[];
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      encryptedPayload: string;
-      id: string;
-      mentions: CommunityMessageMention[];
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      type: 'edited',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
-    );
-
-    /* eslint-disable perfectionist/sort-objects */
-    return {
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      signature: signature.toString(),
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      mentions: input.mentions,
-    };
-    /* eslint-enable perfectionist/sort-objects */
-  }
-
-  private async editPlaintextChannelMessageBody(
-    session: Session,
-    input: {
-      attachmentExternalIdentifiers: string[];
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      id: string;
-      mentions: CommunityMessageMention[];
-      plaintextPayload: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      id: input.id,
-      mentions: input.mentions,
-      plaintextPayload: input.plaintextPayload,
-      type: 'edited',
-    };
-    const signature = await session.encryptedKeyPair.sign(
-      JSON.stringify(signaturePayload),
-      session.password,
-    );
-
-    /* eslint-disable perfectionist/sort-objects */
-    return {
-      createdAt: input.createdAt,
-      plaintextPayload: input.plaintextPayload,
-      signature: signature.toString(),
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
-      mentions: input.mentions,
-    };
-    /* eslint-enable perfectionist/sort-objects */
   }
 }
 

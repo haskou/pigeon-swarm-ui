@@ -1,23 +1,12 @@
-import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
-
 import rnnoiseWasmPath from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import rnnoiseSimdWasmPath from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
 import rnnoiseWorkletPath from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url';
 
+import type { CallMicrophoneCaptureOptions } from './CallMicrophoneCaptureOptions';
+import type { MicrophoneMediaDevices } from './MicrophoneMediaDevices';
+import type { ProcessedMicrophoneStream } from './ProcessedMicrophoneStream';
+
 import { logCallWarning } from './callDebugLogger';
-
-type MicrophoneMediaDevices = Pick<MediaDevices, 'getUserMedia'>;
-type CallMicrophoneCaptureOptions = {
-  noiseCancellationEnabled: boolean;
-};
-
-type ProcessedMicrophoneStream = {
-  audioContext: AudioContext;
-  inputStream: MediaStream;
-  outputStream: MediaStream;
-  processor: RnnoiseWorkletNode;
-  source: MediaStreamAudioSourceNode;
-};
 
 const enhancedAudioConstraints = {
   autoGainControl: true,
@@ -43,6 +32,85 @@ export class CallMicrophoneCapture {
   >();
 
   private static rnnoiseBinary?: Promise<ArrayBuffer>;
+
+  private static async processStream(
+    stream: MediaStream,
+  ): Promise<MediaStream> {
+    const AudioContextConstructor =
+      typeof window === 'undefined' ? undefined : window.AudioContext;
+
+    if (!AudioContextConstructor || stream.getAudioTracks().length === 0) {
+      return stream;
+    }
+
+    const audioContext = new AudioContextConstructor({ sampleRate: 48_000 });
+
+    if (!audioContext.audioWorklet) {
+      await audioContext.close().catch(() => undefined);
+
+      return stream;
+    }
+
+    try {
+      const { RnnoiseWorkletNode } =
+        await import('@sapphi-red/web-noise-suppressor');
+      const wasmBinary = await this.loadRnnoiseBinary();
+
+      await audioContext.audioWorklet.addModule(rnnoiseWorkletPath);
+
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = new RnnoiseWorkletNode(audioContext, {
+        maxChannels: Math.max(1, stream.getAudioTracks().length),
+        wasmBinary,
+      });
+      const destination = audioContext.createMediaStreamDestination();
+
+      source.connect(processor).connect(destination);
+      this.configureStream(destination.stream);
+      this.processedStreams.set(destination.stream, {
+        audioContext,
+        inputStream: stream,
+        outputStream: destination.stream,
+        processor,
+        source,
+      });
+
+      return destination.stream;
+    } catch (error) {
+      logCallWarning('call-microphone-capture:rnnoise-unavailable', {
+        error,
+      });
+      await audioContext.close().catch(() => undefined);
+
+      return stream;
+    }
+  }
+
+  private static loadRnnoiseBinary(): Promise<ArrayBuffer> {
+    async function loadBinary(): Promise<ArrayBuffer> {
+      const { loadRnnoise } = await import('@sapphi-red/web-noise-suppressor');
+
+      return await loadRnnoise({
+        simdUrl: rnnoiseSimdWasmPath,
+        url: rnnoiseWasmPath,
+      });
+    }
+
+    this.rnnoiseBinary ??= loadBinary();
+
+    return this.rnnoiseBinary;
+  }
+
+  private static shouldRetryWithoutAudioProcessing(error: unknown): boolean {
+    if (error instanceof TypeError) return true;
+
+    if (!(error instanceof Error)) return false;
+
+    return (
+      error.name === 'ConstraintNotSatisfiedError' ||
+      error.name === 'OverconstrainedError'
+    );
+  }
 
   public static mediaConstraints(
     options: CallMicrophoneCaptureOptions = {
@@ -130,84 +198,5 @@ export class CallMicrophoneCapture {
     processed.processor.disconnect();
     processed.processor.destroy();
     void processed.audioContext.close().catch(() => undefined);
-  }
-
-  private static async processStream(
-    stream: MediaStream,
-  ): Promise<MediaStream> {
-    const AudioContextConstructor =
-      typeof window === 'undefined' ? undefined : window.AudioContext;
-
-    if (!AudioContextConstructor || stream.getAudioTracks().length === 0) {
-      return stream;
-    }
-
-    const audioContext = new AudioContextConstructor({ sampleRate: 48_000 });
-
-    if (!audioContext.audioWorklet) {
-      await audioContext.close().catch(() => undefined);
-
-      return stream;
-    }
-
-    try {
-      const { RnnoiseWorkletNode } =
-        await import('@sapphi-red/web-noise-suppressor');
-      const wasmBinary = await this.loadRnnoiseBinary();
-
-      await audioContext.audioWorklet.addModule(rnnoiseWorkletPath);
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = new RnnoiseWorkletNode(audioContext, {
-        maxChannels: Math.max(1, stream.getAudioTracks().length),
-        wasmBinary,
-      });
-      const destination = audioContext.createMediaStreamDestination();
-
-      source.connect(processor).connect(destination);
-      this.configureStream(destination.stream);
-      this.processedStreams.set(destination.stream, {
-        audioContext,
-        inputStream: stream,
-        outputStream: destination.stream,
-        processor,
-        source,
-      });
-
-      return destination.stream;
-    } catch (error) {
-      logCallWarning('call-microphone-capture:rnnoise-unavailable', {
-        error,
-      });
-      await audioContext.close().catch(() => undefined);
-
-      return stream;
-    }
-  }
-
-  private static loadRnnoiseBinary(): Promise<ArrayBuffer> {
-    async function loadBinary(): Promise<ArrayBuffer> {
-      const { loadRnnoise } = await import('@sapphi-red/web-noise-suppressor');
-
-      return await loadRnnoise({
-        simdUrl: rnnoiseSimdWasmPath,
-        url: rnnoiseWasmPath,
-      });
-    }
-
-    this.rnnoiseBinary ??= loadBinary();
-
-    return this.rnnoiseBinary;
-  }
-
-  private static shouldRetryWithoutAudioProcessing(error: unknown): boolean {
-    if (error instanceof TypeError) return true;
-
-    if (!(error instanceof Error)) return false;
-
-    return (
-      error.name === 'ConstraintNotSatisfiedError' ||
-      error.name === 'OverconstrainedError'
-    );
   }
 }

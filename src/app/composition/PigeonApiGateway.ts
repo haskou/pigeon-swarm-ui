@@ -13,7 +13,7 @@ import type {
   CallResource,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
-import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
+import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
@@ -22,7 +22,6 @@ import type {
   CommunityChannel,
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
-  CommunityMessageMention,
   CommunityMembershipRequest,
   CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
@@ -51,7 +50,6 @@ import type {
   MessageAttachment,
   MessageLinkPreview,
   MessagePin,
-  MessageReplyPreview,
   MessageResource,
   MyStickersResource,
   NotificationResource,
@@ -68,41 +66,49 @@ import type {
   Session,
   SelectablePresenceStatus,
   StickerInput,
-  StickerMessageReference,
   StickerPackInput,
   StickerPackResource,
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
+import type { CachedIdentity } from './PigeonApiGateway/CachedIdentity';
+import type { CachedRequestEntry } from './PigeonApiGateway/CachedRequestEntry';
+import type { CachedRequestOptions } from './PigeonApiGateway/CachedRequestOptions';
+import type { CommunityChannelMessageEditInput } from './PigeonApiGateway/CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from './PigeonApiGateway/CommunityChannelMessageInput';
+import type { CommunityInviteLinkBody } from './PigeonApiGateway/CommunityInviteLinkBody';
+import type { CommunityInviteLinkInput } from './PigeonApiGateway/CommunityInviteLinkInput';
+import type { ConversationInvitationType } from './PigeonApiGateway/ConversationInvitationType';
+import type { EncryptMessagePayloadInput } from './PigeonApiGateway/EncryptMessagePayloadInput';
+import type { MessageDecryptWorker } from './PigeonApiGateway/MessageDecryptWorker';
+import type { MessageLoadOptions } from './PigeonApiGateway/MessageLoadOptions';
+import type { PublishedCommunityKey } from './PigeonApiGateway/PublishedCommunityKey';
 
 import { AttachmentExternalIdentifiers } from '../../contexts/attachments/domain/AttachmentExternalIdentifiers';
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
-import {
-  encryptCommunityInviteKey,
-  type EncryptedCommunityKey,
-} from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { encryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
-import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/identitySignaturePayloadFactory';
+import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
-import { MessageProjector } from '../../contexts/messages/domain/messageProjector';
+import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
-import { NotificationDecision } from '../../contexts/notifications/domain/notificationDecision';
+import { NotificationDecision } from '../../contexts/notifications/domain/NotificationDecision';
 import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import {
   PigeonPushApi,
   type PushSubscriptionPayload,
-} from '../../contexts/notifications/infrastructure/http/pigeonPushApi';
+} from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
@@ -116,6 +122,11 @@ import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
 import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
+import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
+import { hasEncryptedPayload } from './PigeonApiGateway/hasEncryptedPayload';
+import { throwIfMessageLoadAborted } from './PigeonApiGateway/throwIfMessageLoadAborted';
+import { uniqueSorted } from './PigeonApiGateway/uniqueSorted';
+import { yieldAfterMessageDecryptBatch } from './PigeonApiGateway/yieldAfterMessageDecryptBatch';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -125,135 +136,6 @@ const defaultKeychain: LocalKeychain = {
 const messageDecryptBatchSize = 8;
 const identityCacheTtlMs = 2 * 60 * 1000;
 const startupReadCacheTtlMs = 1500;
-
-type MessageLoadOptions = {
-  limit?: number;
-  signal?: AbortSignal;
-};
-
-type CachedRequestOptions = {
-  ttlMs?: number;
-};
-
-type CachedRequestEntry<T> = {
-  expiresAt: number;
-  promise: Promise<T>;
-  settled: boolean;
-};
-
-type CachedIdentity = {
-  expiresAt: number;
-  identity: IdentityResource;
-};
-
-type CommunityChannelMessagePayloadInput =
-  | {
-      encryptedPayload: string;
-      plaintextPayload?: never;
-    }
-  | {
-      encryptedPayload?: never;
-      plaintextPayload: string;
-    };
-
-type CommunityChannelMessageInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  id?: string;
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
-
-type CommunityChannelMessageEditInput = CommunityChannelMessagePayloadInput & {
-  attachmentExternalIdentifiers?: string[];
-  mentions?: CommunityMessageMention[];
-  timestamp?: number;
-};
-
-type CommunityInviteLinkInput = {
-  expiresAt?: number;
-  maxUses?: number;
-};
-
-type CommunityInviteLinkBody = CommunityInviteLinkInput & {
-  encryptedCommunityKey?: EncryptedCommunityKey;
-};
-
-type PublishedCommunityKey = {
-  keyEntry: ConversationKeyEntry;
-  keychain: LocalKeychain;
-  keychainExternalIdentifier: string;
-};
-
-type MessageDecryptWorker = {
-  decrypt(
-    request: {
-      conversationId: string;
-      copy: {
-        decryptFailed: string;
-        missingKey: string;
-      };
-      currentIdentityId: string;
-      messages: MessageResource[];
-      privateKey?: string;
-    },
-    signal?: AbortSignal,
-  ): Promise<ChatMessage[]>;
-};
-
-type EncryptMessagePayloadInput = {
-  content: string;
-  conversationId: string;
-  eventType?:
-    | 'MessageEdited'
-    | 'MessageSent'
-    | 'StickerMessageSent'
-    | 'ThreadMessageSent'
-    | 'ThreadStickerMessageSent';
-  key: ConversationKeyEntry;
-  linkPreview?: MessageLinkPreview;
-  messageAttachments: MessageAttachment[];
-  replyPreview?: MessageReplyPreview;
-  session: Session;
-  sticker?: StickerMessageReference;
-  threadRootMessageId?: string;
-  timestamp: number;
-};
-
-function throwIfMessageLoadAborted(signal?: AbortSignal): void {
-  if (!signal?.aborted) return;
-
-  const error = new Error('Message load aborted');
-
-  error.name = 'AbortError';
-  throw error;
-}
-
-function hasEncryptedPayload(message: MessageResource): boolean {
-  return Boolean(message.encryptedPayload ?? message.payload);
-}
-
-async function yieldAfterMessageDecryptBatch(): Promise<void> {
-  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort();
-}
-
-function communityInviteLinkBody(
-  input: CommunityInviteLinkInput,
-  encryptedCommunityKey?: EncryptedCommunityKey,
-): CommunityInviteLinkBody {
-  return {
-    ...(encryptedCommunityKey ? { encryptedCommunityKey } : {}),
-    ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
-    ...(input.maxUses !== undefined ? { maxUses: input.maxUses } : {}),
-  };
-}
-
-type ConversationInvitationType =
-  | 'conversation_invitation'
-  | 'group_conversation_invitation';
 
 export class PigeonApiGateway {
   private readonly calls: PigeonCallsGateway;
@@ -355,6 +237,653 @@ export class PigeonApiGateway {
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
     );
+  }
+
+  private async isPublicCommunityWithoutKey(
+    session: Session,
+    communityId: string,
+    existingKeyEntry?: ConversationKeyEntry,
+  ): Promise<boolean> {
+    if (existingKeyEntry) return false;
+
+    const community = await this.getCommunity(session, communityId);
+
+    return community.visibility === 'public';
+  }
+
+  private async createPlainCommunityInvitation(
+    session: Session,
+    communityId: string,
+    recipientIdentityId: string,
+  ): Promise<{
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: null | string;
+  }> {
+    await this.addCommunityMember(session, communityId, recipientIdentityId);
+
+    return {
+      keychain: session.keychain,
+      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
+    };
+  }
+
+  private async publishCommunityKeyIfNeeded(
+    session: Session,
+    communityId: string,
+    existingKeyEntry?: ConversationKeyEntry,
+  ): Promise<PublishedCommunityKey> {
+    const keyEntry =
+      existingKeyEntry ??
+      (await this.createGroupConversationKeyEntry(communityId));
+
+    if (existingKeyEntry && session.keychainExternalIdentifier) {
+      return {
+        keychain: session.keychain,
+        keychainExternalIdentifier: session.keychainExternalIdentifier,
+        keyEntry,
+      };
+    }
+
+    const published = await this.publishKeychain(
+      session,
+      this.withConversationKey(session.keychain, keyEntry),
+    );
+
+    return { keyEntry, ...published };
+  }
+
+  private sessionWithPublishedKeychain(
+    session: Session,
+    published: PublishedCommunityKey,
+  ): Session {
+    return {
+      ...session,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
+  private async createPlainCommunityInviteLink(
+    session: Session,
+    path: string,
+    input: CommunityInviteLinkInput,
+  ): Promise<{
+    invite: CommunityInviteLinkResource;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: null | string;
+  }> {
+    const invite = await this.postCommunityInviteLink(
+      session,
+      path,
+      buildCommunityInviteLinkBody(input),
+    );
+
+    return {
+      invite,
+      keychain: session.keychain,
+      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
+    };
+  }
+
+  private async postCommunityInviteLink(
+    session: Session,
+    path: string,
+    body: CommunityInviteLinkBody,
+  ): Promise<CommunityInviteLinkResource> {
+    return await this.http.request<CommunityInviteLinkResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  private cacheIdentity(identity: IdentityResource): void {
+    this.identityCache.set(IdentityId.normalize(identity.id), {
+      expiresAt: Date.now() + identityCacheTtlMs,
+      identity,
+    });
+  }
+
+  private async decryptMessages(
+    session: Session,
+    conversationId: string,
+    messages: MessageResource[],
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]> {
+    const pendingMessages = messages.filter(
+      (message) => message.type !== 'deleted',
+    );
+    const key = pendingMessages.some(hasEncryptedPayload)
+      ? ConversationKeychain.entry(
+          session.keychain,
+          session.identity.id,
+          conversationId,
+        )
+      : undefined;
+
+    if (typeof Worker !== 'undefined') {
+      const worker = await this.getMessageDecryptWorker();
+
+      return await worker.decrypt(
+        {
+          conversationId,
+          copy: copy.messages,
+          currentIdentityId: session.identity.id,
+          messages: pendingMessages,
+          privateKey: key?.privateKey,
+        },
+        signal,
+      );
+    }
+
+    const decrypted = new Array<ChatMessage>(pendingMessages.length);
+
+    for (
+      let endIndex = pendingMessages.length;
+      endIndex > 0;
+      endIndex -= messageDecryptBatchSize
+    ) {
+      throwIfMessageLoadAborted(signal);
+
+      const startIndex = Math.max(0, endIndex - messageDecryptBatchSize);
+      const indexes = Array.from(
+        { length: endIndex - startIndex },
+        (_, offset) => startIndex + offset,
+      );
+      const batch = pendingMessages.slice(startIndex, endIndex);
+
+      const decryptedBatch = await Promise.all(
+        batch.map((message) =>
+          this.projectMessageDirect(session, conversationId, message),
+        ),
+      );
+
+      for (let index = 0; index < indexes.length; index += 1) {
+        decrypted[indexes[index]] = decryptedBatch[index];
+      }
+
+      throwIfMessageLoadAborted(signal);
+
+      if (startIndex > 0) {
+        await yieldAfterMessageDecryptBatch();
+      }
+    }
+
+    return decrypted;
+  }
+
+  private async createLinkPreviewForContent(
+    session: Session,
+    content: string,
+  ): Promise<MessageLinkPreview | undefined> {
+    const url = MessageLinkPreviews.firstUrl(content);
+
+    if (!url) return undefined;
+
+    return await this.createLinkPreview(session, url).catch(() => undefined);
+  }
+
+  private async createLinkPreviewForMessage(
+    session: Session,
+    content: string,
+    options: SendMessageOptions,
+  ): Promise<MessageLinkPreview | undefined> {
+    if (options.linkPreview || options.sticker) return options.linkPreview;
+
+    return await this.createLinkPreviewForContent(session, content);
+  }
+
+  private encryptMessagePayload(input: EncryptMessagePayloadInput): string {
+    return PublicKey.fromPEM(input.key.publicKey)
+      .encrypt(
+        JSON.stringify({
+          attachments: input.messageAttachments,
+          authorIdentityId: input.session.identity.id,
+          content: input.sticker ? '' : input.content,
+          conversationId: input.conversationId,
+          ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
+          ...(input.replyPreview ? { reply: input.replyPreview } : {}),
+          ...(input.sticker ? { sticker: input.sticker } : {}),
+          ...(input.threadRootMessageId
+            ? { threadRootMessageId: input.threadRootMessageId }
+            : {}),
+          timestamp: input.timestamp,
+          type:
+            input.eventType ??
+            (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
+        }),
+      )
+      .toString();
+  }
+
+  private async projectMessageDirect(
+    session: Session,
+    conversationId: string,
+    message: MessageResource,
+  ): Promise<ChatMessage> {
+    return await this.messages.toChatMessage(session, conversationId, message);
+  }
+
+  private async getMessageDecryptWorker(): Promise<MessageDecryptWorker> {
+    if (this.messageDecryptWorker) return this.messageDecryptWorker;
+
+    const { MessageDecryptWorkerClient } =
+      await import('../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerClient');
+
+    this.messageDecryptWorker = new MessageDecryptWorkerClient();
+
+    return this.messageDecryptWorker;
+  }
+
+  private isMissingRemoteKeychain(caught: unknown): boolean {
+    return (
+      caught instanceof HttpJsonError &&
+      (caught.code === 'KeychainNotFoundError' ||
+        caught.code === 'IdentityNotFoundError')
+    );
+  }
+
+  private async createConversationInvitation(
+    session: Session,
+    peerIdentity: IdentityResource,
+    keyEntry: ConversationKeyEntry,
+    type: ConversationInvitationType = 'conversation_invitation',
+  ): Promise<void> {
+    const path = '/notifications/';
+    const recipientKeyEntry = {
+      ...keyEntry,
+      peerIdentityId: session.identity.id,
+    };
+    const encryptedConversationKey = PublicKey.fromPEM(
+      peerIdentity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(JSON.stringify(recipientKeyEntry))
+      .toString();
+    const inviterSignature = await session.encryptedKeyPair.sign(
+      JSON.stringify({
+        conversationId: keyEntry.conversationId,
+        encryptedConversationKey,
+        inviterIdentityId: session.identity.id,
+        recipientIdentityId: peerIdentity.id,
+      }),
+      session.password,
+    );
+    const body = {
+      conversationId: keyEntry.conversationId,
+      encryptedConversationKey,
+      inviterIdentityId: session.identity.id,
+      inviterSignature: inviterSignature.toString(),
+      recipientIdentityId: peerIdentity.id,
+      type,
+    };
+
+    await this.http.request<NotificationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  private async createCommunityInvitationNotification(
+    session: Session,
+    communityId: string,
+    recipientIdentityId: string,
+  ): Promise<void> {
+    const keyEntry = session.keychain.conversations[communityId];
+
+    if (!keyEntry) {
+      throw new Error(copy.messages.missingConversationKey);
+    }
+
+    const recipientIdentity = await this.getIdentity(recipientIdentityId);
+
+    await this.createEncryptedCommunityInvitation(
+      session,
+      recipientIdentity,
+      keyEntry,
+    );
+  }
+
+  private async createEncryptedCommunityInvitation(
+    session: Session,
+    recipientIdentity: IdentityResource,
+    keyEntry: ConversationKeyEntry,
+  ): Promise<void> {
+    const path = '/notifications/';
+    const recipientKeyEntry = {
+      ...keyEntry,
+      peerIdentityId: session.identity.id,
+    };
+    const encryptedCommunityKey = PublicKey.fromPEM(
+      recipientIdentity.encryptedKeyPair.publicKey,
+    )
+      .encrypt(JSON.stringify(recipientKeyEntry))
+      .toString();
+    const inviterSignature = await session.encryptedKeyPair.sign(
+      JSON.stringify({
+        communityId: keyEntry.conversationId,
+        encryptedCommunityKey,
+        inviterIdentityId: session.identity.id,
+        recipientIdentityId: recipientIdentity.id,
+      }),
+      session.password,
+    );
+    const body = {
+      communityId: keyEntry.conversationId,
+      encryptedCommunityKey,
+      inviterIdentityId: session.identity.id,
+      inviterSignature: inviterSignature.toString(),
+      recipientIdentityId: recipientIdentity.id,
+      type: 'community_invitation',
+    };
+
+    await this.http.request<NotificationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  private async createConversationKeyEntry(
+    identityId: string,
+    peerIdentityId: string,
+    networkId: string,
+  ): Promise<ConversationKeyEntry> {
+    const conversationKeyPair = await KeyPair.generate();
+    const keyPairPrimitives = conversationKeyPair.toPrimitives();
+    const conversationId = this.deterministicConversationId(
+      identityId,
+      peerIdentityId,
+      networkId,
+    );
+
+    return {
+      conversationId,
+      createdAt: Date.now(),
+      peerIdentityId,
+      privateKey: keyPairPrimitives.privateKey,
+      publicKey: keyPairPrimitives.publicKey,
+    };
+  }
+
+  private async createGroupConversationKeyEntry(
+    conversationId: string,
+  ): Promise<ConversationKeyEntry> {
+    const conversationKeyPair = await KeyPair.generate();
+    const keyPairPrimitives = conversationKeyPair.toPrimitives();
+
+    return {
+      conversationId,
+      createdAt: Date.now(),
+      peerIdentityId: '',
+      privateKey: keyPairPrimitives.privateKey,
+      publicKey: keyPairPrimitives.publicKey,
+    };
+  }
+
+  private restoreEncryptedKeyPair(
+    identity: IdentityResource,
+  ): EncryptedKeyPair {
+    return new EncryptedKeyPair(
+      PublicKey.fromPEM(
+        new StringValueObject(identity.encryptedKeyPair.publicKey),
+      ),
+      new EncryptedPrivateKey(
+        new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
+      ),
+    );
+  }
+
+  private async reEncryptKeyPair(
+    session: Session,
+    newPassword: string,
+  ): Promise<IdentityResource['encryptedKeyPair']> {
+    const privateKey = await new EncryptedPrivateKey(
+      new StringValueObject(
+        session.identity.encryptedKeyPair.encryptedPrivateKey,
+      ),
+    ).decrypt(new StringValueObject(session.password));
+    const encryptedKeyPair = await EncryptedKeyPair.encryptKeyPair(
+      PublicKey.fromPEM(
+        new StringValueObject(session.identity.encryptedKeyPair.publicKey),
+      ),
+      privateKey,
+      new StringValueObject(newPassword),
+    );
+
+    return encryptedKeyPair.toPrimitives();
+  }
+
+  private messagesPath(
+    conversationId: string,
+    before?: null | string,
+    limit = 30,
+  ): string {
+    const query = new URLSearchParams({ limit: `${limit}` });
+
+    if (before) {
+      query.set('beforeMessageId', before);
+    }
+
+    return `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages?${query.toString()}`;
+  }
+
+  private messagePath(conversationId: string, messageId: string): string {
+    return `/conversations/${encodeURIComponent(
+      conversationId,
+    )}/messages/${encodeURIComponent(messageId)}`;
+  }
+
+  private messageReactionsPath(
+    conversationId: string,
+    messageId: string,
+  ): string {
+    return `${this.messagePath(conversationId, messageId)}/reactions`;
+  }
+
+  private communityChannelMessageReactionsPath(
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): string {
+    return `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/reactions`;
+  }
+
+  private messagesAroundPath(
+    conversationId: string,
+    messageId: string,
+  ): string {
+    const query = new URLSearchParams({ after: '20', before: '20' });
+
+    return `${this.messagePath(
+      conversationId,
+      messageId,
+    )}/around?${query.toString()}`;
+  }
+
+  private async cachedRequest<T>(
+    key: string,
+    loader: () => Promise<T>,
+    options: CachedRequestOptions = {},
+  ): Promise<T> {
+    const now = Date.now();
+    const cached = this.requestCache.get(key) as
+      | CachedRequestEntry<T>
+      | undefined;
+
+    if (cached && (!cached.settled || cached.expiresAt > now)) {
+      return await cached.promise;
+    }
+
+    if (cached) this.requestCache.delete(key);
+
+    const entry: CachedRequestEntry<T> = {
+      expiresAt: Number.POSITIVE_INFINITY,
+      promise: Promise.resolve(undefined as T),
+      settled: false,
+    };
+
+    entry.promise = Promise.resolve()
+      .then(loader)
+      .then((result) => {
+        entry.settled = true;
+        entry.expiresAt = Date.now() + (options.ttlMs ?? 0);
+
+        if (!options.ttlMs && this.requestCache.get(key) === entry) {
+          this.requestCache.delete(key);
+        }
+
+        return result;
+      })
+      .catch((caught: unknown) => {
+        if (this.requestCache.get(key) === entry) {
+          this.requestCache.delete(key);
+        }
+
+        throw caught;
+      });
+
+    this.requestCache.set(key, entry);
+
+    return await entry.promise;
+  }
+
+  private sessionCacheKey(
+    method: 'GET',
+    path: string,
+    session: Session,
+  ): string {
+    return `${method} ${path} ${session.identity.id}`;
+  }
+
+  private invalidateSessionCacheKey(path: string, session: Session): void {
+    this.requestCache.delete(this.sessionCacheKey('GET', path, session));
+  }
+
+  private invalidateCachedRequest(key: string): void {
+    this.requestCache.delete(key);
+  }
+
+  private invalidateConversationPinsCache(
+    session: Session,
+    conversationId: string,
+  ): void {
+    this.invalidateSessionCacheKey(
+      `/conversations/${encodeURIComponent(conversationId)}/pins`,
+      session,
+    );
+  }
+
+  private invalidateCommunityChannelPinsCache(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): void {
+    this.invalidateSessionCacheKey(
+      `/communities/${encodeURIComponent(
+        communityId,
+      )}/channels/${encodeURIComponent(channelId)}/pins`,
+      session,
+    );
+  }
+
+  private async postConversation(
+    session: Session,
+    peerIdentityId: string,
+    published: {
+      keychain: LocalKeychain;
+      keychainExternalIdentifier: string;
+    },
+    networkId: string,
+  ): Promise<ConversationResource> {
+    const body = {
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+      networkId,
+      participantIds: [session.identity.id, peerIdentityId].sort(),
+      type: 'one-to-one',
+    };
+    const path = '/conversations';
+    const created = await this.http.request<ConversationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(
+        {
+          ...session,
+          keychain: published.keychain,
+          keychainExternalIdentifier: published.keychainExternalIdentifier,
+        },
+        'POST',
+        path,
+        body,
+      ),
+      method: 'POST',
+    });
+    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
+
+    return this.conversations.normalize(created, peerIdentityId);
+  }
+
+  private async postGroupConversation(
+    session: Session,
+    input: {
+      keychainExternalIdentifier: null | string;
+      name: string;
+      networkId: string;
+      participantIds: string[];
+    },
+  ): Promise<ConversationResource> {
+    const body = {
+      keychainExternalIdentifier: input.keychainExternalIdentifier,
+      name: input.name,
+      networkId: input.networkId,
+      participantIds: input.participantIds,
+      type: 'group',
+    };
+    const path = '/conversations';
+    const created = await this.http.request<ConversationResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
+
+    return this.conversations.normalize(created);
+  }
+
+  private withConversationKey(
+    keychain: LocalKeychain,
+    keyEntry: ConversationKeyEntry,
+  ): LocalKeychain {
+    return {
+      conversations: {
+        ...keychain.conversations,
+        [keyEntry.conversationId]: keyEntry,
+      },
+      version: keychain.version + 1,
+    };
+  }
+
+  private withServerConversationId(
+    keychain: LocalKeychain,
+    keyEntry: ConversationKeyEntry,
+    conversationId: string,
+  ): LocalKeychain {
+    if (conversationId === keyEntry.conversationId) {
+      return keychain;
+    }
+
+    return {
+      ...keychain,
+      conversations: {
+        ...keychain.conversations,
+        [conversationId]: { ...keyEntry, conversationId },
+      },
+    };
   }
 
   public apiUrl(path: string): string {
@@ -1264,7 +1793,7 @@ export class PigeonApiGateway {
       existingKeyEntry,
     );
     const encryptedKey = await encryptCommunityInviteKey(published.keyEntry);
-    const body = communityInviteLinkBody(
+    const body = buildCommunityInviteLinkBody(
       input,
       encryptedKey.encryptedCommunityKey,
     );
@@ -1277,104 +1806,6 @@ export class PigeonApiGateway {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
       keyEntry: published.keyEntry,
     };
-  }
-
-  private async isPublicCommunityWithoutKey(
-    session: Session,
-    communityId: string,
-    existingKeyEntry?: ConversationKeyEntry,
-  ): Promise<boolean> {
-    if (existingKeyEntry) return false;
-
-    const community = await this.getCommunity(session, communityId);
-
-    return community.visibility === 'public';
-  }
-
-  private async createPlainCommunityInvitation(
-    session: Session,
-    communityId: string,
-    recipientIdentityId: string,
-  ): Promise<{
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
-    await this.addCommunityMember(session, communityId, recipientIdentityId);
-
-    return {
-      keychain: session.keychain,
-      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-    };
-  }
-
-  private async publishCommunityKeyIfNeeded(
-    session: Session,
-    communityId: string,
-    existingKeyEntry?: ConversationKeyEntry,
-  ): Promise<PublishedCommunityKey> {
-    const keyEntry =
-      existingKeyEntry ??
-      (await this.createGroupConversationKeyEntry(communityId));
-
-    if (existingKeyEntry && session.keychainExternalIdentifier) {
-      return {
-        keychain: session.keychain,
-        keychainExternalIdentifier: session.keychainExternalIdentifier,
-        keyEntry,
-      };
-    }
-
-    const published = await this.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
-    );
-
-    return { keyEntry, ...published };
-  }
-
-  private sessionWithPublishedKeychain(
-    session: Session,
-    published: PublishedCommunityKey,
-  ): Session {
-    return {
-      ...session,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-  }
-
-  private async createPlainCommunityInviteLink(
-    session: Session,
-    path: string,
-    input: CommunityInviteLinkInput,
-  ): Promise<{
-    invite: CommunityInviteLinkResource;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
-    const invite = await this.postCommunityInviteLink(
-      session,
-      path,
-      communityInviteLinkBody(input),
-    );
-
-    return {
-      invite,
-      keychain: session.keychain,
-      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-    };
-  }
-
-  private async postCommunityInviteLink(
-    session: Session,
-    path: string,
-    body: CommunityInviteLinkBody,
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.http.request<CommunityInviteLinkResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
   }
 
   public async getCommunityInviteLink(
@@ -1559,13 +1990,6 @@ export class PigeonApiGateway {
     this.cacheIdentity(updatedIdentity);
 
     return updatedIdentity;
-  }
-
-  private cacheIdentity(identity: IdentityResource): void {
-    this.identityCache.set(IdentityId.normalize(identity.id), {
-      expiresAt: Date.now() + identityCacheTtlMs,
-      identity,
-    });
   }
 
   public async uploadPublicFile(
@@ -2402,547 +2826,5 @@ export class PigeonApiGateway {
       onProgress,
       options,
     );
-  }
-
-  private async decryptMessages(
-    session: Session,
-    conversationId: string,
-    messages: MessageResource[],
-    signal?: AbortSignal,
-  ): Promise<ChatMessage[]> {
-    const pendingMessages = messages.filter(
-      (message) => message.type !== 'deleted',
-    );
-    const key = pendingMessages.some(hasEncryptedPayload)
-      ? ConversationKeychain.entry(
-          session.keychain,
-          session.identity.id,
-          conversationId,
-        )
-      : undefined;
-
-    if (typeof Worker !== 'undefined') {
-      const worker = await this.getMessageDecryptWorker();
-
-      return await worker.decrypt(
-        {
-          conversationId,
-          copy: copy.messages,
-          currentIdentityId: session.identity.id,
-          messages: pendingMessages,
-          privateKey: key?.privateKey,
-        },
-        signal,
-      );
-    }
-
-    const decrypted = new Array<ChatMessage>(pendingMessages.length);
-
-    for (
-      let endIndex = pendingMessages.length;
-      endIndex > 0;
-      endIndex -= messageDecryptBatchSize
-    ) {
-      throwIfMessageLoadAborted(signal);
-
-      const startIndex = Math.max(0, endIndex - messageDecryptBatchSize);
-      const indexes = Array.from(
-        { length: endIndex - startIndex },
-        (_, offset) => startIndex + offset,
-      );
-      const batch = pendingMessages.slice(startIndex, endIndex);
-
-      const decryptedBatch = await Promise.all(
-        batch.map((message) =>
-          this.projectMessageDirect(session, conversationId, message),
-        ),
-      );
-
-      for (let index = 0; index < indexes.length; index += 1) {
-        decrypted[indexes[index]] = decryptedBatch[index];
-      }
-
-      throwIfMessageLoadAborted(signal);
-
-      if (startIndex > 0) {
-        await yieldAfterMessageDecryptBatch();
-      }
-    }
-
-    return decrypted;
-  }
-
-  private async createLinkPreviewForContent(
-    session: Session,
-    content: string,
-  ): Promise<MessageLinkPreview | undefined> {
-    const url = MessageLinkPreviews.firstUrl(content);
-
-    if (!url) return undefined;
-
-    return await this.createLinkPreview(session, url).catch(() => undefined);
-  }
-
-  private async createLinkPreviewForMessage(
-    session: Session,
-    content: string,
-    options: SendMessageOptions,
-  ): Promise<MessageLinkPreview | undefined> {
-    if (options.linkPreview || options.sticker) return options.linkPreview;
-
-    return await this.createLinkPreviewForContent(session, content);
-  }
-
-  private encryptMessagePayload(input: EncryptMessagePayloadInput): string {
-    return PublicKey.fromPEM(input.key.publicKey)
-      .encrypt(
-        JSON.stringify({
-          attachments: input.messageAttachments,
-          authorIdentityId: input.session.identity.id,
-          content: input.sticker ? '' : input.content,
-          conversationId: input.conversationId,
-          ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
-          ...(input.replyPreview ? { reply: input.replyPreview } : {}),
-          ...(input.sticker ? { sticker: input.sticker } : {}),
-          ...(input.threadRootMessageId
-            ? { threadRootMessageId: input.threadRootMessageId }
-            : {}),
-          timestamp: input.timestamp,
-          type:
-            input.eventType ??
-            (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
-        }),
-      )
-      .toString();
-  }
-
-  private async projectMessageDirect(
-    session: Session,
-    conversationId: string,
-    message: MessageResource,
-  ): Promise<ChatMessage> {
-    return await this.messages.toChatMessage(session, conversationId, message);
-  }
-
-  private async getMessageDecryptWorker(): Promise<MessageDecryptWorker> {
-    if (this.messageDecryptWorker) return this.messageDecryptWorker;
-
-    const { MessageDecryptWorkerClient } =
-      await import('../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerClient');
-
-    this.messageDecryptWorker = new MessageDecryptWorkerClient();
-
-    return this.messageDecryptWorker;
-  }
-
-  private isMissingRemoteKeychain(caught: unknown): boolean {
-    return (
-      caught instanceof HttpJsonError &&
-      (caught.code === 'KeychainNotFoundError' ||
-        caught.code === 'IdentityNotFoundError')
-    );
-  }
-
-  private async createConversationInvitation(
-    session: Session,
-    peerIdentity: IdentityResource,
-    keyEntry: ConversationKeyEntry,
-    type: ConversationInvitationType = 'conversation_invitation',
-  ): Promise<void> {
-    const path = '/notifications/';
-    const recipientKeyEntry = {
-      ...keyEntry,
-      peerIdentityId: session.identity.id,
-    };
-    const encryptedConversationKey = PublicKey.fromPEM(
-      peerIdentity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(JSON.stringify(recipientKeyEntry))
-      .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        conversationId: keyEntry.conversationId,
-        encryptedConversationKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: peerIdentity.id,
-      }),
-      session.password,
-    );
-    const body = {
-      conversationId: keyEntry.conversationId,
-      encryptedConversationKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: peerIdentity.id,
-      type,
-    };
-
-    await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-  }
-
-  private async createCommunityInvitationNotification(
-    session: Session,
-    communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    const keyEntry = session.keychain.conversations[communityId];
-
-    if (!keyEntry) {
-      throw new Error(copy.messages.missingConversationKey);
-    }
-
-    const recipientIdentity = await this.getIdentity(recipientIdentityId);
-
-    await this.createEncryptedCommunityInvitation(
-      session,
-      recipientIdentity,
-      keyEntry,
-    );
-  }
-
-  private async createEncryptedCommunityInvitation(
-    session: Session,
-    recipientIdentity: IdentityResource,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<void> {
-    const path = '/notifications/';
-    const recipientKeyEntry = {
-      ...keyEntry,
-      peerIdentityId: session.identity.id,
-    };
-    const encryptedCommunityKey = PublicKey.fromPEM(
-      recipientIdentity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(JSON.stringify(recipientKeyEntry))
-      .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
-      JSON.stringify({
-        communityId: keyEntry.conversationId,
-        encryptedCommunityKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: recipientIdentity.id,
-      }),
-      session.password,
-    );
-    const body = {
-      communityId: keyEntry.conversationId,
-      encryptedCommunityKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: recipientIdentity.id,
-      type: 'community_invitation',
-    };
-
-    await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-  }
-
-  private async createConversationKeyEntry(
-    identityId: string,
-    peerIdentityId: string,
-    networkId: string,
-  ): Promise<ConversationKeyEntry> {
-    const conversationKeyPair = await KeyPair.generate();
-    const keyPairPrimitives = conversationKeyPair.toPrimitives();
-    const conversationId = this.deterministicConversationId(
-      identityId,
-      peerIdentityId,
-      networkId,
-    );
-
-    return {
-      conversationId,
-      createdAt: Date.now(),
-      peerIdentityId,
-      privateKey: keyPairPrimitives.privateKey,
-      publicKey: keyPairPrimitives.publicKey,
-    };
-  }
-
-  private async createGroupConversationKeyEntry(
-    conversationId: string,
-  ): Promise<ConversationKeyEntry> {
-    const conversationKeyPair = await KeyPair.generate();
-    const keyPairPrimitives = conversationKeyPair.toPrimitives();
-
-    return {
-      conversationId,
-      createdAt: Date.now(),
-      peerIdentityId: '',
-      privateKey: keyPairPrimitives.privateKey,
-      publicKey: keyPairPrimitives.publicKey,
-    };
-  }
-
-  private restoreEncryptedKeyPair(
-    identity: IdentityResource,
-  ): EncryptedKeyPair {
-    return new EncryptedKeyPair(
-      PublicKey.fromPEM(
-        new StringValueObject(identity.encryptedKeyPair.publicKey),
-      ),
-      new EncryptedPrivateKey(
-        new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
-      ),
-    );
-  }
-
-  private async reEncryptKeyPair(
-    session: Session,
-    newPassword: string,
-  ): Promise<IdentityResource['encryptedKeyPair']> {
-    const privateKey = await new EncryptedPrivateKey(
-      new StringValueObject(
-        session.identity.encryptedKeyPair.encryptedPrivateKey,
-      ),
-    ).decrypt(new StringValueObject(session.password));
-    const encryptedKeyPair = await EncryptedKeyPair.encryptKeyPair(
-      PublicKey.fromPEM(
-        new StringValueObject(session.identity.encryptedKeyPair.publicKey),
-      ),
-      privateKey,
-      new StringValueObject(newPassword),
-    );
-
-    return encryptedKeyPair.toPrimitives();
-  }
-
-  private messagesPath(
-    conversationId: string,
-    before?: null | string,
-    limit = 30,
-  ): string {
-    const query = new URLSearchParams({ limit: `${limit}` });
-
-    if (before) {
-      query.set('beforeMessageId', before);
-    }
-
-    return `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages?${query.toString()}`;
-  }
-
-  private messagePath(conversationId: string, messageId: string): string {
-    return `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-  }
-
-  private messageReactionsPath(
-    conversationId: string,
-    messageId: string,
-  ): string {
-    return `${this.messagePath(conversationId, messageId)}/reactions`;
-  }
-
-  private communityChannelMessageReactionsPath(
-    communityId: string,
-    channelId: string,
-    messageId: string,
-  ): string {
-    return `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
-      messageId,
-    )}/reactions`;
-  }
-
-  private messagesAroundPath(
-    conversationId: string,
-    messageId: string,
-  ): string {
-    const query = new URLSearchParams({ after: '20', before: '20' });
-
-    return `${this.messagePath(
-      conversationId,
-      messageId,
-    )}/around?${query.toString()}`;
-  }
-
-  private async cachedRequest<T>(
-    key: string,
-    loader: () => Promise<T>,
-    options: CachedRequestOptions = {},
-  ): Promise<T> {
-    const now = Date.now();
-    const cached = this.requestCache.get(key) as
-      | CachedRequestEntry<T>
-      | undefined;
-
-    if (cached && (!cached.settled || cached.expiresAt > now)) {
-      return await cached.promise;
-    }
-
-    if (cached) this.requestCache.delete(key);
-
-    const entry: CachedRequestEntry<T> = {
-      expiresAt: Number.POSITIVE_INFINITY,
-      promise: Promise.resolve(undefined as T),
-      settled: false,
-    };
-
-    entry.promise = Promise.resolve()
-      .then(loader)
-      .then((result) => {
-        entry.settled = true;
-        entry.expiresAt = Date.now() + (options.ttlMs ?? 0);
-
-        if (!options.ttlMs && this.requestCache.get(key) === entry) {
-          this.requestCache.delete(key);
-        }
-
-        return result;
-      })
-      .catch((caught: unknown) => {
-        if (this.requestCache.get(key) === entry) {
-          this.requestCache.delete(key);
-        }
-
-        throw caught;
-      });
-
-    this.requestCache.set(key, entry);
-
-    return await entry.promise;
-  }
-
-  private sessionCacheKey(
-    method: 'GET',
-    path: string,
-    session: Session,
-  ): string {
-    return `${method} ${path} ${session.identity.id}`;
-  }
-
-  private invalidateSessionCacheKey(path: string, session: Session): void {
-    this.requestCache.delete(this.sessionCacheKey('GET', path, session));
-  }
-
-  private invalidateCachedRequest(key: string): void {
-    this.requestCache.delete(key);
-  }
-
-  private invalidateConversationPinsCache(
-    session: Session,
-    conversationId: string,
-  ): void {
-    this.invalidateSessionCacheKey(
-      `/conversations/${encodeURIComponent(conversationId)}/pins`,
-      session,
-    );
-  }
-
-  private invalidateCommunityChannelPinsCache(
-    session: Session,
-    communityId: string,
-    channelId: string,
-  ): void {
-    this.invalidateSessionCacheKey(
-      `/communities/${encodeURIComponent(
-        communityId,
-      )}/channels/${encodeURIComponent(channelId)}/pins`,
-      session,
-    );
-  }
-
-  private async postConversation(
-    session: Session,
-    peerIdentityId: string,
-    published: {
-      keychain: LocalKeychain;
-      keychainExternalIdentifier: string;
-    },
-    networkId: string,
-  ): Promise<ConversationResource> {
-    const body = {
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-      networkId,
-      participantIds: [session.identity.id, peerIdentityId].sort(),
-      type: 'one-to-one',
-    };
-    const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(
-        {
-          ...session,
-          keychain: published.keychain,
-          keychainExternalIdentifier: published.keychainExternalIdentifier,
-        },
-        'POST',
-        path,
-        body,
-      ),
-      method: 'POST',
-    });
-    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
-
-    return this.conversations.normalize(created, peerIdentityId);
-  }
-
-  private async postGroupConversation(
-    session: Session,
-    input: {
-      keychainExternalIdentifier: null | string;
-      name: string;
-      networkId: string;
-      participantIds: string[];
-    },
-  ): Promise<ConversationResource> {
-    const body = {
-      keychainExternalIdentifier: input.keychainExternalIdentifier,
-      name: input.name,
-      networkId: input.networkId,
-      participantIds: input.participantIds,
-      type: 'group',
-    };
-    const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
-
-    return this.conversations.normalize(created);
-  }
-
-  private withConversationKey(
-    keychain: LocalKeychain,
-    keyEntry: ConversationKeyEntry,
-  ): LocalKeychain {
-    return {
-      conversations: {
-        ...keychain.conversations,
-        [keyEntry.conversationId]: keyEntry,
-      },
-      version: keychain.version + 1,
-    };
-  }
-
-  private withServerConversationId(
-    keychain: LocalKeychain,
-    keyEntry: ConversationKeyEntry,
-    conversationId: string,
-  ): LocalKeychain {
-    if (conversationId === keyEntry.conversationId) {
-      return keychain;
-    }
-
-    return {
-      ...keychain,
-      conversations: {
-        ...keychain.conversations,
-        [conversationId]: { ...keyEntry, conversationId },
-      },
-    };
   }
 }

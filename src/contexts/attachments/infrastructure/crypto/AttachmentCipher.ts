@@ -4,54 +4,16 @@ import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/C
 import type {
   AttachmentProgress,
   MessageAttachment,
-  MessageAttachmentEncryption,
   PendingMessageAttachment,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgressHandler } from './AttachmentProgressHandler';
+import type { AttachmentWorkerFactory } from './AttachmentWorkerFactory';
+import type { WorkerRequest } from './WorkerRequest';
+import type { WorkerResponse } from './WorkerResponse';
 
 const chunkSize = 8 * 1024 * 1024;
 const gcmTagBytes = 16;
 const largeAttachmentBytes = 5 * 1024 * 1024;
-
-type AttachmentProgressHandler = (progress: AttachmentProgress) => void;
-type AttachmentWorkerFactory = () => Worker;
-
-type WorkerRequest =
-  | {
-      file: File;
-      id: string;
-      uploadFilename: string;
-      type: 'encrypt';
-    }
-  | {
-      attachment: MessageAttachment;
-      encryptedBytes: ArrayBuffer;
-      id: string;
-      type: 'decrypt';
-    };
-
-type WorkerResponse =
-  | {
-      id: string;
-      progress: AttachmentProgress;
-      type: 'progress';
-    }
-  | {
-      encryptedBytes: ArrayBuffer;
-      encryption: MessageAttachmentEncryption;
-      id: string;
-      type: 'encrypt-result';
-      uploadFilename: string;
-    }
-  | {
-      bytes: ArrayBuffer;
-      id: string;
-      type: 'decrypt-result';
-    }
-  | {
-      error: string;
-      id: string;
-      type: 'error';
-    };
 
 export class AttachmentCipher {
   private nextWorkerRequestId = 0;
@@ -70,96 +32,6 @@ export class AttachmentCipher {
   public constructor(
     private readonly workerFactory?: AttachmentWorkerFactory,
   ) {}
-
-  public async encrypt(
-    file: File,
-    onProgress?: AttachmentProgressHandler,
-  ): Promise<PendingMessageAttachment> {
-    const result = await this.runWorker<
-      Extract<WorkerResponse, { type: 'encrypt-result' }>
-    >(
-      {
-        file,
-        id: UUID.generate().toString(),
-        type: 'encrypt',
-        uploadFilename: `${UUID.generate().toString()}.bin`,
-      },
-      onProgress,
-    ).catch(() => this.encryptInCurrentThread(file, onProgress));
-
-    return {
-      encryptedBytes: result.encryptedBytes,
-      metadata: {
-        contentType: file.type || 'application/octet-stream',
-        encryption: result.encryption,
-        filename: file.name || 'attachment',
-        size: file.size,
-      },
-      uploadFilename: result.uploadFilename,
-    };
-  }
-
-  public async decrypt(
-    attachment: MessageAttachment,
-    encryptedBytes: ArrayBuffer,
-    onProgress?: AttachmentProgressHandler,
-  ): Promise<Blob> {
-    const result = await this.runWorker<
-      Extract<WorkerResponse, { type: 'decrypt-result' }>
-    >(
-      {
-        attachment,
-        encryptedBytes,
-        id: UUID.generate().toString(),
-        type: 'decrypt',
-      },
-      onProgress,
-    ).catch(() =>
-      this.decryptInCurrentThread(attachment, encryptedBytes, onProgress),
-    );
-
-    return new Blob([result.bytes], { type: attachment.contentType });
-  }
-
-  public async encryptWithoutWorker(
-    file: File,
-    onProgress?: AttachmentProgressHandler,
-  ): Promise<Extract<WorkerResponse, { type: 'encrypt-result' }>> {
-    return await this.encryptInCurrentThread(file, onProgress);
-  }
-
-  public decryptWithoutWorker(
-    attachment: MessageAttachment,
-    encryptedBytes: ArrayBuffer,
-    onProgress?: AttachmentProgressHandler,
-  ): Extract<WorkerResponse, { type: 'decrypt-result' }> {
-    return this.decryptInCurrentThread(attachment, encryptedBytes, onProgress);
-  }
-
-  public base64ToBytes(value: string): Uint8Array {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-
-    return bytes;
-  }
-
-  public base64ToArrayBuffer(value: string): ArrayBuffer {
-    const bytes = this.base64ToBytes(value);
-
-    return this.bytesToArrayBuffer(bytes);
-  }
-
-  public bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-    const copy = new Uint8Array(bytes.byteLength);
-
-    copy.set(bytes);
-
-    return copy.buffer;
-  }
 
   private async encryptInCurrentThread(
     file: File,
@@ -410,5 +282,95 @@ export class AttachmentCipher {
     });
 
     return btoa(binary);
+  }
+
+  public async encrypt(
+    file: File,
+    onProgress?: AttachmentProgressHandler,
+  ): Promise<PendingMessageAttachment> {
+    const result = await this.runWorker<
+      Extract<WorkerResponse, { type: 'encrypt-result' }>
+    >(
+      {
+        file,
+        id: UUID.generate().toString(),
+        type: 'encrypt',
+        uploadFilename: `${UUID.generate().toString()}.bin`,
+      },
+      onProgress,
+    ).catch(() => this.encryptInCurrentThread(file, onProgress));
+
+    return {
+      encryptedBytes: result.encryptedBytes,
+      metadata: {
+        contentType: file.type || 'application/octet-stream',
+        encryption: result.encryption,
+        filename: file.name || 'attachment',
+        size: file.size,
+      },
+      uploadFilename: result.uploadFilename,
+    };
+  }
+
+  public async decrypt(
+    attachment: MessageAttachment,
+    encryptedBytes: ArrayBuffer,
+    onProgress?: AttachmentProgressHandler,
+  ): Promise<Blob> {
+    const result = await this.runWorker<
+      Extract<WorkerResponse, { type: 'decrypt-result' }>
+    >(
+      {
+        attachment,
+        encryptedBytes,
+        id: UUID.generate().toString(),
+        type: 'decrypt',
+      },
+      onProgress,
+    ).catch(() =>
+      this.decryptInCurrentThread(attachment, encryptedBytes, onProgress),
+    );
+
+    return new Blob([result.bytes], { type: attachment.contentType });
+  }
+
+  public async encryptWithoutWorker(
+    file: File,
+    onProgress?: AttachmentProgressHandler,
+  ): Promise<Extract<WorkerResponse, { type: 'encrypt-result' }>> {
+    return await this.encryptInCurrentThread(file, onProgress);
+  }
+
+  public decryptWithoutWorker(
+    attachment: MessageAttachment,
+    encryptedBytes: ArrayBuffer,
+    onProgress?: AttachmentProgressHandler,
+  ): Extract<WorkerResponse, { type: 'decrypt-result' }> {
+    return this.decryptInCurrentThread(attachment, encryptedBytes, onProgress);
+  }
+
+  public base64ToBytes(value: string): Uint8Array {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  public base64ToArrayBuffer(value: string): ArrayBuffer {
+    const bytes = this.base64ToBytes(value);
+
+    return this.bytesToArrayBuffer(bytes);
+  }
+
+  public bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+    const copy = new Uint8Array(bytes.byteLength);
+
+    copy.set(bytes);
+
+    return copy.buffer;
   }
 }

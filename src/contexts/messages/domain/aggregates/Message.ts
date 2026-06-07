@@ -12,16 +12,6 @@ import { MessageId } from '../value-objects/MessageId';
 import { MessageReactionEmoji } from '../value-objects/MessageReactionEmoji';
 
 export class Message extends AggregateRoot {
-  private constructor(
-    private readonly id: MessageId,
-    private readonly authorId: MessageAuthorId,
-    private readonly content: MessageContent,
-    private readonly resource: ChatMessage,
-    private reactions: MessageReaction[],
-  ) {
-    super();
-  }
-
   public static fromChatMessage(resource: ChatMessage): Message {
     return new Message(
       MessageId.fromString(resource.id),
@@ -30,6 +20,16 @@ export class Message extends AggregateRoot {
       resource,
       resource.reactions ?? [],
     );
+  }
+
+  private constructor(
+    private readonly id: MessageId,
+    private readonly authorId: MessageAuthorId,
+    private readonly content: MessageContent,
+    private readonly resource: ChatMessage,
+    private reactions: MessageReaction[],
+  ) {
+    super();
   }
 
   public addReaction(

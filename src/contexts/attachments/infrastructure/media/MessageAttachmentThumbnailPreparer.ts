@@ -1,3 +1,5 @@
+import type { ThumbnailDimensions } from './ThumbnailDimensions';
+
 import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
 import { AnimatedWebpEncoder } from '../../../../shared/presentation/media/AnimatedWebpEncoder';
 
@@ -5,11 +7,6 @@ const thumbnailContentType = 'image/webp';
 const thumbnailQuality = 0.72;
 const thumbnailMaxDimension = 480;
 const thumbnailThresholdBytes = 128 * 1024;
-
-type ThumbnailDimensions = {
-  height: number;
-  width: number;
-};
 
 function createGifEncoder(): AnimatedWebpEncoder {
   return new AnimatedWebpEncoder();
@@ -19,28 +16,6 @@ export class MessageAttachmentThumbnailPreparer {
   public constructor(
     private readonly gifEncoder: AnimatedWebpEncoder = createGifEncoder(),
   ) {}
-
-  public async prepare(file: File): Promise<File | null> {
-    if (!this.shouldPrepare(file)) return null;
-
-    if (await this.isAnimatedGif(file)) {
-      return await this.prepareAnimatedGif(file);
-    }
-
-    const image = await this.loadImage(file);
-    const dimensions = this.thumbnailDimensions(image);
-
-    if (!dimensions) return null;
-
-    const blob = await this.renderWebpThumbnail(image, dimensions);
-
-    if (blob.size >= file.size) return null;
-
-    return new File([blob], this.thumbnailFilename(file.name), {
-      lastModified: file.lastModified,
-      type: thumbnailContentType,
-    });
-  }
 
   private shouldPrepare(file: File): boolean {
     if (file.size <= thumbnailThresholdBytes) return false;
@@ -177,5 +152,27 @@ export class MessageAttachmentThumbnailPreparer {
     const contentType = (file.type ?? '').toLowerCase();
 
     return contentType === 'image/gif' || /\.gif$/i.test(file.name);
+  }
+
+  public async prepare(file: File): Promise<File | null> {
+    if (!this.shouldPrepare(file)) return null;
+
+    if (await this.isAnimatedGif(file)) {
+      return await this.prepareAnimatedGif(file);
+    }
+
+    const image = await this.loadImage(file);
+    const dimensions = this.thumbnailDimensions(image);
+
+    if (!dimensions) return null;
+
+    const blob = await this.renderWebpThumbnail(image, dimensions);
+
+    if (blob.size >= file.size) return null;
+
+    return new File([blob], this.thumbnailFilename(file.name), {
+      lastModified: file.lastModified,
+      type: thumbnailContentType,
+    });
   }
 }

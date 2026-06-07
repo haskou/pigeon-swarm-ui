@@ -6,7 +6,31 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 
 export class CommunityChannelCollection {
-  private constructor(private readonly orderedChannels: CommunityChannel[]) {}
+  private static mergeCurrentChannelsWithPreferredOrder({
+    currentChannels,
+    preferredOrder,
+  }: {
+    currentChannels: CommunityChannel[];
+    preferredOrder?: CommunityChannel[];
+  }): CommunityChannel[] {
+    if (!preferredOrder) return currentChannels;
+
+    const currentChannelsById = new Map(
+      currentChannels.map((channel) => [channel.id, channel]),
+    );
+    const orderedChannels: CommunityChannel[] = [];
+
+    for (const channel of preferredOrder) {
+      const currentChannel = currentChannelsById.get(channel.id);
+
+      if (!currentChannel) continue;
+
+      orderedChannels.push(currentChannel);
+      currentChannelsById.delete(channel.id);
+    }
+
+    return [...orderedChannels, ...currentChannelsById.values()];
+  }
 
   public static fromCommunity(
     community: Community,
@@ -27,6 +51,20 @@ export class CommunityChannelCollection {
   ): CommunityChannelCollection {
     return new CommunityChannelCollection([...channels]);
   }
+
+  public static isText(
+    channel: CommunityChannel,
+  ): channel is CommunityTextChannel {
+    return channel.type === 'text';
+  }
+
+  public static isVoice(
+    channel: CommunityChannel,
+  ): channel is CommunityVoiceChannel {
+    return channel.type === 'voice';
+  }
+
+  private constructor(private readonly orderedChannels: CommunityChannel[]) {}
 
   public all(): CommunityChannel[] {
     return [...this.orderedChannels];
@@ -58,43 +96,5 @@ export class CommunityChannelCollection {
       textChannels: this.text(),
       voiceChannels: this.voice(),
     };
-  }
-
-  public static isText(
-    channel: CommunityChannel,
-  ): channel is CommunityTextChannel {
-    return channel.type === 'text';
-  }
-
-  public static isVoice(
-    channel: CommunityChannel,
-  ): channel is CommunityVoiceChannel {
-    return channel.type === 'voice';
-  }
-
-  private static mergeCurrentChannelsWithPreferredOrder({
-    currentChannels,
-    preferredOrder,
-  }: {
-    currentChannels: CommunityChannel[];
-    preferredOrder?: CommunityChannel[];
-  }): CommunityChannel[] {
-    if (!preferredOrder) return currentChannels;
-
-    const currentChannelsById = new Map(
-      currentChannels.map((channel) => [channel.id, channel]),
-    );
-    const orderedChannels: CommunityChannel[] = [];
-
-    for (const channel of preferredOrder) {
-      const currentChannel = currentChannelsById.get(channel.id);
-
-      if (!currentChannel) continue;
-
-      orderedChannels.push(currentChannel);
-      currentChannelsById.delete(channel.id);
-    }
-
-    return [...orderedChannels, ...currentChannelsById.values()];
   }
 }

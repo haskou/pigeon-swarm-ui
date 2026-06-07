@@ -19,7 +19,7 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/realtimeGateway';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';

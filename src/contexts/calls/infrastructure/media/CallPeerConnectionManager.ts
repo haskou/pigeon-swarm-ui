@@ -2,6 +2,8 @@ import type {
   CallSignalType,
   ScreenShareQualityPreset,
 } from '../../domain/callSession.types';
+import type { BrowserWindowWithWebkitAudioContext } from './BrowserWindowWithWebkitAudioContext';
+import type { PeerNegotiationState } from './PeerNegotiationState';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
@@ -13,11 +15,14 @@ import {
   replacementLocalTrack,
 } from './callMediaTrackClassification';
 import {
+  collectPeerMediaStats,
+  type PeerMediaStats,
+} from './collectPeerMediaStats';
+import {
   descriptionPayload,
   type DescriptionSignalPayload,
   type SignalSender,
-} from './callPeerConnectionSignals';
-import { collectPeerMediaStats, type PeerMediaStats } from './callPeerStats';
+} from './descriptionPayload';
 import {
   graphAudioVolume,
   isMediaStreamSource,
@@ -27,18 +32,7 @@ import {
 } from './remoteAudioOutput';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
-export type { PeerMediaStats } from './callPeerStats';
-
-type BrowserWindowWithWebkitAudioContext = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-type PeerNegotiationState = {
-  ignoreOffer: boolean;
-  makingOffer: boolean;
-  polite: boolean;
-};
+export type { PeerMediaStats } from './collectPeerMediaStats';
 
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
@@ -97,104 +91,6 @@ export class CallPeerConnectionManager {
 
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
-  public configure(rtcConfiguration: RTCConfiguration): void {
-    this.rtcConfiguration = rtcConfiguration;
-    logCallDebug('peer-manager:configure', {
-      iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
-    });
-  }
-
-  public setLocalStream(stream: MediaStream | null): void {
-    this.localStream = stream;
-    logCallDebug('peer-manager:set-local-stream', {
-      hasStream: Boolean(stream),
-      tracks:
-        stream?.getTracks().map((track) => ({
-          enabled: track.enabled,
-          id: track.id,
-          kind: track.kind,
-          label: track.label,
-          muted: track.muted,
-          readyState: track.readyState,
-        })) ?? [],
-    });
-    this.syncLocalTracks();
-  }
-
-  public remoteMediaStreams(): Record<string, MediaStream> {
-    return Object.fromEntries(this.remoteStreams.entries());
-  }
-
-  public remoteScreenMediaStreams(): Record<string, MediaStream> {
-    return Object.fromEntries(this.remoteScreenStreams.entries());
-  }
-
-  public retainPeers(peerIdentityIds: Set<string>): void {
-    for (const peerIdentityId of this.peers.keys()) {
-      if (!peerIdentityIds.has(peerIdentityId)) {
-        this.removePeer(peerIdentityId);
-      }
-    }
-  }
-
-  public setDeafened(deafened: boolean): void {
-    this.deafened = deafened;
-    logCallDebug('peer-manager:set-deafened', {
-      deafened,
-      remoteAudioCount: this.remoteAudio.size,
-    });
-
-    for (const [audioKey, audio] of this.remoteAudio.entries()) {
-      const hasAudioGraph = this.remoteAudioGains.has(audioKey);
-
-      audio.muted = deafened;
-      this.applyRemoteAudioOutputVolume(
-        audioKey,
-        this.remoteAudioVolumes.get(audioKey) ?? 1,
-      );
-
-      if (hasAudioGraph) continue;
-
-      if (deafened) {
-        audio.pause();
-      } else {
-        void audio.play().catch(() => undefined);
-      }
-    }
-  }
-
-  public setPeerVolume(peerIdentityId: string, volumePercent: number): void {
-    this.setRemoteAudioChannelVolume(
-      remoteAudioKey(peerIdentityId, 'voice'),
-      volumePercent,
-    );
-
-    logCallDebug('peer-manager:set-peer-volume', {
-      peerIdentityId,
-      volumePercent,
-    });
-  }
-
-  public setPeerScreenShareVolume(
-    peerIdentityId: string,
-    volumePercent: number,
-  ): void {
-    this.setRemoteAudioChannelVolume(
-      remoteAudioKey(peerIdentityId, 'screen'),
-      volumePercent,
-    );
-
-    logCallDebug('peer-manager:set-peer-screen-share-volume', {
-      peerIdentityId,
-      volumePercent,
-    });
-  }
-
-  public setScreenShareQuality(quality: ScreenShareQualityPreset): void {
-    this.screenShareQuality = quality;
-    this.syncScreenShareEncodingParameters();
-  }
-
   private setRemoteAudioChannelVolume(
     audioKey: string,
     volumePercent: number,
@@ -217,162 +113,6 @@ export class CallPeerConnectionManager {
     }
 
     this.applyRemoteAudioOutputVolume(audioKey, volume);
-  }
-
-  public async ensurePeer(
-    peerIdentityId: string,
-    shouldOffer: boolean,
-    sendSignal: SignalSender,
-  ): Promise<void> {
-    logCallDebug('peer-manager:ensure-peer', {
-      hasExistingPeer: this.peers.has(peerIdentityId),
-      peerIdentityId,
-      shouldOffer,
-    });
-    this.configureNegotiationState(peerIdentityId, !shouldOffer);
-    const peer = this.getOrCreatePeer(peerIdentityId, sendSignal);
-
-    if (!shouldOffer || peer.localDescription) {
-      logCallDebug('peer-manager:ensure-peer:offer-skipped', {
-        hasLocalDescription: Boolean(peer.localDescription),
-        peerIdentityId,
-        shouldOffer,
-      });
-
-      return;
-    }
-
-    const state = this.peerNegotiationState(peerIdentityId);
-
-    try {
-      state.makingOffer = true;
-      const offer = await peer.createOffer();
-
-      await peer.setLocalDescription(offer);
-      logCallDebug('peer-manager:ensure-peer:send-offer', {
-        peerIdentityId,
-      });
-      await sendSignal(
-        peerIdentityId,
-        'offer',
-        descriptionPayload(
-          offer,
-          this.localScreenAudioTrackIds(),
-          this.localScreenAudioStreamIds(),
-          this.localScreenTrackIds(),
-          this.localScreenStreamIds(),
-        ),
-      );
-    } finally {
-      state.makingOffer = false;
-    }
-  }
-
-  public async handleSignal(
-    senderIdentityId: string,
-    signalType: CallSignalType,
-    payload: Record<string, unknown>,
-    sendSignal: SignalSender,
-    currentIdentityId?: string,
-  ): Promise<void> {
-    logCallDebug('peer-manager:handle-signal', {
-      senderIdentityId,
-      signalType,
-    });
-
-    if (currentIdentityId) {
-      this.configureNegotiationState(
-        senderIdentityId,
-        currentIdentityId > senderIdentityId,
-      );
-    }
-    const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
-    const state = this.peerNegotiationState(senderIdentityId);
-
-    if (signalType === 'ice_candidate') {
-      await this.handleIceCandidateSignal(
-        senderIdentityId,
-        peer,
-        payload as RTCIceCandidateInit,
-        state,
-      );
-
-      return;
-    }
-
-    await this.handleDescriptionSignal(
-      senderIdentityId,
-      peer,
-      payload as unknown as DescriptionSignalPayload,
-      state,
-      sendSignal,
-    );
-  }
-
-  public reset(): void {
-    logCallDebug('peer-manager:reset', {
-      peerCount: this.peers.size,
-      remoteAudioCount: this.remoteAudio.size,
-    });
-    this.peers.forEach((peer) => peer.close());
-    this.peers.clear();
-    this.pendingIceCandidates.clear();
-    this.peerNegotiationStates.clear();
-
-    for (const audio of this.remoteAudio.values()) {
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
-    }
-    for (const source of this.remoteAudioOutputSources.values()) {
-      source.disconnect();
-    }
-    for (const audioContext of this.remoteAudioContexts.values()) {
-      void audioContext.close().catch(() => undefined);
-    }
-    this.remoteAudio.clear();
-    this.remoteAudioContexts.clear();
-    this.remoteAudioGains.clear();
-    this.remoteAudioOutputSources.clear();
-    this.remoteAudioOutputStreams.clear();
-    this.remoteAudioStreams.clear();
-    this.remoteAudioVolumes.clear();
-    this.remoteStreams.clear();
-    this.remoteScreenStreams.clear();
-    this.remoteScreenStreamIds.clear();
-    this.remoteScreenTrackIds.clear();
-    this.remoteScreenAudioStreamIds.clear();
-    this.remoteScreenAudioTrackIds.clear();
-    this.localScreenStreams.clear();
-    this.previousStatsSamples.clear();
-    this.localStream = null;
-    this.rtcConfiguration = null;
-    this.deafened = false;
-  }
-
-  public async collectStats(): Promise<Record<string, PeerMediaStats>> {
-    const entries = await Promise.all(
-      [...this.peers.entries()].map(
-        async ([identityId, peer]): Promise<[string, PeerMediaStats]> => {
-          const firstPassStats = await collectPeerMediaStats(peer);
-          const bitrateKbps = this.bitrateFor(identityId, firstPassStats);
-
-          return [
-            identityId,
-            bitrateKbps === undefined
-              ? firstPassStats
-              : { ...firstPassStats, bitrateKbps },
-          ];
-        },
-      ),
-    );
-    const stats: Record<string, PeerMediaStats> = {};
-
-    for (const [identityId, peerStats] of entries) {
-      stats[identityId] = peerStats;
-    }
-
-    return stats;
   }
 
   private bitrateFor(
@@ -1212,5 +952,259 @@ export class CallPeerConnectionManager {
       candidateCount: candidates.length,
       peerIdentityId,
     });
+  }
+
+  public configure(rtcConfiguration: RTCConfiguration): void {
+    this.rtcConfiguration = rtcConfiguration;
+    logCallDebug('peer-manager:configure', {
+      iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
+    });
+  }
+
+  public setLocalStream(stream: MediaStream | null): void {
+    this.localStream = stream;
+    logCallDebug('peer-manager:set-local-stream', {
+      hasStream: Boolean(stream),
+      tracks:
+        stream?.getTracks().map((track) => ({
+          enabled: track.enabled,
+          id: track.id,
+          kind: track.kind,
+          label: track.label,
+          muted: track.muted,
+          readyState: track.readyState,
+        })) ?? [],
+    });
+    this.syncLocalTracks();
+  }
+
+  public remoteMediaStreams(): Record<string, MediaStream> {
+    return Object.fromEntries(this.remoteStreams.entries());
+  }
+
+  public remoteScreenMediaStreams(): Record<string, MediaStream> {
+    return Object.fromEntries(this.remoteScreenStreams.entries());
+  }
+
+  public retainPeers(peerIdentityIds: Set<string>): void {
+    for (const peerIdentityId of this.peers.keys()) {
+      if (!peerIdentityIds.has(peerIdentityId)) {
+        this.removePeer(peerIdentityId);
+      }
+    }
+  }
+
+  public setDeafened(deafened: boolean): void {
+    this.deafened = deafened;
+    logCallDebug('peer-manager:set-deafened', {
+      deafened,
+      remoteAudioCount: this.remoteAudio.size,
+    });
+
+    for (const [audioKey, audio] of this.remoteAudio.entries()) {
+      const hasAudioGraph = this.remoteAudioGains.has(audioKey);
+
+      audio.muted = deafened;
+      this.applyRemoteAudioOutputVolume(
+        audioKey,
+        this.remoteAudioVolumes.get(audioKey) ?? 1,
+      );
+
+      if (hasAudioGraph) continue;
+
+      if (deafened) {
+        audio.pause();
+      } else {
+        void audio.play().catch(() => undefined);
+      }
+    }
+  }
+
+  public setPeerVolume(peerIdentityId: string, volumePercent: number): void {
+    this.setRemoteAudioChannelVolume(
+      remoteAudioKey(peerIdentityId, 'voice'),
+      volumePercent,
+    );
+
+    logCallDebug('peer-manager:set-peer-volume', {
+      peerIdentityId,
+      volumePercent,
+    });
+  }
+
+  public setPeerScreenShareVolume(
+    peerIdentityId: string,
+    volumePercent: number,
+  ): void {
+    this.setRemoteAudioChannelVolume(
+      remoteAudioKey(peerIdentityId, 'screen'),
+      volumePercent,
+    );
+
+    logCallDebug('peer-manager:set-peer-screen-share-volume', {
+      peerIdentityId,
+      volumePercent,
+    });
+  }
+
+  public setScreenShareQuality(quality: ScreenShareQualityPreset): void {
+    this.screenShareQuality = quality;
+    this.syncScreenShareEncodingParameters();
+  }
+
+  public async ensurePeer(
+    peerIdentityId: string,
+    shouldOffer: boolean,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    logCallDebug('peer-manager:ensure-peer', {
+      hasExistingPeer: this.peers.has(peerIdentityId),
+      peerIdentityId,
+      shouldOffer,
+    });
+    this.configureNegotiationState(peerIdentityId, !shouldOffer);
+    const peer = this.getOrCreatePeer(peerIdentityId, sendSignal);
+
+    if (!shouldOffer || peer.localDescription) {
+      logCallDebug('peer-manager:ensure-peer:offer-skipped', {
+        hasLocalDescription: Boolean(peer.localDescription),
+        peerIdentityId,
+        shouldOffer,
+      });
+
+      return;
+    }
+
+    const state = this.peerNegotiationState(peerIdentityId);
+
+    try {
+      state.makingOffer = true;
+      const offer = await peer.createOffer();
+
+      await peer.setLocalDescription(offer);
+      logCallDebug('peer-manager:ensure-peer:send-offer', {
+        peerIdentityId,
+      });
+      await sendSignal(
+        peerIdentityId,
+        'offer',
+        descriptionPayload(
+          offer,
+          this.localScreenAudioTrackIds(),
+          this.localScreenAudioStreamIds(),
+          this.localScreenTrackIds(),
+          this.localScreenStreamIds(),
+        ),
+      );
+    } finally {
+      state.makingOffer = false;
+    }
+  }
+
+  public async handleSignal(
+    senderIdentityId: string,
+    signalType: CallSignalType,
+    payload: Record<string, unknown>,
+    sendSignal: SignalSender,
+    currentIdentityId?: string,
+  ): Promise<void> {
+    logCallDebug('peer-manager:handle-signal', {
+      senderIdentityId,
+      signalType,
+    });
+
+    if (currentIdentityId) {
+      this.configureNegotiationState(
+        senderIdentityId,
+        currentIdentityId > senderIdentityId,
+      );
+    }
+    const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
+    const state = this.peerNegotiationState(senderIdentityId);
+
+    if (signalType === 'ice_candidate') {
+      await this.handleIceCandidateSignal(
+        senderIdentityId,
+        peer,
+        payload as RTCIceCandidateInit,
+        state,
+      );
+
+      return;
+    }
+
+    await this.handleDescriptionSignal(
+      senderIdentityId,
+      peer,
+      payload as unknown as DescriptionSignalPayload,
+      state,
+      sendSignal,
+    );
+  }
+
+  public reset(): void {
+    logCallDebug('peer-manager:reset', {
+      peerCount: this.peers.size,
+      remoteAudioCount: this.remoteAudio.size,
+    });
+    this.peers.forEach((peer) => peer.close());
+    this.peers.clear();
+    this.pendingIceCandidates.clear();
+    this.peerNegotiationStates.clear();
+
+    for (const audio of this.remoteAudio.values()) {
+      audio.pause();
+      audio.srcObject = null;
+      audio.remove();
+    }
+    for (const source of this.remoteAudioOutputSources.values()) {
+      source.disconnect();
+    }
+    for (const audioContext of this.remoteAudioContexts.values()) {
+      void audioContext.close().catch(() => undefined);
+    }
+    this.remoteAudio.clear();
+    this.remoteAudioContexts.clear();
+    this.remoteAudioGains.clear();
+    this.remoteAudioOutputSources.clear();
+    this.remoteAudioOutputStreams.clear();
+    this.remoteAudioStreams.clear();
+    this.remoteAudioVolumes.clear();
+    this.remoteStreams.clear();
+    this.remoteScreenStreams.clear();
+    this.remoteScreenStreamIds.clear();
+    this.remoteScreenTrackIds.clear();
+    this.remoteScreenAudioStreamIds.clear();
+    this.remoteScreenAudioTrackIds.clear();
+    this.localScreenStreams.clear();
+    this.previousStatsSamples.clear();
+    this.localStream = null;
+    this.rtcConfiguration = null;
+    this.deafened = false;
+  }
+
+  public async collectStats(): Promise<Record<string, PeerMediaStats>> {
+    const entries = await Promise.all(
+      [...this.peers.entries()].map(
+        async ([identityId, peer]): Promise<[string, PeerMediaStats]> => {
+          const firstPassStats = await collectPeerMediaStats(peer);
+          const bitrateKbps = this.bitrateFor(identityId, firstPassStats);
+
+          return [
+            identityId,
+            bitrateKbps === undefined
+              ? firstPassStats
+              : { ...firstPassStats, bitrateKbps },
+          ];
+        },
+      ),
+    );
+    const stats: Record<string, PeerMediaStats> = {};
+
+    for (const [identityId, peerStats] of entries) {
+      stats[identityId] = peerStats;
+    }
+
+    return stats;
   }
 }

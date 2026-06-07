@@ -7,18 +7,42 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-
-type LegacyPublicFileContent = PublicFileUpload & {
-  data: string;
-  uploadedAt?: string;
-  uploadedByIdentityId?: string;
-};
+import type { LegacyPublicFileContent } from './LegacyPublicFileContent';
 
 export class PigeonPublicFilesClient {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
   ) {}
+
+  private async content(cid: string, blob: Blob): Promise<PublicFileContent> {
+    if (blob.type.includes('json')) {
+      return this.legacyContent(await blob.text());
+    }
+
+    return {
+      blob,
+      cid,
+      contentType: blob.type || 'application/octet-stream',
+      filename: cid,
+      size: blob.size,
+    };
+  }
+
+  private legacyContent(payload: string): PublicFileContent {
+    const content = JSON.parse(payload) as LegacyPublicFileContent;
+    const bytes = Uint8Array.from(Buffer.from(content.data, 'base64'));
+
+    return {
+      blob: new Blob([bytes], { type: content.contentType }),
+      cid: content.cid,
+      contentType: content.contentType,
+      filename: content.filename,
+      size: content.size,
+      uploadedAt: content.uploadedAt,
+      uploadedByIdentityId: content.uploadedByIdentityId,
+    };
+  }
 
   public async fetch(
     cid: string,
@@ -59,34 +83,5 @@ export class PigeonPublicFilesClient {
       },
       method: 'POST',
     });
-  }
-
-  private async content(cid: string, blob: Blob): Promise<PublicFileContent> {
-    if (blob.type.includes('json')) {
-      return this.legacyContent(await blob.text());
-    }
-
-    return {
-      blob,
-      cid,
-      contentType: blob.type || 'application/octet-stream',
-      filename: cid,
-      size: blob.size,
-    };
-  }
-
-  private legacyContent(payload: string): PublicFileContent {
-    const content = JSON.parse(payload) as LegacyPublicFileContent;
-    const bytes = Uint8Array.from(Buffer.from(content.data, 'base64'));
-
-    return {
-      blob: new Blob([bytes], { type: content.contentType }),
-      cid: content.cid,
-      contentType: content.contentType,
-      filename: content.filename,
-      size: content.size,
-      uploadedAt: content.uploadedAt,
-      uploadedByIdentityId: content.uploadedByIdentityId,
-    };
   }
 }

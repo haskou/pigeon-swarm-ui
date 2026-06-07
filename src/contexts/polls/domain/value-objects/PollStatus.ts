@@ -3,8 +3,8 @@ import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
 import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
 
 export class PollStatus extends StringValueObject {
-  private constructor(value: PollResource['status']) {
-    super(value);
+  private static isValid(value: string): value is PollResource['status'] {
+    return value === 'closed' || value === 'open';
   }
 
   public static closed(): PollStatus {
@@ -23,15 +23,15 @@ export class PollStatus extends StringValueObject {
     return new PollStatus('open');
   }
 
+  private constructor(value: PollResource['status']) {
+    super(value);
+  }
+
   public isClosed(): boolean {
     return this.isEqual(PollStatus.closed());
   }
 
   public isOpen(): boolean {
     return this.isEqual(PollStatus.open());
-  }
-
-  private static isValid(value: string): value is PollResource['status'] {
-    return value === 'closed' || value === 'open';
   }
 }
