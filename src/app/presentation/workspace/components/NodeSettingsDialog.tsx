@@ -961,7 +961,9 @@ function PeerSummary({
 function PeerBadges({ peer }: { peer: Peer }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      <PeerBadge value={nodeTypeLabel(peer.nodeType)} />
+      {peer.nodeType && peer.nodeType !== 'unknown' ? (
+        <PeerBadge value={nodeTypeLabel(peer.nodeType)} />
+      ) : null}
       {peer.connectionSummary?.isSharedNetworkPeer ? (
         <PeerBadge
           value={copy.peers.sharedNetworks.replace(
