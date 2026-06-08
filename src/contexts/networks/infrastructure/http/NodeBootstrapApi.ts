@@ -7,9 +7,13 @@ import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuil
 import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 
 export class NodeBootstrapApi {
-  private readonly http = new HttpJsonClient(new ApiUrlBuilder(API_SERVER_URL));
-
   private readonly requestCache = new Map<string, Promise<unknown>>();
+
+  public constructor(
+    private readonly http = new HttpJsonClient(
+      new ApiUrlBuilder(API_SERVER_URL),
+    ),
+  ) {}
 
   private async cachedRequest<T>(
     key: string,
@@ -51,9 +55,7 @@ export class NodeBootstrapApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.cachedRequest('GET /peers/', () =>
-      this.http.request<{ peers: Peer[] }>('/peers/'),
-    );
+    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
 
     return result.peers;
   }

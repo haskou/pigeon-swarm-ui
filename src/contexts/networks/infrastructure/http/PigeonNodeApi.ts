@@ -81,9 +81,7 @@ export class PigeonNodeApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.cachedRequest('GET /peers/', () =>
-      this.http.request<{ peers: Peer[] }>('/peers/'),
-    );
+    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
 
     return result.peers;
   }
