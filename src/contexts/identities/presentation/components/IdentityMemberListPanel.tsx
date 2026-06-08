@@ -104,11 +104,13 @@ export function IdentityMemberListPanel({
 }
 
 export function IdentityMemberRow({
+  className,
   interactive = true,
   item,
   onClick,
   ownerLabel,
 }: {
+  className?: string;
   interactive?: boolean;
   item: IdentityMemberListItem;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -138,7 +140,12 @@ export function IdentityMemberRow({
 
     if (!interactive) {
       return (
-        <div className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left">
+        <div
+          className={cx(
+            'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+            className,
+          )}
+        >
           {loadingContent}
         </div>
       );
@@ -148,7 +155,10 @@ export function IdentityMemberRow({
       <button
         type="button"
         disabled
-        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
+        className={cx(
+          'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+          className,
+        )}
       >
         {loadingContent}
       </button>
@@ -195,7 +205,12 @@ export function IdentityMemberRow({
 
   if (!interactive) {
     return (
-      <div className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left">
+      <div
+        className={cx(
+          'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+          className,
+        )}
+      >
         {content}
       </div>
     );
@@ -205,7 +220,10 @@ export function IdentityMemberRow({
     <button
       type="button"
       onClick={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+      className={cx(
+        'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12',
+        className,
+      )}
     >
       {content}
     </button>

@@ -988,6 +988,7 @@ function PeerOwnerIdentity({
         {copy.peers.owner}
       </div>
       <IdentityMemberRow
+        className="max-w-[20rem]"
         interactive={false}
         item={{
           identity: owner.identity ?? undefined,
