@@ -724,11 +724,6 @@ export const es = {
     saving: 'Guardando...',
     server: 'Nodo',
     title: 'Ajustes del nodo',
-    transport: 'Transporte',
-    transportInMemory: 'En memoria',
-    transportLibp2p: 'libp2p',
-    transportUnknown: 'Desconocido',
-    logLevel: 'Log',
     unclaimed: 'Nodo sin reclamar',
     unclaimedBody: 'Este nodo local todavía no tiene propietario.',
     unclaimedNetworkNote:

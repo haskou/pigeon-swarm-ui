@@ -831,11 +831,6 @@ export const en = {
     saving: 'Saving...',
     server: 'Node',
     title: 'Node settings',
-    transport: 'Transport',
-    transportInMemory: 'In memory',
-    transportLibp2p: 'libp2p',
-    transportUnknown: 'Unknown',
-    logLevel: 'Log',
     unclaimed: 'Unclaimed node',
     unclaimedBody: 'This local node does not have an owner yet.',
     unclaimedNetworkNote:

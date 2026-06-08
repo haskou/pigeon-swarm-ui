@@ -778,19 +778,9 @@ function NodeRuntimeSummary({
           value={nodeTypeLabel(node?.nodeType)}
         />
         <NodeDetailRow
-          label={copy.nodeSettings.transport}
-          value={transportLabel(node?.runtime?.transport)}
-        />
-        <NodeDetailRow
           label={copy.nodeSettings.relay}
           value={relayStatusLabel(node?.relay)}
         />
-        {node?.runtime?.logLevel ? (
-          <NodeDetailRow
-            label={copy.nodeSettings.logLevel}
-            value={node.runtime.logLevel}
-          />
-        ) : null}
         {node?.relay?.peerId ? (
           <NodeDetailRow
             label={copy.nodeSettings.relayPeer}
@@ -1071,19 +1061,6 @@ function relayStatusLabel(
   if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
 
   return copy.nodeSettings.relayEnabled;
-}
-
-function transportLabel(
-  transport: 'in-memory' | 'libp2p-gossipsub' | 'unknown' | undefined,
-): string {
-  switch (transport) {
-    case 'in-memory':
-      return copy.nodeSettings.transportInMemory;
-    case 'libp2p-gossipsub':
-      return copy.nodeSettings.transportLibp2p;
-    default:
-      return copy.nodeSettings.transportUnknown;
-  }
 }
 
 function ReplicationStatusPanel({
