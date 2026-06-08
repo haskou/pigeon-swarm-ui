@@ -86,7 +86,7 @@ export function NotificationsPanel({
       onClick={close}
     >
       <section
-        className="app-overlay-surface glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        className="app-overlay-surface ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl border border-white/10 bg-[#202132] p-4 text-white shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
         data-state={state}
         onClick={(event) => event.stopPropagation()}
       >
