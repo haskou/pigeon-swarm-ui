@@ -14,6 +14,7 @@ import {
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   CallParticipant,
   CallParticipantStatus,
@@ -197,7 +198,7 @@ interface GlassWorkspaceProps {
   communities: Community[];
   communitiesError: Error | null;
   communitiesLoading: boolean;
-  node: { id: string; owner: null | string } | null;
+  node: (NodeInfo & { owner: null | string }) | null;
   nodeNetworks: NodeNetwork[];
   onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   IdentityResource,
   IpfsReplicationStatus,
@@ -20,7 +21,7 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
 interface NodeSettingsDialogProps {
-  node: { id: string; owner: null | string } | null;
+  node: (NodeInfo & { owner: null | string }) | null;
   networks: NodeNetwork[];
   onClose: () => void;
   onNetworksUpdated: () => Promise<void>;
@@ -349,6 +350,7 @@ export function NodeSettingsDialog({
                       : copy.nodeSettings.claim}
                   </button>
                 )}
+                <NodeRuntimeSummary node={node} networks={networks} />
               </div>
 
               <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -670,6 +672,81 @@ function ServerField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function NodeRuntimeSummary({
+  networks,
+  node,
+}: {
+  networks: NodeNetwork[];
+  node: (NodeInfo & { owner: null | string }) | null;
+}) {
+  const publicCount =
+    node?.networkSummary?.publicCount ??
+    networks.filter(isPublicNodeNetwork).length;
+  const privateCount =
+    node?.networkSummary?.privateCount ??
+    Math.max(0, networks.length - publicCount);
+  const total = node?.networkSummary?.total ?? networks.length;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+      <div className="flex flex-wrap gap-1.5">
+        <StatusPill
+          label={copy.nodeSettings.nodeType}
+          value={nodeTypeLabel(node?.nodeType)}
+        />
+        <StatusPill
+          label={copy.nodeSettings.transport}
+          value={transportLabel(node?.runtime?.transport)}
+        />
+        {node?.runtime?.logLevel ? (
+          <StatusPill
+            label={copy.nodeSettings.logLevel}
+            value={node.runtime.logLevel}
+          />
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <StatusPill
+          label={copy.nodeSettings.relay}
+          value={relayStatusLabel(node?.relay)}
+        />
+        {node?.relay?.peerId ? (
+          <StatusPill
+            label={copy.nodeSettings.relayPeer}
+            title={node.relay.peerId}
+            value={shortId(node.relay.peerId)}
+          />
+        ) : null}
+      </div>
+      <div className="text-xs leading-5 text-white/45">
+        {copy.nodeSettings.networkSummary
+          .replace('{total}', String(total))
+          .replace('{public}', String(publicCount))
+          .replace('{private}', String(privateCount))}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <span
+      className="max-w-full truncate rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.68rem] font-black text-white/65"
+      title={title ?? `${label}: ${value}`}
+    >
+      <span className="text-white/35">{label}:</span> {value}
+    </span>
+  );
+}
+
 function PeerStatusPanel({
   copiedPeerId,
   loading,
@@ -782,6 +859,7 @@ function PeerSummary({
         </span>
       </div>
       <div className="mt-3 space-y-2">
+        <PeerBadges peer={peer} />
         <div
           className="truncate text-white/55"
           title={peer.owner || copy.peers.unclaimed}
@@ -816,6 +894,42 @@ function PeerSummary({
   );
 }
 
+function PeerBadges({ peer }: { peer: Peer }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <PeerBadge value={nodeTypeLabel(peer.nodeType)} />
+      {peer.connectionSummary?.isSharedNetworkPeer ? (
+        <PeerBadge
+          value={copy.peers.sharedNetworks.replace(
+            '{count}',
+            String(peer.connectionSummary.sharedNetworkCount),
+          )}
+        />
+      ) : null}
+      {peer.capabilities?.gossipsub ? (
+        <PeerBadge value={copy.peers.capabilityGossipsub} />
+      ) : null}
+      {peer.capabilities?.publicIpfs ? (
+        <PeerBadge value={copy.peers.capabilityPublicIpfs} />
+      ) : null}
+      {peer.capabilities?.privateIpfs ? (
+        <PeerBadge value={copy.peers.capabilityPrivateIpfs} />
+      ) : null}
+      {peer.capabilities?.relay ? (
+        <PeerBadge value={copy.peers.capabilityRelay} />
+      ) : null}
+    </div>
+  );
+}
+
+function PeerBadge({ value }: { value: string }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em] text-white/50">
+      {value}
+    </span>
+  );
+}
+
 function sortedPeersByLastSeen(peers: Peer[]): Peer[] {
   return [...peers].sort(
     (left, right) => peerLastSeenRank(right) - peerLastSeenRank(left),
@@ -843,6 +957,52 @@ function formatPeerLastSeen(lastSeenAt: number): string {
     '{count}',
     String(elapsedMinutes),
   );
+}
+
+function nodeTypeLabel(
+  nodeType: 'leaf' | 'reachable' | 'relay' | 'unknown' | undefined,
+): string {
+  switch (nodeType) {
+    case 'leaf':
+      return copy.nodeSettings.nodeTypeLeaf;
+    case 'reachable':
+      return copy.nodeSettings.nodeTypeReachable;
+    case 'relay':
+      return copy.nodeSettings.nodeTypeRelay;
+    default:
+      return copy.nodeSettings.nodeTypeUnknown;
+  }
+}
+
+function relayStatusLabel(
+  relay:
+    | {
+        advertised: boolean;
+        autoEnabled: boolean;
+        enabled: boolean;
+        running: boolean;
+      }
+    | undefined,
+): string {
+  if (!relay?.enabled) return copy.nodeSettings.relayDisabled;
+  if (relay.running && relay.advertised) return copy.nodeSettings.relayAdvertised;
+  if (relay.running) return copy.nodeSettings.relayRunning;
+  if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
+
+  return copy.nodeSettings.relayEnabled;
+}
+
+function transportLabel(
+  transport: 'in-memory' | 'libp2p-gossipsub' | 'unknown' | undefined,
+): string {
+  switch (transport) {
+    case 'in-memory':
+      return copy.nodeSettings.transportInMemory;
+    case 'libp2p-gossipsub':
+      return copy.nodeSettings.transportLibp2p;
+    default:
+      return copy.nodeSettings.transportUnknown;
+  }
 }
 
 function ReplicationStatusPanel({

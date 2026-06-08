@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   CallParticipant,
   CallResource,
@@ -116,7 +117,7 @@ interface WorkspaceDialogsProps {
   membershipRequests: CommunityMembershipRequest[];
   messageContextMenu: MessageContextMenuState | null;
   messages: ChatMessage[];
-  node: { id: string; owner: null | string } | null;
+  node: (NodeInfo & { owner: null | string }) | null;
   nodeNetworks: NodeNetwork[];
   nodeSettingsOpen: boolean;
   notificationAction: 'accept' | 'archive' | 'decline' | 'refresh' | null;

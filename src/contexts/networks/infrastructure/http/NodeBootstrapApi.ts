@@ -30,10 +30,12 @@ export class NodeBootstrapApi {
     return await request;
   }
 
-  public async getInfo(): Promise<NodeInfo> {
-    return await this.cachedRequest('GET /node/', () =>
+  public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
+    const info = await this.cachedRequest('GET /node/', () =>
       this.http.request<NodeInfo>('/node/'),
     );
+
+    return { ...info, owner: info.owner ?? null };
   }
 
   public async getNetworks(): Promise<NodeNetwork[]> {
