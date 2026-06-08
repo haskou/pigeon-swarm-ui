@@ -832,7 +832,7 @@ export const en = {
     unclaimed: 'Unclaimed node',
     unclaimedBody: 'This local node does not have an owner yet.',
     unclaimedNetworkNote:
-      'Claim the node to manage its networks. Actions allowed before claiming remain visible.',
+      'Claim this node to unlock full network management.',
     unclaimedTitle: 'Unclaimed node',
   },
   notifications: {

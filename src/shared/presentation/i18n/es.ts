@@ -725,7 +725,7 @@ export const es = {
     unclaimed: 'Nodo sin reclamar',
     unclaimedBody: 'Este nodo local todavía no tiene propietario.',
     unclaimedNetworkNote:
-      'Reclama el nodo para gestionar sus redes. Las acciones permitidas antes de reclamar siguen visibles.',
+      'Reclama este nodo para desbloquear toda la gestión de redes.',
     unclaimedTitle: 'Nodo no reclamado',
   },
   notifications: {
