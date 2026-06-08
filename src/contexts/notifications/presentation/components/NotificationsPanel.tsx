@@ -118,7 +118,7 @@ export function NotificationsPanel({
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {notifications.length === 0 &&
             pendingMembershipRequests.length === 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/7 p-4 text-sm text-white/55">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 text-sm text-white/55">
                 {copy.notifications.empty}
               </div>
             )}

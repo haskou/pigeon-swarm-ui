@@ -65,7 +65,7 @@ export function MembershipRequestCard({
         </span>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
+      <div className="mt-3 rounded-2xl bg-white/[0.07] p-3 text-xs text-white/55">
         <div className="flex items-center justify-between gap-3">
           <span>{copy.notifications.community}</span>
           <span className="truncate font-semibold text-white/70">

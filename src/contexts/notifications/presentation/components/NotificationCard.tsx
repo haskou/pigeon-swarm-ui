@@ -128,7 +128,7 @@ export function NotificationCard({
         </span>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white/7 p-3 text-xs text-white/55">
+      <div className="mt-3 rounded-2xl bg-white/[0.07] p-3 text-xs text-white/55">
         <div className="mb-3 flex items-center gap-3 border-b border-white/10 pb-3">
           <PreviewAvatar preview={preview} />
           <div className="min-w-0">
@@ -180,7 +180,7 @@ export function NotificationCard({
         <button
           type="button"
           onClick={() => onArchive(notification.id)}
-          className="rounded-2xl bg-white/7 px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/12"
+          className="rounded-2xl bg-white/[0.07] px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/[0.12]"
         >
           {copy.notifications.archive}
         </button>
