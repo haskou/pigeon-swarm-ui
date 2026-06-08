@@ -4,6 +4,35 @@ import type { Peer } from '../../application/list-peers/ListPeers';
 import { NodeBootstrapApi } from './NodeBootstrapApi';
 
 describe(NodeBootstrapApi.name, () => {
+  it('loads node info fresh because ownership changes after claiming', async () => {
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'node-1',
+        owner: undefined,
+      })
+      .mockResolvedValueOnce({
+        id: 'node-1',
+        owner: 'identity-1',
+      });
+    const api = new NodeBootstrapApi({
+      request,
+    } as unknown as HttpJsonClient);
+
+    await expect(api.getInfo()).resolves.toEqual({
+      id: 'node-1',
+      owner: null,
+    });
+    await expect(api.getInfo()).resolves.toEqual({
+      id: 'node-1',
+      owner: 'identity-1',
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenNthCalledWith(1, '/node/');
+    expect(request).toHaveBeenNthCalledWith(2, '/node/');
+  });
+
   it('loads peers fresh because peer visibility changes over time', async () => {
     const peer: Peer = {
       capabilities: {

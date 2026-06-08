@@ -35,9 +35,7 @@ export class NodeBootstrapApi {
   }
 
   public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
-    const info = await this.cachedRequest('GET /node/', () =>
-      this.http.request<NodeInfo>('/node/'),
-    );
+    const info = await this.http.request<NodeInfo>('/node/');
 
     return { ...info, owner: info.owner ?? null };
   }
