@@ -116,6 +116,8 @@ export function Inspector({
     });
   };
 
+  if (!activeConversation) return null;
+
   return (
     <>
       <IdentityMembersAside
@@ -173,7 +175,7 @@ function conversationParticipantIds({
   currentIdentityId: string;
   peerIdentityId?: string;
 }): string[] {
-  if (!conversation) return [currentIdentityId];
+  if (!conversation) return [];
 
   const ids = isGroup(conversation)
     ? (conversation.participantIdentityIds ??

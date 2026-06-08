@@ -2494,23 +2494,25 @@ export function CommunityWorkspace({
         )}
       </section>
 
-      <CommunityMembersPanel
-        community={community}
-        animateEntries={animateSidePanelEntries}
-        animationScopeKey={community.id}
-        canInvite={owner || currentPermissions.has('create_invites')}
-        members={members}
-        onAddMember={() => setMemberOpen(true)}
-        onCloseMobile={onMobileMembersClose}
-        onMemberClick={(member, event) =>
-          openMemberProfile(
-            member,
-            profileAnchorFromTarget(event.currentTarget),
-          )
-        }
-        openMobile={mobileMembersOpen}
-        presenceByIdentityId={presenceByIdentityId}
-      />
+      {selectedChannel ? (
+        <CommunityMembersPanel
+          community={community}
+          animateEntries={animateSidePanelEntries}
+          animationScopeKey={community.id}
+          canInvite={owner || currentPermissions.has('create_invites')}
+          members={members}
+          onAddMember={() => setMemberOpen(true)}
+          onCloseMobile={onMobileMembersClose}
+          onMemberClick={(member, event) =>
+            openMemberProfile(
+              member,
+              profileAnchorFromTarget(event.currentTarget),
+            )
+          }
+          openMobile={mobileMembersOpen}
+          presenceByIdentityId={presenceByIdentityId}
+        />
+      ) : null}
 
       {messageCollection ? (
         <MessageCollectionDialog
