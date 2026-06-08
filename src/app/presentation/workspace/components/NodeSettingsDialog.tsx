@@ -320,7 +320,7 @@ export function NodeSettingsDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40"
+        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh]"
         data-state={transitionState}
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
