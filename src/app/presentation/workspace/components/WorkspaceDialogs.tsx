@@ -125,6 +125,7 @@ interface WorkspaceDialogsProps {
   notificationSettingsSetting: NotificationScopeSetting | null;
   notificationSettingsTarget: NotificationScopeSettingsTarget | null;
   notificationsOpen: boolean;
+  peersLoading: boolean;
   peers: Peer[];
   presenceByIdentityId: Record<string, IdentityPresence>;
   rawMessage: ChatMessage | null;
@@ -490,6 +491,7 @@ function NodeSettingsOverlay(
         node={props.node}
         onClose={props.onCloseNodeSettings}
         onNetworksUpdated={props.onNetworksUpdated}
+        peersLoading={props.peersLoading}
         peers={props.peers}
         session={props.session}
       />

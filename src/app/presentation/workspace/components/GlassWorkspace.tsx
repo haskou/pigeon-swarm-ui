@@ -204,6 +204,7 @@ interface GlassWorkspaceProps {
   onPeersReload: () => Promise<void>;
   onPendingCommunityInviteHandled?: () => void;
   pendingCommunityInvite?: PendingCommunityInviteLink | null;
+  peersLoading: boolean;
   peers: Peer[];
   preloadedConversationMessages: PreloadedConversationMessages | null;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
@@ -221,6 +222,7 @@ export function GlassWorkspace({
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
+  peersLoading,
   peers,
   pendingCommunityInvite,
   preloadedConversationMessages,
@@ -4571,6 +4573,7 @@ export function GlassWorkspace({
             notificationSettingsSetting={notificationSettingsSetting}
             notificationSettingsTarget={notificationSettingsTarget}
             notificationsOpen={notificationsOpen}
+            peersLoading={peersLoading}
             peers={peers}
             presenceByIdentityId={presenceByIdentityId}
             rawMessage={rawMessage}

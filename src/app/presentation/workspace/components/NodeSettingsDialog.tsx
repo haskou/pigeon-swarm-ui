@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
@@ -24,6 +24,7 @@ interface NodeSettingsDialogProps {
   networks: NodeNetwork[];
   onClose: () => void;
   onNetworksUpdated: () => Promise<void>;
+  peersLoading: boolean;
   peers: Peer[];
   session: Session;
 }
@@ -35,6 +36,7 @@ export function NodeSettingsDialog({
   node,
   onClose,
   onNetworksUpdated,
+  peersLoading,
   peers,
   session,
 }: NodeSettingsDialogProps) {
@@ -45,7 +47,9 @@ export function NodeSettingsDialog({
   const [joinCode, setJoinCode] = useState('');
   const [createName, setCreateName] = useState('');
   const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
+  const [copiedPeerId, setCopiedPeerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState<
     'claim' | 'create' | 'join' | 'public' | 'remove' | null
   >(null);
@@ -61,6 +65,7 @@ export function NodeSettingsDialog({
   const canCreatePublicNetwork =
     !!node && !hasPublicNetwork && (!node.owner || isOwner);
   const canRemoveNetworks = !!node && (!node.owner || isOwner);
+  const canJoinNetwork = isNetworkInviteCode(joinCode);
   const ownerProfile = isOwner
     ? session.identity.profile
     : ownerIdentity?.profile;
@@ -142,10 +147,12 @@ export function NodeSettingsDialog({
 
   const handleClaim = async () => {
     setError(null);
+    setNotice(null);
     setLoading('claim');
     try {
       await applicationContainer.claimNode(session);
       await onNetworksUpdated();
+      setNotice(copy.nodeSettings.claimSuccess);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
@@ -154,7 +161,10 @@ export function NodeSettingsDialog({
 
   const handleJoin = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canJoinNetwork) return;
+
     setError(null);
+    setNotice(null);
     setLoading('join');
     try {
       const invite = NetworkInviteCode.decode(joinCode);
@@ -167,6 +177,7 @@ export function NodeSettingsDialog({
       );
       setJoinCode('');
       await onNetworksUpdated();
+      setNotice(copy.nodeSettings.joinSuccess);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
@@ -180,11 +191,13 @@ export function NodeSettingsDialog({
     if (!name) return;
 
     setError(null);
+    setNotice(null);
     setLoading('create');
     try {
       await applicationContainer.createNodeNetwork(session, name);
       setCreateName('');
       await onNetworksUpdated();
+      setNotice(copy.nodeSettings.createSuccess);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
@@ -195,12 +208,14 @@ export function NodeSettingsDialog({
     if (!canCreatePublicNetwork) return;
 
     setError(null);
+    setNotice(null);
     setLoading('public');
     try {
       await applicationContainer.createPublicNodeNetwork(
         node?.owner ? session : undefined,
       );
       await onNetworksUpdated();
+      setNotice(copy.nodeSettings.publicNetworkSuccess);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
@@ -220,6 +235,7 @@ export function NodeSettingsDialog({
     if (!confirmed) return;
 
     setError(null);
+    setNotice(null);
     setLoading('remove');
     try {
       await applicationContainer.removeNodeNetwork(
@@ -230,6 +246,7 @@ export function NodeSettingsDialog({
         current === network.id ? null : current,
       );
       await onNetworksUpdated();
+      setNotice(copy.nodeSettings.removeNetworkSuccess);
     } catch (caught) {
       setError(
         toUserErrorMessage(caught, copy.nodeSettings.removeNetworkError),
@@ -245,10 +262,22 @@ export function NodeSettingsDialog({
 
     await navigator.clipboard.writeText(code);
     setCopiedNetworkId(network.id);
+    setNotice(copy.nodeSettings.codeCopied);
     window.setTimeout(() => {
       setCopiedNetworkId((current) =>
         current === network.id ? null : current,
       );
+    }, 1800);
+  };
+
+  const copyPeerId = async (peerId: string) => {
+    if (!navigator.clipboard) return;
+
+    await navigator.clipboard.writeText(peerId);
+    setCopiedPeerId(peerId);
+    setNotice(copy.peers.copiedPeerId);
+    window.setTimeout(() => {
+      setCopiedPeerId((current) => (current === peerId ? null : current));
     }, 1800);
   };
 
@@ -452,7 +481,7 @@ export function NodeSettingsDialog({
                   </label>
                   <button
                     type="submit"
-                    disabled={loading !== null}
+                    disabled={loading !== null || !canJoinNetwork}
                     className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {loading === 'join'
@@ -461,22 +490,29 @@ export function NodeSettingsDialog({
                   </button>
                 </form>
 
-                {error && (
-                  <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-                    {error}
-                  </div>
-                )}
               </div>
-            ) : (
-              error && (
-                <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm leading-6 text-rose-100">
-                  {error}
-                </div>
-              )
-            )}
+            ) : null}
           </div>
 
-          <PeerStatusPanel peers={peers} />
+          {(error || notice) && (
+            <div
+              className={cx(
+                'mx-5 mb-5 rounded-2xl border p-3 text-sm',
+                error
+                  ? 'border-rose-300/25 bg-rose-500/15 text-rose-100'
+                  : 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100',
+              )}
+            >
+              {error ?? notice}
+            </div>
+          )}
+
+          <PeerStatusPanel
+            copiedPeerId={copiedPeerId}
+            loading={peersLoading}
+            onCopyPeerId={copyPeerId}
+            peers={peers}
+          />
 
           {isOwner && (
             <ReplicationStatusPanel
@@ -512,6 +548,18 @@ function networkInviteCodeFor(network: NodeNetwork): string {
     key,
     name: network.name,
   });
+}
+
+function isNetworkInviteCode(value: string): boolean {
+  if (!value.trim()) return false;
+
+  try {
+    NetworkInviteCode.decode(value);
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function NetworkLockBadge({ publicNetwork }: { publicNetwork: boolean }) {
@@ -622,7 +670,19 @@ function ServerField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PeerStatusPanel({ peers }: { peers: Peer[] }) {
+function PeerStatusPanel({
+  copiedPeerId,
+  loading,
+  onCopyPeerId,
+  peers,
+}: {
+  copiedPeerId: string | null;
+  loading: boolean;
+  onCopyPeerId: (peerId: string) => Promise<void>;
+  peers: Peer[];
+}) {
+  const sortedPeers = useMemo(() => sortedPeersByLastSeen(peers), [peers]);
+
   return (
     <section className="border-t border-white/10 p-5">
       <div className="mb-4">
@@ -631,14 +691,26 @@ function PeerStatusPanel({ peers }: { peers: Peer[] }) {
         </div>
         <p className="mt-1 text-sm text-white/50">{copy.peers.body}</p>
       </div>
-      {peers.length === 0 ? (
-        <div className="border-l border-white/10 py-1 pl-3 text-sm text-white/55">
-          {copy.peers.empty}
+      {loading ? (
+        <PeerSkeletonList />
+      ) : sortedPeers.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
+          <div className="text-sm font-black text-white/75">
+            {copy.peers.emptyTitle}
+          </div>
+          <p className="mt-1 text-sm leading-6 text-white/50">
+            {copy.peers.empty}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {peers.map((peer) => (
-            <PeerSummary key={peer.id} peer={peer} />
+        <div className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
+          {sortedPeers.map((peer) => (
+            <PeerSummary
+              copied={copiedPeerId === peer.id}
+              key={peer.id}
+              onCopyPeerId={onCopyPeerId}
+              peer={peer}
+            />
           ))}
         </div>
       )}
@@ -646,70 +718,131 @@ function PeerStatusPanel({ peers }: { peers: Peer[] }) {
   );
 }
 
-function PeerSummary({ peer }: { peer: Peer }) {
+function PeerSkeletonList() {
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/20 p-3 text-xs">
+    <div className="space-y-2">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="rounded-2xl border border-white/10 bg-black/15 p-3"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="h-4 w-40 rounded-full bg-white/10" />
+              <div className="mt-2 h-3 w-full rounded-full bg-white/6" />
+            </div>
+            <div className="h-6 w-24 rounded-full bg-white/10" />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <div className="h-6 w-28 rounded-full bg-white/6" />
+            <div className="h-6 w-20 rounded-full bg-white/6" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PeerSummary({
+  copied,
+  onCopyPeerId,
+  peer,
+}: {
+  copied: boolean;
+  onCopyPeerId: (peerId: string) => Promise<void>;
+  peer: Peer;
+}) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/15 p-3 text-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate font-black text-white">
             {copy.peers.node} · {shortId(peer.id)}
           </div>
-          <div className="mt-1 truncate text-white/40" title={peer.id}>
-            {peer.id}
+          <div className="mt-1 flex min-w-0 items-center gap-2">
+            <code
+              className="min-w-0 truncate text-[0.68rem] text-white/40"
+              title={peer.id}
+            >
+              {peer.id}
+            </code>
+            <button
+              type="button"
+              onClick={() => void onCopyPeerId(peer.id)}
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/8 text-white/65 transition hover:bg-white/12 hover:text-white"
+              aria-label={copy.peers.copyPeerId}
+              title={copied ? copy.profile.copied : copy.peers.copyPeerId}
+            >
+              <CopyIcon copied={copied} />
+            </button>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-fuchsia-500/15 px-2 py-1 font-black text-fuchsia-100">
+        <span className="shrink-0 rounded-full bg-white/8 px-2 py-1 font-black text-white/65">
           {formatPeerLastSeen(peer.lastSeenAt)}
         </span>
       </div>
-      <div className="mt-3 grid gap-2">
-        <PeerField
-          label={copy.peers.owner}
-          value={peer.owner ? shortId(peer.owner) : copy.peers.unclaimed}
-          title={peer.owner}
-        />
-        <PeerField
-          label={copy.peers.networks}
-          value={
-            peer.networks.length > 0
-              ? peer.networks.map((network) => network.name).join(', ')
-              : copy.peers.noNetworks
-          }
-        />
+      <div className="mt-3 space-y-2">
+        <div
+          className="truncate text-white/55"
+          title={peer.owner || copy.peers.unclaimed}
+        >
+          {copy.peers.owner}:{' '}
+          <span className="text-white/75">
+            {peer.owner ? shortId(peer.owner) : copy.peers.unclaimed}
+          </span>
+        </div>
+        <div>
+          <div className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
+            {copy.peers.networks}
+          </div>
+          {peer.networks.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {peer.networks.map((network) => (
+                <span
+                  key={`${peer.id}:${network.id}`}
+                  className="max-w-full truncate rounded-full border border-cyan-200/15 bg-cyan-300/10 px-2 py-1 text-[0.68rem] font-black text-cyan-100/80"
+                  title={network.name}
+                >
+                  {network.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-white/45">{copy.peers.noNetworks}</div>
+          )}
+        </div>
       </div>
     </article>
   );
 }
 
-function PeerField({
-  label,
-  title,
-  value,
-}: {
-  label: string;
-  title?: string;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-xl bg-white/6 px-3 py-2">
-      <div className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
-        {label}
-      </div>
-      <div className="mt-1 truncate text-white/65" title={title ?? value}>
-        {value}
-      </div>
-    </div>
+function sortedPeersByLastSeen(peers: Peer[]): Peer[] {
+  return [...peers].sort(
+    (left, right) => peerLastSeenRank(right) - peerLastSeenRank(left),
   );
 }
 
+function peerLastSeenRank(peer: Peer): number {
+  return isValidLastSeenAt(peer.lastSeenAt) ? peer.lastSeenAt : -1;
+}
+
+function isValidLastSeenAt(lastSeenAt: number): boolean {
+  return Number.isFinite(lastSeenAt) && lastSeenAt > 0;
+}
+
 function formatPeerLastSeen(lastSeenAt: number): string {
+  if (!isValidLastSeenAt(lastSeenAt)) return copy.peers.neverSeen;
+
   const elapsedMs = Math.max(0, Date.now() - lastSeenAt);
   const elapsedMinutes = Math.floor(elapsedMs / 60000);
 
-  if (elapsedMinutes <= 0) return copy.peers.justNow;
-  if (elapsedMinutes === 1) return copy.peers.minuteAgo;
+  if (elapsedMinutes <= 0) return copy.peers.seenJustNow;
+  if (elapsedMinutes === 1) return copy.peers.seenMinuteAgo;
 
-  return copy.peers.minutesAgo.replace('{count}', String(elapsedMinutes));
+  return copy.peers.seenMinutesAgo.replace(
+    '{count}',
+    String(elapsedMinutes),
+  );
 }
 
 function ReplicationStatusPanel({
