@@ -776,8 +776,6 @@ export const en = {
     infoTab: 'Info',
     networkIdCopied: 'Network ID copied.',
     networks: 'Node networks',
-    networkSummary: '{total} networks: {public} public, {private} private.',
-    networkSummaryCompact: '{private} private, {public} public',
     networksTab: 'Networks ({count})',
     nodeId: 'Node ID',
     nodeDetails: 'Node details',

@@ -427,7 +427,7 @@ export function NodeSettingsDialog({
                   </div>
                 </section>
 
-                <NodeRuntimeSummary node={node} networks={networks} />
+                <NodeRuntimeSummary node={node} />
 
                 {isOwner && (
                   <ReplicationStatusPanel
@@ -754,19 +754,10 @@ function TrashIcon() {
 }
 
 function NodeRuntimeSummary({
-  networks,
   node,
 }: {
-  networks: NodeNetwork[];
   node: (NodeInfo & { owner: null | string }) | null;
 }) {
-  const publicCount =
-    node?.networkSummary?.publicCount ??
-    networks.filter(isPublicNodeNetwork).length;
-  const privateCount =
-    node?.networkSummary?.privateCount ??
-    Math.max(0, networks.length - publicCount);
-
   return (
     <section className="rounded-2xl bg-black/20 p-4">
       <div className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -788,12 +779,6 @@ function NodeRuntimeSummary({
             value={shortId(node.relay.peerId)}
           />
         ) : null}
-        <NodeDetailRow
-          label={copy.nodeSettings.networks}
-          value={copy.nodeSettings.networkSummaryCompact
-            .replace('{public}', String(publicCount))
-            .replace('{private}', String(privateCount))}
-        />
       </div>
     </section>
   );

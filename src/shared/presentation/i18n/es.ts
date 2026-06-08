@@ -678,8 +678,6 @@ export const es = {
     infoTab: 'Info',
     networkIdCopied: 'ID de red copiado.',
     networks: 'Redes del nodo',
-    networkSummary: '{total} redes: {public} publicas, {private} privadas.',
-    networkSummaryCompact: '{private} privadas, {public} publicas',
     networksTab: 'Redes ({count})',
     nodeId: 'ID del nodo',
     nodeDetails: 'Detalles del nodo',
