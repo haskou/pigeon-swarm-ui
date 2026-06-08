@@ -19,6 +19,11 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import {
+  identityPicture,
+  publicFileObjectUrl,
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
 interface NodeSettingsDialogProps {
   node: (NodeInfo & { owner: null | string }) | null;
@@ -598,6 +603,7 @@ export function NodeSettingsDialog({
               {activeSection === 'peers' && (
                 <PeerStatusPanel
                   copiedPeerId={copiedPeerId}
+                  currentIdentity={session.identity}
                   loading={peersLoading}
                   onCopyPeerId={copyPeerId}
                   peers={peers}
@@ -811,11 +817,13 @@ function NodeDetailRow({
 
 function PeerStatusPanel({
   copiedPeerId,
+  currentIdentity,
   loading,
   onCopyPeerId,
   peers,
 }: {
   copiedPeerId: string | null;
+  currentIdentity: IdentityResource;
   loading: boolean;
   onCopyPeerId: (peerId: string) => Promise<void>;
   peers: Peer[];
@@ -848,6 +856,7 @@ function PeerStatusPanel({
           {sortedPeers.map((peer) => (
             <PeerSummary
               copied={copiedPeerId === peer.id}
+              currentIdentity={currentIdentity}
               key={peer.id}
               onCopyPeerId={onCopyPeerId}
               peer={peer}
@@ -886,10 +895,12 @@ function PeerSkeletonList() {
 
 function PeerSummary({
   copied,
+  currentIdentity,
   onCopyPeerId,
   peer,
 }: {
   copied: boolean;
+  currentIdentity: IdentityResource;
   onCopyPeerId: (peerId: string) => Promise<void>;
   peer: Peer;
 }) {
@@ -924,15 +935,10 @@ function PeerSummary({
       </div>
       <div className="mt-3 space-y-2">
         <PeerBadges peer={peer} />
-        <div
-          className="truncate text-white/55"
-          title={peer.owner || copy.peers.unclaimed}
-        >
-          {copy.peers.owner}:{' '}
-          <span className="text-white/75">
-            {peer.owner ? shortId(peer.owner) : copy.peers.unclaimed}
-          </span>
-        </div>
+        <PeerOwnerIdentity
+          currentIdentity={currentIdentity}
+          ownerIdentityId={peer.owner}
+        />
         <div>
           <div className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
             {copy.peers.networks}
@@ -956,6 +962,122 @@ function PeerSummary({
       </div>
     </article>
   );
+}
+
+function PeerOwnerIdentity({
+  currentIdentity,
+  ownerIdentityId,
+}: {
+  currentIdentity: IdentityResource;
+  ownerIdentityId?: string;
+}) {
+  const owner = usePeerOwnerIdentity(ownerIdentityId, currentIdentity);
+
+  if (!ownerIdentityId) {
+    return (
+      <div className="truncate text-white/55">
+        {copy.peers.owner}:{' '}
+        <span className="text-white/75">{copy.peers.unclaimed}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
+        {copy.peers.owner}
+      </div>
+      <IdentityMemberRow
+        interactive={false}
+        item={{
+          identity: owner.identity ?? undefined,
+          identityId: ownerIdentityId,
+          name:
+            owner.loaded && !owner.identity
+              ? shortId(ownerIdentityId)
+              : undefined,
+          pictureUrl: owner.pictureUrl,
+        }}
+      />
+    </div>
+  );
+}
+
+function usePeerOwnerIdentity(
+  ownerIdentityId: string | undefined,
+  currentIdentity: IdentityResource,
+): {
+  identity: IdentityResource | null;
+  loaded: boolean;
+  pictureUrl: string | null;
+} {
+  const [owner, setOwner] = useState<{
+    identity: IdentityResource | null;
+    loaded: boolean;
+    pictureUrl: string | null;
+  }>({
+    identity: null,
+    loaded: !ownerIdentityId,
+    pictureUrl: null,
+  });
+
+  useEffect(() => {
+    if (!ownerIdentityId) {
+      setOwner({ identity: null, loaded: true, pictureUrl: null });
+
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadOwner = async () => {
+      setOwner({ identity: null, loaded: false, pictureUrl: null });
+
+      try {
+        const identity =
+          ownerIdentityId === currentIdentity.id
+            ? currentIdentity
+            : await applicationContainer.getIdentity(ownerIdentityId);
+        const pictureUrl = await loadIdentityPictureUrl(identity);
+
+        if (!cancelled) {
+          setOwner({ identity, loaded: true, pictureUrl });
+        }
+      } catch {
+        if (!cancelled) {
+          setOwner({ identity: null, loaded: true, pictureUrl: null });
+        }
+      }
+    };
+
+    void loadOwner();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentIdentity, ownerIdentityId]);
+
+  return owner;
+}
+
+async function loadIdentityPictureUrl(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  try {
+    return publicFileObjectUrl(
+      await applicationContainer.getPublicFile(pictureCid),
+    );
+  } catch {
+    return null;
+  }
 }
 
 function PeerBadges({ peer }: { peer: Peer }) {

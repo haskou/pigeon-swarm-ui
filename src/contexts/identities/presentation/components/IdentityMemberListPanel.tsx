@@ -103,13 +103,15 @@ export function IdentityMemberListPanel({
   );
 }
 
-function IdentityMemberRow({
+export function IdentityMemberRow({
+  interactive = true,
   item,
   onClick,
   ownerLabel,
 }: {
+  interactive?: boolean;
   item: IdentityMemberListItem;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   ownerLabel?: string;
 }) {
   const loadingProfile = !item.identity && !item.name;
@@ -120,12 +122,8 @@ function IdentityMemberRow({
   const bannerUrl = useIdentityBannerUrl(item.identity);
 
   if (loadingProfile) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
-      >
+    const loadingContent = (
+      <>
         <span
           aria-hidden="true"
           className="absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-white/8 via-white/4 to-transparent"
@@ -135,16 +133,30 @@ function IdentityMemberRow({
           <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-white/14" />
           <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-white/10" />
         </span>
+      </>
+    );
+
+    if (!interactive) {
+      return (
+        <div className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left">
+          {loadingContent}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        disabled
+        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
+      >
+        {loadingContent}
       </button>
     );
   }
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
-    >
+  const content = (
+    <>
       {bannerUrl && (
         <span
           aria-hidden="true"
@@ -178,6 +190,24 @@ function IdentityMemberRow({
       {item.owner && ownerLabel && (
         <OwnerMarker label={ownerLabel}>♛</OwnerMarker>
       )}
+    </>
+  );
+
+  if (!interactive) {
+    return (
+      <div className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
+    >
+      {content}
     </button>
   );
 }
