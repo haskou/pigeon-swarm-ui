@@ -88,6 +88,6 @@ describe(CommunityMessageMentions.name, () => {
         identities,
         permissions: new Set(['mention_roles', 'view_channels']),
       }),
-    ).toEqual(['@Ops', '@owner-a', '@hasko', '@Hasko (@hasko)']);
+    ).toEqual(['@Ops', '@owner-a', '@hasko', '@Hasko']);
   });
 });
