@@ -14,6 +14,7 @@ import type {
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { CommunityList } from '../view-models/CommunityList';
 
 type CommunitiesState = {
   communities: Community[];
@@ -45,15 +46,16 @@ export function useCommunities(session?: null | Session): CommunitiesState {
           typeof next === 'function'
             ? (next as (current: Community[]) => Community[])(current)
             : next;
+        const uniqueCommunities = CommunityList.withUniqueIds(resolved);
 
         if (sessionIdentityId) {
           communityCacheByIdentityId.set(sessionIdentityId, {
-            communities: resolved,
+            communities: uniqueCommunities,
             storedAt: Date.now(),
           });
         }
 
-        return resolved;
+        return uniqueCommunities;
       });
     },
     [sessionIdentityId],
@@ -72,7 +74,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     const cached = cachedCommunitiesFor(identityId);
 
     if (cached) {
-      setCommunities(cached);
+      setCommunities(CommunityList.withUniqueIds(cached));
       setLoadedIdentityId(identityId);
       setLoading(false);
     } else {
@@ -127,5 +129,14 @@ function cachedCommunitiesFor(identityId: string): Community[] | null {
     return null;
   }
 
-  return entry.communities;
+  const communities = CommunityList.withUniqueIds(entry.communities);
+
+  if (communities !== entry.communities) {
+    communityCacheByIdentityId.set(identityId, {
+      communities,
+      storedAt: entry.storedAt,
+    });
+  }
+
+  return communities;
 }
