@@ -3222,6 +3222,9 @@ export function GlassWorkspace({
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
+      // eslint-disable-next-line no-console
+      console.debug('[pigeon realtime] domain_event', event.type, event);
+
       if (realtimeEventsOpen) {
         setRealtimeEventLog((current) => {
           if (current.some((item) => item.event_id === event.event_id)) {
