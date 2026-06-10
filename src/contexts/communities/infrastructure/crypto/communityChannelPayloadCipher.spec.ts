@@ -1,20 +1,21 @@
-import { KeyPair } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
 
 import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
 
 import { encryptCommunityChannelPayload } from './communityChannelPayloadCipher';
 
 describe('communityChannelPayloadCipher', () => {
-  it('does not expose recipient identifiers in channel message envelopes', async () => {
+  it('does not expose recipient identifiers in channel message envelopes', () => {
     const communityId = 'community-1';
-    const communityKeyPair = await KeyPair.generate();
-    const communityKeyPairPrimitives = communityKeyPair.toPrimitives();
+    const symmetricKey = SymmetricKey.generate();
     const communityKey: ConversationKeyEntry = {
+      algorithm: 'aes-256-gcm',
       conversationId: communityId,
       createdAt: 1,
+      key: symmetricKey.valueOf(),
+      kind: 'community',
       peerIdentityId: communityId,
-      privateKey: communityKeyPairPrimitives.privateKey,
-      publicKey: communityKeyPairPrimitives.publicKey,
+      version: 2,
     };
     const encryptedPayload = encryptCommunityChannelPayload({
       attachments: [],
@@ -25,7 +26,13 @@ describe('communityChannelPayloadCipher', () => {
       content: 'hello community',
       timestamp: 1234,
     });
-    const payload = JSON.parse(encryptedPayload) as {
+    expect(encryptedPayload).not.toContain('hello community');
+    expect(encryptedPayload).not.toContain('recipients');
+    expect(encryptedPayload).not.toContain('wrappedKey');
+
+    const payload = JSON.parse(
+      symmetricKey.decrypt(new EncryptedPayload(encryptedPayload)).toString(),
+    ) as {
       content?: string;
       recipients?: Record<string, string>;
       type?: string;
@@ -51,16 +58,17 @@ describe('communityChannelPayloadCipher', () => {
     ).toThrow('Community key is required');
   });
 
-  it('marks edited channel message payloads with the edition event type', async () => {
+  it('marks edited channel message payloads with the edition event type', () => {
     const communityId = 'community-1';
-    const communityKeyPair = await KeyPair.generate();
-    const communityKeyPairPrimitives = communityKeyPair.toPrimitives();
+    const symmetricKey = SymmetricKey.generate();
     const communityKey: ConversationKeyEntry = {
+      algorithm: 'aes-256-gcm',
       conversationId: communityId,
       createdAt: 1,
+      key: symmetricKey.valueOf(),
+      kind: 'community',
       peerIdentityId: communityId,
-      privateKey: communityKeyPairPrimitives.privateKey,
-      publicKey: communityKeyPairPrimitives.publicKey,
+      version: 2,
     };
     const encryptedPayload = encryptCommunityChannelPayload({
       attachments: [],
@@ -72,7 +80,9 @@ describe('communityChannelPayloadCipher', () => {
       eventType: 'CommunityChannelMessageEdited',
       timestamp: 5678,
     });
-    const payload = JSON.parse(encryptedPayload) as {
+    const payload = JSON.parse(
+      symmetricKey.decrypt(new EncryptedPayload(encryptedPayload)).toString(),
+    ) as {
       content?: string;
       timestamp?: number;
       type?: string;

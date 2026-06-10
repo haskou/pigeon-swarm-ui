@@ -5,7 +5,7 @@ import type { PlainMessage } from './PlainMessage';
 
 export type { MessageProjectionCopy } from './MessageProjectionCopy';
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
@@ -18,10 +18,7 @@ import { ConversationKeychain } from '../../conversations/domain/ConversationKey
 import { PollMessageProjection } from './PollMessageProjection';
 
 export class MessageProjector {
-  private readonly privateKeys = new Map<
-    string,
-    ReturnType<typeof PrivateKey.fromPEM>
-  >();
+  private readonly symmetricKeys = new Map<string, SymmetricKey>();
 
   public constructor(private readonly copy: MessageProjectionCopy) {}
 
@@ -68,29 +65,27 @@ export class MessageProjector {
     );
   }
 
-  private privateKey(
-    privateKey: string,
-  ): ReturnType<typeof PrivateKey.fromPEM> {
-    const cachedPrivateKey = this.privateKeys.get(privateKey);
+  private symmetricKey(key: string): SymmetricKey {
+    const cachedSymmetricKey = this.symmetricKeys.get(key);
 
-    if (cachedPrivateKey) return cachedPrivateKey;
+    if (cachedSymmetricKey) return cachedSymmetricKey;
 
-    const nextPrivateKey = PrivateKey.fromPEM(privateKey);
+    const nextSymmetricKey = SymmetricKey.fromBase64(key);
 
-    this.privateKeys.set(privateKey, nextPrivateKey);
+    this.symmetricKeys.set(key, nextSymmetricKey);
 
-    return nextPrivateKey;
+    return nextSymmetricKey;
   }
 
-  private async decryptMessage(
+  private decryptMessage(
     base: Omit<ChatMessage, 'content' | 'encrypted'>,
     message: MessageResource,
     encryptedPayload: string,
-    privateKey: ReturnType<typeof PrivateKey.fromPEM>,
+    symmetricKey: SymmetricKey,
     currentIdentityId: string,
-  ): Promise<ChatMessage> {
+  ): ChatMessage {
     try {
-      const decrypted = await privateKey.decrypt(
+      const decrypted = symmetricKey.decrypt(
         new EncryptedPayload(encryptedPayload),
       );
       const decryptedText = new TextDecoder().decode(decrypted);
@@ -193,11 +188,11 @@ export class MessageProjector {
     };
   }
 
-  public async toChatMessage(
+  public toChatMessage(
     session: Session,
     conversationId: string,
     message: MessageResource,
-  ): Promise<ChatMessage> {
+  ): ChatMessage {
     const pollMessage = PollMessageProjection.toChatMessage(
       message,
       session.identity.id,
@@ -223,11 +218,11 @@ export class MessageProjector {
       return this.encryptedError(base, message, 'missing-key');
     }
 
-    return await this.decryptMessage(
+    return this.decryptMessage(
       base,
       message,
       encryptedPayload,
-      this.privateKey(key.privateKey),
+      this.symmetricKey(key.key),
       session.identity.id,
     );
   }

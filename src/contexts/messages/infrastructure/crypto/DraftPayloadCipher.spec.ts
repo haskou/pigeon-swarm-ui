@@ -3,26 +3,24 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import { DraftPayloadCipher } from './DraftPayloadCipher';
 
 describe(DraftPayloadCipher.name, () => {
-  it('decrypts draft payload content from its local envelope', async () => {
-    const decrypt = jest.fn().mockResolvedValue({
+  it('decrypts draft payload content from its local envelope', () => {
+    const decrypt = jest.fn().mockReturnValue({
       toString: () => JSON.stringify({ content: 'draft text' }),
     });
     const session = {
-      encryptedKeyPair: { decrypt },
+      masterKey: { decrypt },
       password: 'secret',
     } as unknown as Session;
     const cipher = new DraftPayloadCipher();
 
-    await expect(cipher.decrypt(session, 'encrypted-draft')).resolves.toBe(
-      'draft text',
-    );
-    expect(decrypt).toHaveBeenCalledWith(expect.anything(), 'secret');
+    expect(cipher.decrypt(session, 'encrypted-draft')).toBe('draft text');
+    expect(decrypt).toHaveBeenCalledWith(expect.anything());
   });
 
-  it('keeps plaintext draft payloads readable during local recovery', async () => {
+  it('keeps plaintext draft payloads readable during local recovery', () => {
     const session = {
-      encryptedKeyPair: {
-        decrypt: jest.fn().mockResolvedValue({
+      masterKey: {
+        decrypt: jest.fn().mockReturnValue({
           toString: () => 'plain draft',
         }),
       },
@@ -30,8 +28,6 @@ describe(DraftPayloadCipher.name, () => {
     } as unknown as Session;
     const cipher = new DraftPayloadCipher();
 
-    await expect(cipher.decrypt(session, 'encrypted-draft')).resolves.toBe(
-      'plain draft',
-    );
+    expect(cipher.decrypt(session, 'encrypted-draft')).toBe('plain draft');
   });
 });

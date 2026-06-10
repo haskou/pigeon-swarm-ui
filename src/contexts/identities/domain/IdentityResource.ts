@@ -3,8 +3,17 @@ export type IdentityResource = {
     encryptedPrivateKey: string;
     publicKey: string;
   };
+  encryptedMasterKey: string;
   id: string;
   identityExternalIdentifier?: string | null;
+  masterKeyDerivation: {
+    N: number;
+    algorithm: 'scrypt';
+    p: number;
+    r: number;
+    salt: string;
+    version: 1;
+  };
   networks: string[];
   previousIdentityExternalIdentifier?: string | null;
   profile: {

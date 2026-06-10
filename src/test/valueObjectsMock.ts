@@ -54,6 +54,37 @@ class StringValueObject {
 
 class EncryptedPayload extends StringValueObject {}
 
+class SymmetricKey extends StringValueObject {
+  public static fromBase64(value: string): SymmetricKey {
+    return new SymmetricKey(value);
+  }
+
+  public static generate(): SymmetricKey {
+    return new SymmetricKey(randomBytes(32).toString('base64'));
+  }
+
+  public static async fromPassword(
+    _password: string,
+    input: { salt: string },
+  ): Promise<SymmetricKey> {
+    return new SymmetricKey(
+      createHash('sha256').update(input.salt).digest('base64'),
+    );
+  }
+
+  public decrypt(payload: EncryptedPayload): StringValueObject {
+    return new StringValueObject(
+      Buffer.from(payload.toString(), 'base64').toString('utf8'),
+    );
+  }
+
+  public encrypt(payload: string | StringValueObject): EncryptedPayload {
+    return new EncryptedPayload(
+      Buffer.from(payload.toString(), 'utf8').toString('base64'),
+    );
+  }
+}
+
 class Timestamp {
   private readonly value: number;
 
@@ -238,6 +269,7 @@ export {
   SHA256Hash,
   Signature,
   StringValueObject,
+  SymmetricKey,
   Timestamp,
   UUID,
   ValueNotInEnumError,

@@ -42,14 +42,18 @@ function profileFrom(
 export class IdentitySignaturePayloadFactory {
   public createInitial(input: {
     encryptedKeyPair: IdentityResource['encryptedKeyPair'];
+    encryptedMasterKey: string;
     id: string;
+    masterKeyDerivation: IdentityResource['masterKeyDerivation'];
     networks: string[];
     profile: IdentityUpdateProfileInput;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
     return {
       encryptedKeyPair: input.encryptedKeyPair,
+      encryptedMasterKey: input.encryptedMasterKey,
       id: IdentityId.normalize(input.id),
+      masterKeyDerivation: input.masterKeyDerivation,
       networks: uniqueNetworks(input.networks),
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),
@@ -60,7 +64,9 @@ export class IdentitySignaturePayloadFactory {
 
   public createUpdate(input: {
     encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
+    encryptedMasterKey?: string;
     identity: IdentityResource;
+    masterKeyDerivation?: IdentityResource['masterKeyDerivation'];
     previousIdentityExternalIdentifier?: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
@@ -68,7 +74,11 @@ export class IdentitySignaturePayloadFactory {
     return {
       encryptedKeyPair:
         input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
+      encryptedMasterKey:
+        input.encryptedMasterKey ?? input.identity.encryptedMasterKey,
       id: IdentityId.normalize(input.identity.id),
+      masterKeyDerivation:
+        input.masterKeyDerivation ?? input.identity.masterKeyDerivation,
       networks: uniqueNetworks([
         ...input.identity.networks,
         ...(input.profile.networks ?? []),

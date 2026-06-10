@@ -1,16 +1,12 @@
-import { EncryptedPayload, PublicKey } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/value-objects';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { DraftPlainPayload } from './DraftPlainPayload';
 
 export class DraftPayloadCipher {
-  public async decrypt(
-    session: Session,
-    encryptedPayload: string,
-  ): Promise<string> {
-    const decrypted = await session.encryptedKeyPair.decrypt(
+  public decrypt(session: Session, encryptedPayload: string): string {
+    const decrypted = session.masterKey.decrypt(
       new EncryptedPayload(encryptedPayload),
-      session.password,
     );
     const plaintext = decrypted.toString();
 
@@ -24,8 +20,6 @@ export class DraftPayloadCipher {
   }
 
   public encrypt(session: Session, content: string): string {
-    return PublicKey.fromPEM(session.identity.encryptedKeyPair.publicKey)
-      .encrypt(JSON.stringify({ content }))
-      .toString();
+    return session.masterKey.encrypt(JSON.stringify({ content })).toString();
   }
 }

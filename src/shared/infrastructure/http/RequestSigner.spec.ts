@@ -6,9 +6,8 @@ import { RequestSigner } from './RequestSigner';
 type SignedRequestPayload = {
   bodyHash: string;
   method: string;
-  nonce: string;
   path: string;
-  timestamp: string;
+  timestamp: number;
 };
 
 function signedPayload(sign: jest.Mock): SignedRequestPayload {
@@ -50,13 +49,10 @@ function expectedSignedPath(path: string): string {
 }
 describe(RequestSigner.name, () => {
   it('builds the canonical payload used for signatures', () => {
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
 
     const payload = JSON.parse(
-      signer.payload('post', '/conversations/', '123', 'nonce-1', {
+      signer.payload('post', '/conversations/', 123, {
         hello: 'world',
       }),
     ) as SignedRequestPayload;
@@ -64,37 +60,29 @@ describe(RequestSigner.name, () => {
     expect(payload).toEqual({
       bodyHash: expect.any(String),
       method: 'POST',
-      nonce: 'nonce-1',
       path: expectedSignedPath('/conversations/'),
-      timestamp: '123',
+      timestamp: 123,
     });
   });
 
   it('signs only the request path and leaves query params out', () => {
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
 
     const payload = JSON.parse(
-      signer.payload('GET', '/notifications/?limit=30', '123', 'nonce-1'),
+      signer.payload('GET', '/notifications/?limit=30', 123),
     ) as SignedRequestPayload;
 
     expect(payload).toEqual({
       bodyHash: expect.any(String),
       method: 'GET',
-      nonce: 'nonce-1',
       path: expectedSignedPath('/notifications/'),
-      timestamp: '123',
+      timestamp: 123,
     });
   });
 
   it('signs headers with the session keypair', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
     const session = {
       encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
@@ -103,7 +91,6 @@ describe(RequestSigner.name, () => {
 
     await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual({
       'X-Identity-Id': 'identity-1',
-      'X-Nonce': 'nonce-1',
       'X-Signature': 'signature',
       'X-Timestamp': '123',
     });
@@ -111,38 +98,30 @@ describe(RequestSigner.name, () => {
     expect(signedPayload(sign)).toEqual({
       bodyHash: expect.any(String),
       method: 'GET',
-      nonce: 'nonce-1',
       path: expectedSignedPath('/messages'),
-      timestamp: '123',
+      timestamp: 123,
     });
     expect(signedPassword(sign)).toBe('secret');
   });
 
   it('does not prefix an already-prefixed request path twice', () => {
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
 
     const payload = JSON.parse(
-      signer.payload('GET', '/api/ws', '123', 'nonce-1', {}),
+      signer.payload('GET', '/api/ws', 123, {}),
     ) as SignedRequestPayload;
 
     expect(payload).toEqual({
       bodyHash: expect.any(String),
       method: 'GET',
-      nonce: 'nonce-1',
       path: '/api/ws',
-      timestamp: '123',
+      timestamp: 123,
     });
   });
 
   it('normalizes PEM identity ids in HTTP signature headers', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
     const session = {
       encryptedKeyPair: { sign },
       identity: {
@@ -160,10 +139,7 @@ describe(RequestSigner.name, () => {
 
   it('signs long request payloads without string value object limits', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
     const session = {
       encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
@@ -176,19 +152,15 @@ describe(RequestSigner.name, () => {
     expect(signedPayload(sign)).toEqual({
       bodyHash: expect.any(String),
       method: 'POST',
-      nonce: 'nonce-1',
       path: expectedSignedPath('/keychains/'),
-      timestamp: '123',
+      timestamp: 123,
     });
     expect(signedPassword(sign)).toBe('secret');
   });
 
   it('hashes raw upload bytes instead of JSON stringifying them', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(
-      () => 123,
-      () => 'nonce-1',
-    );
+    const signer = new RequestSigner(() => 123);
     const session = {
       encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
@@ -210,14 +182,13 @@ describe(RequestSigner.name, () => {
     expect(arrayBufferPayload).toEqual({
       bodyHash: typedArrayPayload.bodyHash,
       method: 'POST',
-      nonce: 'nonce-1',
       path: expectedSignedPath('/ipfs/public'),
-      timestamp: '123',
+      timestamp: 123,
     });
     expect(arrayBufferPayload.bodyHash).not.toBe(jsonPayload.bodyHash);
   });
 
-  it('uses a bound crypto random UUID nonce by default', async () => {
+  it('does not send nonce headers', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const session = {
       encryptedKeyPair: { sign },
@@ -228,10 +199,7 @@ describe(RequestSigner.name, () => {
     await expect(
       new RequestSigner(() => 123).headers(session, 'GET', '/messages'),
     ).resolves.toEqual(
-      expect.objectContaining({
-        'X-Nonce': expect.any(String),
-        'X-Signature': 'signature',
-      }),
+      expect.not.objectContaining({ 'X-Nonce': expect.any(String) }),
     );
   });
 });

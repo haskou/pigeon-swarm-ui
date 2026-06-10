@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/value-objects';
 
 import type {
   Community,
@@ -155,18 +155,15 @@ export class PigeonCommunitiesApplication {
     return (await this.gateway.uploadPublicFile(session, value)).cid;
   }
 
-  private async createCommunityKeyEntry(
-    communityId: string,
-  ): Promise<ConversationKeyEntry> {
-    const keyPair = await KeyPair.generate();
-    const primitives = keyPair.toPrimitives();
-
+  private createCommunityKeyEntry(communityId: string): ConversationKeyEntry {
     return {
+      algorithm: 'aes-256-gcm',
       conversationId: communityId,
       createdAt: Date.now(),
+      key: SymmetricKey.generate().valueOf(),
+      kind: 'community',
       peerIdentityId: '',
-      privateKey: primitives.privateKey,
-      publicKey: primitives.publicKey,
+      version: 2,
     };
   }
 

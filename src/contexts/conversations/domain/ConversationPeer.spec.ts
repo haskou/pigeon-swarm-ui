@@ -22,11 +22,13 @@ describe(ConversationPeer.name, () => {
     const keychain = {
       conversations: {
         'conversation-1': {
+          algorithm: 'aes-256-gcm',
           conversationId: 'conversation-1',
           createdAt: 1,
+          key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+          kind: 'conversation',
           peerIdentityId: 'identity-2',
-          privateKey: 'private',
-          publicKey: 'public',
+          version: 2,
         },
       },
       version: 1,

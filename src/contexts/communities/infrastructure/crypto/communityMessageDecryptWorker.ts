@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
@@ -254,11 +254,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-async function decryptCommunityChannelPayload(
+function decryptCommunityChannelPayload(
   encryptedPayload: string,
   communityKey: ConversationKeyEntry,
-): Promise<CommunityChannelPlainPayload> {
-  const decrypted = await PrivateKey.fromPEM(communityKey.privateKey).decrypt(
+): CommunityChannelPlainPayload {
+  const decrypted = SymmetricKey.fromBase64(communityKey.key).decrypt(
     new EncryptedPayload(encryptedPayload),
   );
 

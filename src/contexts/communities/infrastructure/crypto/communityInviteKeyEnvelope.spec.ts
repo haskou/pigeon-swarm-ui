@@ -7,12 +7,13 @@ import {
 
 describe('community invite key envelope', () => {
   const keyEntry: ConversationKeyEntry = {
+    algorithm: 'aes-256-gcm',
     conversationId: 'community-1',
     createdAt: 1770000000000,
+    key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    kind: 'community',
     peerIdentityId: '',
-    privateKey:
-      '-----BEGIN PRIVATE KEY-----\\nprivate\\n-----END PRIVATE KEY-----',
-    publicKey: '-----BEGIN PUBLIC KEY-----\\npublic\\n-----END PUBLIC KEY-----',
+    version: 2,
   };
 
   it('encrypts the community key entry behind a short fragment secret', async () => {
@@ -25,7 +26,7 @@ describe('community invite key envelope', () => {
       version: 1,
     });
     expect(envelope.encryptedCommunityKey.ciphertext).not.toContain(
-      'PRIVATE KEY',
+      keyEntry.key,
     );
   });
 

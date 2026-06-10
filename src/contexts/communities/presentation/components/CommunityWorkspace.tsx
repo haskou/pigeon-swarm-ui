@@ -1,8 +1,8 @@
 import {
   EncryptedPayload,
-  PrivateKey,
   PublicKey,
   StringValueObject,
+  SymmetricKey,
 } from '@haskou/value-objects';
 import {
   type MouseEvent,
@@ -1563,18 +1563,23 @@ export function CommunityWorkspace({
         ).isNotEqual(
           new StringValueObject(community.id, Number.MAX_SAFE_INTEGER),
         ) ||
-        !parsed.privateKey
+        parsed.algorithm !== 'aes-256-gcm' ||
+        !parsed.key ||
+        parsed.kind !== 'community' ||
+        parsed.version !== 2
       ) {
         throw new Error(copy.chat.addPrivateKeyError);
       }
 
-      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
+      SymmetricKey.fromBase64(parsed.key);
       const keyEntry: ConversationKeyEntry = {
+        algorithm: 'aes-256-gcm',
         conversationId: community.id,
         createdAt: parsed.createdAt ?? Date.now(),
+        key: parsed.key,
+        kind: 'community',
         peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
-        privateKey: privateKey.toString(),
-        publicKey: parsed.publicKey ?? privateKey.getPublicKey().toString(),
+        version: 2,
       };
       const published = await applicationContainer.publishKeychain(session, {
         ...session.keychain,

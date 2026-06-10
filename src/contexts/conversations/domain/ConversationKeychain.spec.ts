@@ -5,11 +5,13 @@ import { ConversationKeychain } from './ConversationKeychain';
 const keychain = {
   conversations: {
     'local-key-id': {
+      algorithm: 'aes-256-gcm',
       conversationId: 'local-key-id',
       createdAt: 1,
+      key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      kind: 'conversation',
       peerIdentityId: 'identity-2',
-      privateKey: 'private',
-      publicKey: 'public',
+      version: 2,
     },
   },
   version: 1,

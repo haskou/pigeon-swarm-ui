@@ -1,6 +1,6 @@
 import type { FormEvent, MouseEvent } from 'react';
 
-import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
+import { EncryptedPayload, PublicKey, SymmetricKey } from '@haskou/value-objects';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
@@ -558,20 +558,24 @@ export function ChatColumn({
         throw new Error('Conversation key belongs to another conversation.');
       }
 
-      if (!parsed.privateKey) {
-        throw new Error('Conversation key payload is missing the private key.');
+      if (
+        parsed.algorithm !== 'aes-256-gcm' ||
+        !parsed.key ||
+        parsed.version !== 2
+      ) {
+        throw new Error('Conversation key payload is invalid.');
       }
 
-      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
-      const publicKey =
-        parsed.publicKey ?? privateKey.getPublicKey().toString();
+      SymmetricKey.fromBase64(parsed.key);
       const keyEntry: ConversationKeyEntry = {
+        algorithm: 'aes-256-gcm',
         conversationId: activeConversation.id,
         createdAt: parsed.createdAt ?? Date.now(),
+        key: parsed.key,
+        kind: parsed.kind ?? 'conversation',
         peerIdentityId:
           parsed.peerIdentityId ?? peerIdentityId ?? session.identity.id,
-        privateKey: privateKey.toString(),
-        publicKey,
+        version: 2,
       };
 
       await onConversationKeyImported(keyEntry);

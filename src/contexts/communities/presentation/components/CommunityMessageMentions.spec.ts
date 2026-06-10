@@ -45,7 +45,16 @@ const identities: Record<string, IdentityResource> = {
       encryptedPrivateKey: 'encrypted-private-key',
       publicKey: 'public-key',
     },
+    encryptedMasterKey: 'encrypted-master-key',
     id: 'member-a',
+    masterKeyDerivation: {
+      N: 16_384,
+      algorithm: 'scrypt',
+      p: 5,
+      r: 8,
+      salt: 'master-salt',
+      version: 1,
+    },
     networks: [],
     profile: {
       handle: 'hasko',

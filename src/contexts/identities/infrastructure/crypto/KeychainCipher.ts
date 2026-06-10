@@ -11,13 +11,9 @@ import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 export class KeychainCipher {
-  public async decrypt(
-    session: Session,
-    keychain: KeychainResource,
-  ): Promise<LocalKeychain> {
-    const decrypted = await session.encryptedKeyPair.decrypt(
+  public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
+    const decrypted = session.masterKey.decrypt(
       new EncryptedPayload(keychain.encryptedPayload),
-      session.password,
     );
 
     const parsed = JSON.parse(decrypted.toString()) as Partial<LocalKeychain>;
@@ -38,7 +34,7 @@ export class KeychainCipher {
       nextKeychain.version,
     );
     const keychain = { ...nextKeychain, version };
-    const encryptedPayload = session.encryptedKeyPair
+    const encryptedPayload = session.masterKey
       .encrypt(JSON.stringify(keychain))
       .toString();
     const previousKeychainExternalIdentifier =

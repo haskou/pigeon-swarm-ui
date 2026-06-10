@@ -7,12 +7,13 @@ describe(KeychainCipher.name, () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
-      encryptedKeyPair: { encrypt, sign },
+      encryptedKeyPair: { sign },
       identity: {
         id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
       },
       keychain: { conversations: {}, version: 0 },
       keychainExternalIdentifier: null,
+      masterKey: { encrypt },
       password: 'secret',
     } as unknown as Session;
 
@@ -45,10 +46,11 @@ describe(KeychainCipher.name, () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
-      encryptedKeyPair: { encrypt, sign },
+      encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
       keychain: { conversations: {}, version: 1 },
       keychainExternalIdentifier: 'keychain-previous',
+      masterKey: { encrypt },
       password: 'secret',
     } as unknown as Session;
 
