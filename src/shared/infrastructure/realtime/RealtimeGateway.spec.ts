@@ -98,9 +98,17 @@ describe(RealtimeGateway.name, () => {
     expect(url.searchParams.has('nonce')).toBe(false);
     expect(url.searchParams.get('signature')).toBe('socket-signature');
     expect(sign).toHaveBeenCalledWith(
-      signer.payload('GET', '/ws', 1778536870557, {}),
+      signer.payload('GET', '/api/ws', 1778536870557, {}),
       'secret',
     );
+    expect(
+      JSON.parse((sign.mock.calls[0] as [string, string])[0]) as {
+        timestamp: unknown;
+      },
+    ).toMatchObject({
+      path: '/api/ws',
+      timestamp: 1778536870557,
+    });
   });
 
   it('resolves relative websocket URLs against the current origin', async () => {

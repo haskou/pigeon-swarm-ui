@@ -88,11 +88,11 @@ export class RealtimeGateway {
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
     const timestamp = Date.now();
+    const url = this.connection.websocket('/ws');
     const signature = await signSessionPayload(
       session,
-      this.signer.payload('GET', '/ws', timestamp, {}),
+      this.signer.payload('GET', url.pathname, timestamp, {}),
     );
-    const url = this.connection.websocket('/ws');
 
     url.searchParams.set(
       'identityId',
