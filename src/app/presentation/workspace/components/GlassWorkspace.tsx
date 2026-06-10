@@ -164,6 +164,7 @@ import {
   mergeConversationThreadMessage,
   removeConversationThreadMessage,
 } from './conversationThreadState';
+import { conversationRealtimeTimelineMessageKind } from './conversationRealtimeTimelineMessage';
 import {
   CommunityWorkspace,
   Inspector,
@@ -3139,6 +3140,48 @@ export function GlassWorkspace({
     });
   };
 
+  const applyRealtimeConversationMessage = useCallback(
+    (
+      conversationId: string,
+      message: ChatMessage,
+      shouldAutoScroll: boolean,
+    ) => {
+      const isEditMessage = message.raw.type === 'edited';
+      const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
+
+      if (isThreadReply || isEditMessage) {
+        setConversationThread((current) =>
+          current ? mergeConversationThreadMessage(current, message) : current,
+        );
+      }
+
+      if (!isThreadReply) {
+        setMessages((current) =>
+          isEditMessage
+            ? mergeConversationMessageIfTargetExists(current, message)
+            : MessageCollection.merge(current, [message]),
+        );
+      }
+
+      if (shouldAutoScroll) {
+        markConversationReadUntil(conversationId, [message]);
+        if (!isThreadReply) scrollMessagesToBottom('smooth', true);
+      } else if (!isEditMessage && !isThreadReply) {
+        const setting = NotificationSettingsPolicy.resolve(
+          notificationSettingsRef.current,
+          {
+            conversationId,
+            type: 'conversation',
+          },
+        );
+
+        if (!NotificationSettingsPolicy.isMuted(setting)) {
+          setNewMessageCount((current) => current + 1);
+        }
+      }
+    },
+    [markConversationReadUntil, scrollMessagesToBottom],
+  );
   const fetchRealtimeMessage = useCallback(
     async (
       conversationId: string,
@@ -3154,48 +3197,18 @@ export function GlassWorkspace({
 
         if (!message) return;
 
-        const isEditMessage = message.raw.type === 'edited';
-        const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
-
-        if (isThreadReply || isEditMessage) {
-          setConversationThread((current) =>
-            current
-              ? mergeConversationThreadMessage(current, message)
-              : current,
-          );
-        }
-
-        if (!isThreadReply) {
-          setMessages((current) =>
-            isEditMessage
-              ? mergeConversationMessageIfTargetExists(current, message)
-              : MessageCollection.merge(current, [message]),
-          );
-        }
-
-        if (shouldAutoScroll) {
-          markConversationReadUntil(conversationId, [message]);
-          if (!isThreadReply) scrollMessagesToBottom('smooth', true);
-        } else if (!isEditMessage && !isThreadReply) {
-          const setting = NotificationSettingsPolicy.resolve(
-            notificationSettingsRef.current,
-            {
-              conversationId,
-              type: 'conversation',
-            },
-          );
-
-          if (!NotificationSettingsPolicy.isMuted(setting)) {
-            setNewMessageCount((current) => current + 1);
-          }
-        }
+        applyRealtimeConversationMessage(
+          conversationId,
+          message,
+          shouldAutoScroll,
+        );
       } catch (caught) {
         setSendError(
           toUserErrorMessage(caught, copy.workspace.loadMessagesError),
         );
       }
     },
-    [markConversationReadUntil, scrollMessagesToBottom, session],
+    [applyRealtimeConversationMessage, session],
   );
   const updateCommunityState = useCallback(
     (communityId: string, updater: (community: Community) => Community) => {
@@ -3790,27 +3803,58 @@ export function GlassWorkspace({
 
           if (timelineMessage) {
             const shouldAutoScroll = isScrolledNearBottom();
-            const message: ChatMessage = {
-              attachments: [],
-              authorIdentityId:
-                timelineMessage.actorIdentityId ??
-                timelineMessage.authorIdentityId ??
-                'system',
-              content: '',
-              encrypted: false,
-              id: timelineMessage.id ?? `${event.event_id}:call-event`,
-              kind: 'call-event',
-              mine: timelineMessage.actorIdentityId === session.identity.id,
-              raw: timelineMessage,
-              reactions: timelineMessage.reactions ?? [],
-              timestamp: timelineMessage.createdAt ?? event.occurred_on,
-            };
 
-            setMessages((current) =>
-              MessageCollection.merge(current, [message]),
-            );
+            if (
+              conversationRealtimeTimelineMessageKind(event.type) ===
+              'call-event'
+            ) {
+              const message: ChatMessage = {
+                attachments: [],
+                authorIdentityId:
+                  timelineMessage.actorIdentityId ??
+                  timelineMessage.authorIdentityId ??
+                  'system',
+                content: '',
+                encrypted: false,
+                id: timelineMessage.id ?? `${event.event_id}:call-event`,
+                kind: 'call-event',
+                mine: timelineMessage.actorIdentityId === session.identity.id,
+                raw: timelineMessage,
+                reactions: timelineMessage.reactions ?? [],
+                timestamp: timelineMessage.createdAt ?? event.occurred_on,
+              };
 
-            if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+              setMessages((current) =>
+                MessageCollection.merge(current, [message]),
+              );
+
+              if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+
+              return;
+            }
+
+            if (!activeConversationKeyId) return;
+
+            void applicationContainer
+              .decryptMessageResource(session, conversationId, timelineMessage)
+              .then((message: ChatMessage) =>
+                applyRealtimeConversationMessage(
+                  conversationId,
+                  message,
+                  shouldAutoScroll,
+                ),
+              )
+              .catch(() => {
+                const fallbackMessageId = messageId ?? timelineMessage.id;
+
+                if (!fallbackMessageId) return;
+
+                void fetchRealtimeMessage(
+                  conversationId,
+                  fallbackMessageId,
+                  shouldAutoScroll,
+                );
+              });
 
             return;
           }
@@ -3858,6 +3902,7 @@ export function GlassWorkspace({
       activeConversation?.id,
       activeConversation?.networkId,
       activeConversationKeyId,
+      applyRealtimeConversationMessage,
       clearUnreadMessages,
       communities,
       conversations,

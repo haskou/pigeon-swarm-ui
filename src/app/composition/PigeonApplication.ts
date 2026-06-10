@@ -1425,6 +1425,14 @@ export class PigeonApplication {
     );
   }
 
+  public async decryptMessageResource(
+    session: Session,
+    conversationId: string,
+    message: MessageResource,
+  ): Promise<ChatMessage> {
+    return await this.gateway.decryptMessage(session, conversationId, message);
+  }
+
   public async loadMessagesAround(
     session: Session,
     conversationId: string,
