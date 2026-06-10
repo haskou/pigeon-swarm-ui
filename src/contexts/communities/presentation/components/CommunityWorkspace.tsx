@@ -2221,6 +2221,7 @@ export function CommunityWorkspace({
               onOpenPins={
                 selectedChannel ? () => void openPinnedMessages() : undefined
               }
+              onRealtimeEventsOpen={onRealtimeEventsOpen}
               open={communityMenuOpen}
             />
           }

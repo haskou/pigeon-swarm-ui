@@ -27,6 +27,7 @@ interface ConversationActionsMenuProps {
   onNotificationMuteToggle: () => void;
   onGroupInviteOpen: () => void;
   onOpenPins: () => void;
+  onRealtimeEventsOpen?: () => void;
   onStartCall?: (input: {
     conversationId: string;
     kind: 'group' | 'one-to-one';
@@ -51,6 +52,7 @@ export function ConversationActionsMenu({
   onNotificationMuteToggle,
   onGroupInviteOpen,
   onOpenPins,
+  onRealtimeEventsOpen,
   onStartCall,
 }: ConversationActionsMenuProps) {
   const { close, state } = useCloseTransition(onClose);
@@ -108,6 +110,17 @@ export function ConversationActionsMenu({
           }}
           className="sm:hidden"
         />
+        {onRealtimeEventsOpen ? (
+          <ConversationHeaderMenuAction
+            icon={<RealtimeEventsMenuIcon />}
+            label={copy.chat.viewRealtimeEvents}
+            onClick={() => {
+              onRealtimeEventsOpen();
+              close();
+            }}
+            className="sm:hidden"
+          />
+        ) : null}
         <NotificationScopeMenuActions
           muteLabel={copy.notifications.muteConversation}
           notificationSetting={notificationSetting}
@@ -231,6 +244,25 @@ function DataMenuIcon() {
     >
       <path
         d="M12 11.5v5M12 7.5h.01M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function RealtimeEventsMenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15M7.5 5.5v13M16.5 5.5v13"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"

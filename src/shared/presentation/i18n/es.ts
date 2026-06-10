@@ -209,6 +209,7 @@ export const es = {
     realtimeReconnecting: 'Reconectando',
     sendInvite: 'Enviar invitacion',
     viewData: 'Ver datos',
+    viewRealtimeEvents: 'Ver eventos',
     you: 'Tu',
   },
   communities: {

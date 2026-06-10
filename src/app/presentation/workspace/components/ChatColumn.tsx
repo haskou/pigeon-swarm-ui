@@ -724,6 +724,7 @@ export function ChatColumn({
               })
             }
             onOpenPins={onOpenPins}
+            onRealtimeEventsOpen={onRealtimeEventsOpen}
             onStartCall={onStartCall}
           />
         )}

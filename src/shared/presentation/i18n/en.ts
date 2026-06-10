@@ -224,6 +224,7 @@ export const en = {
     realtimeReconnecting: 'Reconnecting',
     sendInvite: 'Send invite',
     viewData: 'View data',
+    viewRealtimeEvents: 'View events',
     you: 'You',
   },
   communities: {
