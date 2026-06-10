@@ -468,10 +468,10 @@
   resolved "https://registry.yarnpkg.com/@eslint/js/-/js-8.57.1.tgz#de633db3ec2ef6a3c89e2f19038063e8a122e2c2"
   integrity sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==
 
-"@haskou/value-objects@2.7.4":
-  version "2.7.4"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.7.4.tgz#157b9f2fba1ecb3fcd18cbd260d8c1c6640d7657"
-  integrity sha512-JMTehjiUqnoY1zYg7iguyKq9g88WNDv+7j5AxBhINwAuhI8/0/KnpaYqlOKxC753mC63hU1UyZy6/3fCU7JHXA==
+"@haskou/value-objects@2.10.0":
+  version "2.10.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.10.0.tgz#52dc1e39b3a5d44b4784e637e96e061166426165"
+  integrity sha512-Nf9E26hUCs7sJ0gnqdL3x6QG52EFPYn1bMHxOhEbUkpHV5HYA62g+4J2IXaUHtRGFdn5XLUeL9MS5NQ/2JfbQQ==
   dependencies:
     "@noble/ciphers" "^2.2.0"
     "@noble/curves" "^2.0.1"
