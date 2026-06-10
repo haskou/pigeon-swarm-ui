@@ -9,6 +9,7 @@ import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
@@ -87,9 +88,9 @@ export class RealtimeGateway {
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
     const timestamp = Date.now();
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       this.signer.payload('GET', '/ws', timestamp, {}),
-      session.password,
     );
     const url = this.connection.websocket('/ws');
 

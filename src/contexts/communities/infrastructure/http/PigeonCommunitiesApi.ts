@@ -29,6 +29,7 @@ import type { CommunityChannelMessageInput } from './CommunityChannelMessageInpu
 import type { CommunityChannelMessageRequestBody } from './CommunityChannelMessageRequestBody';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 
+import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
 const startupReadCacheTtlMs = 1500;
@@ -74,9 +75,9 @@ export class PigeonCommunitiesApi {
         : {}),
       type: 'sent',
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(signaturePayload),
-      session.password,
     );
 
     return {
@@ -134,9 +135,9 @@ export class PigeonCommunitiesApi {
         : {}),
       type: 'sent',
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(signaturePayload),
-      session.password,
     );
 
     return {
@@ -175,9 +176,9 @@ export class PigeonCommunitiesApi {
       mentions: input.mentions,
       type: 'edited',
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(signaturePayload),
-      session.password,
     );
 
     /* eslint-disable perfectionist/sort-objects */
@@ -214,9 +215,9 @@ export class PigeonCommunitiesApi {
       plaintextPayload: input.plaintextPayload,
       type: 'edited',
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(signaturePayload),
-      session.password,
     );
 
     /* eslint-disable perfectionist/sort-objects */
@@ -1039,9 +1040,9 @@ export class PigeonCommunitiesApi {
       targetMessageId: messageId,
       type: 'deleted',
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(signaturePayload),
-      session.password,
     );
     const body = {
       createdAt,

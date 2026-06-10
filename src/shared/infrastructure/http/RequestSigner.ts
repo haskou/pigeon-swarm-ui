@@ -5,6 +5,7 @@ import type { Session } from '../../domain/pigeonResources.types';
 import type { Clock } from './Clock';
 
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
 export class RequestSigner {
@@ -47,9 +48,9 @@ export class RequestSigner {
     body?: unknown,
   ): Promise<Record<string, string>> {
     const timestamp = this.clock();
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       this.payload(method, path, timestamp, body),
-      session.password,
     );
 
     return {

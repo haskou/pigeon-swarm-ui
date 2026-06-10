@@ -112,6 +112,7 @@ import {
 } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { signSessionPayload } from '../../shared/infrastructure/crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
@@ -508,14 +509,14 @@ export class PigeonApiGateway {
     )
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
+    const inviterSignature = await signSessionPayload(
+      session,
       JSON.stringify({
         conversationId: keyEntry.conversationId,
         encryptedConversationKey,
         inviterIdentityId: session.identity.id,
         recipientIdentityId: peerIdentity.id,
       }),
-      session.password,
     );
     const body = {
       conversationId: keyEntry.conversationId,
@@ -568,14 +569,14 @@ export class PigeonApiGateway {
     )
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
+    const inviterSignature = await signSessionPayload(
+      session,
       JSON.stringify({
         communityId: keyEntry.conversationId,
         encryptedCommunityKey,
         inviterIdentityId: session.identity.id,
         recipientIdentityId: recipientIdentity.id,
       }),
-      session.password,
     );
     const body = {
       communityId: keyEntry.conversationId,
@@ -640,6 +641,20 @@ export class PigeonApiGateway {
         new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
       ),
     );
+  }
+
+  private async restoreKeyPair(
+    identity: IdentityResource,
+    password: string,
+  ): Promise<KeyPair> {
+    const publicKey = PublicKey.fromPEM(
+      new StringValueObject(identity.encryptedKeyPair.publicKey),
+    );
+    const privateKey = await new EncryptedPrivateKey(
+      new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
+    ).decrypt(new StringValueObject(password));
+
+    return new KeyPair(publicKey, privateKey);
   }
 
   private async deriveMasterPasswordKey(
@@ -1957,6 +1972,7 @@ export class PigeonApiGateway {
         ...body,
       },
       keychain: defaultKeychain,
+      keyPair,
       masterKey,
       password,
     } as Session;
@@ -2047,9 +2063,9 @@ export class PigeonApiGateway {
       profile,
       timestamp: Date.now(),
     });
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(unsigned),
-      session.password,
     );
     const body = {
       ...unsigned,
@@ -2534,12 +2550,22 @@ export class PigeonApiGateway {
   ): Promise<LoginResult> {
     const identity = await this.getIdentity(identityId.trim());
     const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
+    const loginPayload = new StringValueObject(
+      `pigeon-swarm:login:${identity.id}`,
+    );
+    let keyPair: KeyPair;
 
     try {
-      await encryptedKeyPair.sign(
-        new StringValueObject(`pigeon-swarm:login:${identity.id}`),
-        new StringValueObject(password),
-      );
+      keyPair = await this.restoreKeyPair(identity, password);
+
+      if (
+        !encryptedKeyPair.isValidSignature(
+          loginPayload,
+          keyPair.sign(loginPayload),
+        )
+      ) {
+        throw new Error(copy.auth.invalidLogin);
+      }
     } catch {
       throw new Error(copy.auth.invalidLogin);
     }
@@ -2553,6 +2579,7 @@ export class PigeonApiGateway {
       encryptedKeyPair,
       identity,
       keychain: defaultKeychain,
+      keyPair,
       masterKey,
       password,
     };
@@ -2681,7 +2708,8 @@ export class PigeonApiGateway {
       timestamp,
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createSent({
           attachmentExternalIdentifiers,
@@ -2694,7 +2722,6 @@ export class PigeonApiGateway {
           replyToMessageId,
         }),
       ),
-      session.password,
     );
     const body = {
       attachmentExternalIdentifiers,
@@ -2750,7 +2777,8 @@ export class PigeonApiGateway {
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
     const previousMessageIds = [messageId];
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createEdited({
           authorId: session.identity.id,
@@ -2761,7 +2789,6 @@ export class PigeonApiGateway {
           targetMessageId: messageId,
         }),
       ),
-      session.password,
     );
     /* eslint-disable perfectionist/sort-objects */
     const body = {
@@ -2791,7 +2818,8 @@ export class PigeonApiGateway {
   ): Promise<void> {
     const createdAt = Date.now();
     const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createDeleted({
           authorId: session.identity.id,
@@ -2801,7 +2829,6 @@ export class PigeonApiGateway {
           targetMessageId: messageId,
         }),
       ),
-      session.password,
     );
     const body = {
       createdAt,

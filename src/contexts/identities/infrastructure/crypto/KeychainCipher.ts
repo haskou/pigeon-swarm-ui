@@ -8,6 +8,7 @@ import type {
 import type { KeychainDomainSignaturePayload } from './KeychainDomainSignaturePayload';
 import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
+import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 export class KeychainCipher {
@@ -46,9 +47,9 @@ export class KeychainCipher {
       timestamp,
       version,
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(domainPayload),
-      session.password,
     );
 
     return {
