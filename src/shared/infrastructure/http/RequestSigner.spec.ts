@@ -1,6 +1,7 @@
+import { SHA256Hash } from '@haskou/value-objects';
+
 import type { Session } from '../../domain/pigeonResources.types';
 
-import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { RequestSigner } from './RequestSigner';
 
 type SignedRequestPayload = {
@@ -22,30 +23,8 @@ function signedPassword(sign: jest.Mock): string {
   return password;
 }
 
-function routePrefix(): string {
-  if (!API_SERVER_URL) return '/';
-
-  const pathname = /^https?:\/\//i.test(API_SERVER_URL)
-    ? new URL(API_SERVER_URL).pathname
-    : API_SERVER_URL;
-  const trimmed = pathname.replace(/^\/+|\/+$/g, '');
-
-  return trimmed ? `/${trimmed}` : '/';
-}
-
-function expectedSignedPath(path: string): string {
-  const requestPath = `/${path.replace(/^\/+/, '').split('?')[0]}`;
-  const prefix = routePrefix();
-
-  if (
-    prefix === '/' ||
-    requestPath === prefix ||
-    requestPath.startsWith(`${prefix}/`)
-  ) {
-    return requestPath;
-  }
-
-  return `${prefix}${requestPath}`;
+function emptyBodyHash(): string {
+  return SHA256Hash.from(JSON.stringify({})).toString();
 }
 describe(RequestSigner.name, () => {
   it('builds the canonical payload used for signatures', () => {
@@ -60,7 +39,7 @@ describe(RequestSigner.name, () => {
     expect(payload).toEqual({
       bodyHash: expect.any(String),
       method: 'POST',
-      path: expectedSignedPath('/conversations/'),
+      path: '/conversations/',
       timestamp: 123,
     });
   });
@@ -75,7 +54,24 @@ describe(RequestSigner.name, () => {
     expect(payload).toEqual({
       bodyHash: expect.any(String),
       method: 'GET',
-      path: expectedSignedPath('/notifications/'),
+      path: '/notifications/',
+      timestamp: 123,
+    });
+  });
+
+  it('signs keychain reads with encoded path params and an empty body hash', () => {
+    const signer = new RequestSigner(() => 123);
+    const identityId = 'identity/with+symbols=';
+    const path = `/keychains/${encodeURIComponent(identityId)}`;
+
+    const payload = JSON.parse(
+      signer.payload('GET', path, 123),
+    ) as SignedRequestPayload;
+
+    expect(payload).toEqual({
+      bodyHash: emptyBodyHash(),
+      method: 'GET',
+      path: '/keychains/identity%2Fwith%2Bsymbols%3D',
       timestamp: 123,
     });
   });
@@ -98,23 +94,23 @@ describe(RequestSigner.name, () => {
     expect(signedPayload(sign)).toEqual({
       bodyHash: expect.any(String),
       method: 'GET',
-      path: expectedSignedPath('/messages'),
+      path: '/messages',
       timestamp: 123,
     });
     expect(signedPassword(sign)).toBe('secret');
   });
 
-  it('does not prefix an already-prefixed request path twice', () => {
+  it('signs only the URL pathname when passed an absolute URL', () => {
     const signer = new RequestSigner(() => 123);
 
     const payload = JSON.parse(
-      signer.payload('GET', '/api/ws', 123, {}),
+      signer.payload('GET', 'https://example.com/keychains/id?limit=1', 123),
     ) as SignedRequestPayload;
 
     expect(payload).toEqual({
-      bodyHash: expect.any(String),
+      bodyHash: emptyBodyHash(),
       method: 'GET',
-      path: '/api/ws',
+      path: '/keychains/id',
       timestamp: 123,
     });
   });
@@ -152,7 +148,7 @@ describe(RequestSigner.name, () => {
     expect(signedPayload(sign)).toEqual({
       bodyHash: expect.any(String),
       method: 'POST',
-      path: expectedSignedPath('/keychains/'),
+      path: '/keychains/',
       timestamp: 123,
     });
     expect(signedPassword(sign)).toBe('secret');
@@ -182,7 +178,7 @@ describe(RequestSigner.name, () => {
     expect(arrayBufferPayload).toEqual({
       bodyHash: typedArrayPayload.bodyHash,
       method: 'POST',
-      path: expectedSignedPath('/ipfs/public'),
+      path: '/ipfs/public',
       timestamp: 123,
     });
     expect(arrayBufferPayload.bodyHash).not.toBe(jsonPayload.bodyHash);

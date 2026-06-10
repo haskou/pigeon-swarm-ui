@@ -4,7 +4,6 @@ import { Buffer } from 'buffer';
 import type { Session } from '../../domain/pigeonResources.types';
 import type { Clock } from './Clock';
 
-import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
@@ -12,32 +11,11 @@ export class RequestSigner {
   public constructor(private readonly clock: Clock = () => Date.now()) {}
 
   private signablePath(path: string): string {
-    const requestPath = ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path);
-    const routePrefix = this.routePrefix();
-
-    if (
-      routePrefix === '/' ||
-      requestPath === routePrefix ||
-      requestPath.startsWith(`${routePrefix}/`)
-    ) {
-      return requestPath;
+    if (/^https?:\/\//i.test(path)) {
+      return ApiUrlBuilder.normalizePath(new URL(path).pathname);
     }
 
-    return `${routePrefix}${requestPath}`;
-  }
-
-  private routePrefix(): string {
-    if (!API_SERVER_URL) return '/';
-
-    if (/^https?:\/\//i.test(API_SERVER_URL)) {
-      const pathname = new URL(API_SERVER_URL).pathname;
-
-      return ApiUrlBuilder.normalizePath(ApiUrlBuilder.trimSlashes(pathname));
-    }
-
-    return ApiUrlBuilder.normalizePath(
-      ApiUrlBuilder.trimSlashes(API_SERVER_URL),
-    );
+    return ApiUrlBuilder.normalizePath(path.split(/[?#]/)[0] ?? path);
   }
 
   private bodyHash(body?: unknown): string {

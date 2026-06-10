@@ -438,6 +438,37 @@ describe(PigeonApiGateway.name, () => {
     );
   });
 
+  it('loads remote keychains with encoded identity paths and empty signed body', async () => {
+    const keychain = {
+      encryptedPayload: 'encrypted-keychain',
+      keychainExternalIdentifier: 'keychain-1',
+      ownerIdentityId: 'identity/with+symbols=',
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(keychain),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity/with+symbols=' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/keychains/identity%2Fwith%2Bsymbols%3D';
+
+    await expect(gateway.loadRemoteKeychain(session)).resolves.toBe(keychain);
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'GET', path);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
+  });
+
   it('creates communities with signed metadata payload', async () => {
     const community = {
       autoJoinEnabled: true,
