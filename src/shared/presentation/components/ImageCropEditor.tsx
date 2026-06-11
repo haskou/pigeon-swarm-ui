@@ -278,12 +278,13 @@ export function ImageCropEditor({
           >
             {copy.dialog.cancel}
           </button>
-          <button
-            type="button"
-            disabled={!image || applying}
-            onClick={() => void applyCrop()}
-            className="rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/25 transition hover:bg-fuchsia-400 disabled:cursor-wait disabled:opacity-60"
-          >
+            <button
+              type="button"
+              disabled={!image || applying}
+              onClick={() => void applyCrop()}
+              data-testid="image-crop-apply-button"
+              className="rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/25 transition hover:bg-fuchsia-400 disabled:cursor-wait disabled:opacity-60"
+            >
             {applying ? copy.app.loading : copy.imageEditor.apply}
           </button>
         </footer>

@@ -269,6 +269,7 @@ export function Sidebar({
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
       <button
         onClick={onCreate}
+        data-testid="create-conversation-button"
         className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
         {copy.sidebar.createConversation}
@@ -306,6 +307,10 @@ export function Sidebar({
               >
                 <button
                   type="button"
+                  data-testid="conversation-list-item"
+                  data-conversation-id={conversation.id}
+                  data-conversation-title={title}
+                  data-banner-url={conversationBannerUrls[conversation.id] ?? ''}
                   onClick={(event) => {
                     if (conversationLongPressOpenedRef.current) {
                       event.preventDefault();
@@ -552,47 +557,82 @@ function useIdentityBannerUrls(
   identities: Record<string, IdentityResource>,
   identityIdsByKey: Record<string, string>,
 ): Record<string, string> {
-  const [bannerUrls, setBannerUrls] = useState<Record<string, string>>({});
+  const [bannerUrls, setBannerUrls] = useState<
+    Record<string, { bannerId: string; url: string }>
+  >({});
 
   useEffect(() => {
     const entries = Object.entries(identityIdsByKey)
-      .map(([key, identityId]) => [key, identities[identityId]] as const)
+      .map(([key, identityId]) => {
+        const identity = identities[identityId];
+        const bannerId = identity?.profile.banner?.trim();
+
+        return [key, identity, bannerId] as const;
+      })
       .filter(
-        (entry): entry is readonly [string, IdentityResource] =>
-          !!entry[1]?.profile.banner && !bannerUrls[entry[0]],
+        (entry): entry is readonly [string, IdentityResource, string] =>
+          !!entry[1] &&
+          !!entry[2] &&
+          bannerUrls[entry[0]]?.bannerId !== entry[2],
       );
+
+    setBannerUrls((current) => {
+      const validBannerIdsByKey = Object.fromEntries(
+        Object.entries(identityIdsByKey).map(([key, identityId]) => [
+          key,
+          identities[identityId]?.profile.banner?.trim() ?? '',
+        ]),
+      );
+      const next = Object.fromEntries(
+        Object.entries(current).filter(
+          ([key, banner]) => validBannerIdsByKey[key] === banner.bannerId,
+        ),
+      );
+
+      return Object.keys(next).length === Object.keys(current).length
+        ? current
+        : next;
+    });
 
     if (entries.length === 0) return;
 
     let cancelled = false;
 
     void Promise.all(
-      entries.map(async ([key, identity]) => {
+      entries.map(async ([key, identity, bannerId]) => {
         const directBanner = identityBanner(identity);
 
-        if (directBanner) return [key, directBanner] as const;
+        if (directBanner) return [key, bannerId, directBanner] as const;
 
-        const bannerCid = identity.profile.banner?.trim();
+        const bannerCid = bannerId;
 
         if (!bannerCid) return null;
 
         const loadedBanner = await loadPublicImage(bannerCid);
 
-        return loadedBanner ? ([key, loadedBanner] as const) : null;
+        return loadedBanner ? ([key, bannerId, loadedBanner] as const) : null;
       }),
     )
       .then((loaded) => {
         if (cancelled) return;
 
         const nextUrls = loaded.filter(
-          (entry): entry is readonly [string, string] => entry !== null,
+          (entry): entry is readonly [string, string, string] => entry !== null,
         );
 
         if (nextUrls.length === 0) return;
 
         setBannerUrls((current) => ({
           ...current,
-          ...Object.fromEntries(nextUrls),
+          ...Object.fromEntries(
+            nextUrls.map(([key, bannerId, url]) => [
+              key,
+              {
+                bannerId,
+                url,
+              },
+            ]),
+          ),
         }));
       })
       .catch(() => undefined);
@@ -602,7 +642,9 @@ function useIdentityBannerUrls(
     };
   }, [bannerUrls, identities, identityIdsByKey]);
 
-  return bannerUrls;
+  return Object.fromEntries(
+    Object.entries(bannerUrls).map(([key, banner]) => [key, banner.url]),
+  );
 }
 
 function isGroupConversation(conversation: ConversationResource): boolean {

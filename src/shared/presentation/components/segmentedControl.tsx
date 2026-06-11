@@ -6,6 +6,7 @@ export type SegmentOption<TValue extends string> = {
 };
 
 interface SegmentedControlProps<TValue extends string> {
+  'data-testid'?: string;
   className?: string;
   onChange: (value: TValue) => void;
   options: Array<SegmentOption<TValue>>;
@@ -14,6 +15,7 @@ interface SegmentedControlProps<TValue extends string> {
 
 export function SegmentedControl<TValue extends string>({
   className,
+  'data-testid': testId,
   onChange,
   options,
   value,
@@ -24,6 +26,7 @@ export function SegmentedControl<TValue extends string>({
         'grid grid-cols-2 gap-2 rounded-2xl bg-black/20 p-1',
         className,
       )}
+      data-testid={testId}
     >
       {options.map((option) => (
         <button

@@ -230,6 +230,7 @@ export function AuthScreen({
             value={mode}
             onChange={setMode}
             options={modeOptions}
+            data-testid="auth-mode-control"
           />
 
           <div className="mt-6 space-y-4">
@@ -258,6 +259,7 @@ export function AuthScreen({
                 autoComplete={
                   mode === 'login' ? 'current-password' : 'new-password'
                 }
+                data-testid="auth-password-input"
               />
             </Field>
             {mode === 'create' && (
@@ -272,6 +274,7 @@ export function AuthScreen({
                     placeholder="••••••••••••"
                     type="password"
                     autoComplete="new-password"
+                    data-testid="auth-password-confirmation-input"
                   />
                 </Field>
                 <PasswordChecklist
@@ -329,6 +332,7 @@ export function AuthScreen({
                 ? 'glass-button bg-gradient-to-r from-cyan-300 to-fuchsia-500 text-white shadow-xl shadow-fuchsia-950/30 hover:scale-[1.01]'
                 : 'cursor-not-allowed bg-white/10 text-white/35',
             )}
+            data-testid="auth-submit-button"
           >
             {state === 'loading'
               ? copy.auth.loadingSubmit

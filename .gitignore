@@ -9,6 +9,9 @@
 !.env.test
 
 tests/coverage/*
+test-results/
+playwright-report/
+blob-report/
 
 /var/log/*
 /var/cache/*

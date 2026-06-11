@@ -442,6 +442,7 @@ export function CreateConversationDialog({
                   className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
                   placeholder={copy.identityLookup.placeholder}
                   autoComplete="off"
+                  data-testid="create-conversation-recipient-input"
                 />
                 <IdentityLookupStatus status={remoteIdentityStatus} />
               </Field>
@@ -473,6 +474,7 @@ export function CreateConversationDialog({
                   disabled={!peerIdentity || sharedNetworkIds.length === 0}
                   value={selectedNetworkId}
                   onChange={setSelectedNetworkId}
+                  data-testid="create-conversation-network-select"
                   options={networkOptions}
                 />
               </Field>{' '}
@@ -608,6 +610,7 @@ export function CreateConversationDialog({
           <button
             disabled={mode === 'direct' ? !canSubmitDirect : !canSubmitGroup}
             className="rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-fuchsia-950/30 transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
+            data-testid="create-conversation-submit-button"
           >
             {state === 'loading'
               ? copy.dialog.createConversationLoading

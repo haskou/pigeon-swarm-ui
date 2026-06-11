@@ -2017,12 +2017,13 @@ export class PigeonApiGateway {
 
     if (cached && Date.now() < cached.expiresAt) return cached.identity;
 
-    const identity = await this.cachedRequest(
-      `GET /identities/${normalizedIdentityId}`,
-      () =>
-        this.http.request<IdentityResource>(
-          `/identities/${encodeURIComponent(normalizedIdentityId)}`,
-        ),
+    return await this.refreshIdentity(normalizedIdentityId);
+  }
+
+  public async refreshIdentity(identityId: string): Promise<IdentityResource> {
+    const normalizedIdentityId = IdentityId.normalize(identityId);
+    const identity = await this.http.request<IdentityResource>(
+      `/identities/${encodeURIComponent(normalizedIdentityId)}`,
     );
 
     this.cacheIdentity(identity);

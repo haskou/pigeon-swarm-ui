@@ -18,7 +18,10 @@ export function PushNotificationPrompt({
   const loading = enableState === 'loading';
 
   return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center lg:bottom-5">
+    <div
+      data-testid="push-notification-prompt"
+      className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center lg:bottom-5"
+    >
       <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-cyan-200/25 bg-[#171827]/95 p-3 shadow-2xl shadow-black/35 backdrop-blur">
         <div className="flex items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/15 text-cyan-100">
@@ -60,10 +63,11 @@ export function PushNotificationPrompt({
                 : copy.notifications.enablePush}
             </button>
           </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
+            <button
+              type="button"
+              onClick={onDismiss}
+              data-testid="push-notification-dismiss-button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
             aria-label={copy.notifications.enablePushDismiss}
           >
             <svg

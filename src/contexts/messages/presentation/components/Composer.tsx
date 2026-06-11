@@ -699,6 +699,7 @@ export function Composer({
                   : 'text-white',
               )}
               placeholder={placeholder}
+              data-testid="message-composer-input"
             />
           </div>
           <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
@@ -707,6 +708,7 @@ export function Composer({
           <button
             disabled={!canSend}
             aria-label={isEditing ? copy.messages.saveEdit : copy.composer.send}
+            data-testid="message-send-button"
             className={cx(
               'shrink-0 items-center justify-center rounded-xl bg-white text-sm font-black text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-45',
               showMobileSendButton ? 'inline-grid sm:inline-flex' : 'hidden sm:inline-flex',

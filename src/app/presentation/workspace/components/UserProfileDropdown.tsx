@@ -215,6 +215,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
         className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
+        data-testid="own-profile-menu-button"
       >
         <ProfileAvatar
           label={ownDisplayName}
@@ -311,6 +312,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
             type="button"
             onClick={() => setProfileEditorOpen(true)}
             className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            data-testid="edit-profile-button"
           >
             {copy.profile.edit}
           </button>

@@ -345,6 +345,7 @@ export function Rail({
       <button
         type="button"
         onClick={onNotificationsClick}
+        data-testid="notifications-open-button"
         className="relative grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15"
         aria-label={copy.notifications.open}
       >

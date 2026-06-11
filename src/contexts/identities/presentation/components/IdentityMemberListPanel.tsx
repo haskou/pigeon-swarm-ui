@@ -141,6 +141,9 @@ export function IdentityMemberRow({
     if (!interactive) {
       return (
         <div
+          data-testid="identity-member-row"
+          data-identity-id={item.identityId}
+          data-banner-url=""
           className={cx(
             'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
             className,
@@ -155,6 +158,9 @@ export function IdentityMemberRow({
       <button
         type="button"
         disabled
+        data-testid="identity-member-row"
+        data-identity-id={item.identityId}
+        data-banner-url=""
         className={cx(
           'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
           className,
@@ -206,6 +212,9 @@ export function IdentityMemberRow({
   if (!interactive) {
     return (
       <div
+        data-testid="identity-member-row"
+        data-identity-id={item.identityId}
+        data-banner-url={bannerUrl ?? ''}
         className={cx(
           'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
           className,
@@ -220,6 +229,9 @@ export function IdentityMemberRow({
     <button
       type="button"
       onClick={onClick}
+      data-testid="identity-member-row"
+      data-identity-id={item.identityId}
+      data-banner-url={bannerUrl ?? ''}
       className={cx(
         'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12',
         className,

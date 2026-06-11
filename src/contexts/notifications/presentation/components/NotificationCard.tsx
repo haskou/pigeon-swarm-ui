@@ -98,7 +98,12 @@ export function NotificationCard({
     notification.state === 'pending' && notification.type !== 'missed_call';
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/25 p-4">
+    <article
+      data-testid="notification-card"
+      data-notification-id={notification.id}
+      data-notification-type={notification.type}
+      className="rounded-2xl border border-white/10 bg-black/25 p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
@@ -163,6 +168,7 @@ export function NotificationCard({
               type="button"
               onClick={() => onAccept(notification)}
               disabled={action === 'accept'}
+              data-testid="notification-accept-button"
               className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
             >
               {copy.notifications.accept}
@@ -171,6 +177,7 @@ export function NotificationCard({
               type="button"
               onClick={() => onDecline(notification.id)}
               disabled={action === 'decline'}
+              data-testid="notification-decline-button"
               className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
             >
               {copy.notifications.decline}
@@ -180,6 +187,7 @@ export function NotificationCard({
         <button
           type="button"
           onClick={() => onArchive(notification.id)}
+          data-testid="notification-archive-button"
           className="rounded-2xl bg-white/[0.07] px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/[0.12]"
         >
           {copy.notifications.archive}

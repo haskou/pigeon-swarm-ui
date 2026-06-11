@@ -80,6 +80,7 @@ import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -3243,6 +3244,20 @@ export function GlassWorkspace({
         return;
       }
 
+      if (event.type === 'identities.v1.identity.was_updated') {
+        const identityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'identityId', 'id');
+
+        if (identityId) {
+          void applicationContainer
+            .refreshIdentity(IdentityId.normalize(identityId))
+            .then(rememberIdentity)
+            .catch(() => undefined);
+        }
+
+        return;
+      }
+
       if (event.type.startsWith('calls.')) {
         const eventCallId =
           eventAggregateId(event) ?? stringAttribute(event, 'callId');
@@ -3926,6 +3941,7 @@ export function GlassWorkspace({
       refreshSession,
       realtimeEventsOpen,
       receiveSignal,
+      rememberIdentity,
       reconcileCallResource,
       session,
       setConversations,

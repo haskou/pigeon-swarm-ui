@@ -1114,6 +1114,10 @@ export class PigeonApplication {
     return await this.gateway.getIdentity(identityId);
   }
 
+  public async refreshIdentity(identityId: string): Promise<IdentityResource> {
+    return await this.gateway.refreshIdentity(identityId);
+  }
+
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
     return await this.gateway.getPublicFile(cid);
   }
