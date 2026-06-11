@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -14,6 +15,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -72,6 +74,10 @@ export function Rail({
   peerCount = 0,
   settingsAttention = false,
 }: RailProps) {
+  const visibleCommunities = useMemo(
+    () => CommunityList.withUniqueIds(communities),
+    [communities],
+  );
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
   const [communityMenu, setCommunityMenu] = useState<null | CommunityMenuState>(
     null,
@@ -197,7 +203,7 @@ export function Rail({
       </div>
       <div className="h-px w-10 bg-white/10" />
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible">
-        {communities.map((community) => {
+        {visibleCommunities.map((community) => {
           const notificationSetting = communityNotificationSetting?.(community);
           const notificationsMuted = notificationSetting
             ? NotificationSettingsPolicy.isMuted(notificationSetting)
