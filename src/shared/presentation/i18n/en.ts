@@ -49,6 +49,7 @@ export const en = {
     installAppReadyHelp: 'Your browser is ready to install Pigeon Swarm.',
     invalidLogin: 'The username or password is incorrect.',
     loginProgress: {
+      confirmingPasskey: 'Confirming passkey...',
       decryptingKeys: 'Decrypting keys...',
       loadingKeychain: 'Loading keychain...',
       loadingWorkspace: 'Opening workspace...',
@@ -80,6 +81,8 @@ export const en = {
       'Uses WebAuthn PRF to wrap the password-derived key before it decrypts your master key.',
     passkeyPrfUnavailable:
       'This browser does not expose WebAuthn PRF for passkey key wrapping.',
+    passkeyPrfNotPersisted:
+      'The identity was created, but the API did not persist passkey PRF protection.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',

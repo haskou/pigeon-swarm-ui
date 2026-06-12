@@ -51,6 +51,7 @@ export const es = {
     installAppReadyHelp: 'Tu navegador esta listo para instalar Pigeon Swarm.',
     invalidLogin: 'El usuario o la contraseña no son correctos.',
     loginProgress: {
+      confirmingPasskey: 'Confirmando passkey...',
       decryptingKeys: 'Descifrando claves...',
       loadingKeychain: 'Cargando llavero...',
       loadingWorkspace: 'Abriendo workspace...',
@@ -82,6 +83,8 @@ export const es = {
       'Usa WebAuthn PRF para envolver la clave derivada de contraseña antes de descifrar tu master key.',
     passkeyPrfUnavailable:
       'Este navegador no expone WebAuthn PRF para envolver claves con passkey.',
+    passkeyPrfNotPersisted:
+      'La identidad se ha creado, pero la API no ha persistido la proteccion passkey PRF.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',

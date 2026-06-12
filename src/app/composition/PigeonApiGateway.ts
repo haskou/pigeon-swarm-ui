@@ -100,7 +100,10 @@ import { IdentityId } from '../../contexts/identities/domain/value-objects/Ident
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { WebAuthnPrfKeyProtector } from '../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
-import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
+import {
+  clearLocalDeviceUnlock,
+  loadLocalDeviceUnlock,
+} from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
@@ -2721,6 +2724,10 @@ export class PigeonApiGateway {
       throw new Error(copy.auth.invalidLogin);
     }
 
+    if (identity.masterKeyDerivation.passkeyPrf) {
+      onProgress?.('confirming-passkey');
+    }
+
     const masterKey = await this.decryptMasterKey(identity, password).catch(
       () => {
         throw new Error(copy.auth.invalidLogin);
@@ -2767,6 +2774,13 @@ export class PigeonApiGateway {
     onProgress?.('resolving-identity');
     const identity = await this.getIdentity(identityId.trim());
     onProgress?.('decrypting-keys');
+
+    if (identity.masterKeyDerivation.passkeyPrf) {
+      await clearLocalDeviceUnlock(identity.id).catch(() => undefined);
+
+      throw new Error(copy.auth.invalidLogin);
+    }
+
     const localUnlock = await loadLocalDeviceUnlock(identity.id);
 
     if (!localUnlock) {
@@ -2865,8 +2879,16 @@ export class PigeonApiGateway {
       handle,
       options,
     );
+    const result = await this.login(identity.id, password);
 
-    return await this.login(identity.id, password);
+    if (
+      options.passkeyPrfEnabled &&
+      !result.session.identity.masterKeyDerivation.passkeyPrf
+    ) {
+      throw new Error(copy.auth.passkeyPrfNotPersisted);
+    }
+
+    return result;
   }
 
   public async sendMessage(

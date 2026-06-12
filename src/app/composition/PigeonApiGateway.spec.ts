@@ -1572,8 +1572,8 @@ describe(PigeonApiGateway.name, () => {
     const session = {
       encryptedKeyPair,
       identity: { id: 'identity-1' },
-      keyPair,
       keychain: { conversations: {}, version: 0 },
+      keyPair,
       password: '',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(
