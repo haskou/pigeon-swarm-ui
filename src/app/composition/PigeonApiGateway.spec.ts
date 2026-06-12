@@ -1523,6 +1523,90 @@ describe(PigeonApiGateway.name, () => {
     expect(result.notification).toBe(updatedNotification);
   });
 
+  it('accepts group invitations after local device unlock restored the key pair', async () => {
+    const keyEntry = {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'group:conversation',
+      createdAt: 1,
+      key: symmetricFixtureKey,
+      kind: 'conversation',
+      peerIdentityId: 'identity-2',
+      version: 2,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce({
+          createdAt: '2026-01-01',
+          id: 'notification-1',
+          payload: {},
+          recipientIdentityId: 'identity-1',
+          state: 'accepted',
+          status: 'read',
+          type: 'group_conversation_invitation',
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const keyPair = {
+      decrypt: jest.fn(() => Buffer.from(JSON.stringify(keyEntry))),
+    };
+    const encryptedKeyPair = {
+      decrypt: jest.fn(),
+    };
+    const session = {
+      encryptedKeyPair,
+      identity: { id: 'identity-1' },
+      keyPair,
+      keychain: { conversations: {}, version: 0 },
+      password: '',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptConversationInvitation(session, {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
+    });
+
+    expect(encryptedKeyPair.decrypt).not.toHaveBeenCalled();
+    expect(keyPair.decrypt).toHaveBeenCalledWith(expect.any(EncryptedPayload));
+    expect(result.keychain.conversations['group:conversation']).toEqual(
+      keyEntry,
+    );
+  });
+
   it('publishes the community invite link key before accepting the invite', async () => {
     const keyEntry = {
       algorithm: 'aes-256-gcm' as const,

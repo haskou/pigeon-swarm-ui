@@ -561,9 +561,8 @@ export function ChatColumn({
     setConversationKeySaving(true);
     setConversationKeyError(null);
     try {
-      const decrypted = await session.encryptedKeyPair.decrypt(
+      const decrypted = session.keyPair.decrypt(
         new EncryptedPayload(encryptedPayload),
-        session.password,
       );
       const parsed = JSON.parse(
         decrypted.toString(),

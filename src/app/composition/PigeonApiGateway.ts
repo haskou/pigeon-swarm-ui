@@ -954,6 +954,19 @@ export class PigeonApiGateway {
     };
   }
 
+  private async decryptIdentityPayload(
+    session: Session,
+    encryptedPayload: string,
+  ): Promise<Buffer> {
+    const payload = new EncryptedPayload(encryptedPayload);
+
+    if (session.password) {
+      return await session.encryptedKeyPair.decrypt(payload, session.password);
+    }
+
+    return session.keyPair.decrypt(payload);
+  }
+
   private withServerConversationId(
     keychain: LocalKeychain,
     keyEntry: ConversationKeyEntry,
@@ -2991,10 +3004,7 @@ export class PigeonApiGateway {
       notification.type === 'community_invitation'
         ? notification.payload.encryptedCommunityKey
         : notification.payload.encryptedConversationKey;
-    const decrypted = await session.encryptedKeyPair.decrypt(
-      new EncryptedPayload(encryptedKey),
-      session.password,
-    );
+    const decrypted = await this.decryptIdentityPayload(session, encryptedKey);
     const keyEntry = JSON.parse(decrypted.toString()) as ConversationKeyEntry;
     const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
     const published = await this.publishKeychain(session, nextKeychain);
