@@ -78,13 +78,13 @@ export const es = {
     },
     passwordRequirements:
       'Usa de 12 a 256 caracteres con mayuscula, minuscula, numero y simbolo.',
-    passkeyPrf: 'Proteger clave de contraseña con passkey',
+    passkeyPrf: 'Proteger mi identidad con passkey',
     passkeyPrfHelp:
-      'Usa WebAuthn PRF para envolver la clave derivada de contraseña antes de descifrar tu master key.',
+      'Al iniciar sesión, se pedirá tu contraseña y una passkey compatible antes de desbloquear tus claves.',
     passkeyPrfUnavailable:
-      'Este navegador no expone WebAuthn PRF para envolver claves con passkey.',
+      'Este navegador no permite usar passkeys para proteger claves.',
     passkeyPrfNotPersisted:
-      'La identidad se ha creado, pero la API no ha persistido la proteccion passkey PRF.',
+      'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',

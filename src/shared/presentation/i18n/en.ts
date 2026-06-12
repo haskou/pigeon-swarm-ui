@@ -76,13 +76,13 @@ export const en = {
     },
     passwordRequirements:
       'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
-    passkeyPrf: 'Protect password key with passkey',
+    passkeyPrf: 'Protect my identity with a passkey',
     passkeyPrfHelp:
-      'Uses WebAuthn PRF to wrap the password-derived key before it decrypts your master key.',
+      'When you sign in, Pigeon Swarm will ask for your password and a compatible passkey before unlocking your keys.',
     passkeyPrfUnavailable:
-      'This browser does not expose WebAuthn PRF for passkey key wrapping.',
+      'This browser cannot use passkeys to protect keys.',
     passkeyPrfNotPersisted:
-      'The identity was created, but the API did not persist passkey PRF protection.',
+      'The identity was created, but the server did not save passkey protection.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
