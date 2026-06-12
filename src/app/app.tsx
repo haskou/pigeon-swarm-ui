@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import type { LoginIdentityProgressStep } from '../contexts/identities/application/ports/LoginIdentityProgressStep';
+
 import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';
 import { useAppBootstrap } from './presentation/useAppBootstrap';
@@ -123,6 +125,8 @@ function App(): ReactElement {
     peers,
     pendingCommunityInvite,
     preloadedConversationMessages,
+    restoreIdentityPreview,
+    restoreProgressStep,
     session,
     setCommunities,
     setConversations,
@@ -158,7 +162,12 @@ function App(): ReactElement {
   }
 
   if (screen === 'loading') {
-    return <AppLoadingScreen label={copy.app.loading} />;
+    return (
+      <AppLoadingScreen
+        identityPreview={restoreIdentityPreview}
+        label={restoreLoadingLabel(restoreProgressStep)}
+      />
+    );
   }
 
   if (screen === 'network-creation') {
@@ -187,6 +196,7 @@ function App(): ReactElement {
             nodeNetworks={nodeNetworks.networks}
             onNodeNetworksReload={nodeNetworks.reload}
             onPeersReload={peers.reload}
+            peersLoading={peers.loading}
             peers={peers.peers}
             setSession={(nextSession) => {
               if (!nextSession) {
@@ -212,6 +222,21 @@ function App(): ReactElement {
       </AppScreenSuspense>
     </AppFrame>
   );
+}
+
+function restoreLoadingLabel(step: LoginIdentityProgressStep | null): string {
+  if (!step) return copy.app.loading;
+
+  switch (step) {
+    case 'decrypting-keys':
+      return copy.auth.loginProgress.decryptingKeys;
+    case 'loading-keychain':
+      return copy.auth.loginProgress.loadingKeychain;
+    case 'loading-workspace':
+      return copy.auth.loginProgress.loadingWorkspace;
+    case 'resolving-identity':
+      return copy.auth.loginProgress.resolvingIdentity;
+  }
 }
 
 export default App;

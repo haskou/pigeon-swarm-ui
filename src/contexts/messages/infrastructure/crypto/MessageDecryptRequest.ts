@@ -10,6 +10,6 @@ export type MessageDecryptRequest = {
   };
   currentIdentityId: string;
   messages: MessageResource[];
-  privateKey?: string;
   requestId: number;
+  symmetricKey?: string;
 };

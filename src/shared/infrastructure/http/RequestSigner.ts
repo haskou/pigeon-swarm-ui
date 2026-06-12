@@ -1,48 +1,22 @@
-import { SHA256Hash, UUID } from '@haskou/value-objects';
+import { SHA256Hash } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/pigeonResources.types';
 import type { Clock } from './Clock';
-import type { NonceFactory } from './NonceFactory';
 
-import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
 export class RequestSigner {
-  public constructor(
-    private readonly clock: Clock = () => Date.now(),
-    private readonly nonceFactory: NonceFactory = () =>
-      UUID.generate().toString(),
-  ) {}
+  public constructor(private readonly clock: Clock = () => Date.now()) {}
 
   private signablePath(path: string): string {
-    const requestPath = ApiUrlBuilder.normalizePath(path.split('?')[0] ?? path);
-    const routePrefix = this.routePrefix();
-
-    if (
-      routePrefix === '/' ||
-      requestPath === routePrefix ||
-      requestPath.startsWith(`${routePrefix}/`)
-    ) {
-      return requestPath;
+    if (/^https?:\/\//i.test(path)) {
+      return ApiUrlBuilder.normalizePath(new URL(path).pathname);
     }
 
-    return `${routePrefix}${requestPath}`;
-  }
-
-  private routePrefix(): string {
-    if (!API_SERVER_URL) return '/';
-
-    if (/^https?:\/\//i.test(API_SERVER_URL)) {
-      const pathname = new URL(API_SERVER_URL).pathname;
-
-      return ApiUrlBuilder.normalizePath(ApiUrlBuilder.trimSlashes(pathname));
-    }
-
-    return ApiUrlBuilder.normalizePath(
-      ApiUrlBuilder.trimSlashes(API_SERVER_URL),
-    );
+    return ApiUrlBuilder.normalizePath(path.split(/[?#]/)[0] ?? path);
   }
 
   private bodyHash(body?: unknown): string {
@@ -73,32 +47,28 @@ export class RequestSigner {
     path: string,
     body?: unknown,
   ): Promise<Record<string, string>> {
-    const timestamp = `${this.clock()}`;
-    const nonce = this.nonceFactory();
-    const signature = await session.encryptedKeyPair.sign(
-      this.payload(method, path, timestamp, nonce, body),
-      session.password,
+    const timestamp = this.clock();
+    const signature = await signSessionPayload(
+      session,
+      this.payload(method, path, timestamp, body),
     );
 
     return {
       'X-Identity-Id': IdentityId.normalize(session.identity.id),
-      'X-Nonce': nonce,
       'X-Signature': signature.toString(),
-      'X-Timestamp': timestamp,
+      'X-Timestamp': `${timestamp}`,
     };
   }
 
   public payload(
     method: string,
     path: string,
-    timestamp: string,
-    nonce: string,
+    timestamp: number,
     body?: unknown,
   ): string {
     return JSON.stringify({
       bodyHash: this.bodyHash(body),
       method: method.toUpperCase(),
-      nonce,
       path: this.signablePath(path),
       timestamp,
     });

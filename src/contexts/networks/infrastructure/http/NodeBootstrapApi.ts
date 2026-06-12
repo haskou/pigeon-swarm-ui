@@ -7,9 +7,13 @@ import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuil
 import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 
 export class NodeBootstrapApi {
-  private readonly http = new HttpJsonClient(new ApiUrlBuilder(API_SERVER_URL));
-
   private readonly requestCache = new Map<string, Promise<unknown>>();
+
+  public constructor(
+    private readonly http = new HttpJsonClient(
+      new ApiUrlBuilder(API_SERVER_URL),
+    ),
+  ) {}
 
   private async cachedRequest<T>(
     key: string,
@@ -30,10 +34,10 @@ export class NodeBootstrapApi {
     return await request;
   }
 
-  public async getInfo(): Promise<NodeInfo> {
-    return await this.cachedRequest('GET /node/', () =>
-      this.http.request<NodeInfo>('/node/'),
-    );
+  public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
+    const info = await this.http.request<NodeInfo>('/node/');
+
+    return { ...info, owner: info.owner ?? null };
   }
 
   public async getNetworks(): Promise<NodeNetwork[]> {
@@ -49,9 +53,7 @@ export class NodeBootstrapApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.cachedRequest('GET /peers/', () =>
-      this.http.request<{ peers: Peer[] }>('/peers/'),
-    );
+    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
 
     return result.peers;
   }

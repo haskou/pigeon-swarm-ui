@@ -56,6 +56,28 @@ function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
+function assertCommunityKeyEntry(
+  parsed: Partial<ConversationKeyEntry>,
+): asserts parsed is ConversationKeyEntry {
+  if (!parsed.conversationId) throw new Error('Invalid community invite key.');
+
+  if (parsed.algorithm !== 'aes-256-gcm') {
+    throw new Error('Invalid community invite key.');
+  }
+
+  if (!parsed.key) throw new Error('Invalid community invite key.');
+
+  if (parsed.kind !== 'community') {
+    throw new Error('Invalid community invite key.');
+  }
+
+  if (parsed.version !== 2) throw new Error('Invalid community invite key.');
+
+  if (typeof parsed.createdAt !== 'number') {
+    throw new Error('Invalid community invite key.');
+  }
+}
+
 export async function encryptCommunityInviteKey(
   keyEntry: ConversationKeyEntry,
 ): Promise<CommunityInviteKeyEnvelope> {
@@ -100,20 +122,15 @@ export async function decryptCommunityInviteKey(
     new TextDecoder().decode(plaintext),
   ) as Partial<ConversationKeyEntry>;
 
-  if (
-    !parsed.conversationId ||
-    !parsed.privateKey ||
-    !parsed.publicKey ||
-    typeof parsed.createdAt !== 'number'
-  ) {
-    throw new Error('Invalid community invite key.');
-  }
+  assertCommunityKeyEntry(parsed);
 
   return {
+    algorithm: 'aes-256-gcm',
     conversationId: parsed.conversationId,
     createdAt: parsed.createdAt,
+    key: parsed.key,
+    kind: 'community',
     peerIdentityId: parsed.peerIdentityId ?? '',
-    privateKey: parsed.privateKey,
-    publicKey: parsed.publicKey,
+    version: 2,
   };
 }

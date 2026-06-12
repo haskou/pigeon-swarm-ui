@@ -39,6 +39,7 @@ export function WorkspaceHeader({
         <button
           type="button"
           onClick={onOpenSidebar}
+          data-testid="workspace-sidebar-open-button"
           aria-label={copy.chat.menu}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 font-black text-white lg:hidden"
         >

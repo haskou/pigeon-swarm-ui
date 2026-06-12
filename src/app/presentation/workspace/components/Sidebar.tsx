@@ -4,12 +4,13 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
   type PointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   ConversationResource,
   IdentityPresence,
@@ -19,26 +20,26 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { loadPublicImage } from '../../../../contexts/communities/presentation/components/communityImages';
 import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
-import {
-  conversationTitle,
-  shortId,
-} from '../../../../shared/presentation/formatting';
+import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityBanner,
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
+import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
-import { loadPublicImage } from '../../../../contexts/communities/presentation/components/communityImages';
-import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
+import { cx } from '../../../../shared/presentation/cx';
+import {
+  conversationTitle,
+  shortId,
+} from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   sidePanelListEnterClassName,
   sidePanelListEnterStyle,
@@ -103,26 +104,26 @@ export function Sidebar({
   identityNames,
   identityPictures,
   identityProfiles,
-  presenceByIdentityId = {},
   nodeNetworks,
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallRetryMicrophone,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
-  onCallRetryMicrophone,
   onCallToggleScreenShare,
   onConversationNotificationMuteToggle,
   onConversationNotificationSettingsOpen,
   onCreate,
   onLogout,
-  onSelect,
-  onSessionUpdated,
   onPresenceChange,
   onPresenceStatusSelected,
+  onSelect,
+  onSessionUpdated,
+  presenceByIdentityId = {},
   session,
 }: SidebarProps) {
   const [conversationSearch, setConversationSearch] = useState('');
@@ -269,6 +270,7 @@ export function Sidebar({
     <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
       <button
         onClick={onCreate}
+        data-testid="create-conversation-button"
         className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
       >
         {copy.sidebar.createConversation}
@@ -292,135 +294,66 @@ export function Sidebar({
           )}
           {filteredConversations.map((conversation, index) => {
             const title = conversationName(conversation);
-            const notificationSetting =
-              conversationNotificationSetting?.(conversation);
+            const peerIdentityId = conversationPeerId(conversation);
 
             return (
-              <div
+              <SidebarConversationListItem
                 key={`${animationScopeKey ?? 'conversations'}:${conversation.id}`}
-                className={cx(
-                  sidePanelListEnterClassName('left', animateEntries),
-                  'relative',
+                active={activeConversationId === conversation.id}
+                animateEntries={animateEntries}
+                bannerUrl={conversationBannerUrls[conversation.id]}
+                canOpenMenu={canOpenConversationMenu}
+                conversation={conversation}
+                conversationMenu={conversationMenu}
+                handle={conversationHandle(conversation)}
+                index={index}
+                loading={conversationIdentityLoadingState({
+                  conversation,
+                  identityNames,
+                  identityPictures,
+                  identityProfiles,
+                  peerIdentityId,
+                })}
+                notificationSetting={conversationNotificationSetting?.(
+                  conversation,
                 )}
-                style={sidePanelListEnterStyle(index, animateEntries)}
-              >
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    if (conversationLongPressOpenedRef.current) {
-                      event.preventDefault();
-                      conversationLongPressOpenedRef.current = false;
+                onClearLongPressTimer={clearConversationLongPressTimer}
+                onContextMenu={(event, selectedConversation, selectedTitle) => {
+                  if (!canOpenConversationMenu) return;
 
-                      return;
-                    }
-
-                    setConversationMenu(null);
-                    onSelect(conversation.id);
-                  }}
-                  onContextMenu={(event) => {
-                    if (!canOpenConversationMenu) return;
-
+                  event.preventDefault();
+                  openConversationMenu(
+                    selectedConversation,
+                    selectedTitle,
+                    event.currentTarget,
+                  );
+                }}
+                onNotificationMuteToggle={onConversationNotificationMuteToggle}
+                onNotificationSettingsOpen={
+                  onConversationNotificationSettingsOpen
+                }
+                onPointerDown={handleConversationPointerDown}
+                onSelect={(event, selectedConversation) => {
+                  if (conversationLongPressOpenedRef.current) {
                     event.preventDefault();
-                    openConversationMenu(conversation, title, event.currentTarget);
-                  }}
-                  onPointerCancel={clearConversationLongPressTimer}
-                  onPointerDown={(event) =>
-                    handleConversationPointerDown(event, conversation, title)
+                    conversationLongPressOpenedRef.current = false;
+
+                    return;
                   }
-                  onPointerLeave={clearConversationLongPressTimer}
-                  onPointerUp={clearConversationLongPressTimer}
-                  className={cx(
-                    'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
-                    activeConversationId === conversation.id
-                      ? 'bg-white text-slate-950'
-                      : 'bg-white/8 text-white hover:bg-white/14',
-                  )}
-                >
-              {conversationBannerUrls[conversation.id] && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{
-                    backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${conversationBannerUrls[conversation.id]})`,
-                    maskImage:
-                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
-                    WebkitMaskImage:
-                      'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
-                  }}
-                />
-              )}
-              <div className="relative flex items-center gap-3">
-                <div
-                  className={cx(
-                    'relative grid h-11 w-11 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
-                    activeConversationId === conversation.id &&
-                      'ring-2 ring-slate-950/20',
-                  )}
-                >
-                  <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
-                    {conversationPicture(conversation) ? (
-                      <img
-                        src={conversationPicture(conversation)}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      title.slice(0, 1).toUpperCase()
-                    )}
-                  </span>
-                  {conversationPeerId(conversation) && (
-                    <PresenceStatusDot
-                      presence={
-                        presenceByIdentityId[conversationPeerId(conversation)!]
-                      }
-                      className="-bottom-1 -right-1"
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-black">
-                    {title}
-                  </div>
-                  <div
-                    className={cx(
-                      'truncate text-xs',
-                      activeConversationId === conversation.id
-                        ? 'text-slate-500'
-                        : 'text-white/45',
-                    )}
-                  >
-                    {conversationHandle(conversation)}
-                  </div>
-                </div>
-                {!!conversation.unreadCount && (
-                  <span className="rounded-full bg-fuchsia-500 px-2 py-1 text-xs font-black text-white">
-                    {conversation.unreadCount}
-                  </span>
-                )}
-              </div>
-                </button>
-                {conversationMenu?.conversation.id === conversation.id &&
-                notificationSetting &&
-                onConversationNotificationMuteToggle &&
-                onConversationNotificationSettingsOpen ? (
-                  <SidebarConversationMenu
-                    left={conversationMenu.left}
-                    notificationSetting={notificationSetting}
-                    title={conversationMenu.title}
-                    top={conversationMenu.top}
-                    onClose={() => setConversationMenu(null)}
-                    onNotificationMuteToggle={() => {
-                      onConversationNotificationMuteToggle(conversation);
-                    }}
-                    onNotificationSettingsOpen={() => {
-                      onConversationNotificationSettingsOpen(
-                        conversation,
-                        conversationMenu.title,
-                      );
-                    }}
-                  />
-                ) : null}
-              </div>
+
+                  setConversationMenu(null);
+                  onSelect(selectedConversation.id);
+                }}
+                onMenuClose={() => setConversationMenu(null)}
+                peerIdentityId={peerIdentityId}
+                pictureUrl={conversationPicture(conversation)}
+                presence={
+                  peerIdentityId
+                    ? presenceByIdentityId[peerIdentityId]
+                    : undefined
+                }
+                title={title}
+              />
             );
           })}
         </div>
@@ -461,14 +394,432 @@ type ConversationMenuState = {
   top: number;
 };
 
-function SidebarConversationMenu({
-  left,
+type SidebarConversationListItemProps = {
+  active: boolean;
+  animateEntries: boolean;
+  bannerUrl?: string;
+  canOpenMenu: boolean;
+  conversation: ConversationResource;
+  conversationMenu: ConversationMenuState | null;
+  handle: string;
+  index: number;
+  loading: ConversationIdentityLoadingState;
+  notificationSetting?: NotificationScopeSetting;
+  onClearLongPressTimer: () => void;
+  onContextMenu: (
+    event: MouseEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  onMenuClose: () => void;
+  onNotificationMuteToggle?: (conversation: ConversationResource) => void;
+  onNotificationSettingsOpen?: (
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  onPointerDown: (
+    event: PointerEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  onSelect: (
+    event: MouseEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+  ) => void;
+  peerIdentityId?: string;
+  pictureUrl?: string;
+  presence?: IdentityPresence;
+  title: string;
+};
+
+function SidebarConversationListItem({
+  active,
+  animateEntries,
+  bannerUrl,
+  canOpenMenu,
+  conversation,
+  conversationMenu,
+  handle,
+  index,
+  loading,
   notificationSetting,
+  onClearLongPressTimer,
+  onContextMenu,
+  onMenuClose,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
+  onPointerDown,
+  onSelect,
+  peerIdentityId,
+  pictureUrl,
+  presence,
   title,
-  top,
+}: SidebarConversationListItemProps) {
+  return (
+    <div
+      className={cx(
+        sidePanelListEnterClassName('left', animateEntries),
+        'relative',
+      )}
+      style={sidePanelListEnterStyle(index, animateEntries)}
+    >
+      <SidebarConversationButton
+        active={active}
+        bannerUrl={bannerUrl}
+        canOpenMenu={canOpenMenu}
+        conversation={conversation}
+        handle={handle}
+        loading={loading}
+        onClearLongPressTimer={onClearLongPressTimer}
+        onContextMenu={onContextMenu}
+        onPointerDown={onPointerDown}
+        onSelect={onSelect}
+        peerIdentityId={peerIdentityId}
+        pictureUrl={pictureUrl}
+        presence={presence}
+        title={title}
+      />
+      <SidebarConversationMenuSlot
+        conversation={conversation}
+        conversationMenu={conversationMenu}
+        notificationSetting={notificationSetting}
+        onClose={onMenuClose}
+        onNotificationMuteToggle={onNotificationMuteToggle}
+        onNotificationSettingsOpen={onNotificationSettingsOpen}
+      />
+    </div>
+  );
+}
+
+type SidebarConversationButtonProps = {
+  active: boolean;
+  bannerUrl?: string;
+  canOpenMenu: boolean;
+  conversation: ConversationResource;
+  handle: string;
+  loading: ConversationIdentityLoadingState;
+  onClearLongPressTimer: () => void;
+  onContextMenu: (
+    event: MouseEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  onPointerDown: (
+    event: PointerEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  onSelect: (
+    event: MouseEvent<HTMLButtonElement>,
+    conversation: ConversationResource,
+  ) => void;
+  peerIdentityId?: string;
+  pictureUrl?: string;
+  presence?: IdentityPresence;
+  title: string;
+};
+
+function SidebarConversationButton({
+  active,
+  bannerUrl,
+  canOpenMenu,
+  conversation,
+  handle,
+  loading,
+  onClearLongPressTimer,
+  onContextMenu,
+  onPointerDown,
+  onSelect,
+  peerIdentityId,
+  pictureUrl,
+  presence,
+  title,
+}: SidebarConversationButtonProps) {
+  return (
+    <button
+      type="button"
+      data-testid="conversation-list-item"
+      data-conversation-id={conversation.id}
+      data-conversation-title={title}
+      data-banner-url={bannerUrl ?? ''}
+      onClick={(event) => onSelect(event, conversation)}
+      onContextMenu={(event) => {
+        if (!canOpenMenu) return;
+
+        onContextMenu(event, conversation, title);
+      }}
+      onPointerCancel={onClearLongPressTimer}
+      onPointerDown={(event) => onPointerDown(event, conversation, title)}
+      onPointerLeave={onClearLongPressTimer}
+      onPointerUp={onClearLongPressTimer}
+      className={cx(
+        'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
+        active
+          ? 'bg-white text-slate-950'
+          : 'bg-white/8 text-white hover:bg-white/14',
+      )}
+    >
+      <SidebarConversationBanner bannerUrl={bannerUrl} hidden={false} />
+      <div className="relative flex items-center gap-3">
+        <SidebarConversationAvatar
+          active={active}
+          loading={loading.avatar}
+          peerIdentityId={peerIdentityId}
+          pictureUrl={pictureUrl}
+          presence={presence}
+          title={title}
+        />
+        <SidebarConversationDetails
+          active={active}
+          handle={handle}
+          loading={loading}
+          title={title}
+        />
+        <SidebarUnreadCount unreadCount={conversation.unreadCount} />
+      </div>
+    </button>
+  );
+}
+
+function SidebarConversationBanner({
+  bannerUrl,
+  hidden,
+}: {
+  bannerUrl?: string;
+  hidden: boolean;
+}) {
+  if (!bannerUrl || hidden) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute inset-0 bg-cover bg-center"
+      style={{
+        backgroundImage: `linear-gradient(90deg, rgba(6,8,26,0) 0%, rgba(6,8,26,0) 50%, rgba(6,8,26,.62) 100%), url(${bannerUrl})`,
+        maskImage:
+          'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+        WebkitMaskImage:
+          'linear-gradient(90deg, transparent 0%, transparent 42%, rgba(0,0,0,.18) 56%, rgba(0,0,0,.55) 72%, black 100%)',
+      }}
+    />
+  );
+}
+
+function SidebarConversationAvatar({
+  active,
+  loading,
+  peerIdentityId,
+  pictureUrl,
+  presence,
+  title,
+}: {
+  active: boolean;
+  loading: boolean;
+  peerIdentityId?: string;
+  pictureUrl?: string;
+  presence?: IdentityPresence;
+  title: string;
+}) {
+  if (loading) {
+    return (
+      <span className="h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
+    );
+  }
+
+  return (
+    <div
+      className={cx(
+        'relative grid h-11 w-11 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+        active && 'ring-2 ring-slate-950/20',
+      )}
+    >
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+        {pictureUrl ? (
+          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          title.slice(0, 1).toUpperCase()
+        )}
+      </span>
+      {peerIdentityId && (
+        <PresenceStatusDot presence={presence} className="-bottom-1 -right-1" />
+      )}
+    </div>
+  );
+}
+
+function SidebarConversationDetails({
+  active,
+  handle,
+  loading,
+  title,
+}: {
+  active: boolean;
+  handle: string;
+  loading: ConversationIdentityLoadingState;
+  title: string;
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      {loading.title ? (
+        <SidebarTextSkeleton active={active} className="h-4 w-32 max-w-[78%]" />
+      ) : (
+        <div className="truncate font-black">{title}</div>
+      )}
+      {loading.subtitle ? (
+        <SidebarTextSkeleton
+          active={active}
+          className="mt-2 h-3 w-20 max-w-[52%]"
+          secondary
+        />
+      ) : (
+        <div
+          className={cx(
+            'truncate text-xs',
+            active ? 'text-slate-500' : 'text-white/45',
+          )}
+        >
+          {handle}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarTextSkeleton({
+  active,
+  className,
+  secondary = false,
+}: {
+  active: boolean;
+  className: string;
+  secondary?: boolean;
+}) {
+  return (
+    <div
+      className={cx(
+        'animate-pulse rounded-full',
+        active
+          ? secondary
+            ? 'bg-slate-400/30'
+            : 'bg-slate-400/40'
+          : secondary
+            ? 'bg-white/12'
+            : 'bg-white/18',
+        className,
+      )}
+    />
+  );
+}
+
+function SidebarUnreadCount({ unreadCount }: { unreadCount?: number }) {
+  if (!unreadCount) return null;
+
+  return (
+    <span className="rounded-full bg-fuchsia-500 px-2 py-1 text-xs font-black text-white">
+      {unreadCount}
+    </span>
+  );
+}
+
+function SidebarConversationMenuSlot({
+  conversation,
+  conversationMenu,
+  notificationSetting,
   onClose,
   onNotificationMuteToggle,
   onNotificationSettingsOpen,
+}: {
+  conversation: ConversationResource;
+  conversationMenu: ConversationMenuState | null;
+  notificationSetting?: NotificationScopeSetting;
+  onClose: () => void;
+  onNotificationMuteToggle?: (conversation: ConversationResource) => void;
+  onNotificationSettingsOpen?: (
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+}) {
+  if (
+    !conversationMenu ||
+    conversationMenu.conversation.id !== conversation.id
+  ) {
+    return null;
+  }
+
+  if (
+    !notificationSetting ||
+    !onNotificationMuteToggle ||
+    !onNotificationSettingsOpen
+  ) {
+    return null;
+  }
+
+  return (
+    <SidebarConversationMenu
+      left={conversationMenu.left}
+      notificationSetting={notificationSetting}
+      title={conversationMenu.title}
+      top={conversationMenu.top}
+      onClose={onClose}
+      onNotificationMuteToggle={() => {
+        onNotificationMuteToggle(conversation);
+      }}
+      onNotificationSettingsOpen={() => {
+        onNotificationSettingsOpen(conversation, conversationMenu.title);
+      }}
+    />
+  );
+}
+
+type ConversationIdentityLoadingState = {
+  avatar: boolean;
+  subtitle: boolean;
+  title: boolean;
+};
+
+function conversationIdentityLoadingState({
+  conversation,
+  identityNames,
+  identityPictures,
+  identityProfiles,
+  peerIdentityId,
+}: {
+  conversation: ConversationResource;
+  identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
+  peerIdentityId?: string;
+}): ConversationIdentityLoadingState {
+  const loaded = {
+    avatar: false,
+    subtitle: false,
+    title: false,
+  };
+
+  if (isGroupConversation(conversation)) return loaded;
+
+  if (!peerIdentityId) return loaded;
+
+  if (identityProfiles[peerIdentityId]) return loaded;
+
+  const identityName = identityNames[peerIdentityId];
+  const hasKnownName = !!identityName && identityName !== peerIdentityId;
+
+  return {
+    avatar: !identityPictures[peerIdentityId],
+    subtitle: true,
+    title: !hasKnownName,
+  };
+}
+
+function SidebarConversationMenu({
+  left,
+  notificationSetting,
+  onClose,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
+  title,
+  top,
 }: {
   left: number;
   notificationSetting: NotificationScopeSetting;
@@ -502,9 +853,9 @@ function SidebarConversationMenu({
           close();
         }}
         style={{
+          userSelect: 'none',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
-          userSelect: 'none',
         }}
         aria-label={copy.dialog.close}
       />
@@ -552,47 +903,82 @@ function useIdentityBannerUrls(
   identities: Record<string, IdentityResource>,
   identityIdsByKey: Record<string, string>,
 ): Record<string, string> {
-  const [bannerUrls, setBannerUrls] = useState<Record<string, string>>({});
+  const [bannerUrls, setBannerUrls] = useState<
+    Record<string, { bannerId: string; url: string }>
+  >({});
 
   useEffect(() => {
     const entries = Object.entries(identityIdsByKey)
-      .map(([key, identityId]) => [key, identities[identityId]] as const)
+      .map(([key, identityId]) => {
+        const identity = identities[identityId];
+        const bannerId = identity?.profile.banner?.trim();
+
+        return [key, identity, bannerId] as const;
+      })
       .filter(
-        (entry): entry is readonly [string, IdentityResource] =>
-          !!entry[1]?.profile.banner && !bannerUrls[entry[0]],
+        (entry): entry is readonly [string, IdentityResource, string] =>
+          !!entry[1] &&
+          !!entry[2] &&
+          bannerUrls[entry[0]]?.bannerId !== entry[2],
       );
+
+    setBannerUrls((current) => {
+      const validBannerIdsByKey = Object.fromEntries(
+        Object.entries(identityIdsByKey).map(([key, identityId]) => [
+          key,
+          identities[identityId]?.profile.banner?.trim() ?? '',
+        ]),
+      );
+      const next = Object.fromEntries(
+        Object.entries(current).filter(
+          ([key, banner]) => validBannerIdsByKey[key] === banner.bannerId,
+        ),
+      );
+
+      return Object.keys(next).length === Object.keys(current).length
+        ? current
+        : next;
+    });
 
     if (entries.length === 0) return;
 
     let cancelled = false;
 
     void Promise.all(
-      entries.map(async ([key, identity]) => {
+      entries.map(async ([key, identity, bannerId]) => {
         const directBanner = identityBanner(identity);
 
-        if (directBanner) return [key, directBanner] as const;
+        if (directBanner) return [key, bannerId, directBanner] as const;
 
-        const bannerCid = identity.profile.banner?.trim();
+        const bannerCid = bannerId;
 
         if (!bannerCid) return null;
 
         const loadedBanner = await loadPublicImage(bannerCid);
 
-        return loadedBanner ? ([key, loadedBanner] as const) : null;
+        return loadedBanner ? ([key, bannerId, loadedBanner] as const) : null;
       }),
     )
       .then((loaded) => {
         if (cancelled) return;
 
         const nextUrls = loaded.filter(
-          (entry): entry is readonly [string, string] => entry !== null,
+          (entry): entry is readonly [string, string, string] => entry !== null,
         );
 
         if (nextUrls.length === 0) return;
 
         setBannerUrls((current) => ({
           ...current,
-          ...Object.fromEntries(nextUrls),
+          ...Object.fromEntries(
+            nextUrls.map(([key, bannerId, url]) => [
+              key,
+              {
+                bannerId,
+                url,
+              },
+            ]),
+          ),
         }));
       })
       .catch(() => undefined);
@@ -602,7 +988,9 @@ function useIdentityBannerUrls(
     };
   }, [bannerUrls, identities, identityIdsByKey]);
 
-  return bannerUrls;
+  return Object.fromEntries(
+    Object.entries(bannerUrls).map(([key, banner]) => [key, banner.url]),
+  );
 }
 
 function isGroupConversation(conversation: ConversationResource): boolean {

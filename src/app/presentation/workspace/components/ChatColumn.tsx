@@ -1,7 +1,18 @@
 import type { FormEvent, MouseEvent } from 'react';
 
-import { EncryptedPayload, PrivateKey, PublicKey } from '@haskou/value-objects';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  EncryptedPayload,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/value-objects';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
@@ -448,7 +459,9 @@ export function ChatColumn({
         return {
           identity,
           identityId,
-          name: memberPrimaryName(identity, identityId),
+          name:
+            identityNames[identityId] ??
+            (identity ? memberPrimaryName(identity, identityId) : undefined),
           picture: identityPictures[identityId],
         };
       }),
@@ -460,7 +473,9 @@ export function ChatColumn({
         identity: participant.identity,
         identityId: participant.identityId,
         muted: false,
-        name: participant.name,
+        name:
+          participant.name ??
+          memberPrimaryName(participant.identity, participant.identityId),
         picture: participant.picture,
       })),
     [groupParticipants],
@@ -470,18 +485,18 @@ export function ChatColumn({
     !hasConversationKey && !!pendingInvitation && !!onInvitationAccept;
   const invitationPrompt =
     !hasConversationKey && pendingInvitation && onInvitationAccept ? (
-    <InvitationKeyPrompt
-      accepting={invitationAccepting}
-      error={invitationError}
-      inviterName={invitationInviterName}
-      kind="conversation"
-      onAccept={() => onInvitationAccept(pendingInvitation)}
-      onManualImport={() => {
-        setConversationKeyError(null);
-        setConversationKeyDialog('add');
-      }}
-    />
-  ) : null;
+      <InvitationKeyPrompt
+        accepting={invitationAccepting}
+        error={invitationError}
+        inviterName={invitationInviterName}
+        kind="conversation"
+        onAccept={() => onInvitationAccept(pendingInvitation)}
+        onManualImport={() => {
+          setConversationKeyError(null);
+          setConversationKeyDialog('add');
+        }}
+      />
+    ) : null;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
     setEncryptedConversationKey('');
@@ -546,9 +561,8 @@ export function ChatColumn({
     setConversationKeySaving(true);
     setConversationKeyError(null);
     try {
-      const decrypted = await session.encryptedKeyPair.decrypt(
+      const decrypted = session.keyPair.decrypt(
         new EncryptedPayload(encryptedPayload),
-        session.password,
       );
       const parsed = JSON.parse(
         decrypted.toString(),
@@ -558,20 +572,24 @@ export function ChatColumn({
         throw new Error('Conversation key belongs to another conversation.');
       }
 
-      if (!parsed.privateKey) {
-        throw new Error('Conversation key payload is missing the private key.');
+      if (
+        parsed.algorithm !== 'aes-256-gcm' ||
+        !parsed.key ||
+        parsed.version !== 2
+      ) {
+        throw new Error('Conversation key payload is invalid.');
       }
 
-      const privateKey = PrivateKey.fromPEM(parsed.privateKey);
-      const publicKey =
-        parsed.publicKey ?? privateKey.getPublicKey().toString();
+      SymmetricKey.fromBase64(parsed.key);
       const keyEntry: ConversationKeyEntry = {
+        algorithm: 'aes-256-gcm',
         conversationId: activeConversation.id,
         createdAt: parsed.createdAt ?? Date.now(),
+        key: parsed.key,
+        kind: parsed.kind ?? 'conversation',
         peerIdentityId:
           parsed.peerIdentityId ?? peerIdentityId ?? session.identity.id,
-        privateKey: privateKey.toString(),
-        publicKey,
+        version: 2,
       };
 
       await onConversationKeyImported(keyEntry);
@@ -720,6 +738,7 @@ export function ChatColumn({
               })
             }
             onOpenPins={onOpenPins}
+            onRealtimeEventsOpen={onRealtimeEventsOpen}
             onStartCall={onStartCall}
           />
         )}
@@ -898,7 +917,12 @@ export function ChatColumn({
                 anchor: profileAnchorFromTarget(event.currentTarget),
                 identity: participant.identity,
                 identityId: participant.identityId,
-                name: participant.name,
+                name:
+                  participant.name ??
+                  memberPrimaryName(
+                    participant.identity,
+                    participant.identityId,
+                  ),
                 picture: participant.picture,
               });
             }}

@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/value-objects';
 
 import type {
   Community,
@@ -24,9 +24,12 @@ import type { CommunityChannelMessageInput } from './PigeonCommunitiesApplicatio
 import type { CommunityImageCids } from './PigeonCommunitiesApplication/CommunityImageCids';
 import type { CreateCommunityInput } from './PigeonCommunitiesApplication/CreateCommunityInput';
 import type { CreateCommunityResult } from './PigeonCommunitiesApplication/CreateCommunityResult';
+import type { LeaveCommunityResult } from './PigeonCommunitiesApplication/LeaveCommunityResult';
 
 import { ListCommunities } from '../../contexts/communities/application/list-communities/ListCommunities';
 import { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
+import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
+import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 export class PigeonCommunitiesApplication {
@@ -155,19 +158,24 @@ export class PigeonCommunitiesApplication {
     return (await this.gateway.uploadPublicFile(session, value)).cid;
   }
 
-  private async createCommunityKeyEntry(
-    communityId: string,
-  ): Promise<ConversationKeyEntry> {
-    const keyPair = await KeyPair.generate();
-    const primitives = keyPair.toPrimitives();
-
+  private createCommunityKeyEntry(communityId: string): ConversationKeyEntry {
     return {
+      algorithm: 'aes-256-gcm',
       conversationId: communityId,
       createdAt: Date.now(),
+      key: SymmetricKey.generate().valueOf(),
+      kind: 'community',
       peerIdentityId: '',
-      privateKey: primitives.privateKey,
-      publicKey: primitives.publicKey,
+      version: 2,
     };
+  }
+
+  private isLeaveAlreadyApplied(caught: unknown): boolean {
+    return (
+      caught instanceof HttpJsonError &&
+      (caught.code === 'CommunityMemberNotFoundError' ||
+        caught.code === 'CommunityNotFoundError')
+    );
   }
 
   private async createInitialChannels(
@@ -352,8 +360,27 @@ export class PigeonCommunitiesApplication {
   public async leave(
     session: Session,
     communityId: string,
-  ): Promise<Community> {
-    return await this.gateway.leaveCommunity(session, communityId);
+  ): Promise<LeaveCommunityResult> {
+    let community: Community | null = null;
+
+    try {
+      community = await this.gateway.leaveCommunity(session, communityId);
+    } catch (caught) {
+      if (!this.isLeaveAlreadyApplied(caught)) throw caught;
+    }
+
+    const nextKeychain = ConversationKeychain.withoutCommunityEntry(
+      session.keychain,
+      communityId,
+    );
+    const published = await this.gateway.publishKeychain(session, nextKeychain);
+
+    return {
+      community,
+      communityId,
+      keychain: published.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
   }
 
   public async createInvitation(

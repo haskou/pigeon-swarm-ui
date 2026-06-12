@@ -103,13 +103,17 @@ export function IdentityMemberListPanel({
   );
 }
 
-function IdentityMemberRow({
+export function IdentityMemberRow({
+  className,
+  interactive = true,
   item,
   onClick,
   ownerLabel,
 }: {
+  className?: string;
+  interactive?: boolean;
   item: IdentityMemberListItem;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   ownerLabel?: string;
 }) {
   const loadingProfile = !item.identity && !item.name;
@@ -120,31 +124,51 @@ function IdentityMemberRow({
   const bannerUrl = useIdentityBannerUrl(item.identity);
 
   if (loadingProfile) {
+    const loadingContent = (
+      <>
+        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
+        <span className="relative min-w-0 flex-1">
+          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-[#747687]" />
+          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-[#666879]" />
+        </span>
+      </>
+    );
+
+    if (!interactive) {
+      return (
+        <div
+          data-testid="identity-member-row"
+          data-identity-id={item.identityId}
+          data-banner-url=""
+          className={cx(
+            'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
+            className,
+          )}
+        >
+          {loadingContent}
+        </div>
+      );
+    }
+
     return (
       <button
         type="button"
         disabled
-        className="relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left"
+        data-testid="identity-member-row"
+        data-identity-id={item.identityId}
+        data-banner-url=""
+        className={cx(
+          'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
+          className,
+        )}
       >
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-white/8 via-white/4 to-transparent"
-        />
-        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-white/12" />
-        <span className="relative min-w-0 flex-1">
-          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-white/14" />
-          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-white/10" />
-        </span>
+        {loadingContent}
       </button>
     );
   }
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12"
-    >
+  const content = (
+    <>
       {bannerUrl && (
         <span
           aria-hidden="true"
@@ -178,6 +202,38 @@ function IdentityMemberRow({
       {item.owner && ownerLabel && (
         <OwnerMarker label={ownerLabel}>♛</OwnerMarker>
       )}
+    </>
+  );
+
+  if (!interactive) {
+    return (
+      <div
+        data-testid="identity-member-row"
+        data-identity-id={item.identityId}
+        data-banner-url={bannerUrl ?? ''}
+        className={cx(
+          'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+          className,
+        )}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid="identity-member-row"
+      data-identity-id={item.identityId}
+      data-banner-url={bannerUrl ?? ''}
+      className={cx(
+        'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12',
+        className,
+      )}
+    >
+      {content}
     </button>
   );
 }

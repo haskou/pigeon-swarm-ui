@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
 import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 
 export function useCommunitySelection({
   activeCommunityId,
@@ -13,11 +14,16 @@ export function useCommunitySelection({
   communities: Community[];
   communityChannelById: Record<string, string>;
 }) {
+  const selectableCommunities = useMemo(
+    () => CommunityList.withUniqueIds(communities),
+    [communities],
+  );
   const activeCommunity = useMemo(
     () =>
-      communities.find((community) => community.id === activeCommunityId) ??
-      communities[0],
-    [activeCommunityId, communities],
+      selectableCommunities.find(
+        (community) => community.id === activeCommunityId,
+      ) ?? selectableCommunities[0],
+    [activeCommunityId, selectableCommunities],
   );
   const activeCommunityTextChannels = useMemo(
     () => (activeCommunity ? CommunityChannels.text(activeCommunity) : []),

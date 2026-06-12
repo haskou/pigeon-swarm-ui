@@ -60,7 +60,10 @@ export function ProfileEditor({
   nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
-  onUpdated: (session: Session) => void;
+  onUpdated: (
+    session: Session,
+    change: { passwordChanged: boolean },
+  ) => void;
 }) {
   const [name, setName] = useState(session.identity.profile.name);
   const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
@@ -237,7 +240,7 @@ export function ProfileEditor({
         ...session,
         identity,
         password: wantsPasswordChange ? newPassword : session.password,
-      });
+      }, { passwordChanged: wantsPasswordChange });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
     }
@@ -279,6 +282,7 @@ export function ProfileEditor({
               onClick={() => bannerInputRef.current?.click()}
               className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
               aria-label={copy.profile.changeBanner}
+              data-testid="profile-banner-button"
             >
               {bannerPreview && (
                 <img
@@ -363,6 +367,7 @@ export function ProfileEditor({
               accept="image/*"
               onChange={handleBannerChange}
               className="sr-only"
+              data-testid="profile-banner-input"
             />
           </div>
           <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
@@ -480,6 +485,7 @@ export function ProfileEditor({
           <button
             disabled={!canSubmit}
             className="rounded-2xl border border-fuchsia-300/30 bg-fuchsia-500 px-5 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-white/45 disabled:hover:bg-white/[0.08]"
+            data-testid="profile-save-button"
           >
             {state === 'loading' ? copy.profile.saving : copy.profile.save}
           </button>

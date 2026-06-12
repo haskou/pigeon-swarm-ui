@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
   ConversationResource,
+  CommunityMembershipRequest,
   IdentityResource,
   NotificationResource,
   Session,
@@ -10,6 +11,7 @@ import type {
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { saveRememberedIdentityPreview } from '../../infrastructure/storage/rememberedIdentityPreview';
 import {
   identityName,
   identityPicture,
@@ -20,6 +22,7 @@ import {
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
+  membershipRequests: CommunityMembershipRequest[];
   messageAuthorIdentityIdsKey: string;
   notifications: NotificationResource[];
   session: Session;
@@ -32,8 +35,11 @@ type ResolvedIdentity = readonly [
   identity: IdentityResource | null,
 ];
 
+const IDENTITY_PROFILE_REFRESH_INTERVAL_MS = 15_000;
+
 export function useIdentityDirectory({
   conversations,
+  membershipRequests,
   messageAuthorIdentityIdsKey,
   notifications,
   session,
@@ -85,7 +91,7 @@ export function useIdentityDirectory({
       .catch(() => undefined);
   }, []);
 
-  const identityIdsToResolve = useMemo(() => {
+  const identityIdsInUse = useMemo(() => {
     const ids = new Set<string>();
 
     conversations.forEach((conversation) => {
@@ -118,77 +124,141 @@ export function useIdentityDirectory({
         ids.add(notification.payload.recipientIdentityId);
       }
     });
+    membershipRequests.forEach((request) => {
+      if (isResolvableIdentityId(request.identityId)) {
+        ids.add(request.identityId);
+      }
+
+      if (isResolvableIdentityId(request.creatorIdentityId)) {
+        ids.add(request.creatorIdentityId);
+      }
+    });
     messageAuthorIdentityIdsKey
       .split('\u0000')
       .filter(isResolvableIdentityId)
       .forEach((identityId) => ids.add(identityId));
     ids.delete(session.identity.id);
 
-    return [...ids].filter(
-      (identityId) =>
-        !identityNames[identityId] &&
-        !resolvingIdentityIds.includes(identityId),
-    );
+    return [...ids].sort();
   }, [
     conversations,
-    identityNames,
+    membershipRequests,
     messageAuthorIdentityIdsKey,
     notifications,
-    resolvingIdentityIds,
     session.identity.id,
     session.keychain,
   ]);
 
+  const applyResolvedIdentities = useCallback(
+    (resolvedIdentities: ResolvedIdentity[]) => {
+      setIdentityNames((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities.map(([identityId, name]) => [identityId, name]),
+        ),
+      }));
+      setIdentityProfiles((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          resolvedIdentities
+            .filter(([, , , identity]) => !!identity)
+            .map(([identityId, , , identity]) => [
+              identityId,
+              identity as IdentityResource,
+            ]),
+        ),
+      }));
+      setIdentityPictures((current) => {
+        const next = { ...current };
+
+        resolvedIdentities.forEach(([identityId, , picture, identity]) => {
+          if (!identity) return;
+
+          if (picture) next[identityId] = picture;
+          else delete next[identityId];
+        });
+
+        return next;
+      });
+    },
+    [],
+  );
+
+  const resolveIdentityIds = useCallback(
+    (identityIds: string[], options: { refresh?: boolean } = {}) => {
+      const nextIdentityIds = identityIds.filter(
+        (identityId) => !resolvingIdentityIds.includes(identityId),
+      );
+
+      if (nextIdentityIds.length === 0) return;
+
+      setResolvingIdentityIds((current) => [
+        ...new Set([...current, ...nextIdentityIds]),
+      ]);
+
+      void Promise.all(
+        nextIdentityIds.map((identityId) =>
+          resolveIdentity(identityId, options),
+        ),
+      ).then((resolvedIdentities) => {
+        applyResolvedIdentities(resolvedIdentities);
+        setResolvingIdentityIds((current) =>
+          current.filter((identityId) => !nextIdentityIds.includes(identityId)),
+        );
+      });
+    },
+    [applyResolvedIdentities, resolvingIdentityIds],
+  );
+
+  const identityIdsToResolve = useMemo(
+    () =>
+      identityIdsInUse.filter((identityId) => !identityProfiles[identityId]),
+    [identityIdsInUse, identityProfiles],
+  );
+
+  const identityIdsToRefresh = useMemo(
+    () =>
+      identityIdsInUse.filter((identityId) => !!identityProfiles[identityId]),
+    [identityIdsInUse, identityProfiles],
+  );
+
   useEffect(() => {
     rememberIdentity(session.identity);
+    void rememberSessionIdentityPreview(session.identity).catch(
+      () => undefined,
+    );
   }, [rememberIdentity, session.identity]);
 
   useEffect(() => {
     if (identityIdsToResolve.length === 0) return;
 
-    setResolvingIdentityIds((current) => [
-      ...new Set([...current, ...identityIdsToResolve]),
-    ]);
+    resolveIdentityIds(identityIdsToResolve);
+  }, [identityIdsToResolve, resolveIdentityIds]);
 
-    void Promise.all(identityIdsToResolve.map(resolveIdentity)).then(
-      (resolvedIdentities) => {
-        setIdentityNames((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities.map(([identityId, name]) => [identityId, name]),
-          ),
-        }));
-        setIdentityProfiles((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            resolvedIdentities
-              .filter(([, , , identity]) => !!identity)
-              .map(([identityId, , , identity]) => [
-                identityId,
-                identity as IdentityResource,
-              ]),
-          ),
-        }));
-        setIdentityPictures((current) => {
-          const next = { ...current };
+  useEffect(() => {
+    if (identityIdsToRefresh.length === 0) return undefined;
 
-          resolvedIdentities.forEach(([identityId, , picture, identity]) => {
-            if (!identity) return;
+    const refreshIdentities = () =>
+      resolveIdentityIds(identityIdsToRefresh, { refresh: true });
+    const refreshVisibleIdentities = () => {
+      if (document.visibilityState === 'visible') refreshIdentities();
+    };
+    const intervalId = window.setInterval(() => {
+      refreshIdentities();
+    }, IDENTITY_PROFILE_REFRESH_INTERVAL_MS);
 
-            if (picture) next[identityId] = picture;
-            else delete next[identityId];
-          });
+    window.addEventListener('focus', refreshIdentities);
+    document.addEventListener('visibilitychange', refreshVisibleIdentities);
 
-          return next;
-        });
-        setResolvingIdentityIds((current) =>
-          current.filter(
-            (identityId) => !identityIdsToResolve.includes(identityId),
-          ),
-        );
-      },
-    );
-  }, [identityIdsToResolve]);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIdentities);
+      document.removeEventListener(
+        'visibilitychange',
+        refreshVisibleIdentities,
+      );
+    };
+  }, [identityIdsToRefresh, resolveIdentityIds]);
 
   return {
     identityNames,
@@ -210,11 +280,15 @@ function isResolvableIdentityId(
   );
 }
 
-async function resolveIdentity(identityId: string): Promise<ResolvedIdentity> {
+async function resolveIdentity(
+  identityId: string,
+  options: { refresh?: boolean } = {},
+): Promise<ResolvedIdentity> {
   try {
-    const identity = await applicationContainer.getIdentity(
-      IdentityId.normalize(identityId),
-    );
+    const normalizedIdentityId = IdentityId.normalize(identityId);
+    const identity = options.refresh
+      ? await applicationContainer.refreshIdentity(normalizedIdentityId)
+      : await applicationContainer.getIdentity(normalizedIdentityId);
     const picture = await loadIdentityPicture(identity).catch(() => null);
 
     return [
@@ -242,4 +316,50 @@ async function loadIdentityPicture(
   const content = await applicationContainer.getPublicFile(pictureCid);
 
   return publicFileObjectUrl(content);
+}
+
+async function rememberSessionIdentityPreview(
+  identity: IdentityResource,
+): Promise<void> {
+  const pictureUrl = await loadRememberedIdentityPicture(identity);
+
+  saveRememberedIdentityPreview({
+    identityId: identity.id,
+    name: identityName(identity) ?? identity.id,
+    pictureUrl,
+  });
+}
+
+async function loadRememberedIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  const content = await applicationContainer.getPublicFile(pictureCid);
+
+  return await blobToDataUrl(content.blob);
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+
+        return;
+      }
+
+      reject(new Error('Could not read identity picture preview.'));
+    });
+    reader.readAsDataURL(blob);
+  });
 }

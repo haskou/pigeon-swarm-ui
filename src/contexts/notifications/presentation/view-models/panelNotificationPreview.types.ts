@@ -10,6 +10,7 @@ import type {
 
 export type NotificationPreview = {
   avatarUrl?: string;
+  loading?: boolean;
   subtitle?: string;
   title: string;
 };

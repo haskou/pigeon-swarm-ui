@@ -8,22 +8,20 @@ import type {
 import type { KeychainDomainSignaturePayload } from './KeychainDomainSignaturePayload';
 import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
+import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 export class KeychainCipher {
-  public async decrypt(
-    session: Session,
-    keychain: KeychainResource,
-  ): Promise<LocalKeychain> {
-    const decrypted = await session.encryptedKeyPair.decrypt(
+  public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
+    const decrypted = session.masterKey.decrypt(
       new EncryptedPayload(keychain.encryptedPayload),
-      session.password,
     );
 
     const parsed = JSON.parse(decrypted.toString()) as Partial<LocalKeychain>;
 
     return {
       conversations: parsed.conversations ?? {},
+      timestamp: parsed.timestamp ?? keychain.timestamp,
       version: parsed.version ?? keychain.version ?? 0,
     };
   }
@@ -37,8 +35,8 @@ export class KeychainCipher {
       (session.keychain.version ?? 0) + 1,
       nextKeychain.version,
     );
-    const keychain = { ...nextKeychain, version };
-    const encryptedPayload = session.encryptedKeyPair
+    const keychain = { ...nextKeychain, timestamp, version };
+    const encryptedPayload = session.masterKey
       .encrypt(JSON.stringify(keychain))
       .toString();
     const previousKeychainExternalIdentifier =
@@ -50,9 +48,9 @@ export class KeychainCipher {
       timestamp,
       version,
     };
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(domainPayload),
-      session.password,
     );
 
     return {

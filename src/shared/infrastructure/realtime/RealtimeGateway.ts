@@ -5,12 +5,11 @@ export type { RealtimeDomainEvent } from './RealtimeDomainEvent';
 export type { RealtimeMessage } from './RealtimeMessage';
 export type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 export type { RealtimeTypingInput } from './RealtimeTypingInput';
-import { UUID } from '@haskou/value-objects';
-
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
@@ -88,21 +87,18 @@ export class RealtimeGateway {
     session: Session,
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
-    const path = this.connection.path('/ws');
-    const timestamp = `${Date.now()}`;
-    const nonce = UUID.generate().toString();
-    const signature = await session.encryptedKeyPair.sign(
-      this.signer.payload('GET', path, timestamp, nonce, {}),
-      session.password,
-    );
+    const timestamp = Date.now();
     const url = this.connection.websocket('/ws');
+    const signature = await signSessionPayload(
+      session,
+      this.signer.payload('GET', url.pathname, timestamp, {}),
+    );
 
     url.searchParams.set(
       'identityId',
       IdentityId.normalize(session.identity.id),
     );
-    url.searchParams.set('timestamp', timestamp);
-    url.searchParams.set('nonce', nonce);
+    url.searchParams.set('timestamp', `${timestamp}`);
     url.searchParams.set('signature', signature.toString());
 
     let socket: WebSocket;

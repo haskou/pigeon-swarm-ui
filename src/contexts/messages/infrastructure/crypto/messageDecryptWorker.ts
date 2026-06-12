@@ -1,4 +1,4 @@
-import { EncryptedPayload, PrivateKey } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
 
 import type {
   ChatMessage,
@@ -68,8 +68,8 @@ async function projectMessages(
   request: MessageDecryptRequest,
 ): Promise<ChatMessage[]> {
   const projectedMessages = new Array<ChatMessage>(request.messages.length);
-  const privateKey = request.privateKey
-    ? PrivateKey.fromPEM(request.privateKey)
+  const symmetricKey = request.symmetricKey
+    ? SymmetricKey.fromBase64(request.symmetricKey)
     : undefined;
 
   for (
@@ -86,7 +86,7 @@ async function projectMessages(
     );
     const batch = await Promise.all(
       indexes.map((index) =>
-        projectMessage(request, request.messages[index], privateKey),
+        projectMessage(request, request.messages[index], symmetricKey),
       ),
     );
 
@@ -101,7 +101,7 @@ async function projectMessages(
 async function projectMessage(
   request: MessageDecryptRequest,
   message: MessageResource,
-  privateKey?: ReturnType<typeof PrivateKey.fromPEM>,
+  symmetricKey?: SymmetricKey,
 ): Promise<ChatMessage> {
   const pollMessage = PollMessageProjection.toChatMessage(
     message,
@@ -125,15 +125,15 @@ async function projectMessage(
 
     if (!encryptedPayload) {
       projectedMessage = plainMessage(base, message);
-    } else if (!privateKey) {
+    } else if (!symmetricKey) {
       projectedMessage = encryptedError(base, message, request.copy.missingKey);
     } else {
-      projectedMessage = await decryptMessage(
+      projectedMessage = decryptMessage(
         request,
         base,
         message,
         encryptedPayload,
-        privateKey,
+        symmetricKey,
       );
     }
   }
@@ -143,15 +143,15 @@ async function projectMessage(
   return projectedMessage;
 }
 
-async function decryptMessage(
+function decryptMessage(
   request: MessageDecryptRequest,
   base: Omit<ChatMessage, 'content' | 'encrypted'>,
   message: MessageResource,
   encryptedPayload: string,
-  privateKey: ReturnType<typeof PrivateKey.fromPEM>,
-): Promise<ChatMessage> {
+  symmetricKey: SymmetricKey,
+): ChatMessage {
   try {
-    const decrypted = await privateKey.decrypt(
+    const decrypted = symmetricKey.decrypt(
       new EncryptedPayload(encryptedPayload),
     );
     const decryptedText = new TextDecoder().decode(decrypted);
@@ -244,7 +244,7 @@ function projectedMessageCacheKey(
   return [
     request.currentIdentityId,
     request.conversationId,
-    request.privateKey ? 'keyed' : 'no-key',
+    request.symmetricKey ? 'keyed' : 'no-key',
     firstCachePart(message.id, message.messageId),
     firstCachePart(message.encryptedPayload, message.payload, message.content),
     firstCachePart(message.timestamp, message.createdAt),

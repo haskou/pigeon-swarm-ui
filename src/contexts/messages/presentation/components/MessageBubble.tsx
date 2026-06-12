@@ -287,7 +287,9 @@ export function MessageBubble({
   return (
     <>
       <div
+        data-testid="message-item"
         data-message-id={message.id}
+        data-message-author-id={message.authorIdentityId}
         className="min-w-0"
       >
         <div
@@ -319,6 +321,7 @@ export function MessageBubble({
             >
               <div
                 data-message-bubble
+                data-testid="message-bubble"
                 onClick={handleMessageClick}
                 onContextMenu={handleContextMenu}
                 onPointerCancel={clearTouchTap}

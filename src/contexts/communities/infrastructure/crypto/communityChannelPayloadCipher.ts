@@ -2,7 +2,7 @@ import type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInpu
 
 export type { CommunityChannelPlainPayload } from './CommunityChannelPlainPayload';
 export type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInput';
-import { PublicKey } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/value-objects';
 
 function communityChannelPayloadType(
   input: CommunityChannelPayloadInput,
@@ -47,7 +47,7 @@ export function encryptCommunityChannelPayload(
 
   const plaintext = serializeCommunityChannelPayload(input);
 
-  return PublicKey.fromPEM(input.communityKey.publicKey)
+  return SymmetricKey.fromBase64(input.communityKey.key)
     .encrypt(plaintext)
     .toString();
 }

@@ -14,6 +14,7 @@ import {
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   CallParticipant,
   CallParticipantStatus,
@@ -79,6 +80,7 @@ import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
   sendRealtimeTyping,
@@ -163,6 +165,7 @@ import {
   mergeConversationThreadMessage,
   removeConversationThreadMessage,
 } from './conversationThreadState';
+import { conversationRealtimeTimelineMessageKind } from './conversationRealtimeTimelineMessage';
 import {
   CommunityWorkspace,
   Inspector,
@@ -197,13 +200,14 @@ interface GlassWorkspaceProps {
   communities: Community[];
   communitiesError: Error | null;
   communitiesLoading: boolean;
-  node: { id: string; owner: null | string } | null;
+  node: (NodeInfo & { owner: null | string }) | null;
   nodeNetworks: NodeNetwork[];
   onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
   onPendingCommunityInviteHandled?: () => void;
   pendingCommunityInvite?: PendingCommunityInviteLink | null;
+  peersLoading: boolean;
   peers: Peer[];
   preloadedConversationMessages: PreloadedConversationMessages | null;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
@@ -221,6 +225,7 @@ export function GlassWorkspace({
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
+  peersLoading,
   peers,
   pendingCommunityInvite,
   preloadedConversationMessages,
@@ -1044,6 +1049,7 @@ export function GlassWorkspace({
     rememberIdentity,
   } = useIdentityDirectory({
     conversations,
+    membershipRequests,
     messageAuthorIdentityIdsKey,
     notifications: notificationList,
     session,
@@ -3136,6 +3142,48 @@ export function GlassWorkspace({
     });
   };
 
+  const applyRealtimeConversationMessage = useCallback(
+    (
+      conversationId: string,
+      message: ChatMessage,
+      shouldAutoScroll: boolean,
+    ) => {
+      const isEditMessage = message.raw.type === 'edited';
+      const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
+
+      if (isThreadReply || isEditMessage) {
+        setConversationThread((current) =>
+          current ? mergeConversationThreadMessage(current, message) : current,
+        );
+      }
+
+      if (!isThreadReply) {
+        setMessages((current) =>
+          isEditMessage
+            ? mergeConversationMessageIfTargetExists(current, message)
+            : MessageCollection.merge(current, [message]),
+        );
+      }
+
+      if (shouldAutoScroll) {
+        markConversationReadUntil(conversationId, [message]);
+        if (!isThreadReply) scrollMessagesToBottom('smooth', true);
+      } else if (!isEditMessage && !isThreadReply) {
+        const setting = NotificationSettingsPolicy.resolve(
+          notificationSettingsRef.current,
+          {
+            conversationId,
+            type: 'conversation',
+          },
+        );
+
+        if (!NotificationSettingsPolicy.isMuted(setting)) {
+          setNewMessageCount((current) => current + 1);
+        }
+      }
+    },
+    [markConversationReadUntil, scrollMessagesToBottom],
+  );
   const fetchRealtimeMessage = useCallback(
     async (
       conversationId: string,
@@ -3151,48 +3199,18 @@ export function GlassWorkspace({
 
         if (!message) return;
 
-        const isEditMessage = message.raw.type === 'edited';
-        const isThreadReply = ThreadMessageVisibility.isThreadMessage(message);
-
-        if (isThreadReply || isEditMessage) {
-          setConversationThread((current) =>
-            current
-              ? mergeConversationThreadMessage(current, message)
-              : current,
-          );
-        }
-
-        if (!isThreadReply) {
-          setMessages((current) =>
-            isEditMessage
-              ? mergeConversationMessageIfTargetExists(current, message)
-              : MessageCollection.merge(current, [message]),
-          );
-        }
-
-        if (shouldAutoScroll) {
-          markConversationReadUntil(conversationId, [message]);
-          if (!isThreadReply) scrollMessagesToBottom('smooth', true);
-        } else if (!isEditMessage && !isThreadReply) {
-          const setting = NotificationSettingsPolicy.resolve(
-            notificationSettingsRef.current,
-            {
-              conversationId,
-              type: 'conversation',
-            },
-          );
-
-          if (!NotificationSettingsPolicy.isMuted(setting)) {
-            setNewMessageCount((current) => current + 1);
-          }
-        }
+        applyRealtimeConversationMessage(
+          conversationId,
+          message,
+          shouldAutoScroll,
+        );
       } catch (caught) {
         setSendError(
           toUserErrorMessage(caught, copy.workspace.loadMessagesError),
         );
       }
     },
-    [markConversationReadUntil, scrollMessagesToBottom, session],
+    [applyRealtimeConversationMessage, session],
   );
   const updateCommunityState = useCallback(
     (communityId: string, updater: (community: Community) => Community) => {
@@ -3206,6 +3224,9 @@ export function GlassWorkspace({
   );
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
+      // eslint-disable-next-line no-console
+      console.debug('[pigeon realtime] domain_event', event.type, event);
+
       if (realtimeEventsOpen) {
         setRealtimeEventLog((current) => {
           if (current.some((item) => item.event_id === event.event_id)) {
@@ -3220,6 +3241,20 @@ export function GlassWorkspace({
 
       if (presence) {
         mergePresence(presence);
+
+        return;
+      }
+
+      if (event.type === 'identities.v1.identity.was_updated') {
+        const identityId =
+          eventAggregateId(event) ?? stringAttribute(event, 'identityId', 'id');
+
+        if (identityId) {
+          void applicationContainer
+            .refreshIdentity(IdentityId.normalize(identityId))
+            .then(rememberIdentity)
+            .catch(() => undefined);
+        }
 
         return;
       }
@@ -3787,27 +3822,58 @@ export function GlassWorkspace({
 
           if (timelineMessage) {
             const shouldAutoScroll = isScrolledNearBottom();
-            const message: ChatMessage = {
-              attachments: [],
-              authorIdentityId:
-                timelineMessage.actorIdentityId ??
-                timelineMessage.authorIdentityId ??
-                'system',
-              content: '',
-              encrypted: false,
-              id: timelineMessage.id ?? `${event.event_id}:call-event`,
-              kind: 'call-event',
-              mine: timelineMessage.actorIdentityId === session.identity.id,
-              raw: timelineMessage,
-              reactions: timelineMessage.reactions ?? [],
-              timestamp: timelineMessage.createdAt ?? event.occurred_on,
-            };
 
-            setMessages((current) =>
-              MessageCollection.merge(current, [message]),
-            );
+            if (
+              conversationRealtimeTimelineMessageKind(event.type) ===
+              'call-event'
+            ) {
+              const message: ChatMessage = {
+                attachments: [],
+                authorIdentityId:
+                  timelineMessage.actorIdentityId ??
+                  timelineMessage.authorIdentityId ??
+                  'system',
+                content: '',
+                encrypted: false,
+                id: timelineMessage.id ?? `${event.event_id}:call-event`,
+                kind: 'call-event',
+                mine: timelineMessage.actorIdentityId === session.identity.id,
+                raw: timelineMessage,
+                reactions: timelineMessage.reactions ?? [],
+                timestamp: timelineMessage.createdAt ?? event.occurred_on,
+              };
 
-            if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+              setMessages((current) =>
+                MessageCollection.merge(current, [message]),
+              );
+
+              if (shouldAutoScroll) scrollMessagesToBottom('smooth', true);
+
+              return;
+            }
+
+            if (!activeConversationKeyId) return;
+
+            void applicationContainer
+              .decryptMessageResource(session, conversationId, timelineMessage)
+              .then((message: ChatMessage) =>
+                applyRealtimeConversationMessage(
+                  conversationId,
+                  message,
+                  shouldAutoScroll,
+                ),
+              )
+              .catch(() => {
+                const fallbackMessageId = messageId ?? timelineMessage.id;
+
+                if (!fallbackMessageId) return;
+
+                void fetchRealtimeMessage(
+                  conversationId,
+                  fallbackMessageId,
+                  shouldAutoScroll,
+                );
+              });
 
             return;
           }
@@ -3855,6 +3921,7 @@ export function GlassWorkspace({
       activeConversation?.id,
       activeConversation?.networkId,
       activeConversationKeyId,
+      applyRealtimeConversationMessage,
       clearUnreadMessages,
       communities,
       conversations,
@@ -3875,6 +3942,7 @@ export function GlassWorkspace({
       refreshSession,
       realtimeEventsOpen,
       receiveSignal,
+      rememberIdentity,
       reconcileCallResource,
       session,
       setConversations,
@@ -4025,10 +4093,17 @@ export function GlassWorkspace({
       if (!window.confirm(copy.communities.leaveConfirm)) return;
 
       try {
-        const updatedCommunity = await applicationContainer.leaveCommunity(
+        const result = await applicationContainer.leaveCommunity(
           session,
           community.id,
         );
+        const updatedCommunity = result.community ?? community;
+
+        setSession({
+          ...session,
+          keychain: result.keychain,
+          keychainExternalIdentifier: result.keychainExternalIdentifier,
+        });
 
         setCommunities((current) =>
           current.filter((item) => item.id !== updatedCommunity.id),
@@ -4048,6 +4123,7 @@ export function GlassWorkspace({
       session,
       setActiveCommunityId,
       setCommunities,
+      setSession,
       setSidebarOpen,
       setWorkspaceMode,
     ],
@@ -4205,9 +4281,7 @@ export function GlassWorkspace({
             <button
               className={cx(
                 'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-                sidebarOpen
-                  ? 'opacity-100'
-                  : 'pointer-events-none opacity-0',
+                sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
               )}
               onClick={() => setSidebarOpen(false)}
               aria-label={copy.workspace.closeSidebar}
@@ -4276,7 +4350,9 @@ export function GlassWorkspace({
                   hasReachedMessageStart={!messageCursor}
                   invitationAccepting={notificationAction === 'accept'}
                   invitationError={notificationError}
-                  invitationInviterName={activeConversationInvitationInviterName}
+                  invitationInviterName={
+                    activeConversationInvitationInviterName
+                  }
                   peerIdentityId={activeConversationPeerIdentityId}
                   peerIdentity={
                     activeConversationPeerIdentityId
@@ -4571,6 +4647,7 @@ export function GlassWorkspace({
             notificationSettingsSetting={notificationSettingsSetting}
             notificationSettingsTarget={notificationSettingsTarget}
             notificationsOpen={notificationsOpen}
+            peersLoading={peersLoading}
             peers={peers}
             presenceByIdentityId={presenceByIdentityId}
             rawMessage={rawMessage}
@@ -4631,7 +4708,9 @@ export function GlassWorkspace({
             onGroupInviteOpen={() =>
               setGroupInviteRequest((request) => request + 1)
             }
-            onOpenConversationWithIdentity={openOrCreateConversationWithIdentity}
+            onOpenConversationWithIdentity={
+              openOrCreateConversationWithIdentity
+            }
             onAcceptMembershipRequest={(requestId) =>
               void acceptMembershipRequest(requestId)
             }

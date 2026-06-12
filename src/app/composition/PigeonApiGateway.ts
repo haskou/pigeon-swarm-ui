@@ -5,6 +5,7 @@ import {
   KeyPair,
   PublicKey,
   StringValueObject,
+  SymmetricKey,
   UUID,
 } from '@haskou/value-objects';
 
@@ -13,6 +14,7 @@ import type {
   CallResource,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
+import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
@@ -96,6 +98,7 @@ import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domai
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
+import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
@@ -111,6 +114,7 @@ import {
 } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { signSessionPayload } from '../../shared/infrastructure/crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
@@ -132,6 +136,14 @@ const defaultKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
 };
+
+const masterKeyDerivationDefaults = {
+  algorithm: 'scrypt',
+  N: 2 ** 18,
+  p: 1,
+  r: 8,
+  version: 1,
+} as const satisfies Omit<IdentityResource['masterKeyDerivation'], 'salt'>;
 
 const messageDecryptBatchSize = 8;
 const identityCacheTtlMs = 2 * 60 * 1000;
@@ -180,6 +192,11 @@ export class PigeonApiGateway {
   >();
 
   private readonly identityCache = new Map<string, CachedIdentity>();
+
+  private readonly pendingIdentityRequests = new Map<
+    string,
+    Promise<IdentityResource>
+  >();
 
   private readonly signer: RequestSigner;
 
@@ -337,11 +354,20 @@ export class PigeonApiGateway {
     });
   }
 
-  private cacheIdentity(identity: IdentityResource): void {
-    this.identityCache.set(IdentityId.normalize(identity.id), {
+  private cacheIdentity(
+    identity: IdentityResource,
+    lookupIdentityId?: string,
+  ): void {
+    const entry = {
       expiresAt: Date.now() + identityCacheTtlMs,
       identity,
-    });
+    };
+
+    this.identityCache.set(IdentityId.normalize(identity.id), entry);
+
+    if (lookupIdentityId) {
+      this.identityCache.set(IdentityId.normalize(lookupIdentityId), entry);
+    }
   }
 
   private async decryptMessages(
@@ -370,7 +396,7 @@ export class PigeonApiGateway {
           copy: copy.messages,
           currentIdentityId: session.identity.id,
           messages: pendingMessages,
-          privateKey: key?.privateKey,
+          symmetricKey: key?.key,
         },
         signal,
       );
@@ -434,7 +460,7 @@ export class PigeonApiGateway {
   }
 
   private encryptMessagePayload(input: EncryptMessagePayloadInput): string {
-    return PublicKey.fromPEM(input.key.publicKey)
+    return SymmetricKey.fromBase64(input.key.key)
       .encrypt(
         JSON.stringify({
           attachments: input.messageAttachments,
@@ -499,14 +525,14 @@ export class PigeonApiGateway {
     )
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
+    const inviterSignature = await signSessionPayload(
+      session,
       JSON.stringify({
         conversationId: keyEntry.conversationId,
         encryptedConversationKey,
         inviterIdentityId: session.identity.id,
         recipientIdentityId: peerIdentity.id,
       }),
-      session.password,
     );
     const body = {
       conversationId: keyEntry.conversationId,
@@ -559,14 +585,14 @@ export class PigeonApiGateway {
     )
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const inviterSignature = await session.encryptedKeyPair.sign(
+    const inviterSignature = await signSessionPayload(
+      session,
       JSON.stringify({
         communityId: keyEntry.conversationId,
         encryptedCommunityKey,
         inviterIdentityId: session.identity.id,
         recipientIdentityId: recipientIdentity.id,
       }),
-      session.password,
     );
     const body = {
       communityId: keyEntry.conversationId,
@@ -584,13 +610,11 @@ export class PigeonApiGateway {
     });
   }
 
-  private async createConversationKeyEntry(
+  private createConversationKeyEntry(
     identityId: string,
     peerIdentityId: string,
     networkId: string,
-  ): Promise<ConversationKeyEntry> {
-    const conversationKeyPair = await KeyPair.generate();
-    const keyPairPrimitives = conversationKeyPair.toPrimitives();
+  ): ConversationKeyEntry {
     const conversationId = this.deterministicConversationId(
       identityId,
       peerIdentityId,
@@ -598,26 +622,27 @@ export class PigeonApiGateway {
     );
 
     return {
+      algorithm: 'aes-256-gcm',
       conversationId,
       createdAt: Date.now(),
+      key: SymmetricKey.generate().valueOf(),
+      kind: 'conversation',
       peerIdentityId,
-      privateKey: keyPairPrimitives.privateKey,
-      publicKey: keyPairPrimitives.publicKey,
+      version: 2,
     };
   }
 
-  private async createGroupConversationKeyEntry(
+  private createGroupConversationKeyEntry(
     conversationId: string,
-  ): Promise<ConversationKeyEntry> {
-    const conversationKeyPair = await KeyPair.generate();
-    const keyPairPrimitives = conversationKeyPair.toPrimitives();
-
+  ): ConversationKeyEntry {
     return {
+      algorithm: 'aes-256-gcm',
       conversationId,
       createdAt: Date.now(),
+      key: SymmetricKey.generate().valueOf(),
+      kind: 'conversation',
       peerIdentityId: '',
-      privateKey: keyPairPrimitives.privateKey,
-      publicKey: keyPairPrimitives.publicKey,
+      version: 2,
     };
   }
 
@@ -634,20 +659,81 @@ export class PigeonApiGateway {
     );
   }
 
+  private async restoreKeyPair(
+    identity: IdentityResource,
+    password: string,
+  ): Promise<KeyPair> {
+    const publicKey = PublicKey.fromPEM(
+      new StringValueObject(identity.encryptedKeyPair.publicKey),
+    );
+    const privateKey = await new EncryptedPrivateKey(
+      new StringValueObject(identity.encryptedKeyPair.encryptedPrivateKey),
+    ).decrypt(new StringValueObject(password));
+
+    return new KeyPair(publicKey, privateKey);
+  }
+
+  private async deriveMasterPasswordKey(
+    password: string,
+    derivation: IdentityResource['masterKeyDerivation'],
+  ): Promise<SymmetricKey> {
+    if (
+      derivation.algorithm !== 'scrypt' ||
+      derivation.version !== masterKeyDerivationDefaults.version
+    ) {
+      throw new Error(copy.auth.invalidLogin);
+    }
+
+    return await SymmetricKey.fromPassword(password, {
+      N: derivation.N,
+      p: derivation.p,
+      r: derivation.r,
+      salt: derivation.salt,
+    });
+  }
+
+  private async encryptMasterKey(
+    masterKey: SymmetricKey,
+    password: string,
+  ): Promise<{
+    encryptedMasterKey: string;
+    masterKeyDerivation: IdentityResource['masterKeyDerivation'];
+  }> {
+    const masterKeyDerivation: IdentityResource['masterKeyDerivation'] = {
+      ...masterKeyDerivationDefaults,
+      salt: SymmetricKey.generate().valueOf(),
+    };
+    const passwordKey = await this.deriveMasterPasswordKey(
+      password,
+      masterKeyDerivation,
+    );
+
+    return {
+      encryptedMasterKey: passwordKey.encrypt(masterKey.valueOf()).toString(),
+      masterKeyDerivation,
+    };
+  }
+
+  private async decryptMasterKey(
+    identity: IdentityResource,
+    password: string,
+  ): Promise<SymmetricKey> {
+    const passwordKey = await this.deriveMasterPasswordKey(
+      password,
+      identity.masterKeyDerivation,
+    );
+    const decrypted = passwordKey.decrypt(
+      new EncryptedPayload(identity.encryptedMasterKey),
+    );
+
+    return SymmetricKey.fromBase64(decrypted.toString());
+  }
+
   private async reEncryptKeyPair(
     session: Session,
     newPassword: string,
   ): Promise<IdentityResource['encryptedKeyPair']> {
-    const privateKey = await new EncryptedPrivateKey(
-      new StringValueObject(
-        session.identity.encryptedKeyPair.encryptedPrivateKey,
-      ),
-    ).decrypt(new StringValueObject(session.password));
-    const encryptedKeyPair = await EncryptedKeyPair.encryptKeyPair(
-      PublicKey.fromPEM(
-        new StringValueObject(session.identity.encryptedKeyPair.publicKey),
-      ),
-      privateKey,
+    const encryptedKeyPair = await session.keyPair.encryptKeyPair(
       new StringValueObject(newPassword),
     );
 
@@ -866,6 +952,19 @@ export class PigeonApiGateway {
       },
       version: keychain.version + 1,
     };
+  }
+
+  private async decryptIdentityPayload(
+    session: Session,
+    encryptedPayload: string,
+  ): Promise<Buffer> {
+    const payload = new EncryptedPayload(encryptedPayload);
+
+    if (session.password) {
+      return await session.encryptedKeyPair.decrypt(payload, session.password);
+    }
+
+    return session.keyPair.decrypt(payload);
   }
 
   private withServerConversationId(
@@ -1868,11 +1967,16 @@ export class PigeonApiGateway {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const encryptedKeyPairPrimitives = encryptedKeyPair.toPrimitives();
+    const masterKey = SymmetricKey.generate();
+    const { encryptedMasterKey, masterKeyDerivation } =
+      await this.encryptMasterKey(masterKey, password);
     const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
     const path = '/identities/';
     const unsigned = this.identitySignatures.createInitial({
       encryptedKeyPair: encryptedKeyPairPrimitives,
+      encryptedMasterKey,
       id: identityId,
+      masterKeyDerivation,
       networks,
       profile: { handle, name },
       timestamp: Date.now(),
@@ -1888,6 +1992,8 @@ export class PigeonApiGateway {
         ...body,
       },
       keychain: defaultKeychain,
+      keyPair,
+      masterKey,
       password,
     } as Session;
 
@@ -1931,17 +2037,31 @@ export class PigeonApiGateway {
 
     if (cached && Date.now() < cached.expiresAt) return cached.identity;
 
-    const identity = await this.cachedRequest(
-      `GET /identities/${normalizedIdentityId}`,
-      () =>
-        this.http.request<IdentityResource>(
-          `/identities/${encodeURIComponent(normalizedIdentityId)}`,
-        ),
-    );
+    return await this.refreshIdentity(normalizedIdentityId);
+  }
 
-    this.cacheIdentity(identity);
+  public async refreshIdentity(identityId: string): Promise<IdentityResource> {
+    const normalizedIdentityId = IdentityId.normalize(identityId);
+    const pending = this.pendingIdentityRequests.get(normalizedIdentityId);
 
-    return identity;
+    if (pending) return await pending;
+
+    const request = this.http
+      .request<IdentityResource>(
+        `/identities/${encodeURIComponent(normalizedIdentityId)}`,
+      )
+      .then((identity) => {
+        this.cacheIdentity(identity, normalizedIdentityId);
+
+        return identity;
+      })
+      .finally(() => {
+        this.pendingIdentityRequests.delete(normalizedIdentityId);
+      });
+
+    this.pendingIdentityRequests.set(normalizedIdentityId, request);
+
+    return await request;
   }
 
   public async updateIdentityProfile(
@@ -1964,17 +2084,22 @@ export class PigeonApiGateway {
     const encryptedKeyPair = newPassword
       ? await this.reEncryptKeyPair(session, newPassword)
       : undefined;
+    const masterKeyEncryption = newPassword
+      ? await this.encryptMasterKey(session.masterKey, newPassword)
+      : undefined;
     const path = `/identities/${encodeURIComponent(identityId)}`;
     const unsigned = this.identitySignatures.createUpdate({
       encryptedKeyPair,
+      encryptedMasterKey: masterKeyEncryption?.encryptedMasterKey,
       identity: currentIdentity,
+      masterKeyDerivation: masterKeyEncryption?.masterKeyDerivation,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: Date.now(),
     });
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(unsigned),
-      session.password,
     );
     const body = {
       ...unsigned,
@@ -2456,25 +2581,49 @@ export class PigeonApiGateway {
   public async login(
     identityId: string,
     password: string,
+    onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
     const identity = await this.getIdentity(identityId.trim());
+    onProgress?.('decrypting-keys');
     const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
+    const loginPayload = new StringValueObject(
+      `pigeon-swarm:login:${identity.id}`,
+    );
+    let keyPair: KeyPair;
 
     try {
-      await encryptedKeyPair.sign(
-        new StringValueObject(`pigeon-swarm:login:${identity.id}`),
-        new StringValueObject(password),
-      );
+      keyPair = await this.restoreKeyPair(identity, password);
+
+      if (
+        !encryptedKeyPair.isValidSignature(
+          loginPayload,
+          keyPair.sign(loginPayload),
+        )
+      ) {
+        throw new Error(copy.auth.invalidLogin);
+      }
     } catch {
       throw new Error(copy.auth.invalidLogin);
     }
 
+    const masterKey = await this.decryptMasterKey(identity, password).catch(
+      () => {
+        throw new Error(copy.auth.invalidLogin);
+      },
+    );
     const session: Session = {
       encryptedKeyPair,
       identity,
       keychain: defaultKeychain,
+      keyPair,
+      masterKey,
       password,
     };
+    onProgress?.('loading-keychain');
+    const conversationsPromise = this.listConversations(session).catch(
+      () => [],
+    );
     const keychainResource = await this.loadRemoteKeychain(session).catch(
       (caught: unknown) => {
         if (this.isMissingRemoteKeychain(caught)) return undefined;
@@ -2491,9 +2640,70 @@ export class PigeonApiGateway {
       keychainExternalIdentifier:
         keychainResource?.keychainExternalIdentifier ?? null,
     };
-    const conversations = await this.listConversations(hydratedSession).catch(
+    onProgress?.('loading-workspace');
+    const conversations = await conversationsPromise;
+
+    return { conversations, session: hydratedSession };
+  }
+
+  public async restoreRememberedSession(
+    identityId: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
+    const identity = await this.getIdentity(identityId.trim());
+    onProgress?.('decrypting-keys');
+    const localUnlock = await loadLocalDeviceUnlock(identity.id);
+
+    if (!localUnlock) {
+      throw new Error(copy.auth.invalidLogin);
+    }
+
+    const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
+    const keyPair = KeyPair.fromPrimitives(localUnlock.keyPair);
+    const loginPayload = new StringValueObject(
+      `pigeon-swarm:login:${identity.id}`,
+    );
+
+    if (
+      !encryptedKeyPair.isValidSignature(
+        loginPayload,
+        keyPair.sign(loginPayload),
+      )
+    ) {
+      throw new Error(copy.auth.invalidLogin);
+    }
+
+    const session: Session = {
+      encryptedKeyPair,
+      identity,
+      keychain: defaultKeychain,
+      keyPair,
+      masterKey: SymmetricKey.fromBase64(localUnlock.masterKey),
+      password: '',
+    };
+    onProgress?.('loading-keychain');
+    const conversationsPromise = this.listConversations(session).catch(
       () => [],
     );
+    const keychainResource = await this.loadRemoteKeychain(session).catch(
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
+    );
+    const keychain = keychainResource
+      ? await this.decryptKeychain(session, keychainResource)
+      : defaultKeychain;
+    const hydratedSession = {
+      ...session,
+      keychain,
+      keychainExternalIdentifier:
+        keychainResource?.keychainExternalIdentifier ?? null,
+    };
+    onProgress?.('loading-workspace');
+    const conversations = await conversationsPromise;
 
     return { conversations, session: hydratedSession };
   }
@@ -2600,7 +2810,8 @@ export class PigeonApiGateway {
       timestamp,
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createSent({
           attachmentExternalIdentifiers,
@@ -2613,7 +2824,6 @@ export class PigeonApiGateway {
           replyToMessageId,
         }),
       ),
-      session.password,
     );
     const body = {
       attachmentExternalIdentifiers,
@@ -2669,7 +2879,8 @@ export class PigeonApiGateway {
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
     const previousMessageIds = [messageId];
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createEdited({
           authorId: session.identity.id,
@@ -2680,7 +2891,6 @@ export class PigeonApiGateway {
           targetMessageId: messageId,
         }),
       ),
-      session.password,
     );
     /* eslint-disable perfectionist/sort-objects */
     const body = {
@@ -2710,7 +2920,8 @@ export class PigeonApiGateway {
   ): Promise<void> {
     const createdAt = Date.now();
     const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signature = await session.encryptedKeyPair.sign(
+    const signature = await signSessionPayload(
+      session,
       JSON.stringify(
         this.messageSignatures.createDeleted({
           authorId: session.identity.id,
@@ -2720,7 +2931,6 @@ export class PigeonApiGateway {
           targetMessageId: messageId,
         }),
       ),
-      session.password,
     );
     const body = {
       createdAt,
@@ -2794,10 +3004,7 @@ export class PigeonApiGateway {
       notification.type === 'community_invitation'
         ? notification.payload.encryptedCommunityKey
         : notification.payload.encryptedConversationKey;
-    const decrypted = await session.encryptedKeyPair.decrypt(
-      new EncryptedPayload(encryptedKey),
-      session.password,
-    );
+    const decrypted = await this.decryptIdentityPayload(session, encryptedKey);
     const keyEntry = JSON.parse(decrypted.toString()) as ConversationKeyEntry;
     const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
     const published = await this.publishKeychain(session, nextKeychain);

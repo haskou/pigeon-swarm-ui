@@ -215,6 +215,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
         className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
         aria-expanded={profileOpen}
+        data-testid="own-profile-menu-button"
       >
         <ProfileAvatar
           label={ownDisplayName}
@@ -296,6 +297,24 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
 
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                {copy.profile.versions}
+              </div>
+              <div className="grid gap-2 rounded-2xl bg-black/25 p-2">
+                <ProfileVersionRow
+                  label={copy.profile.identityVersion}
+                  value={formatProfileVersion(session.identity.version)}
+                  detail={formatProfileVersionDate(session.identity.timestamp)}
+                />
+                <ProfileVersionRow
+                  label={copy.profile.keychainVersion}
+                  value={formatProfileVersion(session.keychain.version)}
+                  detail={formatProfileVersionDate(session.keychain.timestamp)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.language}
               </div>
               <GlassSelect
@@ -311,6 +330,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
             type="button"
             onClick={() => setProfileEditorOpen(true)}
             className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            data-testid="edit-profile-button"
           >
             {copy.profile.edit}
           </button>
@@ -332,9 +352,15 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
             nodeNetworks={nodeNetworks}
             session={session}
             onClose={() => setProfileEditorOpen(false)}
-            onUpdated={(nextSession) => {
-              onSessionUpdated(nextSession);
+            onUpdated={(nextSession, change) => {
               setProfileEditorOpen(false);
+              if (change.passwordChanged) {
+                onLogout();
+
+                return;
+              }
+
+              onSessionUpdated(nextSession);
             }}
           />
         </Suspense>
@@ -342,6 +368,50 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     </div>
   );
 });
+
+function ProfileVersionRow({
+  detail,
+  label,
+  value,
+}: {
+  detail?: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="truncate font-black text-white/70">{label}</div>
+        {detail ? (
+          <div className="truncate text-[0.68rem] font-bold text-white/35">
+            {detail}
+          </div>
+        ) : null}
+      </div>
+      <div className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-black text-white/70">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function formatProfileVersion(version: number): string {
+  return Number.isFinite(version) ? `v${version}` : '-';
+}
+
+function formatProfileVersionDate(timestamp?: number): string | undefined {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(timestamp));
+}
 
 function ProfileAvatar({
   className,

@@ -54,8 +54,6 @@ class WebSocketMock {
   }
 }
 
-const nonce = '00000000-0000-4000-8000-000000000001';
-
 describe(RealtimeGateway.name, () => {
   const originalWebSocket = global.WebSocket;
 
@@ -72,7 +70,6 @@ describe(RealtimeGateway.name, () => {
   it('opens a signed websocket using query authentication', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
     jest.spyOn(Date, 'now').mockReturnValue(1778536870557);
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const signer = new RequestSigner();
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'socket-signature',
@@ -97,19 +94,25 @@ describe(RealtimeGateway.name, () => {
     expect(url.pathname).toBe('/api/ws');
     expect(url.searchParams.get('identityId')).toBe('identity+with/slash=');
     expect(url.searchParams.get('timestamp')).toBe('1778536870557');
-    const queryNonce = url.searchParams.get('nonce');
 
-    expect(queryNonce).toBe(nonce);
+    expect(url.searchParams.has('nonce')).toBe(false);
     expect(url.searchParams.get('signature')).toBe('socket-signature');
     expect(sign).toHaveBeenCalledWith(
-      signer.payload('GET', '/api/ws', '1778536870557', nonce, {}),
+      signer.payload('GET', '/api/ws', 1778536870557, {}),
       'secret',
     );
+    expect(
+      JSON.parse((sign.mock.calls[0] as [string, string])[0]) as {
+        timestamp: unknown;
+      },
+    ).toMatchObject({
+      path: '/api/ws',
+      timestamp: 1778536870557,
+    });
   });
 
   it('resolves relative websocket URLs against the current origin', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('/api'),
       new RequestSigner(),
@@ -132,7 +135,6 @@ describe(RealtimeGateway.name, () => {
 
   it('logs websocket errors without leaking the signature', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const consoleError = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
@@ -162,7 +164,6 @@ describe(RealtimeGateway.name, () => {
 
   it('parses realtime messages from the socket', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -192,7 +193,6 @@ describe(RealtimeGateway.name, () => {
 
   it('parses typing messages from the socket', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -230,7 +230,6 @@ describe(RealtimeGateway.name, () => {
 
   it('sends typing messages through an open socket', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -266,7 +265,6 @@ describe(RealtimeGateway.name, () => {
   it('starts identity heartbeats after the connection acknowledgement', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -300,7 +298,6 @@ describe(RealtimeGateway.name, () => {
     jest.useFakeTimers();
     jest.setSystemTime(1778536870557);
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -341,7 +338,6 @@ describe(RealtimeGateway.name, () => {
     jest.useFakeTimers();
     jest.setSystemTime(1778536870557);
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const activityListeners: EventListener[] = [];
     const globalEvents = globalThis as unknown as {
       addEventListener?: (
@@ -407,7 +403,6 @@ describe(RealtimeGateway.name, () => {
   it('keeps identity heartbeats inactive when presence activity is disabled', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),
@@ -438,7 +433,6 @@ describe(RealtimeGateway.name, () => {
   it('closes the socket when heartbeat acknowledgements stop', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
@@ -471,7 +465,6 @@ describe(RealtimeGateway.name, () => {
   it('keeps the socket open when heartbeat acknowledgements arrive', async () => {
     jest.useFakeTimers();
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(crypto, 'randomUUID').mockReturnValue(nonce);
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/'),
       new RequestSigner(),

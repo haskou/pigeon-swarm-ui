@@ -12,6 +12,7 @@ export type GlassSelectOption = {
 };
 
 interface GlassSelectProps {
+  'data-testid'?: string;
   ariaLabel: string;
   className?: string;
   disabled?: boolean;
@@ -23,6 +24,7 @@ interface GlassSelectProps {
 export function GlassSelect({
   ariaLabel,
   className,
+  'data-testid': testId,
   disabled = false,
   onChange,
   options,
@@ -107,6 +109,7 @@ export function GlassSelect({
         disabled={disabled}
         onClick={() => setOpen((isOpen) => !isOpen)}
         onKeyDown={handleKeyDown}
+        data-testid={testId}
         className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left text-sm font-bold text-white outline-none transition hover:border-white/20 focus:border-cyan-300/60 focus:bg-black/35 disabled:cursor-not-allowed disabled:opacity-45"
       >
         <span className="flex min-w-0 items-center gap-2">

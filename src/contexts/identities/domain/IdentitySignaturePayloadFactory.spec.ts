@@ -9,7 +9,16 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         encryptedPrivateKey: 'encrypted',
         publicKey: 'public',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1', 'network-1'],
       profile: {
         biography: undefined,
@@ -21,7 +30,9 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     expect(Object.keys(payload)).toEqual([
       'encryptedKeyPair',
+      'encryptedMasterKey',
       'id',
+      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -36,7 +47,16 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         encryptedPrivateKey: 'encrypted',
         publicKey: 'public',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: 'identity-1',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1'],
       previousIdentityExternalIdentifier: undefined,
       profile: {
@@ -57,7 +77,16 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         encryptedPrivateKey: 'encrypted',
         publicKey: 'public',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1'],
       profile: { name: 'Ada' },
       signature: 'signature',
@@ -81,7 +110,9 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     expect(Object.keys(payload)).toEqual([
       'encryptedKeyPair',
+      'encryptedMasterKey',
       'id',
+      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -90,7 +121,9 @@ describe(IdentitySignaturePayloadFactory.name, () => {
     ]);
     expect(payload).toEqual({
       encryptedKeyPair: identity.encryptedKeyPair,
+      encryptedMasterKey: identity.encryptedMasterKey,
       id: 'identity-1',
+      masterKeyDerivation: identity.masterKeyDerivation,
       networks: ['network-1', 'network-2'],
       previousIdentityExternalIdentifier: 'cid-1',
       profile: {

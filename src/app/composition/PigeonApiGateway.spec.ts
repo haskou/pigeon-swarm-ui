@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/value-objects';
+import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
 import type {
   ConversationKeyEntry,
@@ -16,6 +16,34 @@ import { decryptCommunityInviteKey } from '../../contexts/communities/infrastruc
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
+  const symmetricFixtureKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
+  function conversationKeyEntry(
+    conversationId: string,
+    peerIdentityId = 'identity-2',
+    kind: ConversationKeyEntry['kind'] = 'conversation',
+  ): ConversationKeyEntry {
+    return {
+      algorithm: 'aes-256-gcm',
+      conversationId,
+      createdAt: 1,
+      key: symmetricFixtureKey,
+      kind,
+      peerIdentityId,
+      version: 2,
+    };
+  }
+
+  function decryptFixturePayload(
+    encryptedPayload: string,
+  ): Record<string, unknown> {
+    return JSON.parse(
+      SymmetricKey.fromBase64(symmetricFixtureKey)
+        .decrypt(new EncryptedPayload(encryptedPayload))
+        .toString(),
+    ) as Record<string, unknown>;
+  }
+
   it('loads node networks anonymously when no session is available', async () => {
     const response = {
       networks: [{ id: 'network-1', key: null, name: 'Public Swarm' }],
@@ -371,6 +399,14 @@ describe(PigeonApiGateway.name, () => {
         encryptedKeyPair: { publicKey: 'public-key' },
         id: 'identity-1',
       },
+      masterKey: {
+        decrypt: jest.fn().mockReturnValue({
+          toString: () => JSON.stringify({ content: 'draft text' }),
+        }),
+        encrypt: jest.fn().mockReturnValue({
+          toString: () => 'encrypted-draft-payload',
+        }),
+      },
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
@@ -400,6 +436,37 @@ describe(PigeonApiGateway.name, () => {
       '/conversations/conversation-1/draft',
       body,
     );
+  });
+
+  it('loads remote keychains with encoded identity paths and empty signed body', async () => {
+    const keychain = {
+      encryptedPayload: 'encrypted-keychain',
+      keychainExternalIdentifier: 'keychain-1',
+      ownerIdentityId: 'identity/with+symbols=',
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue(keychain),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity/with+symbols=' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const path = '/keychains/identity%2Fwith%2Bsymbols%3D';
+
+    await expect(gateway.loadRemoteKeychain(session)).resolves.toBe(keychain);
+
+    expect(signer.headers).toHaveBeenCalledWith(session, 'GET', path);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      headers: { 'X-Identity-Id': 'identity-1' },
+      method: 'GET',
+    });
   });
 
   it('creates communities with signed metadata payload', async () => {
@@ -1168,11 +1235,13 @@ describe(PigeonApiGateway.name, () => {
       keychain: {
         conversations: {
           'community-1': {
+            algorithm: 'aes-256-gcm',
             conversationId: 'community-1',
             createdAt: 1,
+            key: symmetricFixtureKey,
+            kind: 'community',
             peerIdentityId: '',
-            privateKey: 'private-key',
-            publicKey: 'public-key',
+            version: 2,
           },
         },
         version: 1,
@@ -1283,11 +1352,13 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const keyEntry = {
+      algorithm: 'aes-256-gcm',
       conversationId: 'community-1',
       createdAt: 1,
+      key: '12345678901234567890123456789012',
+      kind: 'community',
       peerIdentityId: '',
-      privateKey: 'private-key',
-      publicKey: 'public-key',
+      version: 2,
     };
     const session = {
       encryptedKeyPair: {
@@ -1352,11 +1423,13 @@ describe(PigeonApiGateway.name, () => {
 
   it('accepts group invitations by publishing the decrypted keychain entry', async () => {
     const keyEntry = {
+      algorithm: 'aes-256-gcm',
       conversationId: 'group:conversation',
       createdAt: 1,
+      key: symmetricFixtureKey,
+      kind: 'conversation',
       peerIdentityId: 'identity-2',
-      privateKey: 'private-key',
-      publicKey: 'public-key',
+      version: 2,
     };
     const updatedNotification = {
       createdAt: '2026-01-01',
@@ -1450,13 +1523,99 @@ describe(PigeonApiGateway.name, () => {
     expect(result.notification).toBe(updatedNotification);
   });
 
+  it('accepts group invitations after local device unlock restored the key pair', async () => {
+    const keyEntry = {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'group:conversation',
+      createdAt: 1,
+      key: symmetricFixtureKey,
+      kind: 'conversation',
+      peerIdentityId: 'identity-2',
+      version: 2,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({
+          keychainExternalIdentifier: 'keychain-next',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        })
+        .mockResolvedValueOnce({
+          createdAt: '2026-01-01',
+          id: 'notification-1',
+          payload: {},
+          recipientIdentityId: 'identity-1',
+          state: 'accepted',
+          status: 'read',
+          type: 'group_conversation_invitation',
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const keychains = {
+      encryptForPublish: jest.fn(
+        (_session: Session, nextKeychain: LocalKeychain) =>
+          Promise.resolve({
+            body: { encryptedPayload: 'encrypted-keychain' },
+            keychain: nextKeychain,
+          }),
+      ),
+    };
+    const keyPair = {
+      decrypt: jest.fn(() => Buffer.from(JSON.stringify(keyEntry))),
+    };
+    const encryptedKeyPair = {
+      decrypt: jest.fn(),
+    };
+    const session = {
+      encryptedKeyPair,
+      identity: { id: 'identity-1' },
+      keyPair,
+      keychain: { conversations: {}, version: 0 },
+      password: '',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(
+      http,
+      signer,
+      undefined,
+      undefined,
+      keychains as never,
+    );
+
+    const result = await gateway.acceptConversationInvitation(session, {
+      createdAt: '2026-01-01',
+      id: 'notification-1',
+      payload: {
+        conversationId: 'group:conversation',
+        encryptedConversationKey: 'encrypted-key',
+        inviterIdentityId: 'identity-2',
+        inviterSignature: 'signature',
+        recipientIdentityId: 'identity-1',
+      },
+      recipientIdentityId: 'identity-1',
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
+    });
+
+    expect(encryptedKeyPair.decrypt).not.toHaveBeenCalled();
+    expect(keyPair.decrypt).toHaveBeenCalledWith(expect.any(EncryptedPayload));
+    expect(result.keychain.conversations['group:conversation']).toEqual(
+      keyEntry,
+    );
+  });
+
   it('publishes the community invite link key before accepting the invite', async () => {
     const keyEntry = {
+      algorithm: 'aes-256-gcm' as const,
       conversationId: 'community-1',
       createdAt: 1,
+      key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      kind: 'community' as const,
       peerIdentityId: '',
-      privateKey: 'private-key',
-      publicKey: 'public-key',
+      version: 2 as const,
     };
     const community = {
       createdAt: 1,
@@ -1540,13 +1699,13 @@ describe(PigeonApiGateway.name, () => {
 
   it('creates community invite links with encrypted key envelopes', async () => {
     const keyEntry: ConversationKeyEntry = {
+      algorithm: 'aes-256-gcm',
       conversationId: 'community-1',
       createdAt: 1770000000000,
+      key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      kind: 'community',
       peerIdentityId: '',
-      privateKey:
-        '-----BEGIN PRIVATE KEY-----\\nprivate\\n-----END PRIVATE KEY-----',
-      publicKey:
-        '-----BEGIN PUBLIC KEY-----\\npublic\\n-----END PUBLIC KEY-----',
+      version: 2,
     };
     const invite = {
       communityId: 'community-1',
@@ -1680,7 +1839,16 @@ describe(PigeonApiGateway.name, () => {
         encryptedPrivateKey: 'encrypted-private-key',
         publicKey: 'public-key',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: 'public-key',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1'],
       profile: { handle: 'ada', name: 'Ada' },
       signature: 'keypair-signature',
@@ -1716,7 +1884,9 @@ describe(PigeonApiGateway.name, () => {
     expect(body).not.toHaveProperty('previousIdentityExternalIdentifier');
     expect(Object.keys(body)).toEqual([
       'encryptedKeyPair',
+      'encryptedMasterKey',
       'id',
+      'masterKeyDerivation',
       'networks',
       'profile',
       'timestamp',
@@ -1728,7 +1898,16 @@ describe(PigeonApiGateway.name, () => {
         encryptedPrivateKey: 'encrypted-private-key',
         publicKey: 'public-key',
       },
+      encryptedMasterKey: expect.any(String),
       id: 'public-key',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 2 ** 18,
+        p: 1,
+        r: 8,
+        salt: expect.any(String),
+        version: 1,
+      },
       networks: ['network-1'],
       profile: {
         handle: 'ada',
@@ -1744,7 +1923,9 @@ describe(PigeonApiGateway.name, () => {
 
     expect(Object.keys(signingBody ?? {})).toEqual([
       'encryptedKeyPair',
+      'encryptedMasterKey',
       'id',
+      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -1775,8 +1956,17 @@ describe(PigeonApiGateway.name, () => {
         encryptedPrivateKey: 'encrypted-private-key',
         publicKey: 'public-key',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: 'identity/with+symbols=',
       identityExternalIdentifier: 'current-identity-cid',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1'],
       profile: { name: 'Ada' },
       signature: 'current-signature',
@@ -1835,7 +2025,9 @@ describe(PigeonApiGateway.name, () => {
 
     expect(Object.keys(body)).toEqual([
       'encryptedKeyPair',
+      'encryptedMasterKey',
       'id',
+      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -1857,7 +2049,9 @@ describe(PigeonApiGateway.name, () => {
 
     expect(parsedSignedPayload).toEqual({
       encryptedKeyPair: currentIdentity.encryptedKeyPair,
+      encryptedMasterKey: currentIdentity.encryptedMasterKey,
       id: currentIdentity.id,
+      masterKeyDerivation: currentIdentity.masterKeyDerivation,
       networks: currentIdentity.networks,
       previousIdentityExternalIdentifier: 'current-identity-cid',
       profile: {
@@ -1892,14 +2086,73 @@ describe(PigeonApiGateway.name, () => {
     expect(http.request).toHaveBeenCalledWith('/identities/identity-1');
   });
 
+  it('caches identity reads by the lookup alias and returned identity id', async () => {
+    const identity = {
+      id: 'identity-1',
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+    const http = {
+      request: jest.fn().mockResolvedValue(identity),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    await expect(gateway.getIdentity('@ada')).resolves.toBe(identity);
+    await expect(gateway.getIdentity('@ada')).resolves.toBe(identity);
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/identities/%40ada');
+  });
+
+  it('deduplicates concurrent identity reads', async () => {
+    const identity = {
+      id: 'identity-1',
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+    let resolveIdentity!: (identity: IdentityResource) => void;
+    const identityPromise = new Promise<IdentityResource>((resolve) => {
+      resolveIdentity = resolve;
+    });
+    const http = {
+      request: jest.fn().mockReturnValue(identityPromise),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+    const first = gateway.getIdentity('identity-1');
+    const second = gateway.getIdentity('identity-1');
+
+    resolveIdentity(identity);
+
+    await expect(first).resolves.toBe(identity);
+    await expect(second).resolves.toBe(identity);
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/identities/identity-1');
+  });
+
   it('refreshes the identity cache after updating the profile', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
         encryptedPrivateKey: 'encrypted-private-key',
         publicKey: 'public-key',
       },
+      encryptedMasterKey: 'encrypted-master-key',
       id: 'identity-1',
       identityExternalIdentifier: 'current-identity-cid',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16_384,
+        p: 5,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
       networks: ['network-1'],
       profile: { name: 'Ada' },
       signature: 'current-signature',
@@ -2393,13 +2646,9 @@ describe(PigeonApiGateway.name, () => {
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
-          'one-to-one:conversation': {
-            conversationId: 'one-to-one:conversation',
-            createdAt: 1,
-            peerIdentityId: 'identity-2',
-            privateKey: 'private-key',
-            publicKey: 'public-key',
-          },
+          'one-to-one:conversation': conversationKeyEntry(
+            'one-to-one:conversation',
+          ),
         },
         version: 1,
       },
@@ -2494,7 +2743,7 @@ describe(PigeonApiGateway.name, () => {
       headers: { 'X-Signature': 'http-signature' },
       method: 'POST',
     });
-    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+    expect(decryptFixturePayload(body.encryptedPayload)).toMatchObject({
       attachments: [
         {
           cid: 'bafy-attachment',
@@ -2538,13 +2787,7 @@ describe(PigeonApiGateway.name, () => {
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
-          conversation: {
-            conversationId: 'conversation',
-            createdAt: 1,
-            peerIdentityId: 'identity-2',
-            privateKey: 'private-key',
-            publicKey: 'public-key',
-          },
+          conversation: conversationKeyEntry('conversation'),
         },
         version: 1,
       },
@@ -2568,7 +2811,7 @@ describe(PigeonApiGateway.name, () => {
     };
 
     expect(body.attachmentExternalIdentifiers).toEqual([]);
-    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+    expect(decryptFixturePayload(body.encryptedPayload)).toMatchObject({
       content: '',
       sticker,
       type: 'StickerMessageSent',
@@ -2597,13 +2840,9 @@ describe(PigeonApiGateway.name, () => {
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
-          'one-to-one:conversation': {
-            conversationId: 'one-to-one:conversation',
-            createdAt: 1,
-            peerIdentityId: 'identity-2',
-            privateKey: 'private-key',
-            publicKey: 'public-key',
-          },
+          'one-to-one:conversation': conversationKeyEntry(
+            'one-to-one:conversation',
+          ),
         },
         version: 1,
       },
@@ -2680,7 +2919,7 @@ describe(PigeonApiGateway.name, () => {
       type: 'edited',
     });
     expect(signaturePassword).toBe('secret');
-    expect(JSON.parse(body.encryptedPayload)).toMatchObject({
+    expect(decryptFixturePayload(body.encryptedPayload)).toMatchObject({
       attachments: [],
       content: 'edited',
       type: 'MessageEdited',

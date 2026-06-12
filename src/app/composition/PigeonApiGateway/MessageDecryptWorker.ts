@@ -13,7 +13,7 @@ export type MessageDecryptWorker = {
       };
       currentIdentityId: string;
       messages: MessageResource[];
-      privateKey?: string;
+      symmetricKey?: string;
     },
     signal?: AbortSignal,
   ): Promise<ChatMessage[]>;

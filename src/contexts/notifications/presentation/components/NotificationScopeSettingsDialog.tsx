@@ -101,7 +101,7 @@ export function NotificationScopeSettingsDialog({
           <button
             type="button"
             onClick={close}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/6 text-lg font-black leading-none text-white/50 transition hover:bg-white/12 hover:text-white"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-lg font-black leading-none text-white/50 transition hover:bg-white/[0.12] hover:text-white"
             aria-label={copy.dialog.close}
           >
             ×
@@ -153,7 +153,7 @@ export function NotificationScopeSettingsDialog({
                           : current.notificationLevel,
                     })
                   }
-                  className="min-h-10 rounded-xl border border-white/10 bg-white/6 px-2 text-center text-sm font-black text-white/75 transition hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white"
+                  className="min-h-10 rounded-xl border border-white/10 bg-white/[0.06] px-2 text-center text-sm font-black text-white/75 transition hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white"
                 >
                   {duration.label}
                 </button>
@@ -168,7 +168,7 @@ export function NotificationScopeSettingsDialog({
                 'min-h-11 rounded-xl border px-3 text-center text-sm font-black transition',
                 muted && current.mutedUntil === null
                   ? 'border-violet-200/30 bg-violet-400/20 text-white'
-                  : 'border-white/10 bg-white/6 text-white/75 hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white',
+                  : 'border-white/10 bg-white/[0.06] text-white/75 hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white',
               )}
             >
               {copy.notifications.muteIndefinitely}

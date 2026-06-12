@@ -1,11 +1,12 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
   ConversationResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
+import type { LoginIdentityProgressStep } from '../../contexts/identities/application/ports/LoginIdentityProgressStep';
 import type { PreloadedConversationMessages } from './workspace/PreloadedConversationMessages';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
@@ -18,6 +19,11 @@ import {
   clearSavedCredentials,
   loadSavedCredentials,
 } from '../../contexts/identities/infrastructure/storage/savedCredentials';
+import { clearLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
+import {
+  loadRememberedIdentityPreview,
+  type RememberedIdentityPreview,
+} from '../../contexts/identities/infrastructure/storage/rememberedIdentityPreview';
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { loadApplicationContainer } from '../composition/loadApplicationContainer';
@@ -43,6 +49,8 @@ export function useAppBootstrap(): {
   peers: ReturnType<typeof usePeers>;
   pendingCommunityInvite: PendingCommunityInviteLink | null;
   preloadedConversationMessages: PreloadedConversationMessages | null;
+  restoreIdentityPreview: RememberedIdentityPreview | null;
+  restoreProgressStep: LoginIdentityProgressStep | null;
   session: Session | null;
   setCommunities: ReturnType<typeof useCommunities>['setCommunities'];
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
@@ -50,6 +58,15 @@ export function useAppBootstrap(): {
   setSession: React.Dispatch<React.SetStateAction<Session | null>>;
 } {
   const [hasSavedCredentials] = useState(() => loadSavedCredentials() !== null);
+  const [restoreIdentityPreview] = useState<RememberedIdentityPreview | null>(
+    () => {
+      const savedCredentials = loadSavedCredentials();
+
+      if (!savedCredentials) return null;
+
+      return loadRememberedIdentityPreview(savedCredentials.identityId);
+    },
+  );
   const [session, setSession] = useState<Session | null>(null);
   const [conversations, setConversations] = useState<ConversationResource[]>(
     [],
@@ -59,6 +76,9 @@ export function useAppBootstrap(): {
   const [restoreState, setRestoreState] = useState<RestoreState>(
     hasSavedCredentials ? 'loading' : 'done',
   );
+  const [restoreProgressStep, setRestoreProgressStep] =
+    useState<LoginIdentityProgressStep | null>(null);
+  const restoreInFlightRef = useRef(false);
   const nodeNetworks = useNodeNetworks(session);
   const peers = usePeers({ deferAutoLoad: true });
   const communities = useCommunities(session);
@@ -88,20 +108,25 @@ export function useAppBootstrap(): {
 
     if (restoreState !== 'loading') return;
 
+    if (restoreInFlightRef.current) return;
+
     const savedCredentials = loadSavedCredentials();
 
     if (!savedCredentials) {
+      setRestoreProgressStep(null);
       setRestoreState('done');
 
       return;
     }
 
+    restoreInFlightRef.current = true;
+    setRestoreProgressStep('resolving-identity');
     void loadApplicationContainer()
       .then(async (applicationContainer) => {
         const [result] = await Promise.all([
-          applicationContainer.login(
+          applicationContainer.restoreRememberedSession(
             savedCredentials.identityId,
-            savedCredentials.password,
+            setRestoreProgressStep,
           ),
           preloadGlassWorkspaceModule(),
         ]);
@@ -119,14 +144,28 @@ export function useAppBootstrap(): {
           result.conversations,
           result.preloadedConversationMessages,
         );
+        setRestoreProgressStep(null);
         setRestoreState('done');
+        restoreInFlightRef.current = false;
       })
       .catch(() => {
+        void clearLocalDeviceUnlock().catch(() => undefined);
+        clearSavedCredentials();
+        setRestoreProgressStep(null);
         setRestoreState('done');
+        restoreInFlightRef.current = false;
       });
-  }, [handleAuthenticated, nodeNetworks, restoreState, session]);
+  }, [
+    handleAuthenticated,
+    nodeNetworks.error,
+    nodeNetworks.loading,
+    nodeNetworks.networks.length,
+    restoreState,
+    session,
+  ]);
 
   const clearSession = useCallback(() => {
+    void clearLocalDeviceUnlock().catch(() => undefined);
     clearSavedCredentials();
     setSession(null);
     setPreloadedConversationMessages(null);
@@ -152,6 +191,8 @@ export function useAppBootstrap(): {
     peers,
     pendingCommunityInvite,
     preloadedConversationMessages,
+    restoreIdentityPreview,
+    restoreProgressStep,
     session,
     setCommunities: communities.setCommunities,
     setConversations,

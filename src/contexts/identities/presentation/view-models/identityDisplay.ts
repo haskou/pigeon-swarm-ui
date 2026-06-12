@@ -30,8 +30,6 @@ export function identityName(identity: IdentityResource): string | null {
 
   if (!name && !handle) return null;
 
-  if (name && handle) return `${name} (@${handle})`;
-
   return name || `@${handle}`;
 }
 

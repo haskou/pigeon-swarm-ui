@@ -18,8 +18,8 @@ const identity = {
 } as IdentityResource;
 
 describe('identity display helpers', () => {
-  it('formats display names with handles', () => {
-    expect(identityName(identity)).toBe('Ada (@ada_42)');
+  it('formats display names without appending handles', () => {
+    expect(identityName(identity)).toBe('Ada');
   });
 
   it('normalizes handles', () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { NodeNetwork } from '../../application/list-node-networks/ListNodeNetworks';
+import type { NodeInfo } from '../../infrastructure/http/NodeInfo';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -13,16 +14,16 @@ const nodeBootstrapApi = new NodeBootstrapApi();
 type NodeNetworksState = {
   error: Error | null;
   loading: boolean;
-  node: { id: string; owner: string | null } | null;
+  node: (NodeInfo & { owner: string | null }) | null;
   networks: NodeNetwork[];
   reload: () => Promise<void>;
 };
 
 export function useNodeNetworks(session?: Session | null): NodeNetworksState {
   const [networks, setNetworks] = useState<NodeNetwork[]>([]);
-  const [node, setNode] = useState<{ id: string; owner: string | null } | null>(
-    null,
-  );
+  const [node, setNode] = useState<
+    (NodeInfo & { owner: string | null }) | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 

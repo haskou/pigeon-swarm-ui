@@ -11,10 +11,13 @@
     "measure:startup": "node scripts/measure-startup.cjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest --runInBand",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install chromium",
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@haskou/value-objects": "2.7.4",
+    "@haskou/value-objects": "2.10.0",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
     "@tailwindcss/vite": "^4.1.17",
     "@vitejs/plugin-react": "^4.7.0",
@@ -28,6 +31,7 @@
     "vite": "^6.3.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

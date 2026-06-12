@@ -5,17 +5,17 @@ import type {
   IdentityResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../identities/presentation/view-models/identityDisplay';
+import type { NotificationAction } from './NotificationAction';
+
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { MembershipRequestCard } from './MembershipRequestCard';
 import { NotificationCard } from './NotificationCard';
-import type { NotificationAction } from './NotificationAction';
 
 interface NotificationsPanelProps {
   action: NotificationAction | null;
@@ -86,7 +86,7 @@ export function NotificationsPanel({
       onClick={close}
     >
       <section
-        className="app-overlay-surface glass-panel-strong ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl p-4 shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
+        className="app-overlay-surface ml-auto flex h-full w-full max-w-[430px] flex-col rounded-2xl border border-white/10 bg-[#202132] p-4 text-white shadow-2xl shadow-black/35 lg:h-auto lg:max-h-[calc(100vh-2rem)]"
         data-state={state}
         onClick={(event) => event.stopPropagation()}
       >
@@ -118,7 +118,7 @@ export function NotificationsPanel({
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {notifications.length === 0 &&
             pendingMembershipRequests.length === 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/7 p-4 text-sm text-white/55">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 text-sm text-white/55">
                 {copy.notifications.empty}
               </div>
             )}
@@ -128,6 +128,7 @@ export function NotificationsPanel({
               communities={communities}
               currentIdentityId={currentIdentityId}
               identityNames={identityNames}
+              identityProfiles={identityProfiles}
               key={request.id}
               onAccept={() => onAcceptMembershipRequest(request.id)}
               onDecline={() => onDeclineMembershipRequest(request.id)}

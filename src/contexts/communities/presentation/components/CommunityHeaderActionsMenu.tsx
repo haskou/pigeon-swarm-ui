@@ -20,6 +20,7 @@ type CommunityHeaderActionsMenuProps = {
   onNotificationSettingsOpen: () => void;
   onNotificationMuteToggle: () => void;
   onOpenPins?: () => void;
+  onRealtimeEventsOpen?: () => void;
 };
 
 export function CommunityHeaderActionsMenu({
@@ -35,6 +36,7 @@ export function CommunityHeaderActionsMenu({
   onNotificationSettingsOpen,
   onNotificationMuteToggle,
   onOpenPins,
+  onRealtimeEventsOpen,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   const { close, state } = useCloseTransition(onClose);
   const openedAtRef = useRef(Date.now());
@@ -76,6 +78,17 @@ export function CommunityHeaderActionsMenu({
             label={copy.messages.viewPinned}
             onClick={() => {
               onOpenPins();
+              close();
+            }}
+            className="sm:hidden"
+          />
+        ) : null}
+        {onRealtimeEventsOpen ? (
+          <CommunityHeaderMenuAction
+            icon={<RealtimeEventsMenuIcon />}
+            label={copy.chat.viewRealtimeEvents}
+            onClick={() => {
+              onRealtimeEventsOpen();
               close();
             }}
             className="sm:hidden"
@@ -182,6 +195,25 @@ function DataMenuIcon() {
     >
       <path
         d="M12 11.5v5M12 7.5h.01M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function RealtimeEventsMenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M4.5 7.5h15M4.5 12h15M4.5 16.5h15M7.5 5.5v13M16.5 5.5v13"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -43,41 +43,41 @@ describe(MessageProjector.name, () => {
     });
   });
 
-  it('projects plain messages without requiring a keychain entry', async () => {
+  it('projects plain messages without requiring a keychain entry', () => {
     const projector = new MessageProjector(projectorCopy);
 
-    await expect(
+    expect(
       projector.toChatMessage(session, 'conversation-1', {
         authorIdentityId: 'identity-1',
         content: 'hello',
         id: 'message-1',
         timestamp: 10,
       }),
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       content: 'hello',
       encrypted: false,
       mine: true,
     });
   });
 
-  it('returns a readable encrypted placeholder when the key is missing', async () => {
+  it('returns a readable encrypted placeholder when the key is missing', () => {
     const projector = new MessageProjector(projectorCopy);
 
-    await expect(
+    expect(
       projector.toChatMessage(session, 'conversation-1', {
         authorIdentityId: 'identity-2',
         encryptedPayload: 'payload',
         id: 'message-2',
         timestamp: 20,
       }),
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       content: projectorCopy.missingKey,
       encrypted: true,
       mine: false,
     });
   });
 
-  it('uses exact conversation keys for encrypted messages', async () => {
+  it('uses exact conversation keys for encrypted messages', () => {
     const projector = new MessageProjector(projectorCopy);
     const conversationId = 'local-key-id';
     const hydratedSession = {
@@ -85,25 +85,27 @@ describe(MessageProjector.name, () => {
       keychain: {
         conversations: {
           'local-key-id': {
+            algorithm: 'aes-256-gcm',
             conversationId: 'local-key-id',
             createdAt: 1,
+            key: 'invalid-symmetric-key',
+            kind: 'conversation',
             peerIdentityId: 'identity-2',
-            privateKey: 'invalid-private-key',
-            publicKey: 'invalid-public-key',
+            version: 2,
           },
         },
         version: 1,
       },
     } as unknown as Session;
 
-    await expect(
+    expect(
       projector.toChatMessage(hydratedSession, conversationId, {
         authorIdentityId: 'identity-2',
         encryptedPayload: 'payload',
         id: 'message-2',
         timestamp: 20,
       }),
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       content: projectorCopy.decryptFailed,
       encrypted: true,
     });

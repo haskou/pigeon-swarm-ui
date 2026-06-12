@@ -36,6 +36,7 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
           placeholder={copy.identityLookup.placeholder}
           autoComplete="username"
+          data-testid="auth-identity-input"
         />
         <p className="mt-2 text-xs leading-relaxed text-white/40">
           {copy.identityLookup.help}
@@ -54,6 +55,7 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
           placeholder="Ada"
           autoComplete="name"
+          data-testid="auth-name-input"
         />
       </Field>
       <Field label={copy.auth.handleLabel}>
@@ -66,6 +68,7 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
           className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
           placeholder="@ada"
           autoComplete="username"
+          data-testid="auth-handle-input"
         />
       </Field>
       <NetworkField {...props} />
@@ -87,6 +90,7 @@ function NetworkField(props: {
           ariaLabel={copy.auth.networkLabel}
           value={props.selectedNetwork}
           onChange={props.onSelectedNetworkChange}
+          data-testid="auth-network-select"
           options={props.availableNetworks.map((network) => ({
             label: network.name,
             value: network.id,
@@ -103,6 +107,7 @@ function NetworkField(props: {
         onChange={(event) => props.onNetworksChange(event.target.value)}
         className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
         placeholder="uuid-public, uuid-private"
+        data-testid="auth-networks-input"
       />
     </Field>
   );

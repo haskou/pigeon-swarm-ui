@@ -8,6 +8,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
+import type { NodeInfo } from './NodeInfo';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -42,10 +43,10 @@ export class PigeonNodeApi {
     }
   }
 
-  public async getInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.cachedRequest('GET /node/', () =>
-      this.http.request<{ id: string; owner: string | null }>('/node/'),
-    );
+  public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
+    const info = await this.http.request<NodeInfo>('/node/');
+
+    return { ...info, owner: info.owner ?? null };
   }
 
   public async claim(session: Session): Promise<void> {
@@ -78,9 +79,7 @@ export class PigeonNodeApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.cachedRequest('GET /peers/', () =>
-      this.http.request<{ peers: Peer[] }>('/peers/'),
-    );
+    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
 
     return result.peers;
   }
