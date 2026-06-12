@@ -12,9 +12,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
-import {
-  type IdentityMemberListItem,
-} from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import { type IdentityMemberListItem } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import {
   IdentityMembersAside,
   type IdentityMembersAsideVariant,
@@ -90,7 +88,8 @@ export function Inspector({
           identity,
           identityId,
           name:
-            identityNames[identityId] ?? memberPrimaryName(identity, identityId),
+            identityNames[identityId] ??
+            (identity ? memberPrimaryName(identity, identityId) : undefined),
           pictureUrl: identityPictures[identityId] ?? null,
           presence: presenceByIdentityId[identityId],
         };
@@ -111,7 +110,9 @@ export function Inspector({
       anchor: profileAnchorFromTarget(event.currentTarget),
       identity: participant.identity,
       identityId: participant.identityId,
-      name: participant.name ?? memberPrimaryName(participant.identity, participant.identityId),
+      name:
+        participant.name ??
+        memberPrimaryName(participant.identity, participant.identityId),
       picture: participant.pictureUrl,
     });
   };
@@ -194,6 +195,6 @@ function conversationParticipantIds({
 function isGroup(conversation?: ConversationResource): boolean {
   return Boolean(
     conversation &&
-      (conversation.type === 'group' || conversation.id.startsWith('group:')),
+    (conversation.type === 'group' || conversation.id.startsWith('group:')),
   );
 }

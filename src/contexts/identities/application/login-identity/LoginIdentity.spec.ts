@@ -34,7 +34,11 @@ describe(LoginIdentity.name, () => {
         { id: 'old', latestMessageAt: 1, networkId: 'net' },
       ],
     });
-    expect(gateway.login).toHaveBeenCalledWith('identity-1', 'secret');
+    expect(gateway.login).toHaveBeenCalledWith(
+      'identity-1',
+      'secret',
+      undefined,
+    );
     expect(loadMessages).not.toHaveBeenCalled();
   });
 

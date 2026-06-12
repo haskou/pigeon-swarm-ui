@@ -17,6 +17,45 @@ const keychain = {
   version: 1,
 } satisfies LocalKeychain;
 
+const keychainWithExternalEntryId = {
+  conversations: {
+    'external-key-id': {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'community-1',
+      createdAt: 1,
+      key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      kind: 'community',
+      peerIdentityId: '',
+      version: 2,
+    },
+  },
+  version: 1,
+} satisfies LocalKeychain;
+
+const keychainWithCommunityAndStaleEntrySharingId = {
+  conversations: {
+    'community-entry-id': {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'community-1',
+      createdAt: 1,
+      key: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+      kind: 'community',
+      peerIdentityId: '',
+      version: 2,
+    },
+    'stale-entry-id': {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'community-1',
+      createdAt: 1,
+      key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      kind: 'conversation',
+      peerIdentityId: 'identity-2',
+      version: 2,
+    },
+  },
+  version: 1,
+} satisfies LocalKeychain;
+
 describe(ConversationKeychain.name, () => {
   it('returns keys by exact conversation id', () => {
     expect(
@@ -32,5 +71,71 @@ describe(ConversationKeychain.name, () => {
         'missing-conversation-id',
       ),
     ).toBeUndefined();
+  });
+
+  it('detects exact keychain entries', () => {
+    expect(ConversationKeychain.hasEntry(keychain, 'local-key-id')).toBe(true);
+    expect(ConversationKeychain.hasEntry(keychain, 'missing-key-id')).toBe(
+      false,
+    );
+  });
+
+  it('detects entries by their stored conversation id', () => {
+    expect(
+      ConversationKeychain.hasEntry(keychainWithExternalEntryId, 'community-1'),
+    ).toBe(true);
+  });
+
+  it('detects community entries explicitly', () => {
+    expect(
+      ConversationKeychain.hasCommunityEntry(
+        keychainWithExternalEntryId,
+        'community-1',
+      ),
+    ).toBe(true);
+  });
+
+  it('removes exact keychain entries without mutating the original keychain', () => {
+    const nextKeychain = ConversationKeychain.withoutEntry(
+      keychain,
+      'local-key-id',
+    );
+
+    expect(nextKeychain.conversations).not.toHaveProperty('local-key-id');
+    expect(keychain.conversations).toHaveProperty('local-key-id');
+  });
+
+  it('removes keychain entries by their stored conversation id', () => {
+    const nextKeychain = ConversationKeychain.withoutEntry(
+      keychainWithExternalEntryId,
+      'community-1',
+    );
+
+    expect(nextKeychain.conversations).not.toHaveProperty('external-key-id');
+    expect(keychainWithExternalEntryId.conversations).toHaveProperty(
+      'external-key-id',
+    );
+  });
+
+  it('removes all entries matching the community id', () => {
+    const nextKeychain = ConversationKeychain.withoutCommunityEntry(
+      keychainWithCommunityAndStaleEntrySharingId,
+      'community-1',
+    );
+
+    expect(nextKeychain.conversations).not.toHaveProperty('community-entry-id');
+    expect(nextKeychain.conversations).not.toHaveProperty('stale-entry-id');
+  });
+
+  it('returns the same keychain when removing a missing community key', () => {
+    expect(
+      ConversationKeychain.withoutCommunityEntry(keychain, 'missing-community'),
+    ).toBe(keychain);
+  });
+
+  it('returns the same keychain when removing a missing entry', () => {
+    expect(ConversationKeychain.withoutEntry(keychain, 'missing-key-id')).toBe(
+      keychain,
+    );
   });
 });

@@ -1,7 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
 
+import type { RememberedIdentityPreview } from '../../contexts/identities/infrastructure/storage/rememberedIdentityPreview';
+
 import { BackgroundGlow } from '../../shared/presentation/components/BackgroundGlow';
-import { CommunityWorkspaceStartupFallback } from './workspace/components/CommunityWorkspaceStartupFallback';
 
 interface AppFrameProps {
   children: ReactNode;
@@ -25,42 +26,39 @@ export function AppFrame({
 }
 
 interface AppLoadingScreenProps {
+  identityPreview?: RememberedIdentityPreview | null;
   label: string;
 }
 
 export function AppLoadingScreen({
+  identityPreview,
   label,
 }: AppLoadingScreenProps): ReactElement {
+  const initial = identityPreview?.name?.slice(0, 1).toUpperCase() ?? 'P';
+
   return (
     <AppFrame>
-      <section className="relative z-10 min-h-full overflow-hidden overscroll-none">
-        <div className="app-workspace grid w-full grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
-          <StartupRailFallback />
-          <CommunityWorkspaceStartupFallback message={label} />
+      <section className="relative z-10 grid min-h-full place-items-center overflow-hidden overscroll-none px-6 text-center">
+        <div className="grid gap-3">
+          <div className="mx-auto grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300/75 to-fuchsia-400/75 text-xl font-black text-slate-950 shadow-xl shadow-black/30">
+            {identityPreview?.pictureUrl ? (
+              <img
+                src={identityPreview.pictureUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initial
+            )}
+          </div>
+          <div
+            className="text-lg font-black text-white/80"
+            aria-live="polite"
+          >
+            {label}
+          </div>
         </div>
       </section>
     </AppFrame>
-  );
-}
-
-function StartupRailFallback(): ReactElement {
-  return (
-    <aside
-      aria-hidden="true"
-      className="glass-panel-strong hidden h-full min-h-0 flex-col items-center gap-4 rounded-none p-4 lg:flex"
-    >
-      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-300/75 to-fuchsia-400/75" />
-      <div className="h-px w-10 bg-white/10" />
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-12 w-12 rounded-2xl bg-white/10"
-        />
-      ))}
-      <div className="mt-auto space-y-3">
-        <div className="h-12 w-12 rounded-2xl bg-white/10" />
-        <div className="h-12 w-12 rounded-2xl bg-white/10" />
-      </div>
-    </aside>
   );
 }

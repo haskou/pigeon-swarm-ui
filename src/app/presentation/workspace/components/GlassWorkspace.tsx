@@ -1049,6 +1049,7 @@ export function GlassWorkspace({
     rememberIdentity,
   } = useIdentityDirectory({
     conversations,
+    membershipRequests,
     messageAuthorIdentityIdsKey,
     notifications: notificationList,
     session,
@@ -4092,10 +4093,17 @@ export function GlassWorkspace({
       if (!window.confirm(copy.communities.leaveConfirm)) return;
 
       try {
-        const updatedCommunity = await applicationContainer.leaveCommunity(
+        const result = await applicationContainer.leaveCommunity(
           session,
           community.id,
         );
+        const updatedCommunity = result.community ?? community;
+
+        setSession({
+          ...session,
+          keychain: result.keychain,
+          keychainExternalIdentifier: result.keychainExternalIdentifier,
+        });
 
         setCommunities((current) =>
           current.filter((item) => item.id !== updatedCommunity.id),
@@ -4115,6 +4123,7 @@ export function GlassWorkspace({
       session,
       setActiveCommunityId,
       setCommunities,
+      setSession,
       setSidebarOpen,
       setWorkspaceMode,
     ],
@@ -4272,9 +4281,7 @@ export function GlassWorkspace({
             <button
               className={cx(
                 'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-                sidebarOpen
-                  ? 'opacity-100'
-                  : 'pointer-events-none opacity-0',
+                sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
               )}
               onClick={() => setSidebarOpen(false)}
               aria-label={copy.workspace.closeSidebar}
@@ -4343,7 +4350,9 @@ export function GlassWorkspace({
                   hasReachedMessageStart={!messageCursor}
                   invitationAccepting={notificationAction === 'accept'}
                   invitationError={notificationError}
-                  invitationInviterName={activeConversationInvitationInviterName}
+                  invitationInviterName={
+                    activeConversationInvitationInviterName
+                  }
                   peerIdentityId={activeConversationPeerIdentityId}
                   peerIdentity={
                     activeConversationPeerIdentityId
@@ -4699,7 +4708,9 @@ export function GlassWorkspace({
             onGroupInviteOpen={() =>
               setGroupInviteRequest((request) => request + 1)
             }
-            onOpenConversationWithIdentity={openOrCreateConversationWithIdentity}
+            onOpenConversationWithIdentity={
+              openOrCreateConversationWithIdentity
+            }
             onAcceptMembershipRequest={(requestId) =>
               void acceptMembershipRequest(requestId)
             }

@@ -3,6 +3,7 @@ import type {
   CallResource,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
+import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type {
   AttachmentProgress,
@@ -67,6 +68,7 @@ import {
 import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
 import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
 import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
+import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
 import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
@@ -625,7 +627,12 @@ export class PigeonApplication {
   public async leaveCommunity(
     session: Session,
     communityId: string,
-  ): Promise<Community> {
+  ): Promise<{
+    community: Community | null;
+    communityId: string;
+    keychain: LocalKeychain;
+    keychainExternalIdentifier: null | string;
+  }> {
     return await this.communities.leave(session, communityId);
   }
 
@@ -1518,10 +1525,28 @@ export class PigeonApplication {
   public async login(
     identityId: string,
     password: string,
+    onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     return await this.loginIdentityUseCase.login(
-      new LoginIdentityMessage({ identityId, password }),
+      new LoginIdentityMessage({ identityId, onProgress, password }),
     );
+  }
+
+  public async restoreRememberedSession(
+    identityId: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    const result = await this.gateway.restoreRememberedSession(
+      identityId,
+      onProgress,
+    );
+
+    return {
+      ...result,
+      conversations: ConversationTimeline.sortByLatestMessage(
+        result.conversations,
+      ),
+    };
   }
 
   public async register(

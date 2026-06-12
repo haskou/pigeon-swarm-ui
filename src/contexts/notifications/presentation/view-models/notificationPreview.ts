@@ -1,4 +1,6 @@
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityInvitationNotificationResource } from '../../domain/CommunityInvitationNotificationResource';
+import type { ConversationInvitationNotificationResource } from '../../domain/ConversationInvitationNotificationResource';
 import type {
   NotificationPreview,
   NotificationPreviewContext,
@@ -12,53 +14,62 @@ export function notificationPreview(
   notification: NotificationResource,
   context: NotificationPreviewContext,
 ): NotificationPreview {
-  if (notification.type === 'community_invitation') {
-    const community =
-      context.communityPreviews[notification.payload.communityId] ??
-      context.communities.find(
-        (item) => item.id === notification.payload.communityId,
+  switch (notification.type) {
+    case 'community_invitation':
+      return communityInvitationPreview(notification, context);
+    case 'conversation_invitation':
+      return identityNotificationPreview(
+        notification.payload.inviterIdentityId,
+        context,
       );
-
-    return {
-      avatarUrl: context.communityAvatarUrls[notification.payload.communityId],
-      subtitle:
-        community?.description ||
-        `${community?.memberIds.length ?? 0} ${copy.communities.members}`,
-      title:
-        community?.name ??
-        `${copy.notifications.community} ${shortId(notification.payload.communityId)}`,
-    };
+    case 'group_conversation_invitation':
+      return groupConversationInvitationPreview(notification, context);
+    case 'missed_call':
+      return identityNotificationPreview(
+        notification.payload.callerIdentityId,
+        context,
+      );
+    default:
+      return { title: copy.notifications.invitationTitle };
   }
+}
 
-  if (notification.type === 'conversation_invitation') {
-    return identityNotificationPreview(
-      notification.payload.inviterIdentityId,
-      context,
-    );
-  }
-
-  if (notification.type === 'group_conversation_invitation') {
-    const conversation = context.conversations.find(
-      (item) => item.id === notification.payload.conversationId,
+function communityInvitationPreview(
+  notification: CommunityInvitationNotificationResource,
+  context: NotificationPreviewContext,
+): NotificationPreview {
+  const community =
+    context.communityPreviews[notification.payload.communityId] ??
+    context.communities.find(
+      (item) => item.id === notification.payload.communityId,
     );
 
-    return {
-      subtitle: shortId(notification.payload.conversationId),
-      title:
-        conversation?.name ??
-        conversation?.title ??
-        copy.notifications.groupInvitationTitle,
-    };
-  }
+  return {
+    avatarUrl: context.communityAvatarUrls[notification.payload.communityId],
+    subtitle:
+      community?.description ||
+      `${community?.memberIds.length ?? 0} ${copy.communities.members}`,
+    title:
+      community?.name ??
+      `${copy.notifications.community} ${shortId(notification.payload.communityId)}`,
+  };
+}
 
-  if (notification.type === 'missed_call') {
-    return identityNotificationPreview(
-      notification.payload.callerIdentityId,
-      context,
-    );
-  }
+function groupConversationInvitationPreview(
+  notification: ConversationInvitationNotificationResource,
+  context: NotificationPreviewContext,
+): NotificationPreview {
+  const conversation = context.conversations.find(
+    (item) => item.id === notification.payload.conversationId,
+  );
 
-  return { title: copy.notifications.invitationTitle };
+  return {
+    subtitle: shortId(notification.payload.conversationId),
+    title:
+      conversation?.name ??
+      conversation?.title ??
+      copy.notifications.groupInvitationTitle,
+  };
 }
 
 function identityNotificationPreview(
@@ -71,10 +82,13 @@ function identityNotificationPreview(
   const identity = context.identityProfiles[identityId];
   const name = identity?.profile.name.trim();
   const handle = identity?.profile.handle?.trim();
-  const cachedName = splitCachedIdentityName(context.identityNames[identityId]);
+  const cachedRawName = context.identityNames[identityId];
+  const cachedName = splitCachedIdentityName(cachedRawName);
+  const loading = !identity && (!cachedRawName || cachedRawName === identityId);
 
   return {
     avatarUrl: context.identityPictures[identityId],
+    loading,
     subtitle: handle ? `@${handle}` : (cachedName.handle ?? identityId),
     title:
       name ||

@@ -10,7 +10,7 @@ export function CommunityWorkspaceStartupFallback({
   return (
     <div
       aria-busy="true"
-      className="col-span-1 grid h-full min-h-0 grid-cols-1 overflow-hidden rounded-none lg:col-span-3 lg:grid-cols-[330px_minmax(0,1fr)_320px]"
+      className="col-span-1 grid h-full min-h-0 grid-cols-1 overflow-hidden rounded-none lg:col-span-2 lg:grid-cols-[330px_minmax(0,1fr)] xl:col-span-3 xl:grid-cols-[330px_minmax(0,1fr)_320px]"
     >
       <aside className="glass-panel-strong hidden h-full min-h-0 flex-col rounded-none p-4 lg:flex">
         <div className="h-3 w-40 rounded-full bg-white/18" />
@@ -64,13 +64,12 @@ export function CommunityWorkspaceStartupFallback({
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
-            className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3"
+            className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3"
           >
-            <div className="absolute inset-y-0 right-0 w-32 bg-white/10" />
             <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
             <div className="relative min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-24 rounded-full bg-white/20" />
-              <div className="h-3 w-16 rounded-full bg-white/12" />
+              <div className="h-4 w-24 rounded-full bg-[#747687]" />
+              <div className="h-3 w-16 rounded-full bg-[#666879]" />
             </div>
           </div>
         ))}

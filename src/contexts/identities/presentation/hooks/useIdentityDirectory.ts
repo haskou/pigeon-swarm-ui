@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
   ConversationResource,
+  CommunityMembershipRequest,
   IdentityResource,
   NotificationResource,
   Session,
@@ -10,6 +11,7 @@ import type {
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { saveRememberedIdentityPreview } from '../../infrastructure/storage/rememberedIdentityPreview';
 import {
   identityName,
   identityPicture,
@@ -20,6 +22,7 @@ import {
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
+  membershipRequests: CommunityMembershipRequest[];
   messageAuthorIdentityIdsKey: string;
   notifications: NotificationResource[];
   session: Session;
@@ -36,6 +39,7 @@ const IDENTITY_PROFILE_REFRESH_INTERVAL_MS = 15_000;
 
 export function useIdentityDirectory({
   conversations,
+  membershipRequests,
   messageAuthorIdentityIdsKey,
   notifications,
   session,
@@ -120,6 +124,15 @@ export function useIdentityDirectory({
         ids.add(notification.payload.recipientIdentityId);
       }
     });
+    membershipRequests.forEach((request) => {
+      if (isResolvableIdentityId(request.identityId)) {
+        ids.add(request.identityId);
+      }
+
+      if (isResolvableIdentityId(request.creatorIdentityId)) {
+        ids.add(request.creatorIdentityId);
+      }
+    });
     messageAuthorIdentityIdsKey
       .split('\u0000')
       .filter(isResolvableIdentityId)
@@ -129,6 +142,7 @@ export function useIdentityDirectory({
     return [...ids].sort();
   }, [
     conversations,
+    membershipRequests,
     messageAuthorIdentityIdsKey,
     notifications,
     session.identity.id,
@@ -210,6 +224,9 @@ export function useIdentityDirectory({
 
   useEffect(() => {
     rememberIdentity(session.identity);
+    void rememberSessionIdentityPreview(session.identity).catch(
+      () => undefined,
+    );
   }, [rememberIdentity, session.identity]);
 
   useEffect(() => {
@@ -236,7 +253,10 @@ export function useIdentityDirectory({
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener('focus', refreshIdentities);
-      document.removeEventListener('visibilitychange', refreshVisibleIdentities);
+      document.removeEventListener(
+        'visibilitychange',
+        refreshVisibleIdentities,
+      );
     };
   }, [identityIdsToRefresh, resolveIdentityIds]);
 
@@ -296,4 +316,50 @@ async function loadIdentityPicture(
   const content = await applicationContainer.getPublicFile(pictureCid);
 
   return publicFileObjectUrl(content);
+}
+
+async function rememberSessionIdentityPreview(
+  identity: IdentityResource,
+): Promise<void> {
+  const pictureUrl = await loadRememberedIdentityPicture(identity);
+
+  saveRememberedIdentityPreview({
+    identityId: identity.id,
+    name: identityName(identity) ?? identity.id,
+    pictureUrl,
+  });
+}
+
+async function loadRememberedIdentityPicture(
+  identity: IdentityResource,
+): Promise<string | null> {
+  const directPicture = identityPicture(identity);
+
+  if (directPicture) return directPicture;
+
+  const pictureCid = identity.profile.picture?.trim();
+
+  if (!pictureCid) return null;
+
+  const content = await applicationContainer.getPublicFile(pictureCid);
+
+  return await blobToDataUrl(content.blob);
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+
+        return;
+      }
+
+      reject(new Error('Could not read identity picture preview.'));
+    });
+    reader.readAsDataURL(blob);
+  });
 }

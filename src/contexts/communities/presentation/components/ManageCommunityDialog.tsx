@@ -14,31 +14,31 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { CommunityChannels } from '../../domain/CommunityChannels';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { CommunityChannels } from '../../domain/CommunityChannels';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
-import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
 import {
-  ManagedCommunityChannels,
-  type ManagedCommunityChannel,
-} from './ManagedCommunityChannels';
-import {
   CommunitySettingsNavigation,
   type CommunitySettingsSection,
 } from './communitySettingsNavigation';
-import { ManageCommunityProfilePanel } from './ManageCommunityProfilePanel';
 import { ManageCommunityChannelsPanel } from './ManageCommunityChannelsPanel';
+import { ManageCommunityProfilePanel } from './ManageCommunityProfilePanel';
+import {
+  ManagedCommunityChannels,
+  type ManagedCommunityChannel,
+} from './ManagedCommunityChannels';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -284,6 +284,7 @@ export function ManageCommunityDialog({
 
       for (const [identityId, identity, pictureUrl] of entries) {
         if (identity) nextIdentities[identityId] = identity;
+
         if (pictureUrl) nextPictures[identityId] = pictureUrl;
       }
 
@@ -730,16 +731,9 @@ export function ManageCommunityDialog({
     autoJoinEnabled !== (community.autoJoinEnabled ?? false) ||
     description.trim() !== community.description ||
     discoverable !== (community.discoverable ?? true);
-  const hasChannelChanges = ManagedCommunityChannels.hasChanges(
-    channelDraftInput,
-  );
+  const hasChannelChanges =
+    ManagedCommunityChannels.hasChanges(channelDraftInput);
   const hasManageCommunityChanges = hasProfileChanges || hasChannelChanges;
-  const activeSectionHasChanges =
-    activeSection === 'profile'
-      ? hasProfileChanges
-      : activeSection === 'channels'
-        ? hasChannelChanges
-        : false;
   const activeSectionHasExternalChanges =
     activeSection === 'profile'
       ? hasChannelChanges
@@ -761,12 +755,9 @@ export function ManageCommunityDialog({
     if (hasManageCommunityChanges) setLastSavedSection(null);
   }, [hasManageCommunityChanges]);
 
-  const saveManagedChannels = async (
+  const deleteManagedChannels = async (
     currentCommunity: Community,
-  ): Promise<{
-    channels: CommunityChannel[];
-    community: Community;
-  }> => {
+  ): Promise<Community> => {
     let updatedCommunity = currentCommunity;
 
     for (const channelId of deletedChannelIds) {
@@ -777,59 +768,97 @@ export function ManageCommunityDialog({
       );
     }
 
-    for (const channel of channelOrder) {
-      const nextName = ManagedCommunityChannels.nameFor(
-        channel,
-        channelDraftInput,
+    return updatedCommunity;
+  };
+
+  const createManagedChannel = async (
+    channel: ManagedCommunityChannel,
+    nextName: string,
+  ): Promise<CommunityChannel> => {
+    if (channel.type === 'text') {
+      return await applicationContainer.createCommunityTextChannel(
+        session,
+        community.id,
+        nextName,
       );
+    }
 
-      if (channel.pending) {
-        if (channel.type === 'text') {
-          await applicationContainer.createCommunityTextChannel(
+    return await applicationContainer.createCommunityVoiceChannel(
+      session,
+      community.id,
+      nextName,
+    );
+  };
+
+  const updateManagedChannelPermissions = async (
+    draftChannel: ManagedCommunityChannel,
+    savedChannel: CommunityChannel,
+    visibleRoleIds: string[],
+  ): Promise<CommunityChannel> => {
+    if (
+      !ManagedCommunityChannels.hasVisibleRoleChanges(
+        draftChannel,
+        channelDraftInput,
+      )
+    ) {
+      return savedChannel;
+    }
+
+    return await applicationContainer.updateCommunityChannelPermissions(
+      session,
+      community.id,
+      savedChannel.id,
+      visibleRoleIds,
+    );
+  };
+
+  const saveManagedChannel = async (
+    channel: ManagedCommunityChannel,
+  ): Promise<CommunityChannel> => {
+    const nextName = ManagedCommunityChannels.nameFor(
+      channel,
+      channelDraftInput,
+    );
+    const nextVisibleRoleIds = ManagedCommunityChannels.visibleRoleIdsFor(
+      channel,
+      channelDraftInput,
+    );
+    const savedChannel = channel.pending
+      ? await createManagedChannel(channel, nextName)
+      : nextName !== channel.name
+        ? await applicationContainer.renameCommunityChannel(
             session,
             community.id,
+            channel.id,
             nextName,
-          );
-        } else {
-          await applicationContainer.createCommunityVoiceChannel(
-            session,
-            community.id,
-            nextName,
-          );
-        }
-      } else if (nextName !== channel.name) {
-        await applicationContainer.renameCommunityChannel(
-          session,
-          community.id,
-          channel.id,
-          nextName,
-        );
-      }
+          )
+        : channel;
 
-      if (
-        !channel.pending &&
-        ManagedCommunityChannels.hasVisibleRoleChanges(
-          channel,
-          channelDraftInput,
-        )
-      ) {
-        await applicationContainer.updateCommunityChannelPermissions(
-          session,
-          community.id,
-          channel.id,
-          ManagedCommunityChannels.visibleRoleIdsFor(
-            channel,
-            channelDraftInput,
-          ),
-        );
-      }
+    return await updateManagedChannelPermissions(
+      channel,
+      savedChannel,
+      nextVisibleRoleIds,
+    );
+  };
+
+  const saveManagedChannels = async (
+    currentCommunity: Community,
+  ): Promise<{
+    channels: CommunityChannel[];
+    community: Community;
+  }> => {
+    const updatedCommunity = await deleteManagedChannels(currentCommunity);
+    const deletedChannelIdsSet = new Set(deletedChannelIds);
+    const savedChannels: CommunityChannel[] = [];
+
+    for (const channel of channelOrder) {
+      if (deletedChannelIdsSet.has(channel.id)) continue;
+
+      savedChannels.push(await saveManagedChannel(channel));
     }
 
     return {
-      channels: ManagedCommunityChannels.orderSavedChannels(
-        await applicationContainer.listCommunityChannels(session, community.id),
-        channelDraftInput,
-      ),
+      channels: savedChannels,
       community: updatedCommunity,
     };
   };

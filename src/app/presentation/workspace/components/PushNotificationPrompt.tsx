@@ -20,7 +20,7 @@ export function PushNotificationPrompt({
   return (
     <div
       data-testid="push-notification-prompt"
-      className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center lg:bottom-5"
+      className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[70] flex justify-center lg:bottom-5"
     >
       <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-cyan-200/25 bg-[#171827]/95 p-3 shadow-2xl shadow-black/35 backdrop-blur">
         <div className="flex items-start gap-3">

@@ -1,7 +1,18 @@
 import type { FormEvent, MouseEvent } from 'react';
 
-import { EncryptedPayload, PublicKey, SymmetricKey } from '@haskou/value-objects';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  EncryptedPayload,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/value-objects';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
@@ -448,7 +459,9 @@ export function ChatColumn({
         return {
           identity,
           identityId,
-          name: memberPrimaryName(identity, identityId),
+          name:
+            identityNames[identityId] ??
+            (identity ? memberPrimaryName(identity, identityId) : undefined),
           picture: identityPictures[identityId],
         };
       }),
@@ -460,7 +473,9 @@ export function ChatColumn({
         identity: participant.identity,
         identityId: participant.identityId,
         muted: false,
-        name: participant.name,
+        name:
+          participant.name ??
+          memberPrimaryName(participant.identity, participant.identityId),
         picture: participant.picture,
       })),
     [groupParticipants],
@@ -470,18 +485,18 @@ export function ChatColumn({
     !hasConversationKey && !!pendingInvitation && !!onInvitationAccept;
   const invitationPrompt =
     !hasConversationKey && pendingInvitation && onInvitationAccept ? (
-    <InvitationKeyPrompt
-      accepting={invitationAccepting}
-      error={invitationError}
-      inviterName={invitationInviterName}
-      kind="conversation"
-      onAccept={() => onInvitationAccept(pendingInvitation)}
-      onManualImport={() => {
-        setConversationKeyError(null);
-        setConversationKeyDialog('add');
-      }}
-    />
-  ) : null;
+      <InvitationKeyPrompt
+        accepting={invitationAccepting}
+        error={invitationError}
+        inviterName={invitationInviterName}
+        kind="conversation"
+        onAccept={() => onInvitationAccept(pendingInvitation)}
+        onManualImport={() => {
+          setConversationKeyError(null);
+          setConversationKeyDialog('add');
+        }}
+      />
+    ) : null;
   const closeConversationKeyDialog = () => {
     setConversationKeyDialog(null);
     setEncryptedConversationKey('');
@@ -903,7 +918,12 @@ export function ChatColumn({
                 anchor: profileAnchorFromTarget(event.currentTarget),
                 identity: participant.identity,
                 identityId: participant.identityId,
-                name: participant.name,
+                name:
+                  participant.name ??
+                  memberPrimaryName(
+                    participant.identity,
+                    participant.identityId,
+                  ),
                 picture: participant.picture,
               });
             }}

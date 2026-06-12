@@ -104,13 +104,12 @@ export function InspectorStartupFallback(): ReactElement {
       {Array.from({ length: 2 }).map((_, index) => (
         <div
           key={index}
-          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3"
+          className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3"
         >
-          <div className="absolute inset-y-0 right-0 w-32 bg-white/10" />
           <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
           <div className="relative min-w-0 flex-1 space-y-2">
-            <div className="h-4 w-24 rounded-full bg-white/20" />
-            <div className="h-3 w-16 rounded-full bg-white/12" />
+            <div className="h-4 w-24 rounded-full bg-[#747687]" />
+            <div className="h-3 w-16 rounded-full bg-[#666879]" />
           </div>
         </div>
       ))}

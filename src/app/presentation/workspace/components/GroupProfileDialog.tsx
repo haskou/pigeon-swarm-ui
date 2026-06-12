@@ -21,7 +21,7 @@ import {
 type GroupParticipant = {
   identity?: IdentityResource;
   identityId: string;
-  name: string;
+  name?: string;
   picture?: null | string;
 };
 
@@ -108,20 +108,23 @@ export function GroupProfileDialog({
         <IdentityMemberListPanel
           className="mt-4"
           emptyLabel={copy.communities.noMatchingMembers}
-          items={participants.map((participant) => ({
-            identity: participant.identity,
-            identityId: participant.identityId,
-            name: participant.name,
-            pictureUrl: participant.picture ?? null,
-            presence: presenceByIdentityId[participant.identityId],
-          } satisfies IdentityMemberListItem))}
+          items={participants.map(
+            (participant) =>
+              ({
+                identity: participant.identity,
+                identityId: participant.identityId,
+                name: participant.name,
+                pictureUrl: participant.picture ?? null,
+                presence: presenceByIdentityId[participant.identityId],
+              }) satisfies IdentityMemberListItem,
+          )}
           listClassName="max-h-[45vh] flex-none"
           onItemClick={(participant, event) =>
             onIdentityClick(
               {
                 identity: participant.identity,
                 identityId: participant.identityId,
-                name: participant.name ?? participant.identityId,
+                name: participant.name ?? shortId(participant.identityId),
                 picture: participant.pictureUrl,
               },
               event,

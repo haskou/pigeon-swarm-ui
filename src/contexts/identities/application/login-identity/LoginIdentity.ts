@@ -20,6 +20,7 @@ export class LoginIdentity {
     const result = await this.identities.login(
       message.getIdentityId(),
       message.getPassword(),
+      message.getProgressReporter(),
     );
 
     return {

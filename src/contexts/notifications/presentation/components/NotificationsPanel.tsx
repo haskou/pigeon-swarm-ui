@@ -5,17 +5,17 @@ import type {
   IdentityResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../identities/presentation/view-models/identityDisplay';
+import type { NotificationAction } from './NotificationAction';
+
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { MembershipRequestCard } from './MembershipRequestCard';
 import { NotificationCard } from './NotificationCard';
-import type { NotificationAction } from './NotificationAction';
 
 interface NotificationsPanelProps {
   action: NotificationAction | null;
@@ -128,6 +128,7 @@ export function NotificationsPanel({
               communities={communities}
               currentIdentityId={currentIdentityId}
               identityNames={identityNames}
+              identityProfiles={identityProfiles}
               key={request.id}
               onAccept={() => onAcceptMembershipRequest(request.id)}
               onDecline={() => onDeclineMembershipRequest(request.id)}

@@ -5,6 +5,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
+import type { LoginIdentityProgressStep } from '../../application/ports/LoginIdentityProgressStep';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -15,6 +16,10 @@ import {
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
+import {
+  clearLocalDeviceUnlock,
+  saveLocalDeviceUnlock,
+} from '../../infrastructure/storage/localDeviceUnlock';
 import {
   normalizeHandleInput,
   passwordValidationChecks,
@@ -59,6 +64,8 @@ export function AuthScreen({
   const [rememberMe, setRememberMe] = useState(true);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [loginProgressStep, setLoginProgressStep] =
+    useState<LoginIdentityProgressStep | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { installState, requestInstall } = useInstallPrompt();
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -78,7 +85,6 @@ export function AuthScreen({
 
     if (savedCredentials) {
       setIdentityId(savedCredentials.identityId);
-      setPassword(savedCredentials.password);
       setRememberMe(true);
     }
   }, []);
@@ -120,6 +126,7 @@ export function AuthScreen({
 
     setState('loading');
     setError(null);
+    setLoginProgressStep(mode === 'login' ? 'resolving-identity' : null);
 
     try {
       const applicationContainer = await loadApplicationContainer();
@@ -128,6 +135,7 @@ export function AuthScreen({
           ? await applicationContainer.login(
               normalizeIdentityLogin(identityId),
               password,
+              setLoginProgressStep,
             )
           : await applicationContainer.register(
               name,
@@ -141,22 +149,25 @@ export function AuthScreen({
             );
 
       if (rememberMe) {
+        await saveLocalDeviceUnlock(result.session).catch(() => undefined);
         saveCredentials({
           identityId: result.session.identity.id,
-          password,
         });
       } else {
         clearSavedCredentials();
+        await clearLocalDeviceUnlock();
       }
 
       onAuthenticated(result.session, result.conversations);
     } catch (caught) {
       setState('error');
+      setLoginProgressStep(null);
       setError(toUserErrorMessage(caught, copy.auth.unknownError));
 
       return;
     }
 
+    setLoginProgressStep(null);
     setState('idle');
   };
 
@@ -335,7 +346,9 @@ export function AuthScreen({
             data-testid="auth-submit-button"
           >
             {state === 'loading'
-              ? copy.auth.loadingSubmit
+              ? mode === 'login' && loginProgressStep
+                ? loginProgressLabel(loginProgressStep)
+                : copy.auth.loadingSubmit
               : mode === 'login'
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}
@@ -381,6 +394,19 @@ export function AuthScreen({
 
 function isIosBrowser(): boolean {
   return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
+}
+
+function loginProgressLabel(step: LoginIdentityProgressStep): string {
+  switch (step) {
+    case 'decrypting-keys':
+      return copy.auth.loginProgress.decryptingKeys;
+    case 'loading-keychain':
+      return copy.auth.loginProgress.loadingKeychain;
+    case 'loading-workspace':
+      return copy.auth.loginProgress.loadingWorkspace;
+    case 'resolving-identity':
+      return copy.auth.loginProgress.resolvingIdentity;
+  }
 }
 
 function installFallbackHelp(): string {

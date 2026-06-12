@@ -126,14 +126,10 @@ export function IdentityMemberRow({
   if (loadingProfile) {
     const loadingContent = (
       <>
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-white/8 via-white/4 to-transparent"
-        />
-        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-white/12" />
+        <span className="relative h-10 w-10 shrink-0 animate-pulse rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
         <span className="relative min-w-0 flex-1">
-          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-white/14" />
-          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-white/10" />
+          <span className="block h-4 w-32 max-w-[70%] animate-pulse rounded-full bg-[#747687]" />
+          <span className="mt-2 block h-3 w-20 max-w-[46%] animate-pulse rounded-full bg-[#666879]" />
         </span>
       </>
     );
@@ -145,7 +141,7 @@ export function IdentityMemberRow({
           data-identity-id={item.identityId}
           data-banner-url=""
           className={cx(
-            'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+            'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
             className,
           )}
         >
@@ -162,7 +158,7 @@ export function IdentityMemberRow({
         data-identity-id={item.identityId}
         data-banner-url=""
         className={cx(
-          'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+          'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
           className,
         )}
       >

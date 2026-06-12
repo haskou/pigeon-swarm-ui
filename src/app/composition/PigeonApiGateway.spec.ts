@@ -1818,8 +1818,8 @@ describe(PigeonApiGateway.name, () => {
       id: 'public-key',
       masterKeyDerivation: {
         algorithm: 'scrypt',
-        N: 16_384,
-        p: 5,
+        N: 2 ** 18,
+        p: 1,
         r: 8,
         salt: expect.any(String),
         version: 1,
@@ -1998,6 +1998,56 @@ describe(PigeonApiGateway.name, () => {
     await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
     await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
 
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/identities/identity-1');
+  });
+
+  it('caches identity reads by the lookup alias and returned identity id', async () => {
+    const identity = {
+      id: 'identity-1',
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+    const http = {
+      request: jest.fn().mockResolvedValue(identity),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+
+    await expect(gateway.getIdentity('@ada')).resolves.toBe(identity);
+    await expect(gateway.getIdentity('@ada')).resolves.toBe(identity);
+    await expect(gateway.getIdentity('identity-1')).resolves.toBe(identity);
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('/identities/%40ada');
+  });
+
+  it('deduplicates concurrent identity reads', async () => {
+    const identity = {
+      id: 'identity-1',
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+    let resolveIdentity!: (identity: IdentityResource) => void;
+    const identityPromise = new Promise<IdentityResource>((resolve) => {
+      resolveIdentity = resolve;
+    });
+    const http = {
+      request: jest.fn().mockReturnValue(identityPromise),
+    } as unknown as HttpJsonClient;
+    const gateway = new PigeonApiGateway(http);
+    const first = gateway.getIdentity('identity-1');
+    const second = gateway.getIdentity('identity-1');
+
+    resolveIdentity(identity);
+
+    await expect(first).resolves.toBe(identity);
+    await expect(second).resolves.toBe(identity);
     expect(http.request).toHaveBeenCalledTimes(1);
     expect(http.request).toHaveBeenCalledWith('/identities/identity-1');
   });

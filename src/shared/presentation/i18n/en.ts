@@ -48,6 +48,12 @@ export const en = {
     installAppPrompting: 'Opening installer...',
     installAppReadyHelp: 'Your browser is ready to install Pigeon Swarm.',
     invalidLogin: 'The username or password is incorrect.',
+    loginProgress: {
+      decryptingKeys: 'Decrypting keys...',
+      loadingKeychain: 'Loading keychain...',
+      loadingWorkspace: 'Opening workspace...',
+      resolvingIdentity: 'Downloading identity...',
+    },
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
     loginSubmit: 'Decrypt and enter',
@@ -1003,6 +1009,7 @@ export const en = {
     handle: 'Username',
     hoverToEdit: 'Hover and click the image to edit it.',
     identityId: 'Identity ID',
+    identityVersion: 'Identity',
     keychainVersion: 'Keychain',
     keepEditing: 'Keep editing',
     language: 'Language',
@@ -1035,6 +1042,7 @@ export const en = {
     security: 'Security',
     saving: 'Saving...',
     updateError: 'The profile could not be updated.',
+    versions: 'Versions',
   },
   rail: {
     openMessages: 'Open messages workspace',

@@ -60,7 +60,10 @@ export function ProfileEditor({
   nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
-  onUpdated: (session: Session) => void;
+  onUpdated: (
+    session: Session,
+    change: { passwordChanged: boolean },
+  ) => void;
 }) {
   const [name, setName] = useState(session.identity.profile.name);
   const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
@@ -237,7 +240,7 @@ export function ProfileEditor({
         ...session,
         identity,
         password: wantsPasswordChange ? newPassword : session.password,
-      });
+      }, { passwordChanged: wantsPasswordChange });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
     }

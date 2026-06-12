@@ -169,9 +169,7 @@ interface CommunityWorkspaceProps {
   onMobileMembersClose: () => void;
   onMobileSidebarClose: () => void;
   onOpenMobileSidebar: () => void;
-  onNotificationSettingsOpen: (
-    target: NotificationScopeSettingsTarget,
-  ) => void;
+  onNotificationSettingsOpen: (target: NotificationScopeSettingsTarget) => void;
   onNotificationMuteToggle: (scope: NotificationSettingScope) => void;
   onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
   onOpenConversationWithIdentity?: (
@@ -419,8 +417,7 @@ export function CommunityWorkspace({
     () =>
       textChannels.map((channel) => ({
         ...channel,
-        threads:
-          channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+        threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
       })),
     [channelThreadsByChannelId, textChannels],
   );
@@ -574,8 +571,7 @@ export function CommunityWorkspace({
 
       setDrafts((current) => {
         const currentValue = current[selectedChannelId] ?? '';
-        const value =
-          typeof next === 'function' ? next(currentValue) : next;
+        const value = typeof next === 'function' ? next(currentValue) : next;
 
         scheduleChannelDraftSync(selectedChannelId, value);
 
@@ -610,8 +606,7 @@ export function CommunityWorkspace({
   const channelNameFor = useCallback(
     (channelId: string) =>
       textChannelsWithThreads.find((channel) => channel.id === channelId)
-        ?.name ??
-      shortId(channelId),
+        ?.name ?? shortId(channelId),
     [textChannelsWithThreads],
   );
   const scrollToChannelMessage = useCallback(
@@ -778,7 +773,9 @@ export function CommunityWorkspace({
       channelId: string,
       rootMessageId: string,
     ): Promise<ChatMessage | null> => {
-      const loadedRoot = messages.find((message) => message.id === rootMessageId);
+      const loadedRoot = messages.find(
+        (message) => message.id === rootMessageId,
+      );
 
       if (loadedRoot) return loadedRoot;
 
@@ -811,10 +808,7 @@ export function CommunityWorkspace({
     [community.id, messages, projectChannelMessages, session],
   );
   const openMessageThreadFromSummary = useCallback(
-    async (
-      channelId: string,
-      threadSummary: CommunityChannelThreadSummary,
-    ) => {
+    async (channelId: string, threadSummary: CommunityChannelThreadSummary) => {
       const root =
         (await loadThreadRootMessage(channelId, threadSummary.rootMessageId)) ??
         placeholderThreadRootMessage({
@@ -826,7 +820,12 @@ export function CommunityWorkspace({
 
       await openMessageThread(root);
     },
-    [community.id, loadThreadRootMessage, openMessageThread, session.identity.id],
+    [
+      community.id,
+      loadThreadRootMessage,
+      openMessageThread,
+      session.identity.id,
+    ],
   );
   const openPinnedMessages = useCallback(async () => {
     if (!selectedChannelId) return;
@@ -1037,7 +1036,9 @@ export function CommunityWorkspace({
           .filter(
             (rootMessageId) =>
               !threadRootLabels[rootMessageId] &&
-              !unresolvedKeys.has(threadRootLabelKey(channel.id, rootMessageId)),
+              !unresolvedKeys.has(
+                threadRootLabelKey(channel.id, rootMessageId),
+              ),
           );
 
         return {
@@ -1094,7 +1095,9 @@ export function CommunityWorkspace({
         }
 
         for (const rootMessageId of remainingRootMessageIds) {
-          unresolvedKeys.add(threadRootLabelKey(channel.channelId, rootMessageId));
+          unresolvedKeys.add(
+            threadRootLabelKey(channel.channelId, rootMessageId),
+          );
         }
       }
     })().catch(() => undefined);
@@ -1135,9 +1138,7 @@ export function CommunityWorkspace({
       communityMessageIdentityIds({
         messages: [
           ...messages,
-          ...(threadPanel
-            ? [threadPanel.root, ...threadPanel.messages]
-            : []),
+          ...(threadPanel ? [threadPanel.root, ...threadPanel.messages] : []),
           ...(messageCollection?.messages ?? []),
           ...messageSearch.results.map((result) => result.message),
         ],
@@ -1219,7 +1220,12 @@ export function CommunityWorkspace({
 
       return changed ? next : current;
     });
-  }, [messageCollection?.messages, messageSearch.results, messages, threadPanel]);
+  }, [
+    messageCollection?.messages,
+    messageSearch.results,
+    messages,
+    threadPanel,
+  ]);
   const threadLabelByRootMessageId = useMemo(() => {
     const labels: Record<string, string> = { ...threadRootLabels };
 
@@ -1413,7 +1419,10 @@ export function CommunityWorkspace({
     const pending = pendingSearchResultRef.current;
 
     if (pending) {
-      if (selectedChannelId !== pending.channelId || messageState === 'loading') {
+      if (
+        selectedChannelId !== pending.channelId ||
+        messageState === 'loading'
+      ) {
         return;
       }
 
@@ -1615,13 +1624,18 @@ export function CommunityWorkspace({
     setCommunityLeaveError(null);
 
     try {
-      const updatedCommunity = await applicationContainer.leaveCommunity(
+      const result = await applicationContainer.leaveCommunity(
         session,
         community.id,
       );
 
+      onSessionUpdated({
+        ...session,
+        keychain: result.keychain,
+        keychainExternalIdentifier: result.keychainExternalIdentifier,
+      });
       setCommunityMenuOpen(false);
-      onCommunityLeft(updatedCommunity);
+      onCommunityLeft(result.community ?? community);
     } catch (caught) {
       setCommunityLeaveError(
         toUserErrorMessage(caught, copy.communities.leaveError),
@@ -2536,7 +2550,7 @@ export function CommunityWorkspace({
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading
-              : messageCollection.error ?? copy.messages.emptyPins
+              : (messageCollection.error ?? copy.messages.emptyPins)
           }
           identityNames={communityIdentityNames}
           identityPictures={memberPictures}

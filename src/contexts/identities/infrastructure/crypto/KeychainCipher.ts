@@ -21,6 +21,7 @@ export class KeychainCipher {
 
     return {
       conversations: parsed.conversations ?? {},
+      timestamp: parsed.timestamp ?? keychain.timestamp,
       version: parsed.version ?? keychain.version ?? 0,
     };
   }
@@ -34,7 +35,7 @@ export class KeychainCipher {
       (session.keychain.version ?? 0) + 1,
       nextKeychain.version,
     );
-    const keychain = { ...nextKeychain, version };
+    const keychain = { ...nextKeychain, timestamp, version };
     const encryptedPayload = session.masterKey
       .encrypt(JSON.stringify(keychain))
       .toString();

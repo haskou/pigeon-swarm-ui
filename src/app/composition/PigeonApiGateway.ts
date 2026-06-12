@@ -14,6 +14,7 @@ import type {
   CallResource,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
+import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
@@ -97,6 +98,7 @@ import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domai
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
+import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
@@ -137,8 +139,8 @@ const defaultKeychain: LocalKeychain = {
 
 const masterKeyDerivationDefaults = {
   algorithm: 'scrypt',
-  N: 16_384,
-  p: 5,
+  N: 2 ** 18,
+  p: 1,
   r: 8,
   version: 1,
 } as const satisfies Omit<IdentityResource['masterKeyDerivation'], 'salt'>;
@@ -190,6 +192,11 @@ export class PigeonApiGateway {
   >();
 
   private readonly identityCache = new Map<string, CachedIdentity>();
+
+  private readonly pendingIdentityRequests = new Map<
+    string,
+    Promise<IdentityResource>
+  >();
 
   private readonly signer: RequestSigner;
 
@@ -347,11 +354,20 @@ export class PigeonApiGateway {
     });
   }
 
-  private cacheIdentity(identity: IdentityResource): void {
-    this.identityCache.set(IdentityId.normalize(identity.id), {
+  private cacheIdentity(
+    identity: IdentityResource,
+    lookupIdentityId?: string,
+  ): void {
+    const entry = {
       expiresAt: Date.now() + identityCacheTtlMs,
       identity,
-    });
+    };
+
+    this.identityCache.set(IdentityId.normalize(identity.id), entry);
+
+    if (lookupIdentityId) {
+      this.identityCache.set(IdentityId.normalize(lookupIdentityId), entry);
+    }
   }
 
   private async decryptMessages(
@@ -717,16 +733,7 @@ export class PigeonApiGateway {
     session: Session,
     newPassword: string,
   ): Promise<IdentityResource['encryptedKeyPair']> {
-    const privateKey = await new EncryptedPrivateKey(
-      new StringValueObject(
-        session.identity.encryptedKeyPair.encryptedPrivateKey,
-      ),
-    ).decrypt(new StringValueObject(session.password));
-    const encryptedKeyPair = await EncryptedKeyPair.encryptKeyPair(
-      PublicKey.fromPEM(
-        new StringValueObject(session.identity.encryptedKeyPair.publicKey),
-      ),
-      privateKey,
+    const encryptedKeyPair = await session.keyPair.encryptKeyPair(
       new StringValueObject(newPassword),
     );
 
@@ -2022,13 +2029,26 @@ export class PigeonApiGateway {
 
   public async refreshIdentity(identityId: string): Promise<IdentityResource> {
     const normalizedIdentityId = IdentityId.normalize(identityId);
-    const identity = await this.http.request<IdentityResource>(
-      `/identities/${encodeURIComponent(normalizedIdentityId)}`,
-    );
+    const pending = this.pendingIdentityRequests.get(normalizedIdentityId);
 
-    this.cacheIdentity(identity);
+    if (pending) return await pending;
 
-    return identity;
+    const request = this.http
+      .request<IdentityResource>(
+        `/identities/${encodeURIComponent(normalizedIdentityId)}`,
+      )
+      .then((identity) => {
+        this.cacheIdentity(identity, normalizedIdentityId);
+
+        return identity;
+      })
+      .finally(() => {
+        this.pendingIdentityRequests.delete(normalizedIdentityId);
+      });
+
+    this.pendingIdentityRequests.set(normalizedIdentityId, request);
+
+    return await request;
   }
 
   public async updateIdentityProfile(
@@ -2548,8 +2568,11 @@ export class PigeonApiGateway {
   public async login(
     identityId: string,
     password: string,
+    onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
     const identity = await this.getIdentity(identityId.trim());
+    onProgress?.('decrypting-keys');
     const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
     const loginPayload = new StringValueObject(
       `pigeon-swarm:login:${identity.id}`,
@@ -2584,6 +2607,10 @@ export class PigeonApiGateway {
       masterKey,
       password,
     };
+    onProgress?.('loading-keychain');
+    const conversationsPromise = this.listConversations(session).catch(
+      () => [],
+    );
     const keychainResource = await this.loadRemoteKeychain(session).catch(
       (caught: unknown) => {
         if (this.isMissingRemoteKeychain(caught)) return undefined;
@@ -2600,9 +2627,70 @@ export class PigeonApiGateway {
       keychainExternalIdentifier:
         keychainResource?.keychainExternalIdentifier ?? null,
     };
-    const conversations = await this.listConversations(hydratedSession).catch(
+    onProgress?.('loading-workspace');
+    const conversations = await conversationsPromise;
+
+    return { conversations, session: hydratedSession };
+  }
+
+  public async restoreRememberedSession(
+    identityId: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
+    const identity = await this.getIdentity(identityId.trim());
+    onProgress?.('decrypting-keys');
+    const localUnlock = await loadLocalDeviceUnlock(identity.id);
+
+    if (!localUnlock) {
+      throw new Error(copy.auth.invalidLogin);
+    }
+
+    const encryptedKeyPair = this.restoreEncryptedKeyPair(identity);
+    const keyPair = KeyPair.fromPrimitives(localUnlock.keyPair);
+    const loginPayload = new StringValueObject(
+      `pigeon-swarm:login:${identity.id}`,
+    );
+
+    if (
+      !encryptedKeyPair.isValidSignature(
+        loginPayload,
+        keyPair.sign(loginPayload),
+      )
+    ) {
+      throw new Error(copy.auth.invalidLogin);
+    }
+
+    const session: Session = {
+      encryptedKeyPair,
+      identity,
+      keychain: defaultKeychain,
+      keyPair,
+      masterKey: SymmetricKey.fromBase64(localUnlock.masterKey),
+      password: '',
+    };
+    onProgress?.('loading-keychain');
+    const conversationsPromise = this.listConversations(session).catch(
       () => [],
     );
+    const keychainResource = await this.loadRemoteKeychain(session).catch(
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
+    );
+    const keychain = keychainResource
+      ? await this.decryptKeychain(session, keychainResource)
+      : defaultKeychain;
+    const hydratedSession = {
+      ...session,
+      keychain,
+      keychainExternalIdentifier:
+        keychainResource?.keychainExternalIdentifier ?? null,
+    };
+    onProgress?.('loading-workspace');
+    const conversations = await conversationsPromise;
 
     return { conversations, session: hydratedSession };
   }

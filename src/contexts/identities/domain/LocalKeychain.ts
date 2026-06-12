@@ -2,5 +2,6 @@ import type { ConversationKeyEntry } from '../../conversations/domain/conversati
 
 export type LocalKeychain = {
   conversations: Record<string, ConversationKeyEntry>;
+  timestamp?: number;
   version: number;
 };
