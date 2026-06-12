@@ -77,11 +77,16 @@ export const es = {
     },
     passwordRequirements:
       'Usa de 12 a 256 caracteres con mayuscula, minuscula, numero y simbolo.',
+    passkeyPrf: 'Proteger clave de contraseña con passkey',
+    passkeyPrfHelp:
+      'Usa WebAuthn PRF para envolver la clave derivada de contraseña antes de descifrar tu master key.',
+    passkeyPrfUnavailable:
+      'Este navegador no expone WebAuthn PRF para envolver claves con passkey.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',
     rememberMeHelp:
-      'Guarda usuario y contraseña en este navegador para restaurar la sesion.',
+      'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   calls: {
@@ -268,12 +273,12 @@ export const es = {
     description: 'Descripción',
     descriptionPlaceholder: 'Descripción',
     discover: 'Descubrir comunidades',
-    discoverEmptyBody:
-      'Prueba con otra red o crea una comunidad.',
+    discoverEmptyBody: 'Prueba con otra red o crea una comunidad.',
     discoverEmpty: 'No hay comunidades para esta búsqueda.',
     discoverEmptyTitle: 'No hay comunidades visibles en esta red.',
     discoverError: 'No se pudieron buscar comunidades.',
-    discoverHint: 'Busca comunidades visibles en las redes a las que estás conectado.',
+    discoverHint:
+      'Busca comunidades visibles en las redes a las que estás conectado.',
     discoverJoin: 'Solicitar unirse',
     discoverJoined: 'Miembro',
     discoverJoinInstantly: 'Unirse al instante',
@@ -394,7 +399,8 @@ export const es = {
       view_channels: 'Ver canales',
     },
     privateCommunity: 'Comunidad privada',
-    privateCommunityHelp: 'Solo los miembros pueden ver sus canales y contenido.',
+    privateCommunityHelp:
+      'Solo los miembros pueden ver sus canales y contenido.',
     preview: 'Vista previa',
     profile: 'Perfil',
     publicCommunity: 'Comunidad pública',
@@ -927,6 +933,13 @@ export const es = {
       symbol: 'Simbolo',
       uppercase: 'Mayuscula',
     },
+    passkeyPrf: 'Proteger con passkey PRF',
+    passkeyPrfActive: 'Passkey PRF activo',
+    passkeyPrfHelp:
+      'Envuelve la clave derivada de contraseña con una passkey antes de abrir tu master key.',
+    passkeyPrfPreserved: 'Esta identidad ya usa passkey PRF y se conservará.',
+    passkeyPrfUnavailable:
+      'Este navegador no expone WebAuthn PRF para envolver claves con passkey.',
     picture: 'Imagen de perfil',
     save: 'Guardar cambios',
     security: 'Seguridad',

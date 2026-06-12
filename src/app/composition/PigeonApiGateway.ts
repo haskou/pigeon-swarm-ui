@@ -16,6 +16,7 @@ import type {
 } from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import type { PasskeyPrfMasterKeyProtection } from '../../contexts/identities/domain/PasskeyPrfMasterKeyProtection';
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
@@ -97,6 +98,7 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
+import { WebAuthnPrfKeyProtector } from '../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
@@ -143,7 +145,10 @@ const masterKeyDerivationDefaults = {
   p: 1,
   r: 8,
   version: 1,
-} as const satisfies Omit<IdentityResource['masterKeyDerivation'], 'salt'>;
+} as const satisfies Omit<
+  IdentityResource['masterKeyDerivation'],
+  'passkeyPrf' | 'salt'
+>;
 
 const messageDecryptBatchSize = 8;
 const identityCacheTtlMs = 2 * 60 * 1000;
@@ -167,6 +172,8 @@ export class PigeonApiGateway {
   private readonly identitySignatures: IdentitySignaturePayloadFactory;
 
   private readonly keychains: KeychainCipher;
+
+  private readonly keyProtector = new WebAuthnPrfKeyProtector();
 
   private readonly linkPreviews: PigeonLinkPreviewsApi;
 
@@ -695,6 +702,18 @@ export class PigeonApiGateway {
   private async encryptMasterKey(
     masterKey: SymmetricKey,
     password: string,
+    options: {
+      passkeyPrf?:
+        | {
+            displayName: string;
+            identityId: string;
+            mode: 'create';
+          }
+        | {
+            mode: 'preserve';
+            protection: PasskeyPrfMasterKeyProtection;
+          };
+    } = {},
   ): Promise<{
     encryptedMasterKey: string;
     masterKeyDerivation: IdentityResource['masterKeyDerivation'];
@@ -707,10 +726,17 @@ export class PigeonApiGateway {
       password,
       masterKeyDerivation,
     );
+    const passkeyPrf = await this.passkeyPrfProtectionForPasswordKey(
+      passwordKey,
+      options.passkeyPrf,
+    );
 
     return {
       encryptedMasterKey: passwordKey.encrypt(masterKey.valueOf()).toString(),
-      masterKeyDerivation,
+      masterKeyDerivation: {
+        ...masterKeyDerivation,
+        ...(passkeyPrf ? { passkeyPrf } : {}),
+      },
     };
   }
 
@@ -718,15 +744,86 @@ export class PigeonApiGateway {
     identity: IdentityResource,
     password: string,
   ): Promise<SymmetricKey> {
-    const passwordKey = await this.deriveMasterPasswordKey(
-      password,
-      identity.masterKeyDerivation,
-    );
+    const passwordKey = identity.masterKeyDerivation.passkeyPrf
+      ? await this.keyProtector.unwrapPasswordKey(
+          identity.masterKeyDerivation.passkeyPrf,
+        )
+      : await this.deriveMasterPasswordKey(
+          password,
+          identity.masterKeyDerivation,
+        );
     const decrypted = passwordKey.decrypt(
       new EncryptedPayload(identity.encryptedMasterKey),
     );
 
     return SymmetricKey.fromBase64(decrypted.toString());
+  }
+
+  private async passkeyPrfProtectionForPasswordKey(
+    passwordKey: SymmetricKey,
+    input:
+      | {
+          displayName: string;
+          identityId: string;
+          mode: 'create';
+        }
+      | {
+          mode: 'preserve';
+          protection: PasskeyPrfMasterKeyProtection;
+        }
+      | undefined,
+  ): Promise<PasskeyPrfMasterKeyProtection | undefined> {
+    if (!input) return undefined;
+
+    if (input.mode === 'create') {
+      return await this.keyProtector.createProtection({
+        displayName: input.displayName,
+        identityId: input.identityId,
+        passwordKey,
+      });
+    }
+
+    return await this.keyProtector.rewrapPasswordKey(
+      input.protection,
+      passwordKey,
+    );
+  }
+
+  private profilePasskeyPrfMode({
+    currentIdentity,
+    enabled,
+    identityId,
+    profileName,
+  }: {
+    currentIdentity: IdentityResource;
+    enabled?: boolean;
+    identityId: string;
+    profileName: string;
+  }):
+    | {
+        displayName: string;
+        identityId: string;
+        mode: 'create';
+      }
+    | {
+        mode: 'preserve';
+        protection: PasskeyPrfMasterKeyProtection;
+      }
+    | undefined {
+    if (currentIdentity.masterKeyDerivation.passkeyPrf) {
+      return {
+        mode: 'preserve',
+        protection: currentIdentity.masterKeyDerivation.passkeyPrf,
+      };
+    }
+
+    if (!enabled) return undefined;
+
+    return {
+      displayName: profileName,
+      identityId,
+      mode: 'create',
+    };
   }
 
   private async reEncryptKeyPair(
@@ -1963,14 +2060,23 @@ export class PigeonApiGateway {
     password: string,
     networks: string[],
     handle?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<IdentityResource> {
     const keyPair = await KeyPair.generate();
     const encryptedKeyPair = await keyPair.encryptKeyPair(password);
     const encryptedKeyPairPrimitives = encryptedKeyPair.toPrimitives();
     const masterKey = SymmetricKey.generate();
-    const { encryptedMasterKey, masterKeyDerivation } =
-      await this.encryptMasterKey(masterKey, password);
     const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
+    const { encryptedMasterKey, masterKeyDerivation } =
+      await this.encryptMasterKey(masterKey, password, {
+        passkeyPrf: options.passkeyPrfEnabled
+          ? {
+              displayName: name,
+              identityId,
+              mode: 'create',
+            }
+          : undefined,
+      });
     const path = '/identities/';
     const unsigned = this.identitySignatures.createInitial({
       encryptedKeyPair: encryptedKeyPairPrimitives,
@@ -2068,6 +2174,7 @@ export class PigeonApiGateway {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<IdentityResource> {
     const identityId = IdentityId.normalize(session.identity.id);
     const currentIdentity = await this.getIdentity(identityId);
@@ -2085,7 +2192,14 @@ export class PigeonApiGateway {
       ? await this.reEncryptKeyPair(session, newPassword)
       : undefined;
     const masterKeyEncryption = newPassword
-      ? await this.encryptMasterKey(session.masterKey, newPassword)
+      ? await this.encryptMasterKey(session.masterKey, newPassword, {
+          passkeyPrf: this.profilePasskeyPrfMode({
+            currentIdentity,
+            enabled: options.passkeyPrfEnabled,
+            identityId,
+            profileName: profile.name,
+          }),
+        })
       : undefined;
     const path = `/identities/${encodeURIComponent(identityId)}`;
     const unsigned = this.identitySignatures.createUpdate({
@@ -2742,12 +2856,14 @@ export class PigeonApiGateway {
     password: string,
     networks: string[],
     handle?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<LoginResult> {
     const identity = await this.createIdentity(
       name,
       password,
       networks,
       handle,
+      options,
     );
 
     return await this.login(identity.id, password);

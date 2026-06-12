@@ -1232,11 +1232,13 @@ export class PigeonApplication {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(
       session,
       profile,
       newPassword,
+      options,
     );
   }
 
@@ -1554,12 +1556,14 @@ export class PigeonApplication {
     password: string,
     networks: string[],
     handle?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<LoginResult> {
     return await this.registerIdentityUseCase.register(
       new RegisterIdentityMessage({
         handle,
         name,
         networks,
+        passkeyPrfEnabled: options.passkeyPrfEnabled,
         password,
       }),
     );

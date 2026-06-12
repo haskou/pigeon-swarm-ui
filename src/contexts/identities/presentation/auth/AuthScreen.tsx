@@ -20,6 +20,7 @@ import {
   clearLocalDeviceUnlock,
   saveLocalDeviceUnlock,
 } from '../../infrastructure/storage/localDeviceUnlock';
+import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
 import {
   normalizeHandleInput,
   passwordValidationChecks,
@@ -62,6 +63,8 @@ export function AuthScreen({
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(false);
+  const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
@@ -87,6 +90,10 @@ export function AuthScreen({
       setIdentityId(savedCredentials.identityId);
       setRememberMe(true);
     }
+  }, []);
+
+  useEffect(() => {
+    setPasskeyPrfAvailable(WebAuthnPrfKeyProtector.isAvailable());
   }, []);
 
   const canSubmit = canSubmitAuthForm({
@@ -146,6 +153,7 @@ export function AuthScreen({
                 selectedNetwork,
               }),
               handle.trim() ? normalizeHandleInput(handle) : undefined,
+              { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
             );
 
       if (rememberMe) {
@@ -296,6 +304,52 @@ export function AuthScreen({
                   }}
                   variant="auth"
                 />
+                <button
+                  type="button"
+                  aria-pressed={passkeyPrfEnabled}
+                  disabled={!passkeyPrfAvailable}
+                  onClick={() =>
+                    passkeyPrfAvailable &&
+                    setPasskeyPrfEnabled((enabled) => !enabled)
+                  }
+                  className={cx(
+                    'flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition',
+                    passkeyPrfAvailable
+                      ? passkeyPrfEnabled
+                        ? 'border-cyan-200/35 bg-cyan-300/15'
+                        : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.06]'
+                      : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+                      passkeyPrfEnabled && passkeyPrfAvailable
+                        ? 'bg-cyan-400/25'
+                        : 'bg-black/25',
+                    )}
+                  >
+                    <span
+                      className={cx(
+                        'h-4 w-4 rounded-full bg-white transition-transform',
+                        passkeyPrfEnabled && passkeyPrfAvailable
+                          ? 'translate-x-6'
+                          : 'translate-x-1',
+                      )}
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white/80">
+                      {copy.auth.passkeyPrf}
+                    </span>
+                    <span className="mt-1 block text-xs leading-snug text-white/45">
+                      {passkeyPrfAvailable
+                        ? copy.auth.passkeyPrfHelp
+                        : copy.auth.passkeyPrfUnavailable}
+                    </span>
+                  </span>
+                </button>
               </>
             )}
           </div>

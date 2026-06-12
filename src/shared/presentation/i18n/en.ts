@@ -75,12 +75,17 @@ export const en = {
     },
     passwordRequirements:
       'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+    passkeyPrf: 'Protect password key with passkey',
+    passkeyPrfHelp:
+      'Uses WebAuthn PRF to wrap the password-derived key before it decrypts your master key.',
+    passkeyPrfUnavailable:
+      'This browser does not expose WebAuthn PRF for passkey key wrapping.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
     rememberMe: 'Stay signed in',
     rememberMeHelp:
-      'Stores username and password in this browser to restore the session.',
+      'Stores your identity and a local device unlock envelope in this browser.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
@@ -286,12 +291,12 @@ export const en = {
     description: 'Description',
     descriptionPlaceholder: 'Description',
     discover: 'Discover communities',
-    discoverEmptyBody:
-      'Try another network or create a community.',
+    discoverEmptyBody: 'Try another network or create a community.',
     discoverEmpty: 'No communities match this search.',
     discoverEmptyTitle: 'No visible communities in this network.',
     discoverError: 'Communities could not be searched.',
-    discoverHint: 'Search communities visible on the networks you are connected to.',
+    discoverHint:
+      'Search communities visible on the networks you are connected to.',
     discoverJoin: 'Request to join',
     discoverJoined: 'Member',
     discoverJoinInstantly: 'Join instantly',
@@ -838,8 +843,7 @@ export const en = {
     title: 'Node settings',
     unclaimed: 'Unclaimed node',
     unclaimedBody: 'This local node does not have an owner yet.',
-    unclaimedNetworkNote:
-      'Claim this node to unlock full network management.',
+    unclaimedNetworkNote: 'Claim this node to unlock full network management.',
     unclaimedTitle: 'Unclaimed node',
   },
   notifications: {
@@ -1004,7 +1008,8 @@ export const en = {
     copied: 'Copied',
     copy: 'Copy',
     discardChanges: 'Discard',
-    discardChangesBody: 'There are unsaved changes. Do you want to discard them?',
+    discardChangesBody:
+      'There are unsaved changes. Do you want to discard them?',
     edit: 'Edit profile',
     handle: 'Username',
     hoverToEdit: 'Hover and click the image to edit it.',
@@ -1037,6 +1042,14 @@ export const en = {
       symbol: 'Symbol',
       uppercase: 'Uppercase',
     },
+    passkeyPrf: 'Protect with passkey PRF',
+    passkeyPrfActive: 'Passkey PRF enabled',
+    passkeyPrfHelp:
+      'Wrap the password-derived key with a passkey before it unlocks your master key.',
+    passkeyPrfPreserved:
+      'This identity already uses passkey PRF and it will be preserved.',
+    passkeyPrfUnavailable:
+      'This browser does not expose WebAuthn PRF for passkey key wrapping.',
     picture: 'Profile picture',
     save: 'Save changes',
     security: 'Security',
