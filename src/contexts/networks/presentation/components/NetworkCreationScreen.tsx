@@ -82,13 +82,13 @@ export function NetworkCreationScreen({
         />
 
         <div className="mt-6 min-h-[150px] space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/6 p-4 text-sm leading-relaxed text-white/70">
+          <p className="px-1 text-sm leading-relaxed text-white/60">
             {mode === 'create'
               ? copy.network.createBody
               : mode === 'join'
                 ? copy.network.joinBody
                 : copy.network.publicBody}
-          </div>
+          </p>
 
           {mode === 'create' ? (
             <Field label={copy.network.nameLabel}>
