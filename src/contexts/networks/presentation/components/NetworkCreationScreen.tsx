@@ -74,6 +74,8 @@ export function NetworkCreationScreen({
 
         <SegmentedControl
           className="mt-8"
+          columns={3}
+          dense
           value={mode}
           onChange={setMode}
           options={modeOptions}
