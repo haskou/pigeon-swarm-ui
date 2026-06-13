@@ -233,31 +233,15 @@ export function AuthScreen({
               {copy.auth.heroBody}
             </p>
             <div className="mt-8">
-              {canShowInstallButton && (
-                <button
-                  type="button"
-                  onClick={handleInstallApp}
-                  disabled={installButtonDisabled}
-                  className={cx(
-                    'w-full rounded-2xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
-                    installState === 'ready'
-                      ? 'bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
-                      : 'bg-white/10 text-white/85 hover:bg-white/15',
-                  )}
-                >
-                  {installButtonLabel}
-                </button>
-              )}
-              {showInstallHelp && installHelp && (
-                <p className="mt-3 text-center text-xs leading-snug text-white/45">
-                  {installHelp}
-                </p>
-              )}
-              {!canShowInstallButton && installHelp && (
-                <p className="mt-3 text-center text-xs leading-snug text-white/45">
-                  {installHelp}
-                </p>
-              )}
+              <InstallAppAction
+                canShowButton={canShowInstallButton}
+                disabled={installButtonDisabled}
+                help={installHelp}
+                label={installButtonLabel}
+                onClick={handleInstallApp}
+                ready={installState === 'ready'}
+                showHelp={showInstallHelp}
+              />
             </div>
           </div>
         </div>
@@ -279,6 +263,17 @@ export function AuthScreen({
               </p>
             </div>
           </div>
+
+          <InstallAppAction
+            canShowButton={canShowInstallButton}
+            className="mb-5 lg:hidden"
+            disabled={installButtonDisabled}
+            help={installHelp}
+            label={installButtonLabel}
+            onClick={handleInstallApp}
+            ready={installState === 'ready'}
+            showHelp={showInstallHelp}
+          />
 
           <SegmentedControl
             value={mode}
@@ -440,6 +435,55 @@ export function AuthScreen({
         </form>
       </div>
     </section>
+  );
+}
+
+function InstallAppAction({
+  canShowButton,
+  className,
+  disabled,
+  help,
+  label,
+  onClick,
+  ready,
+  showHelp,
+}: {
+  canShowButton: boolean;
+  className?: string;
+  disabled: boolean;
+  help: null | string;
+  label: string;
+  onClick: () => void;
+  ready: boolean;
+  showHelp: boolean;
+}): ReactElement | null {
+  const shouldShowHelp = Boolean(help && (showHelp || !canShowButton));
+
+  if (!canShowButton && !shouldShowHelp) return null;
+
+  return (
+    <div className={className}>
+      {canShowButton && (
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={cx(
+            'w-full rounded-2xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+            ready
+              ? 'bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
+              : 'bg-white/10 text-white/85 hover:bg-white/15',
+          )}
+        >
+          {label}
+        </button>
+      )}
+      {shouldShowHelp && (
+        <p className="mt-3 text-center text-xs leading-snug text-white/45">
+          {help}
+        </p>
+      )}
+    </div>
   );
 }
 
