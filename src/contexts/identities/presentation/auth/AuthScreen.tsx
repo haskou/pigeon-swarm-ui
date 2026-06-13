@@ -229,17 +229,17 @@ export function AuthScreen({
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/65">
               {copy.auth.heroBody}
             </p>
-            <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="mt-8">
               {canShowInstallButton && (
                 <button
                   type="button"
                   onClick={handleInstallApp}
                   disabled={installButtonDisabled}
                   className={cx(
-                    'w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                    'w-full rounded-2xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
                     installState === 'ready'
-                      ? 'border-cyan-200/40 bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
-                      : 'border-white/10 bg-white/10 text-white/85 hover:border-cyan-200/40 hover:bg-white/15',
+                      ? 'bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
+                      : 'bg-white/10 text-white/85 hover:bg-white/15',
                   )}
                 >
                   {installButtonLabel}
@@ -333,32 +333,32 @@ export function AuthScreen({
                   total={passwordRequirementProgress.total}
                   message={passwordRequirementProgress.message}
                 />
-	                <button
-	                  type="button"
-	                  aria-pressed={passkeyPrfEnabled}
-	                  disabled={!passkeyPrfAvailable}
+                <button
+                  type="button"
+                  aria-pressed={passkeyPrfEnabled}
+                  disabled={!passkeyPrfAvailable}
                   onClick={() =>
                     passkeyPrfAvailable &&
                     setPasskeyPrfEnabled((enabled) => !enabled)
                   }
-	                  className={cx(
-	                    'flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition',
-	                    passkeyPrfAvailable
-	                      ? passkeyPrfEnabled
-	                        ? 'border-cyan-200/35 bg-cyan-300/15'
-	                        : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.06]'
-	                      : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
-	                  )}
-	                >
+                  className={cx(
+                    'flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition',
+                    passkeyPrfAvailable
+                      ? passkeyPrfEnabled
+                        ? 'text-white'
+                        : 'text-white/75 hover:bg-white/[0.04]'
+                      : 'cursor-not-allowed opacity-55',
+                  )}
+                >
                   <span
                     aria-hidden="true"
-	                    className={cx(
-	                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-	                      passkeyPrfEnabled && passkeyPrfAvailable
-	                        ? 'bg-cyan-400/25'
-	                        : 'bg-black/25',
-	                    )}
-	                  >
+                    className={cx(
+                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+                      passkeyPrfEnabled && passkeyPrfAvailable
+                        ? 'bg-cyan-400/25'
+                        : 'bg-black/25',
+                    )}
+                  >
                     <span
                       className={cx(
                         'h-4 w-4 rounded-full bg-white transition-transform',
@@ -411,9 +411,6 @@ export function AuthScreen({
             >
               <span className="block font-bold text-white/70">
                 {copy.auth.rememberMe}
-              </span>
-              <span className="block text-xs leading-snug text-white/35">
-                {copy.auth.rememberMeHelp}
               </span>
             </label>
           </div>
