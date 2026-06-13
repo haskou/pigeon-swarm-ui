@@ -283,12 +283,13 @@ export class PigeonApplication {
         ),
     });
     this.registerIdentityUseCase = new RegisterIdentity({
-      register: async (name, password, networks, handle) =>
+      register: async (name, password, networks, handle, options) =>
         await gateway.register(
           name.toString(),
           password,
           networks.toPrimitives(),
           handle?.toString(),
+          options,
         ),
     });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
@@ -1232,11 +1233,13 @@ export class PigeonApplication {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(
       session,
       profile,
       newPassword,
+      options,
     );
   }
 
@@ -1549,17 +1552,30 @@ export class PigeonApplication {
     };
   }
 
+  public async refreshSession(session: Session): Promise<LoginResult> {
+    const result = await this.gateway.refreshSession(session);
+
+    return {
+      ...result,
+      conversations: ConversationTimeline.sortByLatestMessage(
+        result.conversations,
+      ),
+    };
+  }
+
   public async register(
     name: string,
     password: string,
     networks: string[],
     handle?: string,
+    options: { passkeyPrfEnabled?: boolean } = {},
   ): Promise<LoginResult> {
     return await this.registerIdentityUseCase.register(
       new RegisterIdentityMessage({
         handle,
         name,
         networks,
+        passkeyPrfEnabled: options.passkeyPrfEnabled,
         password,
       }),
     );

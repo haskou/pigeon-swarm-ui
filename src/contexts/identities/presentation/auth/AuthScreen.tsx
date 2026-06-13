@@ -9,7 +9,6 @@ import type { LoginIdentityProgressStep } from '../../application/ports/LoginIde
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
-import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   clearSavedCredentials,
@@ -20,6 +19,7 @@ import {
   clearLocalDeviceUnlock,
   saveLocalDeviceUnlock,
 } from '../../infrastructure/storage/localDeviceUnlock';
+import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
 import {
   normalizeHandleInput,
   passwordValidationChecks,
@@ -35,10 +35,9 @@ import {
   registrationNetworks,
 } from './authFormRules';
 import { Field } from './Field';
-import { HeroMetric } from './HeroMetric';
-import { PasswordChecklist } from './PasswordChecklist';
 
 type LoadState = 'idle' | 'loading' | 'error';
+type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
 
 interface AuthScreenProps {
   availableNetworks: NodeNetwork[];
@@ -46,13 +45,11 @@ interface AuthScreenProps {
     session: Session,
     conversations: ConversationResource[],
   ) => void;
-  peerCount: number;
 }
 
 export function AuthScreen({
   availableNetworks,
   onAuthenticated,
-  peerCount,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
@@ -62,6 +59,9 @@ export function AuthScreen({
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(true);
+  const [passkeyPrfSupport, setPasskeyPrfSupport] =
+    useState<PasskeyPrfSupportState>('checking');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
@@ -89,6 +89,24 @@ export function AuthScreen({
     }
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    WebAuthnPrfKeyProtector.isPrfAvailable()
+      .then((available) => {
+        if (mounted) {
+          setPasskeyPrfSupport(available ? 'available' : 'unavailable');
+        }
+      })
+      .catch(() => {
+        if (mounted) setPasskeyPrfSupport('unavailable');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const canSubmit = canSubmitAuthForm({
     availableNetworkCount: availableNetworks.length,
     handle,
@@ -99,7 +117,15 @@ export function AuthScreen({
     passwordConfirmation,
     selectedNetwork,
   });
+  const passkeyPrfAvailable = passkeyPrfSupport === 'available';
+  const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
   const passwordChecks = passwordValidationChecks(password);
+  const passwordRequirementProgress = createPasswordRequirementProgress({
+    checks: {
+      ...passwordChecks,
+      match: password.length > 0 && password === passwordConfirmation,
+    },
+  });
   const canShowInstallButton =
     installState !== 'fallback' && installState !== 'installed';
   const installButtonDisabled =
@@ -146,6 +172,7 @@ export function AuthScreen({
                 selectedNetwork,
               }),
               handle.trim() ? normalizeHandleInput(handle) : undefined,
+              { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
             );
 
       if (rememberMe) {
@@ -155,7 +182,7 @@ export function AuthScreen({
         });
       } else {
         clearSavedCredentials();
-        await clearLocalDeviceUnlock();
+        await clearLocalDeviceUnlock(result.session.identity.id);
       }
 
       onAuthenticated(result.session, result.conversations);
@@ -205,16 +232,32 @@ export function AuthScreen({
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/65">
               {copy.auth.heroBody}
             </p>
-            <div className="mt-8 grid grid-cols-3 gap-3">
-              <HeroMetric
-                label={copy.auth.apiLabel}
-                value={API_SERVER_URL.replace('http://', '')}
-              />
-              <HeroMetric
-                label={copy.auth.networksLabel}
-                value={`${availableNetworks.length}`}
-              />
-              <HeroMetric label={copy.auth.peersLabel} value={`${peerCount}`} />
+            <div className="mt-8">
+              {canShowInstallButton && (
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  disabled={installButtonDisabled}
+                  className={cx(
+                    'w-full rounded-2xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                    installState === 'ready'
+                      ? 'bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
+                      : 'bg-white/10 text-white/85 hover:bg-white/15',
+                  )}
+                >
+                  {installButtonLabel}
+                </button>
+              )}
+              {showInstallHelp && installHelp && (
+                <p className="mt-3 text-center text-xs leading-snug text-white/45">
+                  {installHelp}
+                </p>
+              )}
+              {!canShowInstallButton && installHelp && (
+                <p className="mt-3 text-center text-xs leading-snug text-white/45">
+                  {installHelp}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -288,17 +331,61 @@ export function AuthScreen({
                     data-testid="auth-password-confirmation-input"
                   />
                 </Field>
-                <PasswordChecklist
-                  checks={{
-                    ...passwordChecks,
-                    match:
-                      password.length > 0 && password === passwordConfirmation,
-                  }}
-                  variant="auth"
+                <PasswordRequirementProgress
+                  complete={passwordRequirementProgress.complete}
+                  total={passwordRequirementProgress.total}
+                  message={passwordRequirementProgress.message}
                 />
+                <button
+                  type="button"
+                  aria-pressed={passkeyPrfEnabled}
+                  disabled={!passkeyPrfAvailable}
+                  data-testid="auth-passkey-prf-toggle"
+                  onClick={() =>
+                    passkeyPrfAvailable &&
+                    setPasskeyPrfEnabled((enabled) => !enabled)
+                  }
+                  className={cx(
+                    'flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition',
+                    passkeyPrfAvailable
+                      ? passkeyPrfEnabled
+                        ? 'text-white'
+                        : 'text-white/75 hover:bg-white/[0.04]'
+                      : 'cursor-not-allowed opacity-55',
+                  )}
+                >
+                  <AuthSwitch
+                    enabled={passkeyPrfEnabled && passkeyPrfAvailable}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white/80">
+                      {copy.auth.passkeyPrf}
+                    </span>
+                    <span className="mt-1 block text-xs leading-snug text-white/45">
+                      {passkeyPrfSupport === 'checking'
+                        ? copy.auth.passkeyPrfChecking
+                        : passkeyPrfAvailable
+                          ? copy.auth.passkeyPrfHelp
+                          : copy.auth.passkeyPrfUnavailable}
+                    </span>
+                  </span>
+                </button>
+                {passkeyPrfUnavailable && (
+                  <PasskeyPrfUnavailableNotice>
+                    {copy.auth.passkeyPrfUnavailableCreate}
+                  </PasskeyPrfUnavailableNotice>
+                )}
               </>
             )}
           </div>
+
+          {mode === 'login' && passkeyPrfUnavailable && (
+            <div className="mt-4">
+              <PasskeyPrfUnavailableNotice>
+                {copy.auth.passkeyPrfUnavailableLogin}
+              </PasskeyPrfUnavailableNotice>
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
@@ -306,31 +393,22 @@ export function AuthScreen({
             </div>
           )}
 
-          <div className="mt-6 flex items-center">
+          <div className="mt-6 flex items-center gap-3 rounded-2xl px-1 py-2">
             <button
               type="button"
               id="remember-me"
               aria-pressed={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full border border-white/10 transition-colors focus:outline-none ${
-                rememberMe ? 'bg-cyan-400/20' : 'bg-black/25'
-              }`}
+              className="shrink-0 focus:outline-none"
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  rememberMe ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              <AuthSwitch enabled={rememberMe} />
             </button>
             <label
               htmlFor="remember-me"
-              className="ml-2 block min-w-0 cursor-pointer text-sm text-white/60"
+              className="block min-w-0 cursor-pointer text-sm text-white/60"
             >
               <span className="block font-bold text-white/70">
                 {copy.auth.rememberMe}
-              </span>
-              <span className="block text-xs leading-snug text-white/35">
-                {copy.auth.rememberMeHelp}
               </span>
             </label>
           </div>
@@ -359,33 +437,6 @@ export function AuthScreen({
             </p>
           )}
 
-          {canShowInstallButton && (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={handleInstallApp}
-                disabled={installButtonDisabled}
-                className={cx(
-                  'w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
-                  installState === 'ready'
-                    ? 'border-cyan-200/40 bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
-                    : 'border-white/10 bg-white/10 text-white/85 hover:border-cyan-200/40 hover:bg-white/15',
-                )}
-              >
-                {installButtonLabel}
-              </button>
-              {showInstallHelp && installHelp && (
-                <p className="mt-2 text-center text-xs leading-snug text-white/45">
-                  {installHelp}
-                </p>
-              )}
-            </div>
-          )}
-          {!canShowInstallButton && installHelp && (
-            <p className="mt-3 text-center text-xs leading-snug text-white/45">
-              {installHelp}
-            </p>
-          )}
         </form>
       </div>
     </section>
@@ -396,8 +447,122 @@ function isIosBrowser(): boolean {
   return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
 }
 
+interface PasswordRequirementProgressProps {
+  complete: number;
+  message: string;
+  total: number;
+}
+
+function AuthSwitch({ enabled }: { enabled: boolean }): ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      className={cx(
+        'flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+        enabled ? 'bg-cyan-400/25' : 'bg-black/25',
+      )}
+    >
+      <span
+        className={cx(
+          'h-4 w-4 rounded-full bg-white transition-transform',
+          enabled ? 'translate-x-6' : 'translate-x-1',
+        )}
+      />
+    </span>
+  );
+}
+
+function PasskeyPrfUnavailableNotice({
+  children,
+}: {
+  children: string;
+}): ReactElement {
+  return (
+    <div
+      data-testid="auth-passkey-prf-warning"
+      className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs leading-snug text-amber-50/80"
+    >
+      {children}
+    </div>
+  );
+}
+
+function PasswordRequirementProgress({
+  complete,
+  message,
+  total,
+}: PasswordRequirementProgressProps): ReactElement {
+  const percentage = total > 0 ? Math.round((complete / total) * 100) : 0;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className={cx(
+            'h-full rounded-full transition-[width,background-color]',
+            complete === total
+              ? 'bg-emerald-300'
+              : 'bg-gradient-to-r from-cyan-300 to-fuchsia-500',
+          )}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <p
+        className={cx(
+          'mt-2 text-xs font-bold leading-snug',
+          complete === total ? 'text-emerald-200' : 'text-white/55',
+        )}
+      >
+        {message}
+      </p>
+    </div>
+  );
+}
+
+interface PasswordRequirementProgressInput {
+  checks: {
+    lowercase: boolean;
+    match: boolean;
+    maxLength: boolean;
+    minLength: boolean;
+    number: boolean;
+    symbol: boolean;
+    uppercase: boolean;
+  };
+}
+
+function createPasswordRequirementProgress({
+  checks,
+}: PasswordRequirementProgressInput): PasswordRequirementProgressProps {
+  const values = Object.values(checks);
+  const complete = values.filter(Boolean).length;
+  const total = values.length;
+
+  return {
+    complete,
+    message: nextPasswordRequirementMessage(checks),
+    total,
+  };
+}
+
+function nextPasswordRequirementMessage(
+  checks: PasswordRequirementProgressInput['checks'],
+): string {
+  if (!checks.uppercase) return copy.auth.passwordRequirementNext.uppercase;
+  if (!checks.number) return copy.auth.passwordRequirementNext.number;
+  if (!checks.symbol) return copy.auth.passwordRequirementNext.symbol;
+  if (!checks.match) return copy.auth.passwordRequirementNext.match;
+  if (Object.values(checks).every(Boolean)) {
+    return copy.auth.passwordRequirementNext.valid;
+  }
+
+  return copy.auth.passwordRequirements;
+}
+
 function loginProgressLabel(step: LoginIdentityProgressStep): string {
   switch (step) {
+    case 'confirming-passkey':
+      return copy.auth.loginProgress.confirmingPasskey;
     case 'decrypting-keys':
       return copy.auth.loginProgress.decryptingKeys;
     case 'loading-keychain':

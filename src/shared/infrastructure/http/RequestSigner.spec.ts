@@ -12,20 +12,26 @@ type SignedRequestPayload = {
 };
 
 function signedPayload(sign: jest.Mock): SignedRequestPayload {
-  const [payload] = sign.mock.calls[0] as [string, string];
+  const [payload] = sign.mock.calls[0] as [string];
 
   return JSON.parse(payload) as SignedRequestPayload;
-}
-
-function signedPassword(sign: jest.Mock): string {
-  const [, password] = sign.mock.calls[0] as [string, string];
-
-  return password;
 }
 
 function emptyBodyHash(): string {
   return SHA256Hash.from(JSON.stringify({})).toString();
 }
+
+function sessionWithSigner(
+  sign: jest.Mock,
+  identityId = 'identity-1',
+): Session {
+  return {
+    identity: { id: identityId },
+    keyPair: { sign },
+    password: 'secret',
+  } as unknown as Session;
+}
+
 describe(RequestSigner.name, () => {
   it('builds the canonical payload used for signatures', () => {
     const signer = new RequestSigner(() => 123);
@@ -79,11 +85,7 @@ describe(RequestSigner.name, () => {
   it('signs headers with the session keypair', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(() => 123);
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
 
     await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual({
       'X-Identity-Id': 'identity-1',
@@ -97,7 +99,6 @@ describe(RequestSigner.name, () => {
       path: '/messages',
       timestamp: 123,
     });
-    expect(signedPassword(sign)).toBe('secret');
   });
 
   it('signs only the URL pathname when passed an absolute URL', () => {
@@ -118,13 +119,10 @@ describe(RequestSigner.name, () => {
   it('normalizes PEM identity ids in HTTP signature headers', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(() => 123);
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: {
-        id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
-      },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(
+      sign,
+      '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+    );
 
     await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual(
       expect.objectContaining({
@@ -136,11 +134,7 @@ describe(RequestSigner.name, () => {
   it('signs long request payloads without string value object limits', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(() => 123);
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const body = { encryptedPayload: 'x'.repeat(6000) };
 
     await signer.headers(session, 'POST', '/keychains/', body);
@@ -151,17 +145,12 @@ describe(RequestSigner.name, () => {
       path: '/keychains/',
       timestamp: 123,
     });
-    expect(signedPassword(sign)).toBe('secret');
   });
 
   it('hashes raw upload bytes instead of JSON stringifying them', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(() => 123);
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const bytes = new Uint8Array([1, 2, 3]);
 
     await signer.headers(session, 'POST', '/ipfs/public', bytes.buffer);
@@ -186,11 +175,7 @@ describe(RequestSigner.name, () => {
 
   it('does not send nonce headers', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
 
     await expect(
       new RequestSigner(() => 123).headers(session, 'GET', '/messages'),

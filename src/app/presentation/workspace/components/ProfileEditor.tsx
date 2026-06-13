@@ -26,6 +26,7 @@ import {
   isValidPassword,
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
+import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle,
@@ -60,10 +61,7 @@ export function ProfileEditor({
   nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
-  onUpdated: (
-    session: Session,
-    change: { passwordChanged: boolean },
-  ) => void;
+  onUpdated: (session: Session, change: { passwordChanged: boolean }) => void;
 }) {
   const [name, setName] = useState(session.identity.profile.name);
   const [handle, setHandle] = useState(session.identity.profile.handle ?? '');
@@ -73,6 +71,9 @@ export function ProfileEditor({
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
+  const hasPasskeyPrf = !!session.identity.masterKeyDerivation.passkeyPrf;
+  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(hasPasskeyPrf);
+  const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [identityNetworkIds, setIdentityNetworkIds] = useState(
     session.identity.networks,
@@ -131,6 +132,23 @@ export function ProfileEditor({
     () => new Map(nodeNetworks.map((network) => [network.id, network.name])),
     [nodeNetworks],
   );
+
+  useEffect(() => {
+    let mounted = true;
+
+    WebAuthnPrfKeyProtector.isPrfAvailable()
+      .then((available) => {
+        if (mounted) setPasskeyPrfAvailable(available);
+      })
+      .catch(() => {
+        if (mounted) setPasskeyPrfAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const requestClose = () => {
     if (state === 'loading') return;
 
@@ -234,13 +252,13 @@ export function ProfileEditor({
           picture: pictureCid,
         },
         wantsPasswordChange ? newPassword : undefined,
+        { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
       );
 
-      onUpdated({
-        ...session,
-        identity,
-        password: wantsPasswordChange ? newPassword : session.password,
-      }, { passwordChanged: wantsPasswordChange });
+      onUpdated(
+        { ...session, identity },
+        { passwordChanged: wantsPasswordChange },
+      );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
     }
@@ -322,7 +340,10 @@ export function ProfileEditor({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
-                    className={cx(profileEditorInputClass, 'text-lg font-black')}
+                    className={cx(
+                      profileEditorInputClass,
+                      'text-lg font-black',
+                    )}
                   />
                 </ProfileEditorField>
                 <ProfileEditorField label={copy.profile.handle}>
@@ -469,6 +490,61 @@ export function ProfileEditor({
                       match: passwordsMatch,
                     }}
                   />
+                  {wantsPasswordChange && (
+                    <button
+                      type="button"
+                      aria-pressed={passkeyPrfEnabled}
+                      disabled={hasPasskeyPrf || !passkeyPrfAvailable}
+                      onClick={() =>
+                        !hasPasskeyPrf &&
+                        passkeyPrfAvailable &&
+                        setPasskeyPrfEnabled((enabled) => !enabled)
+                      }
+                      className={cx(
+                        'mt-3 flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition',
+                        hasPasskeyPrf || passkeyPrfEnabled
+                          ? 'border-cyan-200/25 bg-cyan-300/10'
+                          : passkeyPrfAvailable
+                            ? 'border-white/10 bg-black/15 hover:bg-white/[0.05]'
+                            : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cx(
+                          'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+                          (hasPasskeyPrf || passkeyPrfEnabled) &&
+                            passkeyPrfAvailable
+                            ? 'bg-cyan-400/25'
+                            : 'bg-black/25',
+                        )}
+                      >
+                        <span
+                          className={cx(
+                            'h-4 w-4 rounded-full bg-white transition-transform',
+                            (hasPasskeyPrf || passkeyPrfEnabled) &&
+                              passkeyPrfAvailable
+                              ? 'translate-x-6'
+                              : 'translate-x-1',
+                          )}
+                        />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-white/75">
+                          {hasPasskeyPrf
+                            ? copy.profile.passkeyPrfActive
+                            : copy.profile.passkeyPrf}
+                        </span>
+                        <span className="mt-1 block text-xs leading-snug text-white/45">
+                          {hasPasskeyPrf
+                            ? copy.profile.passkeyPrfPreserved
+                            : passkeyPrfAvailable
+                              ? copy.profile.passkeyPrfHelp
+                              : copy.profile.passkeyPrfUnavailable}
+                        </span>
+                      </span>
+                    </button>
+                  )}
                 </div>
               )}
             </section>

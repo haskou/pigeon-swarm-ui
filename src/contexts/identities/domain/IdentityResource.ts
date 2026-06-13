@@ -1,3 +1,5 @@
+import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtection';
+
 export type IdentityResource = {
   encryptedKeyPair: {
     encryptedPrivateKey: string;
@@ -10,6 +12,7 @@ export type IdentityResource = {
     N: number;
     algorithm: 'scrypt';
     p: number;
+    passkeyPrf?: PasskeyPrfMasterKeyProtection;
     r: number;
     salt: string;
     version: 1;

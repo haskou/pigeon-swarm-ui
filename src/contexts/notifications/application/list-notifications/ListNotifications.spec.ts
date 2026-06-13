@@ -9,7 +9,7 @@ import { ListNotificationsMessage } from './messages/ListNotificationsMessage';
 
 describe(ListNotifications.name, () => {
   it('delegates notification listing to the pigeon API gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const expected = [{ id: 'notification-1' }] as NotificationResource[];
     const gateway = {
       listNotifications: jest.fn().mockResolvedValue(expected),

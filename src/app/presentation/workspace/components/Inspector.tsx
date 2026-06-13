@@ -117,13 +117,11 @@ export function Inspector({
     });
   };
 
-  if (!activeConversation) return null;
-
   return (
     <>
       <IdentityMembersAside
         action={
-          isGroupConversation && onGroupInviteOpen
+          activeConversation && isGroupConversation && onGroupInviteOpen
             ? {
                 label: copy.communities.addMember,
                 onClick: onGroupInviteOpen,
@@ -131,7 +129,7 @@ export function Inspector({
             : undefined
         }
         className={className}
-        emptyLabel={copy.communities.noMatchingMembers}
+        emptyLabel={activeConversation ? copy.communities.noMatchingMembers : ''}
         items={participants}
         onItemClick={openProfile}
         transitionState={transitionState}

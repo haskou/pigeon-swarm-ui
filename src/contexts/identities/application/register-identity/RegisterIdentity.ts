@@ -14,6 +14,7 @@ export class RegisterIdentity {
       message.getPassword(),
       message.getNetworks(),
       message.getHandle(),
+      { passkeyPrfEnabled: message.isPasskeyPrfEnabled() },
     );
   }
 }

@@ -6,6 +6,14 @@ import type { DraftPayloadCipher } from '../../../messages/infrastructure/crypto
 import { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 describe(PigeonCommunitiesApi.name, () => {
+  function sessionWithSigner(sign: jest.Mock): Session {
+    return {
+      identity: { id: 'identity-1' },
+      keyPair: { sign },
+      password: 'secret',
+    } as unknown as Session;
+  }
+
   it('uses the backend cursor when listing community channel messages', async () => {
     const messages = [
       { id: 'message-2', type: 'sent' },
@@ -110,11 +118,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'domain-signature',
     });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const api = new PigeonCommunitiesApi(
       http,
       signer,
@@ -154,7 +158,6 @@ describe(PigeonCommunitiesApi.name, () => {
         mentions: [],
         type: 'sent',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -189,11 +192,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'domain-signature',
     });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const api = new PigeonCommunitiesApi(
       http,
       signer,
@@ -228,7 +227,6 @@ describe(PigeonCommunitiesApi.name, () => {
         plaintextPayload: '{"content":"hello"}',
         type: 'sent',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -263,11 +261,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'domain-signature',
     });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const api = new PigeonCommunitiesApi(
       http,
       signer,
@@ -305,7 +299,6 @@ describe(PigeonCommunitiesApi.name, () => {
         replyToMessageId: 'root-message',
         type: 'sent',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -344,11 +337,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'edition-signature',
     });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const api = new PigeonCommunitiesApi(
       http,
       signer,
@@ -383,7 +372,6 @@ describe(PigeonCommunitiesApi.name, () => {
         mentions: [],
         type: 'edited',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -420,11 +408,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const sign = jest.fn().mockResolvedValue({
       toString: () => 'edition-signature',
     });
-    const session = {
-      encryptedKeyPair: { sign },
-      identity: { id: 'identity-1' },
-      password: 'secret',
-    } as unknown as Session;
+    const session = sessionWithSigner(sign);
     const api = new PigeonCommunitiesApi(
       http,
       signer,
@@ -459,7 +443,6 @@ describe(PigeonCommunitiesApi.name, () => {
         plaintextPayload: '{"content":"edited"}',
         type: 'edited',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(
       session,
