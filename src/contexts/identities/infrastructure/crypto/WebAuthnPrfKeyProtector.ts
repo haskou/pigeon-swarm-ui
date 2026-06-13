@@ -142,6 +142,8 @@ export class WebAuthnPrfKeyProtector {
         const capabilities = await credential.getClientCapabilities();
 
         WebAuthnPrfKeyProtector.debug('capabilities', { capabilities });
+
+        if (capabilities['extension:prf'] === false) return false;
       } catch (error) {
         WebAuthnPrfKeyProtector.debug('capabilities-error', {
           error: String(error),

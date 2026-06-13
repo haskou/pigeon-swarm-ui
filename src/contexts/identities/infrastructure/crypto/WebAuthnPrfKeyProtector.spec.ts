@@ -94,6 +94,28 @@ describe(WebAuthnPrfKeyProtector.name, () => {
     await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
   });
 
+  it('does not report PRF as attemptable when capabilities explicitly reject the PRF extension', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+      getClientCapabilities: jest
+        .fn()
+        .mockResolvedValue({ 'extension:prf': false }),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(false);
+  });
+
+  it('does not block PRF attempts when capabilities omit the PRF extension', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+      getClientCapabilities: jest.fn().mockResolvedValue({}),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
+  });
+
   it('does not block PRF attempts when client capabilities are missing', async () => {
     installWebAuthn({
       create: jest.fn(),
