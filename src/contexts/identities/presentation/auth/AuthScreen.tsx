@@ -387,12 +387,6 @@ export function AuthScreen({
             </div>
           )}
 
-          {error && (
-            <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
-              {error}
-            </div>
-          )}
-
           <div className="mt-6 flex items-center gap-3 rounded-2xl px-1 py-2">
             <button
               type="button"
@@ -412,6 +406,12 @@ export function AuthScreen({
               </span>
             </label>
           </div>
+
+          {error && (
+            <div className="mt-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
+              {error}
+            </div>
+          )}
 
           <button
             disabled={!canSubmit || state === 'loading'}
