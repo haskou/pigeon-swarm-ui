@@ -86,10 +86,15 @@ export const es = {
     passwordRequirements:
       'Usa de 12 a 256 caracteres con mayuscula, minuscula, numero y simbolo.',
     passkeyPrf: 'Proteger con desbloqueo del dispositivo',
+    passkeyPrfChecking: 'Comprobando si este navegador lo permite...',
     passkeyPrfHelp:
       'Recomendado. Añade una capa extra de seguridad usando el desbloqueo de este navegador o dispositivo.',
     passkeyPrfUnavailable:
       'Este navegador no permite usar passkeys para proteger claves.',
+    passkeyPrfUnavailableCreate:
+      'El desbloqueo del dispositivo no está disponible aquí. Puedes crear la identidad, pero quedará protegida solo con contraseña.',
+    passkeyPrfUnavailableLogin:
+      'El desbloqueo del dispositivo no está disponible aquí. Si tu identidad usa esta protección, inicia sesión desde HTTPS o localhost, en el mismo navegador o dispositivo donde creaste la passkey.',
     passkeyPrfNotPersisted:
       'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
     passkeyPrfUnlockFailed:

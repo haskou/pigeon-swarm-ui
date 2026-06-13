@@ -84,10 +84,15 @@ export const en = {
     passwordRequirements:
       'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
     passkeyPrf: 'Protect with device unlock',
+    passkeyPrfChecking: 'Checking whether this browser supports it...',
     passkeyPrfHelp:
       'Recommended. Adds an extra security layer using this browser or device unlock.',
     passkeyPrfUnavailable:
       'This browser cannot use passkeys to protect keys.',
+    passkeyPrfUnavailableCreate:
+      'Device unlock is not available here. You can create the identity, but it will be protected with password only.',
+    passkeyPrfUnavailableLogin:
+      'Device unlock is not available here. If your identity uses this protection, sign in from HTTPS or localhost, on the same browser or device where you created the passkey.',
     passkeyPrfNotPersisted:
       'The identity was created, but the server did not save passkey protection.',
     passkeyPrfUnlockFailed:

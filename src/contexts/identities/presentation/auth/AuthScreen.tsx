@@ -37,6 +37,7 @@ import {
 import { Field } from './Field';
 
 type LoadState = 'idle' | 'loading' | 'error';
+type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
 
 interface AuthScreenProps {
   availableNetworks: NodeNetwork[];
@@ -59,7 +60,8 @@ export function AuthScreen({
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(true);
-  const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
+  const [passkeyPrfSupport, setPasskeyPrfSupport] =
+    useState<PasskeyPrfSupportState>('checking');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
@@ -92,10 +94,12 @@ export function AuthScreen({
 
     WebAuthnPrfKeyProtector.isPrfAvailable()
       .then((available) => {
-        if (mounted) setPasskeyPrfAvailable(available);
+        if (mounted) {
+          setPasskeyPrfSupport(available ? 'available' : 'unavailable');
+        }
       })
       .catch(() => {
-        if (mounted) setPasskeyPrfAvailable(false);
+        if (mounted) setPasskeyPrfSupport('unavailable');
       });
 
     return () => {
@@ -113,6 +117,8 @@ export function AuthScreen({
     passwordConfirmation,
     selectedNetwork,
   });
+  const passkeyPrfAvailable = passkeyPrfSupport === 'available';
+  const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
   const passwordChecks = passwordValidationChecks(password);
   const passwordRequirementProgress = createPasswordRequirementProgress({
     checks: {
@@ -334,6 +340,7 @@ export function AuthScreen({
                   type="button"
                   aria-pressed={passkeyPrfEnabled}
                   disabled={!passkeyPrfAvailable}
+                  data-testid="auth-passkey-prf-toggle"
                   onClick={() =>
                     passkeyPrfAvailable &&
                     setPasskeyPrfEnabled((enabled) => !enabled)
@@ -355,15 +362,30 @@ export function AuthScreen({
                       {copy.auth.passkeyPrf}
                     </span>
                     <span className="mt-1 block text-xs leading-snug text-white/45">
-                      {passkeyPrfAvailable
-                        ? copy.auth.passkeyPrfHelp
-                        : copy.auth.passkeyPrfUnavailable}
+                      {passkeyPrfSupport === 'checking'
+                        ? copy.auth.passkeyPrfChecking
+                        : passkeyPrfAvailable
+                          ? copy.auth.passkeyPrfHelp
+                          : copy.auth.passkeyPrfUnavailable}
                     </span>
                   </span>
                 </button>
+                {passkeyPrfUnavailable && (
+                  <PasskeyPrfUnavailableNotice>
+                    {copy.auth.passkeyPrfUnavailableCreate}
+                  </PasskeyPrfUnavailableNotice>
+                )}
               </>
             )}
           </div>
+
+          {mode === 'login' && passkeyPrfUnavailable && (
+            <div className="mt-4">
+              <PasskeyPrfUnavailableNotice>
+                {copy.auth.passkeyPrfUnavailableLogin}
+              </PasskeyPrfUnavailableNotice>
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
@@ -447,6 +469,21 @@ function AuthSwitch({ enabled }: { enabled: boolean }): ReactElement {
         )}
       />
     </span>
+  );
+}
+
+function PasskeyPrfUnavailableNotice({
+  children,
+}: {
+  children: string;
+}): ReactElement {
+  return (
+    <div
+      data-testid="auth-passkey-prf-warning"
+      className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs leading-snug text-amber-50/80"
+    >
+      {children}
+    </div>
   );
 }
 
