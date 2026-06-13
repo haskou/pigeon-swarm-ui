@@ -55,6 +55,10 @@ class StringValueObject {
 class EncryptedPayload extends StringValueObject {}
 
 class SymmetricKey extends StringValueObject {
+  public static fromBuffer(value: Buffer): SymmetricKey {
+    return new SymmetricKey(value.toString('base64'));
+  }
+
   public static fromBase64(value: string): SymmetricKey {
     return new SymmetricKey(value);
   }
@@ -64,24 +68,55 @@ class SymmetricKey extends StringValueObject {
   }
 
   public static async fromPassword(
-    _password: string,
+    password: string,
     input: { salt: string },
   ): Promise<SymmetricKey> {
     return new SymmetricKey(
-      createHash('sha256').update(input.salt).digest('base64'),
+      createHash('sha256').update(`${password}:${input.salt}`).digest('base64'),
     );
   }
 
   public decrypt(payload: EncryptedPayload): StringValueObject {
-    return new StringValueObject(
-      Buffer.from(payload.toString(), 'base64').toString('utf8'),
+    const decrypted = Buffer.from(payload.toString(), 'base64').toString(
+      'utf8',
     );
+
+    try {
+      const parsed = JSON.parse(decrypted) as {
+        __pigeonTestKey?: string;
+        payload?: string;
+      };
+
+      if (parsed.__pigeonTestKey) {
+        if (parsed.__pigeonTestKey !== this.valueOf()) {
+          throw new Error('Invalid encrypted payload key');
+        }
+
+        return new StringValueObject(parsed.payload ?? '');
+      }
+    } catch (caught) {
+      if ((caught as Error).message === 'Invalid encrypted payload key') {
+        throw caught;
+      }
+    }
+
+    return new StringValueObject(decrypted);
   }
 
   public encrypt(payload: string | StringValueObject): EncryptedPayload {
     return new EncryptedPayload(
-      Buffer.from(payload.toString(), 'utf8').toString('base64'),
+      Buffer.from(
+        JSON.stringify({
+          __pigeonTestKey: this.valueOf(),
+          payload: payload.toString(),
+        }),
+        'utf8',
+      ).toString('base64'),
     );
+  }
+
+  public getBuffer(): Buffer {
+    return Buffer.from(this.valueOf(), 'base64');
   }
 }
 
@@ -233,6 +268,11 @@ class EncryptedKeyPair {
 }
 
 class KeyPair {
+  public constructor(
+    private readonly publicKey: PublicKey = new PublicKey('public-key'),
+    private readonly privateKey: PrivateKey = new PrivateKey('private-key'),
+  ) {}
+
   public static async generate(): Promise<KeyPair> {
     return new KeyPair();
   }
@@ -248,10 +288,14 @@ class KeyPair {
     return new Signature('keypair-signature');
   }
 
+  public isValidSignature(): boolean {
+    return true;
+  }
+
   public toPrimitives(): { privateKey: string; publicKey: string } {
     return {
-      privateKey: 'private-key',
-      publicKey: 'public-key',
+      privateKey: this.privateKey.toString(),
+      publicKey: this.publicKey.toString(),
     };
   }
 }

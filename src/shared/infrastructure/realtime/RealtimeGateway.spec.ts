@@ -75,8 +75,8 @@ describe(RealtimeGateway.name, () => {
       toString: () => 'socket-signature',
     });
     const session = {
-      encryptedKeyPair: { sign },
       identity: { id: 'identity+with/slash=' },
+      keyPair: { sign },
       password: 'secret',
     } as unknown as Session;
     const gateway = new RealtimeGateway(
@@ -99,10 +99,9 @@ describe(RealtimeGateway.name, () => {
     expect(url.searchParams.get('signature')).toBe('socket-signature');
     expect(sign).toHaveBeenCalledWith(
       signer.payload('GET', '/api/ws', 1778536870557, {}),
-      'secret',
     );
     expect(
-      JSON.parse((sign.mock.calls[0] as [string, string])[0]) as {
+      JSON.parse((sign.mock.calls[0] as [string])[0]) as {
         timestamp: unknown;
       },
     ).toMatchObject({
@@ -118,10 +117,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -143,10 +142,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -169,10 +168,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
     const onMessage = jest.fn();
@@ -198,10 +197,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
     const onMessage = jest.fn();
@@ -235,10 +234,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -270,10 +269,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -303,10 +302,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -365,10 +364,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -408,10 +407,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -439,10 +438,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 
@@ -470,10 +469,10 @@ describe(RealtimeGateway.name, () => {
       new RequestSigner(),
     );
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keyPair: {
         sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
       },
-      identity: { id: 'identity-1' },
       password: 'secret',
     } as unknown as Session;
 

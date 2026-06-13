@@ -54,7 +54,7 @@ export function useRealtimeEvents(
     return () => {
       unsubscribeRealtime(connection, subscription);
     };
-  }, [session.encryptedKeyPair, session.identity.id, session.password]);
+  }, [session.identity.id, session.keyPair]);
 }
 
 function subscribeRealtime(

@@ -1,14 +1,9 @@
-import type {
-  EncryptedKeyPair,
-  KeyPair,
-  SymmetricKey,
-} from '@haskou/value-objects';
+import type { KeyPair, SymmetricKey } from '@haskou/value-objects';
 
 import type { IdentityResource } from './IdentityResource';
 import type { LocalKeychain } from './LocalKeychain';
 
 export type Session = {
-  encryptedKeyPair: EncryptedKeyPair;
   identity: IdentityResource;
   keyPair: KeyPair;
   keychain: LocalKeychain;

@@ -1,8 +1,7 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/value-objects';
 
 import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
 
-const keyAlgorithm = 'aes-256-gcm';
 const passkeyPrfAlgorithm = 'webauthn-prf';
 const passkeyPrfVersion = 1;
 const challengeBytes = 32;
@@ -130,8 +129,7 @@ export class WebAuthnPrfKeyProtector {
   ): void {
     if (
       protection.version !== passkeyPrfVersion ||
-      protection.algorithm !== passkeyPrfAlgorithm ||
-      protection.keyAlgorithm !== keyAlgorithm
+      protection.algorithm !== passkeyPrfAlgorithm
     ) {
       throw new Error('Unsupported passkey PRF protection.');
     }
@@ -196,22 +194,16 @@ export class WebAuthnPrfKeyProtector {
     return credential;
   }
 
-  private encryptPasswordKey({
+  private protection({
     credentialId,
-    passwordKey,
-    prfResult,
     salt,
   }: {
     credentialId: string;
-    passwordKey: SymmetricKey;
-    prfResult: SymmetricKey;
     salt: Uint8Array;
   }): PasskeyPrfMasterKeyProtection {
     return {
       algorithm: passkeyPrfAlgorithm,
       credentialId,
-      encryptedPasswordKey: prfResult.encrypt(passwordKey.valueOf()).toString(),
-      keyAlgorithm,
       salt: encodeBase64Url(salt),
       version: passkeyPrfVersion,
     };
@@ -268,12 +260,13 @@ export class WebAuthnPrfKeyProtector {
   public async createProtection({
     displayName,
     identityId,
-    passwordKey,
   }: {
     displayName: string;
     identityId: string;
-    passwordKey: SymmetricKey;
-  }): Promise<PasskeyPrfMasterKeyProtection> {
+  }): Promise<{
+    prfKey: SymmetricKey;
+    protection: PasskeyPrfMasterKeyProtection;
+  }> {
     this.ensureAvailable();
 
     const salt = randomBytes(saltBytes);
@@ -283,54 +276,27 @@ export class WebAuthnPrfKeyProtector {
       salt,
     });
     const credentialId = encodeBase64Url(new Uint8Array(credential.rawId));
-    const result =
+    const prfKey =
       firstPrfResult(credential) ??
       (await this.evaluateCredential({
         credentialId,
         salt,
       }));
 
-    return this.encryptPasswordKey({
-      credentialId,
-      passwordKey,
-      prfResult: result,
-      salt,
-    });
+    return {
+      prfKey,
+      protection: this.protection({ credentialId, salt }),
+    };
   }
 
-  public async rewrapPasswordKey(
-    protection: PasskeyPrfMasterKeyProtection,
-    passwordKey: SymmetricKey,
-  ): Promise<PasskeyPrfMasterKeyProtection> {
-    this.assertSupportedProtection(protection);
-
-    const salt = decodeBase64Url(protection.salt);
-    const prfResult = await this.evaluateCredential({
-      credentialId: protection.credentialId,
-      salt,
-    });
-
-    return this.encryptPasswordKey({
-      credentialId: protection.credentialId,
-      passwordKey,
-      prfResult,
-      salt,
-    });
-  }
-
-  public async unwrapPasswordKey(
+  public async evaluateKey(
     protection: PasskeyPrfMasterKeyProtection,
   ): Promise<SymmetricKey> {
     this.assertSupportedProtection(protection);
 
-    const prfResult = await this.evaluateCredential({
+    return await this.evaluateCredential({
       credentialId: protection.credentialId,
       salt: decodeBase64Url(protection.salt),
     });
-    const decrypted = prfResult
-      .decrypt(new EncryptedPayload(protection.encryptedPasswordKey))
-      .toString();
-
-    return SymmetricKey.fromBase64(decrypted);
   }
 }

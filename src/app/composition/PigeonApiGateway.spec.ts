@@ -44,6 +44,14 @@ describe(PigeonApiGateway.name, () => {
     ) as Record<string, unknown>;
   }
 
+  function unlockedKeyPair(signature: string): Pick<KeyPair, 'sign'> {
+    return {
+      sign: jest.fn().mockReturnValue({
+        toString: () => signature,
+      }),
+    } as unknown as Pick<KeyPair, 'sign'>;
+  }
+
   it('loads node networks anonymously when no session is available', async () => {
     const response = {
       networks: [{ id: 'network-1', key: null, name: 'Public Swarm' }],
@@ -946,12 +954,8 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const session = {
-      encryptedKeyPair: {
-        sign: jest.fn().mockResolvedValue({
-          toString: () => 'domain-signature',
-        }),
-      },
       identity: { id: 'identity-1' },
+      keyPair: unlockedKeyPair('domain-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -978,7 +982,7 @@ describe(PigeonApiGateway.name, () => {
         },
       ),
     ).resolves.toBe(createdMessage);
-    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+    expect(session.keyPair.sign).toHaveBeenCalledWith(
       JSON.stringify({
         attachmentExternalIdentifiers: ['bafy-private'],
         authorIdentityId: 'identity-1',
@@ -990,7 +994,6 @@ describe(PigeonApiGateway.name, () => {
         mentions: [],
         type: 'sent',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(session, 'POST', path, body);
     expect(http.request).toHaveBeenCalledWith(path, {
@@ -1020,12 +1023,8 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const session = {
-      encryptedKeyPair: {
-        sign: jest.fn().mockResolvedValue({
-          toString: () => 'domain-signature',
-        }),
-      },
       identity: { id: 'identity-1' },
+      keyPair: unlockedKeyPair('domain-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -1053,7 +1052,7 @@ describe(PigeonApiGateway.name, () => {
         },
       ),
     ).resolves.toBe(editedMessage);
-    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+    expect(session.keyPair.sign).toHaveBeenCalledWith(
       JSON.stringify({
         attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
@@ -1065,7 +1064,6 @@ describe(PigeonApiGateway.name, () => {
         mentions: [],
         type: 'edited',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenCalledWith(session, 'PUT', path, body);
     expect(http.request).toHaveBeenCalledWith(path, {
@@ -1120,14 +1118,10 @@ describe(PigeonApiGateway.name, () => {
       ),
     };
     const session = {
-      encryptedKeyPair: {
-        sign: jest
-          .fn()
-          .mockResolvedValue({ toString: () => 'inviter-signature' }),
-      },
       identity: { id: 'identity-1' },
       keychain: { conversations: {}, version: 0 },
       keychainExternalIdentifier: 'keychain-current',
+      keyPair: unlockedKeyPair('inviter-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(
@@ -1226,11 +1220,6 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const session = {
-      encryptedKeyPair: {
-        sign: jest
-          .fn()
-          .mockResolvedValue({ toString: () => 'inviter-signature' }),
-      },
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
@@ -1246,6 +1235,7 @@ describe(PigeonApiGateway.name, () => {
         },
         version: 1,
       },
+      keyPair: unlockedKeyPair('inviter-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -1290,14 +1280,13 @@ describe(PigeonApiGateway.name, () => {
       recipientIdentityId: 'identity-2',
       type: 'community_invitation',
     });
-    expect(session.encryptedKeyPair.sign).toHaveBeenCalledWith(
+    expect(session.keyPair.sign).toHaveBeenCalledWith(
       JSON.stringify({
         communityId: 'community-1',
         encryptedCommunityKey: notificationBody.encryptedCommunityKey,
         inviterIdentityId: 'identity-1',
         recipientIdentityId: 'identity-2',
       }),
-      'secret',
     );
     expect(signer.headers).toHaveBeenNthCalledWith(
       2,
@@ -1361,11 +1350,6 @@ describe(PigeonApiGateway.name, () => {
       version: 2,
     };
     const session = {
-      encryptedKeyPair: {
-        sign: jest
-          .fn()
-          .mockResolvedValue({ toString: () => 'inviter-signature' }),
-      },
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
@@ -1374,6 +1358,7 @@ describe(PigeonApiGateway.name, () => {
         version: 1,
       },
       keychainExternalIdentifier: 'keychain-current',
+      keyPair: unlockedKeyPair('inviter-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -1469,13 +1454,13 @@ describe(PigeonApiGateway.name, () => {
       ),
     };
     const session = {
-      encryptedKeyPair: {
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 0 },
+      keyPair: {
         decrypt: jest.fn().mockResolvedValue({
           toString: () => JSON.stringify(keyEntry),
         }),
       },
-      identity: { id: 'identity-1' },
-      keychain: { conversations: {}, version: 0 },
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(
@@ -1566,11 +1551,7 @@ describe(PigeonApiGateway.name, () => {
     const keyPair = {
       decrypt: jest.fn(() => Buffer.from(JSON.stringify(keyEntry))),
     };
-    const encryptedKeyPair = {
-      decrypt: jest.fn(),
-    };
     const session = {
-      encryptedKeyPair,
       identity: { id: 'identity-1' },
       keychain: { conversations: {}, version: 0 },
       keyPair,
@@ -1600,7 +1581,6 @@ describe(PigeonApiGateway.name, () => {
       type: 'group_conversation_invitation',
     });
 
-    expect(encryptedKeyPair.decrypt).not.toHaveBeenCalled();
     expect(keyPair.decrypt).toHaveBeenCalledWith(expect.any(EncryptedPayload));
     expect(result.keychain.conversations['group:conversation']).toEqual(
       keyEntry,
@@ -1895,7 +1875,7 @@ describe(PigeonApiGateway.name, () => {
     ]);
     expect(body).toEqual({
       encryptedKeyPair: {
-        encryptedPrivateKey: 'encrypted-private-key',
+        encryptedPrivateKey: expect.any(String),
         publicKey: 'public-key',
       },
       encryptedMasterKey: expect.any(String),
@@ -1917,6 +1897,10 @@ describe(PigeonApiGateway.name, () => {
       timestamp: 1234,
       version: 1,
     });
+    expect(
+      (body.encryptedKeyPair as IdentityResource['encryptedKeyPair'])
+        .encryptedPrivateKey,
+    ).not.toBe('encrypted-private-key');
     const signingBody = (signer.headers as jest.Mock).mock.calls[0][3] as
       | IdentityResource
       | undefined;
@@ -1989,11 +1973,6 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const session = {
-      encryptedKeyPair: {
-        sign: jest.fn().mockResolvedValue({
-          toString: () => 'identity-signature',
-        }),
-      },
       identity: {
         ...currentIdentity,
         identityExternalIdentifier: undefined,
@@ -2001,6 +1980,7 @@ describe(PigeonApiGateway.name, () => {
         version: 1,
       },
       keychain: { conversations: {}, version: 0 },
+      keyPair: unlockedKeyPair('identity-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -2040,9 +2020,8 @@ describe(PigeonApiGateway.name, () => {
       'current-identity-cid',
     );
     expect(body.signature).toBe('identity-signature');
-    const [signedPayload, signedPassword] = (
-      session.encryptedKeyPair.sign as jest.Mock
-    ).mock.calls[0] as [string, string];
+    const [signedPayload] = (session.keyPair.sign as jest.Mock).mock
+      .calls[0] as [string];
     const parsedSignedPayload = JSON.parse(
       signedPayload,
     ) as Partial<IdentityResource>;
@@ -2062,7 +2041,6 @@ describe(PigeonApiGateway.name, () => {
       timestamp: expect.any(Number),
       version: 8,
     });
-    expect(signedPassword).toBe(session.password);
   });
 
   it('caches identity reads during the startup window', async () => {
@@ -2175,13 +2153,9 @@ describe(PigeonApiGateway.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
     } as unknown as RequestSigner;
     const session = {
-      encryptedKeyPair: {
-        sign: jest.fn().mockResolvedValue({
-          toString: () => 'identity-signature',
-        }),
-      },
       identity: currentIdentity,
       keychain: { conversations: {}, version: 0 },
+      keyPair: unlockedKeyPair('identity-signature'),
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -2642,7 +2616,6 @@ describe(PigeonApiGateway.name, () => {
       toString: () => 'message-signature',
     });
     const session = {
-      encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
@@ -2652,6 +2625,7 @@ describe(PigeonApiGateway.name, () => {
         },
         version: 1,
       },
+      keyPair: { sign },
       password: 'secret',
     } as unknown as Session;
     const file = new File(['photo'], 'photo.png', { type: 'image/png' });
@@ -2692,10 +2666,7 @@ describe(PigeonApiGateway.name, () => {
       signature: string;
     };
     const path = '/conversations/one-to-one%3Aconversation/messages';
-    const [signaturePayload, signaturePassword] = sign.mock.calls[0] as [
-      string,
-      string,
-    ];
+    const [signaturePayload] = sign.mock.calls[0] as [string];
     const parsedSignaturePayload = JSON.parse(signaturePayload) as Record<
       string,
       unknown
@@ -2731,7 +2702,6 @@ describe(PigeonApiGateway.name, () => {
       type: 'sent',
     });
     expect(parsedSignaturePayload).not.toHaveProperty('targetMessageId');
-    expect(signaturePassword).toBe('secret');
     expect(signer.headers).toHaveBeenLastCalledWith(
       session,
       'POST',
@@ -2783,7 +2753,6 @@ describe(PigeonApiGateway.name, () => {
       toString: () => 'message-signature',
     });
     const session = {
-      encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
@@ -2791,6 +2760,7 @@ describe(PigeonApiGateway.name, () => {
         },
         version: 1,
       },
+      keyPair: { sign },
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -2836,7 +2806,6 @@ describe(PigeonApiGateway.name, () => {
       toString: () => 'edit-signature',
     });
     const session = {
-      encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
       keychain: {
         conversations: {
@@ -2846,6 +2815,7 @@ describe(PigeonApiGateway.name, () => {
         },
         version: 1,
       },
+      keyPair: { sign },
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
@@ -2875,10 +2845,7 @@ describe(PigeonApiGateway.name, () => {
       previousMessageIds: string[];
       signature: string;
     };
-    const [signaturePayload, signaturePassword] = sign.mock.calls[0] as [
-      string,
-      string,
-    ];
+    const [signaturePayload] = sign.mock.calls[0] as [string];
     const parsedSignaturePayload = JSON.parse(signaturePayload) as Record<
       string,
       unknown
@@ -2918,7 +2885,6 @@ describe(PigeonApiGateway.name, () => {
       targetMessageId: 'message/to-edit',
       type: 'edited',
     });
-    expect(signaturePassword).toBe('secret');
     expect(decryptFixturePayload(body.encryptedPayload)).toMatchObject({
       attachments: [],
       content: 'edited',
@@ -2943,8 +2909,8 @@ describe(PigeonApiGateway.name, () => {
       toString: () => 'delete-signature',
     });
     const session = {
-      encryptedKeyPair: { sign },
       identity: { id: 'identity-1' },
+      keyPair: { sign },
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);

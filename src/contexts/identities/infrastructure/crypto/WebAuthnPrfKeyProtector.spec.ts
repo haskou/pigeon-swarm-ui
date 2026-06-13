@@ -1,5 +1,3 @@
-import { SymmetricKey } from '@haskou/value-objects';
-
 import { WebAuthnPrfKeyProtector } from './WebAuthnPrfKeyProtector';
 
 class FakePublicKeyCredential {
@@ -101,7 +99,7 @@ describe(WebAuthnPrfKeyProtector.name, () => {
     await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(false);
   });
 
-  it('wraps and unwraps a password-derived key using WebAuthn PRF', async () => {
+  it('creates WebAuthn PRF protection and returns the PRF key material', async () => {
     const create = jest
       .fn()
       .mockResolvedValue(
@@ -113,23 +111,21 @@ describe(WebAuthnPrfKeyProtector.name, () => {
         new FakePublicKeyCredential(credentialRawId, firstPrfResult),
       );
     installWebAuthn({ create, get });
-    const passwordKey = SymmetricKey.generate();
     const protector = new WebAuthnPrfKeyProtector();
 
-    const protection = await protector.createProtection({
+    const { prfKey, protection } = await protector.createProtection({
       displayName: 'Hasko',
       identityId: 'identity-1',
-      passwordKey,
     });
-    const unwrapped = await protector.unwrapPasswordKey(protection);
 
     expect(protection).toMatchObject({
       algorithm: 'webauthn-prf',
-      keyAlgorithm: 'aes-256-gcm',
       version: 1,
     });
     expect(protection.credentialId).toBe('AQIDBAUGBwgJCgsM');
-    expect(unwrapped.valueOf()).toBe(passwordKey.valueOf());
+    expect(prfKey.valueOf()).toBe(
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=',
+    );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         publicKey: expect.objectContaining({
@@ -142,6 +138,32 @@ describe(WebAuthnPrfKeyProtector.name, () => {
           }),
         }),
       }),
+    );
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('evaluates an existing WebAuthn PRF protection', async () => {
+    const create = jest
+      .fn()
+      .mockResolvedValue(
+        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
+      );
+    const get = jest
+      .fn()
+      .mockResolvedValue(
+        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
+      );
+    installWebAuthn({ create, get });
+    const protector = new WebAuthnPrfKeyProtector();
+    const { protection } = await protector.createProtection({
+      displayName: 'Hasko',
+      identityId: 'identity-1',
+    });
+
+    const evaluated = await protector.evaluateKey(protection);
+
+    expect(evaluated.valueOf()).toBe(
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=',
     );
     expect(get).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -164,39 +186,5 @@ describe(WebAuthnPrfKeyProtector.name, () => {
         }),
       }),
     );
-  });
-
-  it('rewraps a password-derived key with an existing passkey credential', async () => {
-    const create = jest
-      .fn()
-      .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
-      );
-    const get = jest
-      .fn()
-      .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
-      );
-    installWebAuthn({ create, get });
-    const protector = new WebAuthnPrfKeyProtector();
-    const initialProtection = await protector.createProtection({
-      displayName: 'Hasko',
-      identityId: 'identity-1',
-      passwordKey: SymmetricKey.generate(),
-    });
-    const nextPasswordKey = SymmetricKey.generate();
-
-    const nextProtection = await protector.rewrapPasswordKey(
-      initialProtection,
-      nextPasswordKey,
-    );
-    const unwrapped = await protector.unwrapPasswordKey(nextProtection);
-
-    expect(nextProtection.credentialId).toBe(initialProtection.credentialId);
-    expect(nextProtection.salt).toBe(initialProtection.salt);
-    expect(nextProtection.encryptedPasswordKey).not.toBe(
-      initialProtection.encryptedPasswordKey,
-    );
-    expect(unwrapped.valueOf()).toBe(nextPasswordKey.valueOf());
   });
 });
