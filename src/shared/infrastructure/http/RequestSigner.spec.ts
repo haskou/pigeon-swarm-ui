@@ -82,6 +82,33 @@ describe(RequestSigner.name, () => {
     });
   });
 
+  it('prefixes relative signed paths when the API is mounted under a route prefix', () => {
+    const signer = new RequestSigner(() => 123, '/api');
+    const identityId = 'identity/with+symbols=';
+    const path = `/keychains/${encodeURIComponent(identityId)}`;
+
+    const payload = JSON.parse(
+      signer.payload('GET', path, 123),
+    ) as SignedRequestPayload;
+
+    expect(payload).toEqual({
+      bodyHash: emptyBodyHash(),
+      method: 'GET',
+      path: '/api/keychains/identity%2Fwith%2Bsymbols%3D',
+      timestamp: 123,
+    });
+  });
+
+  it('does not duplicate an API route prefix that is already in the signed path', () => {
+    const signer = new RequestSigner(() => 123, '/api');
+
+    const payload = JSON.parse(
+      signer.payload('GET', '/api/keychains/id', 123),
+    ) as SignedRequestPayload;
+
+    expect(payload.path).toBe('/api/keychains/id');
+  });
+
   it('signs headers with the session keypair', async () => {
     const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
     const signer = new RequestSigner(() => 123);
@@ -114,6 +141,16 @@ describe(RequestSigner.name, () => {
       path: '/keychains/id',
       timestamp: 123,
     });
+  });
+
+  it('keeps absolute URL pathnames unchanged when a route prefix is configured', () => {
+    const signer = new RequestSigner(() => 123, '/api');
+
+    const payload = JSON.parse(
+      signer.payload('GET', 'https://example.com/keychains/id?limit=1', 123),
+    ) as SignedRequestPayload;
+
+    expect(payload.path).toBe('/keychains/id');
   });
 
   it('normalizes PEM identity ids in HTTP signature headers', async () => {

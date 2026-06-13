@@ -201,7 +201,10 @@ export class PigeonApiGateway {
     http: HttpJsonClient = new HttpJsonClient(
       new ApiUrlBuilder(API_SERVER_URL),
     ),
-    signer: RequestSigner = new RequestSigner(),
+    signer: RequestSigner = new RequestSigner(
+      undefined,
+      ApiUrlBuilder.pathPrefix(API_SERVER_URL),
+    ),
     conversations: ConversationMapper = new ConversationMapper(),
     messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),

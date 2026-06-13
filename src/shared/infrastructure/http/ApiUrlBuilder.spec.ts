@@ -24,4 +24,10 @@ describe(ApiUrlBuilder.name, () => {
       'http://localhost:8080/keychains/',
     );
   });
+
+  it('extracts the API route prefix from base URLs', () => {
+    expect(ApiUrlBuilder.pathPrefix('/api')).toBe('/api');
+    expect(ApiUrlBuilder.pathPrefix('https://example.com/api/')).toBe('/api');
+    expect(ApiUrlBuilder.pathPrefix('http://localhost:8080')).toBe('');
+  });
 });

@@ -9,14 +9,33 @@ import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
 export class RequestSigner {
-  public constructor(private readonly clock: Clock = () => Date.now()) {}
+  private readonly pathPrefix: string;
+
+  public constructor(
+    private readonly clock: Clock = () => Date.now(),
+    pathPrefix = '',
+  ) {
+    this.pathPrefix = ApiUrlBuilder.normalizePrefix(pathPrefix);
+  }
 
   private signablePath(path: string): string {
     if (/^https?:\/\//i.test(path)) {
       return ApiUrlBuilder.normalizePath(new URL(path).pathname);
     }
 
-    return ApiUrlBuilder.normalizePath(path.split(/[?#]/)[0] ?? path);
+    return this.applyPathPrefix(
+      ApiUrlBuilder.normalizePath(path.split(/[?#]/)[0] ?? path),
+    );
+  }
+
+  private applyPathPrefix(path: string): string {
+    if (!this.pathPrefix) return path;
+
+    if (path === this.pathPrefix || path.startsWith(`${this.pathPrefix}/`)) {
+      return path;
+    }
+
+    return `${this.pathPrefix}${path}`;
   }
 
   private bodyHash(body?: unknown): string {
