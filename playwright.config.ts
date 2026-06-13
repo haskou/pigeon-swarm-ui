@@ -10,7 +10,7 @@ export default defineConfig({
   },
   forbidOnly: !!process.env.CI,
   fullyParallel: false,
-  outputDir: 'test-results',
+  outputDir: 'node_modules/.cache/pigeon-swarm-playwright-results',
   projects: [
     {
       name: 'desktop-chromium',
@@ -34,7 +34,16 @@ export default defineConfig({
       },
     },
   ],
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [
+    ['list'],
+    [
+      'html',
+      {
+        open: 'never',
+        outputFolder: 'node_modules/.cache/pigeon-swarm-playwright-report',
+      },
+    ],
+  ],
   retries: 0,
   testDir: './e2e',
   timeout: 120_000,
