@@ -126,8 +126,7 @@ export function AuthScreen({
       match: password.length > 0 && password === passwordConfirmation,
     },
   });
-  const canShowInstallButton =
-    installState !== 'fallback' && installState !== 'installed';
+  const canShowInstallButton = installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
   const installHelp =
