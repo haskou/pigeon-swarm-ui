@@ -99,10 +99,7 @@ import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/
 import { UserRootKeyProtector } from '../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';
 import { WebAuthnPrfKeyProtector } from '../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
-import {
-  clearLocalDeviceUnlock,
-  loadLocalDeviceUnlock,
-} from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
+import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
@@ -2602,12 +2599,6 @@ export class PigeonApiGateway {
     onProgress?.('resolving-identity');
     const identity = await this.getIdentity(identityId.trim());
     onProgress?.('decrypting-keys');
-
-    if (identity.masterKeyDerivation.passkeyPrf) {
-      await clearLocalDeviceUnlock(identity.id).catch(() => undefined);
-
-      throw new Error(copy.auth.invalidLogin);
-    }
 
     const localUnlock = await loadLocalDeviceUnlock(identity.id);
 

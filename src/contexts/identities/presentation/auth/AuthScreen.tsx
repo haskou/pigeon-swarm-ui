@@ -169,10 +169,7 @@ export function AuthScreen({
               { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
             );
 
-      const identityUsesPasskeyPrf =
-        !!result.session.identity.masterKeyDerivation.passkeyPrf;
-
-      if (rememberMe && !identityUsesPasskeyPrf) {
+      if (rememberMe) {
         await saveLocalDeviceUnlock(result.session).catch(() => undefined);
         saveCredentials({
           identityId: result.session.identity.id,
