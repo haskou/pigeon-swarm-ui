@@ -74,11 +74,18 @@ export const en = {
       symbol: 'Symbol',
       uppercase: 'Uppercase',
     },
+    passwordRequirementNext: {
+      match: 'Passwords do not match',
+      number: 'Missing a number',
+      symbol: 'Missing a symbol',
+      uppercase: 'Missing an uppercase letter',
+      valid: 'Password is valid',
+    },
     passwordRequirements:
       'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
-    passkeyPrf: 'Protect my identity with a passkey',
+    passkeyPrf: 'Protect with device unlock',
     passkeyPrfHelp:
-      'When you sign in, Pigeon Swarm will ask for your password and a compatible passkey before unlocking your keys.',
+      'Recommended. Adds an extra security layer using this browser or device unlock.',
     passkeyPrfUnavailable:
       'This browser cannot use passkeys to protect keys.',
     passkeyPrfNotPersisted:

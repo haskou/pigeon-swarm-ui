@@ -76,11 +76,18 @@ export const es = {
       symbol: 'Simbolo',
       uppercase: 'Mayuscula',
     },
+    passwordRequirementNext: {
+      match: 'Las contraseñas no coinciden',
+      number: 'Falta un número',
+      symbol: 'Falta un símbolo',
+      uppercase: 'Falta una mayúscula',
+      valid: 'Contraseña válida',
+    },
     passwordRequirements:
       'Usa de 12 a 256 caracteres con mayuscula, minuscula, numero y simbolo.',
-    passkeyPrf: 'Proteger mi identidad con passkey',
+    passkeyPrf: 'Proteger con desbloqueo del dispositivo',
     passkeyPrfHelp:
-      'Al iniciar sesión, se pedirá tu contraseña y una passkey compatible antes de desbloquear tus claves.',
+      'Recomendado. Añade una capa extra de seguridad usando el desbloqueo de este navegador o dispositivo.',
     passkeyPrfUnavailable:
       'Este navegador no permite usar passkeys para proteger claves.',
     passkeyPrfNotPersisted:

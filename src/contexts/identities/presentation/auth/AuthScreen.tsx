@@ -9,7 +9,6 @@ import type { LoginIdentityProgressStep } from '../../application/ports/LoginIde
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
-import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   clearSavedCredentials,
@@ -36,8 +35,6 @@ import {
   registrationNetworks,
 } from './authFormRules';
 import { Field } from './Field';
-import { HeroMetric } from './HeroMetric';
-import { PasswordChecklist } from './PasswordChecklist';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
@@ -47,13 +44,11 @@ interface AuthScreenProps {
     session: Session,
     conversations: ConversationResource[],
   ) => void;
-  peerCount: number;
 }
 
 export function AuthScreen({
   availableNetworks,
   onAuthenticated,
-  peerCount,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
@@ -63,7 +58,7 @@ export function AuthScreen({
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
-  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(false);
+  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(true);
   const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +114,12 @@ export function AuthScreen({
     selectedNetwork,
   });
   const passwordChecks = passwordValidationChecks(password);
+  const passwordRequirementProgress = createPasswordRequirementProgress({
+    checks: {
+      ...passwordChecks,
+      match: password.length > 0 && password === passwordConfirmation,
+    },
+  });
   const canShowInstallButton =
     installState !== 'fallback' && installState !== 'installed';
   const installButtonDisabled =
@@ -228,16 +229,32 @@ export function AuthScreen({
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/65">
               {copy.auth.heroBody}
             </p>
-            <div className="mt-8 grid grid-cols-3 gap-3">
-              <HeroMetric
-                label={copy.auth.apiLabel}
-                value={API_SERVER_URL.replace('http://', '')}
-              />
-              <HeroMetric
-                label={copy.auth.networksLabel}
-                value={`${availableNetworks.length}`}
-              />
-              <HeroMetric label={copy.auth.peersLabel} value={`${peerCount}`} />
+            <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4">
+              {canShowInstallButton && (
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  disabled={installButtonDisabled}
+                  className={cx(
+                    'w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                    installState === 'ready'
+                      ? 'border-cyan-200/40 bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
+                      : 'border-white/10 bg-white/10 text-white/85 hover:border-cyan-200/40 hover:bg-white/15',
+                  )}
+                >
+                  {installButtonLabel}
+                </button>
+              )}
+              {showInstallHelp && installHelp && (
+                <p className="mt-3 text-center text-xs leading-snug text-white/45">
+                  {installHelp}
+                </p>
+              )}
+              {!canShowInstallButton && installHelp && (
+                <p className="mt-3 text-center text-xs leading-snug text-white/45">
+                  {installHelp}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -311,40 +328,37 @@ export function AuthScreen({
                     data-testid="auth-password-confirmation-input"
                   />
                 </Field>
-                <PasswordChecklist
-                  checks={{
-                    ...passwordChecks,
-                    match:
-                      password.length > 0 && password === passwordConfirmation,
-                  }}
-                  variant="auth"
+                <PasswordRequirementProgress
+                  complete={passwordRequirementProgress.complete}
+                  total={passwordRequirementProgress.total}
+                  message={passwordRequirementProgress.message}
                 />
-                <button
-                  type="button"
-                  aria-pressed={passkeyPrfEnabled}
-                  disabled={!passkeyPrfAvailable}
+	                <button
+	                  type="button"
+	                  aria-pressed={passkeyPrfEnabled}
+	                  disabled={!passkeyPrfAvailable}
                   onClick={() =>
                     passkeyPrfAvailable &&
                     setPasskeyPrfEnabled((enabled) => !enabled)
                   }
-                  className={cx(
-                    'flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition',
-                    passkeyPrfAvailable
-                      ? passkeyPrfEnabled
-                        ? 'border-cyan-200/35 bg-cyan-300/15'
-                        : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.06]'
-                      : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
-                  )}
-                >
+	                  className={cx(
+	                    'flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition',
+	                    passkeyPrfAvailable
+	                      ? passkeyPrfEnabled
+	                        ? 'border-cyan-200/35 bg-cyan-300/15'
+	                        : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.06]'
+	                      : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
+	                  )}
+	                >
                   <span
                     aria-hidden="true"
-                    className={cx(
-                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-                      passkeyPrfEnabled && passkeyPrfAvailable
-                        ? 'bg-cyan-400/25'
-                        : 'bg-black/25',
-                    )}
-                  >
+	                    className={cx(
+	                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+	                      passkeyPrfEnabled && passkeyPrfAvailable
+	                        ? 'bg-cyan-400/25'
+	                        : 'bg-black/25',
+	                    )}
+	                  >
                     <span
                       className={cx(
                         'h-4 w-4 rounded-full bg-white transition-transform',
@@ -428,33 +442,6 @@ export function AuthScreen({
             </p>
           )}
 
-          {canShowInstallButton && (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={handleInstallApp}
-                disabled={installButtonDisabled}
-                className={cx(
-                  'w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
-                  installState === 'ready'
-                    ? 'border-cyan-200/40 bg-cyan-300/15 text-cyan-50 hover:bg-cyan-300/20'
-                    : 'border-white/10 bg-white/10 text-white/85 hover:border-cyan-200/40 hover:bg-white/15',
-                )}
-              >
-                {installButtonLabel}
-              </button>
-              {showInstallHelp && installHelp && (
-                <p className="mt-2 text-center text-xs leading-snug text-white/45">
-                  {installHelp}
-                </p>
-              )}
-            </div>
-          )}
-          {!canShowInstallButton && installHelp && (
-            <p className="mt-3 text-center text-xs leading-snug text-white/45">
-              {installHelp}
-            </p>
-          )}
         </form>
       </div>
     </section>
@@ -463,6 +450,84 @@ export function AuthScreen({
 
 function isIosBrowser(): boolean {
   return /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase());
+}
+
+interface PasswordRequirementProgressProps {
+  complete: number;
+  message: string;
+  total: number;
+}
+
+function PasswordRequirementProgress({
+  complete,
+  message,
+  total,
+}: PasswordRequirementProgressProps): ReactElement {
+  const percentage = total > 0 ? Math.round((complete / total) * 100) : 0;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className={cx(
+            'h-full rounded-full transition-[width,background-color]',
+            complete === total
+              ? 'bg-emerald-300'
+              : 'bg-gradient-to-r from-cyan-300 to-fuchsia-500',
+          )}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <p
+        className={cx(
+          'mt-2 text-xs font-bold leading-snug',
+          complete === total ? 'text-emerald-200' : 'text-white/55',
+        )}
+      >
+        {message}
+      </p>
+    </div>
+  );
+}
+
+interface PasswordRequirementProgressInput {
+  checks: {
+    lowercase: boolean;
+    match: boolean;
+    maxLength: boolean;
+    minLength: boolean;
+    number: boolean;
+    symbol: boolean;
+    uppercase: boolean;
+  };
+}
+
+function createPasswordRequirementProgress({
+  checks,
+}: PasswordRequirementProgressInput): PasswordRequirementProgressProps {
+  const values = Object.values(checks);
+  const complete = values.filter(Boolean).length;
+  const total = values.length;
+
+  return {
+    complete,
+    message: nextPasswordRequirementMessage(checks),
+    total,
+  };
+}
+
+function nextPasswordRequirementMessage(
+  checks: PasswordRequirementProgressInput['checks'],
+): string {
+  if (!checks.uppercase) return copy.auth.passwordRequirementNext.uppercase;
+  if (!checks.number) return copy.auth.passwordRequirementNext.number;
+  if (!checks.symbol) return copy.auth.passwordRequirementNext.symbol;
+  if (!checks.match) return copy.auth.passwordRequirementNext.match;
+  if (Object.values(checks).every(Boolean)) {
+    return copy.auth.passwordRequirementNext.valid;
+  }
+
+  return copy.auth.passwordRequirements;
 }
 
 function loginProgressLabel(step: LoginIdentityProgressStep): string {

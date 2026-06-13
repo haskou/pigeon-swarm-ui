@@ -185,7 +185,6 @@ function App(): ReactElement {
           <AuthScreen
             availableNetworks={nodeNetworks.networks}
             onAuthenticated={handleAuthenticated}
-            peerCount={peers.peers.length}
           />
         ) : (
           <GlassWorkspace
