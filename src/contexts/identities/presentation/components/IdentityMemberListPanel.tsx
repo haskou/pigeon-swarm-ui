@@ -93,7 +93,7 @@ export function IdentityMemberListPanel({
             />
           </div>
         ))}
-        {items.length === 0 && (
+        {items.length === 0 && emptyLabel && (
           <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">
             {emptyLabel}
           </div>

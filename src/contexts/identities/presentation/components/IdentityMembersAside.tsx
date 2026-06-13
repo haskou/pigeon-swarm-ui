@@ -39,6 +39,7 @@ export function IdentityMembersAside({
   return (
     <aside
       className={cx(identityMembersAsideClassName(variant), className)}
+      data-testid="identity-members-aside"
       data-state={transitionState}
     >
       <IdentityMemberListPanel
