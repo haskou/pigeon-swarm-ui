@@ -90,15 +90,15 @@ export const es = {
     passkeyPrfHelp:
       'Recomendado. Añade una capa extra de seguridad usando el desbloqueo de este navegador o dispositivo.',
     passkeyPrfUnavailable:
-      'Este navegador no permite usar passkeys para proteger claves.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passkeyPrfUnavailableCreate:
-      'El desbloqueo del dispositivo no está disponible aquí. Puedes crear la identidad, pero quedará protegida solo con contraseña.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad, pero quedará protegida solo con contraseña.',
     passkeyPrfUnavailableLogin:
-      'El desbloqueo del dispositivo no está disponible aquí. Si tu identidad usa esta protección, inicia sesión desde HTTPS o localhost, en el mismo navegador o dispositivo donde creaste la passkey.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Si tu identidad usa PRF, necesitas el navegador, dominio y autenticador donde se creó.',
     passkeyPrfNotPersisted:
       'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
     passkeyPrfUnlockFailed:
-      'No se puede usar el desbloqueo del dispositivo aqui. Necesitas HTTPS o localhost, el mismo dominio donde se creo la passkey y un navegador compatible.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',
@@ -948,7 +948,7 @@ export const es = {
       'Envuelve la clave derivada de contraseña con una passkey antes de abrir tu master key.',
     passkeyPrfPreserved: 'Esta identidad ya usa passkey PRF y se conservará.',
     passkeyPrfUnavailable:
-      'Este navegador no expone WebAuthn PRF para envolver claves con passkey.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
     picture: 'Imagen de perfil',
     save: 'Guardar cambios',
     security: 'Seguridad',

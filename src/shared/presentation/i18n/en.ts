@@ -88,15 +88,15 @@ export const en = {
     passkeyPrfHelp:
       'Recommended. Adds an extra security layer using this browser or device unlock.',
     passkeyPrfUnavailable:
-      'This browser cannot use passkeys to protect keys.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passkeyPrfUnavailableCreate:
-      'Device unlock is not available here. You can create the identity, but it will be protected with password only.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity, but it will be protected with password only.',
     passkeyPrfUnavailableLogin:
-      'Device unlock is not available here. If your identity uses this protection, sign in from HTTPS or localhost, on the same browser or device where you created the passkey.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. If your identity uses PRF, use the browser, domain and authenticator where it was created.',
     passkeyPrfNotPersisted:
       'The identity was created, but the server did not save passkey protection.',
     passkeyPrfUnlockFailed:
-      'Device unlock cannot be used here. You need HTTPS or localhost, the same domain where the passkey was created, and a compatible browser.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
@@ -1057,7 +1057,7 @@ export const en = {
     passkeyPrfPreserved:
       'This identity already uses passkey PRF and it will be preserved.',
     passkeyPrfUnavailable:
-      'This browser does not expose WebAuthn PRF for passkey key wrapping.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential.',
     picture: 'Profile picture',
     save: 'Save changes',
     security: 'Security',

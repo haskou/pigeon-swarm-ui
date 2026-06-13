@@ -25,12 +25,17 @@ class FakePasskeyPrfProtector {
     version: 1,
   };
 
-  public constructor(private readonly prfKey: SymmetricKey) {}
+  public constructor(
+    private readonly prfKey: SymmetricKey,
+    private readonly shouldReject = false,
+  ) {}
 
   public createProtection(): Promise<{
     prfKey: SymmetricKey;
     protection: PasskeyPrfMasterKeyProtection;
   }> {
+    if (this.shouldReject) return Promise.reject(new Error('PRF unavailable'));
+
     return Promise.resolve({
       prfKey: this.prfKey,
       protection: this.protection,
@@ -38,6 +43,8 @@ class FakePasskeyPrfProtector {
   }
 
   public evaluateKey(): Promise<SymmetricKey> {
+    if (this.shouldReject) return Promise.reject(new Error('PRF unavailable'));
+
     return Promise.resolve(this.prfKey);
   }
 }
@@ -210,5 +217,69 @@ describe(UserRootKeyProtector.name, () => {
     await expect(
       wrongPasskeyProtector.unlockMasterKey(identity, 'correct password'),
     ).rejects.toThrow();
+  });
+
+  it('does not fall back to password-only when a passkey protected identity cannot evaluate PRF', async () => {
+    const masterKey = SymmetricKey.generate();
+    const passkeyPrf = new FakePasskeyPrfProtector(SymmetricKey.generate());
+    const protector = new UserRootKeyProtector(
+      passkeyPrf as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+    const protectedRoot = await protector.protectMasterKey({
+      masterKey,
+      passkeyPrf: {
+        displayName: 'Ada',
+        identityId: 'identity-id',
+        mode: 'create',
+      },
+      password: 'correct password',
+    });
+    const identity = createIdentity({
+      encryptedMasterKey: protectedRoot.encryptedMasterKey,
+      keyPair: await KeyPair.generate(),
+      masterKey,
+      masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+    const rejectingProtector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+
+    await expect(
+      rejectingProtector.unlockMasterKey(identity, 'correct password'),
+    ).rejects.toThrow('PRF unavailable');
+  });
+
+  it('unlocks portable password-only identities without passkey PRF', async () => {
+    const masterKey = SymmetricKey.generate();
+    const protector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+    const protectedRoot = await protector.protectMasterKey({
+      masterKey,
+      password: 'correct password',
+    });
+    const identity = createIdentity({
+      encryptedMasterKey: protectedRoot.encryptedMasterKey,
+      keyPair: await KeyPair.generate(),
+      masterKey,
+      masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+
+    const unlocked = await protector.unlockMasterKey(
+      identity,
+      'correct password',
+    );
+
+    expect(protectedRoot.masterKeyDerivation.passkeyPrf).toBeUndefined();
+    expect(unlocked.isEqual(masterKey)).toBe(true);
   });
 });

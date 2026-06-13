@@ -8,6 +8,21 @@ const challengeBytes = 32;
 const saltBytes = 32;
 const relyingPartyName = 'Pigeon Swarm';
 const timeoutMs = 60_000;
+const debugPrefix = '[WebAuthn PRF]';
+
+type PrfExtensionResults = {
+  enabled?: boolean;
+  results?: {
+    first?: BufferSource;
+    second?: BufferSource;
+  };
+};
+
+type PublicKeyCredentialWithExtensionResults = PublicKeyCredential & {
+  getClientExtensionResults(): {
+    prf?: PrfExtensionResults;
+  };
+};
 
 async function userHandle(identityId: string): Promise<ArrayBuffer> {
   return await crypto.subtle.digest(
@@ -18,22 +33,18 @@ async function userHandle(identityId: string): Promise<ArrayBuffer> {
 
 function isPublicKeyCredentialWithPrf(
   credential: Credential | null,
-): credential is PublicKeyCredential & {
-  getClientExtensionResults(): {
-    prf?: {
-      enabled?: boolean;
-      results?: {
-        first?: BufferSource;
-        second?: BufferSource;
-      };
-    };
-  };
-} {
+): credential is PublicKeyCredentialWithExtensionResults {
   return (
     credential instanceof PublicKeyCredential &&
     typeof credential.getClientExtensionResults === 'function' &&
     credential.rawId instanceof ArrayBuffer
   );
+}
+
+function prfResults(credential: Credential | null): PrfExtensionResults {
+  if (!isPublicKeyCredentialWithPrf(credential)) return {};
+
+  return credential.getClientExtensionResults().prf ?? {};
 }
 
 function randomBytes(length: number): Uint8Array {
@@ -88,9 +99,7 @@ function decodeBase64Url(value: string): Uint8Array {
 function firstPrfResult(
   credential: Credential | null,
 ): SymmetricKey | undefined {
-  if (!isPublicKeyCredentialWithPrf(credential)) return undefined;
-
-  const first = credential.getClientExtensionResults().prf?.results?.first;
+  const first = prfResults(credential).results?.first;
 
   return first
     ? SymmetricKey.fromBase64(bytesToBase64(bufferSourceToBytes(first)))
@@ -98,6 +107,11 @@ function firstPrfResult(
 }
 
 export class WebAuthnPrfKeyProtector {
+  private static debug(event: string, details: Record<string, unknown>): void {
+    // eslint-disable-next-line no-console -- Non-sensitive PRF diagnostics.
+    console.debug(debugPrefix, event, details);
+  }
+
   public static isAvailable(): boolean {
     return (
       typeof globalThis.isSecureContext === 'boolean' &&
@@ -117,11 +131,25 @@ export class WebAuthnPrfKeyProtector {
       >;
     };
 
-    if (typeof credential.getClientCapabilities !== 'function') return false;
+    WebAuthnPrfKeyProtector.debug('availability', {
+      getClientCapabilitiesType: typeof credential.getClientCapabilities,
+      isSecureContext: globalThis.isSecureContext,
+      publicKeyCredentialType: typeof PublicKeyCredential,
+    });
 
-    const capabilities = await credential.getClientCapabilities();
+    if (typeof credential.getClientCapabilities === 'function') {
+      try {
+        const capabilities = await credential.getClientCapabilities();
 
-    return capabilities['extension:prf'] === true;
+        WebAuthnPrfKeyProtector.debug('capabilities', { capabilities });
+      } catch (error) {
+        WebAuthnPrfKeyProtector.debug('capabilities-error', {
+          error: String(error),
+        });
+      }
+    }
+
+    return true;
   }
 
   private assertSupportedProtection(
@@ -143,19 +171,7 @@ export class WebAuthnPrfKeyProtector {
     displayName: string;
     identityId: string;
     salt: Uint8Array;
-  }): Promise<
-    PublicKeyCredential & {
-      getClientExtensionResults(): {
-        prf?: {
-          enabled?: boolean;
-          results?: {
-            first?: BufferSource;
-            second?: BufferSource;
-          };
-        };
-      };
-    }
-  > {
+  }): Promise<PublicKeyCredentialWithExtensionResults> {
     const credential = await navigator.credentials.create({
       publicKey: {
         attestation: 'none',
@@ -189,6 +205,18 @@ export class WebAuthnPrfKeyProtector {
 
     if (!isPublicKeyCredentialWithPrf(credential)) {
       throw new Error('Passkey PRF credential could not be created.');
+    }
+
+    const results = prfResults(credential);
+
+    WebAuthnPrfKeyProtector.debug('create-result', {
+      prfEnabled: results.enabled === true,
+    });
+
+    if (results.enabled !== true) {
+      throw new Error(
+        'This credential did not enable the WebAuthn PRF extension.',
+      );
     }
 
     return credential;
@@ -243,6 +271,10 @@ export class WebAuthnPrfKeyProtector {
     });
 
     const result = firstPrfResult(credential);
+
+    WebAuthnPrfKeyProtector.debug('get-result', {
+      hasFirstPrfResult: !!result,
+    });
 
     if (!result) {
       throw new Error('This passkey does not expose WebAuthn PRF.');
