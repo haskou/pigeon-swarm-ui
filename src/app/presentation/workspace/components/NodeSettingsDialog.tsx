@@ -289,12 +289,24 @@ export function NodeSettingsDialog({
     window.setTimeout(() => setCopiedNodeId(false), 1800);
   };
 
-  const copyNetworkId = async (network: NodeNetwork) => {
+  const copyNetworkCode = async (network: NodeNetwork) => {
     if (!navigator.clipboard) return;
 
-    await navigator.clipboard.writeText(network.id);
+    const text = network.key
+      ? NetworkInviteCode.encode({
+          id: network.id,
+          key: network.key,
+          name: network.name,
+        })
+      : network.id;
+
+    await navigator.clipboard.writeText(text);
     setCopiedNetworkId(network.id);
-    setNotice(copy.nodeSettings.networkIdCopied);
+    setNotice(
+      network.key
+        ? copy.nodeSettings.codeCopied
+        : copy.nodeSettings.networkIdCopied,
+    );
     window.setTimeout(() => {
       setCopiedNetworkId((current) =>
         current === network.id ? null : current,
@@ -503,13 +515,19 @@ export function NodeSettingsDialog({
                           <div className="flex shrink-0 items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => void copyNetworkId(network)}
+                              onClick={() => void copyNetworkCode(network)}
                               className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
-                              aria-label={copy.nodeSettings.copyNetworkId}
+                              aria-label={
+                                network.key
+                                  ? copy.nodeSettings.copyCode
+                                  : copy.nodeSettings.copyNetworkId
+                              }
                               title={
                                 copiedNetworkId === network.id
                                   ? copy.profile.copied
-                                  : copy.nodeSettings.copyNetworkId
+                                  : network.key
+                                    ? copy.nodeSettings.copyCode
+                                    : copy.nodeSettings.copyNetworkId
                               }
                             >
                               <CopyIcon
