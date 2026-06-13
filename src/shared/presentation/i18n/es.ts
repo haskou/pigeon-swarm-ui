@@ -85,6 +85,8 @@ export const es = {
       'Este navegador no permite usar passkeys para proteger claves.',
     passkeyPrfNotPersisted:
       'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
+    passkeyPrfUnlockFailed:
+      'No se ha podido desbloquear la passkey. Usa el mismo dominio donde se creo, comprueba que el navegador soporte passkeys con PRF o entra desde un dispositivo que tenga esa passkey.',
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     rememberMe: 'Mantener sesion iniciada',

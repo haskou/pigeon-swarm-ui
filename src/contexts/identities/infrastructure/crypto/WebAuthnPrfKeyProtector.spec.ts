@@ -24,10 +24,17 @@ class FakePublicKeyCredential {
 function installWebAuthn({
   create,
   get,
+  getClientCapabilities,
 }: {
   create: jest.Mock;
   get: jest.Mock;
+  getClientCapabilities?: jest.Mock;
 }): void {
+  Object.defineProperty(FakePublicKeyCredential, 'getClientCapabilities', {
+    configurable: true,
+    value: getClientCapabilities,
+  });
+
   Object.defineProperty(globalThis, 'isSecureContext', {
     configurable: true,
     value: true,
@@ -71,6 +78,27 @@ describe(WebAuthnPrfKeyProtector.name, () => {
       value: originalPublicKeyCredential,
     });
     jest.restoreAllMocks();
+  });
+
+  it('reports PRF availability when the browser exposes the PRF extension capability', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+      getClientCapabilities: jest
+        .fn()
+        .mockResolvedValue({ 'extension:prf': true }),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
+  });
+
+  it('does not report PRF availability when only generic WebAuthn exists', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(false);
   });
 
   it('wraps and unwraps a password-derived key using WebAuthn PRF', async () => {

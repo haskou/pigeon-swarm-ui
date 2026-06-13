@@ -109,6 +109,22 @@ export class WebAuthnPrfKeyProtector {
     );
   }
 
+  public static async isPrfAvailable(): Promise<boolean> {
+    if (!WebAuthnPrfKeyProtector.isAvailable()) return false;
+
+    const credential = PublicKeyCredential as typeof PublicKeyCredential & {
+      getClientCapabilities?: () => Promise<
+        Record<string, boolean | undefined>
+      >;
+    };
+
+    if (typeof credential.getClientCapabilities !== 'function') return false;
+
+    const capabilities = await credential.getClientCapabilities();
+
+    return capabilities['extension:prf'] === true;
+  }
+
   private assertSupportedProtection(
     protection: PasskeyPrfMasterKeyProtection,
   ): void {

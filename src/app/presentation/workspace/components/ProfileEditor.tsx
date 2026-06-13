@@ -134,7 +134,19 @@ export function ProfileEditor({
   );
 
   useEffect(() => {
-    setPasskeyPrfAvailable(WebAuthnPrfKeyProtector.isAvailable());
+    let mounted = true;
+
+    WebAuthnPrfKeyProtector.isPrfAvailable()
+      .then((available) => {
+        if (mounted) setPasskeyPrfAvailable(available);
+      })
+      .catch(() => {
+        if (mounted) setPasskeyPrfAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const requestClose = () => {

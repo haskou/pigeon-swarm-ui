@@ -83,6 +83,8 @@ export const en = {
       'This browser cannot use passkeys to protect keys.',
     passkeyPrfNotPersisted:
       'The identity was created, but the server did not save passkey protection.',
+    passkeyPrfUnlockFailed:
+      'The passkey could not unlock this identity. Use the same domain where it was created, check that the browser supports passkeys with PRF, or sign in from a device that has that passkey.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',

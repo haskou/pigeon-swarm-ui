@@ -2730,7 +2730,11 @@ export class PigeonApiGateway {
 
     const masterKey = await this.decryptMasterKey(identity, password).catch(
       () => {
-        throw new Error(copy.auth.invalidLogin);
+        throw new Error(
+          identity.masterKeyDerivation.passkeyPrf
+            ? copy.auth.passkeyPrfUnlockFailed
+            : copy.auth.invalidLogin,
+        );
       },
     );
     const session: Session = {
