@@ -283,12 +283,13 @@ export class PigeonApplication {
         ),
     });
     this.registerIdentityUseCase = new RegisterIdentity({
-      register: async (name, password, networks, handle) =>
+      register: async (name, password, networks, handle, options) =>
         await gateway.register(
           name.toString(),
           password,
           networks.toPrimitives(),
           handle?.toString(),
+          options,
         ),
     });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
