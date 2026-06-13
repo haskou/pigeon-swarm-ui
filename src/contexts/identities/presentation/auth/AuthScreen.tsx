@@ -350,24 +350,9 @@ export function AuthScreen({
                       : 'cursor-not-allowed opacity-55',
                   )}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={cx(
-                      'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-                      passkeyPrfEnabled && passkeyPrfAvailable
-                        ? 'bg-cyan-400/25'
-                        : 'bg-black/25',
-                    )}
-                  >
-                    <span
-                      className={cx(
-                        'h-4 w-4 rounded-full bg-white transition-transform',
-                        passkeyPrfEnabled && passkeyPrfAvailable
-                          ? 'translate-x-6'
-                          : 'translate-x-1',
-                      )}
-                    />
-                  </span>
+                  <AuthSwitch
+                    enabled={passkeyPrfEnabled && passkeyPrfAvailable}
+                  />
                   <span className="min-w-0">
                     <span className="block text-sm font-black text-white/80">
                       {copy.auth.passkeyPrf}
@@ -389,25 +374,19 @@ export function AuthScreen({
             </div>
           )}
 
-          <div className="mt-6 flex items-center">
+          <div className="mt-6 flex items-center gap-3 rounded-2xl px-1 py-2">
             <button
               type="button"
               id="remember-me"
               aria-pressed={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full border border-white/10 transition-colors focus:outline-none ${
-                rememberMe ? 'bg-cyan-400/20' : 'bg-black/25'
-              }`}
+              className="shrink-0 focus:outline-none"
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  rememberMe ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              <AuthSwitch enabled={rememberMe} />
             </button>
             <label
               htmlFor="remember-me"
-              className="ml-2 block min-w-0 cursor-pointer text-sm text-white/60"
+              className="block min-w-0 cursor-pointer text-sm text-white/60"
             >
               <span className="block font-bold text-white/70">
                 {copy.auth.rememberMe}
@@ -453,6 +432,25 @@ interface PasswordRequirementProgressProps {
   complete: number;
   message: string;
   total: number;
+}
+
+function AuthSwitch({ enabled }: { enabled: boolean }): ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      className={cx(
+        'flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+        enabled ? 'bg-cyan-400/25' : 'bg-black/25',
+      )}
+    >
+      <span
+        className={cx(
+          'h-4 w-4 rounded-full bg-white transition-transform',
+          enabled ? 'translate-x-6' : 'translate-x-1',
+        )}
+      />
+    </span>
+  );
 }
 
 function PasswordRequirementProgress({
