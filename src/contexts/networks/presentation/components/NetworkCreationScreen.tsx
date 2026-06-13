@@ -1,9 +1,7 @@
 import { FormEvent, useState } from 'react';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { Field } from '../../../identities/presentation/auth/Field';
-import { HeroMetric } from '../../../identities/presentation/auth/HeroMetric';
 import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -16,15 +14,15 @@ export function NetworkCreationScreen({
 }: {
   onNetworkCreated: () => void;
 }) {
-  const [mode, setMode] = useState<NetworkSetupMode>('create');
+  const [mode, setMode] = useState<NetworkSetupMode>('public');
   const [name, setName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [
+    { label: copy.network.public, value: 'public' },
     { label: copy.network.create, value: 'create' },
     { label: copy.network.join, value: 'join' },
-    { label: copy.network.public, value: 'public' },
   ] satisfies Array<{ label: string; value: NetworkSetupMode }>;
 
   const handleSubmit = async (event: FormEvent) => {
@@ -55,121 +53,87 @@ export function NetworkCreationScreen({
   };
 
   return (
-    <section className="app-screen relative z-10 grid place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
-      <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
-        <div className="hidden lg:block">
-          <div className="glass-panel-strong rounded-2xl p-8">
-            <img
-              src="/logo.png"
-              alt="Pigeon Swarm"
-              className="floaty h-28 w-28 rounded-2xl shadow-2xl shadow-indigo-950/40"
-            />
-            <h1 className="mt-8 max-w-xl text-6xl font-black tracking-[-.07em]">
-              {copy.network.heroTitle}
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/65">
-              {copy.network.heroBody}
-            </p>
-            <div className="mt-8 grid grid-cols-3 gap-3">
-              <HeroMetric
-                label={copy.auth.apiLabel}
-                value={API_SERVER_URL.replace('http://', '')}
-              />
-              <HeroMetric
-                label={copy.network.firstRunMetricLabel}
-                value={copy.network.firstRunMetricValue}
-              />
-              <HeroMetric
-                label={copy.network.modeMetricLabel}
-                value={copy.network.modeMetricValue}
-              />
-            </div>
-          </div>
+    <section className="app-screen relative z-10 grid min-h-dvh place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
+      <form
+        onSubmit={handleSubmit}
+        className="glass-panel-strong flex min-h-dvh w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-2xl sm:rounded-2xl sm:p-8"
+      >
+        <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+          <img
+            src="/logo.png"
+            alt="Pigeon Swarm"
+            className="h-16 w-16 rounded-2xl border border-white/15 shadow-lg"
+          />
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl">
+            {copy.network.title}
+          </h1>
+          <p className="mt-3 max-w-lg text-base leading-relaxed text-white/65">
+            {copy.network.body}
+          </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="glass-panel-strong min-h-dvh rounded-none p-5 sm:min-h-0 sm:rounded-2xl sm:p-7"
+        <SegmentedControl
+          className="mt-8"
+          columns={3}
+          dense
+          value={mode}
+          onChange={setMode}
+          options={modeOptions}
+        />
+
+        <div className="mt-6 min-h-[150px] space-y-4">
+          <p className="px-1 text-sm leading-relaxed text-white/60">
+            {mode === 'create'
+              ? copy.network.createBody
+              : mode === 'join'
+                ? copy.network.joinBody
+                : copy.network.publicBody}
+          </p>
+
+          {mode === 'create' ? (
+            <Field label={copy.network.nameLabel}>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.network.namePlaceholder}
+                autoComplete="name"
+                required
+              />
+            </Field>
+          ) : mode === 'join' ? (
+            <Field label={copy.network.inviteCodeLabel}>
+              <textarea
+                value={inviteCode}
+                onChange={(event) => setInviteCode(event.target.value)}
+                className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                placeholder={copy.network.inviteCodePlaceholder}
+                autoComplete="off"
+                required
+              />
+            </Field>
+          ) : null}
+        </div>
+
+        {error && (
+          <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
+            {error}
+          </div>
+        )}
+
+        <button
+          disabled={loading}
+          className="glass-button mt-6 w-full rounded-2xl bg-[#274279] px-5 py-4 text-sm font-black text-white shadow-xl shadow-[#0b162f]/30 transition hover:scale-[1.01] hover:bg-[#31508e] disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Pigeon Swarm"
-              className="h-14 w-14 rounded-2xl border border-white/15 shadow-lg"
-            />
-            <div>
-              <div className="text-2xl font-black tracking-tight">
-                {copy.network.title}
-              </div>
-              <div className="text-sm text-white/55">
-                {mode === 'create'
-                  ? copy.network.createBody
-                  : mode === 'join'
-                    ? copy.network.joinBody
-                    : copy.network.publicBody}
-              </div>
-            </div>
-          </div>
-
-          <SegmentedControl
-            className="mt-6"
-            value={mode}
-            onChange={setMode}
-            options={modeOptions}
-          />
-
-          <div className="mt-6 space-y-4">
-            {mode === 'create' ? (
-              <Field label={copy.network.nameLabel}>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.network.namePlaceholder}
-                  autoComplete="name"
-                  required
-                />
-              </Field>
-            ) : mode === 'join' ? (
-              <>
-                <Field label={copy.network.inviteCodeLabel}>
-                  <textarea
-                    value={inviteCode}
-                    onChange={(event) => setInviteCode(event.target.value)}
-                    className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                    placeholder={copy.network.inviteCodePlaceholder}
-                    autoComplete="off"
-                    required
-                  />
-                </Field>
-              </>
-            ) : (
-              <div className="rounded-2xl border border-cyan-200/20 bg-cyan-300/10 p-4 text-sm leading-relaxed text-cyan-50/75">
-                {copy.network.publicHelp}
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
-              {error}
-            </div>
-          )}
-
-          <button
-            disabled={loading}
-            className="glass-button mt-6 w-full rounded-2xl bg-fuchsia-500 px-5 py-4 text-sm font-black text-white shadow-xl shadow-fuchsia-950/30 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {loading
-              ? copy.network.loadingSubmit
-              : mode === 'create'
-                ? copy.network.createSubmit
-                : mode === 'join'
-                  ? copy.network.joinSubmit
-                  : copy.network.publicSubmit}
-          </button>
-        </form>
-      </div>
+          {loading
+            ? copy.network.loadingSubmit
+            : mode === 'create'
+              ? copy.network.createSubmit
+              : mode === 'join'
+                ? copy.network.joinSubmit
+                : copy.network.publicSubmit}
+        </button>
+      </form>
     </section>
   );
 }

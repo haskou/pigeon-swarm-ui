@@ -97,7 +97,6 @@ import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domai
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { UserRootKeyProtector } from '../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';
-import { WebAuthnPrfKeyProtector } from '../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
@@ -201,7 +200,10 @@ export class PigeonApiGateway {
     http: HttpJsonClient = new HttpJsonClient(
       new ApiUrlBuilder(API_SERVER_URL),
     ),
-    signer: RequestSigner = new RequestSigner(),
+    signer: RequestSigner = new RequestSigner(
+      undefined,
+      ApiUrlBuilder.pathPrefix(API_SERVER_URL),
+    ),
     conversations: ConversationMapper = new ConversationMapper(),
     messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),
@@ -2532,10 +2534,6 @@ export class PigeonApiGateway {
     );
 
     if (identity.masterKeyDerivation.passkeyPrf) {
-      if (!(await WebAuthnPrfKeyProtector.isPrfAvailable())) {
-        throw new Error(copy.auth.passkeyPrfUnlockFailed);
-      }
-
       onProgress?.('confirming-passkey');
     }
 

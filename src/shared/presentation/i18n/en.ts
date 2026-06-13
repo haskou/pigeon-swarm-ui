@@ -88,15 +88,15 @@ export const en = {
     passkeyPrfHelp:
       'Recommended. Adds an extra security layer using this browser or device unlock.',
     passkeyPrfUnavailable:
-      'This browser cannot use passkeys to protect keys.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passkeyPrfUnavailableCreate:
-      'Device unlock is not available here. You can create the identity, but it will be protected with password only.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity, but it will be protected with password only.',
     passkeyPrfUnavailableLogin:
-      'Device unlock is not available here. If your identity uses this protection, sign in from HTTPS or localhost, on the same browser or device where you created the passkey.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. If your identity uses PRF, use the browser, domain and authenticator where it was created.',
     passkeyPrfNotPersisted:
       'The identity was created, but the server did not save passkey protection.',
     passkeyPrfUnlockFailed:
-      'Device unlock cannot be used here. You need HTTPS or localhost, the same domain where the passkey was created, and a compatible browser.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     peersLabel: 'Peers',
     peersPlaceholder: '--',
     profileNameLabel: 'Profile name',
@@ -752,36 +752,27 @@ export const en = {
     viewRaw: 'View message data',
   },
   network: {
-    create: 'Create network',
+    body: 'Before creating identities, this node needs to connect to a network.',
+    create: 'Create private network',
     createBody:
-      'This is the first time this node has started. Create a network so your data have a place to sync.',
-    createSubmit: 'Create network',
-    firstRunMetricLabel: 'State',
-    firstRunMetricValue: 'First run',
-    heroBody:
-      'A node needs one network before accounts can be created. You can start a fresh private swarm here, or join an existing one if another node already owns the network key.',
-    heroTitle: 'First node startup',
-    inviteCodeLabel: 'Network code',
-    inviteCodePlaceholder: 'Paste a psn1 network code',
-    join: 'Join network',
-    joinBody: 'Join an existing network using its share code',
-    joinSubmit: 'Join network',
+      'Create a new private network for this node and the devices you invite.',
+    createSubmit: 'Create private network',
+    inviteCodeLabel: 'Network key or invitation',
+    inviteCodePlaceholder: 'Paste a network key or invitation',
+    join: 'Join private network',
+    joinBody: 'Connect this node to an existing private network.',
+    joinSubmit: 'Join private network',
     keyLabel: 'Network key',
     keyPlaceholder: 'Network key',
     loadingSubmit: 'Processing...',
-    modeMetricLabel: 'Mode',
-    modeMetricValue: 'node',
     nameLabel: 'Network name',
     namePlaceholder: 'My Network',
     networkIdLabel: 'Network ID',
     networkIdPlaceholder: 'Network UUID',
-    public: 'Public network',
-    publicBody:
-      'Create the fixed public network used by public communities on this node.',
-    publicHelp:
-      'The backend generates the network ID and stores it as public. No network key is created or shared.',
-    publicSubmit: 'Create public network',
-    title: 'Network configuration',
+    public: 'Use public network',
+    publicBody: 'Connect this node to the shared public network.',
+    publicSubmit: 'Use public network',
+    title: 'Set up your node',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   nodeSettings: {
@@ -1066,7 +1057,7 @@ export const en = {
     passkeyPrfPreserved:
       'This identity already uses passkey PRF and it will be preserved.',
     passkeyPrfUnavailable:
-      'This browser does not expose WebAuthn PRF for passkey key wrapping.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential.',
     picture: 'Profile picture',
     save: 'Save changes',
     security: 'Security',

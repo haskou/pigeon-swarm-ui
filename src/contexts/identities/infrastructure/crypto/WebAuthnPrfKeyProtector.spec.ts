@@ -3,19 +3,19 @@ import { WebAuthnPrfKeyProtector } from './WebAuthnPrfKeyProtector';
 class FakePublicKeyCredential {
   public constructor(
     public readonly rawId: ArrayBuffer,
-    private readonly firstPrfResult: ArrayBuffer,
+    private readonly prf: {
+      enabled?: boolean;
+      results?: { first?: ArrayBuffer };
+    },
   ) {}
 
   public getClientExtensionResults(): {
-    prf: { results: { first: ArrayBuffer } };
-  } {
-    return {
-      prf: {
-        results: {
-          first: this.firstPrfResult,
-        },
-      },
+    prf: {
+      enabled?: boolean;
+      results?: { first?: ArrayBuffer };
     };
+  } {
+    return { prf: this.prf };
   }
 }
 
@@ -61,6 +61,10 @@ describe(WebAuthnPrfKeyProtector.name, () => {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
   ]).buffer;
   const firstPrfResult = new Uint8Array(32).fill(7).buffer;
+  const enabledPrfWithResult = {
+    enabled: true,
+    results: { first: firstPrfResult },
+  };
 
   afterEach(() => {
     Object.defineProperty(globalThis, 'isSecureContext', {
@@ -78,7 +82,7 @@ describe(WebAuthnPrfKeyProtector.name, () => {
     jest.restoreAllMocks();
   });
 
-  it('reports PRF availability when the browser exposes the PRF extension capability', async () => {
+  it('reports PRF as attemptable when the browser exposes the PRF extension capability', async () => {
     installWebAuthn({
       create: jest.fn(),
       get: jest.fn(),
@@ -90,25 +94,47 @@ describe(WebAuthnPrfKeyProtector.name, () => {
     await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
   });
 
-  it('does not report PRF availability when only generic WebAuthn exists', async () => {
+  it('does not report PRF as attemptable when capabilities explicitly reject the PRF extension', async () => {
     installWebAuthn({
       create: jest.fn(),
       get: jest.fn(),
+      getClientCapabilities: jest
+        .fn()
+        .mockResolvedValue({ 'extension:prf': false }),
     });
 
     await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(false);
   });
 
-  it('creates WebAuthn PRF protection and returns the PRF key material', async () => {
-    const create = jest
-      .fn()
-      .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
-      );
+  it('does not block PRF attempts when capabilities omit the PRF extension', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+      getClientCapabilities: jest.fn().mockResolvedValue({}),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
+  });
+
+  it('does not block PRF attempts when client capabilities are missing', async () => {
+    installWebAuthn({
+      create: jest.fn(),
+      get: jest.fn(),
+    });
+
+    await expect(WebAuthnPrfKeyProtector.isPrfAvailable()).resolves.toBe(true);
+  });
+
+  it('creates WebAuthn PRF protection without client capabilities when create returns PRF enabled', async () => {
+    const create = jest.fn().mockResolvedValue(
+      new FakePublicKeyCredential(credentialRawId, {
+        enabled: true,
+      }),
+    );
     const get = jest
       .fn()
       .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
+        new FakePublicKeyCredential(credentialRawId, enabledPrfWithResult),
       );
     installWebAuthn({ create, get });
     const protector = new WebAuthnPrfKeyProtector();
@@ -139,19 +165,19 @@ describe(WebAuthnPrfKeyProtector.name, () => {
         }),
       }),
     );
-    expect(get).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalled();
   });
 
   it('evaluates an existing WebAuthn PRF protection', async () => {
     const create = jest
       .fn()
       .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
+        new FakePublicKeyCredential(credentialRawId, enabledPrfWithResult),
       );
     const get = jest
       .fn()
       .mockResolvedValue(
-        new FakePublicKeyCredential(credentialRawId, firstPrfResult),
+        new FakePublicKeyCredential(credentialRawId, enabledPrfWithResult),
       );
     installWebAuthn({ create, get });
     const protector = new WebAuthnPrfKeyProtector();
@@ -186,5 +212,64 @@ describe(WebAuthnPrfKeyProtector.name, () => {
         }),
       }),
     );
+  });
+
+  it('evaluates PRF even when capabilities omit the PRF extension', async () => {
+    const get = jest
+      .fn()
+      .mockResolvedValue(
+        new FakePublicKeyCredential(credentialRawId, enabledPrfWithResult),
+      );
+    installWebAuthn({
+      create: jest.fn(),
+      get,
+      getClientCapabilities: jest.fn().mockResolvedValue({}),
+    });
+    const protector = new WebAuthnPrfKeyProtector();
+
+    const evaluated = await protector.evaluateKey({
+      algorithm: 'webauthn-prf',
+      credentialId: 'AQIDBAUGBwgJCgsM',
+      salt: 'AQID',
+      version: 1,
+    });
+
+    expect(evaluated.valueOf()).toBe(
+      'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=',
+    );
+  });
+
+  it('does not enable PRF when credential creation returns PRF disabled', async () => {
+    const create = jest
+      .fn()
+      .mockResolvedValue(
+        new FakePublicKeyCredential(credentialRawId, { enabled: false }),
+      );
+    installWebAuthn({ create, get: jest.fn() });
+    const protector = new WebAuthnPrfKeyProtector();
+
+    await expect(
+      protector.createProtection({
+        displayName: 'Hasko',
+        identityId: 'identity-1',
+      }),
+    ).rejects.toThrow('WebAuthn PRF');
+  });
+
+  it('fails PRF unlock when assertion returns no first PRF result', async () => {
+    const get = jest
+      .fn()
+      .mockResolvedValue(new FakePublicKeyCredential(credentialRawId, {}));
+    installWebAuthn({ create: jest.fn(), get });
+    const protector = new WebAuthnPrfKeyProtector();
+
+    await expect(
+      protector.evaluateKey({
+        algorithm: 'webauthn-prf',
+        credentialId: 'AQIDBAUGBwgJCgsM',
+        salt: 'AQID',
+        version: 1,
+      }),
+    ).rejects.toThrow('WebAuthn PRF');
   });
 });
