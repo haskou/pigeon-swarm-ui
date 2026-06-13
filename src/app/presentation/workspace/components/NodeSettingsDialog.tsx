@@ -292,10 +292,11 @@ export function NodeSettingsDialog({
   const copyNetworkCode = async (network: NodeNetwork) => {
     if (!navigator.clipboard) return;
 
-    const text = network.key
+    const canShareNetworkKey = isOwner && !!network.key;
+    const text = canShareNetworkKey
       ? NetworkInviteCode.encode({
           id: network.id,
-          key: network.key,
+          key: network.key!,
           name: network.name,
         })
       : network.id;
@@ -303,7 +304,7 @@ export function NodeSettingsDialog({
     await navigator.clipboard.writeText(text);
     setCopiedNetworkId(network.id);
     setNotice(
-      network.key
+      canShareNetworkKey
         ? copy.nodeSettings.codeCopied
         : copy.nodeSettings.networkIdCopied,
     );
@@ -487,6 +488,7 @@ export function NodeSettingsDialog({
                   <div className="space-y-2">
                     {networks.map((network) => {
                       const publicNetwork = isPublicNodeNetwork(network);
+                      const canShareNetworkKey = isOwner && !!network.key;
 
                       return (
                         <div
@@ -518,14 +520,14 @@ export function NodeSettingsDialog({
                               onClick={() => void copyNetworkCode(network)}
                               className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
                               aria-label={
-                                network.key
+                                canShareNetworkKey
                                   ? copy.nodeSettings.copyCode
                                   : copy.nodeSettings.copyNetworkId
                               }
                               title={
                                 copiedNetworkId === network.id
                                   ? copy.profile.copied
-                                  : network.key
+                                  : canShareNetworkKey
                                     ? copy.nodeSettings.copyCode
                                     : copy.nodeSettings.copyNetworkId
                               }
