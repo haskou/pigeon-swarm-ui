@@ -10,7 +10,7 @@ import { AcceptConversationInvitationMessage } from './messages/AcceptConversati
 
 describe(AcceptConversationInvitation.name, () => {
   it('delegates invitation acceptance to the pigeon API gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const notification = {
       id: 'notification-1',
       state: 'pending',

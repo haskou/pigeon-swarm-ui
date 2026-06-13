@@ -1552,6 +1552,17 @@ export class PigeonApplication {
     };
   }
 
+  public async refreshSession(session: Session): Promise<LoginResult> {
+    const result = await this.gateway.refreshSession(session);
+
+    return {
+      ...result,
+      conversations: ConversationTimeline.sortByLatestMessage(
+        result.conversations,
+      ),
+    };
+  }
+
   public async register(
     name: string,
     password: string,

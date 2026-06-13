@@ -9,7 +9,7 @@ import { SendMessage } from './SendMessage';
 
 describe(SendMessage.name, () => {
   it('delegates message sending to the pigeon API gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const expected = { content: 'hello' } as ChatMessage;
     const gateway = {
       sendMessage: jest.fn().mockResolvedValue(expected),
@@ -35,7 +35,7 @@ describe(SendMessage.name, () => {
   });
 
   it('passes selected attachments to the gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     const expected = { content: 'hello' } as ChatMessage;
     const gateway = {
@@ -62,7 +62,7 @@ describe(SendMessage.name, () => {
   });
 
   it('passes reply targets to the gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const expected = { content: 'hello' } as ChatMessage;
     const gateway = {
       sendMessage: jest.fn().mockResolvedValue(expected),

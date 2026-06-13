@@ -256,11 +256,7 @@ export function ProfileEditor({
       );
 
       onUpdated(
-        {
-          ...session,
-          identity,
-          password: wantsPasswordChange ? newPassword : session.password,
-        },
+        { ...session, identity },
         { passwordChanged: wantsPasswordChange },
       );
     } catch (caught) {

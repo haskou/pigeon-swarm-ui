@@ -9,5 +9,4 @@ export type Session = {
   keychain: LocalKeychain;
   keychainExternalIdentifier?: string | null;
   masterKey: SymmetricKey;
-  password: string;
 };

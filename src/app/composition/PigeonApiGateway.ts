@@ -1933,7 +1933,6 @@ export class PigeonApiGateway {
       keychain: defaultKeychain,
       keyPair,
       masterKey,
-      password,
     } as Session;
 
     return await this.http.request<IdentityResource>(path, {
@@ -2569,7 +2568,6 @@ export class PigeonApiGateway {
       keychain: defaultKeychain,
       keyPair,
       masterKey,
-      password,
     };
     onProgress?.('loading-keychain');
     const conversationsPromise = this.listConversations(session).catch(
@@ -2631,7 +2629,6 @@ export class PigeonApiGateway {
       keychain: defaultKeychain,
       keyPair,
       masterKey: SymmetricKey.fromBase64(localUnlock.masterKey),
-      password: '',
     };
     onProgress?.('loading-keychain');
     const conversationsPromise = this.listConversations(session).catch(
@@ -2655,6 +2652,30 @@ export class PigeonApiGateway {
     };
     onProgress?.('loading-workspace');
     const conversations = await conversationsPromise;
+
+    return { conversations, session: hydratedSession };
+  }
+
+  public async refreshSession(session: Session): Promise<LoginResult> {
+    const keychainResource = await this.loadRemoteKeychain(session).catch(
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
+    );
+    const keychain = keychainResource
+      ? await this.decryptKeychain(session, keychainResource)
+      : defaultKeychain;
+    const hydratedSession: Session = {
+      ...session,
+      keychain,
+      keychainExternalIdentifier:
+        keychainResource?.keychainExternalIdentifier ?? null,
+    };
+    const conversations = await this.listConversations(hydratedSession).catch(
+      () => [],
+    );
 
     return { conversations, session: hydratedSession };
   }

@@ -11,7 +11,7 @@ import { UpdateNotification } from './UpdateNotification';
 
 describe(UpdateNotification.name, () => {
   it('delegates notification state updates to the pigeon API gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const expected = {
       id: 'notification-1',
       state: 'declined',

@@ -1918,10 +1918,14 @@ describe(PigeonApiGateway.name, () => {
       'signature',
     ]);
     expect(signingBody?.previousIdentityExternalIdentifier).toBeUndefined();
+    const signingSession = (signer.headers as jest.Mock).mock.calls[0][0] as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(signingSession).not.toHaveProperty('password');
     expect(signer.headers).toHaveBeenCalledWith(
       expect.objectContaining({
         identity: expect.objectContaining({ id: 'public-key' }),
-        password: 'secret',
       }),
       'POST',
       '/identities/',

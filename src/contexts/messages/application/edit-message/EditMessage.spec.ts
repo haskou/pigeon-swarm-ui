@@ -9,7 +9,7 @@ import { EditMessageMessage } from './messages/EditMessageMessage';
 
 describe(EditMessage.name, () => {
   it('delegates message edits to the pigeon API gateway', async () => {
-    const session = { password: 'secret' } as Session;
+    const session = {} as Session;
     const expected = {
       content: 'edited',
       raw: { targetMessageId: 'message-1', type: 'edited' },

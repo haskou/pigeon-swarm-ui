@@ -1966,14 +1966,11 @@ export function GlassWorkspace({
   }, [session, setConversations]);
 
   const refreshSession = useCallback(async () => {
-    const result = await applicationContainer.login(
-      session.identity.id,
-      session.password,
-    );
+    const result = await applicationContainer.refreshSession(session);
 
     setSession(result.session);
     setConversations(result.conversations);
-  }, [session.identity.id, session.password, setConversations, setSession]);
+  }, [session, setConversations, setSession]);
 
   const scrollMessagesToBottom = useCallback(
     (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
