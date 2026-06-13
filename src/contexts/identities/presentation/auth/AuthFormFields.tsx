@@ -33,11 +33,14 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
         <input
           value={props.identityId}
           onChange={(event) => props.onIdentityIdChange(event.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder={copy.identityLookup.placeholder}
-          autoComplete="username"
-          data-testid="auth-identity-input"
-        />
+	          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+	          placeholder={copy.identityLookup.placeholder}
+	          autoComplete="username"
+	          autoCapitalize="none"
+	          autoCorrect="off"
+	          data-testid="auth-identity-input"
+	          spellCheck={false}
+	        />
         <p className="mt-2 text-xs leading-relaxed text-white/40">
           {copy.identityLookup.help}
         </p>
@@ -65,11 +68,14 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
             props.onHandleChange(normalizeHandleInput(event.target.value))
           }
           maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="@ada"
-          autoComplete="username"
-          data-testid="auth-handle-input"
-        />
+	          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+	          placeholder="@ada"
+	          autoComplete="username"
+	          autoCapitalize="none"
+	          autoCorrect="off"
+	          data-testid="auth-handle-input"
+	          spellCheck={false}
+	        />
       </Field>
       <NetworkField {...props} />
     </>
@@ -105,10 +111,13 @@ function NetworkField(props: {
       <input
         value={props.networks}
         onChange={(event) => props.onNetworksChange(event.target.value)}
-        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-        placeholder="uuid-public, uuid-private"
-        data-testid="auth-networks-input"
-      />
+	        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+	        placeholder="uuid-public, uuid-private"
+	        autoCapitalize="none"
+	        autoCorrect="off"
+	        data-testid="auth-networks-input"
+	        spellCheck={false}
+	      />
     </Field>
   );
 }

@@ -2725,6 +2725,10 @@ export class PigeonApiGateway {
     }
 
     if (identity.masterKeyDerivation.passkeyPrf) {
+      if (!(await WebAuthnPrfKeyProtector.isPrfAvailable())) {
+        throw new Error(copy.auth.passkeyPrfUnlockFailed);
+      }
+
       onProgress?.('confirming-passkey');
     }
 
