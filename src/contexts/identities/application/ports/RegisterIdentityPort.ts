@@ -9,6 +9,6 @@ export interface RegisterIdentityPort {
     password: string,
     networks: IdentityNetworkMemberships,
     handle?: ProfileHandle,
-    options?: { passkeyPrfEnabled?: boolean },
+    options?: { passkeyPrfEnabled?: boolean; recoveryKey?: string },
   ): Promise<LoginResult>;
 }

@@ -1233,7 +1233,7 @@ export class PigeonApplication {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
-    options: { passkeyPrfEnabled?: boolean } = {},
+    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(
       session,
@@ -1529,9 +1529,15 @@ export class PigeonApplication {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
+    recoveryKey?: string,
   ): Promise<LoginResult> {
     return await this.loginIdentityUseCase.login(
-      new LoginIdentityMessage({ identityId, onProgress, password }),
+      new LoginIdentityMessage({
+        identityId,
+        onProgress,
+        password,
+        recoveryKey,
+      }),
     );
   }
 
@@ -1568,7 +1574,7 @@ export class PigeonApplication {
     password: string,
     networks: string[],
     handle?: string,
-    options: { passkeyPrfEnabled?: boolean } = {},
+    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
     return await this.registerIdentityUseCase.register(
       new RegisterIdentityMessage({
@@ -1577,6 +1583,7 @@ export class PigeonApplication {
         networks,
         passkeyPrfEnabled: options.passkeyPrfEnabled,
         password,
+        recoveryKey: options.recoveryKey,
       }),
     );
   }

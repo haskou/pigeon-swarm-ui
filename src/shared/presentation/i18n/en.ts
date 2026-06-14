@@ -90,7 +90,7 @@ export const en = {
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passkeyPrfUnavailableCreate:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity, but it will be protected with password only.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity with password and recovery key.',
     passkeyPrfUnavailableLogin:
       'This browser or authenticator did not return WebAuthn PRF support for this credential. If your identity uses PRF, use the browser, domain and authenticator where it was created.',
     passkeyPrfNotPersisted:
@@ -103,7 +103,17 @@ export const en = {
     rememberMe: 'Stay signed in',
     rememberMeHelp:
       'Stores your identity and a local device unlock envelope in this browser.',
+    recoveryKeyCreateHelp:
+      'Save this key. You will need it to open your identity from another node or browser.',
+    recoveryKeyLabel: 'Recovery key',
+    recoveryKeyLoginHelp:
+      'Required for identities protected with a recovery key. It is not stored on this node.',
+    recoveryKeyRegenerate: 'Regenerate',
+    recoveryKeySaved: 'I saved my recovery key',
+    recoveryKeyTitle: 'Recovery key',
+    recoveryKeyUnlockFailed: 'The password or recovery key is incorrect.',
     title: 'Pigeon Swarm',
+    useRecoveryKey: 'Use recovery key',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   calls: {
@@ -1059,6 +1069,7 @@ export const en = {
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential.',
     picture: 'Profile picture',
+    recoveryKey: 'Recovery key',
     save: 'Save changes',
     security: 'Security',
     saving: 'Saving...',

@@ -6,6 +6,7 @@ export class LoginIdentityMessage {
       identityId: string;
       onProgress?: LoginIdentityProgressReporter;
       password: string;
+      recoveryKey?: string;
     },
   ) {}
 
@@ -19,5 +20,9 @@ export class LoginIdentityMessage {
 
   public getPassword(): string {
     return this.input.password;
+  }
+
+  public getRecoveryKey(): string | undefined {
+    return this.input.recoveryKey;
   }
 }

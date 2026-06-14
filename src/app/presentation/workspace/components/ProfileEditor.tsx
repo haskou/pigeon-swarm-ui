@@ -27,6 +27,7 @@ import {
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
 import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
+import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle,
@@ -70,8 +71,10 @@ export function ProfileEditor({
   );
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
+  const [passwordRecoveryKey, setPasswordRecoveryKey] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const hasPasskeyPrf = !!session.identity.masterKeyDerivation.passkeyPrf;
+  const hasRecoveryKey = !!session.identity.masterKeyDerivation.recoveryKey;
   const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(hasPasskeyPrf);
   const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
@@ -104,7 +107,10 @@ export function ProfileEditor({
   const passwordsMatch =
     newPassword.length > 0 && newPassword === newPasswordConfirmation;
   const canChangePassword =
-    !wantsPasswordChange || (isValidPassword(newPassword) && passwordsMatch);
+    !wantsPasswordChange ||
+    (isValidPassword(newPassword) &&
+      passwordsMatch &&
+      (!hasRecoveryKey || RecoveryKey.isValid(passwordRecoveryKey)));
   const hasChanges =
     name.trim() !== session.identity.profile.name.trim() ||
     (normalizedHandle ?? '') !== (session.identity.profile.handle ?? '') ||
@@ -252,7 +258,10 @@ export function ProfileEditor({
           picture: pictureCid,
         },
         wantsPasswordChange ? newPassword : undefined,
-        { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
+        {
+          passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable,
+          recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
+        },
       );
 
       onUpdated(
@@ -483,6 +492,15 @@ export function ProfileEditor({
                       placeholder="••••••••••••"
                       type="password"
                     />
+                    {hasRecoveryKey && (
+                      <ProfileInput
+                        label={copy.profile.recoveryKey}
+                        value={passwordRecoveryKey}
+                        onChange={setPasswordRecoveryKey}
+                        placeholder="psrk1..."
+                        type="password"
+                      />
+                    )}
                   </div>
                   <PasswordChecklist
                     checks={{
@@ -490,7 +508,7 @@ export function ProfileEditor({
                       match: passwordsMatch,
                     }}
                   />
-                  {wantsPasswordChange && (
+                  {wantsPasswordChange && !hasRecoveryKey && (
                     <button
                       type="button"
                       aria-pressed={passkeyPrfEnabled}

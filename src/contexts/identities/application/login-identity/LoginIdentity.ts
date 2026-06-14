@@ -21,6 +21,7 @@ export class LoginIdentity {
       message.getIdentityId(),
       message.getPassword(),
       message.getProgressReporter(),
+      message.getRecoveryKey(),
     );
 
     return {

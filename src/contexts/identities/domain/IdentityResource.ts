@@ -14,6 +14,10 @@ export type IdentityResource = {
     p: number;
     passkeyPrf?: PasskeyPrfMasterKeyProtection;
     r: number;
+    recoveryKey?: {
+      algorithm: 'pigeon-recovery-key';
+      version: 1;
+    };
     salt: string;
     version: 1;
   };

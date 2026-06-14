@@ -92,7 +92,7 @@ export const es = {
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passkeyPrfUnavailableCreate:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad, pero quedará protegida solo con contraseña.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad con contraseña y clave de recuperación.',
     passkeyPrfUnavailableLogin:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Si tu identidad usa PRF, necesitas el navegador, dominio y autenticador donde se creó.',
     passkeyPrfNotPersisted:
@@ -104,6 +104,17 @@ export const es = {
     rememberMe: 'Mantener sesion iniciada',
     rememberMeHelp:
       'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
+    recoveryKeyCreateHelp:
+      'Guarda esta clave. La necesitarás para abrir tu identidad desde otro nodo o navegador.',
+    recoveryKeyLabel: 'Clave de recuperación',
+    recoveryKeyLoginHelp:
+      'Necesaria para identidades protegidas con clave de recuperación. No se guarda en este nodo.',
+    recoveryKeyRegenerate: 'Regenerar',
+    recoveryKeySaved: 'He guardado mi clave de recuperación',
+    recoveryKeyTitle: 'Clave de recuperación',
+    recoveryKeyUnlockFailed:
+      'La contraseña o la clave de recuperación no son correctas.',
+    useRecoveryKey: 'Usar clave de recuperación',
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   calls: {
@@ -950,6 +961,7 @@ export const es = {
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
     picture: 'Imagen de perfil',
+    recoveryKey: 'Clave de recuperación',
     save: 'Guardar cambios',
     security: 'Seguridad',
     saving: 'Guardando...',

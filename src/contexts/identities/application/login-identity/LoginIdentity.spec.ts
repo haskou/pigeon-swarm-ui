@@ -38,6 +38,7 @@ describe(LoginIdentity.name, () => {
       'identity-1',
       'secret',
       undefined,
+      undefined,
     );
     expect(loadMessages).not.toHaveBeenCalled();
   });
