@@ -39,6 +39,11 @@ type RtcConfigurationProvider = () => Promise<RTCConfiguration>;
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
 
+  private readonly pendingPeerCreations = new Map<
+    string,
+    Promise<RTCPeerConnection>
+  >();
+
   private readonly peerNegotiationStates = new Map<
     string,
     PeerNegotiationState
@@ -276,6 +281,25 @@ export class CallPeerConnectionManager {
 
     if (existing) return existing;
 
+    const pendingPeerCreation = this.pendingPeerCreations.get(peerIdentityId);
+
+    if (pendingPeerCreation) return await pendingPeerCreation;
+
+    const peerCreation = this.createPeer(peerIdentityId, sendSignal);
+
+    this.pendingPeerCreations.set(peerIdentityId, peerCreation);
+
+    try {
+      return await peerCreation;
+    } finally {
+      this.pendingPeerCreations.delete(peerIdentityId);
+    }
+  }
+
+  private async createPeer(
+    peerIdentityId: string,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection> {
     if (!this.rtcConfigurationProvider) {
       logCallError(
         'peer-manager:create-peer:missing-rtc-configuration',
@@ -1152,6 +1176,7 @@ export class CallPeerConnectionManager {
     });
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
+    this.pendingPeerCreations.clear();
     this.pendingIceCandidates.clear();
     this.peerNegotiationStates.clear();
 

@@ -296,6 +296,43 @@ describe(CallPeerConnectionManager.name, () => {
     expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
   });
 
+  it('serializes concurrent peer creation for the same identity', async () => {
+    const peers: FakePeerConnection[] = [];
+    const configurations: RTCConfiguration[] = [];
+
+    installPeerConnectionMock(peers, configurations);
+    const manager = new CallPeerConnectionManager();
+    const rtcConfiguration: RTCConfiguration = {
+      iceServers: [{ urls: 'turn:relay.example.test' }],
+      iceTransportPolicy: 'relay',
+    };
+    let resolveConfiguration!: (configuration: RTCConfiguration) => void;
+    const pendingConfiguration = new Promise<RTCConfiguration>((resolve) => {
+      resolveConfiguration = resolve;
+    });
+    const rtcConfigurationProvider = jest
+      .fn()
+      .mockReturnValue(pendingConfiguration);
+
+    manager.configure(rtcConfigurationProvider);
+
+    const firstEnsurePeer = manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+    const secondEnsurePeer = manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(rtcConfigurationProvider).toHaveBeenCalledTimes(1);
+    expect(peers).toHaveLength(0);
+
+    resolveConfiguration(rtcConfiguration);
+    await Promise.all([firstEnsurePeer, secondEnsurePeer]);
+
+    expect(peers).toHaveLength(1);
+    expect(configurations).toEqual([rtcConfiguration]);
+  });
+
   it('adds screen sharing without replacing the microphone sender', async () => {
     const peers: FakePeerConnection[] = [];
 
