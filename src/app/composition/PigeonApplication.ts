@@ -1243,6 +1243,14 @@ export class PigeonApplication {
     );
   }
 
+  public async configureLocalPasskeyUnlock(
+    session: Session,
+    password: string,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.gateway.configureLocalPasskeyUnlock(session, password, enabled);
+  }
+
   public async uploadPublicFile(
     session: Session,
     file: File,

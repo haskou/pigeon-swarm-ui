@@ -13,6 +13,10 @@ import type { RequestSigner } from '../../shared/infrastructure/http/RequestSign
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import {
+  loadLocalPasskeyUnlock,
+  saveLocalPasskeyUnlock,
+} from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
@@ -2175,6 +2179,50 @@ describe(PigeonApiGateway.name, () => {
     );
 
     expect(http.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears local passkey unlock from the profile security flow', async () => {
+    const storage = new Map<string, string>();
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: jest.fn((key: string) => storage.get(key) ?? null),
+        removeItem: jest.fn((key: string) => storage.delete(key)),
+        setItem: jest.fn((key: string, value: string) => {
+          storage.set(key, value);
+        }),
+      },
+    });
+
+    saveLocalPasskeyUnlock({
+      encryptedMasterKey: 'encrypted-master-key',
+      identityId: 'identity-1',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16,
+        p: 1,
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'credential-id',
+          salt: 'salt',
+          version: 1,
+        },
+        r: 1,
+        salt: 'password-salt',
+        version: 1,
+      },
+    });
+    const gateway = new PigeonApiGateway();
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+
+    await expect(
+      gateway.configureLocalPasskeyUnlock(session, '', false),
+    ).resolves.toBeUndefined();
+
+    expect(loadLocalPasskeyUnlock('identity-1')).toBeUndefined();
   });
 
   it('uploads public profile files as signed binary bodies', async () => {

@@ -101,6 +101,7 @@ import { UserRootKeyProtector } from '../../contexts/identities/infrastructure/c
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import {
+  clearLocalPasskeyUnlock,
   loadLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
 } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
@@ -1106,6 +1107,105 @@ export class PigeonApiGateway {
     };
   }
 
+  private async createIdentityMaterial(
+    name: string,
+    password: string,
+    networks: string[],
+    handle?: string,
+    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+  ): Promise<{
+    identity: IdentityResource;
+    keyPair: KeyPair;
+    masterKey: SymmetricKey;
+  }> {
+    const keyPair = await KeyPair.generate();
+    const masterKey = SymmetricKey.generate();
+    const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
+    const encryptedKeyPair = this.userRootKeys.protectIdentityKeyPair(
+      keyPair,
+      masterKey,
+    );
+    const recoveryKey = options.recoveryKey
+      ? RecoveryKey.fromString(options.recoveryKey)
+      : undefined;
+    const { encryptedMasterKey, masterKeyDerivation } =
+      await this.userRootKeys.protectMasterKey({
+        masterKey,
+        passkeyPrf: this.registrationPasskeyPrfMode({
+          displayName: name,
+          enabled: options.passkeyPrfEnabled,
+          identityId,
+          recoveryKey,
+        }),
+        password,
+        recoveryKey,
+      });
+    const path = '/identities/';
+    const unsigned = this.identitySignatures.createInitial({
+      encryptedKeyPair,
+      encryptedMasterKey,
+      id: identityId,
+      masterKeyDerivation,
+      networks,
+      profile: { handle, name },
+      timestamp: Date.now(),
+    });
+    const signature = keyPair.sign(JSON.stringify(unsigned));
+    const body = {
+      ...unsigned,
+      signature: signature.toString(),
+    };
+    const signingSession = {
+      identity: {
+        ...body,
+      },
+      keychain: defaultKeychain,
+      keyPair,
+      masterKey,
+    } as Session;
+
+    const identity = await this.http.request<IdentityResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(signingSession, 'POST', path, body),
+      method: 'POST',
+    });
+
+    return { identity, keyPair, masterKey };
+  }
+
+  private async hydrateLoginSession(
+    session: Session,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    onProgress?.('loading-keychain');
+    const conversationsPromise = this.listConversations(session).catch(
+      () => [],
+    );
+    const keychainResource = await this.loadRemoteKeychain(session).catch(
+      (caught: unknown) => {
+        if (this.isMissingRemoteKeychain(caught)) return undefined;
+
+        throw caught;
+      },
+    );
+    const keychain = keychainResource
+      ? await this.decryptKeychain(session, keychainResource)
+      : defaultKeychain;
+    const hydratedSession = {
+      ...session,
+      keychain,
+      keychainExternalIdentifier:
+        keychainResource?.keychainExternalIdentifier ?? null,
+    };
+
+    onProgress?.('loading-workspace');
+
+    return {
+      conversations: await conversationsPromise,
+      session: hydratedSession,
+    };
+  }
+
   public apiUrl(path: string): string {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
   }
@@ -2079,72 +2179,6 @@ export class PigeonApiGateway {
     };
   }
 
-  private async createIdentityMaterial(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
-  ): Promise<{
-    identity: IdentityResource;
-    keyPair: KeyPair;
-    masterKey: SymmetricKey;
-  }> {
-    const keyPair = await KeyPair.generate();
-    const masterKey = SymmetricKey.generate();
-    const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
-    const encryptedKeyPair = this.userRootKeys.protectIdentityKeyPair(
-      keyPair,
-      masterKey,
-    );
-    const recoveryKey = options.recoveryKey
-      ? RecoveryKey.fromString(options.recoveryKey)
-      : undefined;
-    const { encryptedMasterKey, masterKeyDerivation } =
-      await this.userRootKeys.protectMasterKey({
-        masterKey,
-        passkeyPrf: this.registrationPasskeyPrfMode({
-          displayName: name,
-          enabled: options.passkeyPrfEnabled,
-          identityId,
-          recoveryKey,
-        }),
-        password,
-        recoveryKey,
-      });
-    const path = '/identities/';
-    const unsigned = this.identitySignatures.createInitial({
-      encryptedKeyPair,
-      encryptedMasterKey,
-      id: identityId,
-      masterKeyDerivation,
-      networks,
-      profile: { handle, name },
-      timestamp: Date.now(),
-    });
-    const signature = keyPair.sign(JSON.stringify(unsigned));
-    const body = {
-      ...unsigned,
-      signature: signature.toString(),
-    };
-    const signingSession = {
-      identity: {
-        ...body,
-      },
-      keychain: defaultKeychain,
-      keyPair,
-      masterKey,
-    } as Session;
-
-    const identity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(signingSession, 'POST', path, body),
-      method: 'POST',
-    });
-
-    return { identity, keyPair, masterKey };
-  }
-
   public async createIdentity(
     name: string,
     password: string,
@@ -2276,6 +2310,25 @@ export class PigeonApiGateway {
     this.cacheIdentity(updatedIdentity);
 
     return updatedIdentity;
+  }
+
+  public async configureLocalPasskeyUnlock(
+    session: Session,
+    password: string,
+    enabled: boolean,
+  ): Promise<void> {
+    if (!enabled) {
+      clearLocalPasskeyUnlock(session.identity.id);
+
+      return;
+    }
+
+    await this.saveLocalPasskeyMasterKeyUnlock({
+      displayName: session.identity.profile.name,
+      identityId: session.identity.id,
+      masterKey: session.masterKey,
+      password,
+    });
   }
 
   public async uploadPublicFile(
@@ -2737,39 +2790,6 @@ export class PigeonApiGateway {
         }),
       { ttlMs: startupReadCacheTtlMs },
     );
-  }
-
-  private async hydrateLoginSession(
-    session: Session,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session).catch(
-      () => [],
-    );
-    const keychainResource = await this.loadRemoteKeychain(session).catch(
-      (caught: unknown) => {
-        if (this.isMissingRemoteKeychain(caught)) return undefined;
-
-        throw caught;
-      },
-    );
-    const keychain = keychainResource
-      ? await this.decryptKeychain(session, keychainResource)
-      : defaultKeychain;
-    const hydratedSession = {
-      ...session,
-      keychain,
-      keychainExternalIdentifier:
-        keychainResource?.keychainExternalIdentifier ?? null,
-    };
-
-    onProgress?.('loading-workspace');
-
-    return {
-      conversations: await conversationsPromise,
-      session: hydratedSession,
-    };
   }
 
   public async login(

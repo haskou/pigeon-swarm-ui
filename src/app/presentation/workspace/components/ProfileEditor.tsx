@@ -27,6 +27,7 @@ import {
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
 import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
+import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
@@ -51,6 +52,8 @@ const ImageCropEditor = lazy(() =>
 const profileEditorInputClass =
   'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/50 focus:bg-black/25';
 
+type ProfileEditorSection = 'profile' | 'networks' | 'security';
+
 export function ProfileEditor({
   currentPicture,
   nodeNetworks,
@@ -72,11 +75,21 @@ export function ProfileEditor({
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [passwordRecoveryKey, setPasswordRecoveryKey] = useState('');
+  const [currentPasswordForPasskey, setCurrentPasswordForPasskey] =
+    useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const hasPasskeyPrf = !!session.identity.masterKeyDerivation.passkeyPrf;
   const hasRecoveryKey = !!session.identity.masterKeyDerivation.recoveryKey;
   const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(hasPasskeyPrf);
+  const [initialLocalPasskeyPrfEnabled] = useState(
+    () => hasRecoveryKey && !!loadLocalPasskeyUnlock(session.identity.id),
+  );
+  const [localPasskeyPrfEnabled, setLocalPasskeyPrfEnabled] = useState(
+    initialLocalPasskeyPrfEnabled,
+  );
   const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
+  const [activeSection, setActiveSection] =
+    useState<ProfileEditorSection>('profile');
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [identityNetworkIds, setIdentityNetworkIds] = useState(
     session.identity.networks,
@@ -106,26 +119,44 @@ export function ProfileEditor({
   const passwordChecks = passwordValidationChecks(newPassword);
   const passwordsMatch =
     newPassword.length > 0 && newPassword === newPasswordConfirmation;
+  const localPasskeyPrfChanged =
+    hasRecoveryKey && localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
+  const shouldRefreshLocalPasskeyPrf =
+    hasRecoveryKey && localPasskeyPrfEnabled && wantsPasswordChange;
+  const shouldConfigureLocalPasskeyPrf =
+    localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
+  const needsCurrentPasswordForPasskey =
+    localPasskeyPrfChanged && localPasskeyPrfEnabled && !wantsPasswordChange;
   const canChangePassword =
     !wantsPasswordChange ||
     (isValidPassword(newPassword) &&
       passwordsMatch &&
       (!hasRecoveryKey || RecoveryKey.isValid(passwordRecoveryKey)));
-  const hasChanges =
+  const canUpdateLocalPasskeyPrf =
+    !shouldConfigureLocalPasskeyPrf ||
+    !localPasskeyPrfEnabled ||
+    (passkeyPrfAvailable &&
+      (wantsPasswordChange || currentPasswordForPasskey.trim().length > 0));
+  const profileChanged =
     name.trim() !== session.identity.profile.name.trim() ||
     (normalizedHandle ?? '') !== (session.identity.profile.handle ?? '') ||
     (biography.trim() || undefined) !==
-      (session.identity.profile.biography?.trim() || undefined) ||
-    pictureFile !== null ||
-    bannerFile !== null ||
-    !sameStringArray(identityNetworkIds, session.identity.networks) ||
-    wantsPasswordChange;
+      (session.identity.profile.biography?.trim() || undefined);
+  const mediaChanged = pictureFile !== null || bannerFile !== null;
+  const networksChanged = !sameStringArray(
+    identityNetworkIds,
+    session.identity.networks,
+  );
+  const hasRemoteChanges =
+    profileChanged || mediaChanged || networksChanged || wantsPasswordChange;
+  const hasChanges = hasRemoteChanges || localPasskeyPrfChanged;
   const canSubmit =
     hasChanges &&
     name.trim().length > 0 &&
     identityNetworkIds.length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
     canChangePassword &&
+    canUpdateLocalPasskeyPrf &&
     state !== 'loading';
   const nodeNetworkOptions = useMemo(
     () =>
@@ -240,29 +271,44 @@ export function ProfileEditor({
     setState('loading');
     setError(null);
     try {
-      const pictureCid = pictureFile
-        ? (await applicationContainer.uploadPublicFile(session, pictureFile))
-            .cid
-        : session.identity.profile.picture?.trim() || undefined;
-      const bannerCid = bannerFile
-        ? (await applicationContainer.uploadPublicFile(session, bannerFile)).cid
-        : session.identity.profile.banner?.trim() || undefined;
-      const identity = await applicationContainer.updateIdentityProfile(
-        session,
-        {
-          banner: bannerCid,
-          biography: biography.trim() || undefined,
-          handle: normalizedHandle,
-          name: name.trim(),
-          networks: identityNetworkIds,
-          picture: pictureCid,
-        },
-        wantsPasswordChange ? newPassword : undefined,
-        {
-          passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable,
-          recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
-        },
-      );
+      let identity = session.identity;
+
+      if (hasRemoteChanges) {
+        const pictureCid = pictureFile
+          ? (await applicationContainer.uploadPublicFile(session, pictureFile))
+              .cid
+          : session.identity.profile.picture?.trim() || undefined;
+        const bannerCid = bannerFile
+          ? (await applicationContainer.uploadPublicFile(session, bannerFile))
+              .cid
+          : session.identity.profile.banner?.trim() || undefined;
+
+        identity = await applicationContainer.updateIdentityProfile(
+          session,
+          {
+            banner: bannerCid,
+            biography: biography.trim() || undefined,
+            handle: normalizedHandle,
+            name: name.trim(),
+            networks: identityNetworkIds,
+            picture: pictureCid,
+          },
+          wantsPasswordChange ? newPassword : undefined,
+          {
+            passkeyPrfEnabled:
+              !hasRecoveryKey && passkeyPrfEnabled && passkeyPrfAvailable,
+            recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
+          },
+        );
+      }
+
+      if (shouldConfigureLocalPasskeyPrf) {
+        await applicationContainer.configureLocalPasskeyUnlock(
+          { ...session, identity },
+          wantsPasswordChange ? newPassword : currentPasswordForPasskey,
+          localPasskeyPrfEnabled,
+        );
+      }
 
       onUpdated(
         { ...session, identity },
@@ -273,6 +319,12 @@ export function ProfileEditor({
     }
     setState('idle');
   };
+
+  const sections: ReadonlyArray<readonly [ProfileEditorSection, string]> = [
+    ['profile', copy.profile.profileTab],
+    ['networks', copy.profile.networksTab],
+    ['security', copy.profile.securityTab],
+  ];
 
   return createPortal(
     <div
@@ -287,7 +339,7 @@ export function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-[88vh] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
         data-state={transitionState}
       >
         <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
@@ -302,277 +354,331 @@ export function ProfileEditor({
           </button>
         </div>
 
-        <div className="profile-editor-scroll mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/10">
-            <button
-              type="button"
-              onClick={() => bannerInputRef.current?.click()}
-              className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
-              aria-label={copy.profile.changeBanner}
-              data-testid="profile-banner-button"
-            >
-              {bannerPreview && (
-                <img
-                  src={bannerPreview}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              )}
-              <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                ✎
-              </span>
-            </button>
-            <div className="relative px-5 pb-5">
-              <button
-                type="button"
-                onClick={() => pictureInputRef.current?.click()}
-                className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
-                aria-label={copy.profile.changePicture}
-              >
-                {picturePreview ? (
-                  <img
-                    src={picturePreview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  (name || session.identity.id).slice(0, 1).toUpperCase()
-                )}
-                <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                  ✎
-                </span>
-              </button>
-              <div className="mt-2 grid gap-3">
-                <ProfileEditorField label={copy.profile.name}>
-                  <input
-                    aria-label={copy.profile.name}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
-                    className={cx(
-                      profileEditorInputClass,
-                      'text-lg font-black',
-                    )}
-                  />
-                </ProfileEditorField>
-                <ProfileEditorField label={copy.profile.handle}>
-                  <input
-                    aria-label={copy.profile.handle}
-                    value={handle}
-                    onChange={(event) =>
-                      setHandle(normalizeHandle(event.target.value))
-                    }
-                    maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
-                    placeholder="@ada"
-                    className={cx(
-                      profileEditorInputClass,
-                      'text-sm font-bold text-white/70',
-                    )}
-                  />
-                </ProfileEditorField>
-                <ProfileEditorField label={copy.profile.biography}>
-                  <textarea
-                    aria-label={copy.profile.biography}
-                    value={biography}
-                    onChange={(event) => setBiography(event.target.value)}
-                    maxLength={IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH}
-                    className={cx(
-                      profileEditorInputClass,
-                      'min-h-[4.75rem] resize-y text-sm font-normal',
-                    )}
-                  />
-                </ProfileEditorField>
-              </div>
-            </div>
-            <input
-              ref={pictureInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePictureChange}
-              className="sr-only"
-            />
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleBannerChange}
-              className="sr-only"
-              data-testid="profile-banner-input"
-            />
-          </div>
-          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-            <section className="rounded-2xl border border-white/[0.06] bg-black/10 px-4 py-3">
-              <div className="text-sm font-black text-white/70">
-                {copy.profile.networks}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {identityNetworkIds.length > 0 ? (
-                  identityNetworkIds.map((networkId) => (
-                    <span
-                      key={networkId}
-                      title={networkId}
-                      className="min-w-0 max-w-full truncate rounded-full border border-white/[0.06] bg-white/10 px-2.5 py-1 text-xs font-black text-white/70"
-                    >
-                      {networkNamesById.get(networkId) ?? shortId(networkId)}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs font-bold text-white/40">
-                    {copy.profile.noNetworks}
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <GlassSelect
-                  ariaLabel={copy.profile.availableNetwork}
-                  className="min-w-0"
-                  disabled={nodeNetworkOptions.length === 0}
-                  onChange={setNetworkToAdd}
-                  options={
-                    nodeNetworkOptions.length > 0
-                      ? nodeNetworkOptions
-                      : [
-                          {
-                            disabled: true,
-                            label: copy.profile.noAvailableNetworks,
-                            value: '',
-                          },
-                        ]
-                  }
-                  value={networkToAdd}
-                />
-                <button
-                  type="button"
-                  onClick={addNetwork}
-                  disabled={!networkToAdd || nodeNetworkOptions.length === 0}
-                  className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
-                >
-                  {copy.profile.addNetwork}
-                </button>
-              </div>
-            </section>
-            <section className="rounded-2xl border border-white/[0.06] bg-black/10">
-              <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
-                {copy.profile.security}
-              </div>
-              <button
-                type="button"
-                onClick={() => setPasswordSectionOpen((isOpen) => !isOpen)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
-                aria-expanded={passwordSectionOpen}
-              >
-                <span>{copy.profile.changePassword}</span>
-                <span
-                  aria-hidden="true"
-                  className={cx(
-                    'text-white/45 transition-transform',
-                    passwordSectionOpen && 'rotate-180',
-                  )}
-                >
-                  ⌄
-                </span>
-              </button>
-              {passwordSectionOpen && (
-                <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
-                  <p className="text-xs font-bold text-white/45">
-                    {copy.profile.newPasswordHelp}
-                  </p>
-                  <div className="mt-4 grid gap-3">
-                    <ProfileInput
-                      label={copy.profile.newPassword}
-                      value={newPassword}
-                      onChange={setNewPassword}
-                      placeholder="••••••••••••"
-                      type="password"
-                    />
-                    <ProfileInput
-                      label={copy.profile.newPasswordConfirm}
-                      value={newPasswordConfirmation}
-                      onChange={setNewPasswordConfirmation}
-                      placeholder="••••••••••••"
-                      type="password"
-                    />
-                    {hasRecoveryKey && (
-                      <ProfileInput
-                        label={copy.profile.recoveryKey}
-                        value={passwordRecoveryKey}
-                        onChange={setPasswordRecoveryKey}
-                        placeholder="psrk1..."
-                        type="password"
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
+          <ProfileEditorNavigation
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            sections={sections}
+          />
+          <div className="profile-editor-scroll min-h-0 overflow-y-auto pr-1">
+            <div className="mx-auto w-full max-w-3xl">
+              {activeSection === 'profile' && (
+                <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/10">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="group relative block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                    aria-label={copy.profile.changeBanner}
+                    data-testid="profile-banner-button"
+                  >
+                    {bannerPreview && (
+                      <img
+                        src={bannerPreview}
+                        alt=""
+                        className="h-full w-full object-cover"
                       />
                     )}
-                  </div>
-                  <PasswordChecklist
-                    checks={{
-                      ...passwordChecks,
-                      match: passwordsMatch,
-                    }}
-                  />
-                  {wantsPasswordChange && !hasRecoveryKey && (
+                    <span className="absolute inset-0 grid place-items-center bg-black/0 text-3xl opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                      ✎
+                    </span>
+                  </button>
+                  <div className="relative px-5 pb-5">
                     <button
                       type="button"
-                      aria-pressed={passkeyPrfEnabled}
-                      disabled={hasPasskeyPrf || !passkeyPrfAvailable}
-                      onClick={() =>
-                        !hasPasskeyPrf &&
-                        passkeyPrfAvailable &&
-                        setPasskeyPrfEnabled((enabled) => !enabled)
-                      }
-                      className={cx(
-                        'mt-3 flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition',
-                        hasPasskeyPrf || passkeyPrfEnabled
-                          ? 'border-cyan-200/25 bg-cyan-300/10'
-                          : passkeyPrfAvailable
-                            ? 'border-white/10 bg-black/15 hover:bg-white/[0.05]'
-                            : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
-                      )}
+                      onClick={() => pictureInputRef.current?.click()}
+                      className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
+                      aria-label={copy.profile.changePicture}
                     >
+                      {picturePreview ? (
+                        <img
+                          src={picturePreview}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        (name || session.identity.id).slice(0, 1).toUpperCase()
+                      )}
+                      <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                        ✎
+                      </span>
+                    </button>
+                    <div className="mt-2 grid gap-3">
+                      <ProfileEditorField label={copy.profile.name}>
+                        <input
+                          aria-label={copy.profile.name}
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
+                          className={cx(
+                            profileEditorInputClass,
+                            'text-lg font-black',
+                          )}
+                        />
+                      </ProfileEditorField>
+                      <ProfileEditorField label={copy.profile.handle}>
+                        <input
+                          aria-label={copy.profile.handle}
+                          value={handle}
+                          onChange={(event) =>
+                            setHandle(normalizeHandle(event.target.value))
+                          }
+                          maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
+                          placeholder="@ada"
+                          className={cx(
+                            profileEditorInputClass,
+                            'text-sm font-bold text-white/70',
+                          )}
+                        />
+                      </ProfileEditorField>
+                      <ProfileEditorField label={copy.profile.biography}>
+                        <textarea
+                          aria-label={copy.profile.biography}
+                          value={biography}
+                          onChange={(event) => setBiography(event.target.value)}
+                          maxLength={IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH}
+                          className={cx(
+                            profileEditorInputClass,
+                            'min-h-[4.75rem] resize-y text-sm font-normal',
+                          )}
+                        />
+                      </ProfileEditorField>
+                    </div>
+                  </div>
+                  <input
+                    ref={pictureInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePictureChange}
+                    className="sr-only"
+                  />
+                  <input
+                    ref={bannerInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerChange}
+                    className="sr-only"
+                    data-testid="profile-banner-input"
+                  />
+                </div>
+              )}
+              <div className="grid min-w-0 gap-3">
+                {activeSection === 'networks' && (
+                  <section className="rounded-2xl border border-white/[0.06] bg-black/10 px-4 py-3">
+                    <div className="text-sm font-black text-white/70">
+                      {copy.profile.networks}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {identityNetworkIds.length > 0 ? (
+                        identityNetworkIds.map((networkId) => (
+                          <span
+                            key={networkId}
+                            title={networkId}
+                            className="min-w-0 max-w-full truncate rounded-full border border-white/[0.06] bg-white/10 px-2.5 py-1 text-xs font-black text-white/70"
+                          >
+                            {networkNamesById.get(networkId) ??
+                              shortId(networkId)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs font-bold text-white/40">
+                          {copy.profile.noNetworks}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <GlassSelect
+                        ariaLabel={copy.profile.availableNetwork}
+                        className="min-w-0"
+                        disabled={nodeNetworkOptions.length === 0}
+                        onChange={setNetworkToAdd}
+                        options={
+                          nodeNetworkOptions.length > 0
+                            ? nodeNetworkOptions
+                            : [
+                                {
+                                  disabled: true,
+                                  label: copy.profile.noAvailableNetworks,
+                                  value: '',
+                                },
+                              ]
+                        }
+                        value={networkToAdd}
+                      />
+                      <button
+                        type="button"
+                        onClick={addNetwork}
+                        disabled={
+                          !networkToAdd || nodeNetworkOptions.length === 0
+                        }
+                        className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
+                      >
+                        {copy.profile.addNetwork}
+                      </button>
+                    </div>
+                  </section>
+                )}
+                {activeSection === 'security' && (
+                  <section className="rounded-2xl border border-white/[0.06] bg-black/10">
+                    <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
+                      {copy.profile.security}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPasswordSectionOpen((isOpen) => !isOpen)
+                      }
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
+                      aria-expanded={passwordSectionOpen}
+                    >
+                      <span>{copy.profile.changePassword}</span>
                       <span
                         aria-hidden="true"
                         className={cx(
-                          'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-                          (hasPasskeyPrf || passkeyPrfEnabled) &&
-                            passkeyPrfAvailable
-                            ? 'bg-cyan-400/25'
-                            : 'bg-black/25',
+                          'text-white/45 transition-transform',
+                          passwordSectionOpen && 'rotate-180',
                         )}
                       >
-                        <span
-                          className={cx(
-                            'h-4 w-4 rounded-full bg-white transition-transform',
-                            (hasPasskeyPrf || passkeyPrfEnabled) &&
-                              passkeyPrfAvailable
-                              ? 'translate-x-6'
-                              : 'translate-x-1',
-                          )}
-                        />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs font-black text-white/75">
-                          {hasPasskeyPrf
-                            ? copy.profile.passkeyPrfActive
-                            : copy.profile.passkeyPrf}
-                        </span>
-                        <span className="mt-1 block text-xs leading-snug text-white/45">
-                          {hasPasskeyPrf
-                            ? copy.profile.passkeyPrfPreserved
-                            : passkeyPrfAvailable
-                              ? copy.profile.passkeyPrfHelp
-                              : copy.profile.passkeyPrfUnavailable}
-                        </span>
+                        ⌄
                       </span>
                     </button>
-                  )}
+                    {passwordSectionOpen && (
+                      <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
+                        <p className="text-xs font-bold text-white/45">
+                          {copy.profile.newPasswordHelp}
+                        </p>
+                        <div className="mt-4 grid gap-3">
+                          <ProfileInput
+                            label={copy.profile.newPassword}
+                            value={newPassword}
+                            onChange={setNewPassword}
+                            placeholder="••••••••••••"
+                            type="password"
+                          />
+                          <ProfileInput
+                            label={copy.profile.newPasswordConfirm}
+                            value={newPasswordConfirmation}
+                            onChange={setNewPasswordConfirmation}
+                            placeholder="••••••••••••"
+                            type="password"
+                          />
+                          {hasRecoveryKey && (
+                            <ProfileInput
+                              label={copy.profile.recoveryKey}
+                              value={passwordRecoveryKey}
+                              onChange={setPasswordRecoveryKey}
+                              placeholder="psrk1..."
+                              type="password"
+                            />
+                          )}
+                        </div>
+                        <PasswordChecklist
+                          checks={{
+                            ...passwordChecks,
+                            match: passwordsMatch,
+                          }}
+                        />
+                        {wantsPasswordChange && !hasRecoveryKey && (
+                          <button
+                            type="button"
+                            aria-pressed={passkeyPrfEnabled}
+                            disabled={hasPasskeyPrf || !passkeyPrfAvailable}
+                            onClick={() =>
+                              !hasPasskeyPrf &&
+                              passkeyPrfAvailable &&
+                              setPasskeyPrfEnabled((enabled) => !enabled)
+                            }
+                            className={cx(
+                              'mt-3 flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition',
+                              hasPasskeyPrf || passkeyPrfEnabled
+                                ? 'border-cyan-200/25 bg-cyan-300/10'
+                                : passkeyPrfAvailable
+                                  ? 'border-white/10 bg-black/15 hover:bg-white/[0.05]'
+                                  : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cx(
+                                'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+                                (hasPasskeyPrf || passkeyPrfEnabled) &&
+                                  passkeyPrfAvailable
+                                  ? 'bg-cyan-400/25'
+                                  : 'bg-black/25',
+                              )}
+                            >
+                              <span
+                                className={cx(
+                                  'h-4 w-4 rounded-full bg-white transition-transform',
+                                  (hasPasskeyPrf || passkeyPrfEnabled) &&
+                                    passkeyPrfAvailable
+                                    ? 'translate-x-6'
+                                    : 'translate-x-1',
+                                )}
+                              />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-xs font-black text-white/75">
+                                {hasPasskeyPrf
+                                  ? copy.profile.passkeyPrfActive
+                                  : copy.profile.passkeyPrf}
+                              </span>
+                              <span className="mt-1 block text-xs leading-snug text-white/45">
+                                {hasPasskeyPrf
+                                  ? copy.profile.passkeyPrfPreserved
+                                  : passkeyPrfAvailable
+                                    ? copy.profile.passkeyPrfHelp
+                                    : copy.profile.passkeyPrfUnavailable}
+                              </span>
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {hasRecoveryKey && (
+                      <div className="border-t border-white/[0.06] px-4 py-4">
+                        <ProfileSwitchButton
+                          checked={localPasskeyPrfEnabled}
+                          disabled={
+                            !passkeyPrfAvailable && !localPasskeyPrfEnabled
+                          }
+                          help={
+                            passkeyPrfAvailable
+                              ? copy.profile.localDeviceUnlockHelp
+                              : copy.profile.localDeviceUnlockUnavailable
+                          }
+                          label={copy.profile.localDeviceUnlock}
+                          onClick={() =>
+                            (passkeyPrfAvailable || localPasskeyPrfEnabled) &&
+                            setLocalPasskeyPrfEnabled((enabled) => !enabled)
+                          }
+                        />
+                        {needsCurrentPasswordForPasskey && (
+                          <div className="mt-4">
+                            <ProfileInput
+                              label={copy.profile.currentPassword}
+                              value={currentPasswordForPasskey}
+                              onChange={setCurrentPasswordForPasskey}
+                              placeholder="••••••••••••"
+                              type="password"
+                            />
+                            <p className="mt-2 text-xs leading-relaxed text-white/45">
+                              {copy.profile.currentPasswordForPasskeyHelp}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                  {error}
                 </div>
               )}
-            </section>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-              {error}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="mt-5 flex shrink-0 justify-end border-t border-white/[0.06] pt-4">
@@ -638,6 +744,88 @@ function ProfileInput({
         className={cx(profileEditorInputClass, 'text-sm font-normal')}
       />
     </label>
+  );
+}
+
+function ProfileEditorNavigation({
+  activeSection,
+  onSectionChange,
+  sections,
+}: {
+  activeSection: ProfileEditorSection;
+  onSectionChange: (section: ProfileEditorSection) => void;
+  sections: ReadonlyArray<readonly [ProfileEditorSection, string]>;
+}) {
+  return (
+    <nav className="mb-4 flex w-full max-w-full flex-wrap gap-2 overflow-visible rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1">
+      {sections.map(([section, label]) => (
+        <button
+          key={section}
+          type="button"
+          onClick={() => onSectionChange(section)}
+          className={cx(
+            'shrink-0 whitespace-nowrap rounded-xl border px-3 py-2 text-left text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 sm:block sm:w-full',
+            activeSection === section
+              ? 'border-white/10 bg-white/[0.09] text-white'
+              : 'border-transparent text-white/55 hover:bg-white/8',
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function ProfileSwitchButton({
+  checked,
+  disabled,
+  help,
+  label,
+  onClick,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  help: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      disabled={disabled}
+      onClick={onClick}
+      className={cx(
+        'flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition',
+        disabled
+          ? 'cursor-not-allowed opacity-55'
+          : checked
+            ? 'text-white'
+            : 'text-white/75 hover:bg-white/[0.04]',
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cx(
+          'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
+          checked && !disabled ? 'bg-cyan-400/25' : 'bg-black/25',
+        )}
+      >
+        <span
+          className={cx(
+            'h-4 w-4 rounded-full bg-white transition-transform',
+            checked && !disabled ? 'translate-x-6' : 'translate-x-1',
+          )}
+        />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-black text-white/80">{label}</span>
+        <span className="mt-1 block text-xs leading-snug text-white/45">
+          {help}
+        </span>
+      </span>
+    </button>
   );
 }
 

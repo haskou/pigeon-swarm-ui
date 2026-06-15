@@ -666,8 +666,7 @@ export const es = {
     viewRaw: 'Ver datos del mensaje',
   },
   network: {
-    body:
-      'Antes de crear identidades, este nodo necesita conectarse a una red.',
+    body: 'Antes de crear identidades, este nodo necesita conectarse a una red.',
     create: 'Crear red privada',
     createBody:
       'Crea una red privada nueva para este nodo y los dispositivos que invites.',
@@ -920,6 +919,9 @@ export const es = {
     communityRoles: 'Roles de comunidad',
     copied: 'Copiado',
     copy: 'Copiar',
+    currentPassword: 'Contraseña actual',
+    currentPasswordForPasskeyHelp:
+      'Se usa una vez para crear el desbloqueo local de este dispositivo. No se guarda.',
     edit: 'Editar perfil',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
@@ -961,9 +963,17 @@ export const es = {
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
     picture: 'Imagen de perfil',
+    localDeviceUnlock: 'Proteger con desbloqueo del dispositivo',
+    localDeviceUnlockHelp:
+      'Permite abrir esta identidad en este navegador usando contraseña y passkey local.',
+    localDeviceUnlockUnavailable:
+      'Este navegador o autenticador no permite crear desbloqueo local con WebAuthn PRF.',
+    profileTab: 'Perfil',
     recoveryKey: 'Clave de recuperación',
+    networksTab: 'Redes',
     save: 'Guardar cambios',
     security: 'Seguridad',
+    securityTab: 'Seguridad',
     saving: 'Guardando...',
     updateError: 'No se pudo actualizar el perfil.',
     versions: 'Versiones',

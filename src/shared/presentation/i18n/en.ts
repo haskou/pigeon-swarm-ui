@@ -1025,6 +1025,9 @@ export const en = {
     communityRoles: 'Community roles',
     copied: 'Copied',
     copy: 'Copy',
+    currentPassword: 'Current password',
+    currentPasswordForPasskeyHelp:
+      'Used once to create this device unlock. It is not saved.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',
@@ -1069,9 +1072,17 @@ export const en = {
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential.',
     picture: 'Profile picture',
+    localDeviceUnlock: 'Protect with device unlock',
+    localDeviceUnlockHelp:
+      'Open this identity in this browser using your password and local passkey.',
+    localDeviceUnlockUnavailable:
+      'This browser or authenticator cannot create a local WebAuthn PRF unlock.',
+    profileTab: 'Profile',
     recoveryKey: 'Recovery key',
+    networksTab: 'Networks',
     save: 'Save changes',
     security: 'Security',
+    securityTab: 'Security',
     saving: 'Saving...',
     updateError: 'The profile could not be updated.',
     versions: 'Versions',
