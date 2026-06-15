@@ -13,18 +13,14 @@ describe('i18n language selection', () => {
   });
 
   it('defaults to Spanish with only a legacy saved preference', () => {
-    const storage = fakeStorage([
-      ['pigeon-swarm-language', 'en'],
-    ]);
+    const storage = fakeStorage([['pigeon-swarm-language', 'en']]);
     defineWindow(storage);
 
     expect(getInitialLanguage()).toBe('es');
   });
 
   it('defaults to Spanish with an unconfirmed current saved preference', () => {
-    const storage = fakeStorage([
-      ['pigeon-swarm-language-v2', 'en'],
-    ]);
+    const storage = fakeStorage([['pigeon-swarm-language-v2', 'en']]);
     defineWindow(storage);
 
     expect(getInitialLanguage()).toBe('es');
@@ -85,7 +81,7 @@ describe('i18n language selection', () => {
     const { copy } = await import('./copy');
 
     expect(copy.profile.newPasswordHelp).toBe(
-      'Deja ambos campos vacíos para mantener tu contraseña actual.',
+      'La nueva contraseña reenvolverá tu clave raíz. No cambia tus claves de chats ni comunidades.',
     );
   });
 
