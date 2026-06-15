@@ -1046,7 +1046,8 @@ export const en = {
     networks: 'Networks',
     newPassword: 'New password',
     newPasswordConfirm: 'Repeat new password',
-    newPasswordHelp: 'Leave both fields empty to keep your current password.',
+    newPasswordHelp:
+      'The new password will rewrap your root key. It does not change chat or community keys.',
     noAvailableNetworks: 'No more networks available',
     noBiography: 'No bio',
     noCommunityRoles: 'No community roles',
@@ -1071,14 +1072,24 @@ export const en = {
       'This identity already uses passkey PRF and it will be preserved.',
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential.',
+    passwordChangePreservesPasskey:
+      'Keeps the current identity protection method.',
+    passwordChangeRequiresRecoveryKey: 'Requires your current recovery key.',
     picture: 'Profile picture',
-    localDeviceUnlock: 'Protect with device unlock',
+    localDeviceUnlock: 'Use device unlock',
     localDeviceUnlockHelp:
-      'Open this identity in this browser using your password and local passkey.',
+      'Optional. Creates a local unlock for this browser using your password and passkey. It does not change your password or recovery key.',
+    localDeviceUnlockSection: 'Local unlock',
+    localDeviceUnlockSectionHelp:
+      'This only affects this browser or device. Portable access still uses password and recovery key.',
     localDeviceUnlockUnavailable:
       'This browser or authenticator cannot create a local WebAuthn PRF unlock.',
     profileTab: 'Profile',
     recoveryKey: 'Recovery key',
+    recoveryKeyForPassword: 'Current recovery key',
+    recoveryKeyRequiredHelp:
+      'The app does not store this key. It is required to rewrap your root key with the new password.',
+    recoveryKeyRequiredTitle: 'Recovery key required',
     networksTab: 'Networks',
     save: 'Save changes',
     security: 'Security',

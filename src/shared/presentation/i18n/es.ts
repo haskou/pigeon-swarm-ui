@@ -938,7 +938,7 @@ export const es = {
     newPassword: 'Nueva contraseña',
     newPasswordConfirm: 'Repite la nueva contraseña',
     newPasswordHelp:
-      'Deja ambos campos vacíos para mantener tu contraseña actual.',
+      'La nueva contraseña reenvolverá tu clave raíz. No cambia tus claves de chats ni comunidades.',
     noAvailableNetworks: 'No hay más redes disponibles',
     noBiography: 'Sin bio',
     noCommunityRoles: 'Sin roles de comunidad',
@@ -962,14 +962,25 @@ export const es = {
     passkeyPrfPreserved: 'Esta identidad ya usa passkey PRF y se conservará.',
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
+    passwordChangePreservesPasskey:
+      'Mantiene la protección actual de la identidad.',
+    passwordChangeRequiresRecoveryKey:
+      'Requiere tu clave de recuperación actual.',
     picture: 'Imagen de perfil',
-    localDeviceUnlock: 'Proteger con desbloqueo del dispositivo',
+    localDeviceUnlock: 'Usar desbloqueo del dispositivo',
     localDeviceUnlockHelp:
-      'Permite abrir esta identidad en este navegador usando contraseña y passkey local.',
+      'Opcional. Crea un desbloqueo local para este navegador usando contraseña y passkey. No cambia tu contraseña ni tu clave de recuperación.',
+    localDeviceUnlockSection: 'Desbloqueo local',
+    localDeviceUnlockSectionHelp:
+      'Esto solo afecta a este navegador o dispositivo. El acceso portable seguirá usando contraseña y clave de recuperación.',
     localDeviceUnlockUnavailable:
       'Este navegador o autenticador no permite crear desbloqueo local con WebAuthn PRF.',
     profileTab: 'Perfil',
     recoveryKey: 'Clave de recuperación',
+    recoveryKeyForPassword: 'Clave de recuperación actual',
+    recoveryKeyRequiredHelp:
+      'La app no guarda esta clave. Es necesaria para reenvolver tu clave raíz con la nueva contraseña.',
+    recoveryKeyRequiredTitle: 'Clave de recuperación requerida',
     networksTab: 'Redes',
     save: 'Guardar cambios',
     security: 'Seguridad',

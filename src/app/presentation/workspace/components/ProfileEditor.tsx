@@ -530,7 +530,16 @@ export function ProfileEditor({
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
                       aria-expanded={passwordSectionOpen}
                     >
-                      <span>{copy.profile.changePassword}</span>
+                      <span className="min-w-0">
+                        <span className="block">
+                          {copy.profile.changePassword}
+                        </span>
+                        <span className="mt-1 block text-xs font-bold text-white/40">
+                          {hasRecoveryKey
+                            ? copy.profile.passwordChangeRequiresRecoveryKey
+                            : copy.profile.passwordChangePreservesPasskey}
+                        </span>
+                      </span>
                       <span
                         aria-hidden="true"
                         className={cx(
@@ -562,13 +571,23 @@ export function ProfileEditor({
                             type="password"
                           />
                           {hasRecoveryKey && (
-                            <ProfileInput
-                              label={copy.profile.recoveryKey}
-                              value={passwordRecoveryKey}
-                              onChange={setPasswordRecoveryKey}
-                              placeholder="psrk1..."
-                              type="password"
-                            />
+                            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
+                              <div className="text-xs font-black text-amber-50">
+                                {copy.profile.recoveryKeyRequiredTitle}
+                              </div>
+                              <p className="mt-1 text-xs leading-relaxed text-amber-50/70">
+                                {copy.profile.recoveryKeyRequiredHelp}
+                              </p>
+                              <div className="mt-3">
+                                <ProfileInput
+                                  label={copy.profile.recoveryKeyForPassword}
+                                  value={passwordRecoveryKey}
+                                  onChange={setPasswordRecoveryKey}
+                                  placeholder="psrk1..."
+                                  type="password"
+                                />
+                              </div>
+                            </div>
                           )}
                         </div>
                         <PasswordChecklist
@@ -636,6 +655,14 @@ export function ProfileEditor({
                     )}
                     {hasRecoveryKey && (
                       <div className="border-t border-white/[0.06] px-4 py-4">
+                        <div className="mb-3">
+                          <div className="text-sm font-black text-white/75">
+                            {copy.profile.localDeviceUnlockSection}
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-white/45">
+                            {copy.profile.localDeviceUnlockSectionHelp}
+                          </p>
+                        </div>
                         <ProfileSwitchButton
                           checked={localPasskeyPrfEnabled}
                           disabled={
