@@ -921,7 +921,7 @@ export const es = {
     copy: 'Copiar',
     currentPassword: 'Contraseña actual',
     currentPasswordForPasskeyHelp:
-      'Se usa una vez para crear el desbloqueo local de este dispositivo. No se guarda.',
+      'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
     edit: 'Editar perfil',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',

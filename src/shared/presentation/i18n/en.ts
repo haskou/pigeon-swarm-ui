@@ -1027,7 +1027,7 @@ export const en = {
     copy: 'Copy',
     currentPassword: 'Current password',
     currentPasswordForPasskeyHelp:
-      'Used once to create this device unlock. It is not saved.',
+      'The current password and recovery key are verified before creating local unlock. They are not saved.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',

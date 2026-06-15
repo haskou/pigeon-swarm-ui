@@ -866,6 +866,22 @@ export class PigeonApiGateway {
       });
   }
 
+  private async verifyRemoteMasterKeyFactors({
+    identity,
+    password,
+    recoveryKey,
+  }: {
+    identity: IdentityResource;
+    password: string;
+    recoveryKey?: string;
+  }): Promise<void> {
+    await this.unlockRemoteMasterKey({
+      identity,
+      password,
+      recoveryKey,
+    });
+  }
+
   private messagesPath(
     conversationId: string,
     before?: null | string,
@@ -2316,12 +2332,19 @@ export class PigeonApiGateway {
     session: Session,
     password: string,
     enabled: boolean,
+    recoveryKey?: string,
   ): Promise<void> {
     if (!enabled) {
       clearLocalPasskeyUnlock(session.identity.id);
 
       return;
     }
+
+    await this.verifyRemoteMasterKeyFactors({
+      identity: session.identity,
+      password,
+      recoveryKey,
+    });
 
     await this.saveLocalPasskeyMasterKeyUnlock({
       displayName: session.identity.profile.name,
@@ -2971,7 +2994,7 @@ export class PigeonApiGateway {
         identityId: result.session.identity.id,
         masterKey: result.session.masterKey,
         password,
-      });
+      }).catch(() => undefined);
     }
 
     return result;

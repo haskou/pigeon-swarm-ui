@@ -127,6 +127,8 @@ export function ProfileEditor({
     localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
   const needsCurrentPasswordForPasskey =
     localPasskeyPrfChanged && localPasskeyPrfEnabled && !wantsPasswordChange;
+  const needsRecoveryKeyForPasskey =
+    needsCurrentPasswordForPasskey && hasRecoveryKey;
   const canChangePassword =
     !wantsPasswordChange ||
     (isValidPassword(newPassword) &&
@@ -136,7 +138,10 @@ export function ProfileEditor({
     !shouldConfigureLocalPasskeyPrf ||
     !localPasskeyPrfEnabled ||
     (passkeyPrfAvailable &&
-      (wantsPasswordChange || currentPasswordForPasskey.trim().length > 0));
+      (wantsPasswordChange ||
+        (currentPasswordForPasskey.trim().length > 0 &&
+          (!needsRecoveryKeyForPasskey ||
+            RecoveryKey.isValid(passwordRecoveryKey)))));
   const profileChanged =
     name.trim() !== session.identity.profile.name.trim() ||
     (normalizedHandle ?? '') !== (session.identity.profile.handle ?? '') ||
@@ -307,6 +312,9 @@ export function ProfileEditor({
           { ...session, identity },
           wantsPasswordChange ? newPassword : currentPasswordForPasskey,
           localPasskeyPrfEnabled,
+          localPasskeyPrfEnabled && hasRecoveryKey
+            ? passwordRecoveryKey
+            : undefined,
         );
       }
 
@@ -680,7 +688,7 @@ export function ProfileEditor({
                           }
                         />
                         {needsCurrentPasswordForPasskey && (
-                          <div className="mt-4">
+                          <div className="mt-4 grid gap-3">
                             <ProfileInput
                               label={copy.profile.currentPassword}
                               value={currentPasswordForPasskey}
@@ -688,6 +696,15 @@ export function ProfileEditor({
                               placeholder="••••••••••••"
                               type="password"
                             />
+                            {needsRecoveryKeyForPasskey && (
+                              <ProfileInput
+                                label={copy.profile.recoveryKeyForPassword}
+                                value={passwordRecoveryKey}
+                                onChange={setPasswordRecoveryKey}
+                                placeholder="psrk1..."
+                                type="password"
+                              />
+                            )}
                             <p className="mt-2 text-xs leading-relaxed text-white/45">
                               {copy.profile.currentPasswordForPasskeyHelp}
                             </p>

@@ -1247,8 +1247,14 @@ export class PigeonApplication {
     session: Session,
     password: string,
     enabled: boolean,
+    recoveryKey?: string,
   ): Promise<void> {
-    await this.gateway.configureLocalPasskeyUnlock(session, password, enabled);
+    await this.gateway.configureLocalPasskeyUnlock(
+      session,
+      password,
+      enabled,
+      recoveryKey,
+    );
   }
 
   public async uploadPublicFile(
