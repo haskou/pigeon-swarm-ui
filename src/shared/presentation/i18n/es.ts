@@ -92,7 +92,7 @@ export const es = {
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passkeyPrfUnavailableCreate:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad, pero quedará protegida solo con contraseña.',
+      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad con contraseña y clave de recuperación.',
     passkeyPrfUnavailableLogin:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Si tu identidad usa PRF, necesitas el navegador, dominio y autenticador donde se creó.',
     passkeyPrfNotPersisted:
@@ -104,6 +104,17 @@ export const es = {
     rememberMe: 'Mantener sesion iniciada',
     rememberMeHelp:
       'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
+    recoveryKeyCreateHelp:
+      'Guarda esta clave. La necesitarás para abrir tu identidad desde otro nodo o navegador.',
+    recoveryKeyLabel: 'Clave de recuperación',
+    recoveryKeyLoginHelp:
+      'Necesaria para identidades protegidas con clave de recuperación. No se guarda en este nodo.',
+    recoveryKeyRegenerate: 'Regenerar',
+    recoveryKeySaved: 'He guardado mi clave de recuperación',
+    recoveryKeyTitle: 'Clave de recuperación',
+    recoveryKeyUnlockFailed:
+      'La contraseña o la clave de recuperación no son correctas.',
+    useRecoveryKey: 'Usar clave de recuperación',
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   calls: {
@@ -655,8 +666,7 @@ export const es = {
     viewRaw: 'Ver datos del mensaje',
   },
   network: {
-    body:
-      'Antes de crear identidades, este nodo necesita conectarse a una red.',
+    body: 'Antes de crear identidades, este nodo necesita conectarse a una red.',
     create: 'Crear red privada',
     createBody:
       'Crea una red privada nueva para este nodo y los dispositivos que invites.',
@@ -909,6 +919,9 @@ export const es = {
     communityRoles: 'Roles de comunidad',
     copied: 'Copiado',
     copy: 'Copiar',
+    currentPassword: 'Contraseña actual',
+    currentPasswordForPasskeyHelp:
+      'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
     edit: 'Editar perfil',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
@@ -925,7 +938,7 @@ export const es = {
     newPassword: 'Nueva contraseña',
     newPasswordConfirm: 'Repite la nueva contraseña',
     newPasswordHelp:
-      'Deja ambos campos vacíos para mantener tu contraseña actual.',
+      'La nueva contraseña reenvolverá tu clave raíz. No cambia tus claves de chats ni comunidades.',
     noAvailableNetworks: 'No hay más redes disponibles',
     noBiography: 'Sin bio',
     noCommunityRoles: 'Sin roles de comunidad',
@@ -949,9 +962,29 @@ export const es = {
     passkeyPrfPreserved: 'Esta identidad ya usa passkey PRF y se conservará.',
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
+    passwordChangePreservesPasskey:
+      'Mantiene la protección actual de la identidad.',
+    passwordChangeRequiresRecoveryKey:
+      'Requiere tu clave de recuperación actual.',
     picture: 'Imagen de perfil',
+    localDeviceUnlock: 'Usar desbloqueo del dispositivo',
+    localDeviceUnlockHelp:
+      'Opcional. Crea un desbloqueo local para este navegador usando contraseña y passkey. No cambia tu contraseña ni tu clave de recuperación.',
+    localDeviceUnlockSection: 'Desbloqueo local',
+    localDeviceUnlockSectionHelp:
+      'Esto solo afecta a este navegador o dispositivo. El acceso portable seguirá usando contraseña y clave de recuperación.',
+    localDeviceUnlockUnavailable:
+      'Este navegador o autenticador no permite crear desbloqueo local con WebAuthn PRF.',
+    profileTab: 'Perfil',
+    recoveryKey: 'Clave de recuperación',
+    recoveryKeyForPassword: 'Clave de recuperación actual',
+    recoveryKeyRequiredHelp:
+      'La app no guarda esta clave. Es necesaria para reenvolver tu clave raíz con la nueva contraseña.',
+    recoveryKeyRequiredTitle: 'Clave de recuperación requerida',
+    networksTab: 'Redes',
     save: 'Guardar cambios',
     security: 'Seguridad',
+    securityTab: 'Seguridad',
     saving: 'Guardando...',
     updateError: 'No se pudo actualizar el perfil.',
     versions: 'Versiones',

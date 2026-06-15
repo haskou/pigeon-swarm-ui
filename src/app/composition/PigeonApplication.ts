@@ -1233,13 +1233,27 @@ export class PigeonApplication {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
-    options: { passkeyPrfEnabled?: boolean } = {},
+    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(
       session,
       profile,
       newPassword,
       options,
+    );
+  }
+
+  public async configureLocalPasskeyUnlock(
+    session: Session,
+    password: string,
+    enabled: boolean,
+    recoveryKey?: string,
+  ): Promise<void> {
+    await this.gateway.configureLocalPasskeyUnlock(
+      session,
+      password,
+      enabled,
+      recoveryKey,
     );
   }
 
@@ -1529,9 +1543,15 @@ export class PigeonApplication {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
+    recoveryKey?: string,
   ): Promise<LoginResult> {
     return await this.loginIdentityUseCase.login(
-      new LoginIdentityMessage({ identityId, onProgress, password }),
+      new LoginIdentityMessage({
+        identityId,
+        onProgress,
+        password,
+        recoveryKey,
+      }),
     );
   }
 
@@ -1568,7 +1588,7 @@ export class PigeonApplication {
     password: string,
     networks: string[],
     handle?: string,
-    options: { passkeyPrfEnabled?: boolean } = {},
+    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
     return await this.registerIdentityUseCase.register(
       new RegisterIdentityMessage({
@@ -1577,6 +1597,7 @@ export class PigeonApplication {
         networks,
         passkeyPrfEnabled: options.passkeyPrfEnabled,
         password,
+        recoveryKey: options.recoveryKey,
       }),
     );
   }

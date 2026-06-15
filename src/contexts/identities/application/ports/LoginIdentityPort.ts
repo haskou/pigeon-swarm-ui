@@ -6,5 +6,6 @@ export interface LoginIdentityPort {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
+    recoveryKey?: string,
   ): Promise<LoginResult>;
 }

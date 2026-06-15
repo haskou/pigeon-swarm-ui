@@ -12,10 +12,13 @@ import type { IdentityResource } from '../../domain/IdentityResource';
 import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
 import type { UserRootKeyPasskeyPrfInput } from './UserRootKeyPasskeyPrfInput';
 
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { WebAuthnPrfKeyProtector } from './WebAuthnPrfKeyProtector';
 
 const passwordPasskeyInfo = '@pigeon/user-root-key/password+passkey-prf/v1';
+const passwordRecoveryInfo = '@pigeon/user-root-key/password+recovery/v1';
 const passkeyPrfInfo = '@pigeon/passkey-prf/v1';
+const recoveryKeyInfo = '@pigeon/recovery-key/v1';
 const hkdfSaltBytes = 32;
 
 export const userRootKeyDerivationDefaults = {
@@ -26,7 +29,7 @@ export const userRootKeyDerivationDefaults = {
   version: 1,
 } as const satisfies Omit<
   IdentityResource['masterKeyDerivation'],
-  'passkeyPrf' | 'salt'
+  'passkeyPrf' | 'recoveryKey' | 'salt'
 >;
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -75,7 +78,7 @@ export class UserRootKeyProtector {
     passkeys?: WebAuthnPrfKeyProtector,
     private readonly derivationDefaults: Omit<
       IdentityResource['masterKeyDerivation'],
-      'passkeyPrf' | 'salt'
+      'passkeyPrf' | 'recoveryKey' | 'salt'
     > = userRootKeyDerivationDefaults,
   ) {
     this.passkeys = passkeys ?? new WebAuthnPrfKeyProtector();
@@ -121,16 +124,34 @@ export class UserRootKeyProtector {
     return await hkdfKey(prfKey.getBuffer(), passkeyPrfInfo);
   }
 
+  private async recoveryKek(recoveryKey: RecoveryKey): Promise<SymmetricKey> {
+    return await hkdfKey(recoveryKey.getBytes(), recoveryKeyInfo);
+  }
+
   private async finalKek({
     passkeyPrf,
     passwordKek,
+    recoveryKey,
   }: {
     passkeyPrf?: UserRootKeyPasskeyPrfInput;
     passwordKek: SymmetricKey;
+    recoveryKey?: RecoveryKey;
   }): Promise<{
     kek: SymmetricKey;
     passkeyPrf?: PasskeyPrfMasterKeyProtection;
   }> {
+    if (recoveryKey) {
+      const recoveryKek = await this.recoveryKek(recoveryKey);
+      const combined = concatBytes(
+        passwordKek.getBuffer(),
+        recoveryKek.getBuffer(),
+      );
+
+      return {
+        kek: await hkdfKey(combined, passwordRecoveryInfo),
+      };
+    }
+
     if (!passkeyPrf) return { kek: passwordKek };
 
     const material = await this.passkeyMaterial(passkeyPrf);
@@ -150,10 +171,12 @@ export class UserRootKeyProtector {
     masterKey,
     passkeyPrf,
     password,
+    recoveryKey,
   }: {
     masterKey: SymmetricKey;
     passkeyPrf?: UserRootKeyPasskeyPrfInput;
     password: string;
+    recoveryKey?: RecoveryKey;
   }): Promise<{
     encryptedMasterKey: string;
     masterKeyDerivation: IdentityResource['masterKeyDerivation'];
@@ -169,6 +192,7 @@ export class UserRootKeyProtector {
     const { kek, passkeyPrf: protection } = await this.finalKek({
       passkeyPrf,
       passwordKek,
+      recoveryKey,
     });
 
     return {
@@ -176,6 +200,14 @@ export class UserRootKeyProtector {
       masterKeyDerivation: {
         ...masterKeyDerivation,
         ...(protection ? { passkeyPrf: protection } : {}),
+        ...(recoveryKey
+          ? {
+              recoveryKey: {
+                algorithm: 'pigeon-recovery-key',
+                version: 1,
+              } as const,
+            }
+          : {}),
       },
     };
   }
@@ -183,7 +215,12 @@ export class UserRootKeyProtector {
   public async unlockMasterKey(
     identity: IdentityResource,
     password: string,
+    recoveryKey?: RecoveryKey,
   ): Promise<SymmetricKey> {
+    if (identity.masterKeyDerivation.recoveryKey && !recoveryKey) {
+      throw new Error('Recovery key is required to unlock this identity.');
+    }
+
     const passwordKek = await this.derivePasswordKek(
       password,
       identity.masterKeyDerivation,
@@ -196,6 +233,7 @@ export class UserRootKeyProtector {
           }
         : undefined,
       passwordKek,
+      recoveryKey,
     });
     const decrypted = kek.decrypt(
       new EncryptedPayload(identity.encryptedMasterKey),

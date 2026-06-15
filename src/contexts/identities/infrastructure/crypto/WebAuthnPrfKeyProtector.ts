@@ -1,6 +1,8 @@
 import { SymmetricKey } from '@haskou/value-objects';
 
 import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
+import type { PrfExtensionResults } from './PrfExtensionResults';
+import type { PublicKeyCredentialWithExtensionResults } from './PublicKeyCredentialWithExtensionResults';
 
 const passkeyPrfAlgorithm = 'webauthn-prf';
 const passkeyPrfVersion = 1;
@@ -9,20 +11,6 @@ const saltBytes = 32;
 const relyingPartyName = 'Pigeon Swarm';
 const timeoutMs = 60_000;
 const debugPrefix = '[WebAuthn PRF]';
-
-type PrfExtensionResults = {
-  enabled?: boolean;
-  results?: {
-    first?: BufferSource;
-    second?: BufferSource;
-  };
-};
-
-type PublicKeyCredentialWithExtensionResults = PublicKeyCredential & {
-  getClientExtensionResults(): {
-    prf?: PrfExtensionResults;
-  };
-};
 
 async function userHandle(identityId: string): Promise<ArrayBuffer> {
   return await crypto.subtle.digest(

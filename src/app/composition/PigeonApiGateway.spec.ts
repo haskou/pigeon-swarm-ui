@@ -13,6 +13,10 @@ import type { RequestSigner } from '../../shared/infrastructure/http/RequestSign
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import {
+  loadLocalPasskeyUnlock,
+  saveLocalPasskeyUnlock,
+} from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 describe(PigeonApiGateway.name, () => {
@@ -1938,6 +1942,68 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('does not fail registration when optional local passkey unlock setup is cancelled', async () => {
+    const identity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      encryptedMasterKey: 'encrypted-master-key',
+      id: 'public-key',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 2 ** 18,
+        p: 1,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'keypair-signature',
+      timestamp: 1234,
+      version: 1,
+    } satisfies IdentityResource;
+    const masterKey = SymmetricKey.generate();
+    const keyPair = unlockedKeyPair('signature') as unknown as KeyPair;
+    const session = {
+      identity,
+      keychain: { conversations: {}, version: 0 },
+      keyPair,
+      masterKey,
+    } as unknown as Session;
+    const loginResult = { conversations: [], session };
+    const gateway = new PigeonApiGateway();
+    const internals = gateway as unknown as {
+      createIdentityMaterial: jest.Mock;
+      hydrateLoginSession: jest.Mock;
+      saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+    };
+
+    internals.createIdentityMaterial = jest.fn().mockResolvedValue({
+      identity,
+      keyPair,
+      masterKey,
+    });
+    internals.hydrateLoginSession = jest.fn().mockResolvedValue(loginResult);
+    internals.saveLocalPasskeyMasterKeyUnlock = jest
+      .fn()
+      .mockRejectedValue(new Error('cancelled'));
+
+    await expect(
+      gateway.register('Ada', 'secret', ['network-1'], 'ada', {
+        passkeyPrfEnabled: true,
+      }),
+    ).resolves.toBe(loginResult);
+
+    expect(internals.saveLocalPasskeyMasterKeyUnlock).toHaveBeenCalledWith({
+      displayName: 'Ada',
+      identityId: identity.id,
+      masterKey,
+      password: 'secret',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -2175,6 +2241,106 @@ describe(PigeonApiGateway.name, () => {
     );
 
     expect(http.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears local passkey unlock from the profile security flow', async () => {
+    const storage = new Map<string, string>();
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: jest.fn((key: string) => storage.get(key) ?? null),
+        removeItem: jest.fn((key: string) => storage.delete(key)),
+        setItem: jest.fn((key: string, value: string) => {
+          storage.set(key, value);
+        }),
+      },
+    });
+
+    saveLocalPasskeyUnlock({
+      encryptedMasterKey: 'encrypted-master-key',
+      identityId: 'identity-1',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 16,
+        p: 1,
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'credential-id',
+          salt: 'salt',
+          version: 1,
+        },
+        r: 1,
+        salt: 'password-salt',
+        version: 1,
+      },
+    });
+    const gateway = new PigeonApiGateway();
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+
+    await expect(
+      gateway.configureLocalPasskeyUnlock(session, '', false),
+    ).resolves.toBeUndefined();
+
+    expect(loadLocalPasskeyUnlock('identity-1')).toBeUndefined();
+  });
+
+  it('verifies remote recovery factors before saving local passkey unlock', async () => {
+    const storage = new Map<string, string>();
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: jest.fn((key: string) => storage.get(key) ?? null),
+        removeItem: jest.fn((key: string) => storage.delete(key)),
+        setItem: jest.fn((key: string, value: string) => {
+          storage.set(key, value);
+        }),
+      },
+    });
+
+    const gateway = new PigeonApiGateway();
+    const session = {
+      identity: {
+        encryptedKeyPair: {
+          encryptedPrivateKey: 'encrypted-private-key',
+          publicKey: 'identity-recovery',
+        },
+        encryptedMasterKey: 'encrypted-master-key',
+        id: 'identity-recovery',
+        masterKeyDerivation: {
+          algorithm: 'scrypt',
+          N: 2 ** 18,
+          p: 1,
+          r: 8,
+          recoveryKey: {
+            algorithm: 'pigeon-recovery-key',
+            version: 1,
+          },
+          salt: 'master-salt',
+          version: 1,
+        },
+        networks: ['network-1'],
+        profile: { name: 'Ada' },
+        signature: 'signature',
+        timestamp: 1,
+        version: 1,
+      },
+      masterKey: SymmetricKey.generate(),
+    } as unknown as Session;
+
+    await expect(
+      gateway.configureLocalPasskeyUnlock(
+        session,
+        'wrong-password',
+        true,
+        'not-a-recovery-key',
+      ),
+    ).rejects.toThrow();
+
+    expect(loadLocalPasskeyUnlock('identity-recovery')).toBeUndefined();
   });
 
   it('uploads public profile files as signed binary bodies', async () => {

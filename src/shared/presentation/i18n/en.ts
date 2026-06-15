@@ -90,7 +90,7 @@ export const en = {
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passkeyPrfUnavailableCreate:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity, but it will be protected with password only.',
+      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity with password and recovery key.',
     passkeyPrfUnavailableLogin:
       'This browser or authenticator did not return WebAuthn PRF support for this credential. If your identity uses PRF, use the browser, domain and authenticator where it was created.',
     passkeyPrfNotPersisted:
@@ -103,7 +103,17 @@ export const en = {
     rememberMe: 'Stay signed in',
     rememberMeHelp:
       'Stores your identity and a local device unlock envelope in this browser.',
+    recoveryKeyCreateHelp:
+      'Save this key. You will need it to open your identity from another node or browser.',
+    recoveryKeyLabel: 'Recovery key',
+    recoveryKeyLoginHelp:
+      'Required for identities protected with a recovery key. It is not stored on this node.',
+    recoveryKeyRegenerate: 'Regenerate',
+    recoveryKeySaved: 'I saved my recovery key',
+    recoveryKeyTitle: 'Recovery key',
+    recoveryKeyUnlockFailed: 'The password or recovery key is incorrect.',
     title: 'Pigeon Swarm',
+    useRecoveryKey: 'Use recovery key',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   calls: {
@@ -1015,6 +1025,9 @@ export const en = {
     communityRoles: 'Community roles',
     copied: 'Copied',
     copy: 'Copy',
+    currentPassword: 'Current password',
+    currentPasswordForPasskeyHelp:
+      'The current password and recovery key are verified before creating local unlock. They are not saved.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',
@@ -1033,7 +1046,8 @@ export const en = {
     networks: 'Networks',
     newPassword: 'New password',
     newPasswordConfirm: 'Repeat new password',
-    newPasswordHelp: 'Leave both fields empty to keep your current password.',
+    newPasswordHelp:
+      'The new password will rewrap your root key. It does not change chat or community keys.',
     noAvailableNetworks: 'No more networks available',
     noBiography: 'No bio',
     noCommunityRoles: 'No community roles',
@@ -1058,9 +1072,28 @@ export const en = {
       'This identity already uses passkey PRF and it will be preserved.',
     passkeyPrfUnavailable:
       'This browser or authenticator did not return WebAuthn PRF support for this credential.',
+    passwordChangePreservesPasskey:
+      'Keeps the current identity protection method.',
+    passwordChangeRequiresRecoveryKey: 'Requires your current recovery key.',
     picture: 'Profile picture',
+    localDeviceUnlock: 'Use device unlock',
+    localDeviceUnlockHelp:
+      'Optional. Creates a local unlock for this browser using your password and passkey. It does not change your password or recovery key.',
+    localDeviceUnlockSection: 'Local unlock',
+    localDeviceUnlockSectionHelp:
+      'This only affects this browser or device. Portable access still uses password and recovery key.',
+    localDeviceUnlockUnavailable:
+      'This browser or authenticator cannot create a local WebAuthn PRF unlock.',
+    profileTab: 'Profile',
+    recoveryKey: 'Recovery key',
+    recoveryKeyForPassword: 'Current recovery key',
+    recoveryKeyRequiredHelp:
+      'The app does not store this key. It is required to rewrap your root key with the new password.',
+    recoveryKeyRequiredTitle: 'Recovery key required',
+    networksTab: 'Networks',
     save: 'Save changes',
     security: 'Security',
+    securityTab: 'Security',
     saving: 'Saving...',
     updateError: 'The profile could not be updated.',
     versions: 'Versions',

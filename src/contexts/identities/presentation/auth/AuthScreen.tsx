@@ -19,6 +19,7 @@ import {
   clearLocalDeviceUnlock,
   saveLocalDeviceUnlock,
 } from '../../infrastructure/storage/localDeviceUnlock';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
 import {
   normalizeHandleInput,
@@ -58,6 +59,12 @@ export function AuthScreen({
   const [networks, setNetworks] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [recoveryKey, setRecoveryKey] = useState(() =>
+    RecoveryKey.generate().valueOf(),
+  );
+  const [recoveryKeyConfirmed, setRecoveryKeyConfirmed] = useState(false);
+  const [loginRecoveryKey, setLoginRecoveryKey] = useState('');
+  const [useRecoveryKey, setUseRecoveryKey] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(true);
   const [passkeyPrfSupport, setPasskeyPrfSupport] =
@@ -107,16 +114,19 @@ export function AuthScreen({
     };
   }, []);
 
-  const canSubmit = canSubmitAuthForm({
-    availableNetworkCount: availableNetworks.length,
-    handle,
-    identityId,
-    mode,
-    name,
-    password,
-    passwordConfirmation,
-    selectedNetwork,
-  });
+  const canSubmit =
+    canSubmitAuthForm({
+      availableNetworkCount: availableNetworks.length,
+      handle,
+      identityId,
+      mode,
+      name,
+      password,
+      passwordConfirmation,
+      selectedNetwork,
+    }) &&
+    (mode !== 'login' || !useRecoveryKey || RecoveryKey.isValid(loginRecoveryKey)) &&
+    (mode === 'login' || recoveryKeyConfirmed);
   const passkeyPrfAvailable = passkeyPrfSupport === 'available';
   const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
   const passwordChecks = passwordValidationChecks(password);
@@ -161,6 +171,7 @@ export function AuthScreen({
               normalizeIdentityLogin(identityId),
               password,
               setLoginProgressStep,
+              useRecoveryKey ? loginRecoveryKey.trim() || undefined : undefined,
             )
           : await applicationContainer.register(
               name,
@@ -171,7 +182,10 @@ export function AuthScreen({
                 selectedNetwork,
               }),
               handle.trim() ? normalizeHandleInput(handle) : undefined,
-              { passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable },
+              {
+                passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable,
+                recoveryKey,
+              },
             );
 
       if (rememberMe) {
@@ -310,6 +324,43 @@ export function AuthScreen({
                 data-testid="auth-password-input"
               />
             </Field>
+            {mode === 'login' && (
+              <div className="rounded-2xl px-1 py-1">
+                <button
+                  type="button"
+                  aria-pressed={useRecoveryKey}
+                  onClick={() => setUseRecoveryKey((enabled) => !enabled)}
+                  className="flex w-full items-center gap-3 rounded-2xl py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
+                  data-testid="auth-use-recovery-key-toggle"
+                >
+                  <AuthSwitch enabled={useRecoveryKey} />
+                  <span>{copy.auth.useRecoveryKey}</span>
+                </button>
+                {useRecoveryKey && (
+                  <div className="mt-3">
+                    <Field label={copy.auth.recoveryKeyLabel}>
+                      <input
+                        value={loginRecoveryKey}
+                        onChange={(event) =>
+                          setLoginRecoveryKey(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        placeholder="psrk1..."
+                        type="password"
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-testid="auth-recovery-key-input"
+                      />
+                      <p className="mt-2 text-xs leading-relaxed text-white/40">
+                        {copy.auth.recoveryKeyLoginHelp}
+                      </p>
+                    </Field>
+                  </div>
+                )}
+              </div>
+            )}
             {mode === 'create' && (
               <>
                 <Field label={copy.auth.passwordConfirmLabel}>
@@ -329,6 +380,15 @@ export function AuthScreen({
                   complete={passwordRequirementProgress.complete}
                   total={passwordRequirementProgress.total}
                   message={passwordRequirementProgress.message}
+                />
+                <RecoveryKeyPanel
+                  recoveryKey={recoveryKey}
+                  confirmed={recoveryKeyConfirmed}
+                  onConfirmedChange={setRecoveryKeyConfirmed}
+                  onRegenerate={() => {
+                    setRecoveryKey(RecoveryKey.generate().valueOf());
+                    setRecoveryKeyConfirmed(false);
+                  }}
                 />
                 <button
                   type="button"
@@ -527,6 +587,56 @@ function PasskeyPrfUnavailableNotice({
     >
       {children}
     </div>
+  );
+}
+
+function RecoveryKeyPanel({
+  confirmed,
+  onConfirmedChange,
+  onRegenerate,
+  recoveryKey,
+}: {
+  confirmed: boolean;
+  onConfirmedChange: (confirmed: boolean) => void;
+  onRegenerate: () => void;
+  recoveryKey: string;
+}): ReactElement {
+  return (
+    <section className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-black text-amber-50">
+            {copy.auth.recoveryKeyTitle}
+          </h2>
+          <p className="mt-1 text-xs leading-snug text-amber-50/70">
+            {copy.auth.recoveryKeyCreateHelp}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRegenerate}
+          className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white/75 transition hover:bg-white/15"
+        >
+          {copy.auth.recoveryKeyRegenerate}
+        </button>
+      </div>
+      <textarea
+        readOnly
+        value={recoveryKey}
+        className="mt-3 h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/30 p-3 font-mono text-xs text-white outline-none"
+        data-testid="auth-recovery-key-output"
+      />
+      <button
+        type="button"
+        aria-pressed={confirmed}
+        onClick={() => onConfirmedChange(!confirmed)}
+        className="mt-3 flex w-full items-center gap-3 rounded-2xl px-1 py-2 text-left text-sm font-bold text-white/75"
+        data-testid="auth-recovery-key-confirm"
+      >
+        <AuthSwitch enabled={confirmed} />
+        <span>{copy.auth.recoveryKeySaved}</span>
+      </button>
+    </section>
   );
 }
 

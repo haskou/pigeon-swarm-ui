@@ -3,6 +3,7 @@ import { KeyPair, SymmetricKey } from '@haskou/value-objects';
 import type { IdentityResource } from '../../domain/IdentityResource';
 import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
 
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { UserRootKeyProtector } from './UserRootKeyProtector';
 import { WebAuthnPrfKeyProtector } from './WebAuthnPrfKeyProtector';
 
@@ -216,6 +217,98 @@ describe(UserRootKeyProtector.name, () => {
 
     await expect(
       wrongPasskeyProtector.unlockMasterKey(identity, 'correct password'),
+    ).rejects.toThrow();
+  });
+
+  it('protects the user root key with password and recovery key', async () => {
+    const masterKey = SymmetricKey.generate();
+    const recoveryKey = RecoveryKey.generate();
+    const protector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+    const protectedRoot = await protector.protectMasterKey({
+      masterKey,
+      password: 'correct password',
+      recoveryKey,
+    });
+    const identity = createIdentity({
+      encryptedMasterKey: protectedRoot.encryptedMasterKey,
+      keyPair: await KeyPair.generate(),
+      masterKey,
+      masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+
+    const unlocked = await protector.unlockMasterKey(
+      identity,
+      'correct password',
+      recoveryKey,
+    );
+
+    expect(unlocked.isEqual(masterKey)).toBe(true);
+    expect(protectedRoot.masterKeyDerivation.recoveryKey).toMatchObject({
+      algorithm: 'pigeon-recovery-key',
+      version: 1,
+    });
+    expect(protectedRoot.masterKeyDerivation.passkeyPrf).toBeUndefined();
+  });
+
+  it('rejects password-only unlocks for recovery protected identities', async () => {
+    const masterKey = SymmetricKey.generate();
+    const protector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+    const protectedRoot = await protector.protectMasterKey({
+      masterKey,
+      password: 'correct password',
+      recoveryKey: RecoveryKey.generate(),
+    });
+    const identity = createIdentity({
+      encryptedMasterKey: protectedRoot.encryptedMasterKey,
+      keyPair: await KeyPair.generate(),
+      masterKey,
+      masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+
+    await expect(
+      protector.unlockMasterKey(identity, 'correct password'),
+    ).rejects.toThrow('Recovery key is required');
+  });
+
+  it('rejects wrong recovery keys for recovery protected identities', async () => {
+    const masterKey = SymmetricKey.generate();
+    const protector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
+    const protectedRoot = await protector.protectMasterKey({
+      masterKey,
+      password: 'correct password',
+      recoveryKey: RecoveryKey.generate(),
+    });
+    const identity = createIdentity({
+      encryptedMasterKey: protectedRoot.encryptedMasterKey,
+      keyPair: await KeyPair.generate(),
+      masterKey,
+      masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+
+    await expect(
+      protector.unlockMasterKey(
+        identity,
+        'correct password',
+        RecoveryKey.generate(),
+      ),
     ).rejects.toThrow();
   });
 

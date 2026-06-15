@@ -8,6 +8,7 @@ export class RegisterIdentityMessage {
   private readonly networks: IdentityNetworkMemberships;
   private readonly password: string;
   private readonly passkeyPrfEnabled: boolean;
+  private readonly recoveryKey?: string;
 
   public constructor(input: {
     handle?: string;
@@ -15,6 +16,7 @@ export class RegisterIdentityMessage {
     networks: string[];
     password: string;
     passkeyPrfEnabled?: boolean;
+    recoveryKey?: string;
   }) {
     this.handle = input.handle
       ? ProfileHandle.fromString(input.handle)
@@ -23,6 +25,7 @@ export class RegisterIdentityMessage {
     this.networks = IdentityNetworkMemberships.fromPrimitives(input.networks);
     this.password = input.password;
     this.passkeyPrfEnabled = input.passkeyPrfEnabled ?? false;
+    this.recoveryKey = input.recoveryKey;
   }
 
   public getHandle(): ProfileHandle | undefined {
@@ -43,5 +46,9 @@ export class RegisterIdentityMessage {
 
   public isPasskeyPrfEnabled(): boolean {
     return this.passkeyPrfEnabled;
+  }
+
+  public getRecoveryKey(): string | undefined {
+    return this.recoveryKey;
   }
 }
