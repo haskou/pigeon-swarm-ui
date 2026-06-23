@@ -71,6 +71,18 @@ export class PigeonFilesApi {
     return options.encryptLargeAttachments === true;
   }
 
+  private privateAttachmentUploadNetworkId(
+    options: AttachmentUploadOptions,
+  ): string {
+    const networkId = options.networkId?.trim();
+
+    if (!networkId) {
+      throw new Error('Private attachment uploads require a network id.');
+    }
+
+    return networkId;
+  }
+
   private async decryptAttachment(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
@@ -244,6 +256,7 @@ export class PigeonFilesApi {
 
   private async uploadPendingAttachment(
     session: Session,
+    networkId: string,
     pending: PendingMessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<{
@@ -258,7 +271,7 @@ export class PigeonFilesApi {
         percent: 0,
         phase: 'upload',
       });
-      const upload = await this.uploadPrivateFile(session, pending);
+      const upload = await this.uploadPrivateFile(session, networkId, pending);
 
       onProgress?.({
         filename: pending.metadata.filename,
@@ -285,6 +298,7 @@ export class PigeonFilesApi {
       );
       const upload = await this.privateFiles.upload(
         session,
+        networkId,
         chunk,
         `${pending.uploadFilename}.part-${String(index).padStart(4, '0')}`,
       );
@@ -326,6 +340,7 @@ export class PigeonFilesApi {
 
   private async uploadPrivateAttachmentPreview(
     session: Session,
+    networkId: string,
     file: File,
   ): Promise<MessageAttachment | undefined> {
     return await (async () => {
@@ -334,7 +349,11 @@ export class PigeonFilesApi {
       if (!thumbnail) return undefined;
 
       const pending = await this.attachmentCipher.encrypt(thumbnail);
-      const upload = await this.uploadPendingAttachment(session, pending);
+      const upload = await this.uploadPendingAttachment(
+        session,
+        networkId,
+        pending,
+      );
 
       return {
         ...pending.metadata,
@@ -483,10 +502,12 @@ export class PigeonFilesApi {
 
   public async uploadPrivateFile(
     session: Session,
+    networkId: string,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
     return await this.privateFiles.upload(
       session,
+      networkId,
       attachment.encryptedBytes,
       attachment.uploadFilename,
     );
@@ -524,10 +545,16 @@ export class PigeonFilesApi {
         continue;
       }
 
-      const preview = await this.uploadPrivateAttachmentPreview(session, file);
+      const networkId = this.privateAttachmentUploadNetworkId(options);
+      const preview = await this.uploadPrivateAttachmentPreview(
+        session,
+        networkId,
+        file,
+      );
       const pending = await this.attachmentCipher.encrypt(file, onProgress);
       const upload = await this.uploadPendingAttachment(
         session,
+        networkId,
         pending,
         onProgress,
       );

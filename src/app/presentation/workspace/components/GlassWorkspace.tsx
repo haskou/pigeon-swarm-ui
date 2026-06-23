@@ -2354,6 +2354,7 @@ export function GlassWorkspace({
   const sendPendingMessage = (payload: PendingSend) => {
     if (!activeConversation?.id) return;
     const conversationId = activeConversation.id;
+    const conversationNetworkId = activeConversation.networkId;
     const optimisticTimestamp = Date.now();
     const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
@@ -2410,7 +2411,10 @@ export function GlassWorkspace({
           payload.content,
           {
             attachments: payload.attachments,
-            attachmentUpload: payload.attachmentUpload,
+            attachmentUpload: {
+              ...payload.attachmentUpload,
+              networkId: conversationNetworkId,
+            },
             onAttachmentProgress: (progress) => {
               startTransition(() => {
                 setMessages((current) =>
@@ -2862,7 +2866,10 @@ export function GlassWorkspace({
       content,
       {
         attachments,
-        attachmentUpload,
+        attachmentUpload: {
+          ...attachmentUpload,
+          networkId: activeConversation.networkId,
+        },
         previousMessageIds:
           conversationThread.messages.length > 0
             ? [

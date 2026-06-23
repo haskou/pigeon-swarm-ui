@@ -325,7 +325,9 @@ describe(PigeonFilesApi.name, () => {
     );
 
     await expect(
-      api.publishMessageAttachments(session, [file]),
+      api.publishMessageAttachments(session, [file], undefined, {
+        networkId: 'network-1',
+      }),
     ).resolves.toEqual([
       {
         ...pending.metadata,
@@ -339,11 +341,11 @@ describe(PigeonFilesApi.name, () => {
     expect(signerHeaders).toHaveBeenCalledWith(
       session,
       'POST',
-      '/ipfs/private',
+      '/ipfs/network-1',
       pending.encryptedBytes,
     );
     expect(request).toHaveBeenCalledWith(
-      '/ipfs/private',
+      '/ipfs/network-1',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'application/octet-stream',
@@ -353,6 +355,38 @@ describe(PigeonFilesApi.name, () => {
         method: 'POST',
       }),
     );
+  });
+
+  it('rejects private attachment uploads without a network id', async () => {
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    const pending: PendingMessageAttachment = {
+      encryptedBytes: new Uint8Array([1, 2, 3]).buffer,
+      metadata: {
+        contentType: 'text/plain',
+        encryption: attachmentEncryption(),
+        filename: 'hello.txt',
+        size: file.size,
+      },
+      uploadFilename: 'encrypted.bin',
+    };
+    const request = jest.fn();
+    const signerHeaders = jest.fn();
+    const cipher = {
+      encrypt: jest.fn().mockResolvedValue(pending),
+    } as unknown as AttachmentCipher;
+    const api = new PigeonFilesApi(
+      httpClient({ request }),
+      signer({ headers: signerHeaders }),
+      cipher,
+    );
+
+    await expect(
+      api.publishMessageAttachments(session, [file]),
+    ).rejects.toThrow('Private attachment uploads require a network id.');
+
+    expect(cipher.encrypt).not.toHaveBeenCalled();
+    expect(signerHeaders).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('keeps thumbnails private when the original image is encrypted', async () => {
@@ -426,7 +460,9 @@ describe(PigeonFilesApi.name, () => {
     );
 
     await expect(
-      api.publishMessageAttachments(session, [file]),
+      api.publishMessageAttachments(session, [file], undefined, {
+        networkId: 'network-1',
+      }),
     ).resolves.toEqual([
       {
         ...pendingOriginal.metadata,
