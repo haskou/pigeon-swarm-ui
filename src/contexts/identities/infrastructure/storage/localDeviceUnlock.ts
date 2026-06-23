@@ -17,6 +17,41 @@ function getLocalDeviceUnlockRecord(
   >;
 }
 
+function openDeviceUnlockDatabase(): Promise<IDBDatabase | null> {
+  if (!globalThis.indexedDB || !globalThis.crypto?.subtle) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.addEventListener('error', () => resolve(null));
+    request.addEventListener('success', () => resolve(request.result));
+    request.addEventListener('upgradeneeded', () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: 'identityId' });
+      }
+    });
+  });
+}
+
+function runStoreRequest<T>(
+  database: IDBDatabase,
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, mode);
+    const request = callback(transaction.objectStore(STORE_NAME));
+
+    request.addEventListener('error', () => reject(request.error));
+    request.addEventListener('success', () => resolve(request.result));
+    transaction.addEventListener('error', () => reject(transaction.error));
+  });
+}
+
 export async function clearLocalDeviceUnlock(
   identityId?: string,
 ): Promise<void> {
@@ -122,39 +157,4 @@ export async function saveLocalDeviceUnlock(session: Session): Promise<void> {
     } satisfies LocalDeviceUnlockRecord),
   );
   database.close();
-}
-
-function openDeviceUnlockDatabase(): Promise<IDBDatabase | null> {
-  if (!globalThis.indexedDB || !globalThis.crypto?.subtle) {
-    return Promise.resolve(null);
-  }
-
-  return new Promise((resolve) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.addEventListener('error', () => resolve(null));
-    request.addEventListener('success', () => resolve(request.result));
-    request.addEventListener('upgradeneeded', () => {
-      const database = request.result;
-
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'identityId' });
-      }
-    });
-  });
-}
-
-function runStoreRequest<T>(
-  database: IDBDatabase,
-  mode: IDBTransactionMode,
-  callback: (store: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, mode);
-    const request = callback(transaction.objectStore(STORE_NAME));
-
-    request.addEventListener('error', () => reject(request.error));
-    request.addEventListener('success', () => resolve(request.result));
-    transaction.addEventListener('error', () => reject(transaction.error));
-  });
 }

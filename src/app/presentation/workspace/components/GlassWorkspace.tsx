@@ -2866,7 +2866,10 @@ export function GlassWorkspace({
       content,
       {
         attachments,
-        attachmentUpload,
+        attachmentUpload: {
+          ...attachmentUpload,
+          networkId: activeConversation.networkId,
+        },
         previousMessageIds:
           conversationThread.messages.length > 0
             ? [
