@@ -1,26 +1,6 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-
-type LocalDeviceUnlockKeyPair = {
-  privateKey: string;
-  publicKey: string;
-};
-
-export type LocalDeviceUnlockPayload = {
-  keyPair: LocalDeviceUnlockKeyPair;
-  masterKey: string;
-  version: 1;
-};
-
-type LocalDeviceUnlockRecord = {
-  createdAt: number;
-  deviceKey: CryptoKey;
-  encryptedPayload: ArrayBuffer;
-  identityId: string;
-  identityVersion: number;
-  iv: ArrayBuffer;
-  keychainVersion: number;
-  updatedAt: number;
-};
+import type { LocalDeviceUnlockPayload } from './LocalDeviceUnlockPayload';
+import type { LocalDeviceUnlockRecord } from './LocalDeviceUnlockRecord';
 
 const DB_NAME = 'pigeon-swarm-device-unlock';
 const STORE_NAME = 'sessions';

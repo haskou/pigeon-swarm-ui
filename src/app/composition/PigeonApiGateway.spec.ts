@@ -2727,17 +2727,17 @@ describe(PigeonApiGateway.name, () => {
     } satisfies PendingMessageAttachment;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.uploadPrivateFile(session, attachment)).resolves.toBe(
-      upload,
-    );
+    await expect(
+      gateway.uploadPrivateFile(session, 'network-1', attachment),
+    ).resolves.toBe(upload);
 
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'POST',
-      '/ipfs/private',
+      '/ipfs/network-1',
       bytes,
     );
-    expect(http.request).toHaveBeenCalledWith('/ipfs/private', {
+    expect(http.request).toHaveBeenCalledWith('/ipfs/network-1', {
       body: bytes,
       headers: {
         'Content-Type': 'application/octet-stream',
@@ -2812,6 +2812,7 @@ describe(PigeonApiGateway.name, () => {
     await expect(
       gateway.sendMessage(session, 'one-to-one:conversation', 'hello', {
         attachments: [file],
+        attachmentUpload: { networkId: 'network-1' },
         previousMessageIds: ['previous-message'],
         replyPreview: {
           authorIdentityId: 'identity-2',
@@ -2821,6 +2822,19 @@ describe(PigeonApiGateway.name, () => {
         replyToMessageId: 'message-0',
       }),
     ).resolves.toMatchObject({ content: 'sent' });
+
+    expect(http.request).toHaveBeenNthCalledWith(
+      1,
+      '/ipfs/network-1',
+      expect.objectContaining({
+        body: encryptedBytes,
+        headers: expect.objectContaining({
+          'Content-Type': 'application/octet-stream',
+          'X-Filename': 'encrypted.bin',
+        }),
+        method: 'POST',
+      }),
+    );
 
     const [, messageRequest] = (http.request as jest.Mock).mock.calls[1] as [
       string,

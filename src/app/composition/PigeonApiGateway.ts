@@ -2464,9 +2464,10 @@ export class PigeonApiGateway {
 
   public async uploadPrivateFile(
     session: Session,
+    networkId: string,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
-    return await this.files.uploadPrivateFile(session, attachment);
+    return await this.files.uploadPrivateFile(session, networkId, attachment);
   }
 
   public async downloadAttachment(

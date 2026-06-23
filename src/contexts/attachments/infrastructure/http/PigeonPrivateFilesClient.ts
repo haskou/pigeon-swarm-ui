@@ -20,10 +20,11 @@ export class PigeonPrivateFilesClient {
 
   public async upload(
     session: Session,
+    networkId: string,
     bytes: ArrayBuffer,
     filename: string,
   ): Promise<PrivateFileUpload> {
-    const path = '/ipfs/private';
+    const path = `/ipfs/${encodeURIComponent(networkId)}`;
 
     return await this.http.request<PrivateFileUpload>(path, {
       body: bytes,

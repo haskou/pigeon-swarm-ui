@@ -103,8 +103,9 @@ export function useCommunityMessageComposer({
   const [error, setError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
-  const [editingMessage, setEditingMessage] =
-    useState<EditingMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
+    null,
+  );
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [failedSends, setFailedSends] = useState<
     Record<string, CommunityPendingSend>
@@ -302,7 +303,9 @@ export function useCommunityMessageComposer({
     setError(copy.messages.replyTargetNotFound);
   };
 
-  const deleteChannelMessage = async (message: ChatMessage): Promise<boolean> => {
+  const deleteChannelMessage = async (
+    message: ChatMessage,
+  ): Promise<boolean> => {
     const channelId = message.raw.channelId ?? selectedChannelId;
 
     if (
@@ -449,7 +452,9 @@ export function useCommunityMessageComposer({
           content: payload.sticker
             ? ''
             : payload.content ||
-              payload.attachments.map((attachment) => attachment.name).join(', '),
+              payload.attachments
+                .map((attachment) => attachment.name)
+                .join(', '),
           deliveryStatus: 'pending',
           encrypted: false,
           id: optimisticId,
@@ -490,7 +495,7 @@ export function useCommunityMessageComposer({
                 );
               });
             },
-            payload.attachmentUpload,
+            { ...payload.attachmentUpload, networkId: community.networkId },
           );
         const linkPreview = payload.sticker
           ? undefined
@@ -577,7 +582,9 @@ export function useCommunityMessageComposer({
       }
     });
 
-    sendQueueRef.current = delivery.catch(() => undefined).then(() => undefined);
+    sendQueueRef.current = delivery
+      .catch(() => undefined)
+      .then(() => undefined);
 
     return delivery;
   };
