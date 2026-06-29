@@ -178,12 +178,16 @@ function installMediaStreamMock(): void {
   });
 }
 
-function installPeerConnectionMock(peers: FakePeerConnection[]): void {
+function installPeerConnectionMock(
+  peers: FakePeerConnection[],
+  configurations: RTCConfiguration[] = [],
+): void {
   Object.defineProperty(globalThis, 'RTCPeerConnection', {
     configurable: true,
-    value: jest.fn(() => {
+    value: jest.fn((configuration: RTCConfiguration) => {
       const peer = createFakePeerConnection();
 
+      configurations.push(configuration);
       peers.push(peer);
 
       return peer;
@@ -228,7 +232,7 @@ describe(CallPeerConnectionManager.name, () => {
     const initialMicrophone = mediaTrack('microphone-1', 'audio');
     const nextMicrophone = mediaTrack('microphone-2', 'audio');
 
-    manager.configure({ iceServers: [] });
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
     manager.setLocalStream(mediaStreamWithTracks([initialMicrophone]));
 
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -245,6 +249,90 @@ describe(CallPeerConnectionManager.name, () => {
     expect(peer.addTrack).toHaveBeenCalledTimes(1);
   });
 
+  it('loads fresh ICE configuration for each new peer connection', async () => {
+    const peers: FakePeerConnection[] = [];
+    const configurations: RTCConfiguration[] = [];
+
+    installPeerConnectionMock(peers, configurations);
+    const manager = new CallPeerConnectionManager();
+    const firstConfiguration: RTCConfiguration = {
+      iceServers: [
+        {
+          credential: 'turn-password-1',
+          urls: ['turn:relay-one.example.test', 'turns:relay-one.example.test'],
+          username: 'turn-user-1',
+        },
+      ],
+      iceTransportPolicy: 'relay',
+    };
+    const secondConfiguration: RTCConfiguration = {
+      iceServers: [
+        {
+          credential: 'turn-password-2',
+          urls: 'turn:relay-two.example.test',
+          username: 'turn-user-2',
+        },
+      ],
+      iceTransportPolicy: 'all',
+    };
+    const rtcConfigurationProvider = jest
+      .fn()
+      .mockResolvedValueOnce(firstConfiguration)
+      .mockResolvedValueOnce(secondConfiguration);
+
+    manager.configure(rtcConfigurationProvider);
+
+    await manager.ensurePeer('peer-identity-id-1', false, () =>
+      Promise.resolve(),
+    );
+    await manager.ensurePeer('peer-identity-id-2', false, () =>
+      Promise.resolve(),
+    );
+    await manager.ensurePeer('peer-identity-id-1', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(rtcConfigurationProvider).toHaveBeenCalledTimes(2);
+    expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
+  });
+
+  it('serializes concurrent peer creation for the same identity', async () => {
+    const peers: FakePeerConnection[] = [];
+    const configurations: RTCConfiguration[] = [];
+
+    installPeerConnectionMock(peers, configurations);
+    const manager = new CallPeerConnectionManager();
+    const rtcConfiguration: RTCConfiguration = {
+      iceServers: [{ urls: 'turn:relay.example.test' }],
+      iceTransportPolicy: 'relay',
+    };
+    let resolveConfiguration!: (configuration: RTCConfiguration) => void;
+    const pendingConfiguration = new Promise<RTCConfiguration>((resolve) => {
+      resolveConfiguration = resolve;
+    });
+    const rtcConfigurationProvider = jest
+      .fn()
+      .mockReturnValue(pendingConfiguration);
+
+    manager.configure(rtcConfigurationProvider);
+
+    const firstEnsurePeer = manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+    const secondEnsurePeer = manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(rtcConfigurationProvider).toHaveBeenCalledTimes(1);
+    expect(peers).toHaveLength(0);
+
+    resolveConfiguration(rtcConfiguration);
+    await Promise.all([firstEnsurePeer, secondEnsurePeer]);
+
+    expect(peers).toHaveLength(1);
+    expect(configurations).toEqual([rtcConfiguration]);
+  });
+
   it('adds screen sharing without replacing the microphone sender', async () => {
     const peers: FakePeerConnection[] = [];
 
@@ -254,7 +342,7 @@ describe(CallPeerConnectionManager.name, () => {
     const microphone = mediaTrack('microphone', 'audio');
     const screen = mediaTrack('screen', 'video', 'detail');
 
-    manager.configure({ iceServers: [] });
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
     manager.setLocalStream(mediaStreamWithTracks([microphone]));
 
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -287,7 +375,7 @@ describe(CallPeerConnectionManager.name, () => {
     const screen = mediaTrack('screen', 'video', 'detail');
     const screenAudio = mediaTrack('screen-audio', 'audio', 'music');
 
-    manager.configure({ iceServers: [] });
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
     manager.setLocalStream(mediaStreamWithTracks([microphone]));
 
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -525,7 +613,7 @@ describe(CallPeerConnectionManager.name, () => {
     const gain = gainNode();
     const screenTrack = mediaTrack('remote-screen-track', 'video');
 
-    manager.configure({ iceServers: [] });
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );

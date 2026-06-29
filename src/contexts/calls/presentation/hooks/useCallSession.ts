@@ -40,7 +40,7 @@ type StartCallInput = {
   channelId?: string;
   conversationId?: string;
   kind: CallSession['kind'];
-  iceConfig: CallIceServerConfig;
+  loadIceConfig: () => Promise<CallIceServerConfig>;
   localStream?: MediaStream | null;
   noiseCancellationEnabled: boolean;
   onSignal: SignalSender;
@@ -53,8 +53,8 @@ type ReconcileCallInput = Omit<
   StartCallInput,
   | 'call'
   | 'currentIdentityId'
-  | 'iceConfig'
   | 'id'
+  | 'loadIceConfig'
   | 'noiseCancellationEnabled'
   | 'onSignal'
 >;
@@ -258,7 +258,7 @@ export function useCallSession(): {
         callId: nextCall.id,
         hasStream: Boolean(stream),
       });
-      peerManager.configure(input.iceConfig);
+      peerManager.configure(input.loadIceConfig);
       peerManager.setLocalStream(stream);
       setActiveCall((current) =>
         current?.id === nextCall.id

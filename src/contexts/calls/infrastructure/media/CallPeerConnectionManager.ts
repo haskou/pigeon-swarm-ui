@@ -34,8 +34,15 @@ import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
 
+type RtcConfigurationProvider = () => Promise<RTCConfiguration>;
+
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
+
+  private readonly pendingPeerCreations = new Map<
+    string,
+    Promise<RTCPeerConnection>
+  >();
 
   private readonly peerNegotiationStates = new Map<
     string,
@@ -85,7 +92,7 @@ export class CallPeerConnectionManager {
 
   private localStream: MediaStream | null = null;
 
-  private rtcConfiguration: RTCConfiguration | null = null;
+  private rtcConfigurationProvider: RtcConfigurationProvider | null = null;
 
   private deafened = false;
 
@@ -266,15 +273,34 @@ export class CallPeerConnectionManager {
     return true;
   }
 
-  private getOrCreatePeer(
+  private async getOrCreatePeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): RTCPeerConnection {
+  ): Promise<RTCPeerConnection> {
     const existing = this.peers.get(peerIdentityId);
 
     if (existing) return existing;
 
-    if (!this.rtcConfiguration) {
+    const pendingPeerCreation = this.pendingPeerCreations.get(peerIdentityId);
+
+    if (pendingPeerCreation) return await pendingPeerCreation;
+
+    const peerCreation = this.createPeer(peerIdentityId, sendSignal);
+
+    this.pendingPeerCreations.set(peerIdentityId, peerCreation);
+
+    try {
+      return await peerCreation;
+    } finally {
+      this.pendingPeerCreations.delete(peerIdentityId);
+    }
+  }
+
+  private async createPeer(
+    peerIdentityId: string,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection> {
+    if (!this.rtcConfigurationProvider) {
       logCallError(
         'peer-manager:create-peer:missing-rtc-configuration',
         new Error('RTCPeerConnection configuration is not loaded.'),
@@ -283,9 +309,12 @@ export class CallPeerConnectionManager {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const peer = new RTCPeerConnection(this.rtcConfiguration);
+    const rtcConfiguration = await this.rtcConfigurationProvider();
+    const peer = new RTCPeerConnection(rtcConfiguration);
+
     logCallDebug('peer-manager:create-peer', {
       hasLocalStream: Boolean(this.localStream),
+      iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
       peerIdentityId,
     });
 
@@ -954,11 +983,9 @@ export class CallPeerConnectionManager {
     });
   }
 
-  public configure(rtcConfiguration: RTCConfiguration): void {
-    this.rtcConfiguration = rtcConfiguration;
-    logCallDebug('peer-manager:configure', {
-      iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
-    });
+  public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {
+    this.rtcConfigurationProvider = rtcConfigurationProvider;
+    logCallDebug('peer-manager:configure');
   }
 
   public setLocalStream(stream: MediaStream | null): void {
@@ -1063,7 +1090,7 @@ export class CallPeerConnectionManager {
       shouldOffer,
     });
     this.configureNegotiationState(peerIdentityId, !shouldOffer);
-    const peer = this.getOrCreatePeer(peerIdentityId, sendSignal);
+    const peer = await this.getOrCreatePeer(peerIdentityId, sendSignal);
 
     if (!shouldOffer || peer.localDescription) {
       logCallDebug('peer-manager:ensure-peer:offer-skipped', {
@@ -1119,7 +1146,7 @@ export class CallPeerConnectionManager {
         currentIdentityId > senderIdentityId,
       );
     }
-    const peer = this.getOrCreatePeer(senderIdentityId, sendSignal);
+    const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
     const state = this.peerNegotiationState(senderIdentityId);
 
     if (signalType === 'ice_candidate') {
@@ -1149,6 +1176,7 @@ export class CallPeerConnectionManager {
     });
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
+    this.pendingPeerCreations.clear();
     this.pendingIceCandidates.clear();
     this.peerNegotiationStates.clear();
 
@@ -1179,7 +1207,7 @@ export class CallPeerConnectionManager {
     this.localScreenStreams.clear();
     this.previousStatsSamples.clear();
     this.localStream = null;
-    this.rtcConfiguration = null;
+    this.rtcConfigurationProvider = null;
     this.deafened = false;
   }
 

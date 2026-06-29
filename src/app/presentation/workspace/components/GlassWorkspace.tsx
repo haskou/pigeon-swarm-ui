@@ -1350,21 +1350,13 @@ export function GlassWorkspace({
     [],
   );
   const loadCallIceConfig = useCallback(async () => {
-    const fallbackIceConfig = {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    };
-
-    let iceConfig;
-
     try {
-      iceConfig = await applicationContainer.getCallIceServers(
-        sessionRef.current,
-      );
-    } catch {
-      return fallbackIceConfig;
-    }
+      return await applicationContainer.getCallIceServers(sessionRef.current);
+    } catch (caught) {
+      logCallError('workspace:call:ice-config-unavailable', caught);
 
-    return iceConfig.iceServers.length > 0 ? iceConfig : fallbackIceConfig;
+      throw new Error(copy.calls.iceServersUnavailable);
+    }
   }, []);
   const requestLocalAudio = useCallback(async (): Promise<MediaStream> => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -1529,14 +1521,13 @@ export function GlassWorkspace({
             })),
           });
           const details = callDetailsForResource(call);
-          const iceConfig = await loadCallIceConfig();
 
           await startCall({
             ...details,
             call,
             currentIdentityId: sessionRef.current.identity.id,
-            iceConfig,
             id: call.id,
+            loadIceConfig: loadCallIceConfig,
             localStream,
             noiseCancellationEnabled: callNoiseCancellationEnabled,
             onSignal: callSignalSender(call.id),
@@ -1645,11 +1636,6 @@ export function GlassWorkspace({
           participantCount: call.participants.length,
           status: call.status,
         });
-        const iceConfig = await loadCallIceConfig();
-        logCallDebug('workspace:community-voice:ice-config-loaded', {
-          callId: call.id,
-          iceServerCount: iceConfig.iceServers.length,
-        });
         const currentIdentityId = sessionRef.current.identity.id;
         const details = callDetailsForResource(call);
 
@@ -1661,8 +1647,8 @@ export function GlassWorkspace({
           ...details,
           call,
           currentIdentityId,
-          iceConfig,
           id: call.id,
+          loadIceConfig: loadCallIceConfig,
           localStream,
           noiseCancellationEnabled: callNoiseCancellationEnabled,
           onSignal: callSignalSender(call.id),
@@ -1777,14 +1763,13 @@ export function GlassWorkspace({
         })),
       });
       const details = callDetailsForResource(call);
-      const iceConfig = await loadCallIceConfig();
 
       await startCall({
         ...details,
         call,
         currentIdentityId: sessionRef.current.identity.id,
-        iceConfig,
         id: call.id,
+        loadIceConfig: loadCallIceConfig,
         localStream,
         noiseCancellationEnabled: callNoiseCancellationEnabled,
         onSignal: callSignalSender(call.id),
