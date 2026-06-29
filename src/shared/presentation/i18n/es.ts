@@ -588,6 +588,10 @@ export const es = {
     sharedNetwork: 'Red',
   },
   errors: {
+    backend: {
+      503020:
+        'El nodo está sincronizando, espera unos minutos e inténtalo de nuevo.',
+    },
     fallback: 'El servidor rechazo la solicitud. Intentalo de nuevo.',
     forbidden: 'No tienes permiso para hacer eso.',
     network: 'No se pudo contactar con el servidor. Revisa tu nodo.',

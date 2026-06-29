@@ -34,6 +34,23 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
+  it('translates replicated state warmup errors', () => {
+    const error = new HttpJsonError(
+      503,
+      'Service Unavailable',
+      JSON.stringify({
+        code: 503020,
+        httpStatus: 503,
+        message:
+          'Replicated state is not ready yet. Retry after the node finishes opening and synchronizing replicated state.',
+      }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend[503020],
+    );
+  });
+
   it('falls back to readable HTTP status messages instead of raw JSON', () => {
     const error = new HttpJsonError(
       422,
