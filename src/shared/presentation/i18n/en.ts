@@ -610,6 +610,7 @@ export const en = {
       403010: 'Only the node owner can do that.',
       403020: 'Only the notification inviter can do that.',
       422030: 'That file is too large for the node to accept.',
+      503020: 'The node is synchronizing. Wait a few minutes and try again.',
       AuthenticatedIdentityIsNotInviterError:
         'Only the notification inviter can do that.',
       AuthenticatedIdentityIsNotNodeOwnerError:
