@@ -140,9 +140,7 @@ export function useWorkspacePresence({
   }, [mergePresence]);
 
   useEffect(() => {
-    const onLocalActivity = () => refreshLocalActivityPresence();
-    const onFocusedActivity = () =>
-      refreshLocalActivityPresence({ force: true });
+    const onLocalActivity = () => refreshLocalActivityPresence({ force: true });
     const onVisible = () => {
       if (globalThis.document?.visibilityState === 'visible') {
         refreshLocalActivityPresence({ force: true });
@@ -167,10 +165,10 @@ export function useWorkspacePresence({
     globalThis.document?.addEventListener?.('visibilitychange', onVisible, {
       passive: true,
     });
-    globalThis.addEventListener?.('focus', onFocusedActivity, {
+    globalThis.addEventListener?.('focus', onLocalActivity, {
       passive: true,
     });
-    globalThis.addEventListener?.('pageshow', onFocusedActivity, {
+    globalThis.addEventListener?.('pageshow', onLocalActivity, {
       passive: true,
     });
 
@@ -182,8 +180,8 @@ export function useWorkspacePresence({
         'visibilitychange',
         onVisible,
       );
-      globalThis.removeEventListener?.('focus', onFocusedActivity);
-      globalThis.removeEventListener?.('pageshow', onFocusedActivity);
+      globalThis.removeEventListener?.('focus', onLocalActivity);
+      globalThis.removeEventListener?.('pageshow', onLocalActivity);
     };
   }, [refreshLocalActivityPresence]);
 
