@@ -728,9 +728,7 @@ export function ManageCommunityDialog({
   const effectiveAutoJoinEnabled = communityCanAutoJoin
     ? autoJoinEnabled
     : false;
-  const savedAutoJoinEnabled = communityCanAutoJoin
-    ? (community.autoJoinEnabled ?? false)
-    : false;
+  const savedAutoJoinEnabled = community.autoJoinEnabled ?? false;
   const hasProfileChanges =
     avatar !== null ||
     banner !== null ||
