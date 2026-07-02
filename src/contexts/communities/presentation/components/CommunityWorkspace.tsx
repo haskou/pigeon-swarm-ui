@@ -132,6 +132,7 @@ interface CommunityWorkspaceProps {
   invitationAccepting?: boolean;
   invitationError?: null | string;
   invitationInviterName?: string;
+  timelineFocusKey?: string;
   mobileMembersOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileRail?: ReactNode;
@@ -236,6 +237,7 @@ export function CommunityWorkspace({
   invitationAccepting = false,
   invitationError,
   invitationInviterName,
+  timelineFocusKey,
   mobileMembersOpen,
   mobileRail,
   mobileSidebarOpen,
@@ -537,6 +539,7 @@ export function CommunityWorkspace({
     onChannelViewed,
     onMobileSidebarClose,
     resolvedChannelId,
+    timelineFocusKey,
   });
   const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
   const scheduleChannelDraftSync = useCallback(
@@ -2525,7 +2528,10 @@ export function CommunityWorkspace({
         onAddMember={() => setMemberOpen(true)}
         onCloseMobile={onMobileMembersClose}
         onMemberClick={(member, event) =>
-          openMemberProfile(member, profileAnchorFromTarget(event.currentTarget))
+          openMemberProfile(
+            member,
+            profileAnchorFromTarget(event.currentTarget),
+          )
         }
         openMobile={mobileMembersOpen}
         presenceByIdentityId={presenceByIdentityId}

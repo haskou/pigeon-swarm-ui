@@ -38,6 +38,7 @@ type UseCommunityChannelMessagesInput = {
   onChannelViewed?: (channelId: string) => void;
   onMobileSidebarClose: () => void;
   resolvedChannelId: null | string;
+  timelineFocusKey?: string;
 };
 
 type UseCommunityChannelMessagesResult = {
@@ -76,6 +77,7 @@ export function useCommunityChannelMessages({
   onChannelViewed,
   onMobileSidebarClose,
   resolvedChannelId,
+  timelineFocusKey,
 }: UseCommunityChannelMessagesInput): UseCommunityChannelMessagesResult {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
     resolvedChannelId,
@@ -89,8 +91,9 @@ export function useCommunityChannelMessages({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const keepChannelBottomUntilRef = useRef(0);
-  const messageScrollAnchorRef =
-    useRef<MessageScrollAnchorSnapshot | null>(null);
+  const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
+    null,
+  );
   const messageStateRef = useRef<CommunityChannelMessageLoadState>('idle');
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastScrollTopRef = useRef(0);
@@ -176,6 +179,12 @@ export function useCommunityChannelMessages({
   const resetNewChannelMessageCount = useCallback(() => {
     setNewChannelMessageCount(0);
   }, []);
+
+  useEffect(() => {
+    if (!timelineFocusKey || !selectedChannelId) return;
+
+    scrollChannelToBottom('auto', true);
+  }, [scrollChannelToBottom, selectedChannelId, timelineFocusKey]);
 
   const incrementNewChannelMessageCount = useCallback(() => {
     setNewChannelMessageCount((current) => current + 1);

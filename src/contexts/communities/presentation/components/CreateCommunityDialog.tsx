@@ -72,8 +72,7 @@ export function CreateCommunityDialog({
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [autoJoinEnabled, setAutoJoinEnabled] = useState(false);
   const [discoverable, setDiscoverable] = useState(true);
-  const [visibility, setVisibility] =
-    useState<CommunityVisibility>('private');
+  const [visibility, setVisibility] = useState<CommunityVisibility>('private');
   const [imageEditor, setImageEditor] = useState<{
     file: File;
     shape: 'avatar' | 'banner';
@@ -177,8 +176,10 @@ export function CreateCommunityDialog({
     setState('loading');
     setError(null);
     try {
+      const effectiveAutoJoinEnabled =
+        visibility === 'public' ? autoJoinEnabled : false;
       const created = await applicationContainer.createCommunity(session, {
-        autoJoinEnabled,
+        autoJoinEnabled: effectiveAutoJoinEnabled,
         avatar,
         banner,
         channels: channels
@@ -471,7 +472,9 @@ function channelValidationError(
   }
 
   if (
-    channels.some((channel) => normalizeChannelName(channel.name) === normalized)
+    channels.some(
+      (channel) => normalizeChannelName(channel.name) === normalized,
+    )
   ) {
     return copy.communities.duplicateChannelName;
   }
