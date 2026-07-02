@@ -228,10 +228,7 @@ export function NodeRelayConfigurationForm({
           onChange={(event) =>
             onChange({
               ...configuration,
-              manualRelayMultiaddrs: event.target.value
-                .split(/\r?\n/)
-                .map((value) => value.trim())
-                .filter(Boolean),
+              manualRelayMultiaddrs: event.target.value.split(/\r?\n/),
             })
           }
           disabled={disabled}

@@ -108,6 +108,18 @@ describe(PigeonNodeApi.name, () => {
   it('updates relay configuration with the canonical request path', async () => {
     const configuration = defaultNodeRelayConfiguration();
     configuration.publicHost = 'relay.example.com';
+    configuration.manualRelayMultiaddrs = [
+      '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId',
+      '',
+      '  /dns4/relay-backup.example.com/tcp/4100/p2p/12D3KooWBackup  ',
+    ];
+    const expectedBody = {
+      ...configuration,
+      manualRelayMultiaddrs: [
+        '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId',
+        '/dns4/relay-backup.example.com/tcp/4100/p2p/12D3KooWBackup',
+      ],
+    };
     const request = jest.fn().mockResolvedValueOnce(configuration);
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
@@ -126,10 +138,10 @@ describe(PigeonNodeApi.name, () => {
       session,
       'PUT',
       '/node/relay-configuration/',
-      configuration,
+      expectedBody,
     );
     expect(request).toHaveBeenCalledWith('/node/relay-configuration/', {
-      body: JSON.stringify(configuration),
+      body: JSON.stringify(expectedBody),
       headers: { 'X-Signature': 'signature' },
       method: 'PUT',
     });

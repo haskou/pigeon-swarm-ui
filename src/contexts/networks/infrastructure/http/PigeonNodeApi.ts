@@ -46,6 +46,17 @@ export class PigeonNodeApi {
     }
   }
 
+  private relayConfigurationPayload(
+    configuration: NodeRelayConfiguration,
+  ): NodeRelayConfiguration {
+    return {
+      ...configuration,
+      manualRelayMultiaddrs: configuration.manualRelayMultiaddrs
+        .map((value) => value.trim())
+        .filter(Boolean),
+    };
+  }
+
   public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
     const info = await this.http.request<NodeInfo>('/node/');
 
@@ -183,11 +194,12 @@ export class PigeonNodeApi {
     session?: Session,
   ): Promise<NodeRelayConfiguration> {
     const path = '/node/relay-configuration/';
+    const body = this.relayConfigurationPayload(configuration);
 
     return await this.http.request<NodeRelayConfiguration>(path, {
-      body: JSON.stringify(configuration),
+      body: JSON.stringify(body),
       headers: session
-        ? await this.signer.headers(session, 'PUT', path, configuration)
+        ? await this.signer.headers(session, 'PUT', path, body)
         : undefined,
       method: 'PUT',
     });
