@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   ConversationResource,
@@ -35,7 +35,8 @@ type ResolvedIdentity = readonly [
   identity: IdentityResource | null,
 ];
 
-const IDENTITY_PROFILE_REFRESH_INTERVAL_MS = 15_000;
+const IDENTITY_PROFILE_REFRESH_INTERVAL_MS = 5 * 60_000;
+const IDENTITY_PROFILE_FOCUS_REFRESH_THROTTLE_MS = 60_000;
 
 export function useIdentityDirectory({
   conversations,
@@ -66,6 +67,7 @@ export function useIdentityDirectory({
   const [resolvingIdentityIds, setResolvingIdentityIds] = useState<string[]>(
     [],
   );
+  const lastIdentityRefreshAtRef = useRef(0);
 
   const rememberIdentity = useCallback((identity: IdentityResource) => {
     setIdentityNames((current) => ({
@@ -238,21 +240,34 @@ export function useIdentityDirectory({
   useEffect(() => {
     if (identityIdsToRefresh.length === 0) return undefined;
 
-    const refreshIdentities = () =>
+    const refreshIdentities = (options: { force?: boolean } = {}) => {
+      const now = Date.now();
+
+      if (
+        !options.force &&
+        now - lastIdentityRefreshAtRef.current <
+          IDENTITY_PROFILE_FOCUS_REFRESH_THROTTLE_MS
+      ) {
+        return;
+      }
+
+      lastIdentityRefreshAtRef.current = now;
       resolveIdentityIds(identityIdsToRefresh, { refresh: true });
+    };
     const refreshVisibleIdentities = () => {
       if (document.visibilityState === 'visible') refreshIdentities();
     };
+    const refreshFocusedIdentities = () => refreshIdentities();
     const intervalId = window.setInterval(() => {
-      refreshIdentities();
+      refreshIdentities({ force: true });
     }, IDENTITY_PROFILE_REFRESH_INTERVAL_MS);
 
-    window.addEventListener('focus', refreshIdentities);
+    window.addEventListener('focus', refreshFocusedIdentities);
     document.addEventListener('visibilitychange', refreshVisibleIdentities);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshIdentities);
+      window.removeEventListener('focus', refreshFocusedIdentities);
       document.removeEventListener(
         'visibilitychange',
         refreshVisibleIdentities,
