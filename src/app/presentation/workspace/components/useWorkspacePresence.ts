@@ -14,6 +14,9 @@ import {
   readPresencePreference,
   writePresencePreference,
 } from '../presencePreferenceStorage';
+import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity';
+
+const localActivityPresenceRefreshThrottleMs = 30_000;
 
 export function useWorkspacePresence({
   communities,
@@ -32,11 +35,18 @@ export function useWorkspacePresence({
   const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
     readPresencePreference(session.identity.id),
   );
+  const lastLocalActivityPresenceRefreshAtRef = useRef(0);
+  const localActivityPresenceRefreshInFlightRef = useRef(false);
+  const presenceByIdentityIdRef = useRef<Record<string, IdentityPresence>>({});
   const sessionRef = useRef(session);
 
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    presenceByIdentityIdRef.current = presenceByIdentityId;
+  }, [presenceByIdentityId]);
 
   useEffect(() => {
     const preference = readPresencePreference(session.identity.id);
@@ -96,6 +106,84 @@ export function useWorkspacePresence({
     },
     [],
   );
+  const refreshLocalActivityPresence = useCallback((options?: {
+    force?: boolean;
+  }) => {
+    const now = Date.now();
+
+    if (
+      localActivityPresenceRefreshInFlightRef.current ||
+      now - lastLocalActivityPresenceRefreshAtRef.current <
+        localActivityPresenceRefreshThrottleMs
+    ) {
+      return;
+    }
+
+    const nextStatus = presenceStatusForLocalActivity({
+      force: options?.force,
+      ownPresence:
+        presenceByIdentityIdRef.current[sessionRef.current.identity.id],
+      preferredStatus: presencePreferenceRef.current,
+    });
+
+    if (!nextStatus) return;
+
+    lastLocalActivityPresenceRefreshAtRef.current = now;
+    localActivityPresenceRefreshInFlightRef.current = true;
+    void applicationContainer
+      .updatePresence(sessionRef.current, { status: nextStatus })
+      .then(mergePresence)
+      .catch(() => undefined)
+      .finally(() => {
+        localActivityPresenceRefreshInFlightRef.current = false;
+      });
+  }, [mergePresence]);
+
+  useEffect(() => {
+    const onLocalActivity = () => refreshLocalActivityPresence({ force: true });
+    const onVisible = () => {
+      if (globalThis.document?.visibilityState === 'visible') {
+        refreshLocalActivityPresence({ force: true });
+      }
+    };
+    const movementEvent =
+      'PointerEvent' in globalThis ? 'pointermove' : 'mousemove';
+    const activityEvents = [
+      'keydown',
+      'mousedown',
+      'pointerdown',
+      'scroll',
+      'touchstart',
+      movementEvent,
+    ];
+
+    for (const eventName of activityEvents) {
+      globalThis.addEventListener?.(eventName, onLocalActivity, {
+        passive: true,
+      });
+    }
+    globalThis.document?.addEventListener?.('visibilitychange', onVisible, {
+      passive: true,
+    });
+    globalThis.addEventListener?.('focus', onLocalActivity, {
+      passive: true,
+    });
+    globalThis.addEventListener?.('pageshow', onLocalActivity, {
+      passive: true,
+    });
+
+    return () => {
+      for (const eventName of activityEvents) {
+        globalThis.removeEventListener?.(eventName, onLocalActivity);
+      }
+      globalThis.document?.removeEventListener?.(
+        'visibilitychange',
+        onVisible,
+      );
+      globalThis.removeEventListener?.('focus', onLocalActivity);
+      globalThis.removeEventListener?.('pageshow', onLocalActivity);
+    };
+  }, [refreshLocalActivityPresence]);
 
   useEffect(() => {
     if (presenceIdentityIds.length === 0) return;
