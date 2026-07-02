@@ -106,7 +106,9 @@ export function useWorkspacePresence({
     },
     [],
   );
-  const refreshLocalActivityPresence = useCallback(() => {
+  const refreshLocalActivityPresence = useCallback((options?: {
+    force?: boolean;
+  }) => {
     const now = Date.now();
 
     if (
@@ -118,6 +120,7 @@ export function useWorkspacePresence({
     }
 
     const nextStatus = presenceStatusForLocalActivity({
+      force: options?.force,
       ownPresence:
         presenceByIdentityIdRef.current[sessionRef.current.identity.id],
       preferredStatus: presencePreferenceRef.current,
@@ -138,15 +141,16 @@ export function useWorkspacePresence({
 
   useEffect(() => {
     const onLocalActivity = () => refreshLocalActivityPresence();
+    const onFocusedActivity = () =>
+      refreshLocalActivityPresence({ force: true });
     const onVisible = () => {
       if (globalThis.document?.visibilityState === 'visible') {
-        refreshLocalActivityPresence();
+        refreshLocalActivityPresence({ force: true });
       }
     };
     const movementEvent =
       'PointerEvent' in globalThis ? 'pointermove' : 'mousemove';
     const activityEvents = [
-      'focus',
       'keydown',
       'mousedown',
       'pointerdown',
@@ -163,7 +167,10 @@ export function useWorkspacePresence({
     globalThis.document?.addEventListener?.('visibilitychange', onVisible, {
       passive: true,
     });
-    globalThis.addEventListener?.('pageshow', onLocalActivity, {
+    globalThis.addEventListener?.('focus', onFocusedActivity, {
+      passive: true,
+    });
+    globalThis.addEventListener?.('pageshow', onFocusedActivity, {
       passive: true,
     });
 
@@ -175,7 +182,8 @@ export function useWorkspacePresence({
         'visibilitychange',
         onVisible,
       );
-      globalThis.removeEventListener?.('pageshow', onLocalActivity);
+      globalThis.removeEventListener?.('focus', onFocusedActivity);
+      globalThis.removeEventListener?.('pageshow', onFocusedActivity);
     };
   }, [refreshLocalActivityPresence]);
 

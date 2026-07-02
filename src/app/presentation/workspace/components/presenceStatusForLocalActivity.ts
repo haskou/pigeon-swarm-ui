@@ -9,12 +9,15 @@ const recoverableActivityStatuses = new Set<IdentityPresence['status']>([
 ]);
 
 export function presenceStatusForLocalActivity(input: {
+  force?: boolean;
   ownPresence?: IdentityPresence;
   preferredStatus: SelectablePresenceStatus | null;
 }): SelectablePresenceStatus | null {
   const preferredStatus = input.preferredStatus ?? 'available';
 
   if (!input.ownPresence) return preferredStatus;
+
+  if (input.force) return preferredStatus;
 
   if (input.ownPresence.status === preferredStatus) return null;
 

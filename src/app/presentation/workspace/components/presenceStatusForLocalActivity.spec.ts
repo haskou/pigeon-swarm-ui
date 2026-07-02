@@ -55,6 +55,16 @@ describe(presenceStatusForLocalActivity.name, () => {
     ).toBe('busy');
   });
 
+  it('forces a refresh when browser activity may have missed realtime presence events', () => {
+    expect(
+      presenceStatusForLocalActivity({
+        force: true,
+        ownPresence: presence('available'),
+        preferredStatus: null,
+      }),
+    ).toBe('available');
+  });
+
   it.each(['available', 'busy', 'invisible'] as const)(
     'does not republish when current presence is already %s',
     (status) => {
