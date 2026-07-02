@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   IdentityResource,
@@ -20,6 +22,10 @@ import { MetricCard } from '../../../../shared/presentation/components/MetricCar
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
+import { nodeRelayConfigurationPorts } from '../../../../contexts/networks/application/configure-node-relay/nodeRelayConfigurationPorts';
+import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
+import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import {
   identityPicture,
   publicFileObjectUrl,
@@ -37,7 +43,7 @@ interface NodeSettingsDialogProps {
 
 const PUBLIC_NETWORK_NAMES = new Set(['public', 'public network']);
 
-type NodeSettingsSection = 'info' | 'networks' | 'peers';
+type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
 
 export function NodeSettingsDialog({
   networks,
@@ -71,6 +77,17 @@ export function NodeSettingsDialog({
   const [replicationLoading, setReplicationLoading] = useState(true);
   const [replicationStatus, setReplicationStatus] =
     useState<IpfsReplicationStatus | null>(null);
+  const [relayConfiguration, setRelayConfiguration] =
+    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
+  const [relayError, setRelayError] = useState<string | null>(null);
+  const [relayLoading, setRelayLoading] = useState(false);
+  const [relayPortCheck, setRelayPortCheck] =
+    useState<NodeRelayPortCheckResource | null>(null);
+  const [relayPortCheckError, setRelayPortCheckError] = useState<string | null>(
+    null,
+  );
+  const [relayPortCheckLoading, setRelayPortCheckLoading] = useState(false);
+  const [relaySaving, setRelaySaving] = useState(false);
   const isOwner = node?.owner === session.identity.id;
   const hasPublicNetwork = networks.some(isPublicNodeNetwork);
   const canCreatePublicNetwork =
@@ -99,6 +116,7 @@ export function NodeSettingsDialog({
         String(networks.length),
       ),
     ],
+    ['relay', copy.nodeSettings.relayTab],
     [
       'peers',
       copy.nodeSettings.peersTab.replace('{count}', String(peers.length)),
@@ -161,6 +179,46 @@ export function NodeSettingsDialog({
         }
       }
       if (!cancelled) setReplicationLoading(false);
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, session]);
+
+  useEffect(() => {
+    if (!isOwner) {
+      setRelayConfiguration(defaultNodeRelayConfiguration());
+      setRelayError(null);
+      setRelayLoading(false);
+      setRelayPortCheck(null);
+      setRelayPortCheckError(null);
+
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      setRelayError(null);
+      setRelayLoading(true);
+      try {
+        const configuration =
+          await applicationContainer.getNodeRelayConfiguration(session);
+
+        if (!cancelled) {
+          setRelayConfiguration(normalizeNodeRelayConfiguration(configuration));
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setRelayError(
+            toUserErrorMessage(caught, copy.nodeSettings.relayLoadError),
+          );
+        }
+      }
+      if (!cancelled) setRelayLoading(false);
     };
 
     void load();
@@ -324,6 +382,60 @@ export function NodeSettingsDialog({
     window.setTimeout(() => {
       setCopiedPeerId((current) => (current === peerId ? null : current));
     }, 1800);
+  };
+
+  const handleSaveRelayConfiguration = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!isOwner || relaySaving) return;
+
+    setError(null);
+    setNotice(null);
+    setRelayError(null);
+    setRelaySaving(true);
+    try {
+      const saved = await applicationContainer.updateNodeRelayConfiguration(
+        relayConfiguration,
+        session,
+      );
+
+      setRelayConfiguration(normalizeNodeRelayConfiguration(saved));
+      setRelayPortCheck(null);
+      setRelayPortCheckError(null);
+      setNotice(copy.nodeSettings.relaySaveSuccess);
+    } catch (caught) {
+      setRelayError(
+        toUserErrorMessage(caught, copy.nodeSettings.relaySaveError),
+      );
+    }
+    setRelaySaving(false);
+  };
+
+  const handleCheckRelayPorts = async () => {
+    const publicHost = relayConfiguration.publicHost?.trim();
+    const checks = nodeRelayConfigurationPorts(relayConfiguration);
+
+    if (!isOwner || !publicHost || checks.length === 0) return;
+
+    setRelayPortCheck(null);
+    setRelayPortCheckError(null);
+    setRelayPortCheckLoading(true);
+    try {
+      setRelayPortCheck(
+        await applicationContainer.checkNodeRelayPorts(
+          publicHost,
+          checks,
+          session,
+        ),
+      );
+    } catch (caught) {
+      setRelayPortCheckError(
+        toUserErrorMessage(
+          caught,
+          copy.nodeSettings.relayReachabilityUnavailable,
+        ),
+      );
+    }
+    setRelayPortCheckLoading(false);
   };
 
   return createPortal(
@@ -616,6 +728,49 @@ export function NodeSettingsDialog({
                         </button>
                       </form>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {activeSection === 'relay' && (
+                <div className="grid content-start gap-3">
+                  {!isOwner ? (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-white/55">
+                      {copy.nodeSettings.ownerOnlyRelay}
+                    </div>
+                  ) : relayLoading ? (
+                    <div className="rounded-2xl bg-black/20 p-5 text-sm text-white/55">
+                      {copy.nodeSettings.relayLoading}
+                    </div>
+                  ) : (
+                    <form
+                      className="grid gap-3"
+                      onSubmit={handleSaveRelayConfiguration}
+                    >
+                      {relayError && (
+                        <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                          {relayError}
+                        </div>
+                      )}
+                      <NodeRelayConfigurationForm
+                        configuration={relayConfiguration}
+                        disabled={relaySaving}
+                        onChange={setRelayConfiguration}
+                        onCheckPorts={() => void handleCheckRelayPorts()}
+                        portCheck={relayPortCheck}
+                        portCheckError={relayPortCheckError}
+                        portCheckLoading={relayPortCheckLoading}
+                      />
+                      <button
+                        type="submit"
+                        disabled={relaySaving}
+                        className="justify-self-end rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {relaySaving
+                          ? copy.nodeSettings.saving
+                          : copy.nodeSettings.relaySave}
+                      </button>
+                    </form>
                   )}
                 </div>
               )}

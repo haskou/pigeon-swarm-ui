@@ -764,6 +764,9 @@ export const en = {
   },
   network: {
     body: 'Before creating identities, this node needs to connect to a network.',
+    configureRelay: 'Configure server relay',
+    configureRelayBody:
+      'Optional. Set public host and relay ports before joining a network. The backend must allow this before the node is claimed.',
     create: 'Create private network',
     createBody:
       'Create a new private network for this node and the devices you invite.',
@@ -835,10 +838,52 @@ export const en = {
     relay: 'Relay',
     relayAdvertised: 'Advertised',
     relayAutoEnabled: 'Auto',
+    relayCheckPorts: 'Check ports',
+    relayCheckingPorts: 'Checking...',
+    relayDiscoveryEnabled: 'Discovery enabled',
     relayDisabled: 'Disabled',
     relayEnabled: 'Enabled',
+    relayEnabledSetting: 'Enabled',
+    relayLoadError: 'Relay configuration could not be loaded.',
     relayPeer: 'Relay peer',
+    relayPortReachable: 'Reachable',
+    relayPortUnknown: 'Unknown',
+    relayPortUnreachable: 'Blocked',
+    relayPublicHost: 'Public host',
+    relayPublicHostBody:
+      'DNS name or public host used when this node advertises relays.',
+    relayPublicHostPlaceholder: 'relay.example.com',
+    relayReachabilityBody:
+      'Checks whether the configured public host and relay ports are reachable from outside. This requires backend support.',
+    relayReachabilityTitle: 'Port reachability',
+    relayReachabilityUnavailable:
+      'Port reachability check is not available on this backend yet.',
     relayRunning: 'Running',
+    relaySave: 'Save relay configuration',
+    relaySaveError: 'Relay configuration could not be saved.',
+    relaySaveSuccess: 'Relay configuration saved.',
+    relayTab: 'Relay',
+    relayLoading: 'Loading relay configuration...',
+    callsRelayBody:
+      'TURN listening port used for call media relay credentials.',
+    callsRelayPort: 'TURN port',
+    callsRelayTitle: 'Calls relay',
+    manualRelayMultiaddrs: 'Manual relay multiaddrs',
+    manualRelayMultiaddrsBody:
+      'Optional fallback libp2p relay multiaddrs, one per line.',
+    ownerOnlyRelay: 'Only the node owner can manage relay configuration.',
+    privateRelayBody:
+      'TCP relay range used by private IPFS networks and relay records.',
+    privateRelayDiscoverRecords: 'Discover public relay records',
+    privateRelayPortEnd: 'Port end',
+    privateRelayPortStart: 'Port start',
+    privateRelayPublishRecords: 'Publish public relay records',
+    privateRelayTitle: 'Private relay',
+    publicRelayBody:
+      'Public libp2p relay advertised by this node when reachable.',
+    publicRelayLibp2pPort: 'Libp2p port',
+    publicRelayPort: 'Relay port',
+    publicRelayTitle: 'Public relay',
     replication: 'Replication status',
     replicationActiveNodes: 'Active',
     replicationBody: 'Node replication diagnostics.',

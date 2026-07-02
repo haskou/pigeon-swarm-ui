@@ -5,6 +5,9 @@ import type {
 } from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -1112,6 +1115,30 @@ export class PigeonApplication {
     return await this.removeNodeNetworkUseCase.remove(
       new RemoveNodeNetworkMessage({ networkId, session }),
     );
+  }
+
+  public async getNodeRelayConfiguration(
+    session: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.gateway.getNodeRelayConfiguration(session);
+  }
+
+  public async updateNodeRelayConfiguration(
+    configuration: NodeRelayConfiguration,
+    session?: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.gateway.updateNodeRelayConfiguration(
+      configuration,
+      session,
+    );
+  }
+
+  public async checkNodeRelayPorts(
+    publicHost: string,
+    checks: NodeRelayPortCheckTarget[],
+    session: Session,
+  ): Promise<NodeRelayPortCheckResource> {
+    return await this.gateway.checkNodeRelayPorts(publicHost, checks, session);
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {

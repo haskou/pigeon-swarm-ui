@@ -2,7 +2,11 @@ import { FormEvent, useState } from 'react';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { Field } from '../../../identities/presentation/auth/Field';
+import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+
+import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
 import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
+import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -17,6 +21,9 @@ export function NetworkCreationScreen({
   const [mode, setMode] = useState<NetworkSetupMode>('public');
   const [name, setName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [configureRelay, setConfigureRelay] = useState(false);
+  const [relayConfiguration, setRelayConfiguration] =
+    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [
@@ -31,6 +38,12 @@ export function NetworkCreationScreen({
     setLoading(true);
 
     try {
+      if (configureRelay) {
+        await applicationContainer.updateNodeRelayConfiguration(
+          relayConfiguration,
+        );
+      }
+
       if (mode === 'create') {
         await applicationContainer.createNetwork(name);
       } else if (mode === 'join') {
@@ -113,6 +126,30 @@ export function NetworkCreationScreen({
               />
             </Field>
           ) : null}
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
+          <label className="flex items-center justify-between gap-3 text-left text-sm font-black text-white/75">
+            <span>{copy.network.configureRelay}</span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={configureRelay}
+              onChange={(event) => setConfigureRelay(event.target.checked)}
+              className="h-5 w-9 accent-cyan-300"
+            />
+          </label>
+          <p className="mt-2 text-sm leading-6 text-white/50">
+            {copy.network.configureRelayBody}
+          </p>
+          {configureRelay && (
+            <NodeRelayConfigurationForm
+              className="mt-4 text-left"
+              configuration={relayConfiguration}
+              disabled={loading}
+              onChange={setRelayConfiguration}
+            />
+          )}
         </div>
 
         {error && (

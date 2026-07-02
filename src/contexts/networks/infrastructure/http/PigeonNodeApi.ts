@@ -6,6 +6,9 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
 import type { NodeInfo } from './NodeInfo';
@@ -160,6 +163,48 @@ export class PigeonNodeApi {
     return await this.http.request<IpfsReplicationStatus>(path, {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
+    });
+  }
+
+  public async getRelayConfiguration(
+    session: Session,
+  ): Promise<NodeRelayConfiguration> {
+    const path = '/node/relay-configuration/';
+    const body = {};
+
+    return await this.http.request<NodeRelayConfiguration>(path, {
+      headers: await this.signer.headers(session, 'GET', path, body),
+      method: 'GET',
+    });
+  }
+
+  public async updateRelayConfiguration(
+    configuration: NodeRelayConfiguration,
+    session?: Session,
+  ): Promise<NodeRelayConfiguration> {
+    const path = '/node/relay-configuration/';
+
+    return await this.http.request<NodeRelayConfiguration>(path, {
+      body: JSON.stringify(configuration),
+      headers: session
+        ? await this.signer.headers(session, 'PUT', path, configuration)
+        : undefined,
+      method: 'PUT',
+    });
+  }
+
+  public async checkRelayPorts(
+    publicHost: string,
+    checks: NodeRelayPortCheckTarget[],
+    session: Session,
+  ): Promise<NodeRelayPortCheckResource> {
+    const path = '/node/relay-configuration/reachability-check/';
+    const body = { checks, publicHost };
+
+    return await this.http.request<NodeRelayPortCheckResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
     });
   }
 }

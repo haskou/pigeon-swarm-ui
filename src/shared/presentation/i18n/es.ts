@@ -627,6 +627,9 @@ export const es = {
   },
   network: {
     body: 'Antes de crear identidades, este nodo necesita conectarse a una red.',
+    configureRelay: 'Configurar relay del servidor',
+    configureRelayBody:
+      'Opcional. Define host publico y puertos de relay antes de unirte a una red. Backend debe permitirlo antes de reclamar el nodo.',
     create: 'Crear red privada',
     createBody:
       'Crea una red privada nueva para este nodo y los dispositivos que invites.',
@@ -691,10 +694,52 @@ export const es = {
     relay: 'Relay',
     relayAdvertised: 'Publicado',
     relayAutoEnabled: 'Auto',
+    relayCheckPorts: 'Verificar puertos',
+    relayCheckingPorts: 'Verificando...',
+    relayDiscoveryEnabled: 'Discovery activado',
     relayDisabled: 'Desactivado',
     relayEnabled: 'Activado',
+    relayEnabledSetting: 'Activado',
+    relayLoadError: 'No se pudo cargar la configuracion de relay.',
     relayPeer: 'Peer relay',
+    relayPortReachable: 'Accesible',
+    relayPortUnknown: 'Desconocido',
+    relayPortUnreachable: 'Bloqueado',
+    relayPublicHost: 'Host publico',
+    relayPublicHostBody:
+      'DNS o host publico usado cuando este nodo publica relays.',
+    relayPublicHostPlaceholder: 'relay.example.com',
+    relayReachabilityBody:
+      'Comprueba si el host publico y los puertos configurados son accesibles desde fuera. Requiere soporte de backend.',
+    relayReachabilityTitle: 'Accesibilidad de puertos',
+    relayReachabilityUnavailable:
+      'La verificacion de puertos aun no esta disponible en este backend.',
     relayRunning: 'Ejecutandose',
+    relaySave: 'Guardar configuracion de relay',
+    relaySaveError: 'No se pudo guardar la configuracion de relay.',
+    relaySaveSuccess: 'Configuracion de relay guardada.',
+    relayTab: 'Relay',
+    relayLoading: 'Cargando configuracion de relay...',
+    callsRelayBody:
+      'Puerto TURN usado para credenciales de relay multimedia en llamadas.',
+    callsRelayPort: 'Puerto TURN',
+    callsRelayTitle: 'Relay de llamadas',
+    manualRelayMultiaddrs: 'Multiaddrs de relay manuales',
+    manualRelayMultiaddrsBody:
+      'Fallback opcional de multiaddrs libp2p, una por linea.',
+    ownerOnlyRelay: 'Solo el propietario del nodo puede gestionar el relay.',
+    privateRelayBody:
+      'Rango TCP usado por redes IPFS privadas y registros de relay.',
+    privateRelayDiscoverRecords: 'Descubrir registros publicos de relay',
+    privateRelayPortEnd: 'Puerto final',
+    privateRelayPortStart: 'Puerto inicial',
+    privateRelayPublishRecords: 'Publicar registros publicos de relay',
+    privateRelayTitle: 'Relay privado',
+    publicRelayBody:
+      'Relay libp2p publico anunciado por este nodo cuando es alcanzable.',
+    publicRelayLibp2pPort: 'Puerto libp2p',
+    publicRelayPort: 'Puerto relay',
+    publicRelayTitle: 'Relay publico',
     removeNetwork: 'Eliminar red',
     removeNetworkConfirm:
       'Eliminar {name} de este nodo? Se borraran el storage IPFS local y la metadata de esta red.',
