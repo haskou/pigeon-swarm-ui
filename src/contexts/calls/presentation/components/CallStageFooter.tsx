@@ -6,6 +6,7 @@ import {
   CameraIcon,
   HangUpIcon,
   HeadphonesIcon,
+  LockIcon,
   MicrophoneIcon,
   NoiseCancellationIcon,
   ScreenShareIcon,
@@ -17,6 +18,7 @@ export function CallStageFooter({
   onToggleCamera,
   onToggleDeafen,
   onToggleMute,
+  onToggleMediaEncryption,
   onToggleNoiseCancellation,
   onToggleScreenShare,
 }: {
@@ -25,6 +27,7 @@ export function CallStageFooter({
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
+  onToggleMediaEncryption: () => void;
   onToggleNoiseCancellation: () => void;
   onToggleScreenShare: () => void;
 }) {
@@ -65,6 +68,19 @@ export function CallStageFooter({
         onClick={onToggleScreenShare}
       >
         <ScreenShareIcon active={call.screenSharing} />
+      </CallButton>
+      <CallButton
+        active={call.mediaEncryption.active}
+        blocked={!call.mediaEncryption.available}
+        disabled={!call.mediaEncryption.available}
+        label={
+          call.mediaEncryption.active
+            ? copy.calls.mediaEncryptionOff
+            : copy.calls.mediaEncryptionOn
+        }
+        onClick={onToggleMediaEncryption}
+      >
+        <LockIcon active={call.mediaEncryption.active} />
       </CallButton>
       <CallButton
         active={call.noiseCancellationEnabled}

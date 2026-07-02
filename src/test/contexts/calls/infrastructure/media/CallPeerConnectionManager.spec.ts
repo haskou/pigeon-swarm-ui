@@ -1,3 +1,5 @@
+import { SymmetricKey } from '@haskou/value-objects';
+
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
 import type { MockAudioContext } from '../../../../../contexts/calls/infrastructure/media/MockAudioContext';
@@ -16,6 +18,14 @@ const originalPeerConnection = Object.getOwnPropertyDescriptor(
 const originalSessionDescription = Object.getOwnPropertyDescriptor(
   globalThis,
   'RTCSessionDescription',
+);
+const originalRtpReceiver = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'RTCRtpReceiver',
+);
+const originalRtpSender = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'RTCRtpSender',
 );
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -129,10 +139,25 @@ function remoteTrackEvent(
   } as unknown as RTCTrackEvent;
 }
 
+function encodedFrameStreams(): {
+  readable: ReadableStream<RTCEncodedAudioFrame | RTCEncodedVideoFrame>;
+  writable: WritableStream<RTCEncodedAudioFrame | RTCEncodedVideoFrame>;
+} {
+  return {
+    readable: new ReadableStream({
+      start(controller): void {
+        controller.close();
+      },
+    }),
+    writable: new WritableStream(),
+  };
+}
+
 function createFakeSender(track: MediaStreamTrack): FakeSender {
   let currentTrack: MediaStreamTrack | null = track;
 
   return {
+    createEncodedStreams: jest.fn(() => encodedFrameStreams()),
     replaceTrack: jest.fn((nextTrack: MediaStreamTrack | null) => {
       currentTrack = nextTrack;
 
@@ -142,6 +167,28 @@ function createFakeSender(track: MediaStreamTrack): FakeSender {
       return currentTrack;
     },
   };
+}
+
+function installEncodedStreamSupport(): void {
+  function FakeRtpSender(): void {}
+  function FakeRtpReceiver(): void {}
+
+  Object.defineProperty(FakeRtpSender.prototype, 'createEncodedStreams', {
+    configurable: true,
+    value: jest.fn(),
+  });
+  Object.defineProperty(FakeRtpReceiver.prototype, 'createEncodedStreams', {
+    configurable: true,
+    value: jest.fn(),
+  });
+  Object.defineProperty(globalThis, 'RTCRtpSender', {
+    configurable: true,
+    value: FakeRtpSender,
+  });
+  Object.defineProperty(globalThis, 'RTCRtpReceiver', {
+    configurable: true,
+    value: FakeRtpReceiver,
+  });
 }
 
 function createFakePeerConnection(): FakePeerConnection {
@@ -281,6 +328,8 @@ function restoreGlobalProperty(
     | 'MediaStream'
     | 'RTCPeerConnection'
     | 'RTCSessionDescription'
+    | 'RTCRtpReceiver'
+    | 'RTCRtpSender'
     | 'window',
   descriptor: PropertyDescriptor | undefined,
 ): void {
@@ -299,6 +348,8 @@ describe(CallPeerConnectionManager.name, () => {
     restoreGlobalProperty('MediaStream', originalMediaStream);
     restoreGlobalProperty('RTCPeerConnection', originalPeerConnection);
     restoreGlobalProperty('RTCSessionDescription', originalSessionDescription);
+    restoreGlobalProperty('RTCRtpReceiver', originalRtpReceiver);
+    restoreGlobalProperty('RTCRtpSender', originalRtpSender);
     restoreGlobalProperty('window', originalWindow);
   });
 
@@ -521,6 +572,28 @@ describe(CallPeerConnectionManager.name, () => {
       type: 'answer',
     });
     expect(peer.signalingState).toBe('stable');
+  });
+
+  it('configures encoded streams for encrypted local media senders', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+    const microphone = mediaTrack('microphone-1', 'audio');
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.setLocalStream(mediaStreamWithTracks([microphone]));
+
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    const [peer] = peers;
+    const [sender] = peer.senders as unknown as FakeSender[];
+
+    expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
   });
 
   it('serializes concurrent peer creation for the same identity', async () => {

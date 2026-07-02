@@ -93,6 +93,7 @@ interface SidebarProps {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
   onCallToggleScreenShare?: () => void;
@@ -118,6 +119,7 @@ export function Sidebar({
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleMediaEncryption,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onConversationNotificationMuteToggle,
@@ -387,6 +389,7 @@ export function Sidebar({
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMute={onCallToggleMute}
+        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
         onCallToggleScreenShare={onCallToggleScreenShare}

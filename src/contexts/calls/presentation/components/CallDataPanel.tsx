@@ -13,6 +13,7 @@ export function CallDataPanel({ call }: { call: CallSession }) {
       conversationId: call.conversationId,
       hasMicrophone: call.hasMicrophone,
       kind: call.kind,
+      mediaEncryption: call.mediaEncryption,
       screenSharing: call.screenSharing,
       screenShareQuality: call.screenShareQuality,
       status: call.status,

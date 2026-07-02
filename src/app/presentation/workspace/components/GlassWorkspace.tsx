@@ -15,6 +15,7 @@ import type { NodeNetwork } from '../../../../contexts/networks/application/list
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
+  CallMediaEncryptionUnavailableReason,
   CallParticipant,
   CallParticipantMediaConnection,
   CallResource,
@@ -176,6 +177,11 @@ type PendingSend = {
   content: string;
   replyTarget: ChatMessage | null;
   sticker?: StickerMessageReference;
+};
+type CallMediaEncryptionInput = {
+  mediaEncryptionEnabled: boolean;
+  mediaEncryptionKey?: string;
+  mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
 };
 type FailedSends = Record<string, PendingSend>;
 interface GlassWorkspaceProps {
@@ -354,19 +360,23 @@ export function GlassWorkspace({
     startCall,
     toggleCamera,
     toggleDeafen,
+    toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
     retryMicrophone,
     toggleScreenShare,
   } = useCallSession();
   const {
+    mediaEncryptionEnabled: callMediaEncryptionEnabled,
     noiseCancellationEnabled: callNoiseCancellationEnabled,
     requestOptionalLocalAudio,
     stopLocalAudio,
+    toggleCallMediaEncryption,
     toggleCallNoiseCancellation,
   } = useCallMediaAccess({
     identityId: session.identity.id,
     onError: setSendError,
+    toggleMediaEncryption,
     toggleNoiseCancellation,
   });
   const {
@@ -1043,6 +1053,50 @@ export function GlassWorkspace({
       session.keychain,
     ],
   );
+  const callMediaEncryptionForResource = useCallback(
+    (call: CallResource): CallMediaEncryptionInput => {
+      const scope = call.scope;
+      const disabled = (reason: CallMediaEncryptionUnavailableReason) => ({
+        mediaEncryptionEnabled: callMediaEncryptionEnabled,
+        mediaEncryptionUnavailableReason: reason,
+      });
+      const enabled = (entry: ConversationKeyEntry | undefined) =>
+        entry?.key
+          ? {
+              mediaEncryptionEnabled: callMediaEncryptionEnabled,
+              mediaEncryptionKey: entry.key,
+            }
+          : disabled('missing-key');
+
+      if (scope.type === 'community_channel') {
+        const community = communities.find(
+          (item) => item.id === scope.communityId,
+        );
+
+        if (community?.visibility === 'public') {
+          return disabled('public-community');
+        }
+
+        return enabled(
+          session.keychain.conversations[scope.communityId],
+        );
+      }
+
+      return enabled(
+        ConversationKeychain.entry(
+          session.keychain,
+          session.identity.id,
+          scope.conversationId,
+        ),
+      );
+    },
+    [
+      callMediaEncryptionEnabled,
+      communities,
+      session.identity.id,
+      session.keychain,
+    ],
+  );
   const { incomingCall, reconcileCallResource, setIncomingCall } =
     useCallResourceReconciliation({
       activeCall,
@@ -1122,6 +1176,7 @@ export function GlassWorkspace({
     activeCall,
     activeCommunity,
     callDetailsForResource,
+    callMediaEncryptionForResource,
     callNoiseCancellationEnabled,
     callSignalSender,
     cleanupJoinedCalls,
@@ -2699,6 +2754,7 @@ export function GlassWorkspace({
                     onCallScreenShareQualityChange={setScreenShareQuality}
                     onCallToggleCamera={toggleCamera}
                     onCallToggleDeafen={toggleDeafen}
+                    onCallToggleMediaEncryption={toggleCallMediaEncryption}
                     onCallToggleMute={toggleMute}
                     onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
                     onCallRetryMicrophone={retryMicrophone}
@@ -2951,6 +3007,7 @@ export function GlassWorkspace({
               onCallScreenShareQualityChange={setScreenShareQuality}
               onCallToggleCamera={toggleCamera}
               onCallToggleDeafen={toggleDeafen}
+              onCallToggleMediaEncryption={toggleCallMediaEncryption}
               onCallToggleMute={toggleMute}
               onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
               onCallRetryMicrophone={retryMicrophone}

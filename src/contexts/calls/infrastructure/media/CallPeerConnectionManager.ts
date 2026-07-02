@@ -25,6 +25,7 @@ import {
   type DescriptionSignalPayload,
   type SignalSender,
 } from './descriptionPayload';
+import { EncodedCallMediaCipher } from './EncodedCallMediaCipher';
 import {
   graphAudioVolume,
   isMediaStreamSource,
@@ -41,9 +42,17 @@ const disconnectedPeerRecoveryDelayMs = 3_000;
 const maximumPeerRecoveryDelayMs = 15_000;
 
 export class CallPeerConnectionManager {
+  private mediaEncryptionCipher: EncodedCallMediaCipher | null = null;
+
+  private mediaEncryptionEnabled = false;
+
+  private readonly peerAcceptsEncryptedMedia = new Map<string, boolean>();
+
   private readonly peers = new Map<string, RTCPeerConnection>();
 
   private latestPeerStats: Record<string, PeerMediaStats> = {};
+
+  private readonly peerSignalSenders = new Map<string, SignalSender>();
 
   private readonly pendingPeerCreations = new Map<
     string,
@@ -214,6 +223,7 @@ export class CallPeerConnectionManager {
       return;
     }
 
+    this.rememberRemoteMediaEncryptionMetadata(senderIdentityId, payload);
     this.rememberRemoteScreenShareMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
@@ -241,6 +251,7 @@ export class CallPeerConnectionManager {
         this.localScreenAudioStreamIds(),
         this.localScreenTrackIds(),
         this.localScreenStreamIds(),
+        this.localMediaEncryptionMetadata(senderIdentityId),
       ),
     );
   }
@@ -327,6 +338,7 @@ export class CallPeerConnectionManager {
     );
     const peer = new RTCPeerConnection(rtcConfiguration);
 
+    this.peerSignalSenders.set(peerIdentityId, sendSignal);
     logCallDebug('peer-manager:create-peer', {
       hasLocalStream: Boolean(this.localStream),
       iceServerCount: rtcConfiguration.iceServers?.length ?? 0,
@@ -384,6 +396,7 @@ export class CallPeerConnectionManager {
     peer.addEventListener('track', (event) => {
       const [stream] = event.streams;
 
+      this.configureRemoteReceiver(event.receiver);
       logCallDebug('peer-manager:track-received', {
         hasStream: Boolean(stream),
         peerIdentityId,
@@ -414,6 +427,7 @@ export class CallPeerConnectionManager {
 
       this.configureLocalSender(
         peer.addTrack(track, this.localTrackStream(track)),
+        peerIdentityId,
       );
     });
   }
@@ -479,6 +493,19 @@ export class CallPeerConnectionManager {
   ): void {
     this.rememberRemoteScreenVideoMetadata(peerIdentityId, payload);
     this.rememberRemoteScreenAudioMetadata(peerIdentityId, payload);
+  }
+
+  private rememberRemoteMediaEncryptionMetadata(
+    peerIdentityId: string,
+    payload: DescriptionSignalPayload,
+  ): void {
+    if (!payload.mediaEncryption) return;
+
+    this.peerAcceptsEncryptedMedia.set(
+      peerIdentityId,
+      payload.mediaEncryption.acceptsEncrypted,
+    );
+    this.syncPeerMediaEncryption(peerIdentityId);
   }
 
   private rememberRemoteScreenVideoMetadata(
@@ -656,12 +683,13 @@ export class CallPeerConnectionManager {
   private syncLocalTracks(): void {
     const activeTracks = this.localStream?.getTracks() ?? [];
 
-    for (const peer of this.peers.values()) {
-      this.syncPeerLocalTracks(peer, activeTracks);
+    for (const [peerIdentityId, peer] of this.peers.entries()) {
+      this.syncPeerLocalTracks(peerIdentityId, peer, activeTracks);
     }
   }
 
   private syncPeerLocalTracks(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     activeTracks: MediaStreamTrack[],
   ): void {
@@ -670,6 +698,7 @@ export class CallPeerConnectionManager {
 
     for (const sender of peer.getSenders()) {
       this.syncLocalSender(
+        peerIdentityId,
         peer,
         sender,
         activeTracks,
@@ -679,11 +708,12 @@ export class CallPeerConnectionManager {
     }
 
     for (const track of activeTracks) {
-      this.addMissingLocalTrack(peer, track, syncedTracks);
+      this.addMissingLocalTrack(peerIdentityId, peer, track, syncedTracks);
     }
   }
 
   private syncLocalSender(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     sender: RTCRtpSender,
     activeTracks: MediaStreamTrack[],
@@ -711,7 +741,7 @@ export class CallPeerConnectionManager {
     syncedTracks.add(replacement);
     void sender
       .replaceTrack(replacement)
-      .then(() => this.configureLocalSender(sender))
+      .then(() => this.configureLocalSender(sender, peerIdentityId))
       .catch((error: unknown) => {
         logCallError('peer-manager:replace-local-track-failed', error, {
           kind: replacement.kind,
@@ -720,6 +750,7 @@ export class CallPeerConnectionManager {
   }
 
   private addMissingLocalTrack(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     track: MediaStreamTrack,
     syncedTracks: Set<MediaStreamTrack>,
@@ -730,10 +761,32 @@ export class CallPeerConnectionManager {
 
     this.configureLocalSender(
       peer.addTrack(track, this.localTrackStream(track)),
+      peerIdentityId,
     );
   }
 
-  private configureLocalSender(sender: RTCRtpSender): void {
+  private configureLocalSender(
+    sender: RTCRtpSender,
+    peerIdentityId: string,
+  ): void {
+    this.configureLocalSenderMediaEncryption(sender, peerIdentityId);
+    this.configureLocalSenderScreenShareQuality(sender);
+  }
+
+  private configureLocalSenderMediaEncryption(
+    sender: RTCRtpSender,
+    peerIdentityId: string,
+  ): void {
+    this.mediaEncryptionCipher?.configureSender(sender, () =>
+      this.outboundMediaEncryptionEnabled(peerIdentityId),
+    );
+  }
+
+  private configureRemoteReceiver(receiver: RTCRtpReceiver): void {
+    this.mediaEncryptionCipher?.configureReceiver(receiver);
+  }
+
+  private configureLocalSenderScreenShareQuality(sender: RTCRtpSender): void {
     if (!sender.track || !isScreenShareTrack(sender.track)) return;
 
     if (
@@ -761,9 +814,55 @@ export class CallPeerConnectionManager {
   }
 
   private syncScreenShareEncodingParameters(): void {
-    for (const peer of this.peers.values()) {
-      peer.getSenders().forEach((sender) => this.configureLocalSender(sender));
+    for (const [peerIdentityId, peer] of this.peers.entries()) {
+      peer
+        .getSenders()
+        .forEach((sender) => this.configureLocalSender(sender, peerIdentityId));
     }
+  }
+
+  private syncMediaEncryptionTransforms(): void {
+    for (const [peerIdentityId, peer] of this.peers.entries()) {
+      this.syncPeerMediaEncryption(peerIdentityId, peer);
+    }
+  }
+
+  private syncPeerMediaEncryption(
+    peerIdentityId: string,
+    peer = this.peers.get(peerIdentityId),
+  ): void {
+    if (!peer) return;
+
+    peer
+      .getSenders()
+      .forEach((sender) =>
+        this.configureLocalSenderMediaEncryption(sender, peerIdentityId),
+      );
+    peer
+      .getReceivers?.()
+      .forEach((receiver) => this.configureRemoteReceiver(receiver));
+  }
+
+  private outboundMediaEncryptionEnabled(peerIdentityId: string): boolean {
+    return (
+      Boolean(this.mediaEncryptionCipher) &&
+      this.mediaEncryptionEnabled &&
+      (this.peerAcceptsEncryptedMedia.get(peerIdentityId) ?? true)
+    );
+  }
+
+  private acceptsEncryptedMedia(): boolean {
+    return Boolean(this.mediaEncryptionCipher) && this.mediaEncryptionEnabled;
+  }
+
+  private localMediaEncryptionMetadata(
+    peerIdentityId: string,
+  ): DescriptionSignalPayload['mediaEncryption'] {
+    return {
+      acceptsEncrypted: this.acceptsEncryptedMedia(),
+      enabled: this.outboundMediaEncryptionEnabled(peerIdentityId),
+      version: 1,
+    };
   }
 
   private hasLocalSender(
@@ -812,6 +911,7 @@ export class CallPeerConnectionManager {
           this.localScreenAudioStreamIds(),
           this.localScreenTrackIds(),
           this.localScreenStreamIds(),
+          this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
     } finally {
@@ -948,7 +1048,9 @@ export class CallPeerConnectionManager {
     this.peers.delete(peerIdentityId);
     this.peerRecoveryAttempts.delete(peerIdentityId);
     this.pendingIceCandidates.delete(peerIdentityId);
+    this.peerAcceptsEncryptedMedia.delete(peerIdentityId);
     this.peerNegotiationStates.delete(peerIdentityId);
+    this.peerSignalSenders.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
     this.remoteScreenStreams.delete(peerIdentityId);
     this.remoteScreenStreamIds.delete(peerIdentityId);
@@ -1107,9 +1209,58 @@ export class CallPeerConnectionManager {
     });
   }
 
+  private async renegotiateMediaEncryption(): Promise<void> {
+    await Promise.all(
+      [...this.peers.entries()].map(async ([peerIdentityId, peer]) => {
+        const sendSignal = this.peerSignalSenders.get(peerIdentityId);
+
+        if (!sendSignal) return;
+
+        await this.sendRenegotiationOffer(peerIdentityId, peer, sendSignal);
+      }),
+    );
+  }
+
   public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {
     this.rtcConfigurationProvider = rtcConfigurationProvider;
     logCallDebug('peer-manager:configure');
+  }
+
+  public static mediaEncryptionSupported(): boolean {
+    return EncodedCallMediaCipher.isSupported();
+  }
+
+  public configureMediaEncryption(
+    base64Key: null | string,
+    enabled: boolean,
+  ): void {
+    const supported = EncodedCallMediaCipher.isSupported();
+
+    this.mediaEncryptionCipher =
+      base64Key && supported ? new EncodedCallMediaCipher(base64Key) : null;
+    this.mediaEncryptionEnabled = Boolean(
+      enabled && this.mediaEncryptionCipher,
+    );
+    this.syncMediaEncryptionTransforms();
+    logCallDebug('peer-manager:media-encryption:configure', {
+      enabled: this.mediaEncryptionEnabled,
+      hasKey: Boolean(base64Key),
+      supported,
+    });
+  }
+
+  public setMediaEncryptionEnabled(enabled: boolean): void {
+    this.mediaEncryptionEnabled = Boolean(
+      enabled && this.mediaEncryptionCipher,
+    );
+    logCallDebug('peer-manager:media-encryption:set-enabled', {
+      enabled: this.mediaEncryptionEnabled,
+    });
+    void this.renegotiateMediaEncryption().catch((error: unknown) => {
+      logCallWarning('peer-manager:media-encryption:renegotiate-failed', {
+        error,
+      });
+    });
   }
 
   public setLocalStream(stream: MediaStream | null): void {
@@ -1245,6 +1396,7 @@ export class CallPeerConnectionManager {
           this.localScreenAudioStreamIds(),
           this.localScreenTrackIds(),
           this.localScreenStreamIds(),
+          this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
     } finally {
@@ -1270,6 +1422,7 @@ export class CallPeerConnectionManager {
         currentIdentityId > senderIdentityId,
       );
     }
+    this.peerSignalSenders.set(senderIdentityId, sendSignal);
     const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
     const state = this.peerNegotiationState(senderIdentityId);
 
@@ -1300,12 +1453,14 @@ export class CallPeerConnectionManager {
     });
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
+    this.peerAcceptsEncryptedMedia.clear();
     this.pendingPeerCreations.clear();
     this.pendingPeerRecoveries.forEach((timeout) => clearTimeout(timeout));
     this.pendingPeerRecoveries.clear();
     this.peerRecoveryAttempts.clear();
     this.pendingIceCandidates.clear();
     this.peerNegotiationStates.clear();
+    this.peerSignalSenders.clear();
 
     for (const audio of this.remoteAudio.values()) {
       audio.pause();
@@ -1335,6 +1490,8 @@ export class CallPeerConnectionManager {
     this.previousStatsSamples.clear();
     this.localStream = null;
     this.latestPeerStats = {};
+    this.mediaEncryptionCipher = null;
+    this.mediaEncryptionEnabled = false;
     this.rtcConfigurationProvider = null;
     this.deafened = false;
   }

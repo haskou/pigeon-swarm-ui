@@ -7,6 +7,10 @@ export type { CallResource } from './CallResource';
 export type { CallSignalType } from './CallSignalType';
 export type { CallSignalPayload } from './CallSignalPayload';
 export type { CallIceServerConfig } from './CallIceServerConfig';
+export type {
+  CallMediaEncryptionState,
+  CallMediaEncryptionUnavailableReason,
+} from './CallMediaEncryptionState';
 export type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 export type { CallParticipant } from './CallParticipant';
 export type { CallParticipantMediaConnection } from './CallParticipantMediaConnection';

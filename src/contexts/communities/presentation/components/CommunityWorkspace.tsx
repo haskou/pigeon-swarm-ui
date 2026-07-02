@@ -153,6 +153,7 @@ interface CommunityWorkspaceProps {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
   onCallToggleScreenShare?: () => void;
@@ -331,6 +332,7 @@ export function CommunityWorkspace({
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleMediaEncryption,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onChannelSelected,
@@ -1599,6 +1601,7 @@ export function CommunityWorkspace({
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMicrophone={onCallToggleMute}
+        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
         onCallToggleScreenShare={onCallToggleScreenShare}
