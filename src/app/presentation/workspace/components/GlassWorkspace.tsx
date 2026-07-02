@@ -2211,6 +2211,8 @@ export function GlassWorkspace({
     }
 
     if (loadedMessagesConversationIdRef.current === activeConversation.id) {
+      scrollMessagesToBottom('auto', true);
+
       return;
     }
 
@@ -4452,6 +4454,9 @@ export function GlassWorkspace({
               invitationAccepting={notificationAction === 'accept'}
               invitationError={notificationError}
               invitationInviterName={activeCommunityInvitationInviterName}
+              timelineFocusKey={`${workspaceMode}:${activeCommunity.id}:${
+                activeCommunityChannelId ?? ''
+              }`}
               notificationSettingsByScopeKey={notificationSettingsByScopeKey}
               mobileMembersOpen={communityMembersOpen}
               mobileSidebarOpen={sidebarOpen}

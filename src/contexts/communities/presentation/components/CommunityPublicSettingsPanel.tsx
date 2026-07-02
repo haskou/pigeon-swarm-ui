@@ -25,6 +25,8 @@ export function CommunityPublicSettingsPanel({
   onVisibilityChange,
   visibility,
 }: CommunityPublicSettingsPanelProps) {
+  const showAutoJoin = visibility === 'public';
+
   return (
     <section
       className={
@@ -36,12 +38,16 @@ export function CommunityPublicSettingsPanel({
         disabled={disabled}
         onChange={onDiscoverableChange}
       />
-      <div className="my-3 h-px bg-white/10" />
-      <CommunityAutoJoinSwitch
-        checked={autoJoinEnabled}
-        disabled={disabled}
-        onChange={onAutoJoinChange}
-      />
+      {showAutoJoin && (
+        <>
+          <div className="my-3 h-px bg-white/10" />
+          <CommunityAutoJoinSwitch
+            checked={autoJoinEnabled}
+            disabled={disabled}
+            onChange={onAutoJoinChange}
+          />
+        </>
+      )}
       {visibility && onVisibilityChange && (
         <CommunityVisibilitySelector
           disabled={disabled}

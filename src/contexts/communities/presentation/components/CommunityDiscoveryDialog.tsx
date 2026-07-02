@@ -24,6 +24,7 @@ import { GlassSelect } from '../../../../shared/presentation/components/glassSel
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { communityDiscoveryCanAutoJoin } from './communityDiscoveryCanAutoJoin';
 
 type CommunityDiscoveryDialogProps = {
   headerControl?: ReactElement;
@@ -337,7 +338,8 @@ function CommunityDiscoveryRow({
                 <span className="max-w-40 truncate">{networkName}</span>
               </span>
             ) : null}
-            {community.autoJoinEnabled && community.membershipStatus === 'none' ? (
+            {communityDiscoveryCanAutoJoin(community) &&
+            community.membershipStatus === 'none' ? (
               <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-xs font-black text-amber-100">
                 {copy.communities.discoverJoinInstantly}
               </span>
@@ -391,7 +393,7 @@ function membershipStatusLabel(community: CommunityDiscoveryResource): string {
     return copy.communities.discoverPendingInvitation;
   }
 
-  if (community.autoJoinEnabled) {
+  if (communityDiscoveryCanAutoJoin(community)) {
     return copy.communities.discoverJoinInstantly;
   }
 

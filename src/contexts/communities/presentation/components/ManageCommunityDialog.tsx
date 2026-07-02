@@ -71,8 +71,9 @@ export function ManageCommunityDialog({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const communityCanAutoJoin = community.visibility === 'public';
   const [autoJoinEnabled, setAutoJoinEnabled] = useState(
-    community.autoJoinEnabled ?? false,
+    communityCanAutoJoin ? (community.autoJoinEnabled ?? false) : false,
   );
   const [discoverable, setDiscoverable] = useState(
     community.discoverable ?? true,
@@ -724,11 +725,15 @@ export function ManageCommunityDialog({
     deletedChannelIds,
     originalChannelIds: originalChannelIdsRef.current,
   };
+  const effectiveAutoJoinEnabled = communityCanAutoJoin
+    ? autoJoinEnabled
+    : false;
+  const savedAutoJoinEnabled = community.autoJoinEnabled ?? false;
   const hasProfileChanges =
     avatar !== null ||
     banner !== null ||
     name.trim() !== community.name ||
-    autoJoinEnabled !== (community.autoJoinEnabled ?? false) ||
+    effectiveAutoJoinEnabled !== savedAutoJoinEnabled ||
     description.trim() !== community.description ||
     discoverable !== (community.discoverable ?? true);
   const hasChannelChanges =
@@ -884,7 +889,7 @@ export function ManageCommunityDialog({
           session,
           community.id,
           {
-            autoJoinEnabled,
+            autoJoinEnabled: effectiveAutoJoinEnabled,
             avatar: avatar ?? community.avatar,
             banner: banner ?? community.banner,
             description: description.trim(),

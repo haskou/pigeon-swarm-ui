@@ -114,6 +114,7 @@ export function ManageCommunityProfilePanel({
             framed={false}
             onAutoJoinChange={onAutoJoinChange}
             onDiscoverableChange={onDiscoverableChange}
+            visibility={community.visibility}
           />
         </div>
       </div>
