@@ -706,6 +706,7 @@ export function Composer({
             {draft.length}/{MESSAGE_MAX_LENGTH}
           </span>
           <button
+            type="submit"
             disabled={!canSend}
             aria-label={isEditing ? copy.messages.saveEdit : copy.composer.send}
             data-testid="message-send-button"
