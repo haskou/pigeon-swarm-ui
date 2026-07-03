@@ -2211,6 +2211,7 @@ export function GlassWorkspace({
     }
 
     if (loadedMessagesConversationIdRef.current === activeConversation.id) {
+      setMessageLoadState('idle');
       scrollMessagesToBottom('auto', true);
 
       return;
