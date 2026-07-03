@@ -333,8 +333,8 @@ export class CallPeerConnectionManager {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const rtcConfiguration = safeRtcConfiguration(
-      await this.rtcConfigurationProvider(),
+    const rtcConfiguration = this.peerConnectionConfiguration(
+      safeRtcConfiguration(await this.rtcConfigurationProvider()),
     );
     const peer = new RTCPeerConnection(rtcConfiguration);
 
@@ -847,8 +847,21 @@ export class CallPeerConnectionManager {
     return (
       Boolean(this.mediaEncryptionCipher) &&
       this.mediaEncryptionEnabled &&
-      (this.peerAcceptsEncryptedMedia.get(peerIdentityId) ?? true)
+      (this.peerAcceptsEncryptedMedia.get(peerIdentityId) ?? false)
     );
+  }
+
+  private peerConnectionConfiguration(
+    rtcConfiguration: RTCConfiguration,
+  ): RTCConfiguration {
+    if (!this.mediaEncryptionCipher || !EncodedCallMediaCipher.isSupported()) {
+      return rtcConfiguration;
+    }
+
+    return {
+      ...rtcConfiguration,
+      encodedInsertableStreams: true,
+    } as RTCConfiguration;
   }
 
   private acceptsEncryptedMedia(): boolean {

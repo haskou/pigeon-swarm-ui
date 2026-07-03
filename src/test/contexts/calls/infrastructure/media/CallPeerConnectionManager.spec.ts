@@ -1,11 +1,13 @@
 import { SymmetricKey } from '@haskou/value-objects';
 
+import type { SignalSender } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
 import type { MockAudioContext } from '../../../../../contexts/calls/infrastructure/media/MockAudioContext';
 import type { PeerConnectionManagerInternals } from '../../../../../contexts/calls/infrastructure/media/PeerConnectionManagerInternals';
 
 import { CallPeerConnectionManager } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnectionManager';
+import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
 
 const originalMediaStream = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -28,6 +30,10 @@ const originalRtpSender = Object.getOwnPropertyDescriptor(
   'RTCRtpSender',
 );
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+
+type RtcConfigurationWithEncodedInsertableStreams = RTCConfiguration & {
+  encodedInsertableStreams?: boolean;
+};
 
 function mediaStreamWithTracks(
   tracks: MediaStreamTrack[],
@@ -576,9 +582,10 @@ describe(CallPeerConnectionManager.name, () => {
 
   it('configures encoded streams for encrypted local media senders', async () => {
     const peers: FakePeerConnection[] = [];
+    const configurations: RtcConfigurationWithEncodedInsertableStreams[] = [];
 
     installEncodedStreamSupport();
-    installPeerConnectionMock(peers);
+    installPeerConnectionMock(peers, configurations);
     const manager = new CallPeerConnectionManager();
     const microphone = mediaTrack('microphone-1', 'audio');
 
@@ -593,7 +600,52 @@ describe(CallPeerConnectionManager.name, () => {
     const [peer] = peers;
     const [sender] = peer.senders as unknown as FakeSender[];
 
+    expect(configurations[0]?.encodedInsertableStreams).toBe(true);
     expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not announce encrypted outbound media to peers without metadata', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
+    );
+
+    await manager.ensurePeer('peer-identity-id', true, sendSignal);
+
+    expect(sendSignal).toHaveBeenCalledWith(
+      'peer-identity-id',
+      'offer',
+      expect.objectContaining({
+        mediaEncryption: {
+          acceptsEncrypted: true,
+          enabled: false,
+          version: 1,
+        },
+      }),
+    );
+  });
+
+  it('does not throw when encoded streams are rejected by the browser', () => {
+    const cipher = new EncodedCallMediaCipher(
+      SymmetricKey.generate().valueOf(),
+    );
+    const sender = {
+      createEncodedStreams: jest.fn(() => {
+        throw new Error('Encoded insertable streams are disabled.');
+      }),
+    } as unknown as RTCRtpSender;
+
+    expect(() => cipher.configureSender(sender, () => true)).not.toThrow();
   });
 
   it('serializes concurrent peer creation for the same identity', async () => {

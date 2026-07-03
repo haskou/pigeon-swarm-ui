@@ -156,15 +156,23 @@ export class EncodedCallMediaCipher {
   private static configureEncodedStreams(
     owner: EncodedStreamOwner,
     transform: TransformStream<EncodedFrame, EncodedFrame>,
-  ): void {
-    const streams = owner.createEncodedStreams?.();
+  ): boolean {
+    let streams: EncodedFrameStreams | undefined;
 
-    if (!streams) return;
+    try {
+      streams = owner.createEncodedStreams?.();
+    } catch {
+      return false;
+    }
+
+    if (!streams) return false;
 
     void streams.readable
       .pipeThrough(transform)
       .pipeTo(streams.writable)
       .catch(() => undefined);
+
+    return true;
   }
 
   public static isSupported(): boolean {
@@ -179,11 +187,12 @@ export class EncodedCallMediaCipher {
 
     if (!isEncodedStreamOwner(sender)) return;
 
-    this.configuredSenders.add(sender);
-    EncodedCallMediaCipher.configureEncodedStreams(
+    const configured = EncodedCallMediaCipher.configureEncodedStreams(
       sender,
       this.senderTransform(shouldEncrypt),
     );
+
+    if (configured) this.configuredSenders.add(sender);
   }
 
   public configureReceiver(receiver: RTCRtpReceiver): void {
@@ -191,10 +200,11 @@ export class EncodedCallMediaCipher {
 
     if (!isEncodedStreamOwner(receiver)) return;
 
-    this.configuredReceivers.add(receiver);
-    EncodedCallMediaCipher.configureEncodedStreams(
+    const configured = EncodedCallMediaCipher.configureEncodedStreams(
       receiver,
       this.receiverTransform(),
     );
+
+    if (configured) this.configuredReceivers.add(receiver);
   }
 }

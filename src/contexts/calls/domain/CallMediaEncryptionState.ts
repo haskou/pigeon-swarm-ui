@@ -1,8 +1,4 @@
-export type CallMediaEncryptionUnavailableReason =
-  | 'disabled'
-  | 'missing-key'
-  | 'public-community'
-  | 'unsupported';
+import type { CallMediaEncryptionUnavailableReason } from './CallMediaEncryptionUnavailableReason';
 
 export type CallMediaEncryptionState = {
   active: boolean;
