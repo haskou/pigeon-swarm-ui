@@ -1141,6 +1141,7 @@ export function GlassWorkspace({
   );
   const reconcileCallResource = useCallback(
     (call: CallResource) => {
+      const currentActiveCall = activeCallRef.current;
       const details = callDetailsForResource(call);
       const currentParticipant = call.participants.find(
         (participant) => participant.identityId === session.identity.id,
@@ -1155,7 +1156,7 @@ export function GlassWorkspace({
       ) as Record<string, CallParticipantStatus>;
       const remoteParticipantLeftActiveCommunityVoice =
         call.scope.type === 'community_channel' &&
-        activeCallRef.current?.id === call.id &&
+        currentActiveCall?.id === call.id &&
         call.status === 'active' &&
         call.participants.some(
           (participant) =>
@@ -1215,7 +1216,7 @@ export function GlassWorkspace({
       if (call.status !== 'active') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
 
-        if (activeCall?.id === call.id) {
+        if (currentActiveCall?.id === call.id) {
           logCallWarning('workspace:call:ended-by-resource-status', {
             callId: call.id,
             status: call.status,
@@ -1230,7 +1231,7 @@ export function GlassWorkspace({
       if (details.kind === 'group') {
         if (incomingCall?.call.id === call.id) setIncomingCall(null);
 
-        if (activeCall?.id === call.id) {
+        if (currentActiveCall?.id === call.id) {
           logCallWarning('workspace:call:ended-unsupported-group-call', {
             callId: call.id,
           });
@@ -1243,7 +1244,7 @@ export function GlassWorkspace({
 
       if (
         details.kind === 'one-to-one' &&
-        activeCall?.id === call.id &&
+        currentActiveCall?.id === call.id &&
         call.participants.some(
           (participant) =>
             participant.identityId !== session.identity.id &&
@@ -1296,7 +1297,7 @@ export function GlassWorkspace({
       if (
         details.kind === 'one-to-one' &&
         currentParticipant?.status === 'joined' &&
-        activeCall?.id !== call.id
+        currentActiveCall?.id !== call.id
       ) {
         logCallDebug('workspace:call:joined-on-another-device', {
           callId: call.id,
@@ -1306,10 +1307,9 @@ export function GlassWorkspace({
         return;
       }
 
-      if (activeCall?.id === call.id) reconcileCall(call, details);
+      if (currentActiveCall?.id === call.id) reconcileCall(call, details);
     },
     [
-      activeCall?.id,
       callDetailsForResource,
       endCall,
       incomingCall?.call.id,
