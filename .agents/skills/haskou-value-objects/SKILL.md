@@ -150,6 +150,8 @@ Hashes, media, and crypto:
 Nullish behavior:
 
 - `ValueObject` supports the library's Null Object behavior for `null` or `undefined` inputs.
+- Do not return `Foo | undefined`, `Foo | null`, or broad optional unions from domain/application code as defensive programming.
+- If a required value/object is missing, return `NullObject.new(Foo)` instead of widening the return type, and let the appropriate error handler handle that failure path.
 - Do not pass `null` or `undefined` intentionally to mean a business state unless the existing design explicitly models that pattern.
 - Prefer explicit domain concepts such as `OptionalDeliveryDate`, `UnassignedOwner`, or nullable fields at the boundary when absence is part of the language.
 
