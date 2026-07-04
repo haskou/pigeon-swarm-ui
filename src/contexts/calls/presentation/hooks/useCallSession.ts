@@ -18,6 +18,10 @@ import {
 } from '../../infrastructure/media/callDebugLogger';
 import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+import {
+  signalingRemotePeerIdentityIds,
+  shouldCreateInitialOffer,
+} from './callPeerConnectionPlan';
 
 type SignalSender = (
   recipientIdentityId: string,
@@ -267,7 +271,7 @@ export function useCallSession(): {
       );
       startingCallIdRef.current = null;
       await flushPendingSignals(nextCall.id, input.onSignal);
-      await connectJoinedPeers(
+      await connectSignalReadyPeers(
         nextCall,
         input.currentIdentityId,
         input.onSignal,
@@ -341,7 +345,7 @@ export function useCallSession(): {
 
       if (currentIdentityId) {
         peerManager.retainPeers(
-          joinedRemotePeerIdentityIds(call, currentIdentityId),
+          new Set(signalingRemotePeerIdentityIds(call, currentIdentityId)),
         );
       }
 
@@ -349,7 +353,7 @@ export function useCallSession(): {
         return;
       }
 
-      void connectJoinedPeers(
+      void connectSignalReadyPeers(
         callSessionForJoinedPeerConnection(
           call,
           currentIdentityId,
@@ -735,34 +739,29 @@ export function useCallSession(): {
     toggleScreenShare,
   };
 
-  async function connectJoinedPeers(
+  async function connectSignalReadyPeers(
     call: CallSession,
     currentIdentityId: string,
     sendSignal: SignalSender,
   ): Promise<void> {
-    const joinedParticipants = new Set(
-      call.call?.participants
-        .filter((participant) => participant.status === 'joined')
-        .map((participant) => participant.identityId) ?? [],
-    );
+    const peerIdentityIds = call.call
+      ? signalingRemotePeerIdentityIds(call.call, currentIdentityId)
+      : [];
 
-    logCallDebug('session:connect-joined-peers', {
+    logCallDebug('session:connect-signal-ready-peers', {
       callId: call.id,
       currentIdentityId,
-      joinedParticipantCount: joinedParticipants.size,
+      signalingParticipantCount: peerIdentityIds.length,
       participantCount: call.participants.length,
     });
     await Promise.all(
-      call.participants
-        .filter((participant) => participant.identityId !== currentIdentityId)
-        .filter((participant) => joinedParticipants.has(participant.identityId))
-        .map((participant) =>
-          peerManager.ensurePeer(
-            participant.identityId,
-            currentIdentityId < participant.identityId,
-            sendSignal,
-          ),
+      peerIdentityIds.map((peerIdentityId) =>
+        peerManager.ensurePeer(
+          peerIdentityId,
+          shouldCreateInitialOffer(currentIdentityId, peerIdentityId),
+          sendSignal,
         ),
+      ),
     );
   }
 
@@ -828,18 +827,6 @@ function reconciledCallStatus(
   if (call.status === 'active') return current.status;
 
   return call.status === 'missed' ? 'missed' : 'ended';
-}
-
-function joinedRemotePeerIdentityIds(
-  call: CallResource,
-  currentIdentityId: string,
-): Set<string> {
-  return new Set(
-    call.participants
-      .filter((participant) => participant.status === 'joined')
-      .filter((participant) => participant.identityId !== currentIdentityId)
-      .map((participant) => participant.identityId),
-  );
 }
 
 function localMediaFlagsChanged(

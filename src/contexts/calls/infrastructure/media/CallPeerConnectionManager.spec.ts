@@ -13,6 +13,10 @@ const originalPeerConnection = Object.getOwnPropertyDescriptor(
   globalThis,
   'RTCPeerConnection',
 );
+const originalSessionDescription = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'RTCSessionDescription',
+);
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
 function mediaStreamWithTracks(
@@ -142,8 +146,11 @@ function createFakeSender(track: MediaStreamTrack): FakeSender {
 
 function createFakePeerConnection(): FakePeerConnection {
   const senders: RTCRtpSender[] = [];
+  let offerCount = 0;
+  let answerCount = 0;
   const peer: FakePeerConnection = {
     addEventListener: jest.fn(),
+    addIceCandidate: jest.fn(() => Promise.resolve()),
     addTrack: jest.fn((track: MediaStreamTrack) => {
       const sender = createFakeSender(track);
 
@@ -154,15 +161,55 @@ function createFakePeerConnection(): FakePeerConnection {
     addTransceiver: jest.fn(),
     close: jest.fn(),
     connectionState: 'new',
+    createAnswer: jest.fn(() => {
+      answerCount += 1;
+
+      return Promise.resolve({
+        sdp: `answer-sdp-${answerCount}`,
+        type: 'answer',
+      } as RTCSessionDescriptionInit);
+    }),
+    createOffer: jest.fn(() => {
+      offerCount += 1;
+
+      return Promise.resolve({
+        sdp: `offer-sdp-${offerCount}`,
+        type: 'offer',
+      } as RTCSessionDescriptionInit);
+    }),
     getSenders: jest.fn(() => senders),
     iceConnectionState: 'new',
     localDescription: null,
+    remoteDescription: null,
     removeTrack: jest.fn((sender: RTCRtpSender) => {
       const senderIndex = senders.indexOf(sender);
 
       if (senderIndex >= 0) senders.splice(senderIndex, 1);
     }),
     senders,
+    setLocalDescription: jest.fn((description?: RTCSessionDescriptionInit) => {
+      if (!description) return Promise.resolve();
+
+      if (description.type === 'rollback') {
+        peer.localDescription = null;
+        peer.signalingState = 'stable';
+
+        return Promise.resolve();
+      }
+
+      peer.localDescription = description;
+      peer.signalingState =
+        description.type === 'offer' ? 'have-local-offer' : 'stable';
+
+      return Promise.resolve();
+    }),
+    setRemoteDescription: jest.fn((description: RTCSessionDescriptionInit) => {
+      peer.remoteDescription = description;
+      peer.signalingState =
+        description.type === 'offer' ? 'have-remote-offer' : 'stable';
+
+      return Promise.resolve();
+    }),
     signalingState: 'stable',
   };
 
@@ -195,6 +242,13 @@ function installPeerConnectionMock(
   });
 }
 
+function installSessionDescriptionMock(): void {
+  Object.defineProperty(globalThis, 'RTCSessionDescription', {
+    configurable: true,
+    value: jest.fn((description: RTCSessionDescriptionInit) => description),
+  });
+}
+
 function installAudioContextMock(context: MockAudioContext): void {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -205,7 +259,11 @@ function installAudioContextMock(context: MockAudioContext): void {
 }
 
 function restoreGlobalProperty(
-  property: 'MediaStream' | 'RTCPeerConnection' | 'window',
+  property:
+    | 'MediaStream'
+    | 'RTCPeerConnection'
+    | 'RTCSessionDescription'
+    | 'window',
   descriptor: PropertyDescriptor | undefined,
 ): void {
   if (descriptor) {
@@ -221,6 +279,7 @@ describe(CallPeerConnectionManager.name, () => {
   afterEach(() => {
     restoreGlobalProperty('MediaStream', originalMediaStream);
     restoreGlobalProperty('RTCPeerConnection', originalPeerConnection);
+    restoreGlobalProperty('RTCSessionDescription', originalSessionDescription);
     restoreGlobalProperty('window', originalWindow);
   });
 
@@ -294,6 +353,66 @@ describe(CallPeerConnectionManager.name, () => {
 
     expect(rtcConfigurationProvider).toHaveBeenCalledTimes(2);
     expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
+  });
+
+  it('exchanges offer and answer between joined peers', async () => {
+    const peers: FakePeerConnection[] = [];
+    const manager = new CallPeerConnectionManager();
+    const sentSignals: Array<{
+      payload: Record<string, unknown>;
+      recipientIdentityId: string;
+      signalType: string;
+    }> = [];
+
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+
+    await manager.ensurePeer(
+      'remote-identity-id',
+      true,
+      (recipientIdentityId, signalType, payload) => {
+        sentSignals.push({ payload, recipientIdentityId, signalType });
+
+        return Promise.resolve();
+      },
+    );
+
+    const [peer] = peers;
+    const offerSignal = sentSignals.find(
+      (signal) => signal.signalType === 'offer',
+    );
+
+    expect(offerSignal).toMatchObject({
+      payload: expect.objectContaining({ type: 'offer' }),
+      recipientIdentityId: 'remote-identity-id',
+      signalType: 'offer',
+    });
+    expect(peer.localDescription).toMatchObject({ type: 'offer' });
+
+    await manager.handleSignal(
+      'remote-identity-id',
+      'answer',
+      {
+        sdp: 'remote-answer-sdp',
+        type: 'answer',
+      },
+      (recipientIdentityId, signalType, payload) => {
+        sentSignals.push({ payload, recipientIdentityId, signalType });
+
+        return Promise.resolve();
+      },
+      'current-identity-id',
+    );
+
+    expect(peer.remoteDescription).toMatchObject({
+      sdp: 'remote-answer-sdp',
+      type: 'answer',
+    });
+    expect(peer.signalingState).toBe('stable');
   });
 
   it('serializes concurrent peer creation for the same identity', async () => {
