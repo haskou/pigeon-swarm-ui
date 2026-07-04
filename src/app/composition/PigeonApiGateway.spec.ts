@@ -13,6 +13,7 @@ import type { RequestSigner } from '../../shared/infrastructure/http/RequestSign
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { RecoveryKey } from '../../contexts/identities/domain/value-objects/RecoveryKey';
 import {
   loadLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
@@ -2004,6 +2005,31 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('keeps passkey PRF registration enabled when a recovery key is also created', () => {
+    const gateway = new PigeonApiGateway();
+    const internals = gateway as unknown as {
+      registrationPasskeyPrfMode(input: {
+        displayName: string;
+        enabled?: boolean;
+        identityId: string;
+        recoveryKey?: RecoveryKey;
+      }): unknown;
+    };
+
+    const mode = internals.registrationPasskeyPrfMode({
+      displayName: 'Ada',
+      enabled: true,
+      identityId: 'identity-1',
+      recoveryKey: RecoveryKey.generate(),
+    });
+
+    expect(mode).toEqual({
+      displayName: 'Ada',
+      identityId: 'identity-1',
+      mode: 'create',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -2317,6 +2343,8 @@ describe(PigeonApiGateway.name, () => {
           r: 8,
           recoveryKey: {
             algorithm: 'pigeon-recovery-key',
+            encryptedMasterKey: 'encrypted-recovery-master-key',
+            mode: 'recovery-key',
             version: 1,
           },
           salt: 'master-salt',

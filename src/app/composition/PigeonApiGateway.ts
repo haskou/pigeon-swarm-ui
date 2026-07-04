@@ -102,7 +102,6 @@ import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import {
   clearLocalPasskeyUnlock,
-  loadLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
 } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
@@ -680,14 +679,12 @@ export class PigeonApiGateway {
     displayName,
     enabled,
     identityId,
-    recoveryKey,
   }: {
     displayName: string;
     enabled?: boolean;
     identityId: string;
-    recoveryKey?: RecoveryKey;
   }): UserRootKeyPasskeyPrfInput | undefined {
-    if (recoveryKey || !enabled) return undefined;
+    if (!enabled) return undefined;
 
     return {
       displayName,
@@ -702,7 +699,9 @@ export class PigeonApiGateway {
   ): RecoveryKey | undefined {
     if (!currentIdentity.masterKeyDerivation.recoveryKey) return undefined;
 
-    return RecoveryKey.fromString(recoveryKey ?? '');
+    if (!recoveryKey) return undefined;
+
+    return RecoveryKey.fromString(recoveryKey);
   }
 
   private async protectProfileMasterKey({
@@ -733,37 +732,32 @@ export class PigeonApiGateway {
       options.recoveryKey,
     );
 
-    return await this.userRootKeys.protectMasterKey({
+    const protectedRoot = await this.userRootKeys.protectMasterKey({
       masterKey: session.masterKey,
-      passkeyPrf: recoveryKey
-        ? undefined
-        : this.profilePasskeyPrfMode({
-            currentIdentity,
-            enabled: options.passkeyPrfEnabled,
-            identityId,
-            profileName: profile.name,
-          }),
+      passkeyPrf: this.profilePasskeyPrfMode({
+        currentIdentity,
+        enabled: options.passkeyPrfEnabled,
+        identityId,
+        profileName: profile.name,
+      }),
       password: newPassword,
       recoveryKey,
     });
-  }
 
-  private async unlockLocalPasskeyMasterKey(
-    identity: IdentityResource,
-    password: string,
-  ): Promise<SymmetricKey | undefined> {
-    const localUnlock = loadLocalPasskeyUnlock(identity.id);
+    if (
+      !recoveryKey &&
+      currentIdentity.masterKeyDerivation.recoveryKey?.mode === 'recovery-key'
+    ) {
+      return {
+        ...protectedRoot,
+        masterKeyDerivation: {
+          ...protectedRoot.masterKeyDerivation,
+          recoveryKey: currentIdentity.masterKeyDerivation.recoveryKey,
+        },
+      };
+    }
 
-    if (!localUnlock) return undefined;
-
-    return await this.userRootKeys.unlockMasterKey(
-      {
-        ...identity,
-        encryptedMasterKey: localUnlock.encryptedMasterKey,
-        masterKeyDerivation: localUnlock.masterKeyDerivation,
-      },
-      password,
-    );
+    return protectedRoot;
   }
 
   private async saveLocalPasskeyMasterKeyUnlock({
@@ -800,11 +794,7 @@ export class PigeonApiGateway {
   ): boolean {
     if (recoveryKey) return false;
 
-    if (identity.masterKeyDerivation.passkeyPrf) return true;
-
-    if (!identity.masterKeyDerivation.recoveryKey) return false;
-
-    return !!loadLocalPasskeyUnlock(identity.id);
+    return !!identity.masterKeyDerivation.passkeyPrf;
   }
 
   private async unlockLoginMasterKey({
@@ -816,17 +806,6 @@ export class PigeonApiGateway {
     password: string;
     recoveryKey?: string;
   }): Promise<SymmetricKey> {
-    if (identity.masterKeyDerivation.recoveryKey && !recoveryKey) {
-      const localMasterKey = await this.unlockLocalPasskeyMasterKey(
-        identity,
-        password,
-      ).catch(() => {
-        throw new Error(copy.auth.passkeyPrfUnlockFailed);
-      });
-
-      if (localMasterKey) return localMasterKey;
-    }
-
     return await this.unlockRemoteMasterKey({
       identity,
       password,
@@ -846,8 +825,8 @@ export class PigeonApiGateway {
     let recoveryUnlockKey: RecoveryKey | undefined;
 
     try {
-      recoveryUnlockKey = identity.masterKeyDerivation.recoveryKey
-        ? RecoveryKey.fromString(recoveryKey ?? '')
+      recoveryUnlockKey = recoveryKey
+        ? RecoveryKey.fromString(recoveryKey)
         : undefined;
     } catch {
       throw new Error(copy.auth.recoveryKeyUnlockFailed);
@@ -857,7 +836,7 @@ export class PigeonApiGateway {
       .unlockMasterKey(identity, password, recoveryUnlockKey)
       .catch(() => {
         throw new Error(
-          identity.masterKeyDerivation.recoveryKey
+          recoveryKey
             ? copy.auth.recoveryKeyUnlockFailed
             : identity.masterKeyDerivation.passkeyPrf
               ? copy.auth.passkeyPrfUnlockFailed
@@ -1151,7 +1130,6 @@ export class PigeonApiGateway {
           displayName: name,
           enabled: options.passkeyPrfEnabled,
           identityId,
-          recoveryKey,
         }),
         password,
         recoveryKey,

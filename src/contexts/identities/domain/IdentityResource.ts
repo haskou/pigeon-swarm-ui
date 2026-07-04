@@ -16,6 +16,8 @@ export type IdentityResource = {
     r: number;
     recoveryKey?: {
       algorithm: 'pigeon-recovery-key';
+      encryptedMasterKey: string;
+      mode: 'password-recovery' | 'recovery-key';
       version: 1;
     };
     salt: string;

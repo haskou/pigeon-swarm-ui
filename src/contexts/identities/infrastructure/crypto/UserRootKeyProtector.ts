@@ -20,6 +20,8 @@ const passwordRecoveryInfo = '@pigeon/user-root-key/password+recovery/v1';
 const passkeyPrfInfo = '@pigeon/passkey-prf/v1';
 const recoveryKeyInfo = '@pigeon/recovery-key/v1';
 const hkdfSaltBytes = 32;
+const passwordRecoveryMode = 'password-recovery';
+const recoveryKeyMode = 'recovery-key';
 
 export const userRootKeyDerivationDefaults = {
   algorithm: 'scrypt',
@@ -128,30 +130,16 @@ export class UserRootKeyProtector {
     return await hkdfKey(recoveryKey.getBytes(), recoveryKeyInfo);
   }
 
-  private async finalKek({
+  private async primaryKek({
     passkeyPrf,
     passwordKek,
-    recoveryKey,
   }: {
     passkeyPrf?: UserRootKeyPasskeyPrfInput;
     passwordKek: SymmetricKey;
-    recoveryKey?: RecoveryKey;
   }): Promise<{
     kek: SymmetricKey;
     passkeyPrf?: PasskeyPrfMasterKeyProtection;
   }> {
-    if (recoveryKey) {
-      const recoveryKek = await this.recoveryKek(recoveryKey);
-      const combined = concatBytes(
-        passwordKek.getBuffer(),
-        recoveryKek.getBuffer(),
-      );
-
-      return {
-        kek: await hkdfKey(combined, passwordRecoveryInfo),
-      };
-    }
-
     if (!passkeyPrf) return { kek: passwordKek };
 
     const material = await this.passkeyMaterial(passkeyPrf);
@@ -165,6 +153,75 @@ export class UserRootKeyProtector {
       kek: await hkdfKey(combined, passwordPasskeyInfo),
       passkeyPrf: material.protection,
     };
+  }
+
+  private async passwordRecoveryKek(
+    passwordKek: SymmetricKey,
+    recoveryKey: RecoveryKey,
+  ): Promise<SymmetricKey> {
+    const recoveryKek = await this.recoveryKek(recoveryKey);
+    const combined = concatBytes(
+      passwordKek.getBuffer(),
+      recoveryKek.getBuffer(),
+    );
+
+    return await hkdfKey(combined, passwordRecoveryInfo);
+  }
+
+  private async protectRecoveryMasterKey({
+    masterKey,
+    mode,
+    passwordKek,
+    recoveryKey,
+  }: {
+    masterKey: SymmetricKey;
+    mode: NonNullable<
+      IdentityResource['masterKeyDerivation']['recoveryKey']
+    >['mode'];
+    passwordKek: SymmetricKey;
+    recoveryKey: RecoveryKey;
+  }): Promise<
+    NonNullable<IdentityResource['masterKeyDerivation']['recoveryKey']>
+  > {
+    const kek =
+      mode === passwordRecoveryMode
+        ? await this.passwordRecoveryKek(passwordKek, recoveryKey)
+        : await this.recoveryKek(recoveryKey);
+
+    return {
+      algorithm: 'pigeon-recovery-key',
+      encryptedMasterKey: kek.encrypt(masterKey.valueOf()).toString(),
+      mode,
+      version: 1,
+    };
+  }
+
+  private async unlockRecoveryMasterKey(
+    identity: IdentityResource,
+    password: string,
+    recoveryKey: RecoveryKey,
+  ): Promise<SymmetricKey> {
+    const recoveryProtection = identity.masterKeyDerivation.recoveryKey;
+
+    if (!recoveryProtection) {
+      throw new Error('Recovery key is not available for this identity.');
+    }
+
+    const kek =
+      recoveryProtection.mode === passwordRecoveryMode
+        ? await this.passwordRecoveryKek(
+            await this.derivePasswordKek(
+              password,
+              identity.masterKeyDerivation,
+            ),
+            recoveryKey,
+          )
+        : await this.recoveryKek(recoveryKey);
+    const decrypted = kek.decrypt(
+      new EncryptedPayload(recoveryProtection.encryptedMasterKey),
+    );
+
+    return SymmetricKey.fromBase64(decrypted.toString());
   }
 
   public async protectMasterKey({
@@ -189,24 +246,26 @@ export class UserRootKeyProtector {
       password,
       masterKeyDerivation,
     );
-    const { kek, passkeyPrf: protection } = await this.finalKek({
+    const { kek, passkeyPrf: protection } = await this.primaryKek({
       passkeyPrf,
       passwordKek,
-      recoveryKey,
     });
+    const recoveryKeyProtection = recoveryKey
+      ? await this.protectRecoveryMasterKey({
+          masterKey,
+          mode: protection ? passwordRecoveryMode : recoveryKeyMode,
+          passwordKek,
+          recoveryKey,
+        })
+      : undefined;
 
     return {
       encryptedMasterKey: kek.encrypt(masterKey.valueOf()).toString(),
       masterKeyDerivation: {
         ...masterKeyDerivation,
         ...(protection ? { passkeyPrf: protection } : {}),
-        ...(recoveryKey
-          ? {
-              recoveryKey: {
-                algorithm: 'pigeon-recovery-key',
-                version: 1,
-              } as const,
-            }
+        ...(recoveryKeyProtection
+          ? { recoveryKey: recoveryKeyProtection }
           : {}),
       },
     };
@@ -217,15 +276,19 @@ export class UserRootKeyProtector {
     password: string,
     recoveryKey?: RecoveryKey,
   ): Promise<SymmetricKey> {
-    if (identity.masterKeyDerivation.recoveryKey && !recoveryKey) {
-      throw new Error('Recovery key is required to unlock this identity.');
+    if (recoveryKey) {
+      return await this.unlockRecoveryMasterKey(
+        identity,
+        password,
+        recoveryKey,
+      );
     }
 
     const passwordKek = await this.derivePasswordKek(
       password,
       identity.masterKeyDerivation,
     );
-    const { kek } = await this.finalKek({
+    const { kek } = await this.primaryKek({
       passkeyPrf: identity.masterKeyDerivation.passkeyPrf
         ? {
             mode: 'preserve',
@@ -233,7 +296,6 @@ export class UserRootKeyProtector {
           }
         : undefined,
       passwordKek,
-      recoveryKey,
     });
     const decrypted = kek.decrypt(
       new EncryptedPayload(identity.encryptedMasterKey),
