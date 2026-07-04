@@ -930,7 +930,7 @@ export const es = {
       lowercase: 'Minuscula',
       match: 'Las contraseñas coinciden',
       maxLength: '256 caracteres o menos',
-      minLength: 'Al menos 12 caracteres',
+      minLength: 'Al menos 20 caracteres',
       number: 'Numero',
       symbol: 'Simbolo',
       uppercase: 'Mayuscula',

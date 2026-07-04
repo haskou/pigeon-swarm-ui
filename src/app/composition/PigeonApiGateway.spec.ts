@@ -2005,6 +2005,67 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('does not create a local passkey unlock when registration already protected the identity with passkey PRF', async () => {
+    const identity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      encryptedMasterKey: 'encrypted-master-key',
+      id: 'public-key',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 2 ** 18,
+        p: 1,
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'credential-id',
+          salt: 'salt',
+          version: 1,
+        },
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'keypair-signature',
+      timestamp: 1234,
+      version: 1,
+    } satisfies IdentityResource;
+    const masterKey = SymmetricKey.generate();
+    const keyPair = unlockedKeyPair('signature') as unknown as KeyPair;
+    const session = {
+      identity,
+      keychain: { conversations: {}, version: 0 },
+      keyPair,
+      masterKey,
+    } as unknown as Session;
+    const loginResult = { conversations: [], session };
+    const gateway = new PigeonApiGateway();
+    const internals = gateway as unknown as {
+      createIdentityMaterial: jest.Mock;
+      hydrateLoginSession: jest.Mock;
+      saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+    };
+
+    internals.createIdentityMaterial = jest.fn().mockResolvedValue({
+      identity,
+      keyPair,
+      masterKey,
+    });
+    internals.hydrateLoginSession = jest.fn().mockResolvedValue(loginResult);
+    internals.saveLocalPasskeyMasterKeyUnlock = jest.fn();
+
+    await expect(
+      gateway.register('Ada', 'secret', ['network-1'], 'ada', {
+        passkeyPrfEnabled: true,
+      }),
+    ).resolves.toBe(loginResult);
+
+    expect(internals.saveLocalPasskeyMasterKeyUnlock).not.toHaveBeenCalled();
+  });
+
   it('keeps passkey PRF registration enabled when a recovery key is also created', () => {
     const gateway = new PigeonApiGateway();
     const internals = gateway as unknown as {

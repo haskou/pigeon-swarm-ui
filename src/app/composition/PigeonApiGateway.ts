@@ -2967,7 +2967,10 @@ export class PigeonApiGateway {
       masterKey,
     });
 
-    if (options.passkeyPrfEnabled) {
+    if (
+      options.passkeyPrfEnabled &&
+      !result.session.identity.masterKeyDerivation.passkeyPrf
+    ) {
       await this.saveLocalPasskeyMasterKeyUnlock({
         displayName: name,
         identityId: result.session.identity.id,

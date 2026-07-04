@@ -1060,7 +1060,7 @@ export const en = {
       lowercase: 'Lowercase',
       match: 'Passwords match',
       maxLength: '256 characters or fewer',
-      minLength: 'At least 12 characters',
+      minLength: 'At least 20 characters',
       number: 'Number',
       symbol: 'Symbol',
       uppercase: 'Uppercase',
