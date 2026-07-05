@@ -65,6 +65,7 @@ export const en = {
     networksLabel: 'Networks',
     nodeOwner: 'Owner',
     nodeOwnerUnclaimed: 'Unclaimed',
+    nodeNetworksNone: 'No networks',
     nodePeers: 'Peers',
     nodePeersCount: '{count} peers',
     nodePeersLoading: 'Searching...',
