@@ -1,3 +1,5 @@
+import { SymmetricKey } from '@haskou/value-objects';
+
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 
 import { MessageProjector } from './MessageProjector';
@@ -27,6 +29,29 @@ const session = {
   },
   password: 'secret',
 } as unknown as Session;
+
+function sessionWithConversationKey(
+  conversationId: string,
+  key: string,
+): Session {
+  return {
+    ...session,
+    keychain: {
+      conversations: {
+        [conversationId]: {
+          algorithm: 'aes-256-gcm',
+          conversationId,
+          createdAt: 1,
+          key,
+          kind: 'conversation',
+          peerIdentityId: 'identity-2',
+          version: 2,
+        },
+      },
+      version: 1,
+    },
+  } as unknown as Session;
+}
 
 describe(MessageProjector.name, () => {
   it('normalizes message envelopes and cursors', () => {
@@ -109,5 +134,78 @@ describe(MessageProjector.name, () => {
       content: projectorCopy.decryptFailed,
       encrypted: true,
     });
+  });
+
+  it('marks encrypted thread messages when projecting without a worker', () => {
+    const projector = new MessageProjector(projectorCopy);
+    const conversationId = 'thread-conversation';
+    const symmetricKey = SymmetricKey.generate();
+    const encryptedPayload = symmetricKey
+      .encrypt(
+        JSON.stringify({
+          authorIdentityId: 'identity-2',
+          content: 'thread reply',
+          timestamp: 30,
+          type: 'ThreadMessageSent',
+        }),
+      )
+      .toString();
+    const projected = projector.toChatMessage(
+      sessionWithConversationKey(conversationId, symmetricKey.valueOf()),
+      conversationId,
+      {
+        authorIdentityId: 'identity-2',
+        encryptedPayload,
+        id: 'thread-message',
+        replyToMessageId: 'root-message',
+        timestamp: 30,
+      },
+    );
+
+    expect(projected).toMatchObject({
+      content: 'thread reply',
+      encrypted: false,
+      replyToMessageId: 'root-message',
+      threadRootMessageId: 'root-message',
+    });
+  });
+
+  it('does not mark encrypted normal replies as thread messages', () => {
+    const projector = new MessageProjector(projectorCopy);
+    const conversationId = 'reply-conversation';
+    const symmetricKey = SymmetricKey.generate();
+    const encryptedPayload = symmetricKey
+      .encrypt(
+        JSON.stringify({
+          authorIdentityId: 'identity-2',
+          content: 'normal reply',
+          reply: {
+            authorIdentityId: 'identity-1',
+            content: 'root',
+            messageId: 'root-message',
+          },
+          timestamp: 40,
+          type: 'MessageSent',
+        }),
+      )
+      .toString();
+    const projected = projector.toChatMessage(
+      sessionWithConversationKey(conversationId, symmetricKey.valueOf()),
+      conversationId,
+      {
+        authorIdentityId: 'identity-2',
+        encryptedPayload,
+        id: 'reply-message',
+        replyToMessageId: 'root-message',
+        timestamp: 40,
+      },
+    );
+
+    expect(projected).toMatchObject({
+      content: 'normal reply',
+      encrypted: false,
+      replyToMessageId: 'root-message',
+    });
+    expect(projected.threadRootMessageId).toBeUndefined();
   });
 });
