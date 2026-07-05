@@ -1,3 +1,6 @@
+import type { NodeRelayConfiguration } from '../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type { NodeNetwork } from '../../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../../contexts/networks/application/list-peers/ListPeers';
 import type {
@@ -30,6 +33,27 @@ export class PigeonNodeGateway {
     session: Session,
   ): Promise<IpfsReplicationStatus> {
     return await this.node.getIpfsReplicationStatus(session);
+  }
+
+  public async getRelayConfiguration(
+    session: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.node.getRelayConfiguration(session);
+  }
+
+  public async updateRelayConfiguration(
+    configuration: NodeRelayConfiguration,
+    session?: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.node.updateRelayConfiguration(configuration, session);
+  }
+
+  public async checkRelayPorts(
+    publicHost: string,
+    checks: NodeRelayPortCheckTarget[],
+    session: Session,
+  ): Promise<NodeRelayPortCheckResource> {
+    return await this.node.checkRelayPorts(publicHost, checks, session);
   }
 
   public async createNetwork(name: string, session?: Session): Promise<void> {

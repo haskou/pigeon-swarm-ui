@@ -15,6 +15,9 @@ import type {
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { UserRootKeyPasskeyPrfInput } from '../../contexts/identities/infrastructure/crypto/UserRootKeyPasskeyPrfInput';
+import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
@@ -1226,6 +1229,27 @@ export class PigeonApiGateway {
     session: Session,
   ): Promise<IpfsReplicationStatus> {
     return await this.node.getIpfsReplicationStatus(session);
+  }
+
+  public async getNodeRelayConfiguration(
+    session: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.node.getRelayConfiguration(session);
+  }
+
+  public async updateNodeRelayConfiguration(
+    configuration: NodeRelayConfiguration,
+    session?: Session,
+  ): Promise<NodeRelayConfiguration> {
+    return await this.node.updateRelayConfiguration(configuration, session);
+  }
+
+  public async checkNodeRelayPorts(
+    publicHost: string,
+    checks: NodeRelayPortCheckTarget[],
+    session: Session,
+  ): Promise<NodeRelayPortCheckResource> {
+    return await this.node.checkRelayPorts(publicHost, checks, session);
   }
 
   public async getPresence(

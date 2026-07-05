@@ -172,7 +172,10 @@ function App(): ReactElement {
     return (
       <AppFrame>
         <AppScreenSuspense>
-          <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
+          <NetworkCreationScreen
+            nodeOwnerId={nodeNetworks.node?.owner ?? null}
+            onNetworkCreated={handleNetworkCreated}
+          />
         </AppScreenSuspense>
       </AppFrame>
     );
@@ -184,7 +187,10 @@ function App(): ReactElement {
         {screen === 'auth' || !session ? (
           <AuthScreen
             availableNetworks={nodeNetworks.networks}
+            nodeOwnerId={nodeNetworks.node?.owner ?? null}
             onAuthenticated={handleAuthenticated}
+            peerCount={peers.peers.length}
+            peersLoading={peers.loading}
           />
         ) : (
           <GlassWorkspace

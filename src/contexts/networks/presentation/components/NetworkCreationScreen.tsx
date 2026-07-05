@@ -2,7 +2,12 @@ import { FormEvent, useState } from 'react';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { Field } from '../../../identities/presentation/auth/Field';
+import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+
+import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
 import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
+import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
+import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -10,13 +15,18 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 type NetworkSetupMode = 'create' | 'join' | 'public';
 
 export function NetworkCreationScreen({
+  nodeOwnerId,
   onNetworkCreated,
 }: {
+  nodeOwnerId: null | string;
   onNetworkCreated: () => void;
 }) {
   const [mode, setMode] = useState<NetworkSetupMode>('public');
   const [name, setName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [configureRelay, setConfigureRelay] = useState(false);
+  const [relayConfiguration, setRelayConfiguration] =
+    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [
@@ -24,6 +34,7 @@ export function NetworkCreationScreen({
     { label: copy.network.create, value: 'create' },
     { label: copy.network.join, value: 'join' },
   ] satisfies Array<{ label: string; value: NetworkSetupMode }>;
+  const canConfigureRelay = nodeOwnerId === null;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -31,6 +42,12 @@ export function NetworkCreationScreen({
     setLoading(true);
 
     try {
+      if (configureRelay && canConfigureRelay) {
+        await applicationContainer.updateNodeRelayConfiguration(
+          relayConfiguration,
+        );
+      }
+
       if (mode === 'create') {
         await applicationContainer.createNetwork(name);
       } else if (mode === 'join') {
@@ -53,10 +70,10 @@ export function NetworkCreationScreen({
   };
 
   return (
-    <section className="app-screen relative z-10 grid min-h-dvh place-items-stretch p-0 sm:place-items-center sm:px-4 sm:py-8">
+    <section className="app-screen subtle-scrollbar relative z-10 grid h-full min-h-0 place-items-stretch overflow-y-auto overscroll-contain p-0 sm:place-items-start sm:justify-items-center sm:px-4 sm:py-8">
       <form
         onSubmit={handleSubmit}
-        className="glass-panel-strong flex min-h-dvh w-full flex-col justify-center rounded-none p-5 sm:min-h-0 sm:max-w-2xl sm:rounded-2xl sm:p-8"
+        className="glass-panel-strong flex min-h-full w-full flex-col rounded-none p-5 sm:min-h-0 sm:max-w-2xl sm:rounded-2xl sm:p-8"
       >
         <div className="mx-auto flex max-w-xl flex-col items-center text-center">
           <img
@@ -81,7 +98,7 @@ export function NetworkCreationScreen({
           options={modeOptions}
         />
 
-        <div className="mt-6 min-h-[150px] space-y-4">
+        <div className="mt-6 grid gap-4">
           <p className="px-1 text-sm leading-relaxed text-white/60">
             {mode === 'create'
               ? copy.network.createBody
@@ -115,6 +132,41 @@ export function NetworkCreationScreen({
           ) : null}
         </div>
 
+        {canConfigureRelay && (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/15">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-sm font-black text-white/75 transition hover:bg-white/[0.03]"
+              aria-expanded={configureRelay}
+              onClick={() => setConfigureRelay((current) => !current)}
+            >
+              <span>{copy.network.configureRelay}</span>
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'grid h-8 w-8 place-items-center rounded-xl bg-white/[0.06] text-white/60 transition-transform',
+                  configureRelay && 'rotate-180',
+                )}
+              >
+                <ChevronDownIcon />
+              </span>
+            </button>
+            {configureRelay && (
+              <div className="border-t border-white/10 p-4 pt-3">
+                <p className="mb-4 text-sm leading-6 text-white/50">
+                  {copy.network.configureRelayBody}
+                </p>
+                <NodeRelayConfigurationForm
+                  className="text-left"
+                  configuration={relayConfiguration}
+                  disabled={loading}
+                  onChange={setRelayConfiguration}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {error && (
           <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
             {error}
@@ -135,5 +187,24 @@ export function NetworkCreationScreen({
         </button>
       </form>
     </section>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d="m7 10 5 5 5-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }

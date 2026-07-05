@@ -26,6 +26,7 @@ import {
   passwordValidationChecks,
 } from './credentialsValidation';
 import { cx } from '../../../../shared/presentation/cx';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { AuthFormFields } from './AuthFormFields';
@@ -42,15 +43,21 @@ type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
 
 interface AuthScreenProps {
   availableNetworks: NodeNetwork[];
+  nodeOwnerId: string | null;
   onAuthenticated: (
     session: Session,
     conversations: ConversationResource[],
   ) => void;
+  peerCount: number;
+  peersLoading: boolean;
 }
 
 export function AuthScreen({
   availableNetworks,
+  nodeOwnerId,
   onAuthenticated,
+  peerCount,
+  peersLoading,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
@@ -256,6 +263,12 @@ export function AuthScreen({
                 showHelp={showInstallHelp}
               />
             </div>
+            <NodeLoginSummary
+              className="mt-4"
+              ownerIdentityId={nodeOwnerId}
+              peerCount={peerCount}
+              peersLoading={peersLoading}
+            />
           </div>
         </div>
 
@@ -286,6 +299,13 @@ export function AuthScreen({
             onClick={handleInstallApp}
             ready={installState === 'ready'}
             showHelp={showInstallHelp}
+          />
+
+          <NodeLoginSummary
+            className="mb-5 lg:hidden"
+            ownerIdentityId={nodeOwnerId}
+            peerCount={peerCount}
+            peersLoading={peersLoading}
           />
 
           <SegmentedControl
@@ -542,6 +562,72 @@ function InstallAppAction({
           {help}
         </p>
       )}
+    </div>
+  );
+}
+
+function NodeLoginSummary({
+  className,
+  ownerIdentityId,
+  peerCount,
+  peersLoading,
+}: {
+  className?: string;
+  ownerIdentityId: string | null;
+  peerCount: number;
+  peersLoading: boolean;
+}): ReactElement {
+  return (
+    <div
+      className={cx(
+        'grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-sm',
+        className,
+      )}
+    >
+      <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+        {copy.auth.nodeSummaryTitle}
+      </div>
+      <NodeLoginSummaryRow
+        label={copy.auth.nodeOwner}
+        title={ownerIdentityId ?? undefined}
+        value={
+          ownerIdentityId
+            ? shortId(ownerIdentityId)
+            : copy.auth.nodeOwnerUnclaimed
+        }
+      />
+      <NodeLoginSummaryRow
+        label={copy.auth.nodePeers}
+        value={
+          peersLoading
+            ? copy.auth.nodePeersLoading
+            : peerCount === 1
+              ? copy.auth.nodePeersOne
+              : copy.auth.nodePeersCount.replace('{count}', String(peerCount))
+        }
+      />
+    </div>
+  );
+}
+
+function NodeLoginSummaryRow({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}): ReactElement {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-white/45">{label}</span>
+      <span
+        className="min-w-0 truncate text-right font-black text-white/75"
+        title={title ?? value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
