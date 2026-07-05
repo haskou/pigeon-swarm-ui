@@ -471,7 +471,7 @@ export function NodeSettingsDialog({
 
                   <NodeRuntimeSummary
                     node={node}
-                    relayConfiguration={relayConfiguration}
+                    relayConfiguration={isOwner ? relayConfiguration : null}
                   />
 
                   {isOwner && (
@@ -855,7 +855,7 @@ function NodeRuntimeSummary({
   relayConfiguration,
 }: {
   node: (NodeInfo & { owner: null | string }) | null;
-  relayConfiguration: NodeRelayConfiguration;
+  relayConfiguration: NodeRelayConfiguration | null;
 }) {
   return (
     <section className="rounded-2xl bg-black/20 p-3">
@@ -863,14 +863,16 @@ function NodeRuntimeSummary({
         {copy.nodeSettings.nodeDetails}
       </div>
       <div className="divide-y divide-white/10">
-        <NodeDetailRow
-          label={copy.nodeSettings.privateRelayDiscoverRecords}
-          value={
-            relayConfiguration.privateRelay.discoveryEnabled
-              ? copy.nodeSettings.relayEnabled
-              : copy.nodeSettings.relayDisabled
-          }
-        />
+        {relayConfiguration ? (
+          <NodeDetailRow
+            label={copy.nodeSettings.privateRelayDiscoverRecords}
+            value={
+              relayConfiguration.privateRelay.discoveryEnabled
+                ? copy.nodeSettings.relayEnabled
+                : copy.nodeSettings.relayDisabled
+            }
+          />
+        ) : null}
         <NodeDetailRow
           label={copy.nodeSettings.relay}
           value={relayStatusLabel(node?.relay)}
