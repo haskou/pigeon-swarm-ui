@@ -5,13 +5,11 @@ export function defaultNodeRelayConfiguration(): NodeRelayConfiguration {
     callsRelay: {},
     manualRelayMultiaddrs: [],
     privateRelay: {
+      discoveryEnabled: true,
       enabled: false,
-      publicRecordDiscoveryEnabled: false,
-      publicRecordPublicationEnabled: false,
+      publicationEnabled: false,
     },
-    publicRelay: {
-      autoEnabled: false,
-      discoveryEnabled: false,
+    publicNetwork: {
       enabled: false,
     },
   };

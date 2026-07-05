@@ -37,25 +37,6 @@ function optionalTarget(
   };
 }
 
-function publicRelayTargets(
-  configuration: NodeRelayConfiguration,
-): NodeRelayPortCheckTarget[] {
-  if (!configuration.publicRelay.enabled) return [];
-
-  return [
-    optionalTarget(
-      'publicRelay',
-      'Public relay',
-      configuration.publicRelay.port,
-    ),
-    optionalTarget(
-      'publicRelayLibp2p',
-      'Public relay libp2p',
-      configuration.publicRelay.libp2pPort,
-    ),
-  ].filter((target): target is NodeRelayPortCheckTarget => target !== null);
-}
-
 function privateRelayTargets(
   configuration: NodeRelayConfiguration,
 ): NodeRelayPortCheckTarget[] {
@@ -75,12 +56,24 @@ function privateRelayTargets(
   ].filter((target): target is NodeRelayPortCheckTarget => target !== null);
 }
 
+function publicNetworkTargets(
+  configuration: NodeRelayConfiguration,
+): NodeRelayPortCheckTarget[] {
+  return [
+    optionalTarget(
+      'publicNetwork',
+      'Public network',
+      configuration.publicNetwork.port,
+    ),
+  ].filter((target): target is NodeRelayPortCheckTarget => target !== null);
+}
+
 export function nodeRelayConfigurationPorts(
   configuration: NodeRelayConfiguration,
 ): NodeRelayPortCheckTarget[] {
   return [
+    ...publicNetworkTargets(configuration),
     ...callsRelayTargets(configuration),
-    ...publicRelayTargets(configuration),
     ...privateRelayTargets(configuration),
   ];
 }

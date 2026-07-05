@@ -1,7 +1,5 @@
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
 
-import { nodeRelayConfigurationPorts } from '../../application/configure-node-relay/nodeRelayConfigurationPorts';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 
@@ -9,131 +7,59 @@ export function NodeRelayConfigurationForm({
   className,
   configuration,
   disabled = false,
-  portCheck,
-  portCheckError,
-  portCheckLoading = false,
   onChange,
-  onCheckPorts,
 }: {
   className?: string;
   configuration: NodeRelayConfiguration;
   disabled?: boolean;
   onChange: (configuration: NodeRelayConfiguration) => void;
-  onCheckPorts?: () => void;
-  portCheck?: NodeRelayPortCheckResource | null;
-  portCheckError?: string | null;
-  portCheckLoading?: boolean;
 }) {
-  const portTargets = nodeRelayConfigurationPorts(configuration);
-  const canCheckPorts =
-    !!onCheckPorts &&
-    !!configuration.publicHost?.trim() &&
-    portTargets.length > 0 &&
-    !disabled;
-
   return (
     <div className={cx('grid gap-3', className)}>
       <section className="rounded-2xl bg-black/20 p-4">
-        <div className="mb-3">
-          <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-            {copy.nodeSettings.relayPublicHost}
-          </div>
-          <p className="mt-1 text-sm text-white/50">
-            {copy.nodeSettings.relayPublicHostBody}
-          </p>
-        </div>
-        <input
-          value={configuration.publicHost ?? ''}
-          onChange={(event) =>
-            onChange({
-              ...configuration,
-              publicHost: event.target.value.trim() || undefined,
-            })
-          }
-          disabled={disabled}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-45"
-          placeholder={copy.nodeSettings.relayPublicHostPlaceholder}
-          autoComplete="off"
-        />
-      </section>
-
-      <section className="rounded-2xl bg-black/20 p-4">
         <RelaySectionHeader
-          title={copy.nodeSettings.callsRelayTitle}
-          body={copy.nodeSettings.callsRelayBody}
-        />
-        <NumberField
-          disabled={disabled}
-          label={copy.nodeSettings.callsRelayPort}
-          min={1}
-          max={65535}
-          value={configuration.callsRelay.port}
-          onChange={(port) =>
-            onChange({
-              ...configuration,
-              callsRelay: { port },
-            })
-          }
-        />
-      </section>
-
-      <section className="rounded-2xl bg-black/20 p-4">
-        <RelaySectionHeader
-          title={copy.nodeSettings.publicRelayTitle}
-          body={copy.nodeSettings.publicRelayBody}
+          title={copy.nodeSettings.publicAccessTitle}
+          body={copy.nodeSettings.publicAccessBody}
         />
         <div className="grid gap-3">
-          <SwitchField
-            checked={configuration.publicRelay.enabled}
+          <TextField
             disabled={disabled}
-            label={copy.nodeSettings.relayEnabledSetting}
-            onChange={(enabled) =>
+            label={copy.nodeSettings.relayPublicHost}
+            placeholder={copy.nodeSettings.relayPublicHostPlaceholder}
+            value={configuration.publicHost ?? ''}
+            onChange={(publicHost) =>
               onChange({
                 ...configuration,
-                publicRelay: { ...configuration.publicRelay, enabled },
-              })
-            }
-          />
-          <SwitchField
-            checked={configuration.publicRelay.discoveryEnabled}
-            disabled={disabled}
-            label={copy.nodeSettings.relayDiscoveryEnabled}
-            onChange={(discoveryEnabled) =>
-              onChange({
-                ...configuration,
-                publicRelay: {
-                  ...configuration.publicRelay,
-                  discoveryEnabled,
-                },
+                publicHost,
               })
             }
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <NumberField
-              disabled={disabled || !configuration.publicRelay.enabled}
-              label={copy.nodeSettings.publicRelayPort}
+              disabled={disabled}
+              label={copy.nodeSettings.callsRelayPort}
               min={1}
               max={65535}
-              value={configuration.publicRelay.port}
+              value={configuration.callsRelay.port}
               onChange={(port) =>
                 onChange({
                   ...configuration,
-                  publicRelay: { ...configuration.publicRelay, port },
+                  callsRelay: { port },
                 })
               }
             />
             <NumberField
-              disabled={disabled || !configuration.publicRelay.enabled}
-              label={copy.nodeSettings.publicRelayLibp2pPort}
+              disabled={disabled}
+              label={copy.nodeSettings.publicNetworkPort}
               min={1}
               max={65535}
-              value={configuration.publicRelay.libp2pPort}
-              onChange={(libp2pPort) =>
+              value={configuration.publicNetwork.port}
+              onChange={(port) =>
                 onChange({
                   ...configuration,
-                  publicRelay: {
-                    ...configuration.publicRelay,
-                    libp2pPort,
+                  publicNetwork: {
+                    enabled: port !== undefined,
+                    port,
                   },
                 })
               }
@@ -149,72 +75,78 @@ export function NodeRelayConfigurationForm({
         />
         <div className="grid gap-3">
           <SwitchField
+            checked={configuration.privateRelay.discoveryEnabled}
+            disabled={disabled}
+            label={copy.nodeSettings.privateRelayDiscoverRecords}
+            onChange={(discoveryEnabled) =>
+              onChange({
+                ...configuration,
+                privateRelay: {
+                  ...configuration.privateRelay,
+                  discoveryEnabled,
+                },
+              })
+            }
+          />
+          <SwitchField
             checked={configuration.privateRelay.enabled}
             disabled={disabled}
-            label={copy.nodeSettings.relayEnabledSetting}
+            label={copy.nodeSettings.privateRelayEnabledSetting}
             onChange={(enabled) =>
               onChange({
                 ...configuration,
-                privateRelay: { ...configuration.privateRelay, enabled },
-              })
-            }
-          />
-          <SwitchField
-            checked={configuration.privateRelay.publicRecordPublicationEnabled}
-            disabled={disabled || !configuration.privateRelay.enabled}
-            label={copy.nodeSettings.privateRelayPublishRecords}
-            onChange={(publicRecordPublicationEnabled) =>
-              onChange({
-                ...configuration,
                 privateRelay: {
                   ...configuration.privateRelay,
-                  publicRecordPublicationEnabled,
+                  enabled,
+                  publicationEnabled: enabled,
                 },
               })
             }
           />
-          <SwitchField
-            checked={configuration.privateRelay.publicRecordDiscoveryEnabled}
-            disabled={disabled}
-            label={copy.nodeSettings.privateRelayDiscoverRecords}
-            onChange={(publicRecordDiscoveryEnabled) =>
-              onChange({
-                ...configuration,
-                privateRelay: {
-                  ...configuration.privateRelay,
-                  publicRecordDiscoveryEnabled,
-                },
-              })
-            }
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <NumberField
-              disabled={disabled || !configuration.privateRelay.enabled}
-              label={copy.nodeSettings.privateRelayPortStart}
-              min={1}
-              max={65535}
-              value={configuration.privateRelay.portStart}
-              onChange={(portStart) =>
-                onChange({
-                  ...configuration,
-                  privateRelay: { ...configuration.privateRelay, portStart },
-                })
-              }
-            />
-            <NumberField
-              disabled={disabled || !configuration.privateRelay.enabled}
-              label={copy.nodeSettings.privateRelayPortEnd}
-              min={1}
-              max={65535}
-              value={configuration.privateRelay.portEnd}
-              onChange={(portEnd) =>
-                onChange({
-                  ...configuration,
-                  privateRelay: { ...configuration.privateRelay, portEnd },
-                })
-              }
-            />
-          </div>
+          {configuration.privateRelay.enabled ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <NumberField
+                  disabled={disabled}
+                  label={copy.nodeSettings.privateRelayPortStart}
+                  min={1}
+                  max={65535}
+                  value={configuration.privateRelay.portStart}
+                  onChange={(portStart) =>
+                    onChange({
+                      ...configuration,
+                      privateRelay: {
+                        ...configuration.privateRelay,
+                        portStart,
+                      },
+                    })
+                  }
+                />
+                <NumberField
+                  disabled={disabled}
+                  label={copy.nodeSettings.privateRelayPortEnd}
+                  min={1}
+                  max={65535}
+                  value={configuration.privateRelay.portEnd}
+                  onChange={(portEnd) =>
+                    onChange({
+                      ...configuration,
+                      privateRelay: { ...configuration.privateRelay, portEnd },
+                    })
+                  }
+                />
+              </div>
+              <p className="text-sm leading-6 text-white/45">
+                {copy.nodeSettings.privateRelayPortRangeHelp}
+              </p>
+            </>
+          ) : null}
+          {!configuration.privateRelay.enabled &&
+          configuration.privateRelay.discoveryEnabled ? (
+            <p className="rounded-2xl border border-cyan-200/15 bg-cyan-300/10 px-3 py-2 text-sm leading-6 text-cyan-50/75">
+              {copy.nodeSettings.privateRelayDiscoveryOnlyBody}
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -238,73 +170,6 @@ export function NodeRelayConfigurationForm({
         />
       </section>
 
-      <section className="rounded-2xl border border-cyan-200/15 bg-cyan-300/10 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100/70">
-              {copy.nodeSettings.relayReachabilityTitle}
-            </div>
-            <p className="mt-1 text-sm leading-6 text-cyan-50/70">
-              {copy.nodeSettings.relayReachabilityBody}
-            </p>
-          </div>
-          {onCheckPorts && (
-            <button
-              type="button"
-              onClick={onCheckPorts}
-              disabled={!canCheckPorts || portCheckLoading}
-              className="shrink-0 rounded-2xl bg-cyan-300 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {portCheckLoading
-                ? copy.nodeSettings.relayCheckingPorts
-                : copy.nodeSettings.relayCheckPorts}
-            </button>
-          )}
-        </div>
-        {portTargets.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {portTargets.map((target) => (
-              <span
-                key={target.id}
-                className="rounded-full border border-cyan-200/15 bg-black/20 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.08em] text-cyan-50/70"
-              >
-                {target.port}/{target.protocol}
-              </span>
-            ))}
-          </div>
-        )}
-        {portCheckError && (
-          <div className="mt-3 rounded-2xl border border-amber-200/25 bg-amber-300/10 p-3 text-sm text-amber-50/80">
-            {portCheckError}
-          </div>
-        )}
-        {portCheck && (
-          <div className="mt-3 grid gap-2">
-            {portCheck.checks.map((result) => (
-              <div
-                key={result.id}
-                className="flex items-center justify-between gap-3 rounded-xl bg-black/20 px-3 py-2 text-xs"
-              >
-                <span className="min-w-0 truncate text-white/70">
-                  {result.label} · {result.port}/{result.protocol}
-                </span>
-                <span
-                  className={cx(
-                    'shrink-0 rounded-full px-2 py-1 font-black uppercase tracking-[0.08em]',
-                    result.status === 'reachable'
-                      ? 'bg-emerald-300/15 text-emerald-100'
-                      : result.status === 'unreachable'
-                        ? 'bg-rose-300/15 text-rose-100'
-                        : 'bg-white/10 text-white/60',
-                  )}
-                >
-                  {relayPortStatusLabel(result.status)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
@@ -360,6 +225,37 @@ function NumberField({
   );
 }
 
+function TextField({
+  disabled,
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-white/35">
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        type="text"
+        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-45"
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+    </label>
+  );
+}
+
 function SwitchField({
   checked,
   disabled,
@@ -394,17 +290,4 @@ function toOptionalPort(value: string): number | undefined {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined;
 
   return port;
-}
-
-function relayPortStatusLabel(
-  status: 'reachable' | 'unreachable' | 'unknown',
-): string {
-  switch (status) {
-    case 'reachable':
-      return copy.nodeSettings.relayPortReachable;
-    case 'unreachable':
-      return copy.nodeSettings.relayPortUnreachable;
-    default:
-      return copy.nodeSettings.relayPortUnknown;
-  }
 }

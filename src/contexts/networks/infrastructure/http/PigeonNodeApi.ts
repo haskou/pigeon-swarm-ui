@@ -46,14 +46,38 @@ export class PigeonNodeApi {
     }
   }
 
-  private relayConfigurationPayload(
-    configuration: NodeRelayConfiguration,
-  ): NodeRelayConfiguration {
+  private relayConfigurationPayload(configuration: NodeRelayConfiguration) {
+    const publicHost = configuration.publicHost?.trim();
+    const privateRelayEnabled = configuration.privateRelay.enabled;
+    const publicNetworkPort = configuration.publicNetwork.port;
+
     return {
-      ...configuration,
+      callsRelay: {
+        port: configuration.callsRelay.port,
+      },
       manualRelayMultiaddrs: configuration.manualRelayMultiaddrs
         .map((value) => value.trim())
         .filter(Boolean),
+      privateRelay: {
+        discoveryEnabled: configuration.privateRelay.discoveryEnabled,
+        enabled: privateRelayEnabled,
+        portEnd: privateRelayEnabled
+          ? configuration.privateRelay.portEnd
+          : undefined,
+        portStart: privateRelayEnabled
+          ? configuration.privateRelay.portStart
+          : undefined,
+        publicationEnabled: privateRelayEnabled,
+      },
+      publicHost: publicHost ? publicHost : undefined,
+      ...(publicNetworkPort === undefined
+        ? {}
+        : {
+            publicNetwork: {
+              enabled: true,
+              port: publicNetworkPort,
+            },
+          }),
     };
   }
 

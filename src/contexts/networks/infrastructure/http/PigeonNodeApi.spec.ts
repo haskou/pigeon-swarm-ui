@@ -107,18 +107,44 @@ describe(PigeonNodeApi.name, () => {
 
   it('updates relay configuration with the canonical request path', async () => {
     const configuration = defaultNodeRelayConfiguration();
-    configuration.publicHost = 'relay.example.com';
+    configuration.callsRelay.port = 3478;
     configuration.manualRelayMultiaddrs = [
       '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId',
       '',
       '  /dns4/relay-backup.example.com/tcp/4100/p2p/12D3KooWBackup  ',
     ];
+    configuration.privateRelay = {
+      discoveryEnabled: true,
+      enabled: true,
+      portEnd: 4172,
+      portStart: 4172,
+      publicationEnabled: false,
+    };
+    configuration.publicHost = '  teamspeak.futoineko.com  ';
+    configuration.publicNetwork = {
+      enabled: true,
+      port: 4011,
+    };
     const expectedBody = {
-      ...configuration,
+      callsRelay: {
+        port: 3478,
+      },
       manualRelayMultiaddrs: [
         '/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelayPeerId',
         '/dns4/relay-backup.example.com/tcp/4100/p2p/12D3KooWBackup',
       ],
+      privateRelay: {
+        discoveryEnabled: true,
+        enabled: true,
+        portEnd: 4172,
+        portStart: 4172,
+        publicationEnabled: true,
+      },
+      publicHost: 'teamspeak.futoineko.com',
+      publicNetwork: {
+        enabled: true,
+        port: 4011,
+      },
     };
     const request = jest.fn().mockResolvedValueOnce(configuration);
     const signer = {
@@ -133,6 +159,42 @@ describe(PigeonNodeApi.name, () => {
     await expect(
       api.updateRelayConfiguration(configuration, session),
     ).resolves.toEqual(configuration);
+
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'PUT',
+      '/node/relay-configuration/',
+      expectedBody,
+    );
+    expect(request).toHaveBeenCalledWith('/node/relay-configuration/', {
+      body: JSON.stringify(expectedBody),
+      headers: { 'X-Signature': 'signature' },
+      method: 'PUT',
+    });
+  });
+
+  it('omits public network settings when no public network port is configured', async () => {
+    const configuration = defaultNodeRelayConfiguration();
+    const request = jest.fn().mockResolvedValueOnce(configuration);
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
+    } as unknown as RequestSigner;
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const api = new PigeonNodeApi(
+      { request } as unknown as HttpJsonClient,
+      signer,
+    );
+    const expectedBody = {
+      callsRelay: {},
+      manualRelayMultiaddrs: [],
+      privateRelay: {
+        discoveryEnabled: true,
+        enabled: false,
+        publicationEnabled: false,
+      },
+    };
+
+    await api.updateRelayConfiguration(configuration, session);
 
     expect(signer.headers).toHaveBeenCalledWith(
       session,

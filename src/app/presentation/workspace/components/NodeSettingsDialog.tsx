@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   IdentityResource,
@@ -23,7 +22,6 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
-import { nodeRelayConfigurationPorts } from '../../../../contexts/networks/application/configure-node-relay/nodeRelayConfigurationPorts';
 import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import {
@@ -70,9 +68,6 @@ export function NodeSettingsDialog({
   const [loading, setLoading] = useState<
     'claim' | 'create' | 'join' | 'public' | 'remove' | null
   >(null);
-  const [ownerIdentity, setOwnerIdentity] = useState<IdentityResource | null>(
-    node?.owner === session.identity.id ? session.identity : null,
-  );
   const [replicationError, setReplicationError] = useState<string | null>(null);
   const [replicationLoading, setReplicationLoading] = useState(true);
   const [replicationStatus, setReplicationStatus] =
@@ -81,12 +76,6 @@ export function NodeSettingsDialog({
     useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
   const [relayError, setRelayError] = useState<string | null>(null);
   const [relayLoading, setRelayLoading] = useState(false);
-  const [relayPortCheck, setRelayPortCheck] =
-    useState<NodeRelayPortCheckResource | null>(null);
-  const [relayPortCheckError, setRelayPortCheckError] = useState<string | null>(
-    null,
-  );
-  const [relayPortCheckLoading, setRelayPortCheckLoading] = useState(false);
   const [relaySaving, setRelaySaving] = useState(false);
   const isOwner = node?.owner === session.identity.id;
   const hasPublicNetwork = networks.some(isPublicNodeNetwork);
@@ -94,19 +83,6 @@ export function NodeSettingsDialog({
     !!node && !hasPublicNetwork && (!node.owner || isOwner);
   const canRemoveNetworks = !!node && (!node.owner || isOwner);
   const canJoinNetwork = isNetworkInviteCode(joinCode);
-  const ownerProfile = isOwner
-    ? session.identity.profile
-    : ownerIdentity?.profile;
-  const ownerName = ownerProfile?.name.trim();
-  const ownerLabel = !node?.owner
-    ? copy.nodeSettings.unclaimed
-    : ownerName || shortId(node.owner);
-  const ownerHandle =
-    ownerProfile?.handle?.trim() && node?.owner
-      ? `@${ownerProfile.handle.trim()}`
-      : node?.owner
-        ? shortId(node.owner)
-        : copy.nodeSettings.claimAvailable;
   const sections: ReadonlyArray<readonly [NodeSettingsSection, string]> = [
     ['info', copy.nodeSettings.infoTab],
     [
@@ -122,35 +98,6 @@ export function NodeSettingsDialog({
       copy.nodeSettings.peersTab.replace('{count}', String(peers.length)),
     ],
   ];
-
-  useEffect(() => {
-    if (!node?.owner) {
-      setOwnerIdentity(null);
-
-      return;
-    }
-
-    if (node.owner === session.identity.id) {
-      setOwnerIdentity(session.identity);
-
-      return;
-    }
-
-    let cancelled = false;
-
-    void applicationContainer
-      .getIdentity(node.owner)
-      .then((identity) => {
-        if (!cancelled) setOwnerIdentity(identity);
-      })
-      .catch(() => {
-        if (!cancelled) setOwnerIdentity(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [node?.owner, session.identity]);
 
   useEffect(() => {
     if (!isOwner) {
@@ -193,8 +140,6 @@ export function NodeSettingsDialog({
       setRelayConfiguration(defaultNodeRelayConfiguration());
       setRelayError(null);
       setRelayLoading(false);
-      setRelayPortCheck(null);
-      setRelayPortCheckError(null);
 
       return undefined;
     }
@@ -399,8 +344,6 @@ export function NodeSettingsDialog({
       );
 
       setRelayConfiguration(normalizeNodeRelayConfiguration(saved));
-      setRelayPortCheck(null);
-      setRelayPortCheckError(null);
       setNotice(copy.nodeSettings.relaySaveSuccess);
     } catch (caught) {
       setRelayError(
@@ -408,34 +351,6 @@ export function NodeSettingsDialog({
       );
     }
     setRelaySaving(false);
-  };
-
-  const handleCheckRelayPorts = async () => {
-    const publicHost = relayConfiguration.publicHost?.trim();
-    const checks = nodeRelayConfigurationPorts(relayConfiguration);
-
-    if (!isOwner || !publicHost || checks.length === 0) return;
-
-    setRelayPortCheck(null);
-    setRelayPortCheckError(null);
-    setRelayPortCheckLoading(true);
-    try {
-      setRelayPortCheck(
-        await applicationContainer.checkNodeRelayPorts(
-          publicHost,
-          checks,
-          session,
-        ),
-      );
-    } catch (caught) {
-      setRelayPortCheckError(
-        toUserErrorMessage(
-          caught,
-          copy.nodeSettings.relayReachabilityUnavailable,
-        ),
-      );
-    }
-    setRelayPortCheckLoading(false);
   };
 
   return createPortal(
@@ -518,14 +433,10 @@ export function NodeSettingsDialog({
                         <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
                           {copy.nodeSettings.owner}
                         </div>
-                        <div className="mt-2 border-l border-white/10 py-1 pl-3">
-                          <div className="truncate text-sm font-black text-white">
-                            {ownerLabel}
-                          </div>
-                          <div className="truncate text-xs text-white/50">
-                            {ownerHandle}
-                          </div>
-                        </div>
+                        <NodeOwnerIdentity
+                          currentIdentity={session.identity}
+                          ownerIdentityId={node.owner}
+                        />
                       </div>
                     )}
                   </section>
@@ -558,7 +469,10 @@ export function NodeSettingsDialog({
                     </div>
                   </section>
 
-                  <NodeRuntimeSummary node={node} />
+                  <NodeRuntimeSummary
+                    node={node}
+                    relayConfiguration={relayConfiguration}
+                  />
 
                   {isOwner && (
                     <ReplicationStatusPanel
@@ -756,10 +670,6 @@ export function NodeSettingsDialog({
                         configuration={relayConfiguration}
                         disabled={relaySaving}
                         onChange={setRelayConfiguration}
-                        onCheckPorts={() => void handleCheckRelayPorts()}
-                        portCheck={relayPortCheck}
-                        portCheckError={relayPortCheckError}
-                        portCheckLoading={relayPortCheckLoading}
                       />
                       <button
                         type="submit"
@@ -942,8 +852,10 @@ function TrashIcon() {
 
 function NodeRuntimeSummary({
   node,
+  relayConfiguration,
 }: {
   node: (NodeInfo & { owner: null | string }) | null;
+  relayConfiguration: NodeRelayConfiguration;
 }) {
   return (
     <section className="rounded-2xl bg-black/20 p-3">
@@ -952,8 +864,12 @@ function NodeRuntimeSummary({
       </div>
       <div className="divide-y divide-white/10">
         <NodeDetailRow
-          label={copy.nodeSettings.nodeType}
-          value={nodeTypeLabel(node?.nodeType)}
+          label={copy.nodeSettings.privateRelayDiscoverRecords}
+          value={
+            relayConfiguration.privateRelay.discoveryEnabled
+              ? copy.nodeSettings.relayEnabled
+              : copy.nodeSettings.relayDisabled
+          }
         />
         <NodeDetailRow
           label={copy.nodeSettings.relay}
@@ -1136,6 +1052,33 @@ function PeerSummary({
         </div>
       </div>
     </article>
+  );
+}
+
+function NodeOwnerIdentity({
+  currentIdentity,
+  ownerIdentityId,
+}: {
+  currentIdentity: IdentityResource;
+  ownerIdentityId: string;
+}) {
+  const owner = usePeerOwnerIdentity(ownerIdentityId, currentIdentity);
+
+  return (
+    <div className="mt-2 w-full max-w-[18rem]">
+      <IdentityMemberRow
+        interactive={false}
+        item={{
+          identity: owner.identity ?? undefined,
+          identityId: ownerIdentityId,
+          name:
+            owner.loaded && !owner.identity
+              ? shortId(ownerIdentityId)
+              : undefined,
+          pictureUrl: owner.pictureUrl,
+        }}
+      />
+    </div>
   );
 }
 

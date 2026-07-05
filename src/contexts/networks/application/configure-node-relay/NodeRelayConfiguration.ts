@@ -4,18 +4,15 @@ export type NodeRelayConfiguration = {
   };
   manualRelayMultiaddrs: string[];
   privateRelay: {
-    enabled: boolean;
-    portEnd?: number;
-    portStart?: number;
-    publicRecordDiscoveryEnabled: boolean;
-    publicRecordPublicationEnabled: boolean;
-  };
-  publicHost?: string;
-  publicRelay: {
-    autoEnabled: boolean;
     discoveryEnabled: boolean;
     enabled: boolean;
-    libp2pPort?: number;
+    publicationEnabled: boolean;
+    portEnd?: number;
+    portStart?: number;
+  };
+  publicHost?: string;
+  publicNetwork: {
+    enabled: boolean;
     port?: number;
   };
 };
