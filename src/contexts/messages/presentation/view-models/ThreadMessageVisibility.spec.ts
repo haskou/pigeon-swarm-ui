@@ -15,17 +15,33 @@ describe(ThreadMessageVisibility.name, () => {
     ]);
   });
 
-  it('keeps legacy thread messages without reply preview', () => {
+  it('does not treat unmarked replies as thread messages', () => {
     const message = chatMessage({
-      id: 'legacy-thread-message',
+      id: 'normal-reply-without-preview',
       replyToMessageId: 'root-message',
     });
 
-    expect(ThreadMessageVisibility.forRoot('root-message', [message])).toEqual([
-      message,
-    ]);
-    expect(ThreadMessageVisibility.isThreadMessage(message)).toBe(true);
-    expect(ThreadMessageVisibility.rootMessageId(message)).toBe('root-message');
+    expect(ThreadMessageVisibility.forRoot('root-message', [message])).toEqual(
+      [],
+    );
+    expect(ThreadMessageVisibility.isThreadMessage(message)).toBe(false);
+    expect(ThreadMessageVisibility.rootMessageId(message)).toBeUndefined();
+  });
+
+  it('marks messages loaded from a thread endpoint for the requested root', () => {
+    const message = chatMessage({
+      id: 'loaded-thread-message',
+      replyToMessageId: 'root-message',
+    });
+    const [markedMessage] = ThreadMessageVisibility.markAsThreadMessages(
+      'root-message',
+      [message],
+    );
+
+    expect(markedMessage.threadRootMessageId).toBe('root-message');
+    expect(
+      ThreadMessageVisibility.forRoot('root-message', [markedMessage]),
+    ).toEqual([markedMessage]);
   });
 
   it('excludes normal replies with a reply preview from the thread panel', () => {

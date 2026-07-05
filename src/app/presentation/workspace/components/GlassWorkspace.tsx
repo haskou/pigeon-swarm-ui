@@ -2602,7 +2602,13 @@ export function GlassWorkspace({
         draft: '',
         editingMessage: null,
         error: null,
-        messages: ThreadMessageVisibility.forRoot(message.id, result.messages),
+        messages: ThreadMessageVisibility.forRoot(
+          message.id,
+          ThreadMessageVisibility.markAsThreadMessages(
+            message.id,
+            result.messages,
+          ),
+        ),
         replyTarget: null,
         root: message,
         state: 'ready',

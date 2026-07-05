@@ -23,11 +23,19 @@ export class ThreadMessageVisibility {
     return Boolean(ThreadMessageVisibility.rootMessageId(message));
   }
 
+  public static markAsThreadMessages(
+    rootMessageId: string,
+    messages: ChatMessage[],
+  ): ChatMessage[] {
+    return messages.map((message) => ({
+      ...message,
+      threadRootMessageId: message.threadRootMessageId ?? rootMessageId,
+    }));
+  }
+
   public static rootMessageId(message: ChatMessage): string | undefined {
     if (message.threadRootMessageId) return message.threadRootMessageId;
 
-    if (message.replyPreview) return undefined;
-
-    return message.replyToMessageId ?? message.raw.replyToMessageId;
+    return undefined;
   }
 }
