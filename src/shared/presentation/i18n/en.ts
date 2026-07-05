@@ -69,7 +69,7 @@ export const en = {
       lowercase: 'Lowercase',
       match: 'Passwords match',
       maxLength: '256 characters or fewer',
-      minLength: 'At least 12 characters',
+      minLength: 'At least 20 characters',
       number: 'Number',
       symbol: 'Symbol',
       uppercase: 'Uppercase',
@@ -82,7 +82,7 @@ export const en = {
       valid: 'Password is valid',
     },
     passwordRequirements:
-      'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
+      'Use 20 to 256 characters with uppercase, lowercase, number and symbol.',
     passkeyPrf: 'Protect with device unlock',
     passkeyPrfChecking: 'Checking whether this browser supports it...',
     passkeyPrfHelp:
@@ -1060,7 +1060,7 @@ export const en = {
       lowercase: 'Lowercase',
       match: 'Passwords match',
       maxLength: '256 characters or fewer',
-      minLength: 'At least 12 characters',
+      minLength: 'At least 20 characters',
       number: 'Number',
       symbol: 'Symbol',
       uppercase: 'Uppercase',

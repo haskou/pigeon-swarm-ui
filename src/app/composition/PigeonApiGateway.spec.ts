@@ -13,6 +13,7 @@ import type { RequestSigner } from '../../shared/infrastructure/http/RequestSign
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { RecoveryKey } from '../../contexts/identities/domain/value-objects/RecoveryKey';
 import {
   loadLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
@@ -2004,6 +2005,92 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('does not create a local passkey unlock when registration already protected the identity with passkey PRF', async () => {
+    const identity = {
+      encryptedKeyPair: {
+        encryptedPrivateKey: 'encrypted-private-key',
+        publicKey: 'public-key',
+      },
+      encryptedMasterKey: 'encrypted-master-key',
+      id: 'public-key',
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 2 ** 18,
+        p: 1,
+        passkeyPrf: {
+          algorithm: 'webauthn-prf',
+          credentialId: 'credential-id',
+          salt: 'salt',
+          version: 1,
+        },
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
+      networks: ['network-1'],
+      profile: { handle: 'ada', name: 'Ada' },
+      signature: 'keypair-signature',
+      timestamp: 1234,
+      version: 1,
+    } satisfies IdentityResource;
+    const masterKey = SymmetricKey.generate();
+    const keyPair = unlockedKeyPair('signature') as unknown as KeyPair;
+    const session = {
+      identity,
+      keychain: { conversations: {}, version: 0 },
+      keyPair,
+      masterKey,
+    } as unknown as Session;
+    const loginResult = { conversations: [], session };
+    const gateway = new PigeonApiGateway();
+    const internals = gateway as unknown as {
+      createIdentityMaterial: jest.Mock;
+      hydrateLoginSession: jest.Mock;
+      saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+    };
+
+    internals.createIdentityMaterial = jest.fn().mockResolvedValue({
+      identity,
+      keyPair,
+      masterKey,
+    });
+    internals.hydrateLoginSession = jest.fn().mockResolvedValue(loginResult);
+    internals.saveLocalPasskeyMasterKeyUnlock = jest.fn();
+
+    await expect(
+      gateway.register('Ada', 'secret', ['network-1'], 'ada', {
+        passkeyPrfEnabled: true,
+      }),
+    ).resolves.toBe(loginResult);
+
+    expect(internals.saveLocalPasskeyMasterKeyUnlock).not.toHaveBeenCalled();
+  });
+
+  it('keeps passkey PRF registration enabled when a recovery key is also created', () => {
+    const gateway = new PigeonApiGateway();
+    const internals = gateway as unknown as {
+      registrationPasskeyPrfMode(input: {
+        displayName: string;
+        enabled?: boolean;
+        identityId: string;
+        recoveryKey?: RecoveryKey;
+      }): unknown;
+    };
+
+    const mode = internals.registrationPasskeyPrfMode({
+      displayName: 'Ada',
+      enabled: true,
+      identityId: 'identity-1',
+      recoveryKey: RecoveryKey.generate(),
+    });
+
+    expect(mode).toEqual({
+      displayName: 'Ada',
+      identityId: 'identity-1',
+      mode: 'create',
+    });
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {
@@ -2317,6 +2404,8 @@ describe(PigeonApiGateway.name, () => {
           r: 8,
           recoveryKey: {
             algorithm: 'pigeon-recovery-key',
+            encryptedMasterKey: 'encrypted-recovery-master-key',
+            mode: 'recovery-key',
             version: 1,
           },
           salt: 'master-salt',

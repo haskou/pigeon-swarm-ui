@@ -220,7 +220,7 @@ describe(UserRootKeyProtector.name, () => {
     ).rejects.toThrow();
   });
 
-  it('protects the user root key with password and recovery key', async () => {
+  it('protects password-only identities with an independent recovery envelope', async () => {
     const masterKey = SymmetricKey.generate();
     const recoveryKey = RecoveryKey.generate();
     const protector = new UserRootKeyProtector(
@@ -242,33 +242,44 @@ describe(UserRootKeyProtector.name, () => {
       masterKeyDerivation: protectedRoot.masterKeyDerivation,
     });
 
-    const unlocked = await protector.unlockMasterKey(
+    const unlockedWithPassword = await protector.unlockMasterKey(
       identity,
       'correct password',
+    );
+    const unlockedWithRecovery = await protector.unlockMasterKey(
+      identity,
+      'unused password',
       recoveryKey,
     );
 
-    expect(unlocked.isEqual(masterKey)).toBe(true);
+    expect(unlockedWithPassword.isEqual(masterKey)).toBe(true);
+    expect(unlockedWithRecovery.isEqual(masterKey)).toBe(true);
     expect(protectedRoot.masterKeyDerivation.recoveryKey).toMatchObject({
       algorithm: 'pigeon-recovery-key',
+      encryptedMasterKey: expect.any(String),
+      mode: 'recovery-key',
       version: 1,
     });
     expect(protectedRoot.masterKeyDerivation.passkeyPrf).toBeUndefined();
   });
 
-  it('rejects password-only unlocks for recovery protected identities', async () => {
+  it('protects passkey identities with a password and recovery envelope', async () => {
     const masterKey = SymmetricKey.generate();
+    const recoveryKey = RecoveryKey.generate();
+    const passkeyPrf = new FakePasskeyPrfProtector(SymmetricKey.generate());
     const protector = new UserRootKeyProtector(
-      new FakePasskeyPrfProtector(
-        SymmetricKey.generate(),
-        true,
-      ) as unknown as WebAuthnPrfKeyProtector,
+      passkeyPrf as unknown as WebAuthnPrfKeyProtector,
       testDerivationDefaults,
     );
     const protectedRoot = await protector.protectMasterKey({
       masterKey,
+      passkeyPrf: {
+        displayName: 'Ada',
+        identityId: 'identity-id',
+        mode: 'create',
+      },
       password: 'correct password',
-      recoveryKey: RecoveryKey.generate(),
+      recoveryKey,
     });
     const identity = createIdentity({
       encryptedMasterKey: protectedRoot.encryptedMasterKey,
@@ -276,10 +287,40 @@ describe(UserRootKeyProtector.name, () => {
       masterKey,
       masterKeyDerivation: protectedRoot.masterKeyDerivation,
     });
+    const recoveryProtector = new UserRootKeyProtector(
+      new FakePasskeyPrfProtector(
+        SymmetricKey.generate(),
+        true,
+      ) as unknown as WebAuthnPrfKeyProtector,
+      testDerivationDefaults,
+    );
 
+    const unlockedWithPasskey = await protector.unlockMasterKey(
+      identity,
+      'correct password',
+    );
+    const unlockedWithRecovery = await recoveryProtector.unlockMasterKey(
+      identity,
+      'correct password',
+      recoveryKey,
+    );
+
+    expect(unlockedWithPasskey.isEqual(masterKey)).toBe(true);
+    expect(unlockedWithRecovery.isEqual(masterKey)).toBe(true);
+    expect(protectedRoot.masterKeyDerivation.passkeyPrf).toBeDefined();
+    expect(protectedRoot.masterKeyDerivation.recoveryKey).toMatchObject({
+      algorithm: 'pigeon-recovery-key',
+      encryptedMasterKey: expect.any(String),
+      mode: 'password-recovery',
+      version: 1,
+    });
     await expect(
-      protector.unlockMasterKey(identity, 'correct password'),
-    ).rejects.toThrow('Recovery key is required');
+      recoveryProtector.unlockMasterKey(
+        identity,
+        'wrong password',
+        recoveryKey,
+      ),
+    ).rejects.toThrow();
   });
 
   it('rejects wrong recovery keys for recovery protected identities', async () => {
