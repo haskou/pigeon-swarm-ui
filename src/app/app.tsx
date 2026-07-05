@@ -172,7 +172,10 @@ function App(): ReactElement {
     return (
       <AppFrame>
         <AppScreenSuspense>
-          <NetworkCreationScreen onNetworkCreated={handleNetworkCreated} />
+          <NetworkCreationScreen
+            nodeOwnerId={nodeNetworks.node?.owner ?? null}
+            onNetworkCreated={handleNetworkCreated}
+          />
         </AppScreenSuspense>
       </AppFrame>
     );

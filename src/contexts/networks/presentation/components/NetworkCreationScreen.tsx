@@ -15,8 +15,10 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 type NetworkSetupMode = 'create' | 'join' | 'public';
 
 export function NetworkCreationScreen({
+  nodeOwnerId,
   onNetworkCreated,
 }: {
+  nodeOwnerId: null | string;
   onNetworkCreated: () => void;
 }) {
   const [mode, setMode] = useState<NetworkSetupMode>('public');
@@ -32,6 +34,7 @@ export function NetworkCreationScreen({
     { label: copy.network.create, value: 'create' },
     { label: copy.network.join, value: 'join' },
   ] satisfies Array<{ label: string; value: NetworkSetupMode }>;
+  const canConfigureRelay = nodeOwnerId === null;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -39,7 +42,7 @@ export function NetworkCreationScreen({
     setLoading(true);
 
     try {
-      if (configureRelay) {
+      if (configureRelay && canConfigureRelay) {
         await applicationContainer.updateNodeRelayConfiguration(
           relayConfiguration,
         );
@@ -129,38 +132,40 @@ export function NetworkCreationScreen({
           ) : null}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-black/15">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-sm font-black text-white/75 transition hover:bg-white/[0.03]"
-            aria-expanded={configureRelay}
-            onClick={() => setConfigureRelay((current) => !current)}
-          >
-            <span>{copy.network.configureRelay}</span>
-            <span
-              aria-hidden="true"
-              className={cx(
-                'grid h-8 w-8 place-items-center rounded-xl bg-white/[0.06] text-white/60 transition-transform',
-                configureRelay && 'rotate-180',
-              )}
+        {canConfigureRelay && (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/15">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-sm font-black text-white/75 transition hover:bg-white/[0.03]"
+              aria-expanded={configureRelay}
+              onClick={() => setConfigureRelay((current) => !current)}
             >
-              <ChevronDownIcon />
-            </span>
-          </button>
-          {configureRelay && (
-            <div className="border-t border-white/10 p-4 pt-3">
-              <p className="mb-4 text-sm leading-6 text-white/50">
-                {copy.network.configureRelayBody}
-              </p>
-              <NodeRelayConfigurationForm
-                className="text-left"
-                configuration={relayConfiguration}
-                disabled={loading}
-                onChange={setRelayConfiguration}
-              />
-            </div>
-          )}
-        </div>
+              <span>{copy.network.configureRelay}</span>
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'grid h-8 w-8 place-items-center rounded-xl bg-white/[0.06] text-white/60 transition-transform',
+                  configureRelay && 'rotate-180',
+                )}
+              >
+                <ChevronDownIcon />
+              </span>
+            </button>
+            {configureRelay && (
+              <div className="border-t border-white/10 p-4 pt-3">
+                <p className="mb-4 text-sm leading-6 text-white/50">
+                  {copy.network.configureRelayBody}
+                </p>
+                <NodeRelayConfigurationForm
+                  className="text-left"
+                  configuration={relayConfiguration}
+                  disabled={loading}
+                  onChange={setRelayConfiguration}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
