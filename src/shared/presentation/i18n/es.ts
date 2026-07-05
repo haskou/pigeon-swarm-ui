@@ -1041,7 +1041,6 @@ export const es = {
     packLoadError: 'No se pudo cargar el pack de stickers.',
     packName: 'Nombre del pack',
     recent: 'Recientes',
-    refresh: 'Actualizar',
     removePack: 'Quitar',
     removeStickerPack: 'Quitar pack de stickers',
     savedPacks: 'Packs guardados',
