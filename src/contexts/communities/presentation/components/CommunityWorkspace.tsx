@@ -725,7 +725,10 @@ export function CommunityWorkspace({
         );
         const visibleThreadMessages = ThreadMessageVisibility.forRoot(
           message.id,
-          threadMessages,
+          ThreadMessageVisibility.markAsThreadMessages(
+            message.id,
+            threadMessages,
+          ),
         );
 
         setThreadPanel({

@@ -16,6 +16,7 @@ export type PlainMessage = {
   mentions?: CommunityMessageMention[];
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
   timestamp?: number;
   type?: string;
 };

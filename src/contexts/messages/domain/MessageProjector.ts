@@ -88,7 +88,7 @@ export class MessageProjector {
       const decrypted = symmetricKey.decrypt(
         new EncryptedPayload(encryptedPayload),
       );
-      const decryptedText = new TextDecoder().decode(decrypted);
+      const decryptedText = decrypted.toString();
       const parsed = JSON.parse(decryptedText) as PlainMessage;
 
       return this.projectDecrypted(
@@ -164,8 +164,25 @@ export class MessageProjector {
       replyPreview: parsed.reply,
       replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
       sticker: parsed.sticker,
+      threadRootMessageId: this.threadRootMessageId(parsed, message),
       timestamp: parsed.timestamp ?? base.timestamp,
     };
+  }
+
+  private threadRootMessageId(
+    payload: PlainMessage,
+    message: MessageResource,
+  ): string | undefined {
+    if (payload.threadRootMessageId) return payload.threadRootMessageId;
+
+    if (
+      payload.type === 'ThreadMessageSent' ||
+      payload.type === 'ThreadStickerMessageSent'
+    ) {
+      return message.replyToMessageId;
+    }
+
+    return undefined;
   }
 
   public list(value: unknown): {
