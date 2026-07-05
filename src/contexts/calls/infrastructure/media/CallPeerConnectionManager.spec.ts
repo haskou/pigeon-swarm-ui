@@ -355,6 +355,40 @@ describe(CallPeerConnectionManager.name, () => {
     expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
   });
 
+  it('drops TURN ICE servers without credentials before creating a peer connection', async () => {
+    const peers: FakePeerConnection[] = [];
+    const configurations: RTCConfiguration[] = [];
+
+    installPeerConnectionMock(peers, configurations);
+    const manager = new CallPeerConnectionManager();
+
+    manager.configure(() =>
+      Promise.resolve({
+        iceServers: [
+          {
+            urls: [
+              'turn:relay.example.test:4101?transport=udp',
+              'turn:relay.example.test:4101?transport=tcp',
+            ],
+          },
+        ],
+        iceTransportPolicy: 'relay',
+      }),
+    );
+
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(peers).toHaveLength(1);
+    expect(configurations).toEqual([
+      {
+        iceServers: [],
+        iceTransportPolicy: 'all',
+      },
+    ]);
+  });
+
   it('exchanges offer and answer between joined peers', async () => {
     const peers: FakePeerConnection[] = [];
     const manager = new CallPeerConnectionManager();
@@ -422,7 +456,13 @@ describe(CallPeerConnectionManager.name, () => {
     installPeerConnectionMock(peers, configurations);
     const manager = new CallPeerConnectionManager();
     const rtcConfiguration: RTCConfiguration = {
-      iceServers: [{ urls: 'turn:relay.example.test' }],
+      iceServers: [
+        {
+          credential: 'turn-password',
+          urls: 'turn:relay.example.test',
+          username: 'turn-user',
+        },
+      ],
       iceTransportPolicy: 'relay',
     };
     let resolveConfiguration!: (configuration: RTCConfiguration) => void;
@@ -450,6 +490,38 @@ describe(CallPeerConnectionManager.name, () => {
 
     expect(peers).toHaveLength(1);
     expect(configurations).toEqual([rtcConfiguration]);
+  });
+
+  it('sends one initial offer when concurrent peer ensures target the same identity', async () => {
+    const peers: FakePeerConnection[] = [];
+    const sentSignals: Array<{ signalType: string }> = [];
+
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+
+    await Promise.all([
+      manager.ensurePeer('peer-identity-id', true, (_recipient, signalType) => {
+        sentSignals.push({ signalType });
+
+        return Promise.resolve();
+      }),
+      manager.ensurePeer('peer-identity-id', true, (_recipient, signalType) => {
+        sentSignals.push({ signalType });
+
+        return Promise.resolve();
+      }),
+    ]);
+
+    const [peer] = peers;
+
+    expect(peers).toHaveLength(1);
+    expect(peer.createOffer).toHaveBeenCalledTimes(1);
+    expect(sentSignals).toEqual([{ signalType: 'offer' }]);
   });
 
   it('adds screen sharing without replacing the microphone sender', async () => {
