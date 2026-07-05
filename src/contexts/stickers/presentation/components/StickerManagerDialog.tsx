@@ -25,7 +25,6 @@ type StickerManagerDialogProps = {
     stickerId: string,
     favorite: boolean,
   ) => Promise<void>;
-  onRefresh: () => Promise<void>;
   onSavePack: (packId: string, saved: boolean) => Promise<void>;
   onStickerDelete: (packId: string, stickerId: string) => Promise<void>;
   onStickerCreated: () => Promise<void>;
@@ -40,7 +39,6 @@ export function StickerManagerDialog({
   onClose,
   onCreatePack,
   onFavoriteToggle,
-  onRefresh,
   onSavePack,
   onStickerDelete,
   onStickerCreated,
@@ -217,13 +215,6 @@ export function StickerManagerDialog({
             setPackSearch={setPackSearch}
           />
         )}
-        <button
-          type="button"
-          onClick={() => void onRefresh()}
-          className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-black text-white/70 transition hover:bg-white/15"
-        >
-          {copy.stickers.refresh}
-        </button>
       </div>
     </div>
   );

@@ -549,7 +549,6 @@ export const en = {
     packLoadError: 'Sticker pack could not be loaded.',
     packName: 'Pack name',
     recent: 'Recent',
-    refresh: 'Refresh',
     removePack: 'Remove',
     removeStickerPack: 'Remove sticker pack',
     savePack: 'Save',

@@ -473,10 +473,6 @@ export function StickerPicker({
                 await loadLibrary();
               }}
               onFavoriteToggle={toggleFavorite}
-              onRefresh={async () => {
-                invalidateStickerCaches();
-                await loadLibrary();
-              }}
               onSavePack={savePack}
               onStickerDelete={deleteSticker}
               onStickerCreated={loadLibrary}
