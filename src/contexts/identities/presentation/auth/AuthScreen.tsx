@@ -29,6 +29,8 @@ import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { IdentityMemberRow } from '../components/IdentityMemberListPanel';
+import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
   type AuthMode,
@@ -264,6 +266,7 @@ export function AuthScreen({
               />
             </div>
             <NodeLoginSummary
+              availableNetworks={availableNetworks}
               className="mt-4"
               ownerIdentityId={nodeOwnerId}
               peerCount={peerCount}
@@ -302,6 +305,7 @@ export function AuthScreen({
           />
 
           <NodeLoginSummary
+            availableNetworks={availableNetworks}
             className="mb-5 lg:hidden"
             ownerIdentityId={nodeOwnerId}
             peerCount={peerCount}
@@ -567,16 +571,20 @@ function InstallAppAction({
 }
 
 function NodeLoginSummary({
+  availableNetworks,
   className,
   ownerIdentityId,
   peerCount,
   peersLoading,
 }: {
+  availableNetworks: NodeNetwork[];
   className?: string;
   ownerIdentityId: string | null;
   peerCount: number;
   peersLoading: boolean;
 }): ReactElement {
+  const owner = useIdentityPreview(ownerIdentityId ?? undefined);
+
   return (
     <div
       className={cx(
@@ -587,14 +595,34 @@ function NodeLoginSummary({
       <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.auth.nodeSummaryTitle}
       </div>
+      {ownerIdentityId ? (
+        <div className="flex items-center justify-between gap-3">
+          <div className="shrink-0 text-white/45">{copy.auth.nodeOwner}</div>
+          <div className="ml-auto w-full max-w-[18rem]">
+            <IdentityMemberRow
+              interactive={false}
+              item={{
+                identity: owner.identity ?? undefined,
+                identityId: ownerIdentityId,
+                name:
+                  owner.loaded && !owner.identity
+                    ? shortId(ownerIdentityId)
+                    : undefined,
+                pictureUrl: owner.pictureUrl,
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <NodeLoginSummaryRow
+          label={copy.auth.nodeOwner}
+          value={copy.auth.nodeOwnerUnclaimed}
+        />
+      )}
       <NodeLoginSummaryRow
-        label={copy.auth.nodeOwner}
-        title={ownerIdentityId ?? undefined}
-        value={
-          ownerIdentityId
-            ? shortId(ownerIdentityId)
-            : copy.auth.nodeOwnerUnclaimed
-        }
+        label={copy.auth.networksLabel}
+        title={availableNetworks.map((network) => network.name).join(', ')}
+        value={availableNetworksLabel(availableNetworks)}
       />
       <NodeLoginSummaryRow
         label={copy.auth.nodePeers}
@@ -608,6 +636,12 @@ function NodeLoginSummary({
       />
     </div>
   );
+}
+
+function availableNetworksLabel(availableNetworks: NodeNetwork[]): string {
+  if (availableNetworks.length === 0) return copy.auth.nodeNetworksNone;
+
+  return availableNetworks.map((network) => network.name).join(', ');
 }
 
 function NodeLoginSummaryRow({

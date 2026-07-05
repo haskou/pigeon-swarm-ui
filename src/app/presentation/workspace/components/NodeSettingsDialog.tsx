@@ -21,13 +21,10 @@ import { MetricCard } from '../../../../shared/presentation/components/MetricCar
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
 import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
 import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
-import {
-  identityPicture,
-  publicFileObjectUrl,
-} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
 interface NodeSettingsDialogProps {
   node: (NodeInfo & { owner: null | string }) | null;
@@ -74,6 +71,8 @@ export function NodeSettingsDialog({
     useState<IpfsReplicationStatus | null>(null);
   const [relayConfiguration, setRelayConfiguration] =
     useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
+  const [relayConfigurationLoaded, setRelayConfigurationLoaded] =
+    useState(false);
   const [relayError, setRelayError] = useState<string | null>(null);
   const [relayLoading, setRelayLoading] = useState(false);
   const [relaySaving, setRelaySaving] = useState(false);
@@ -138,6 +137,7 @@ export function NodeSettingsDialog({
   useEffect(() => {
     if (!isOwner) {
       setRelayConfiguration(defaultNodeRelayConfiguration());
+      setRelayConfigurationLoaded(false);
       setRelayError(null);
       setRelayLoading(false);
 
@@ -148,6 +148,7 @@ export function NodeSettingsDialog({
 
     const load = async () => {
       setRelayError(null);
+      setRelayConfigurationLoaded(false);
       setRelayLoading(true);
       try {
         const configuration =
@@ -155,9 +156,11 @@ export function NodeSettingsDialog({
 
         if (!cancelled) {
           setRelayConfiguration(normalizeNodeRelayConfiguration(configuration));
+          setRelayConfigurationLoaded(true);
         }
       } catch (caught) {
         if (!cancelled) {
+          setRelayConfigurationLoaded(false);
           setRelayError(
             toUserErrorMessage(caught, copy.nodeSettings.relayLoadError),
           );
@@ -344,6 +347,7 @@ export function NodeSettingsDialog({
       );
 
       setRelayConfiguration(normalizeNodeRelayConfiguration(saved));
+      setRelayConfigurationLoaded(true);
       setNotice(copy.nodeSettings.relaySaveSuccess);
     } catch (caught) {
       setRelayError(
@@ -471,7 +475,11 @@ export function NodeSettingsDialog({
 
                   <NodeRuntimeSummary
                     node={node}
-                    relayConfiguration={isOwner ? relayConfiguration : null}
+                    relayConfiguration={
+                      isOwner && relayConfigurationLoaded
+                        ? relayConfiguration
+                        : null
+                    }
                   />
 
                   {isOwner && (
@@ -875,7 +883,7 @@ function NodeRuntimeSummary({
         ) : null}
         <NodeDetailRow
           label={copy.nodeSettings.relay}
-          value={relayStatusLabel(node?.relay)}
+          value={nodeRelayStatusLabel(relayConfiguration, node?.relay)}
         />
         {node?.relay?.peerId ? (
           <NodeDetailRow
@@ -1064,7 +1072,7 @@ function NodeOwnerIdentity({
   currentIdentity: IdentityResource;
   ownerIdentityId: string;
 }) {
-  const owner = usePeerOwnerIdentity(ownerIdentityId, currentIdentity);
+  const owner = useIdentityPreview(ownerIdentityId, currentIdentity);
 
   return (
     <div className="mt-2 w-full max-w-[18rem]">
@@ -1091,7 +1099,7 @@ function PeerOwnerIdentity({
   currentIdentity: IdentityResource;
   ownerIdentityId?: string;
 }) {
-  const owner = usePeerOwnerIdentity(ownerIdentityId, currentIdentity);
+  const owner = useIdentityPreview(ownerIdentityId, currentIdentity);
 
   if (!ownerIdentityId) {
     return (
@@ -1122,83 +1130,6 @@ function PeerOwnerIdentity({
       />
     </div>
   );
-}
-
-function usePeerOwnerIdentity(
-  ownerIdentityId: string | undefined,
-  currentIdentity: IdentityResource,
-): {
-  identity: IdentityResource | null;
-  loaded: boolean;
-  pictureUrl: string | null;
-} {
-  const [owner, setOwner] = useState<{
-    identity: IdentityResource | null;
-    loaded: boolean;
-    pictureUrl: string | null;
-  }>({
-    identity: null,
-    loaded: !ownerIdentityId,
-    pictureUrl: null,
-  });
-
-  useEffect(() => {
-    if (!ownerIdentityId) {
-      setOwner({ identity: null, loaded: true, pictureUrl: null });
-
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadOwner = async () => {
-      setOwner({ identity: null, loaded: false, pictureUrl: null });
-
-      try {
-        const identity =
-          ownerIdentityId === currentIdentity.id
-            ? currentIdentity
-            : await applicationContainer.getIdentity(ownerIdentityId);
-        const pictureUrl = await loadIdentityPictureUrl(identity);
-
-        if (!cancelled) {
-          setOwner({ identity, loaded: true, pictureUrl });
-        }
-      } catch {
-        if (!cancelled) {
-          setOwner({ identity: null, loaded: true, pictureUrl: null });
-        }
-      }
-    };
-
-    void loadOwner();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentIdentity, ownerIdentityId]);
-
-  return owner;
-}
-
-async function loadIdentityPictureUrl(
-  identity: IdentityResource,
-): Promise<string | null> {
-  const directPicture = identityPicture(identity);
-
-  if (directPicture) return directPicture;
-
-  const pictureCid = identity.profile.picture?.trim();
-
-  if (!pictureCid) return null;
-
-  try {
-    return publicFileObjectUrl(
-      await applicationContainer.getPublicFile(pictureCid),
-    );
-  } catch {
-    return null;
-  }
 }
 
 function PeerBadges({ peer }: { peer: Peer }) {
@@ -1299,6 +1230,24 @@ function relayStatusLabel(
   if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
 
   return copy.nodeSettings.relayEnabled;
+}
+
+function nodeRelayStatusLabel(
+  relayConfiguration: NodeRelayConfiguration | null,
+  relay:
+    | {
+        advertised: boolean;
+        autoEnabled: boolean;
+        enabled: boolean;
+        running: boolean;
+      }
+    | undefined,
+): string {
+  if (!relayConfiguration) return relayStatusLabel(relay);
+
+  return relayConfiguration.privateRelay.enabled
+    ? copy.nodeSettings.relayEnabled
+    : copy.nodeSettings.relayDisabled;
 }
 
 function ReplicationStatusPanel({

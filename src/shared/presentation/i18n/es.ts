@@ -63,6 +63,7 @@ export const es = {
     networksLabel: 'Redes',
     nodeOwner: 'Propietario',
     nodeOwnerUnclaimed: 'Sin reclamar',
+    nodeNetworksNone: 'Sin redes',
     nodePeers: 'Pares',
     nodePeersCount: '{count} pares',
     nodePeersLoading: 'Buscando...',
