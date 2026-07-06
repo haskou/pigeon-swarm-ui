@@ -20,6 +20,8 @@ export const es = {
     openImage: 'Abrir imagen',
     previewVideo: 'Previsualizar video',
     previousImage: 'Imagen anterior',
+    publicUnencrypted: 'Media público sin cifrar en chat cifrado',
+    shareIpfs: 'Copiar enlace',
   },
 
   auth: {
@@ -220,8 +222,10 @@ export const es = {
     addPrivateKeyTitle: 'Anadir clave de conversacion',
     conversationDataTitle: 'Datos de conversacion',
     conversationMenu: 'Abrir menu de conversacion',
-    copyPrivateKey: 'Copiar clave privada',
-    copyPrivateKeyAction: 'Copiar clave cifrada',
+    copyPrivateKey: 'Compartir clave privada',
+    copyPrivateKeyAction: 'Compartir clave cifrada',
+    copyPrivateKeyBody:
+      'Este paquete está cifrado para la otra persona y se puede pegar en su diálogo de clave faltante.',
     copyPrivateKeyTitle: 'Clave cifrada de conversacion',
     createConversation: 'Nueva conversacion',
     directMessage: 'Mensaje directo',
@@ -588,6 +592,37 @@ export const es = {
     privateKey: 'Estado del llavero',
     storedOneKeys: 'Claves guardadas',
   },
+  encryption: {
+    algorithm: 'Algoritmo',
+    communityKey: 'Clave de comunidad',
+    communityNote:
+      'Los mensajes del canal usan esta clave simétrica de tu llavero.',
+    communityTitle: 'Cifrado de comunidad',
+    conversationNote:
+      'Los mensajes de la conversación usan esta clave simétrica de tu llavero.',
+    conversationTitle: 'Cifrado de conversación',
+    createdAt: 'Creada',
+    empty: 'Sin valor',
+    keyVersion: 'Versión de clave',
+    keys: 'Claves',
+    missing: 'Falta la clave de cifrado',
+    missingNote:
+      'La clave no está disponible en tu llavero, así que este contenido cifrado no se puede descifrar aquí.',
+    network: 'Red',
+    peerIdentity: 'Identidad remota',
+    plaintext: 'Texto plano',
+    public: 'Texto plano público',
+    publicCommunityNote:
+      'Esta comunidad pública guarda mensajes buscables en texto plano. Este canal no usa clave de mensajes de comunidad.',
+    ready: 'Cifrado extremo a extremo activo',
+    scope: 'Ámbito',
+    symmetricKey: 'Clave simétrica',
+    unknown: 'Desconocido',
+  },
+  ipfs: {
+    links: 'Enlaces IPFS',
+    open: 'Abrir enlace IPFS',
+  },
   messages: {
     addReaction: 'Anadir reaccion',
     cancelEdit: 'Cancelar edicion',
@@ -944,6 +979,14 @@ export const es = {
     identityId: 'ID de identidad',
     identityVersion: 'Identidad',
     keepEditing: 'Seguir editando',
+    keychainHelp:
+      'Las claves locales disponibles se muestran censuradas. Cópialas solo si necesitas inspeccionar. Nunca compartas tus claves privadas sin encriptar.',
+    keychainTab: 'Llavero',
+    communityKey: 'Clave de comunidad',
+    conversationKey: 'Clave de conversación',
+    encryptedMasterKey: 'Clave maestra cifrada',
+    encryptedPrivateKey: 'Clave privada cifrada',
+    identityKeys: 'Claves de identidad',
     keychainVersion: 'Llavero',
     language: 'Idioma',
     localDeviceUnlock: 'Usar desbloqueo del dispositivo',
@@ -965,6 +1008,7 @@ export const es = {
     noAvailableNetworks: 'No hay más redes disponibles',
     noBiography: 'Sin bio',
     noCommunityRoles: 'Sin roles de comunidad',
+    noKeychainKeys: 'No hay claves en este llavero.',
     noNetworks: 'Sin redes',
     openBanner: 'Abrir banner de perfil',
     openConversation: 'Abrir mensaje directo',
