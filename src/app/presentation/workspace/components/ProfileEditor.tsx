@@ -144,7 +144,9 @@ export function ProfileEditor({
   const shouldConfigureLocalPasskeyPrf =
     localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
   const needsCurrentPasswordForPasskey =
-    passkeyPrfChanged && !wantsPasswordChange;
+    !wantsPasswordChange &&
+    (passkeyPrfChanged ||
+      (localPasskeyPrfChanged && localPasskeyPrfEnabled));
   const needsRecoveryKeyForPasskey =
     needsCurrentPasswordForPasskey && hasRecoveryKey;
   const canChangePassword =
@@ -334,8 +336,9 @@ export function ProfileEditor({
               passkeyPrfChanged && !wantsPasswordChange
                 ? currentPasswordForPasskey
                 : undefined,
-            passkeyPrfEnabled:
-              passkeyPrfEnabled && (hasPasskeyPrf || passkeyPrfAvailable),
+            passkeyPrfEnabled: passkeyPrfChanged
+              ? passkeyPrfEnabled
+              : undefined,
             recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
           },
         );
@@ -651,21 +654,21 @@ export function ProfileEditor({
                           </p>
                         </div>
                         <ProfileSwitchButton
-                          checked={passkeyPrfEnabled}
+                          checked={localPasskeyPrfEnabled}
                           disabled={
-                            !passkeyPrfAvailable && !passkeyPrfEnabled
+                            !passkeyPrfAvailable && !localPasskeyPrfEnabled
                           }
                           help={
-                            passkeyPrfEnabled
-                              ? copy.profile.passkeyPrfPreserved
+                            localPasskeyPrfEnabled
+                              ? copy.profile.localDeviceUnlockHelp
                               : passkeyPrfAvailable
                                 ? copy.profile.localDeviceUnlockHelp
                                 : copy.profile.localDeviceUnlockUnavailable
                           }
                           label={copy.profile.localDeviceUnlock}
                           onClick={() =>
-                            (passkeyPrfAvailable || passkeyPrfEnabled) &&
-                            setPasskeyPrfEnabled((enabled) => !enabled)
+                            (passkeyPrfAvailable || localPasskeyPrfEnabled) &&
+                            setLocalPasskeyPrfEnabled((enabled) => !enabled)
                           }
                         />
                         {needsCurrentPasswordForPasskey && (
