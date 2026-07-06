@@ -5,12 +5,15 @@ import type {
 } from '../view-models/panelNotificationPreview.types';
 import type { NotificationAction } from './NotificationAction';
 
+import { useState } from 'react';
+
 import { cx } from '../../../../shared/presentation/cx';
 import {
   formatTime,
   shortId,
 } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 import { notificationPreview } from '../view-models/notificationPreview';
 
@@ -20,6 +23,7 @@ interface NotificationCardProps {
   onAccept: (notification: NotificationResource) => void;
   onArchive: (notificationId: string) => void;
   onDecline: (notificationId: string) => void;
+  onIdentityOpen: (identityId: string) => void;
   previewContext: NotificationPreviewContext;
 }
 
@@ -86,25 +90,50 @@ function PreviewAvatar({ preview }: { preview: NotificationPreview }) {
 }
 
 function IdentityName({
+  className = 'mt-2',
   identityId,
+  onOpen,
   previewContext,
 }: {
+  className?: string;
   identityId: string;
+  onOpen: (identityId: string) => void;
   previewContext: NotificationPreviewContext;
 }) {
   const identity = previewContext.identityProfiles[identityId];
   const cachedName = previewContext.identityNames[identityId];
+  const pictureUrl = previewContext.identityPictures[identityId] ?? null;
 
   if (!identity && (!cachedName || cachedName === identityId)) {
     return (
-      <span className="inline-block h-3.5 w-24 animate-pulse rounded-full bg-white/18 align-middle" />
+      <div
+        className={cx(
+          className,
+          'h-14 animate-pulse rounded-2xl bg-white/10',
+        )}
+      />
     );
   }
 
   return (
-    <span className="font-semibold text-white/75">
-      {identityDisplayName(identityId, previewContext.identityNames)}
-    </span>
+    <button
+      type="button"
+      onClick={() => onOpen(identityId)}
+      className={cx(
+        className,
+        'block w-full rounded-2xl text-left transition hover:ring-1 hover:ring-white/15',
+      )}
+    >
+      <IdentityMemberRow
+        item={{
+          identity,
+          identityId,
+          name: identityDisplayName(identityId, previewContext.identityNames),
+          pictureUrl,
+        }}
+        interactive={false}
+      />
+    </button>
   );
 }
 
@@ -114,16 +143,33 @@ export function NotificationCard({
   onAccept,
   onArchive,
   onDecline,
+  onIdentityOpen,
   previewContext,
 }: NotificationCardProps) {
+  const [targetCopied, setTargetCopied] = useState(false);
   const target = notificationTarget(notification);
   const preview = notificationPreview(notification, previewContext);
   const inviterIdentityId =
     notification.type === 'missed_call'
       ? notification.payload.callerIdentityId
       : notification.payload.inviterIdentityId;
+  const previewIdentityId =
+    notification.type === 'missed_call' ||
+    notification.type === 'conversation_invitation'
+      ? inviterIdentityId
+      : null;
   const canRespond =
     notification.state === 'pending' && notification.type !== 'missed_call';
+  const showStateBadge = notification.state !== 'pending' || canRespond;
+
+  const copyTarget = async () => {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(target.value);
+    }
+
+    setTargetCopied(true);
+    window.setTimeout(() => setTargetCopied(false), 1600);
+  };
 
   return (
     <article
@@ -133,59 +179,84 @@ export function NotificationCard({
       className="rounded-2xl border border-white/10 bg-black/25 p-4"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h3 className="font-black text-white">
             {notificationTitle(notification)}
           </h3>
           <p className="mt-1 text-sm text-white/55">
             {notification.type === 'missed_call'
               ? copy.notifications.calledBy
-              : copy.notifications.invitedBy}{' '}
+              : copy.notifications.invitedBy}
+          </p>
+          {!previewIdentityId && (
             <IdentityName
               identityId={inviterIdentityId}
+              onOpen={onIdentityOpen}
               previewContext={previewContext}
             />
-          </p>
-        </div>
-        <span
-          className={cx(
-            'shrink-0 rounded-full px-2.5 py-1 text-xs font-black',
-            notification.state === 'pending'
-              ? 'bg-cyan-300/15 text-cyan-100'
-              : 'bg-white/10 text-white/55',
           )}
-        >
-          {copy.notifications.states[notification.state]}
-        </span>
+        </div>
+        {showStateBadge && (
+          <span
+            className={cx(
+              'shrink-0 rounded-full px-2.5 py-1 text-xs font-black',
+              notification.state === 'pending'
+                ? 'bg-cyan-300/15 text-cyan-100'
+                : 'bg-white/10 text-white/55',
+            )}
+          >
+            {copy.notifications.states[notification.state]}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 rounded-2xl bg-white/[0.07] p-3 text-xs text-white/55">
-        <div className="mb-3 flex items-center gap-3 border-b border-white/10 pb-3">
-          <PreviewAvatar preview={preview} />
-          <div className="min-w-0">
-            {preview.loading ? (
-              <div className="space-y-2">
-                <div className="h-4 w-32 max-w-full animate-pulse rounded-full bg-white/18" />
-                <div className="h-3 w-20 animate-pulse rounded-full bg-white/12" />
-              </div>
-            ) : (
-              <>
-                <div className="truncate text-sm font-black text-white/85">
-                  {preview.title}
-                </div>
-                {preview.subtitle && (
-                  <div className="mt-1 line-clamp-2 text-xs font-semibold text-white/50">
-                    {preview.subtitle}
+        <div className="mb-3 border-b border-white/10 pb-3">
+          {previewIdentityId ? (
+            <IdentityName
+              className=""
+              identityId={previewIdentityId}
+              onOpen={onIdentityOpen}
+              previewContext={previewContext}
+            />
+          ) : (
+            <div className="flex items-center gap-3">
+              <PreviewAvatar preview={preview} />
+              <div className="min-w-0">
+                {preview.loading ? (
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 max-w-full animate-pulse rounded-full bg-white/18" />
+                    <div className="h-3 w-20 animate-pulse rounded-full bg-white/12" />
                   </div>
+                ) : (
+                  <>
+                    <div className="truncate text-sm font-black text-white/85">
+                      {preview.title}
+                    </div>
+                    {preview.subtitle && (
+                      <div className="mt-1 line-clamp-2 text-xs font-semibold text-white/50">
+                        {preview.subtitle}
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between gap-3">
           <span>{target.label}</span>
-          <span className="truncate font-semibold text-white/70">
-            {shortId(target.value)}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-semibold text-white/70">
+              {shortId(target.value)}
+            </span>
+            <button
+              type="button"
+              onClick={() => void copyTarget()}
+              className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/60 transition hover:bg-white/15 hover:text-white"
+            >
+              {targetCopied ? copy.profile.copied : copy.profile.copy}
+            </button>
           </span>
         </div>
         <div className="mt-2 flex items-center justify-between gap-3">

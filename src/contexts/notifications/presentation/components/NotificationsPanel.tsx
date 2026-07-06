@@ -5,15 +5,20 @@ import type {
   IdentityResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../identities/presentation/view-models/identityDisplay';
 import type { NotificationAction } from './NotificationAction';
 
+import { useState } from 'react';
+
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
+import { UserProfileDialog } from '../../../identities/presentation/components/UserProfileDialog';
 import { MembershipRequestCard } from './MembershipRequestCard';
 import { NotificationCard } from './NotificationCard';
 
@@ -26,6 +31,7 @@ interface NotificationsPanelProps {
   currentIdentityId: string;
   error: string | null;
   notifications: NotificationResource[];
+  nodeNetworks: NodeNetwork[];
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
@@ -55,6 +61,7 @@ export function NotificationsPanel({
   membershipError,
   membershipRequests,
   notifications,
+  nodeNetworks,
   onAccept,
   onAcceptMembershipRequest,
   onArchive,
@@ -63,6 +70,9 @@ export function NotificationsPanel({
   onDeclineMembershipRequest,
 }: NotificationsPanelProps) {
   const { close, state } = useCloseTransition(onClose);
+  const [profileIdentityId, setProfileIdentityId] = useState<string | null>(
+    null,
+  );
 
   useCloseOnEscape(close);
 
@@ -147,11 +157,22 @@ export function NotificationsPanel({
               onAccept={onAccept}
               onArchive={onArchive}
               onDecline={onDecline}
+              onIdentityOpen={setProfileIdentityId}
               previewContext={notificationPreviewContext}
             />
           ))}
         </div>
       </section>
+      {profileIdentityId && (
+        <UserProfileDialog
+          identity={identityProfiles[profileIdentityId]}
+          identityId={profileIdentityId}
+          name={identityDisplayName(profileIdentityId, identityNames)}
+          nodeNetworks={nodeNetworks}
+          onClose={() => setProfileIdentityId(null)}
+          picture={identityPictures[profileIdentityId]}
+        />
+      )}
     </div>
   );
 }

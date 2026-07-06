@@ -246,7 +246,10 @@ function OwnerMarker({
   label: string;
 }) {
   return (
-    <span className="shrink-0 text-sm text-yellow-300" title={label}>
+    <span
+      className="shrink-0 text-base text-yellow-200 opacity-100 drop-shadow-[0_0_8px_rgba(250,204,21,0.7)]"
+      title={label}
+    >
       {children}
     </span>
   );

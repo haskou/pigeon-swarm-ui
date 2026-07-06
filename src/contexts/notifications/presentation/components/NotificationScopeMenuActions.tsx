@@ -5,6 +5,7 @@ import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonR
 import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 
 type NotificationScopeMenuActionsVariant = 'block' | 'compact';
 
@@ -34,7 +35,13 @@ export function NotificationScopeMenuActions({
     <>
       <NotificationScopeMenuButton
         className={actionClassName}
-        icon={<NotificationMuteIcon muted={muted} />}
+        icon={
+          muted ? (
+            <NotificationUnmuteIcon />
+          ) : (
+            <MutedNotificationsIcon className="h-4 w-4 shrink-0 text-white/55" />
+          )
+        }
         label={muteActionLabel}
         onClick={onNotificationMuteToggle}
       />
@@ -78,7 +85,7 @@ function NotificationScopeMenuButton({
   );
 }
 
-function NotificationMuteIcon({ muted }: { muted: boolean }) {
+function NotificationUnmuteIcon() {
   return (
     <svg
       aria-hidden="true"
@@ -92,21 +99,12 @@ function NotificationMuteIcon({ muted }: { muted: boolean }) {
         strokeLinejoin="round"
         strokeWidth="1.8"
       />
-      {muted ? (
-        <path
-          d="m16.2 9.2 4 4m0-4-4 4"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeWidth="1.8"
-        />
-      ) : (
-        <path
-          d="M16.6 8.5a4.9 4.9 0 0 1 0 7M18.9 6.2a8.3 8.3 0 0 1 0 11.6"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeWidth="1.8"
-        />
-      )}
+      <path
+        d="M16.6 8.5a4.9 4.9 0 0 1 0 7M18.9 6.2a8.3 8.3 0 0 1 0 11.6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
     </svg>
   );
 }

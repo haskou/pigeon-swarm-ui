@@ -26,6 +26,7 @@ import {
   sidePanelListEnterClassName,
   sidePanelListEnterStyle,
 } from '../../../../shared/presentation/sidePanelListMotion';
+import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 import {
   VoiceChannelButton,
   type VoiceParticipantView,
@@ -270,9 +271,9 @@ export function CommunityChannelList({
                   {displayedVoiceChannels.map((channel, index) => (
                     <div
                       key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
-                      className={sidePanelListEnterClassName(
-                        'left',
-                        animateEntries,
+                      className={cx(
+                        sidePanelListEnterClassName('left', animateEntries),
+                        'relative',
                       )}
                       style={sidePanelListEnterStyle(
                         displayedTextChannels.length + index,
@@ -288,6 +289,13 @@ export function CommunityChannelList({
                           voiceParticipantsByChannelId.get(channel.id) ?? []
                         }
                       />
+                      {NotificationSettingsPolicy.isMuted(
+                        voiceChannelNotificationSetting(channel),
+                      ) && (
+                        <span className="pointer-events-none absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-black/25 text-white/50">
+                          <MutedNotificationsIcon className="h-3 w-3" />
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -512,6 +520,14 @@ function TextChannelButton({
         aria-haspopup="menu"
       >
         <span className="min-w-0 flex-1 truncate"># {channel.name}</span>
+        {muted && (
+          <span
+            className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-black/20 text-current opacity-70"
+            title={copy.notifications.mute}
+          >
+            <MutedNotificationsIcon className="h-3 w-3" />
+          </span>
+        )}
         {unreadCount > 0 && (
           <span className="grid min-w-5 place-items-center rounded-full bg-fuchsia-500 px-1.5 py-0.5 text-[0.65rem] leading-none text-white">
             {unreadCount > 9 ? '9+' : unreadCount}

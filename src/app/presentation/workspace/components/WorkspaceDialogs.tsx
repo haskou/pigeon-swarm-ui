@@ -448,6 +448,7 @@ function WorkspaceNotificationDialog(
         membershipError={props.membershipRequestError}
         membershipRequests={props.membershipRequests}
         notifications={props.visibleNotifications}
+        nodeNetworks={props.nodeNetworks}
         onAcceptMembershipRequest={props.onAcceptMembershipRequest}
         onAccept={props.onAcceptNotification}
         onArchive={props.archiveNotification}
