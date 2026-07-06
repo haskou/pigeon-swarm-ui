@@ -1371,6 +1371,21 @@ export function GlassWorkspace({
       throw new Error(copy.calls.microphoneUnavailable);
     }
   }, [callNoiseCancellationEnabled]);
+  const requestOptionalLocalAudio = useCallback(
+    async (
+      event: string,
+      context: Record<string, unknown>,
+    ): Promise<MediaStream | null> =>
+      await requestLocalAudio().catch((caught): null => {
+        logCallWarning(event, {
+          ...context,
+          error: caught,
+        });
+
+        return null;
+      }),
+    [requestLocalAudio],
+  );
   const stopLocalAudio = (stream: MediaStream | null) => {
     CallMicrophoneCapture.stop(stream);
   };
@@ -1494,7 +1509,12 @@ export function GlassWorkspace({
       let localStream: MediaStream | null = null;
 
       callActionInProgressRef.current = true;
-      const localAudioRequest = requestLocalAudio();
+      const localAudioRequest = requestOptionalLocalAudio(
+        'workspace:conversation-call:microphone-unavailable',
+        {
+          conversationId: input.conversationId,
+        },
+      );
 
       void localAudioRequest
         .then(async (stream) => {
@@ -1605,15 +1625,13 @@ export function GlassWorkspace({
       let localStream: MediaStream | null = null;
 
       void (async () => {
-        localStream = await requestLocalAudio().catch((caught): null => {
-          logCallWarning('workspace:community-voice:microphone-unavailable', {
+        localStream = await requestOptionalLocalAudio(
+          'workspace:community-voice:microphone-unavailable',
+          {
             channelId: channel.id,
             communityId: activeCommunity.id,
-            error: caught,
-          });
-
-          return null;
-        });
+          },
+        );
 
         logCallDebug('workspace:community-voice:leaving-current-call', {
           channelId: channel.id,
@@ -1727,7 +1745,12 @@ export function GlassWorkspace({
 
       setIncomingCall(null);
       stopIncomingCallSound();
-      localStream = await requestLocalAudio();
+      localStream = await requestOptionalLocalAudio(
+        'workspace:incoming-call:microphone-unavailable',
+        {
+          callId: pendingCall.id,
+        },
+      );
 
       await leaveCurrentCallForSwitch();
       await cleanupJoinedCalls(pendingCall.id);

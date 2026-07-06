@@ -4,6 +4,7 @@ import type {
 } from '../../domain/callSession.types';
 import type { BrowserWindowWithWebkitAudioContext } from './BrowserWindowWithWebkitAudioContext';
 import type { PeerNegotiationState } from './PeerNegotiationState';
+import type { RtcConfigurationProvider } from './RtcConfigurationProvider';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
@@ -30,11 +31,10 @@ import {
   needsAudioGraph,
   remoteAudioKey,
 } from './remoteAudioOutput';
+import { safeRtcConfiguration } from './safeRtcConfiguration';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
-
-type RtcConfigurationProvider = () => Promise<RTCConfiguration>;
 
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
@@ -309,7 +309,9 @@ export class CallPeerConnectionManager {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const rtcConfiguration = await this.rtcConfigurationProvider();
+    const rtcConfiguration = safeRtcConfiguration(
+      await this.rtcConfigurationProvider(),
+    );
     const peer = new RTCPeerConnection(rtcConfiguration);
 
     logCallDebug('peer-manager:create-peer', {
@@ -769,9 +771,17 @@ export class CallPeerConnectionManager {
     peer: RTCPeerConnection,
     sendSignal: SignalSender,
   ): Promise<void> {
-    if (peer.signalingState !== 'stable') return;
-
     const state = this.peerNegotiationState(peerIdentityId);
+
+    if (state.makingOffer || peer.signalingState !== 'stable') {
+      logCallDebug('peer-manager:renegotiation:offer-skipped', {
+        makingOffer: state.makingOffer,
+        peerIdentityId,
+        signalingState: peer.signalingState,
+      });
+
+      return;
+    }
 
     try {
       state.makingOffer = true;
@@ -1091,18 +1101,18 @@ export class CallPeerConnectionManager {
     });
     this.configureNegotiationState(peerIdentityId, !shouldOffer);
     const peer = await this.getOrCreatePeer(peerIdentityId, sendSignal);
+    const state = this.peerNegotiationState(peerIdentityId);
 
-    if (!shouldOffer || peer.localDescription) {
+    if (!shouldOffer || peer.localDescription || state.makingOffer) {
       logCallDebug('peer-manager:ensure-peer:offer-skipped', {
         hasLocalDescription: Boolean(peer.localDescription),
+        makingOffer: state.makingOffer,
         peerIdentityId,
         shouldOffer,
       });
 
       return;
     }
-
-    const state = this.peerNegotiationState(peerIdentityId);
 
     try {
       state.makingOffer = true;
