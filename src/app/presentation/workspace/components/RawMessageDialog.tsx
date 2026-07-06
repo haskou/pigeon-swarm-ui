@@ -3,6 +3,8 @@ import type { ChatMessage } from '../../../../shared/domain/pigeonResources.type
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { collectIpfsLinks } from '../../../../shared/presentation/ipfsLinks';
+import { IpfsLinksPanel } from './IpfsLinksPanel';
 
 export function RawMessageDialog({
   message,
@@ -12,6 +14,10 @@ export function RawMessageDialog({
   onClose: () => void;
 }) {
   const { close, state } = useCloseTransition(onClose);
+  const ipfsLinks = collectIpfsLinks({
+    attachments: message.attachments,
+    raw: message.raw,
+  });
 
   useCloseOnEscape(close);
 
@@ -41,9 +47,12 @@ export function RawMessageDialog({
             &times;
           </button>
         </div>
-        <pre className="mt-4 min-h-0 overflow-auto rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
-          {JSON.stringify(message.raw, null, 2)}
-        </pre>
+        <div className="mt-4 min-h-0 overflow-auto">
+          <IpfsLinksPanel links={ipfsLinks} />
+          <pre className="rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+            {JSON.stringify(message.raw, null, 2)}
+          </pre>
+        </div>
       </section>
     </div>
   );

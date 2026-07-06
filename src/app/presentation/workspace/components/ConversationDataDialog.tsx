@@ -2,6 +2,8 @@ import { createPortal } from 'react-dom';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { collectIpfsLinks } from '../../../../shared/presentation/ipfsLinks';
+import { IpfsLinksPanel } from './IpfsLinksPanel';
 
 export function ConversationDataDialog({
   data,
@@ -13,6 +15,7 @@ export function ConversationDataDialog({
   title?: string;
 }) {
   useCloseOnEscape(onClose);
+  const ipfsLinks = collectIpfsLinks(data);
 
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md">
@@ -34,9 +37,12 @@ export function ConversationDataDialog({
             &times;
           </button>
         </div>
-        <pre className="mt-4 min-h-0 overflow-auto rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
-          {JSON.stringify(data, null, 2)}
-        </pre>
+        <div className="mt-4 min-h-0 overflow-auto">
+          <IpfsLinksPanel links={ipfsLinks} />
+          <pre className="rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
       </section>
     </div>,
     document.body,

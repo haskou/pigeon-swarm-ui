@@ -160,6 +160,9 @@ export function MessageBubble({
   const hasTextContent = message.content.trim().length > 0;
   const stickerWithReply = Boolean(sticker && hasReply);
   const canViewOriginalMessage = Boolean(message.originalContent && !sticker);
+  const encryptedEnvironment = Boolean(
+    message.encrypted || message.raw.encryptedPayload || message.raw.payload,
+  );
   const reactionGroups = useMemo(
     () =>
       groupMessageReactions(
@@ -372,6 +375,7 @@ export function MessageBubble({
                     {imageAttachments.length > 0 && (
                       <ImageAttachmentAlbum
                         contained={!imageOnlyMessage}
+                        encryptedEnvironment={encryptedEnvironment}
                         items={imageAttachments}
                         mine={mine}
                         onOpen={(images, index) =>
@@ -384,6 +388,7 @@ export function MessageBubble({
                       <VideoAttachmentCard
                         attachment={attachment}
                         contained={!videoOnlyMessage}
+                        encryptedEnvironment={encryptedEnvironment}
                         key={`${message.id}-${attachment.cid}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}
@@ -393,6 +398,7 @@ export function MessageBubble({
                     {otherAttachments.map(({ attachment, index }) => (
                       <AttachmentCard
                         attachment={attachment}
+                        encryptedEnvironment={encryptedEnvironment}
                         key={`${message.id}-${attachment.cid}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}

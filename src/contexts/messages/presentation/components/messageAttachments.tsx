@@ -22,12 +22,14 @@ export type IndexedAttachment = {
 
 export function ImageAttachmentAlbum({
   contained = false,
+  encryptedEnvironment = false,
   items,
   mine,
   onOpen,
   onPreview,
 }: {
   contained?: boolean;
+  encryptedEnvironment?: boolean;
   items: IndexedAttachment[];
   mine: boolean;
   onOpen: (images: LightboxImage[], index: number) => void;
@@ -156,36 +158,44 @@ export function ImageAttachmentAlbum({
             : -1;
 
           return (
-            <button
-              type="button"
+            <div
               key={attachment.cid}
-              onClick={() => {
-                if (lightboxImages.length === 0 || lightboxIndex < 0) return;
-                onOpen(lightboxImages, lightboxIndex);
-              }}
               className={cx(
-                'relative w-full min-w-0 overflow-hidden rounded-2xl bg-black/25 text-left transition hover:opacity-90',
+                'relative w-full min-w-0 overflow-hidden rounded-2xl bg-black/25 text-left',
                 visibleItems.length === 1 ? 'aspect-[4/3]' : 'aspect-square',
               )}
-              aria-label={copy.attachments.openImage}
             >
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt=""
-                  decoding="async"
-                  loading="lazy"
-                  className="h-full w-full rounded-2xl object-cover"
-                />
-              ) : (
-                <ImageAttachmentSkeleton progress={progress} />
-              )}
-              {isOverflowTile && (
-                <div className="absolute inset-0 grid place-items-center bg-black/65 text-3xl font-black text-white">
-                  +{extraCount}
-                </div>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (lightboxImages.length === 0 || lightboxIndex < 0) return;
+                  onOpen(lightboxImages, lightboxIndex);
+                }}
+                className="h-full w-full transition hover:opacity-90"
+                aria-label={copy.attachments.openImage}
+              >
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                    className="h-full w-full rounded-2xl object-cover"
+                  />
+                ) : (
+                  <ImageAttachmentSkeleton progress={progress} />
+                )}
+                {isOverflowTile && (
+                  <div className="absolute inset-0 grid place-items-center bg-black/65 text-3xl font-black text-white">
+                    +{extraCount}
+                  </div>
+                )}
+              </button>
+              <PublicMediaControls
+                attachment={attachment}
+                encryptedEnvironment={encryptedEnvironment}
+              />
+            </div>
           );
         })}
       </div>
@@ -195,12 +205,14 @@ export function ImageAttachmentAlbum({
 
 export function AttachmentCard({
   attachment,
+  encryptedEnvironment = false,
   mine,
   onClick,
   onPreview,
   pending,
 }: {
   attachment: MessageAttachment;
+  encryptedEnvironment?: boolean;
   mine: boolean;
   onClick: () => void;
   onPreview: (
@@ -284,12 +296,16 @@ export function AttachmentCard({
     <div
       ref={cardRef}
       className={cx(
-        'overflow-hidden rounded-2xl border text-left transition',
+        'relative overflow-hidden rounded-2xl border text-left transition',
         mine
           ? 'border-white/20 bg-white/10 hover:bg-white/15'
           : 'border-white/10 bg-white/8 hover:bg-white/12',
       )}
     >
+      <PublicMediaControls
+        attachment={attachment}
+        encryptedEnvironment={encryptedEnvironment}
+      />
       {previewUrl && attachment.contentType.startsWith('video/') && (
         <video
           src={previewUrl}
@@ -355,12 +371,14 @@ export function AttachmentCard({
 export function VideoAttachmentCard({
   attachment,
   contained = false,
+  encryptedEnvironment = false,
   mine,
   onPreview,
   pending,
 }: {
   attachment: MessageAttachment;
   contained?: boolean;
+  encryptedEnvironment?: boolean;
   mine: boolean;
   onPreview: (
     attachment: MessageAttachment,
@@ -475,11 +493,15 @@ export function VideoAttachmentCard({
     <div
       ref={cardRef}
       className={cx(
-        'overflow-hidden rounded-2xl border',
+        'relative overflow-hidden rounded-2xl border',
         contained ? 'w-full max-w-full' : imageAttachmentAlbumWidthClass,
         mine ? 'border-white/20 bg-white/10' : 'border-white/10 bg-white/8',
       )}
     >
+      <PublicMediaControls
+        attachment={attachment}
+        encryptedEnvironment={encryptedEnvironment}
+      />
       {videoUrl ? (
         <video
           autoPlay={largeOrChunked}
@@ -534,6 +556,70 @@ export function VideoAttachmentCard({
         <AttachmentPreviewSkeleton mediaType="video" progress={progress} />
       )}
     </div>
+  );
+}
+
+function PublicMediaControls({
+  attachment,
+  encryptedEnvironment,
+}: {
+  attachment: MessageAttachment;
+  encryptedEnvironment: boolean;
+}) {
+  if (!isPublicUnencryptedAttachment(attachment) || !encryptedEnvironment) {
+    return null;
+  }
+
+  return (
+    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+      <span
+        className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200/60 bg-rose-500/45 text-rose-50 shadow-lg shadow-black/45"
+        title={copy.attachments.publicUnencrypted}
+        aria-label={copy.attachments.publicUnencrypted}
+      >
+        <OpenLockIcon />
+      </span>
+    </div>
+  );
+}
+
+function OpenLockIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d="M9 10V8a5 5 0 0 1 8.7-3.4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M6.5 10h11A1.5 1.5 0 0 1 19 11.5v7A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 14v2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+export function isPublicUnencryptedAttachment(
+  attachment: MessageAttachment,
+): boolean {
+  return (
+    attachment.storage === 'public' ||
+    (attachment.storage !== 'private' &&
+      attachment.encrypted === false &&
+      !attachment.encryption)
   );
 }
 

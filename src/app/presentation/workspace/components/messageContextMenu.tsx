@@ -31,11 +31,13 @@ import {
   formatFileSize,
   isAudioAttachment,
   isImageAttachment,
+  isPublicUnencryptedAttachment,
   isVideoAttachment,
 } from '../../../../contexts/messages/presentation/components/messageAttachments';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -107,6 +109,10 @@ export function MessageContextMenu({
     () => menu.message.attachments.find(isDownloadableAttachment),
     [menu.message.attachments],
   );
+  const shareableAttachment = useMemo(
+    () => menu.message.attachments.find(isShareableIpfsAttachment),
+    [menu.message.attachments],
+  );
   const toggleReaction = (emoji: string) => {
     const reacted = Boolean(
       currentIdentityId &&
@@ -121,9 +127,14 @@ export function MessageContextMenu({
     onReactionToggle?.(menu.message, emoji, reacted);
     close();
   };
-  const runAction = (action: () => void) => {
+  const shareAttachmentLink = async (attachment: MessageAttachment) => {
+    const url = ipfsUrl(attachment.cid);
+
+    if (navigator.clipboard) await navigator.clipboard.writeText(url);
+  };
+  const runAction = (action: () => Promise<void> | void) => {
     close();
-    action();
+    void action();
   };
   const anchorStyle = {
     anchorName: '--message-menu-anchor',
@@ -319,6 +330,15 @@ export function MessageContextMenu({
             }
           />
         ) : null}
+        {shareableAttachment ? (
+          <MessageMenuAction
+            icon={<CopyIcon />}
+            label={copy.attachments.shareIpfs}
+            onClick={() =>
+              runAction(() => shareAttachmentLink(shareableAttachment))
+            }
+          />
+        ) : null}
         {onEdit ? (
           <MessageMenuAction
             icon={<EditIcon />}
@@ -450,6 +470,13 @@ function isDownloadableAttachment(attachment: MessageAttachment): boolean {
     isAudioAttachment(attachment) ||
     isImageAttachment(attachment) ||
     isVideoAttachment(attachment)
+  );
+}
+
+function isShareableIpfsAttachment(attachment: MessageAttachment): boolean {
+  return (
+    isDownloadableAttachment(attachment) &&
+    isPublicUnencryptedAttachment(attachment)
   );
 }
 
