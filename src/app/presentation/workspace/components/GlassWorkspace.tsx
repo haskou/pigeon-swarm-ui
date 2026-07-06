@@ -2390,7 +2390,7 @@ export function GlassWorkspace({
 
     sendQueueRef.current = sendQueueRef.current.then(async () => {
       try {
-        const lastMessageId = MessageCollection.lastDelivered(
+        const lastMessageId = MessageCollection.lastDeliveredMessageTarget(
           messagesRef.current,
         )?.id;
         const sent = await applicationContainer.sendMessage(
