@@ -9,8 +9,10 @@ export type IpfsLink = {
 };
 
 export function ipfsUrl(cid: string): string {
-  return new ApiUrlBuilder(API_SERVER_URL).build(
-    `/ipfs/${encodeURIComponent(cid)}`,
+  return absoluteApiUrl(
+    new ApiUrlBuilder(API_SERVER_URL).build(
+      `/ipfs/${encodeURIComponent(cid)}`,
+    ),
   );
 }
 
@@ -107,4 +109,14 @@ function singularLabel(value: string): string {
   const label = value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 
   return label.endsWith('s') ? label.slice(0, -1) : label;
+}
+
+function absoluteApiUrl(url: string): string {
+  if (/^[a-z][a-z\d+\-.]*:\/\//i.test(url)) return url;
+
+  const origin = globalThis.location?.origin;
+
+  if (!origin || origin === 'null') return url;
+
+  return new URL(url, origin).toString();
 }

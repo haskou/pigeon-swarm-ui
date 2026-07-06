@@ -4,6 +4,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity';
+import { presenceWithLocalPreference } from './presenceWithLocalPreference';
 
 function presence(status: IdentityPresence['status']): IdentityPresence {
   return {
@@ -76,4 +77,18 @@ describe(presenceStatusForLocalActivity.name, () => {
       ).toBeNull();
     },
   );
+});
+
+describe(presenceWithLocalPreference.name, () => {
+  it('keeps a manual away preference when a realtime event reports the user as available', () => {
+    expect(
+      presenceWithLocalPreference(presence('available'), 'identity-1', 'away'),
+    ).toEqual(presence('away'));
+  });
+
+  it('does not override other identities with the local manual preference', () => {
+    expect(
+      presenceWithLocalPreference(presence('available'), 'identity-2', 'away'),
+    ).toEqual(presence('available'));
+  });
 });

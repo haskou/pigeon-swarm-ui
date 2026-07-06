@@ -15,6 +15,7 @@ import {
   writePresencePreference,
 } from '../presencePreferenceStorage';
 import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity';
+import { presenceWithLocalPreference } from './presenceWithLocalPreference';
 
 const localActivityPresenceRefreshThrottleMs = 30_000;
 
@@ -90,9 +91,15 @@ export function useWorkspacePresence({
     [presenceIdentityIdsKey],
   );
   const mergePresence = useCallback((presence: IdentityPresence) => {
+    const effectivePresence = presenceWithLocalPreference(
+      presence,
+      sessionRef.current.identity.id,
+      presencePreferenceRef.current,
+    );
+
     setPresenceByIdentityId((current) => ({
       ...current,
-      [presence.identityId]: presence,
+      [effectivePresence.identityId]: effectivePresence,
     }));
   }, []);
   const rememberPresencePreference = useCallback(
