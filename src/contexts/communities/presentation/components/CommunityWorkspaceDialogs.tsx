@@ -11,6 +11,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
+import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetailsDialog';
 import type { ProfilePopoverAnchor } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -34,6 +35,13 @@ const ConversationKeyDialog = lazy(() =>
   import('../../../../app/presentation/workspace/components/ConversationKeyDialog').then(
     (module) => ({
       default: module.ConversationKeyDialog,
+    }),
+  ),
+);
+const EncryptionDetailsDialog = lazy(() =>
+  import('../../../../app/presentation/workspace/components/EncryptionDetailsDialog').then(
+    (module) => ({
+      default: module.EncryptionDetailsDialog,
     }),
   ),
 );
@@ -88,6 +96,7 @@ type CommunityWorkspaceDialogsProps = {
   communityKeyError: string | null;
   communityKeyInput: string;
   communityKeySaving: boolean;
+  encryptionDetails: EncryptionDetails | null;
   currentIdentityId: string;
   currentPermissions: Set<CommunityPermission>;
   manageOpen: boolean;
@@ -103,6 +112,7 @@ type CommunityWorkspaceDialogsProps = {
   onCloseAvatarViewer: () => void;
   onCloseBannerViewer: () => void;
   onCloseCommunityData: () => void;
+  onCloseEncryptionDetails: () => void;
   onCloseCommunityKey: () => void;
   onCloseManage: () => void;
   onCloseMember: () => void;
@@ -146,6 +156,7 @@ export function CommunityWorkspaceDialogs({
   communityKeyError,
   communityKeyInput,
   communityKeySaving,
+  encryptionDetails,
   currentIdentityId,
   currentPermissions,
   manageOpen,
@@ -161,6 +172,7 @@ export function CommunityWorkspaceDialogs({
   onCloseAvatarViewer,
   onCloseBannerViewer,
   onCloseCommunityData,
+  onCloseEncryptionDetails,
   onCloseCommunityKey,
   onCloseManage,
   onCloseMember,
@@ -340,6 +352,12 @@ export function CommunityWorkspaceDialogs({
           onImport={onCommunityKeyImport}
           onInputChange={onCommunityKeyInputChange}
           saving={communityKeySaving}
+        />
+      )}
+      {encryptionDetails && (
+        <EncryptionDetailsDialog
+          details={encryptionDetails}
+          onClose={onCloseEncryptionDetails}
         />
       )}
     </Suspense>

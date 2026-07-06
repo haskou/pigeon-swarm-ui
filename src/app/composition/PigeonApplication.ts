@@ -1260,7 +1260,11 @@ export class PigeonApplication {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+    options: {
+      currentPassword?: string;
+      passkeyPrfEnabled?: boolean;
+      recoveryKey?: string;
+    } = {},
   ): Promise<IdentityResource> {
     return await this.gateway.updateIdentityProfile(
       session,

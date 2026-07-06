@@ -11,6 +11,9 @@ import {
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
 import type {
+  Community,
+  ConversationResource,
+  IdentityResource,
   IdentityPresence,
   SelectablePresenceStatus,
   Session,
@@ -36,6 +39,7 @@ import { FallbackImage } from '../../../../shared/presentation/components/Fallba
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { useCloseOnOutsidePointerDown } from '../../../../shared/presentation/hooks/useCloseOnOutsidePointerDown';
+import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
 
 const GlobalCallBar = lazy(() =>
   import('../../../../contexts/calls/presentation/components/GlobalCallBar').then(
@@ -52,8 +56,11 @@ const ProfileEditor = lazy(() =>
 
 export const UserProfileDropdown = memo(function UserProfileDropdown({
   activeCall,
+  communities = [],
+  conversations = [],
   identityNames = {},
   identityPictures = {},
+  identityProfiles = {},
   nodeNetworks,
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
@@ -72,8 +79,11 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   presence,
   session,
 }: {
+  communities?: Community[];
+  conversations?: ConversationResource[];
   identityNames?: IdentityNames;
   identityPictures?: IdentityPictures;
+  identityProfiles?: Record<string, IdentityResource>;
   nodeNetworks: NodeNetwork[];
   onLogout: () => void;
   onPresenceChange?: (presence: IdentityPresence) => void;
@@ -301,11 +311,21 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
               </div>
               <div className="grid gap-2 rounded-2xl bg-black/25 p-2">
                 <ProfileVersionRow
+                  href={
+                    session.identity.identityExternalIdentifier
+                      ? ipfsUrl(session.identity.identityExternalIdentifier)
+                      : undefined
+                  }
                   label={copy.profile.identityVersion}
                   value={formatProfileVersion(session.identity.version)}
                   detail={formatProfileVersionDate(session.identity.timestamp)}
                 />
                 <ProfileVersionRow
+                  href={
+                    session.keychainExternalIdentifier
+                      ? ipfsUrl(session.keychainExternalIdentifier)
+                      : undefined
+                  }
                   label={copy.profile.keychainVersion}
                   value={formatProfileVersion(session.keychain.version)}
                   detail={formatProfileVersionDate(session.keychain.timestamp)}
@@ -348,7 +368,11 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       {profileEditorOpen && (
         <Suspense fallback={null}>
           <ProfileEditor
+            communities={communities}
+            conversations={conversations}
             currentPicture={ownPicture}
+            identityNames={identityNames}
+            identityProfiles={identityProfiles}
             nodeNetworks={nodeNetworks}
             session={session}
             onClose={() => setProfileEditorOpen(false)}
@@ -371,15 +395,17 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
 
 function ProfileVersionRow({
   detail,
+  href,
   label,
   value,
 }: {
   detail?: string;
+  href?: string;
   label: string;
   value: string;
 }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
+  const content = (
+    <>
       <div className="min-w-0">
         <div className="truncate font-black text-white/70">{label}</div>
         {detail ? (
@@ -391,6 +417,25 @@ function ProfileVersionRow({
       <div className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-black text-white/70">
         {value}
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 transition hover:bg-white/8"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      {content}
     </div>
   );
 }

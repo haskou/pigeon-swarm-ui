@@ -23,6 +23,7 @@ export function CommunityHeader({
   menuContent,
   networkName,
   onCommunityMenuToggle,
+  onEncryptionDetailsOpen,
   onOpenAvatar,
   onOpenMobileSidebar,
   onPinsOpen,
@@ -41,6 +42,7 @@ export function CommunityHeader({
   menuContent?: ReactNode;
   networkName: string;
   onCommunityMenuToggle: () => void;
+  onEncryptionDetailsOpen?: () => void;
   onOpenAvatar?: () => void;
   onOpenMobileSidebar: () => void;
   onPinsOpen?: () => void;
@@ -80,20 +82,22 @@ export function CommunityHeader({
         </button>
       }
       lock={
-        <span
+        <button
+          type="button"
+          onClick={onEncryptionDetailsOpen}
           className={cx(
-            'shrink-0',
+            'shrink-0 transition',
             channelPublic
-              ? 'text-amber-300'
+              ? 'text-amber-300 hover:text-amber-100'
               : channelEncryptionReady
-                ? 'text-emerald-300'
-                : 'text-rose-300',
+                ? 'text-emerald-300 hover:text-emerald-100'
+                : 'text-rose-300 hover:text-rose-100',
           )}
           title={channelEncryptionTooltip}
           aria-label={channelEncryptionTooltip}
         >
           <LockIcon locked={!channelPublic && channelEncryptionReady} />
-        </span>
+        </button>
       }
       menuContent={
         <>
