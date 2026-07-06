@@ -212,6 +212,80 @@ function threadSummariesByChannelId(
   );
 }
 
+function communityEncryptionDetails({
+  channelEncryptionReady,
+  community,
+  communityIsPublic,
+  communityKey,
+  networkName,
+  selectedChannel,
+}: {
+  channelEncryptionReady: boolean;
+  community: Community;
+  communityIsPublic: boolean;
+  communityKey?: ConversationKeyEntry;
+  networkName: string;
+  selectedChannel?: CommunityTextChannel;
+}) {
+  return {
+    note: communityIsPublic
+      ? copy.encryption.publicCommunityNote
+      : channelEncryptionReady
+        ? copy.encryption.communityNote
+        : copy.encryption.missingNote,
+    rows: [
+      {
+        label: copy.encryption.scope,
+        value: selectedChannel
+          ? `${community.name} / #${selectedChannel.name}`
+          : community.name,
+      },
+      {
+        label: copy.encryption.network,
+        value: networkName,
+      },
+      {
+        label: copy.encryption.algorithm,
+        value: communityIsPublic
+          ? copy.encryption.plaintext
+          : (communityKey?.algorithm ?? copy.encryption.unknown),
+      },
+      {
+        label: copy.encryption.keyVersion,
+        value: communityKey ? `v${communityKey.version}` : '-',
+      },
+      {
+        label: copy.encryption.createdAt,
+        value: communityKey
+          ? new Intl.DateTimeFormat(undefined, {
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            }).format(new Date(communityKey.createdAt))
+          : '-',
+      },
+    ],
+    secrets: communityIsPublic
+      ? []
+      : [
+          {
+            label: copy.encryption.communityKey,
+            sensitive: true,
+            value: communityKey?.key,
+          },
+        ],
+    status: communityIsPublic
+      ? ('public' as const)
+      : channelEncryptionReady
+        ? ('ready' as const)
+        : ('missing' as const),
+    subtitle: selectedChannel ? shortId(selectedChannel.id) : shortId(community.id),
+    title: copy.encryption.communityTitle,
+  };
+}
+
 function cachedChannelThreadsFor(
   communityId: string,
 ): Record<string, CommunityChannelThreadSummary[]> | null {
@@ -362,6 +436,7 @@ export function CommunityWorkspace({
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [communityDataOpen, setCommunityDataOpen] = useState(false);
+  const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
   const [communityKeyDialog, setCommunityKeyDialog] = useState<
     'add' | 'copy' | null
   >(null);
@@ -2248,6 +2323,7 @@ export function CommunityWorkspace({
           onCommunityMenuToggle={() =>
             setCommunityMenuOpen((isOpen) => !isOpen)
           }
+          onEncryptionDetailsOpen={() => setEncryptionDetailsOpen(true)}
           onOpenAvatar={avatarUrl ? () => setAvatarViewerOpen(true) : undefined}
           onOpenMobileSidebar={onOpenMobileSidebar}
           onPinsOpen={() => void openPinnedMessages()}
@@ -2587,6 +2663,18 @@ export function CommunityWorkspace({
         communityKeySaving={communityKeySaving}
         currentIdentityId={session.identity.id}
         currentPermissions={currentPermissions}
+        encryptionDetails={
+          encryptionDetailsOpen
+            ? communityEncryptionDetails({
+                channelEncryptionReady,
+                community,
+                communityIsPublic,
+                communityKey,
+                networkName,
+                selectedChannel,
+              })
+            : null
+        }
         manageOpen={manageOpen}
         memberOpen={memberOpen}
         messageContextMenu={messageContextMenu}
@@ -2594,6 +2682,7 @@ export function CommunityWorkspace({
         onCloseAvatarViewer={() => setAvatarViewerOpen(false)}
         onCloseBannerViewer={() => setBannerViewerOpen(false)}
         onCloseCommunityData={() => setCommunityDataOpen(false)}
+        onCloseEncryptionDetails={() => setEncryptionDetailsOpen(false)}
         onCloseCommunityKey={closeCommunityKeyDialog}
         onCloseManage={() => setManageOpen(false)}
         onCloseMember={() => setMemberOpen(false)}

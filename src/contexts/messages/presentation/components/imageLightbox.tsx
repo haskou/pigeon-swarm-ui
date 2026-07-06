@@ -169,7 +169,22 @@ export function ImageLightbox({
   }, [hasNext, hasPrevious]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'touch') return;
+    if (event.pointerType !== 'touch') {
+      if (zoom <= 1) return;
+
+      panRef.current = {
+        pointerId: event.pointerId,
+        startPan: pan,
+        startX: event.clientX,
+        startY: event.clientY,
+      };
+      setTouchGestureActive(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
 
     pointerPositionsRef.current.set(event.pointerId, {
       x: event.clientX,
@@ -314,6 +329,7 @@ export function ImageLightbox({
 
     if (panRef.current?.pointerId === event.pointerId) {
       panRef.current = null;
+      if (event.pointerType !== 'touch') setTouchGestureActive(false);
 
       return;
     }
@@ -359,7 +375,10 @@ export function ImageLightbox({
       if (pointerPositionsRef.current.size === 0) setTouchGestureActive(false);
     }
 
-    if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+    if (panRef.current?.pointerId === event.pointerId) {
+      panRef.current = null;
+      if (event.pointerType !== 'touch') setTouchGestureActive(false);
+    }
 
     const swipe = swipeRef.current;
 

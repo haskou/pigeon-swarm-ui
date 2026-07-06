@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
+  Community,
   ConversationResource,
   IdentityPresence,
   IdentityResource,
@@ -29,6 +30,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';
@@ -44,12 +46,14 @@ import {
   sidePanelListEnterClassName,
   sidePanelListEnterStyle,
 } from '../../../../shared/presentation/sidePanelListMotion';
+import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 import { UserProfileDropdown } from './UserProfileDropdown';
 
 interface SidebarProps {
   animateEntries?: boolean;
   animationScopeKey?: string;
   session: Session;
+  communities: Community[];
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
   identityNames: IdentityNames;
@@ -99,6 +103,7 @@ export function Sidebar({
   activeConversationId,
   animateEntries = true,
   animationScopeKey,
+  communities,
   conversationNotificationSetting,
   conversations,
   identityNames,
@@ -360,8 +365,11 @@ export function Sidebar({
       </div>
 
       <UserProfileDropdown
+        communities={communities}
+        conversations={conversations}
         identityNames={identityNames}
         identityPictures={identityPictures}
+        identityProfiles={identityProfiles}
         nodeNetworks={nodeNetworks}
         onLogout={onLogout}
         onPresenceChange={onPresenceChange}
@@ -455,6 +463,10 @@ function SidebarConversationListItem({
   presence,
   title,
 }: SidebarConversationListItemProps) {
+  const notificationsMuted = notificationSetting
+    ? NotificationSettingsPolicy.isMuted(notificationSetting)
+    : false;
+
   return (
     <div
       className={cx(
@@ -470,6 +482,7 @@ function SidebarConversationListItem({
         conversation={conversation}
         handle={handle}
         loading={loading}
+        notificationsMuted={notificationsMuted}
         onClearLongPressTimer={onClearLongPressTimer}
         onContextMenu={onContextMenu}
         onPointerDown={onPointerDown}
@@ -498,6 +511,7 @@ type SidebarConversationButtonProps = {
   conversation: ConversationResource;
   handle: string;
   loading: ConversationIdentityLoadingState;
+  notificationsMuted: boolean;
   onClearLongPressTimer: () => void;
   onContextMenu: (
     event: MouseEvent<HTMLButtonElement>,
@@ -526,6 +540,7 @@ function SidebarConversationButton({
   conversation,
   handle,
   loading,
+  notificationsMuted,
   onClearLongPressTimer,
   onContextMenu,
   onPointerDown,
@@ -575,6 +590,17 @@ function SidebarConversationButton({
           loading={loading}
           title={title}
         />
+        {notificationsMuted && (
+          <span
+            className={cx(
+              'grid h-6 w-6 shrink-0 place-items-center rounded-full',
+              active ? 'bg-slate-950/10 text-slate-600' : 'bg-black/25 text-white/55',
+            )}
+            title={copy.notifications.muteConversation}
+          >
+            <MutedNotificationsIcon />
+          </span>
+        )}
         <SidebarUnreadCount unreadCount={conversation.unreadCount} />
       </div>
     </button>

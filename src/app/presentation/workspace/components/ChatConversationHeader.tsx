@@ -23,6 +23,7 @@ interface ChatConversationHeaderProps {
   hasConversationKey: boolean;
   isGroupConversation: boolean;
   onConversationOpen: (event?: MouseEvent<HTMLElement>) => void;
+  onEncryptionDetailsOpen?: () => void;
   onMenuToggle: () => void;
   onOpenSidebar: () => void;
   onPinsOpen?: () => void;
@@ -45,6 +46,7 @@ export function ChatConversationHeader({
   isGroupConversation,
   menuOpen,
   onConversationOpen,
+  onEncryptionDetailsOpen,
   onMenuToggle,
   onOpenSidebar,
   onPinsOpen,
@@ -92,6 +94,7 @@ export function ChatConversationHeader({
         activeConversation ? (
           <ConversationLockState
             hasConversationKey={hasConversationKey}
+            onClick={onEncryptionDetailsOpen}
             tooltip={e2eTooltip}
           />
         ) : null
@@ -164,23 +167,27 @@ function ConversationAvatar({
 
 function ConversationLockState({
   hasConversationKey,
+  onClick,
   tooltip,
 }: {
   hasConversationKey: boolean;
+  onClick?: () => void;
   tooltip: string;
 }) {
   return (
-    <span
+    <button
+      type="button"
+      onClick={onClick}
       className={
         hasConversationKey
-          ? 'inline-grid h-5 w-5 shrink-0 place-items-center text-emerald-300'
-          : 'inline-grid h-5 w-5 shrink-0 place-items-center text-rose-300'
+          ? 'inline-grid h-5 w-5 shrink-0 place-items-center text-emerald-300 transition hover:text-emerald-100'
+          : 'inline-grid h-5 w-5 shrink-0 place-items-center text-rose-300 transition hover:text-rose-100'
       }
       title={tooltip}
       aria-label={tooltip}
     >
       <LockIcon locked={hasConversationKey} />
-    </span>
+    </button>
   );
 }
 

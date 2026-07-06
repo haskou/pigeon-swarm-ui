@@ -12,7 +12,12 @@ import {
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  ConversationResource,
+  IdentityResource,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
@@ -29,12 +34,16 @@ import {
 import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
-import { shortId } from '../../../../shared/presentation/formatting';
+import {
+  conversationTitle,
+  shortId,
+} from '../../../../shared/presentation/formatting';
 import {
   isValidHandle,
   normalizeHandle,
   profilePictureUrl,
   publicFileObjectUrl,
+  type IdentityNames,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
@@ -52,16 +61,24 @@ const ImageCropEditor = lazy(() =>
 const profileEditorInputClass =
   'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/50 focus:bg-black/25';
 
-type ProfileEditorSection = 'profile' | 'networks' | 'security';
+type ProfileEditorSection = 'keychain' | 'networks' | 'profile' | 'security';
 
 export function ProfileEditor({
+  communities = [],
+  conversations = [],
   currentPicture,
+  identityNames = {},
+  identityProfiles = {},
   nodeNetworks,
   onClose,
   onUpdated,
   session,
 }: {
+  communities?: Community[];
+  conversations?: ConversationResource[];
   currentPicture?: string | null;
+  identityNames?: IdentityNames;
+  identityProfiles?: Record<string, IdentityResource>;
   nodeNetworks: NodeNetwork[];
   session: Session;
   onClose: () => void;
@@ -82,7 +99,7 @@ export function ProfileEditor({
   const hasRecoveryKey = !!session.identity.masterKeyDerivation.recoveryKey;
   const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(hasPasskeyPrf);
   const [initialLocalPasskeyPrfEnabled] = useState(
-    () => hasRecoveryKey && !!loadLocalPasskeyUnlock(session.identity.id),
+    () => !!loadLocalPasskeyUnlock(session.identity.id),
   );
   const [localPasskeyPrfEnabled, setLocalPasskeyPrfEnabled] = useState(
     initialLocalPasskeyPrfEnabled,
@@ -119,14 +136,17 @@ export function ProfileEditor({
   const passwordChecks = passwordValidationChecks(newPassword);
   const passwordsMatch =
     newPassword.length > 0 && newPassword === newPasswordConfirmation;
+  const passkeyPrfChanged = passkeyPrfEnabled !== hasPasskeyPrf;
   const localPasskeyPrfChanged =
-    hasRecoveryKey && localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
+    localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
   const shouldRefreshLocalPasskeyPrf =
-    hasRecoveryKey && localPasskeyPrfEnabled && wantsPasswordChange;
+    localPasskeyPrfEnabled && wantsPasswordChange;
   const shouldConfigureLocalPasskeyPrf =
     localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
   const needsCurrentPasswordForPasskey =
-    localPasskeyPrfChanged && localPasskeyPrfEnabled && !wantsPasswordChange;
+    !wantsPasswordChange &&
+    (passkeyPrfChanged ||
+      (localPasskeyPrfChanged && localPasskeyPrfEnabled));
   const needsRecoveryKeyForPasskey =
     needsCurrentPasswordForPasskey && hasRecoveryKey;
   const canChangePassword =
@@ -134,6 +154,13 @@ export function ProfileEditor({
     (isValidPassword(newPassword) &&
       passwordsMatch &&
       (!hasRecoveryKey || RecoveryKey.isValid(passwordRecoveryKey)));
+  const canUpdatePasskeyPrf =
+    !passkeyPrfChanged ||
+    ((!passkeyPrfEnabled || passkeyPrfAvailable) &&
+      (wantsPasswordChange ||
+        (currentPasswordForPasskey.trim().length > 0 &&
+          (!needsRecoveryKeyForPasskey ||
+            RecoveryKey.isValid(passwordRecoveryKey)))));
   const canUpdateLocalPasskeyPrf =
     !shouldConfigureLocalPasskeyPrf ||
     !localPasskeyPrfEnabled ||
@@ -153,7 +180,11 @@ export function ProfileEditor({
     session.identity.networks,
   );
   const hasRemoteChanges =
-    profileChanged || mediaChanged || networksChanged || wantsPasswordChange;
+    profileChanged ||
+    mediaChanged ||
+    networksChanged ||
+    wantsPasswordChange ||
+    passkeyPrfChanged;
   const hasChanges = hasRemoteChanges || localPasskeyPrfChanged;
   const canSubmit =
     hasChanges &&
@@ -161,6 +192,7 @@ export function ProfileEditor({
     identityNetworkIds.length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
     canChangePassword &&
+    canUpdatePasskeyPrf &&
     canUpdateLocalPasskeyPrf &&
     state !== 'loading';
   const nodeNetworkOptions = useMemo(
@@ -300,8 +332,13 @@ export function ProfileEditor({
           },
           wantsPasswordChange ? newPassword : undefined,
           {
-            passkeyPrfEnabled:
-              !hasRecoveryKey && passkeyPrfEnabled && passkeyPrfAvailable,
+            currentPassword:
+              passkeyPrfChanged && !wantsPasswordChange
+                ? currentPasswordForPasskey
+                : undefined,
+            passkeyPrfEnabled: passkeyPrfChanged
+              ? passkeyPrfEnabled
+              : undefined,
             recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
           },
         );
@@ -332,6 +369,7 @@ export function ProfileEditor({
     ['profile', copy.profile.profileTab],
     ['networks', copy.profile.networksTab],
     ['security', copy.profile.securityTab],
+    ['keychain', copy.profile.keychainTab],
   ];
 
   return createPortal(
@@ -604,65 +642,9 @@ export function ProfileEditor({
                             match: passwordsMatch,
                           }}
                         />
-                        {wantsPasswordChange && !hasRecoveryKey && (
-                          <button
-                            type="button"
-                            aria-pressed={passkeyPrfEnabled}
-                            disabled={hasPasskeyPrf || !passkeyPrfAvailable}
-                            onClick={() =>
-                              !hasPasskeyPrf &&
-                              passkeyPrfAvailable &&
-                              setPasskeyPrfEnabled((enabled) => !enabled)
-                            }
-                            className={cx(
-                              'mt-3 flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition',
-                              hasPasskeyPrf || passkeyPrfEnabled
-                                ? 'border-cyan-200/25 bg-cyan-300/10'
-                                : passkeyPrfAvailable
-                                  ? 'border-white/10 bg-black/15 hover:bg-white/[0.05]'
-                                  : 'cursor-not-allowed border-white/5 bg-white/[0.03] opacity-55',
-                            )}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className={cx(
-                                'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-                                (hasPasskeyPrf || passkeyPrfEnabled) &&
-                                  passkeyPrfAvailable
-                                  ? 'bg-cyan-400/25'
-                                  : 'bg-black/25',
-                              )}
-                            >
-                              <span
-                                className={cx(
-                                  'h-4 w-4 rounded-full bg-white transition-transform',
-                                  (hasPasskeyPrf || passkeyPrfEnabled) &&
-                                    passkeyPrfAvailable
-                                    ? 'translate-x-6'
-                                    : 'translate-x-1',
-                                )}
-                              />
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block text-xs font-black text-white/75">
-                                {hasPasskeyPrf
-                                  ? copy.profile.passkeyPrfActive
-                                  : copy.profile.passkeyPrf}
-                              </span>
-                              <span className="mt-1 block text-xs leading-snug text-white/45">
-                                {hasPasskeyPrf
-                                  ? copy.profile.passkeyPrfPreserved
-                                  : passkeyPrfAvailable
-                                    ? copy.profile.passkeyPrfHelp
-                                    : copy.profile.passkeyPrfUnavailable}
-                              </span>
-                            </span>
-                          </button>
-                        )}
                       </div>
                     )}
-                    {hasRecoveryKey && (
-                      <div className="border-t border-white/[0.06] px-4 py-4">
+                    <div className="border-t border-white/[0.06] px-4 py-4">
                         <div className="mb-3">
                           <div className="text-sm font-black text-white/75">
                             {copy.profile.localDeviceUnlockSection}
@@ -677,9 +659,11 @@ export function ProfileEditor({
                             !passkeyPrfAvailable && !localPasskeyPrfEnabled
                           }
                           help={
-                            passkeyPrfAvailable
+                            localPasskeyPrfEnabled
                               ? copy.profile.localDeviceUnlockHelp
-                              : copy.profile.localDeviceUnlockUnavailable
+                              : passkeyPrfAvailable
+                                ? copy.profile.localDeviceUnlockHelp
+                                : copy.profile.localDeviceUnlockUnavailable
                           }
                           label={copy.profile.localDeviceUnlock}
                           onClick={() =>
@@ -710,9 +694,17 @@ export function ProfileEditor({
                             </p>
                           </div>
                         )}
-                      </div>
-                    )}
+                    </div>
                   </section>
+                )}
+                {activeSection === 'keychain' && (
+                  <KeychainSection
+                    communities={communities}
+                    conversations={conversations}
+                    identityNames={identityNames}
+                    identityProfiles={identityProfiles}
+                    session={session}
+                  />
                 )}
               </div>
 
@@ -842,10 +834,12 @@ function ProfileSwitchButton({
       onClick={onClick}
       className={cx(
         'flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition',
-        disabled
+        disabled && !checked
           ? 'cursor-not-allowed opacity-55'
           : checked
-            ? 'text-white'
+            ? disabled
+              ? 'cursor-default text-white'
+              : 'text-white'
             : 'text-white/75 hover:bg-white/[0.04]',
       )}
     >
@@ -853,13 +847,13 @@ function ProfileSwitchButton({
         aria-hidden="true"
         className={cx(
           'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-          checked && !disabled ? 'bg-cyan-400/25' : 'bg-black/25',
+          checked ? 'bg-cyan-400/25' : 'bg-black/25',
         )}
       >
         <span
           className={cx(
             'h-4 w-4 rounded-full bg-white transition-transform',
-            checked && !disabled ? 'translate-x-6' : 'translate-x-1',
+            checked ? 'translate-x-6' : 'translate-x-1',
           )}
         />
       </span>
@@ -871,6 +865,240 @@ function ProfileSwitchButton({
       </span>
     </button>
   );
+}
+
+function KeychainSection({
+  communities,
+  conversations,
+  identityNames,
+  identityProfiles,
+  session,
+}: {
+  communities: Community[];
+  conversations: ConversationResource[];
+  identityNames: IdentityNames;
+  identityProfiles: Record<string, IdentityResource>;
+  session: Session;
+}) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const entries = keychainDisplayEntries({
+    communities,
+    conversations,
+    identityNames,
+    identityProfiles,
+    session,
+  });
+
+  const copyValue = async (entryId: string, value: string) => {
+    if (navigator.clipboard) await navigator.clipboard.writeText(value);
+
+    setCopiedKey(entryId);
+    window.setTimeout(() => setCopiedKey(null), 1600);
+  };
+
+  return (
+    <section className="rounded-2xl border border-white/[0.06] bg-black/10">
+      <div className="border-b border-white/[0.06] px-4 py-3">
+        <div className="text-sm font-black text-white/70">
+          {copy.profile.keychainTab}
+        </div>
+        <p className="mt-1 text-xs font-bold leading-relaxed text-white/40">
+          {copy.profile.keychainHelp}
+        </p>
+      </div>
+      <div className="grid gap-2 p-4">
+        {entries.length === 0 ? (
+          <div className="rounded-2xl bg-white/[0.06] p-4 text-sm font-semibold text-white/45">
+            {copy.profile.noKeychainKeys}
+          </div>
+        ) : (
+          entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="rounded-2xl border border-white/[0.06] bg-black/20 p-3"
+            >
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black text-white/80">
+                    {entry.title}
+                  </div>
+                  {entry.subtitle && (
+                    <div className="mt-1 truncate text-xs font-semibold text-white/40">
+                      {entry.subtitle}
+                    </div>
+                  )}
+                </div>
+                <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] font-black uppercase text-white/55">
+                  {entry.algorithm}
+                </span>
+              </div>
+              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-xs">
+                <span className="min-w-0 flex-1 truncate font-mono text-white/45">
+                  ••••••••••••••••••••••••
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void copyValue(entry.id, entry.key)}
+                  className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/70 transition hover:bg-white/15 hover:text-white"
+                >
+                  {copiedKey === entry.id
+                    ? copy.profile.copied
+                    : copy.profile.copy}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+type KeychainDisplayEntry = {
+  algorithm: string;
+  id: string;
+  key: string;
+  subtitle?: string;
+  title: string;
+};
+
+function keychainDisplayEntries({
+  communities,
+  conversations,
+  identityNames,
+  identityProfiles,
+  session,
+}: {
+  communities: Community[];
+  conversations: ConversationResource[];
+  identityNames: IdentityNames;
+  identityProfiles: Record<string, IdentityResource>;
+  session: Session;
+}): KeychainDisplayEntry[] {
+  return [
+    {
+      algorithm: copy.profile.identityKeys,
+      id: 'identity-master-key',
+      key: session.identity.encryptedMasterKey,
+      subtitle: readableIdentityName(
+        session.identity.id,
+        identityProfiles,
+        identityNames,
+      ),
+      title: copy.profile.encryptedMasterKey,
+    },
+    {
+      algorithm: copy.profile.identityKeys,
+      id: 'identity-private-key',
+      key: session.identity.encryptedKeyPair.encryptedPrivateKey,
+      subtitle: readableIdentityName(
+        session.identity.id,
+        identityProfiles,
+        identityNames,
+      ),
+      title: copy.profile.encryptedPrivateKey,
+    },
+    ...Object.entries(session.keychain.conversations).map(([entryId, entry]) =>
+      keychainConversationDisplayEntry({
+        communities,
+        conversations,
+        entry,
+        entryId,
+        identityNames,
+        identityProfiles,
+      }),
+    ),
+  ];
+}
+
+function keychainConversationDisplayEntry({
+  communities,
+  conversations,
+  entry,
+  entryId,
+  identityNames,
+  identityProfiles,
+}: {
+  communities: Community[];
+  conversations: ConversationResource[];
+  entry: Session['keychain']['conversations'][string];
+  entryId: string;
+  identityNames: IdentityNames;
+  identityProfiles: Record<string, IdentityResource>;
+}): KeychainDisplayEntry {
+  if (entry.kind === 'community') {
+    const community = communities.find(
+      (candidate) =>
+        candidate.id === entry.conversationId || candidate.id === entryId,
+    );
+
+    return {
+      algorithm: entry.algorithm,
+      id: entryId,
+      key: entry.key,
+      subtitle: community?.description || undefined,
+      title: `${copy.profile.communityKey} · ${
+        community?.name ?? shortId(entry.conversationId || entryId)
+      }`,
+    };
+  }
+
+  const conversation = conversations.find(
+    (candidate) => candidate.id === entry.conversationId,
+  );
+  const peerIdentity = identityProfiles[entry.peerIdentityId];
+  const peerName = readableIdentityName(
+    entry.peerIdentityId,
+    identityProfiles,
+    identityNames,
+  );
+  const title =
+    conversation?.name ??
+    conversation?.title ??
+    peerIdentity?.profile.name?.trim() ??
+    (conversation
+      ? conversationTitle({
+          ...conversation,
+          participantIdentityIds: conversation.participantIdentityIds?.map(
+            (identityId) =>
+              readableIdentityName(identityId, identityProfiles, identityNames),
+          ),
+          peerIdentityId: conversation.peerIdentityId
+            ? readableIdentityName(
+                conversation.peerIdentityId,
+                identityProfiles,
+                identityNames,
+              )
+            : undefined,
+        })
+      : shortId(entry.conversationId));
+
+  return {
+    algorithm: entry.algorithm,
+    id: entryId,
+    key: entry.key,
+    subtitle: peerName,
+    title: `${copy.profile.conversationKey} · ${title}`,
+  };
+}
+
+function readableIdentityName(
+  identityId: string,
+  identityProfiles: Record<string, IdentityResource>,
+  identityNames: IdentityNames,
+): string {
+  const identity = identityProfiles[identityId];
+  const profileName = identity?.profile.name?.trim();
+  const handle = identity?.profile.handle?.trim();
+  const cachedName = identityNames[identityId]?.trim();
+
+  if (profileName) return profileName;
+  if (handle) return `@${handle}`;
+  if (cachedName && cachedName !== identityId) {
+    return cachedName.replace(/\s+\(@[^)]+\)$/, '');
+  }
+
+  return shortId(identityId);
 }
 
 function DiscardProfileChangesDialog({

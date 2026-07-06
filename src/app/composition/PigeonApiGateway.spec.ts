@@ -2091,6 +2091,56 @@ describe(PigeonApiGateway.name, () => {
     });
   });
 
+  it('preserves existing passkey PRF during profile updates unless explicitly disabled', () => {
+    const gateway = new PigeonApiGateway();
+    const passkeyPrf = {
+      algorithm: 'webauthn-prf',
+      credentialId: 'credential-id',
+      salt: 'salt',
+      version: 1,
+    } satisfies NonNullable<
+      IdentityResource['masterKeyDerivation']['passkeyPrf']
+    >;
+    const currentIdentity = {
+      masterKeyDerivation: {
+        algorithm: 'scrypt',
+        N: 2 ** 18,
+        p: 1,
+        passkeyPrf,
+        r: 8,
+        salt: 'master-salt',
+        version: 1,
+      },
+    } as IdentityResource;
+    const internals = gateway as unknown as {
+      profilePasskeyPrfMode(input: {
+        currentIdentity: IdentityResource;
+        enabled?: boolean;
+        identityId: string;
+        profileName: string;
+      }): unknown;
+    };
+
+    expect(
+      internals.profilePasskeyPrfMode({
+        currentIdentity,
+        identityId: 'identity-1',
+        profileName: 'Ada',
+      }),
+    ).toEqual({
+      mode: 'preserve',
+      protection: passkeyPrf,
+    });
+    expect(
+      internals.profilePasskeyPrfMode({
+        currentIdentity,
+        enabled: false,
+        identityId: 'identity-1',
+        profileName: 'Ada',
+      }),
+    ).toBeUndefined();
+  });
+
   it('refreshes the current identity reference before signing profile updates', async () => {
     const currentIdentity = {
       encryptedKeyPair: {

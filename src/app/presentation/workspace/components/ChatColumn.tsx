@@ -65,6 +65,11 @@ const ConversationKeyDialog = lazy(() =>
     default: module.ConversationKeyDialog,
   })),
 );
+const EncryptionDetailsDialog = lazy(() =>
+  import('./EncryptionDetailsDialog').then((module) => ({
+    default: module.EncryptionDetailsDialog,
+  })),
+);
 const CreatePollDialog = lazy(() =>
   import('../../../../contexts/polls/presentation/components/CreatePollDialog').then(
     (module) => ({
@@ -262,6 +267,7 @@ export function ChatColumn({
     useState<AttachmentProgress | null>(null);
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
+  const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
   const [groupInviteOpen, setGroupInviteOpen] = useState(false);
   const [groupInviteInput, setGroupInviteInput] = useState('');
   const [groupInviteError, setGroupInviteError] = useState<string | null>(null);
@@ -694,6 +700,7 @@ export function ChatColumn({
         menuOpen={conversationMenuOpen}
         onConversationOpen={openConversationHeader}
         onMenuToggle={() => setConversationMenuOpen((isOpen) => !isOpen)}
+        onEncryptionDetailsOpen={() => setEncryptionDetailsOpen(true)}
         onOpenSidebar={onOpenSidebar}
         onPinsOpen={onOpenPins}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
@@ -850,6 +857,19 @@ export function ChatColumn({
           />
         </Suspense>
       )}
+      {encryptionDetailsOpen && activeConversation && (
+        <Suspense fallback={null}>
+          <EncryptionDetailsDialog
+            details={conversationEncryptionDetails({
+              conversation: activeConversation,
+              conversationKey,
+              hasConversationKey,
+              networkName: conversationNetworkName,
+            })}
+            onClose={() => setEncryptionDetailsOpen(false)}
+          />
+        </Suspense>
+      )}
       {groupInviteOpen && activeConversation && (
         <Suspense fallback={null}>
           <GroupInvitationDialog
@@ -946,4 +966,66 @@ function conversationParticipantIds(
     conversation.participants ??
     []
   );
+}
+
+function conversationEncryptionDetails({
+  conversation,
+  conversationKey,
+  hasConversationKey,
+  networkName,
+}: {
+  conversation: ConversationResource;
+  conversationKey?: ConversationKeyEntry;
+  hasConversationKey: boolean;
+  networkName: string;
+}) {
+  return {
+    note: hasConversationKey
+      ? copy.encryption.conversationNote
+      : copy.encryption.missingNote,
+    rows: [
+      {
+        label: copy.encryption.scope,
+        value: conversation.id,
+      },
+      {
+        label: copy.encryption.network,
+        value: networkName,
+      },
+      {
+        label: copy.encryption.algorithm,
+        value: conversationKey?.algorithm ?? copy.encryption.unknown,
+      },
+      {
+        label: copy.encryption.keyVersion,
+        value: conversationKey ? `v${conversationKey.version}` : '-',
+      },
+      {
+        label: copy.encryption.createdAt,
+        value: conversationKey
+          ? new Intl.DateTimeFormat(undefined, {
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            }).format(new Date(conversationKey.createdAt))
+          : '-',
+      },
+    ],
+    secrets: [
+      {
+        label: copy.encryption.symmetricKey,
+        sensitive: true,
+        value: conversationKey?.key,
+      },
+      {
+        label: copy.encryption.peerIdentity,
+        value: conversationKey?.peerIdentityId,
+      },
+    ],
+    status: hasConversationKey ? ('ready' as const) : ('missing' as const),
+    subtitle: shortId(conversation.id),
+    title: copy.encryption.conversationTitle,
+  };
 }

@@ -28,6 +28,7 @@ import {
   type InstallState,
   useInstallPrompt,
 } from '../../../../shared/presentation/hooks/useInstallPrompt';
+import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 
 interface RailProps {
   activeMessages?: boolean;
@@ -267,6 +268,11 @@ export function Rail({
                   <CommunityRailAvatar community={community} />
                 </span>
               </button>
+              {notificationsMuted && (
+                <span className="pointer-events-none absolute bottom-0 right-[calc(50%-1.7rem)] z-20 grid h-5 w-5 place-items-center rounded-full border border-[#1b1d38] bg-[#1b1d38] text-white/65">
+                  <MutedNotificationsIcon className="h-3 w-3" />
+                </span>
+              )}
               {canOpenCommunityMenu && communityMenu?.communityId === community.id ? (
                 <CommunityRailMenu
                   communityName={community.name}

@@ -93,6 +93,24 @@ export class MessageCollection {
     return undefined;
   }
 
+  public static lastDeliveredMessageTarget(
+    messages: readonly ChatMessage[],
+  ): ChatMessage | undefined {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+
+      if (message.deliveryStatus) continue;
+
+      if (message.kind && message.kind !== 'message') continue;
+
+      if (message.raw.type && message.raw.type !== 'sent') continue;
+
+      return message;
+    }
+
+    return undefined;
+  }
+
   public static latestDeliveredTimestamp(
     messages: readonly ChatMessage[],
   ): number | undefined {

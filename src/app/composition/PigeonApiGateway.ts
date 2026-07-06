@@ -662,6 +662,8 @@ export class PigeonApiGateway {
     identityId: string;
     profileName: string;
   }): UserRootKeyPasskeyPrfInput | undefined {
+    if (enabled === false) return undefined;
+
     if (currentIdentity.masterKeyDerivation.passkeyPrf) {
       return {
         mode: 'preserve',
@@ -718,7 +720,11 @@ export class PigeonApiGateway {
     currentIdentity: IdentityResource;
     identityId: string;
     newPassword?: string;
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string };
+    options: {
+      currentPassword?: string;
+      passkeyPrfEnabled?: boolean;
+      recoveryKey?: string;
+    };
     profile: IdentityUpdateProfileInput;
     session: Session;
   }): Promise<
@@ -728,7 +734,17 @@ export class PigeonApiGateway {
       }
     | undefined
   > {
-    if (!newPassword) return undefined;
+    const masterKeyPassword = newPassword ?? options.currentPassword;
+
+    if (!masterKeyPassword) return undefined;
+
+    if (!newPassword && options.currentPassword) {
+      await this.verifyRemoteMasterKeyFactors({
+        identity: currentIdentity,
+        password: options.currentPassword,
+        recoveryKey: options.recoveryKey,
+      });
+    }
 
     const recoveryKey = this.profileRecoveryKey(
       currentIdentity,
@@ -743,7 +759,7 @@ export class PigeonApiGateway {
         identityId,
         profileName: profile.name,
       }),
-      password: newPassword,
+      password: masterKeyPassword,
       recoveryKey,
     });
 
@@ -2279,7 +2295,11 @@ export class PigeonApiGateway {
     session: Session,
     profile: IdentityUpdateProfileInput,
     newPassword?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+    options: {
+      currentPassword?: string;
+      passkeyPrfEnabled?: boolean;
+      recoveryKey?: string;
+    } = {},
   ): Promise<IdentityResource> {
     const identityId = IdentityId.normalize(session.identity.id);
     const currentIdentity = await this.getIdentity(identityId);
@@ -2326,6 +2346,10 @@ export class PigeonApiGateway {
     });
 
     this.cacheIdentity(updatedIdentity);
+
+    if (options.passkeyPrfEnabled === false) {
+      clearLocalPasskeyUnlock(identityId);
+    }
 
     return updatedIdentity;
   }

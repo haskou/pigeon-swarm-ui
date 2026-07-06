@@ -51,6 +51,41 @@ describe(MessageCollection.name, () => {
     ).toBeUndefined();
   });
 
+  it('finds the last delivered message target without returning call events', () => {
+    expect(
+      MessageCollection.lastDeliveredMessageTarget([
+        message({ id: 'message-1', timestamp: 100 }),
+        message({
+          id: 'missed-call-1',
+          kind: 'call-event',
+          raw: {
+            callEventType: 'missed',
+            callId: 'call-1',
+            id: 'missed-call-1',
+            type: 'call_event',
+          },
+          timestamp: 200,
+        }),
+      ])?.id,
+    ).toBe('message-1');
+
+    expect(
+      MessageCollection.lastDeliveredMessageTarget([
+        message({
+          id: 'missed-call-1',
+          kind: 'call-event',
+          raw: {
+            callEventType: 'missed',
+            callId: 'call-1',
+            id: 'missed-call-1',
+            type: 'call_event',
+          },
+          timestamp: 100,
+        }),
+      ]),
+    ).toBeUndefined();
+  });
+
   it('finds the latest delivered timestamp independently from list order', () => {
     expect(
       MessageCollection.latestDeliveredTimestamp([
