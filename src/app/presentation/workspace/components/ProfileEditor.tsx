@@ -139,6 +139,9 @@ export function ProfileEditor({
   const passkeyPrfChanged = passkeyPrfEnabled !== hasPasskeyPrf;
   const localPasskeyPrfChanged =
     localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
+  const deviceUnlockEnabled = passkeyPrfEnabled || localPasskeyPrfEnabled;
+  const hasSavedDeviceUnlock = hasPasskeyPrf || initialLocalPasskeyPrfEnabled;
+  const canEnableDeviceUnlock = passkeyPrfAvailable || hasSavedDeviceUnlock;
   const shouldRefreshLocalPasskeyPrf =
     localPasskeyPrfEnabled && wantsPasswordChange;
   const shouldConfigureLocalPasskeyPrf =
@@ -284,6 +287,20 @@ export function ProfileEditor({
     if (!networkToAdd || identityNetworkIds.includes(networkToAdd)) return;
 
     setIdentityNetworkIds((networkIds) => [...networkIds, networkToAdd]);
+  };
+
+  const toggleDeviceUnlock = () => {
+    if (deviceUnlockEnabled) {
+      setPasskeyPrfEnabled(false);
+      setLocalPasskeyPrfEnabled(false);
+
+      return;
+    }
+
+    if (!canEnableDeviceUnlock) return;
+
+    setPasskeyPrfEnabled(passkeyPrfAvailable || hasPasskeyPrf);
+    setLocalPasskeyPrfEnabled(initialLocalPasskeyPrfEnabled);
   };
 
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -654,22 +671,17 @@ export function ProfileEditor({
                           </p>
                         </div>
                         <ProfileSwitchButton
-                          checked={localPasskeyPrfEnabled}
-                          disabled={
-                            !passkeyPrfAvailable && !localPasskeyPrfEnabled
-                          }
+                          checked={deviceUnlockEnabled}
+                          disabled={!canEnableDeviceUnlock && !deviceUnlockEnabled}
                           help={
-                            localPasskeyPrfEnabled
+                            deviceUnlockEnabled
                               ? copy.profile.localDeviceUnlockHelp
                               : passkeyPrfAvailable
                                 ? copy.profile.localDeviceUnlockHelp
                                 : copy.profile.localDeviceUnlockUnavailable
                           }
                           label={copy.profile.localDeviceUnlock}
-                          onClick={() =>
-                            (passkeyPrfAvailable || localPasskeyPrfEnabled) &&
-                            setLocalPasskeyPrfEnabled((enabled) => !enabled)
-                          }
+                          onClick={toggleDeviceUnlock}
                         />
                         {needsCurrentPasswordForPasskey && (
                           <div className="mt-4 grid gap-3">
