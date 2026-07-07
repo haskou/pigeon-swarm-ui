@@ -893,6 +893,8 @@ export const en = {
       'Only needed when this node publishes services or bridges calls/networks. Other nodes use this public address to reach it.',
     relayPublicHostNotConfigured: 'Not configured',
     relayPublicHostPlaceholder: 'relay.example.com',
+    relayPublicHostRequiredWarning:
+      'Set a public host before enabling a private relay, calls relay port, or public network port.',
     relayReachabilityBody:
       'Checks whether the public host and configured ports are reachable from outside your network.',
     relayReachabilityTitle: 'External access check',
