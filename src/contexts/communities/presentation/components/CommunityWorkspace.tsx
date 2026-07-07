@@ -92,12 +92,14 @@ import {
 import { findMentionTrigger } from './communityMentionTrigger';
 import {
   type CommunityThreadState,
+  hiddenCommunityThreadSummaryKeysFromMessages,
   isThreadRootMessage,
   mergeCommunityThreadMessage,
   placeholderThreadRootMessage,
   removeCommunityThreadMessage,
   threadRootLabelKey,
   threadTitleFromMessage,
+  visibleCommunityThreadSummaries,
 } from './communityThreadState';
 import { useCommunityMembers } from './useCommunityMembers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
@@ -210,6 +212,22 @@ function threadSummariesByChannelId(
   return Object.fromEntries(
     channels.map((channel) => [channel.id, channel.threads ?? []]),
   );
+}
+
+function withThreadRootLabelKeys(
+  current: Set<string>,
+  keys: string[],
+): Set<string> {
+  let next: Set<string> | undefined;
+
+  for (const key of keys) {
+    if (current.has(key)) continue;
+
+    next ??= new Set(current);
+    next.add(key);
+  }
+
+  return next ?? current;
 }
 
 function communityEncryptionDetails({
@@ -473,6 +491,9 @@ export function CommunityWorkspace({
   const [threadRootLabels, setThreadRootLabels] = useState<
     Record<string, string>
   >({});
+  const [hiddenThreadRootLabelKeys, setHiddenThreadRootLabelKeys] = useState<
+    Set<string>
+  >(() => new Set());
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
@@ -494,12 +515,17 @@ export function CommunityWorkspace({
     () =>
       textChannels.map((channel) => ({
         ...channel,
-        threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+        threads: visibleCommunityThreadSummaries({
+          channelId: channel.id,
+          hiddenThreadRootLabelKeys,
+          threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+        }),
       })),
-    [channelThreadsByChannelId, textChannels],
+    [channelThreadsByChannelId, hiddenThreadRootLabelKeys, textChannels],
   );
   useEffect(() => {
     setThreadRootLabels({});
+    setHiddenThreadRootLabelKeys(new Set());
     unresolvedThreadRootLabelKeysRef.current.clear();
   }, [community.id]);
   useEffect(() => {
@@ -616,6 +642,25 @@ export function CommunityWorkspace({
     resolvedChannelId,
     timelineFocusKey,
   });
+  useEffect(() => {
+    if (!selectedChannelId) return;
+
+    const channelThreads = channelThreadsByChannelId[selectedChannelId] ?? [];
+
+    if (channelThreads.length === 0) return;
+
+    const hiddenKeys = hiddenCommunityThreadSummaryKeysFromMessages({
+      channelId: selectedChannelId,
+      messages,
+      threads: channelThreads,
+    });
+
+    if (hiddenKeys.length === 0) return;
+
+    setHiddenThreadRootLabelKeys((current) =>
+      withThreadRootLabelKeys(current, hiddenKeys),
+    );
+  }, [channelThreadsByChannelId, messages, selectedChannelId]);
   const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
   const scheduleChannelDraftSync = useCallback(
     (channelId: string, value: string) => {
@@ -750,6 +795,17 @@ export function CommunityWorkspace({
   });
   const upsertChannelThreadSummary = useCallback(
     (channelId: string, summary: CommunityChannelThreadSummary) => {
+      setHiddenThreadRootLabelKeys((current) => {
+        const key = threadRootLabelKey(channelId, summary.rootMessageId);
+
+        if (!current.has(key)) return current;
+
+        const next = new Set(current);
+
+        next.delete(key);
+
+        return next;
+      });
       setChannelThreadsByChannelId((current) => {
         const currentThreads = current[channelId] ?? [];
         const nextThreads = [
@@ -1155,19 +1211,28 @@ export function CommunityWorkspace({
             result.messages,
           );
           const labels: Record<string, string> = {};
+          const hiddenKeys: string[] = [];
 
           for (const message of loadedMessages) {
-            if (
-              remainingRootMessageIds.has(message.id) &&
-              isThreadRootMessage(message)
-            ) {
+            if (!remainingRootMessageIds.has(message.id)) continue;
+
+            if (isThreadRootMessage(message)) {
               labels[message.id] = threadTitleFromMessage(message);
               remainingRootMessageIds.delete(message.id);
+              continue;
             }
+
+            hiddenKeys.push(threadRootLabelKey(channel.channelId, message.id));
+            remainingRootMessageIds.delete(message.id);
           }
 
           if (Object.keys(labels).length > 0 && !cancelled) {
             setThreadRootLabels((current) => ({ ...current, ...labels }));
+          }
+          if (hiddenKeys.length > 0 && !cancelled) {
+            setHiddenThreadRootLabelKeys((current) =>
+              withThreadRootLabelKeys(current, hiddenKeys),
+            );
           }
 
           if (!result.nextBeforeMessageId) break;
