@@ -140,6 +140,8 @@ export function ProfileEditor({
   const localPasskeyPrfChanged =
     localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
   const deviceUnlockEnabled = passkeyPrfEnabled || localPasskeyPrfEnabled;
+  const hasSavedDeviceUnlock = hasPasskeyPrf || initialLocalPasskeyPrfEnabled;
+  const canEnableDeviceUnlock = passkeyPrfAvailable || hasSavedDeviceUnlock;
   const shouldRefreshLocalPasskeyPrf =
     localPasskeyPrfEnabled && wantsPasswordChange;
   const shouldConfigureLocalPasskeyPrf =
@@ -295,9 +297,10 @@ export function ProfileEditor({
       return;
     }
 
-    if (!passkeyPrfAvailable) return;
+    if (!canEnableDeviceUnlock) return;
 
-    setPasskeyPrfEnabled(true);
+    setPasskeyPrfEnabled(passkeyPrfAvailable || hasPasskeyPrf);
+    setLocalPasskeyPrfEnabled(initialLocalPasskeyPrfEnabled);
   };
 
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -669,7 +672,7 @@ export function ProfileEditor({
                         </div>
                         <ProfileSwitchButton
                           checked={deviceUnlockEnabled}
-                          disabled={!passkeyPrfAvailable && !deviceUnlockEnabled}
+                          disabled={!canEnableDeviceUnlock && !deviceUnlockEnabled}
                           help={
                             deviceUnlockEnabled
                               ? copy.profile.localDeviceUnlockHelp
