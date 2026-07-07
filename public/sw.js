@@ -322,11 +322,7 @@ function attachmentPushBody(data) {
     return localizedMessageCopy().sentPhoto;
   }
 
-  if (
-    attachmentKind === 'file' ||
-    arrayValue(data.attachmentExternalIdentifiers).length > 0 ||
-    arrayValue(data.attachment_external_identifiers).length > 0
-  ) {
+  if (attachmentKind === 'file') {
     return localizedMessageCopy().sentFile;
   }
 

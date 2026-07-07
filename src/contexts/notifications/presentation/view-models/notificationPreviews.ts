@@ -13,7 +13,6 @@ import { ConversationPeer } from '../../../conversations/domain/ConversationPeer
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 type NotificationMessagePreviewInput = {
-  attachmentExternalIdentifiers?: string[];
   attachments?: MessageAttachment[];
   plaintextPayload?: string;
   publicPlaintext?: boolean;
@@ -36,7 +35,6 @@ export function communityNotificationPreview(
   const author = authorIdentityId ? identityNames[authorIdentityId] : undefined;
   const location = channel ? `#${channel.name}` : copy.chat.newMessage;
   const body = messageNotificationBody({
-    attachmentExternalIdentifiers: message?.attachmentExternalIdentifiers,
     attachments: attachmentsFromPlaintextPayload(message?.plaintextPayload),
     plaintextPayload: message?.plaintextPayload,
     publicPlaintext: community?.visibility === 'public',
@@ -62,18 +60,14 @@ export function conversationNotificationPreview(
 
   if (!conversation) {
     return {
-      body: messageNotificationBody({
-        attachmentExternalIdentifiers: message?.attachmentExternalIdentifiers,
-      }),
+      body: messageNotificationBody({}),
       title: copy.chat.directMessage,
     };
   }
 
   if (conversation.type === 'group') {
     return {
-      body: messageNotificationBody({
-        attachmentExternalIdentifiers: message?.attachmentExternalIdentifiers,
-      }),
+      body: messageNotificationBody({}),
       title: conversation.name ?? conversation.title ?? copy.chat.groupMessage,
     };
   }
@@ -112,9 +106,7 @@ function oneToOneConversationNotificationPreview(
     copy.chat.directMessage;
 
   return {
-    body: messageNotificationBody({
-      attachmentExternalIdentifiers: message?.attachmentExternalIdentifiers,
-    }),
+    body: messageNotificationBody({}),
     title: peerName,
   };
 }
@@ -128,12 +120,7 @@ export function messageNotificationBody(
     if (content) return truncateNotificationBody(content);
   }
 
-  return (
-    attachmentNotificationBody(
-      input.attachments,
-      input.attachmentExternalIdentifiers,
-    ) ?? copy.chat.newMessage
-  );
+  return attachmentNotificationBody(input.attachments) ?? copy.chat.newMessage;
 }
 
 function plaintextMessageContent(
@@ -176,7 +163,6 @@ function attachmentsFromPlaintextPayload(
 
 function attachmentNotificationBody(
   attachments: MessageAttachment[] | undefined,
-  attachmentExternalIdentifiers: string[] | undefined,
 ): string | undefined {
   if (attachments?.length) {
     const imageCount = attachments.filter(isImageAttachment).length;
@@ -188,7 +174,7 @@ function attachmentNotificationBody(
     return copy.chat.sentFile;
   }
 
-  return attachmentExternalIdentifiers?.length ? copy.chat.sentFile : undefined;
+  return undefined;
 }
 
 function isImageAttachment(attachment: MessageAttachment): boolean {

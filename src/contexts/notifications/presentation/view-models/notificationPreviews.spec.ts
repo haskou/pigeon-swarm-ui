@@ -55,11 +55,4 @@ describe(messageNotificationBody.name, () => {
     ).toBe(copy.chat.sentAlbum);
   });
 
-  it('summarizes unknown external attachments as a file', () => {
-    expect(
-      messageNotificationBody({
-        attachmentExternalIdentifiers: ['bafy-file'],
-      }),
-    ).toBe(copy.chat.sentFile);
-  });
 });
