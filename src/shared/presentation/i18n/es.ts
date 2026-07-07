@@ -752,6 +752,8 @@ export const es = {
       'Solo necesario si este nodo publica servicios o hace de puente para llamadas/redes. Es la dirección pública por la que otros nodos intentarán alcanzarlo.',
     relayPublicHostNotConfigured: 'Sin configurar',
     relayPublicHostPlaceholder: 'relay.example.com',
+    relayPublicHostRequiredWarning:
+      'Configura un host público antes de habilitar el relay privado, el puerto de llamadas o el puerto de la red pública.',
     relayReachabilityBody:
       'Comprueba si el host público y los puertos se ven desde fuera de tu red.',
     relayReachabilityTitle: 'Comprobación externa',

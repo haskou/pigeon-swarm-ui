@@ -14,6 +14,8 @@ export function NodeRelayConfigurationForm({
   disabled?: boolean;
   onChange: (configuration: NodeRelayConfiguration) => void;
 }) {
+  const requiresPublicHost = needsPublicHost(configuration);
+
   return (
     <div className={cx('grid gap-3', className)}>
       <section className="rounded-2xl bg-black/20 p-4">
@@ -34,6 +36,11 @@ export function NodeRelayConfigurationForm({
               })
             }
           />
+          {requiresPublicHost ? (
+            <p className="rounded-2xl border border-amber-200/20 bg-amber-300/10 px-3 py-2 text-sm leading-6 text-amber-50/80">
+              {copy.nodeSettings.relayPublicHostRequiredWarning}
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <NumberField
               disabled={disabled}
@@ -290,4 +297,17 @@ function toOptionalPort(value: string): number | undefined {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined;
 
   return port;
+}
+
+function needsPublicHost(configuration: NodeRelayConfiguration): boolean {
+  const publicHost = configuration.publicHost?.trim() ?? '';
+
+  if (publicHost) return false;
+
+  return (
+    configuration.privateRelay.enabled ||
+    configuration.callsRelay.port !== undefined ||
+    configuration.publicNetwork.enabled ||
+    configuration.publicNetwork.port !== undefined
+  );
 }
