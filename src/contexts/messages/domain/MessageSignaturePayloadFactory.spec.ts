@@ -11,7 +11,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
     });
 
     expect(Object.keys(payload)).toEqual([
-      'attachmentExternalIdentifiers',
       'authorId',
       'conversationId',
       'createdAt',
@@ -23,7 +22,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
       'type',
     ]);
     expect(payload).toEqual({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: 123,
@@ -39,7 +37,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
 
   it('builds the canonical sent-message payload expected by the backend', () => {
     const payload = new MessageSignaturePayloadFactory().createSent({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: 123,
@@ -50,7 +47,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
     });
 
     expect(Object.keys(payload)).toEqual([
-      'attachmentExternalIdentifiers',
       'authorId',
       'conversationId',
       'createdAt',
@@ -62,7 +58,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
       'type',
     ]);
     expect(payload).toEqual({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: 123,
@@ -87,7 +82,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
     });
 
     expect(Object.keys(payload)).toEqual([
-      'attachmentExternalIdentifiers',
       'authorId',
       'conversationId',
       'createdAt',
@@ -99,7 +93,6 @@ describe(MessageSignaturePayloadFactory.name, () => {
       'type',
     ]);
     expect(payload).toEqual({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: 123,

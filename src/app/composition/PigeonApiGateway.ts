@@ -87,7 +87,6 @@ import type { MessageDecryptWorker } from './PigeonApiGateway/MessageDecryptWork
 import type { MessageLoadOptions } from './PigeonApiGateway/MessageLoadOptions';
 import type { PublishedCommunityKey } from './PigeonApiGateway/PublishedCommunityKey';
 
-import { AttachmentExternalIdentifiers } from '../../contexts/attachments/domain/AttachmentExternalIdentifiers';
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
@@ -3062,8 +3061,6 @@ export class PigeonApiGateway {
       onAttachmentProgress,
       attachmentUpload,
     );
-    const attachmentExternalIdentifiers =
-      AttachmentExternalIdentifiers.from(messageAttachments);
     const linkPreview = await this.createLinkPreviewForMessage(
       session,
       content,
@@ -3091,7 +3088,6 @@ export class PigeonApiGateway {
       session,
       JSON.stringify(
         this.messageSignatures.createSent({
-          attachmentExternalIdentifiers,
           authorId: session.identity.id,
           conversationId,
           createdAt: timestamp,
@@ -3103,7 +3099,6 @@ export class PigeonApiGateway {
       ),
     );
     const body = {
-      attachmentExternalIdentifiers,
       createdAt: timestamp,
       encryptedPayload,
       id,

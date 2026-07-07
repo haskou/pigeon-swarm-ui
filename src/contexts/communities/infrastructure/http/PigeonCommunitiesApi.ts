@@ -51,7 +51,6 @@ export class PigeonCommunitiesApi {
   private async createEncryptedChannelMessageBody(
     session: Session,
     input: {
-      attachmentExternalIdentifiers: string[];
       channelId: string;
       communityId: string;
       createdAt: number;
@@ -62,7 +61,6 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       authorIdentityId: session.identity.id,
       channelId: input.channelId,
       communityId: input.communityId,
@@ -81,7 +79,6 @@ export class PigeonCommunitiesApi {
     );
 
     return {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       createdAt: input.createdAt,
       encryptedPayload: input.encryptedPayload,
       id: input.id,
@@ -111,7 +108,6 @@ export class PigeonCommunitiesApi {
   private async createPlaintextChannelMessageBody(
     session: Session,
     input: {
-      attachmentExternalIdentifiers: string[];
       channelId: string;
       communityId: string;
       createdAt: number;
@@ -122,7 +118,6 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       authorIdentityId: session.identity.id,
       channelId: input.channelId,
       communityId: input.communityId,
@@ -141,7 +136,6 @@ export class PigeonCommunitiesApi {
     );
 
     return {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       createdAt: input.createdAt,
       id: input.id,
       mentions: input.mentions,
@@ -156,7 +150,6 @@ export class PigeonCommunitiesApi {
   private async editEncryptedChannelMessageBody(
     session: Session,
     input: {
-      attachmentExternalIdentifiers: string[];
       channelId: string;
       communityId: string;
       createdAt: number;
@@ -166,7 +159,6 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       authorIdentityId: session.identity.id,
       channelId: input.channelId,
       communityId: input.communityId,
@@ -186,7 +178,6 @@ export class PigeonCommunitiesApi {
       createdAt: input.createdAt,
       encryptedPayload: input.encryptedPayload,
       signature: signature.toString(),
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       mentions: input.mentions,
     };
     /* eslint-enable perfectionist/sort-objects */
@@ -195,7 +186,6 @@ export class PigeonCommunitiesApi {
   private async editPlaintextChannelMessageBody(
     session: Session,
     input: {
-      attachmentExternalIdentifiers: string[];
       channelId: string;
       communityId: string;
       createdAt: number;
@@ -205,7 +195,6 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<CommunityChannelMessageRequestBody> {
     const signaturePayload = {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       authorIdentityId: session.identity.id,
       channelId: input.channelId,
       communityId: input.communityId,
@@ -225,7 +214,6 @@ export class PigeonCommunitiesApi {
       createdAt: input.createdAt,
       plaintextPayload: input.plaintextPayload,
       signature: signature.toString(),
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       mentions: input.mentions,
     };
     /* eslint-enable perfectionist/sort-objects */
@@ -738,8 +726,6 @@ export class PigeonCommunitiesApi {
     const id =
       input.id ??
       `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}`;
-    const attachmentExternalIdentifiers =
-      input.attachmentExternalIdentifiers ?? [];
     const mentions = input.mentions ?? [];
     const path = `/communities/${encodeURIComponent(
       communityId,
@@ -747,7 +733,6 @@ export class PigeonCommunitiesApi {
     const body =
       input.plaintextPayload !== undefined
         ? await this.createPlaintextChannelMessageBody(session, {
-            attachmentExternalIdentifiers,
             channelId,
             communityId,
             createdAt,
@@ -757,7 +742,6 @@ export class PigeonCommunitiesApi {
             replyToMessageId: input.replyToMessageId,
           })
         : await this.createEncryptedChannelMessageBody(session, {
-            attachmentExternalIdentifiers,
             channelId,
             communityId,
             createdAt,
@@ -1070,8 +1054,6 @@ export class PigeonCommunitiesApi {
     input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
     const createdAt = input.timestamp ?? Date.now();
-    const attachmentExternalIdentifiers =
-      input.attachmentExternalIdentifiers ?? [];
     const mentions = input.mentions ?? [];
     const path = `/communities/${encodeURIComponent(
       communityId,
@@ -1081,7 +1063,6 @@ export class PigeonCommunitiesApi {
     const body =
       input.plaintextPayload !== undefined
         ? await this.editPlaintextChannelMessageBody(session, {
-            attachmentExternalIdentifiers,
             channelId,
             communityId,
             createdAt,
@@ -1090,7 +1071,6 @@ export class PigeonCommunitiesApi {
             plaintextPayload: input.plaintextPayload,
           })
         : await this.editEncryptedChannelMessageBody(session, {
-            attachmentExternalIdentifiers,
             channelId,
             communityId,
             createdAt,

@@ -2,7 +2,6 @@
 import type { CommunityMessageMention } from '../../../../shared/domain/pigeonResources.types';
 
 export type CommunityChannelMessageRequestBody = {
-  attachmentExternalIdentifiers: string[];
   createdAt: number;
   encryptedPayload?: string;
   id?: string;
