@@ -1,5 +1,4 @@
 export type MessageSignaturePayload = {
-  attachmentExternalIdentifiers: string[];
   authorId: string;
   conversationId: string;
   createdAt: number;

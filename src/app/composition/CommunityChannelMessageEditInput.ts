@@ -3,7 +3,6 @@ import type { CommunityChannelMessagePayloadInput } from './CommunityChannelMess
 
 export type CommunityChannelMessageEditInput =
   CommunityChannelMessagePayloadInput & {
-    attachmentExternalIdentifiers?: string[];
     mentions?: CommunityMessageMention[];
     timestamp?: number;
   };

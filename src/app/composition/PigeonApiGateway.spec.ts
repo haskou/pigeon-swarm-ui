@@ -942,7 +942,6 @@ describe(PigeonApiGateway.name, () => {
 
   it('creates community channel messages with the canonical domain signature', async () => {
     const createdMessage = {
-      attachmentExternalIdentifiers: ['bafy-private'],
       authorIdentityId: 'identity-1',
       channelId: 'channel-1',
       communityId: 'community-1',
@@ -966,7 +965,6 @@ describe(PigeonApiGateway.name, () => {
     const gateway = new PigeonApiGateway(http, signer);
     const path = '/communities/community-1/channels/channel-1/messages';
     const body = {
-      attachmentExternalIdentifiers: ['bafy-private'],
       createdAt: 1234,
       encryptedPayload: 'encrypted-payload',
       id: 'message-1',
@@ -980,7 +978,6 @@ describe(PigeonApiGateway.name, () => {
         'community-1',
         'channel-1',
         {
-          attachmentExternalIdentifiers: ['bafy-private'],
           encryptedPayload: 'encrypted-payload',
           id: 'message-1',
           timestamp: 1234,
@@ -989,7 +986,6 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(createdMessage);
     expect(session.keyPair.sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: ['bafy-private'],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -1040,7 +1036,6 @@ describe(PigeonApiGateway.name, () => {
       createdAt: 5678,
       encryptedPayload: 'edited-encrypted-payload',
       signature: 'domain-signature',
-      attachmentExternalIdentifiers: [],
       mentions: [],
     };
     /* eslint-enable perfectionist/sort-objects */
@@ -1059,7 +1054,6 @@ describe(PigeonApiGateway.name, () => {
     ).resolves.toBe(editedMessage);
     expect(session.keyPair.sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -2980,7 +2974,6 @@ describe(PigeonApiGateway.name, () => {
       RequestInit,
     ];
     const body = JSON.parse(messageRequest.body as string) as {
-      attachmentExternalIdentifiers: string[];
       createdAt: number;
       encryptedPayload: string;
       id: string;
@@ -2995,7 +2988,6 @@ describe(PigeonApiGateway.name, () => {
       unknown
     >;
 
-    expect(body.attachmentExternalIdentifiers).toEqual(['bafy-attachment']);
     expect(body.createdAt).toEqual(expect.any(Number));
     expect(body.encryptedPayload).toEqual(expect.any(String));
     expect(body.id).toEqual(expect.stringContaining('one-to-one:conversation'));
@@ -3003,7 +2995,6 @@ describe(PigeonApiGateway.name, () => {
     expect(body.replyToMessageId).toBe('message-0');
     expect(body.signature).toBe('message-signature');
     expect(Object.keys(parsedSignaturePayload)).toEqual([
-      'attachmentExternalIdentifiers',
       'authorId',
       'conversationId',
       'createdAt',
@@ -3014,7 +3005,6 @@ describe(PigeonApiGateway.name, () => {
       'type',
     ]);
     expect(parsedSignaturePayload).toEqual({
-      attachmentExternalIdentifiers: ['bafy-attachment'],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: body.createdAt,
@@ -3099,11 +3089,9 @@ describe(PigeonApiGateway.name, () => {
       RequestInit,
     ];
     const body = JSON.parse(messageRequest.body as string) as {
-      attachmentExternalIdentifiers: string[];
       encryptedPayload: string;
     };
 
-    expect(body.attachmentExternalIdentifiers).toEqual([]);
     expect(decryptFixturePayload(body.encryptedPayload)).toMatchObject({
       content: '',
       sticker,
@@ -3187,7 +3175,6 @@ describe(PigeonApiGateway.name, () => {
     expect(body.previousMessageIds).toEqual(['message/to-edit']);
     expect(body.signature).toBe('edit-signature');
     expect(Object.keys(parsedSignaturePayload)).toEqual([
-      'attachmentExternalIdentifiers',
       'authorId',
       'conversationId',
       'createdAt',
@@ -3198,7 +3185,6 @@ describe(PigeonApiGateway.name, () => {
       'type',
     ]);
     expect(parsedSignaturePayload).toEqual({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: body.createdAt,
@@ -3267,7 +3253,6 @@ describe(PigeonApiGateway.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(session, 'DELETE', path, body);
     expect(body.signature).toBe('delete-signature');
     expect(JSON.parse(signaturePayload)).toEqual({
-      attachmentExternalIdentifiers: [],
       authorId: 'identity-1',
       conversationId: 'one-to-one:conversation',
       createdAt: body.createdAt,

@@ -9,7 +9,6 @@ export class MessageSignaturePayloadFactory {
     targetMessageId: string;
   }): MessageSignaturePayload {
     return {
-      attachmentExternalIdentifiers: [],
       authorId: input.authorId,
       conversationId: input.conversationId,
       createdAt: input.createdAt,
@@ -31,7 +30,6 @@ export class MessageSignaturePayloadFactory {
     targetMessageId: string;
   }): MessageSignaturePayload {
     return {
-      attachmentExternalIdentifiers: [],
       authorId: input.authorId,
       conversationId: input.conversationId,
       createdAt: input.createdAt,
@@ -45,7 +43,6 @@ export class MessageSignaturePayloadFactory {
   }
 
   public createSent(input: {
-    attachmentExternalIdentifiers: string[];
     authorId: string;
     conversationId: string;
     createdAt: number;
@@ -55,7 +52,6 @@ export class MessageSignaturePayloadFactory {
     replyToMessageId?: string;
   }): MessageSignaturePayload {
     return {
-      attachmentExternalIdentifiers: input.attachmentExternalIdentifiers,
       authorId: input.authorId,
       conversationId: input.conversationId,
       createdAt: input.createdAt,

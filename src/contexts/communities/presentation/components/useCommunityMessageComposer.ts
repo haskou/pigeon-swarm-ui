@@ -26,7 +26,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { AttachmentExternalIdentifiers } from '../../../attachments/domain/AttachmentExternalIdentifiers';
 import { PendingMessageAttachments } from '../../../attachments/domain/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
@@ -252,9 +251,6 @@ export function useCommunityMessageComposer({
       channelId,
       message.id,
       {
-        attachmentExternalIdentifiers: AttachmentExternalIdentifiers.from(
-          message.attachments,
-        ),
         ...messagePayload,
         mentions,
         timestamp,
@@ -534,8 +530,6 @@ export function useCommunityMessageComposer({
             community.id,
             payload.channelId,
             {
-              attachmentExternalIdentifiers:
-                AttachmentExternalIdentifiers.from(messageAttachments),
               ...messagePayload,
               mentions: payload.mentions,
               replyToMessageId: payload.replyTarget?.id,

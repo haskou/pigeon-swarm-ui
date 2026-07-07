@@ -4,7 +4,6 @@ import type { CommunityChannelMessagePayloadInput } from './CommunityChannelMess
 
 export type CommunityChannelMessageInput =
   CommunityChannelMessagePayloadInput & {
-    attachmentExternalIdentifiers?: string[];
     id?: string;
     mentions?: CommunityMessageMention[];
     replyToMessageId?: string;

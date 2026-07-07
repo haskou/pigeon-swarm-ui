@@ -125,7 +125,6 @@ describe(PigeonCommunitiesApi.name, () => {
       async (_key, loader) => await loader(),
     );
     const body = {
-      attachmentExternalIdentifiers: [],
       createdAt: 1779315464545,
       encryptedPayload: 'encrypted-payload',
       id: '6a072ee87e00690039d0ad27:6a073dc64d72b40039b156f8:1779315464545:cf164426-84b5-4eda-8e58-d9ef8b198f0d',
@@ -148,7 +147,6 @@ describe(PigeonCommunitiesApi.name, () => {
 
     expect(sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: '6a073dc64d72b40039b156f8',
         communityId: '6a072ee87e00690039d0ad27',
@@ -199,7 +197,6 @@ describe(PigeonCommunitiesApi.name, () => {
       async (_key, loader) => await loader(),
     );
     const body = {
-      attachmentExternalIdentifiers: [],
       createdAt: 1779315464545,
       id: 'message-1',
       mentions: [],
@@ -217,7 +214,6 @@ describe(PigeonCommunitiesApi.name, () => {
 
     expect(sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -268,7 +264,6 @@ describe(PigeonCommunitiesApi.name, () => {
       async (_key, loader) => await loader(),
     );
     const body = {
-      attachmentExternalIdentifiers: [],
       createdAt: 1779315464545,
       encryptedPayload: 'encrypted-payload',
       id: 'message-1',
@@ -288,7 +283,6 @@ describe(PigeonCommunitiesApi.name, () => {
 
     expect(sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -348,7 +342,6 @@ describe(PigeonCommunitiesApi.name, () => {
       createdAt: 1773848929055,
       encryptedPayload: 'edited-encrypted-payload',
       signature: 'edition-signature',
-      attachmentExternalIdentifiers: [],
       mentions: [],
     };
     /* eslint-enable perfectionist/sort-objects */
@@ -362,7 +355,6 @@ describe(PigeonCommunitiesApi.name, () => {
 
     expect(sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',
@@ -419,7 +411,6 @@ describe(PigeonCommunitiesApi.name, () => {
       createdAt: 1773848929055,
       plaintextPayload: '{"content":"edited"}',
       signature: 'edition-signature',
-      attachmentExternalIdentifiers: [],
       mentions: [],
     };
     /* eslint-enable perfectionist/sort-objects */
@@ -433,7 +424,6 @@ describe(PigeonCommunitiesApi.name, () => {
 
     expect(sign).toHaveBeenCalledWith(
       JSON.stringify({
-        attachmentExternalIdentifiers: [],
         authorIdentityId: 'identity-1',
         channelId: 'channel-1',
         communityId: 'community-1',

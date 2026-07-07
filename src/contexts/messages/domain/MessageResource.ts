@@ -10,7 +10,6 @@ import type { MessageReaction } from './MessageReaction';
 export type MessageResource = {
   actorIdentityId?: string;
   allowsMultipleVotes?: boolean;
-  attachmentExternalIdentifiers?: string[];
   authorId?: string;
   authorIdentityId?: string;
   callEventType?: 'declined' | 'ended' | 'missed';
