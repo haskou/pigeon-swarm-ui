@@ -1,4 +1,7 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  ChatMessage,
+  CommunityChannelThreadSummary,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -120,4 +123,46 @@ export function threadRootLabelKey(
   rootMessageId: string,
 ): string {
   return `${channelId}:${rootMessageId}`;
+}
+
+export function visibleCommunityThreadSummaries({
+  channelId,
+  hiddenThreadRootLabelKeys,
+  threads,
+}: {
+  channelId: string;
+  hiddenThreadRootLabelKeys: ReadonlySet<string>;
+  threads: CommunityChannelThreadSummary[];
+}): CommunityChannelThreadSummary[] {
+  return threads.filter(
+    (thread) =>
+      !hiddenThreadRootLabelKeys.has(
+        threadRootLabelKey(channelId, thread.rootMessageId),
+    ),
+  );
+}
+
+export function hiddenCommunityThreadSummaryKeysFromMessages({
+  channelId,
+  messages,
+  threads,
+}: {
+  channelId: string;
+  messages: ChatMessage[];
+  threads: CommunityChannelThreadSummary[];
+}): string[] {
+  const messagesById = new Map(messages.map((message) => [message.id, message]));
+
+  return threads
+    .filter((thread) => {
+      const lastReply = messagesById.get(thread.lastReplyMessageId);
+
+      if (!lastReply) return false;
+
+      return !ThreadMessageVisibility.belongsToRoot(
+        thread.rootMessageId,
+        lastReply,
+      );
+    })
+    .map((thread) => threadRootLabelKey(channelId, thread.rootMessageId));
 }
