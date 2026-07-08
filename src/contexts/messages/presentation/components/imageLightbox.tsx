@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import type { MouseEvent, PointerEvent } from 'react';
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -27,6 +27,7 @@ type PanOffset = {
 };
 
 type PanGesture = {
+  dragging: boolean;
   pointerId: number;
   startPan: PanOffset;
   startX: number;
@@ -70,6 +71,7 @@ export function ImageLightbox({
   const originalUrlsRef = useRef<Record<number, string>>({});
   const [touchGestureActive, setTouchGestureActive] = useState(false);
   const pointerPositionsRef = useRef<Map<number, PointerPosition>>(new Map());
+  const suppressNextClickRef = useRef(false);
   const panRef = useRef<PanGesture | null>(null);
   const pinchRef = useRef<PinchGesture | null>(null);
   const swipeRef = useRef<{
@@ -147,6 +149,7 @@ export function ImageLightbox({
     setSwipeDirection(null);
     setTouchGestureActive(false);
     pointerPositionsRef.current.clear();
+    suppressNextClickRef.current = false;
     panRef.current = null;
     pinchRef.current = null;
     swipeRef.current = null;
@@ -173,6 +176,7 @@ export function ImageLightbox({
       if (zoom <= 1) return;
 
       panRef.current = {
+        dragging: false,
         pointerId: event.pointerId,
         startPan: pan,
         startX: event.clientX,
@@ -212,6 +216,7 @@ export function ImageLightbox({
 
     if (zoom > 1) {
       panRef.current = {
+        dragging: false,
         pointerId: event.pointerId,
         startPan: pan,
         startX: event.clientX,
@@ -267,6 +272,7 @@ export function ImageLightbox({
                 pinchRef.current.startCenter.y,
             },
       );
+      suppressNextClickRef.current = true;
       event.preventDefault();
       event.stopPropagation();
 
@@ -276,6 +282,14 @@ export function ImageLightbox({
     const panGesture = panRef.current;
 
     if (panGesture && panGesture.pointerId === event.pointerId && zoom > 1) {
+      if (
+        Math.hypot(
+          event.clientX - panGesture.startX,
+          event.clientY - panGesture.startY,
+        ) > 4
+      ) {
+        panGesture.dragging = true;
+      }
       setPan({
         x: panGesture.startPan.x + event.clientX - panGesture.startX,
         y: panGesture.startPan.y + event.clientY - panGesture.startY,
@@ -302,6 +316,7 @@ export function ImageLightbox({
     }
 
     if (swipe.direction === 'horizontal') {
+      suppressNextClickRef.current = true;
       const boundedDeltaX =
         (deltaX > 0 && !hasPrevious) || (deltaX < 0 && !hasNext)
           ? deltaX * 0.28
@@ -315,6 +330,7 @@ export function ImageLightbox({
     }
 
     if (swipe.direction === 'vertical') {
+      suppressNextClickRef.current = true;
       setSwipeOffset({ x: 0, y: deltaY });
       event.preventDefault();
       event.stopPropagation();
@@ -328,8 +344,15 @@ export function ImageLightbox({
     }
 
     if (panRef.current?.pointerId === event.pointerId) {
+      const wasDragging = panRef.current.dragging;
+
       panRef.current = null;
       if (event.pointerType !== 'touch') setTouchGestureActive(false);
+      if (wasDragging) {
+        suppressNextClickRef.current = true;
+        event.preventDefault();
+        event.stopPropagation();
+      }
 
       return;
     }
@@ -342,6 +365,7 @@ export function ImageLightbox({
 
     if (!swipe.dragging) return;
 
+    suppressNextClickRef.current = true;
     event.preventDefault();
     event.stopPropagation();
 
@@ -376,6 +400,7 @@ export function ImageLightbox({
     }
 
     if (panRef.current?.pointerId === event.pointerId) {
+      if (panRef.current.dragging) suppressNextClickRef.current = true;
       panRef.current = null;
       if (event.pointerType !== 'touch') setTouchGestureActive(false);
     }
@@ -383,10 +408,29 @@ export function ImageLightbox({
     const swipe = swipeRef.current;
 
     if (swipe?.pointerId === event.pointerId) {
+      if (swipe.dragging) suppressNextClickRef.current = true;
       swipeRef.current = null;
       setSwipeOffset({ x: 0, y: 0 });
       setSwipeDirection(null);
     }
+  };
+  const handleScrimClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+
+      return;
+    }
+
+    close();
+  };
+  const handleGestureSurfaceClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (!suppressNextClickRef.current) return;
+
+    suppressNextClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   if (!activeImage) return null;
@@ -397,10 +441,11 @@ export function ImageLightbox({
       data-state={transitionState}
       role="dialog"
       aria-modal="true"
-      onClick={close}
+      onClick={handleScrimClick}
     >
       <div
         className="relative z-10 flex h-full w-full touch-none items-center justify-center overflow-hidden"
+        onClick={handleGestureSurfaceClick}
         onPointerCancel={handlePointerCancel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -423,7 +468,16 @@ export function ImageLightbox({
         <img
           src={activeImageUrl}
           alt={activeImage.alt}
-          onClick={(event) => event.stopPropagation()}
+          draggable={false}
+          onClick={(event) => {
+            if (suppressNextClickRef.current) {
+              suppressNextClickRef.current = false;
+              event.preventDefault();
+            }
+
+            event.stopPropagation();
+          }}
+          onDragStart={(event) => event.preventDefault()}
           onWheel={(event) => {
             event.preventDefault();
             event.stopPropagation();

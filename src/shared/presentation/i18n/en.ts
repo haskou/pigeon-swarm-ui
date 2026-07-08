@@ -776,6 +776,7 @@ export const en = {
       'This conversation key is missing from the keychain.',
     missingKey:
       '[encrypted] This conversation key is missing from the keychain.',
+    openMenu: 'Open message menu',
     originalMessage: 'original message',
     rawTitle: 'Message data',
     reactionError: 'The reaction could not be updated.',

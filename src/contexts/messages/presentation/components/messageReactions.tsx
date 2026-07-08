@@ -32,7 +32,7 @@ export function MessageReactions({
           key={group.emoji}
           onClick={() => onToggle(group.emoji, group.reacted)}
           className={cx(
-            'inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
+            'inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-black leading-none shadow-sm backdrop-blur transition hover:brightness-110',
             group.reacted
               ? 'border-sky-200/45 bg-sky-400/35 text-sky-50 shadow-sky-950/20'
               : 'border-white/12 bg-black/25 text-white/78 shadow-black/15 hover:bg-white/10',
@@ -40,7 +40,7 @@ export function MessageReactions({
           aria-label={`${group.emoji} ${group.count}`}
           title={group.authors.join(', ')}
         >
-          <span className="text-[0.82rem] leading-none">{group.emoji}</span>
+          <span className="text-base leading-none">{group.emoji}</span>
           <span className="tabular-nums leading-none">{group.count}</span>
         </button>
       ))}

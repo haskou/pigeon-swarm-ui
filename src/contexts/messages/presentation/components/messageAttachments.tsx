@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AttachmentProgress,
@@ -25,6 +25,7 @@ export function ImageAttachmentAlbum({
   encryptedEnvironment = false,
   items,
   mine,
+  onMenuOpen,
   onOpen,
   onPreview,
 }: {
@@ -32,6 +33,7 @@ export function ImageAttachmentAlbum({
   encryptedEnvironment?: boolean;
   items: IndexedAttachment[];
   mine: boolean;
+  onMenuOpen?: (event: MouseEvent<HTMLElement>) => void;
   onOpen: (images: LightboxImage[], index: number) => void;
   onPreview: (
     attachment: MessageAttachment,
@@ -156,6 +158,8 @@ export function ImageAttachmentAlbum({
           const lightboxIndex = previewUrl
             ? lightboxImages.findIndex((image) => image.url === previewUrl)
             : -1;
+          const publicUnencrypted =
+            encryptedEnvironment && isPublicUnencryptedAttachment(attachment);
 
           return (
             <div
@@ -194,7 +198,11 @@ export function ImageAttachmentAlbum({
               <PublicMediaControls
                 attachment={attachment}
                 encryptedEnvironment={encryptedEnvironment}
+                onMenuOpen={onMenuOpen}
               />
+              {onMenuOpen && !publicUnencrypted ? (
+                <ImageAttachmentMenuButton onMenuOpen={onMenuOpen} />
+              ) : null}
             </div>
           );
         })}
@@ -562,9 +570,11 @@ export function VideoAttachmentCard({
 function PublicMediaControls({
   attachment,
   encryptedEnvironment,
+  onMenuOpen,
 }: {
   attachment: MessageAttachment;
   encryptedEnvironment: boolean;
+  onMenuOpen?: (event: MouseEvent<HTMLElement>) => void;
 }) {
   if (!isPublicUnencryptedAttachment(attachment) || !encryptedEnvironment) {
     return null;
@@ -572,14 +582,87 @@ function PublicMediaControls({
 
   return (
     <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-      <span
-        className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200/60 bg-rose-500/45 text-rose-50 shadow-lg shadow-black/45"
-        title={copy.attachments.publicUnencrypted}
-        aria-label={copy.attachments.publicUnencrypted}
-      >
-        <OpenLockIcon />
-      </span>
+      {onMenuOpen ? (
+        <button
+          type="button"
+          onClick={onMenuOpen}
+          className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200/60 bg-rose-500/45 text-rose-50 shadow-lg shadow-black/45 transition hover:bg-rose-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-100/60"
+          title={copy.attachments.publicUnencrypted}
+          aria-label={copy.attachments.publicUnencrypted}
+        >
+          <OpenLockIcon />
+        </button>
+      ) : (
+        <span
+          className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200/60 bg-rose-500/45 text-rose-50 shadow-lg shadow-black/45"
+          title={copy.attachments.publicUnencrypted}
+          aria-label={copy.attachments.publicUnencrypted}
+        >
+          <OpenLockIcon />
+        </span>
+      )}
     </div>
+  );
+}
+
+function ImageAttachmentMenuButton({
+  onMenuOpen,
+}: {
+  onMenuOpen: (event: MouseEvent<HTMLElement>) => void;
+}) {
+  const coarsePointer = useCoarsePointer();
+
+  return (
+    <button
+      type="button"
+      onClick={onMenuOpen}
+      className={cx(
+        'absolute right-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-xl border border-white/15 bg-black/55 text-white shadow-lg shadow-black/35 backdrop-blur-md transition hover:bg-black/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50',
+        coarsePointer ? '' : 'sm:hidden',
+      )}
+      aria-label={copy.messages.openMenu}
+    >
+      <MoreDotsIcon />
+    </button>
+  );
+}
+
+function useCoarsePointer(): boolean {
+  const [coarsePointer, setCoarsePointer] = useState(() =>
+    typeof window === 'undefined'
+      ? false
+      : window.matchMedia('(pointer: coarse)').matches,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia('(pointer: coarse)');
+    const update = () => setCoarsePointer(query.matches);
+
+    update();
+    query.addEventListener('change', update);
+
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  return coarsePointer;
+}
+
+function MoreDotsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4"
+    >
+      <path
+        d="M5 12h.01M12 12h.01M19 12h.01"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+    </svg>
   );
 }
 
