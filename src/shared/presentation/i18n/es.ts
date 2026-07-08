@@ -642,6 +642,7 @@ export const es = {
       'Falta la clave de comunidad en el llavero, asi que los mensajes no pueden descifrarse.',
     missingConversationKey: 'Falta la clave de esta conversacion.',
     missingKey: '[cifrado] Falta la clave de esta conversacion.',
+    openMenu: 'Abrir menu del mensaje',
     openThread: 'Abrir hilo',
     originalMessage: 'mensaje original',
     pin: 'Fijar',

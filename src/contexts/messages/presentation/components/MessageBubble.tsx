@@ -378,6 +378,15 @@ export function MessageBubble({
                         encryptedEnvironment={encryptedEnvironment}
                         items={imageAttachments}
                         mine={mine}
+                        onMenuOpen={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onMessageMenuOpen(
+                            message,
+                            event.clientX,
+                            event.clientY,
+                          );
+                        }}
                         onOpen={(images, index) =>
                           setLightbox({ images, index })
                         }
