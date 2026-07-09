@@ -18,8 +18,12 @@ export function CallEventMessage({
   const duration = formatDuration(message.raw.durationMs);
 
   return (
-    <div data-message-id={message.id} className="flex justify-center py-2">
-      <div className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-black text-white/55">
+    <div
+      data-message-id={message.id}
+      className="flex w-full items-center gap-3 py-2"
+    >
+      <span className="h-px flex-1 bg-white/[0.07]" />
+      <div className="text-xs font-bold text-white/45">
         {direction && (
           <>
             <span>{direction}</span>
@@ -33,6 +37,7 @@ export function CallEventMessage({
           · {formatTime(message.timestamp)}
         </span>
       </div>
+      <span className="h-px flex-1 bg-white/[0.07]" />
     </div>
   );
 }

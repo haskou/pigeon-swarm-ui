@@ -272,11 +272,11 @@ export function Sidebar({
   );
 
   return (
-    <aside className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
+    <aside className="ui-sidebar flex h-full min-h-0 flex-col p-4">
       <button
         onClick={onCreate}
         data-testid="create-conversation-button"
-        className="glass-button rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black shadow-xl shadow-fuchsia-950/20"
+        className="ui-button ui-button-primary w-full"
       >
         {copy.sidebar.createConversation}
       </button>
@@ -293,7 +293,7 @@ export function Sidebar({
         />
         <div className="space-y-2">
           {filteredConversations.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+            <div className="border-y border-white/10 py-6 text-center text-sm text-white/55">
               {copy.sidebar.emptyConversations}
             </div>
           )}
@@ -568,10 +568,8 @@ function SidebarConversationButton({
       onPointerLeave={onClearLongPressTimer}
       onPointerUp={onClearLongPressTimer}
       className={cx(
-        'relative w-full overflow-hidden rounded-2xl p-3 text-left transition',
-        active
-          ? 'bg-white text-slate-950'
-          : 'bg-white/8 text-white hover:bg-white/14',
+        'ui-navigation-row p-3 text-left',
+        active ? 'is-active' : '',
       )}
     >
       <SidebarConversationBanner bannerUrl={bannerUrl} hidden={false} />
@@ -594,7 +592,7 @@ function SidebarConversationButton({
           <span
             className={cx(
               'grid h-6 w-6 shrink-0 place-items-center rounded-full',
-              active ? 'bg-slate-950/10 text-slate-600' : 'bg-black/25 text-white/55',
+              'bg-black/25 text-white/55',
             )}
             title={copy.notifications.muteConversation}
           >
@@ -648,18 +646,18 @@ function SidebarConversationAvatar({
 }) {
   if (loading) {
     return (
-      <span className="h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
+      <span className="h-11 w-11 shrink-0 animate-pulse rounded-lg bg-gradient-to-br from-cyan-300/70 to-fuchsia-400/70" />
     );
   }
 
   return (
     <div
       className={cx(
-        'relative grid h-11 w-11 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
+        'relative grid h-11 w-11 place-items-center overflow-visible rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950',
         active && 'ring-2 ring-slate-950/20',
       )}
     >
-      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-lg">
         {pictureUrl ? (
           <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -701,7 +699,7 @@ function SidebarConversationDetails({
         <div
           className={cx(
             'truncate text-xs',
-            active ? 'text-slate-500' : 'text-white/45',
+            active ? 'text-white/55' : 'text-white/45',
           )}
         >
           {handle}
@@ -726,8 +724,8 @@ function SidebarTextSkeleton({
         'animate-pulse rounded-full',
         active
           ? secondary
-            ? 'bg-slate-400/30'
-            : 'bg-slate-400/40'
+            ? 'bg-white/12'
+            : 'bg-white/18'
           : secondary
             ? 'bg-white/12'
             : 'bg-white/18',

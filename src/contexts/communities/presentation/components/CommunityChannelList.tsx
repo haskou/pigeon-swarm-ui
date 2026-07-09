@@ -206,10 +206,7 @@ export function CommunityChannelList({
             {displayedTextChannels.map((channel, index) => (
               <div
                 key={`${animationScopeKey ?? 'channels'}:${channel.id}`}
-                className={sidePanelListEnterClassName(
-                  'left',
-                  animateEntries,
-                )}
+                className={sidePanelListEnterClassName('left', animateEntries)}
                 style={sidePanelListEnterStyle(index, animateEntries)}
               >
                 <TextChannelButton
@@ -487,9 +484,9 @@ function TextChannelButton({
   return (
     <div
       className={cx(
-        'group relative w-full rounded-2xl transition',
+        'group relative w-full rounded-md border-l-2 border-transparent transition',
         active
-          ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
+          ? 'border-cyan-300/80 bg-[#c8c0d8]/15 text-white'
           : muted
             ? 'text-white/40 hover:bg-white/10 hover:text-white/70'
             : 'text-white hover:bg-white/12',
@@ -515,7 +512,7 @@ function TextChannelButton({
         onPointerDown={handlePointerDown}
         onPointerLeave={clearLongPressTimer}
         onPointerUp={clearLongPressTimer}
-        className="flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-1.5 text-left text-sm font-black"
+        className="flex w-full min-w-0 items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm font-black"
         aria-expanded={menuOpen}
         aria-haspopup="menu"
       >
