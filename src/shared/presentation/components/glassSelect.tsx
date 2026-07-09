@@ -110,7 +110,7 @@ export function GlassSelect({
         onClick={() => setOpen((isOpen) => !isOpen)}
         onKeyDown={handleKeyDown}
         data-testid={testId}
-        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left text-sm font-bold text-white outline-none transition hover:border-white/20 focus:border-cyan-300/60 focus:bg-black/35 disabled:cursor-not-allowed disabled:opacity-45"
+        className="ui-field-control flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
       >
         <span className="flex min-w-0 items-center gap-2">
           {selectedOption?.indicatorClassName && (
@@ -150,7 +150,7 @@ export function GlassSelect({
           id={listboxId}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-30 overflow-hidden rounded-2xl border border-white/12 bg-[#0c102b]/95 p-1 shadow-2xl shadow-black/45 backdrop-blur-xl"
+          className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-30 overflow-hidden rounded-lg border border-white/12 bg-[#0c102b]/96 py-1 shadow-2xl shadow-black/45 backdrop-blur-xl"
         >
           {options.map((option) => (
             <button
@@ -162,11 +162,11 @@ export function GlassSelect({
               disabled={option.disabled}
               onClick={() => selectOption(option.value)}
               className={cx(
-                'flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm font-bold outline-none transition',
+                'flex w-full items-center justify-between border-b border-white/[0.06] px-3 py-2.5 text-left text-sm font-bold outline-none transition last:border-b-0',
                 option.disabled
                   ? 'cursor-not-allowed text-white/25'
                   : option.value === value
-                    ? 'bg-white text-slate-950'
+                    ? 'bg-cyan-300/10 text-cyan-100'
                     : 'text-white/70 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white',
               )}
             >
