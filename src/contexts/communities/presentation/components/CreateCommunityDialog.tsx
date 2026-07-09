@@ -22,6 +22,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
@@ -219,34 +220,21 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl"
         data-state={transitionState}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
-              {copy.communities.createTitle}
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-white/55">
-              {copy.communities.createBody}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={copy.dialog.close}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
-          >
-            ×
-          </button>
-        </div>
-        {headerControl}
+        <DialogHeader
+          description={copy.communities.createBody}
+          title={copy.communities.createTitle}
+          onClose={close}
+        />
+        <div className="px-5">{headerControl}</div>
 
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
             <div className="grid gap-4">
-              <div className="overflow-hidden rounded-2xl bg-black/25">
-                <div className="px-4 pt-4 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-black/10">
+                <div className="px-4 pt-4 text-sm font-semibold text-white/55">
                   {copy.communities.preview}
                 </div>
                 <button
@@ -274,7 +262,7 @@ export function CreateCommunityDialog({
                   <button
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
-                    className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+                    className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-lg border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
                     aria-label={copy.communities.avatar}
                   >
                     {avatarPreview ? (
@@ -291,21 +279,27 @@ export function CreateCommunityDialog({
                     </span>
                   </button>
                   <div className="mt-4 grid gap-3">
-                    <input
-                      aria-label={copy.communities.name}
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                      placeholder={copy.communities.namePlaceholder}
-                      autoComplete="off"
-                    />
-                    <textarea
-                      aria-label={copy.communities.description}
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
-                      className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                      placeholder={copy.communities.descriptionPlaceholder}
-                    />
+                    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+                      {copy.communities.name}
+                      <input
+                        aria-label={copy.communities.name}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        className="ui-field-control px-4 py-3 text-base font-semibold placeholder:text-white/30"
+                        placeholder={copy.communities.namePlaceholder}
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+                      {copy.communities.description}
+                      <textarea
+                        aria-label={copy.communities.description}
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        className="ui-field-control min-h-24 resize-none px-4 py-3 text-sm placeholder:text-white/30"
+                        placeholder={copy.communities.descriptionPlaceholder}
+                      />
+                    </label>
                   </div>
                 </div>
                 <input
@@ -324,8 +318,8 @@ export function CreateCommunityDialog({
                 />
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              <div className="ui-section py-3">
+                <div className="mb-3 text-sm font-semibold text-white/65">
                   {copy.communities.network}
                 </div>
                 <GlassSelect
@@ -342,6 +336,7 @@ export function CreateCommunityDialog({
                 autoJoinEnabled={autoJoinEnabled}
                 discoverable={discoverable}
                 disabled={state === 'loading'}
+                framed={false}
                 onAutoJoinChange={setAutoJoinEnabled}
                 onDiscoverableChange={setDiscoverable}
                 onVisibilityChange={setVisibility}
@@ -349,8 +344,8 @@ export function CreateCommunityDialog({
               />
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+            <div className="ui-section py-3">
+              <div className="text-sm font-semibold text-white/65">
                 {copy.communities.initialChannels}
               </div>
               <p className="mt-2 text-xs leading-relaxed text-white/45">
@@ -360,7 +355,7 @@ export function CreateCommunityDialog({
                 <input
                   value={channelName}
                   onChange={(event) => setChannelName(event.target.value)}
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                  className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm placeholder:text-white/30"
                   placeholder={copy.communities.initialChannelName}
                 />
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -379,7 +374,7 @@ export function CreateCommunityDialog({
                     type="button"
                     onClick={addChannel}
                     disabled={!canAddChannel}
-                    className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="ui-button"
                   >
                     {copy.communities.addInitialChannel}
                   </button>
@@ -391,16 +386,19 @@ export function CreateCommunityDialog({
                 ) : null}
               </div>
               {channels.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 divide-y divide-white/10 border-y border-white/10">
                   {channels.map((channel, index) => (
                     <button
                       type="button"
                       key={`${channel.type}:${channel.name}:${index}`}
                       onClick={() => removeChannel(index)}
-                      className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70 transition hover:bg-rose-500/15 hover:text-rose-100"
+                      className="flex w-full items-center justify-between gap-3 px-1 py-2.5 text-left text-sm font-semibold text-white/70 transition hover:bg-rose-500/10 hover:text-rose-100"
                       title={copy.messages.delete}
                     >
-                      {channelTypeLabel(channel.type)} · #{channel.name} ×
+                      <span>
+                        {channelTypeLabel(channel.type)} · #{channel.name}
+                      </span>
+                      <span aria-hidden="true">×</span>
                     </button>
                   ))}
                 </div>
@@ -409,22 +407,17 @@ export function CreateCommunityDialog({
           </div>
 
           {error && (
-            <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+            <div className="ui-inline-notice mt-4 border-rose-300/25 bg-rose-500/10 text-sm text-rose-100">
               {error}
             </div>
           )}
         </div>
 
-        <div className="mt-5 shrink-0 border-t border-white/10 pt-4">
+        <div className="mt-4 shrink-0 border-t border-white/10 px-5 py-4">
           <div className="flex justify-end">
             <button
               disabled={!canSubmit}
-              className={cx(
-                'w-full rounded-2xl px-5 py-3 text-sm font-black transition sm:w-auto',
-                canSubmit
-                  ? 'glass-button bg-fuchsia-500 text-white hover:bg-fuchsia-400'
-                  : 'cursor-not-allowed bg-white/10 text-white/35',
-              )}
+              className="ui-button ui-button-primary w-full sm:w-auto"
             >
               {state === 'loading'
                 ? copy.communities.creating

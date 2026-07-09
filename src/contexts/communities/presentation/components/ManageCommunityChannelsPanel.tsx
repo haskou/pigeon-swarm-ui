@@ -145,7 +145,7 @@ function ChannelCreateRow({
   onChannelTypeChange: (type: 'text' | 'voice') => void;
 }) {
   return (
-    <div className="mt-2 flex gap-2">
+    <div className="mt-2 grid gap-2 border-t border-white/10 pt-3">
       <input
         value={channelName}
         onChange={(event) => onChannelNameChange(event.target.value)}
@@ -154,34 +154,37 @@ function ChannelCreateRow({
           event.preventDefault();
           onChannelCreate();
         }}
-        className="ui-field-control h-10 min-w-0 flex-1 px-3 py-2 text-sm placeholder:text-white/30"
+        className="ui-field-control h-10 min-w-0 w-full px-3 py-2 text-sm placeholder:text-white/30"
         placeholder={copy.communities.addChannelPlaceholder}
       />
-      <select
-        value={channelType}
-        onChange={(event) =>
-          onChannelTypeChange(event.target.value as 'text' | 'voice')
-        }
-        className="ui-field-control h-10 w-24 shrink-0 px-2 text-xs font-bold"
-        aria-label={copy.communities.channelType}
-      >
-        {(['text', 'voice'] as const).map((type) => (
-          <option key={type} value={type}>
-            {type === 'voice'
-              ? copy.communities.voiceChannel
-              : copy.communities.textChannel}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        onClick={onChannelCreate}
-        disabled={!channelName.trim() || disabled}
-        className="ui-button ui-button-primary h-10 w-10 shrink-0 p-0"
-        aria-label={copy.communities.addInitialChannel}
-      >
-        +
-      </button>
+      <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+        <select
+          value={channelType}
+          onChange={(event) =>
+            onChannelTypeChange(event.target.value as 'text' | 'voice')
+          }
+          className="ui-field-control h-10 min-w-0 px-3 text-xs font-bold"
+          aria-label={copy.communities.channelType}
+        >
+          {(['text', 'voice'] as const).map((type) => (
+            <option key={type} value={type}>
+              {type === 'voice'
+                ? copy.communities.voiceChannel
+                : copy.communities.textChannel}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onChannelCreate}
+          disabled={!channelName.trim() || disabled}
+          className="ui-button ui-button-primary h-10 w-10 shrink-0 p-0"
+          aria-label={copy.communities.addInitialChannel}
+          title={copy.communities.addInitialChannel}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

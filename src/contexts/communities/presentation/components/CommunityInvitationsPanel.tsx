@@ -38,9 +38,9 @@ export function CommunityInvitationsPanel({
   state: 'idle' | 'loading';
 }) {
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5">
       {canCreateInvitations && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <section className="ui-list-block border-y border-white/10 py-3">
           <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
             {copy.communities.inviteMember}
           </div>
@@ -53,31 +53,31 @@ export function CommunityInvitationsPanel({
                 event.preventDefault();
                 onInvite();
               }}
-              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+              className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm"
               placeholder={copy.identityLookup.placeholder}
             />
             <button
               type="button"
               onClick={onInvite}
               disabled={!identityInput.trim() || state === 'loading'}
-              className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="ui-button ui-button-primary disabled:cursor-not-allowed disabled:opacity-45"
             >
               {copy.communities.sendInvitation}
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <section className="ui-list-block">
         <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
           {copy.communities.invitations}
         </div>
         {requests.length === 0 ? (
-          <div className="rounded-2xl bg-white/8 p-4 text-sm text-white/45">
+          <div className="border-y border-white/10 py-5 text-sm text-white/45">
             {copy.communities.noMembershipRequests}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-white/10 border-y border-white/10">
             {requests.map((request) => (
               <MembershipRequestRow
                 canApproveRequests={canApproveRequests}
@@ -93,7 +93,7 @@ export function CommunityInvitationsPanel({
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -127,7 +127,7 @@ function MembershipRequestRow({
     (canApproveRequests || canRejectRequests);
 
   return (
-    <article className="rounded-2xl bg-white/8 p-4">
+    <article className="py-4 first:pt-2 last:pb-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
@@ -149,20 +149,20 @@ function MembershipRequestRow({
         </span>
       </div>
 
-      <div className="mt-3 grid gap-2 rounded-2xl bg-black/20 p-3 text-xs text-white/55">
-        <div className="flex items-center justify-between gap-3">
+      <div className="mt-3 grid border-t border-white/10 text-xs text-white/55">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2">
           <span>{copy.notifications.community}</span>
           <span className="truncate font-semibold text-white/70">
             {community.name}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2">
           <span>{copy.communities.targetMember}</span>
           <span className="truncate font-semibold text-white/70">
             {identityLabel(targetIdentityId, identityLookup)}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 py-2">
           <span>{copy.notifications.createdAt}</span>
           <span className="font-semibold text-white/70">
             {formatTime(request.createdAt)}
@@ -177,7 +177,7 @@ function MembershipRequestRow({
               type="button"
               onClick={onAccept}
               disabled={state === 'loading'}
-              className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
+              className="ui-button ui-button-primary disabled:opacity-50"
             >
               {copy.notifications.accept}
             </button>
@@ -187,7 +187,7 @@ function MembershipRequestRow({
               type="button"
               onClick={onDecline}
               disabled={state === 'loading'}
-              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
+              className="ui-button disabled:opacity-50"
             >
               {copy.notifications.decline}
             </button>

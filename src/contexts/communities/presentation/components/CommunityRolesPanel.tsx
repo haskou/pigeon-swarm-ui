@@ -38,9 +38,9 @@ export function CommunityRolesPanel({
   selectedRole: CommunityRoleResource | null;
   state: 'idle' | 'loading';
 }) {
-  const [pendingDeleteRoleId, setPendingDeleteRoleId] = useState<
-    string | null
-  >(null);
+  const [pendingDeleteRoleId, setPendingDeleteRoleId] = useState<string | null>(
+    null,
+  );
   const selectedRoleIsBuiltIn = selectedRole?.builtIn ?? false;
   const displayedRoleName =
     selectedRoleIsBuiltIn && selectedRole
@@ -51,19 +51,19 @@ export function CommunityRolesPanel({
     : 0;
 
   return (
-    <div className="grid min-h-0 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <div className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-black/20 p-3">
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+    <div className="grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <div className="flex min-h-0 flex-col border-y border-white/10 py-2 lg:border-r lg:border-y-0 lg:pr-4">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {roles.map((role) => (
             <button
               key={role.id}
               type="button"
               onClick={() => onRoleSelect(role.id)}
               className={cx(
-                'block w-full rounded-2xl px-3 py-2 text-left text-sm font-black transition',
+                'block w-full border-l-2 px-3 py-2.5 text-left text-sm font-black transition',
                 selectedRole?.id === role.id
-                  ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
-                  : 'bg-white/8 text-white/75 hover:bg-white/12',
+                  ? 'border-cyan-300/80 bg-cyan-300/10 text-cyan-50'
+                  : 'border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white',
               )}
             >
               {communityRoleDisplayName(role)}
@@ -76,12 +76,12 @@ export function CommunityRolesPanel({
             onRoleSelect('');
             onRoleNameChange('');
           }}
-          className="mt-3 w-full shrink-0 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950"
+          className="ui-button mt-3 w-full shrink-0"
         >
           + {copy.communities.role}
         </button>
       </div>
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="ui-list-block min-w-0">
         <input
           value={displayedRoleName}
           onChange={(event) => {
@@ -91,21 +91,21 @@ export function CommunityRolesPanel({
           }}
           readOnly={selectedRoleIsBuiltIn}
           className={cx(
-            'mb-4 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none focus:border-cyan-300/60',
+            'ui-field-control mb-4 w-full px-4 py-3 text-lg font-black',
             selectedRoleIsBuiltIn && 'cursor-default',
           )}
           placeholder={copy.communities.roleName}
         />
-        <div className="grid gap-3">
+        <div className="border-y border-white/10">
           {PERMISSION_GROUPS.map((group) => (
             <section
               key={group.id}
-              className="rounded-2xl border border-white/10 bg-white/5 p-3"
+              className="border-b border-white/10 py-3 last:border-b-0"
             >
               <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
                 {permissionGroupLabel(group.id)}
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid sm:grid-cols-2 sm:gap-x-4">
                 {group.permissions.map((permission) => (
                   <PermissionToggle
                     key={permission}
@@ -125,7 +125,7 @@ export function CommunityRolesPanel({
             disabled={
               selectedRoleIsBuiltIn || !roleName.trim() || state === 'loading'
             }
-            className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+            className="ui-button ui-button-primary disabled:cursor-not-allowed disabled:opacity-45"
           >
             {state === 'loading'
               ? copy.profile.saving
@@ -138,7 +138,7 @@ export function CommunityRolesPanel({
               type="button"
               onClick={() => setPendingDeleteRoleId(selectedRole.id)}
               disabled={state === 'loading'}
-              className="rounded-2xl bg-rose-500/15 px-4 py-2 text-sm font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+              className="ui-button border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {copy.messages.delete}
             </button>
@@ -260,14 +260,14 @@ function PermissionToggle({
   return (
     <label
       className={cx(
-        'flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-xs font-black transition',
+        'flex min-h-11 cursor-pointer items-center justify-between gap-3 border-b border-white/10 px-2 py-2 text-xs font-black transition last:border-b-0',
         selected && sensitive
-          ? 'border-amber-300/70 bg-amber-300/20 text-amber-50'
+          ? 'bg-amber-300/12 text-amber-50'
           : selected
-            ? 'border-[#c8c0d8]/70 bg-[#c8c0d8]/85 text-[#171426]'
+            ? 'bg-cyan-300/10 text-cyan-50'
             : sensitive
-              ? 'border-amber-300/25 bg-amber-300/5 text-amber-50/80 hover:bg-amber-300/10'
-              : 'border-white/10 bg-white/8 text-white/75 hover:bg-white/12 hover:text-white',
+              ? 'text-amber-50/80 hover:bg-amber-300/[0.06]'
+              : 'text-white/70 hover:bg-white/[0.05] hover:text-white',
       )}
     >
       <span className="min-w-0">
