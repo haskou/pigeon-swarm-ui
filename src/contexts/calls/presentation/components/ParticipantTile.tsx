@@ -41,6 +41,9 @@ export function ParticipantTile({
   const participantName = callParticipantDisplayName(participant);
   const participantSubtitle = participantTileSubtitle(participant);
   const hasActiveScreenShare = callParticipantHasActiveScreenShare(participant);
+  const hasVisualMedia =
+    hasActiveScreenShare ||
+    Boolean(participant.videoEnabled && participant.mediaStream);
   const muted = isCurrentIdentity ? call.muted : volumePercent === 0;
 
   const updateVolume = (nextVolume: number) => {
@@ -69,10 +72,12 @@ export function ParticipantTile({
   return (
     <article
       className={cx(
-        'flex shrink-0 flex-col items-center rounded-[1.5rem] border bg-black/25 text-center transition',
+        'flex shrink-0 flex-col items-center rounded-lg border bg-black/20 text-center transition',
         variant === 'strip'
           ? 'min-h-[150px] w-[154px] p-2 sm:min-h-[222px] sm:w-[230px] sm:p-3'
-          : 'min-h-[340px] w-full max-w-[300px] justify-center px-3 py-5 sm:min-h-[360px] sm:max-w-[340px] sm:py-6',
+          : hasVisualMedia
+            ? 'min-h-[320px] w-full max-w-[340px] justify-center px-3 py-4 sm:min-h-[350px]'
+            : 'min-h-[250px] w-full max-w-[280px] justify-center px-3 py-4 sm:min-h-[270px]',
         participant.speaking
           ? 'border-emerald-300 shadow-[0_0_0_2px_rgba(110,231,183,0.25)]'
           : 'border-white/10',

@@ -33,7 +33,7 @@ export function CallParticipantAudioControls({
     <>
       <div
         className={cx(
-          'flex w-full items-center gap-1.5 rounded-xl border border-white/8 bg-white/6 p-1.5 text-left sm:gap-2 sm:rounded-2xl sm:p-2',
+          'flex w-full items-center gap-1.5 border-y border-white/10 py-2 text-left sm:gap-2',
           variant === 'strip' ? 'mt-2 sm:mt-3' : 'mt-5',
         )}
       >

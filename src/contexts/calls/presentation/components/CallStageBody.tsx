@@ -27,7 +27,9 @@ export function CallStageBody({
     identityId: string,
     volumePercent: number,
   ) => void;
-  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
+  onScreenShareQualityChange: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onToggleMute: () => void;
 }) {
   const screenParticipant =
@@ -80,7 +82,7 @@ export function CallStageBody({
           />
         </div>
         {dataOpen && (
-          <div className="min-h-0 w-full shrink-0 xl:h-full xl:w-[360px]">
+          <div className="order-first max-h-[46%] min-h-0 w-full shrink-0 xl:order-last xl:h-full xl:max-h-none xl:w-[360px]">
             <CallDataPanel call={call} />
           </div>
         )}
@@ -106,7 +108,7 @@ export function CallStageBody({
         variant="grid"
       />
       {dataOpen && (
-        <div className="min-h-0 w-full shrink-0 lg:h-full lg:w-[360px]">
+        <div className="order-first max-h-[46%] min-h-0 w-full shrink-0 lg:order-last lg:h-full lg:max-h-none lg:w-[360px]">
           <CallDataPanel call={call} />
         </div>
       )}
