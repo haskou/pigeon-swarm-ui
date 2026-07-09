@@ -3,6 +3,9 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatTime } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { JsonTree } from '../../../../shared/presentation/components/JsonDataViewer';
 
 interface RealtimeEventsDialogProps {
   events: RealtimeDomainEvent[];
@@ -13,31 +16,32 @@ export function RealtimeEventsDialog({
   events,
   onClose,
 }: RealtimeEventsDialogProps) {
-  useCloseOnEscape(onClose);
+  const { close, state } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   return (
-    <div className="fixed inset-0 z-[95] bg-black/55 p-3 backdrop-blur-sm sm:p-5">
-      <section className="glass-panel-strong mx-auto flex h-full w-full max-w-4xl flex-col rounded-2xl p-4 shadow-2xl shadow-black/45">
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-              {copy.chat.realtimeEventsEyebrow}
-            </div>
-            <h2 className="mt-1 text-xl font-black text-white">
-              {copy.chat.realtimeEventsTitle}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[95] grid place-items-stretch bg-black/55 p-0 backdrop-blur-sm sm:place-items-center sm:p-5"
+      data-state={state}
+    >
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={close}
+        aria-label={copy.dialog.close}
+      />
+      <section
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-[88vh] sm:max-w-4xl"
+        data-state={state}
+      >
+        <DialogHeader
+          kicker={copy.chat.realtimeEventsEyebrow}
+          title={copy.chat.realtimeEventsTitle}
+          onClose={close}
+        />
 
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-2xl bg-black/30 p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {events.length === 0 ? (
             <div className="grid h-full place-items-center text-center text-sm text-white/45">
               {copy.chat.realtimeEventsEmpty}
@@ -47,7 +51,7 @@ export function RealtimeEventsDialog({
               {events.map((event) => (
                 <article
                   key={event.event_id}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                  className="rounded-md border border-white/10 border-l-2 border-l-emerald-300/45 bg-white/[0.025] p-3"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="font-black text-emerald-200">
@@ -57,9 +61,9 @@ export function RealtimeEventsDialog({
                       {formatTime(event.occurred_on)}
                     </span>
                   </div>
-                  <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-white/70">
-                    {JSON.stringify(event, null, 2)}
-                  </pre>
+                  <div className="mt-3 max-h-72 overflow-auto rounded-md border border-white/[0.07] bg-black/25 p-3 font-mono text-xs leading-5">
+                    <JsonTree value={event} />
+                  </div>
                 </article>
               ))}
             </div>

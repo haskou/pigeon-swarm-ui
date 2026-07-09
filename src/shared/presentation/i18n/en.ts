@@ -755,6 +755,18 @@ export const en = {
     links: 'IPFS links',
     open: 'Open IPFS link',
   },
+  dataViewer: {
+    additional: 'Additional data',
+    array: 'Array ({count})',
+    copied: 'JSON copied',
+    copyJson: 'Copy JSON',
+    decrypted: 'Decrypted content',
+    derived: 'Derived on this device',
+    description:
+      'Separates data received from the server, content decrypted locally, and values derived by the interface.',
+    object: 'Object ({count})',
+    received: 'Received from server',
+  },
   messages: {
     addReaction: 'Add reaction',
     cancelEdit: 'Cancel edit',

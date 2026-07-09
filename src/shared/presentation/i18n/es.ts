@@ -623,6 +623,18 @@ export const es = {
     links: 'Enlaces IPFS',
     open: 'Abrir enlace IPFS',
   },
+  dataViewer: {
+    additional: 'Datos adicionales',
+    array: 'Array ({count})',
+    copied: 'JSON copiado',
+    copyJson: 'Copiar JSON',
+    decrypted: 'Contenido descifrado',
+    derived: 'Derivado en este dispositivo',
+    description:
+      'Separa los datos recibidos del servidor, el contenido descifrado localmente y los valores derivados por la interfaz.',
+    object: 'Objeto ({count})',
+    received: 'Recibido del servidor',
+  },
   messages: {
     addReaction: 'Anadir reaccion',
     cancelEdit: 'Cancelar edicion',
