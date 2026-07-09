@@ -88,6 +88,16 @@ export function callSignalTypeAttribute(
     : undefined;
 }
 
+export function callIdFromRealtimeEvent(
+  event: RealtimeDomainEvent,
+): string | undefined {
+  if (event.type === 'calls.v1.participant_lease.was_updated') {
+    return stringAttribute(event, 'callId');
+  }
+
+  return eventAggregateId(event) ?? stringAttribute(event, 'callId');
+}
+
 export function eventAggregateId(
   event: RealtimeDomainEvent,
 ): string | undefined {

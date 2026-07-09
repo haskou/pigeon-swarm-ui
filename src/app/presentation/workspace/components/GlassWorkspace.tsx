@@ -39,6 +39,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type {
+  NetworkSynchronizationStatus,
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
@@ -139,6 +140,7 @@ import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import {
+  callIdFromRealtimeEvent,
   callSignalTypeAttribute,
   communityAttribute,
   communityChannelAttribute,
@@ -323,6 +325,8 @@ export function GlassWorkspace({
     title: string;
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
+  const [networkSynchronizationStatus, setNetworkSynchronizationStatus] =
+    useState<NetworkSynchronizationStatus | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
     string[]
@@ -1191,7 +1195,7 @@ export function GlassWorkspace({
             ? [
                 ...new Set(
                   call.participants
-                    .filter((participant) => participant.status === 'joined')
+                    .filter((participant) => participant.connected)
                     .map((participant) => participant.identityId),
                 ),
               ]
@@ -1296,7 +1300,7 @@ export function GlassWorkspace({
 
       if (
         details.kind === 'one-to-one' &&
-        currentParticipant?.status === 'joined' &&
+        currentParticipant?.connected &&
         currentActiveCall?.id !== call.id
       ) {
         logCallDebug('workspace:call:joined-on-another-device', {
@@ -1437,8 +1441,7 @@ export function GlassWorkspace({
           call.id !== exceptCallId &&
           call.participants.some(
             (participant) =>
-              participant.identityId === identityId &&
-              participant.status === 'joined',
+              participant.identityId === identityId && participant.connected,
           ),
       );
 
@@ -1536,6 +1539,7 @@ export function GlassWorkspace({
             callId: call.id,
             conversationId: input.conversationId,
             participantStatuses: call.participants.map((participant) => ({
+              connected: participant.connected,
               identityId: participant.identityId,
               status: participant.status,
             })),
@@ -1768,9 +1772,10 @@ export function GlassWorkspace({
           participant.identityId === sessionRef.current.identity.id,
       );
 
-      if (joinedParticipant?.status !== 'joined') {
+      if (!joinedParticipant?.connected) {
         logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
+          participantConnected: joinedParticipant?.connected,
           participantStatus: joinedParticipant?.status,
         });
         stopLocalAudio(localStream);
@@ -1781,6 +1786,7 @@ export function GlassWorkspace({
       logCallDebug('workspace:incoming-call:joined', {
         callId: call.id,
         participantStatuses: call.participants.map((participant) => ({
+          connected: participant.connected,
           identityId: participant.identityId,
           status: participant.status,
         })),
@@ -1863,10 +1869,12 @@ export function GlassWorkspace({
   ]);
 
   const heartbeatActiveCall = useCallback(async (callId: string) => {
-    await applicationContainer.heartbeatCallParticipant(
+    const call = await applicationContainer.heartbeatCallParticipant(
       sessionRef.current,
       callId,
     );
+
+    reconcileCallResourceRef.current(call);
   }, []);
 
   useWorkspaceCallHeartbeat({
@@ -1913,8 +1921,7 @@ export function GlassWorkspace({
             call.scope.type === 'community_channel' &&
             call.participants.some(
               (participant) =>
-                participant.identityId === identityId &&
-                participant.status === 'joined',
+                participant.identityId === identityId && participant.connected,
             ),
         );
 
@@ -3281,8 +3288,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('calls.')) {
-        const eventCallId =
-          eventAggregateId(event) ?? stringAttribute(event, 'callId');
+        const eventCallId = callIdFromRealtimeEvent(event);
 
         logCallDebug('workspace:realtime-call-event', {
           activeCallId: activeCallRef.current?.id,
@@ -3318,7 +3324,7 @@ export function GlassWorkspace({
           return;
         }
 
-        const callId = eventAggregateId(event);
+        const callId = eventCallId;
 
         if (!callId) return;
 
@@ -3329,6 +3335,7 @@ export function GlassWorkspace({
               activeCallId: activeCallRef.current?.id,
               callId: call.id,
               participantStatuses: call.participants.map((participant) => ({
+                connected: participant.connected,
                 identityId: participant.identityId,
                 status: participant.status,
               })),
@@ -4035,9 +4042,16 @@ export function GlassWorkspace({
     onConnected: () => {
       setRealtimeStatus('connected');
     },
-    onDisconnected: () => setRealtimeStatus('reconnecting'),
+    onDisconnected: () => {
+      setNetworkSynchronizationStatus(null);
+      setRealtimeStatus('reconnecting');
+    },
     onDomainEvent: handleRealtimeEvent,
-    onReconnecting: () => setRealtimeStatus('reconnecting'),
+    onNetworkSynchronizationStatus: setNetworkSynchronizationStatus,
+    onReconnecting: () => {
+      setNetworkSynchronizationStatus(null);
+      setRealtimeStatus('reconnecting');
+    },
     onTyping: handleRealtimeTyping,
   });
   const conversationTypingIdentityIds = activeTypingIdentityIds(
@@ -4666,6 +4680,7 @@ export function GlassWorkspace({
             node={node}
             nodeNetworks={nodeNetworks}
             nodeSettingsOpen={nodeSettingsOpen}
+            networkSynchronizationStatus={networkSynchronizationStatus}
             notificationAction={notificationAction}
             notificationError={notificationError}
             notificationSettingsError={notificationSettingsError}

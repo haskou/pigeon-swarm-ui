@@ -49,8 +49,11 @@ export class PigeonCallsGateway {
     await this.calls.leave(session, callId);
   }
 
-  public async heartbeat(session: Session, callId: string): Promise<void> {
-    await this.calls.heartbeat(session, callId);
+  public async heartbeat(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
+    return await this.calls.heartbeat(session, callId);
   }
 
   public async end(session: Session, callId: string): Promise<void> {

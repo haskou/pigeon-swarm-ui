@@ -822,6 +822,18 @@ export const es = {
     replicationReleasable: 'Puede liberar',
     replicationResponsible: 'Responsable de',
     replicationTotalSize: 'Tamano total',
+    synchronizationAwaitingSnapshot:
+      'Esperando el estado en tiempo real del nodo...',
+    synchronizationBody:
+      'Convergencia observada por este nodo. No incluye nodos desconectados o todavía no descubiertos.',
+    synchronizationChangedAt: 'Último cambio: {date}',
+    synchronizationConnectedPeers: '{count} pares conectados',
+    synchronizationConverged: 'Sincronizada',
+    synchronizationEmpty: 'Este nodo todavía no informa redes sincronizadas.',
+    synchronizationStores: '{converged} de {total} almacenes sincronizados',
+    synchronizationSyncing: 'Sincronizando',
+    synchronizationTitle: 'Sincronización de redes',
+    synchronizationWaitingForPeers: 'Esperando pares',
     saving: 'Guardando...',
     server: 'Nodo',
     title: 'Ajustes del nodo',

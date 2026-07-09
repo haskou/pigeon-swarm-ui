@@ -28,7 +28,9 @@ interface GlobalCallBarProps {
     identityId: string,
     volumePercent: number,
   ) => void;
-  onScreenShareQualityChange: (quality: CallSession['screenShareQuality']) => void;
+  onScreenShareQualityChange: (
+    quality: CallSession['screenShareQuality'],
+  ) => void;
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
@@ -141,9 +143,8 @@ function useRingingAudio(call: CallSession): void {
 function useJoinedParticipantSound(call: CallSession): void {
   const joinedParticipantCount = useMemo(
     () =>
-      call.call?.participants.filter(
-        (participant) => participant.status === 'joined',
-      ).length ?? 0,
+      call.call?.participants.filter((participant) => participant.connected)
+        .length ?? 0,
     [call.call?.participants],
   );
   const previousJoinedParticipantCountRef = useRef(joinedParticipantCount);

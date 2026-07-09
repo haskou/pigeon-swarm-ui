@@ -1382,8 +1382,8 @@ export class PigeonApiGateway {
   public async heartbeatCallParticipant(
     session: Session,
     callId: string,
-  ): Promise<void> {
-    await this.calls.heartbeat(session, callId);
+  ): Promise<CallResource> {
+    return await this.calls.heartbeat(session, callId);
   }
 
   public async endCall(session: Session, callId: string): Promise<void> {

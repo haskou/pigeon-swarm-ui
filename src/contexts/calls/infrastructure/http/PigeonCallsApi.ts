@@ -99,13 +99,16 @@ export class PigeonCallsApi {
     });
   }
 
-  public async heartbeat(session: Session, callId: string): Promise<void> {
+  public async heartbeat(
+    session: Session,
+    callId: string,
+  ): Promise<CallResource> {
     const path = `/calls/${encodeURIComponent(
       callId,
     )}/participants/me/heartbeat`;
     const body = {};
 
-    await this.http.request(path, {
+    return await this.http.request<CallResource>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',

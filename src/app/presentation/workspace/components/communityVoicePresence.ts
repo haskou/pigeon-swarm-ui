@@ -69,7 +69,9 @@ export function communitiesWithCallVoicePresence(
   return changed ? nextCommunities : communities;
 }
 
-function connectedVoiceIdentities(calls: CallResource[]): Map<string, string[]> {
+function connectedVoiceIdentities(
+  calls: CallResource[],
+): Map<string, string[]> {
   const connectedIdentityIdsByChannel = new Map<string, string[]>();
 
   for (const call of calls) {
@@ -82,15 +84,12 @@ function connectedVoiceIdentities(calls: CallResource[]): Map<string, string[]> 
     );
 
     if (connectedIdentityIds.length > 0) {
-      connectedIdentityIdsByChannel.set(
-        key,
-        [
-          ...new Set([
-            ...(connectedIdentityIdsByChannel.get(key) ?? []),
-            ...connectedIdentityIds,
-          ]),
-        ],
-      );
+      connectedIdentityIdsByChannel.set(key, [
+        ...new Set([
+          ...(connectedIdentityIdsByChannel.get(key) ?? []),
+          ...connectedIdentityIds,
+        ]),
+      ]);
     }
   }
 
@@ -103,7 +102,7 @@ function joinedParticipantIdentityIds(
   return [
     ...new Set(
       participants
-        .filter((participant) => participant.status === 'joined')
+        .filter((participant) => participant.connected)
         .map((participant) => participant.identityId),
     ),
   ];

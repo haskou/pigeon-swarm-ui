@@ -810,14 +810,21 @@ function mergeParticipantStatuses(
   const byIdentityId = new Map(
     call.participants.map((participant) => [
       participant.identityId,
-      participant.status,
+      participant,
     ]),
   );
 
-  return participants.map((participant) => ({
-    ...participant,
-    status: byIdentityId.get(participant.identityId) ?? participant.status,
-  }));
+  return participants.map((participant) => {
+    const resourceParticipant = byIdentityId.get(participant.identityId);
+
+    return {
+      ...participant,
+      connected: resourceParticipant?.connected ?? participant.connected,
+      lastHeartbeatAt:
+        resourceParticipant?.lastHeartbeatAt ?? participant.lastHeartbeatAt,
+      status: resourceParticipant?.status ?? participant.status,
+    };
+  });
 }
 
 function reconciledCallStatus(

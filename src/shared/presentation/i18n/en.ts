@@ -964,6 +964,19 @@ export const en = {
     replicationResponsibleNodes: 'Responsible nodes',
     replicationStandby: 'Standby',
     replicationTotalSize: 'Total size',
+    synchronizationAwaitingSnapshot:
+      'Waiting for the live node status snapshot...',
+    synchronizationBody:
+      'Convergence observed by this node. Offline or undiscovered nodes cannot be included.',
+    synchronizationChangedAt: 'Last change: {date}',
+    synchronizationConnectedPeers: '{count} connected peers',
+    synchronizationConverged: 'Synchronized',
+    synchronizationEmpty:
+      'This node does not report synchronized networks yet.',
+    synchronizationStores: '{converged} of {total} stores synchronized',
+    synchronizationSyncing: 'Synchronizing',
+    synchronizationTitle: 'Network synchronization',
+    synchronizationWaitingForPeers: 'Waiting for peers',
     saving: 'Saving...',
     server: 'Node',
     title: 'Node settings',

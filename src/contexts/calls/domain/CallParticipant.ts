@@ -7,11 +7,13 @@ export type CallParticipant = {
   codec?: string;
   connectionPath?: 'direct' | 'relay' | 'unknown';
   connectionState?: RTCPeerConnectionState;
+  connected?: boolean;
   deafened?: boolean;
   identity?: IdentityResource;
   identityId: string;
   iceState?: RTCIceConnectionState;
   jitterMs?: number;
+  lastHeartbeatAt?: number;
   latencyMs?: number;
   mediaStream?: MediaStream;
   muted: boolean;

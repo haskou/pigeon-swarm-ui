@@ -60,8 +60,8 @@ export class PigeonCallsApplication {
   public async heartbeatParticipant(
     session: Session,
     callId: string,
-  ): Promise<void> {
-    await this.gateway.heartbeatCallParticipant(session, callId);
+  ): Promise<CallResource> {
+    return await this.gateway.heartbeatCallParticipant(session, callId);
   }
 
   public async end(session: Session, callId: string): Promise<void> {

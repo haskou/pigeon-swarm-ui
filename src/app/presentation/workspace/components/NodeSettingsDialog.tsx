@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
@@ -28,6 +29,7 @@ import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/a
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 
 interface NodeSettingsDialogProps {
+  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
   node: (NodeInfo & { owner: null | string }) | null;
   networks: NodeNetwork[];
   onClose: () => void;
@@ -42,6 +44,7 @@ const PUBLIC_NETWORK_NAMES = new Set(['public', 'public network']);
 type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
 
 export function NodeSettingsDialog({
+  networkSynchronizationStatus,
   networks,
   node,
   onClose,
@@ -477,11 +480,16 @@ export function NodeSettingsDialog({
                   </section>
 
                   {isOwner && (
-                    <ReplicationStatusPanel
-                      error={replicationError}
-                      loading={replicationLoading}
-                      status={replicationStatus}
-                    />
+                    <>
+                      <NetworkSynchronizationPanel
+                        status={networkSynchronizationStatus}
+                      />
+                      <ReplicationStatusPanel
+                        error={replicationError}
+                        loading={replicationLoading}
+                        status={replicationStatus}
+                      />
+                    </>
                   )}
                 </div>
               )}
@@ -1194,6 +1202,93 @@ function nodeRelayStatusLabel(
   return relayConfiguration.privateRelay.enabled
     ? copy.nodeSettings.relayEnabled
     : copy.nodeSettings.relayDisabled;
+}
+
+function NetworkSynchronizationPanel({
+  status,
+}: {
+  status: NetworkSynchronizationStatus | null;
+}) {
+  return (
+    <section className="ui-section py-3">
+      <div className="mb-3">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
+          {copy.nodeSettings.synchronizationTitle}
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-white/50">
+          {copy.nodeSettings.synchronizationBody}
+        </p>
+      </div>
+
+      {!status ? (
+        <div className="border-y border-white/10 py-4 text-sm text-white/55">
+          {copy.nodeSettings.synchronizationAwaitingSnapshot}
+        </div>
+      ) : status.networks.length === 0 ? (
+        <div className="border-y border-white/10 py-4 text-sm text-white/55">
+          {copy.nodeSettings.synchronizationEmpty}
+        </div>
+      ) : (
+        <div className="divide-y divide-white/10 border-y border-white/10">
+          {status.networks.map((network) => (
+            <div
+              className="flex flex-col gap-1.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              key={network.id}
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-black text-white/85">
+                  {network.name}
+                </div>
+                <div className="mt-1 text-xs text-white/45">
+                  {copy.nodeSettings.synchronizationStores
+                    .replace('{converged}', String(network.convergedStoreCount))
+                    .replace('{total}', String(network.totalStoreCount))}
+                  {' · '}
+                  {copy.nodeSettings.synchronizationConnectedPeers.replace(
+                    '{count}',
+                    String(network.connectedPeerIds.length),
+                  )}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-xs font-black">
+                <span
+                  className={cx(
+                    'h-2 w-2 rounded-full',
+                    network.state === 'converged'
+                      ? 'bg-emerald-300'
+                      : network.state === 'syncing'
+                        ? 'animate-pulse bg-amber-300'
+                        : 'bg-white/35',
+                  )}
+                />
+                <span className="text-white/65">
+                  {networkSynchronizationStateLabel(network.state)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {status ? (
+        <div className="mt-2 text-right text-xs text-white/35">
+          {copy.nodeSettings.synchronizationChangedAt.replace(
+            '{date}',
+            new Date(status.changedAt).toLocaleString(),
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function networkSynchronizationStateLabel(
+  state: NetworkSynchronizationStatus['networks'][number]['state'],
+): string {
+  if (state === 'converged') return copy.nodeSettings.synchronizationConverged;
+  if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
+
+  return copy.nodeSettings.synchronizationWaitingForPeers;
 }
 
 function ReplicationStatusPanel({

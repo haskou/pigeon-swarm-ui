@@ -13,7 +13,9 @@ describe(ListCalls.name, () => {
       id: 'call-1',
       networkId: 'network-1',
       participantIds: ['identity-1'],
-      participants: [{ identityId: 'identity-1', status: 'joined' }],
+      participants: [
+        { connected: true, identityId: 'identity-1', status: 'joined' },
+      ],
       scope: { conversationId: 'conversation-1', type: 'conversation' },
       status: 'active',
     } satisfies CallResource;

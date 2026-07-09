@@ -3,6 +3,7 @@ import type { RealtimeTypingInput } from './RealtimeTypingInput';
 
 export type { RealtimeDomainEvent } from './RealtimeDomainEvent';
 export type { RealtimeMessage } from './RealtimeMessage';
+export type { NetworkSynchronizationStatus } from '../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 export type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 export type { RealtimeTypingInput } from './RealtimeTypingInput';
 import type { Session } from '../../domain/pigeonResources.types';

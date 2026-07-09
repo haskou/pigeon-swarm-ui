@@ -7,7 +7,7 @@ import {
 } from './callPeerConnectionPlan';
 
 describe('callPeerConnectionPlan', () => {
-  it('uses joined participants from the call resource even when UI participants are not hydrated yet', () => {
+  it('uses connected participants from the call resource even when UI participants are not hydrated yet', () => {
     const call = callResource({
       currentIdentityId: 'alice',
       remoteIdentityId: 'bob',
@@ -23,30 +23,28 @@ describe('callPeerConnectionPlan', () => {
     });
 
     call.participants.push(
-      { identityId: 'carol', status: 'ringing' },
-      { identityId: 'den', status: 'left' },
+      { connected: false, identityId: 'carol', status: 'ringing' },
+      { connected: false, identityId: 'den', status: 'left' },
+      { connected: false, identityId: 'eve', status: 'joined' },
     );
 
     expect(joinedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
   });
 
-  it('can signal ringing participants before they accept the call', () => {
+  it('signals only participants with an active backend lease', () => {
     const call = callResource({
       currentIdentityId: 'alice',
       remoteIdentityId: 'bob',
     });
 
     call.participants.push(
-      { identityId: 'carol', status: 'ringing' },
-      { identityId: 'den', status: 'left' },
-      { identityId: 'eve', status: 'declined' },
-      { identityId: 'frank', status: 'missed' },
+      { connected: false, identityId: 'carol', status: 'ringing' },
+      { connected: false, identityId: 'den', status: 'left' },
+      { connected: false, identityId: 'eve', status: 'declined' },
+      { connected: false, identityId: 'frank', status: 'missed' },
     );
 
-    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual([
-      'bob',
-      'carol',
-    ]);
+    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
   });
 
   it('chooses a stable initial offerer for both peers', () => {
@@ -70,11 +68,13 @@ function callResource({
     participantIds: [currentIdentityId, remoteIdentityId],
     participants: [
       {
+        connected: true,
         identityId: currentIdentityId,
         joinedAt: 1_780_000_000_000,
         status: 'joined',
       },
       {
+        connected: true,
         identityId: remoteIdentityId,
         joinedAt: 1_780_000_000_001,
         status: 'joined',

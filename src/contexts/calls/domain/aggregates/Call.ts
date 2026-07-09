@@ -46,6 +46,7 @@ export class Call extends AggregateRoot {
 
       return {
         ...participant,
+        connected: status === 'joined',
         declinedAt:
           status === 'declined' ? timestamp.valueOf() : participant.declinedAt,
         joinedAt:

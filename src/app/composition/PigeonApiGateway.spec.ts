@@ -1,5 +1,6 @@
 import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
+import type { CallResource } from '../../contexts/calls/domain/callSession.types';
 import type {
   ConversationKeyEntry,
   IdentityResource,
@@ -728,8 +729,25 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('sends call participant heartbeat', async () => {
+    const call = {
+      createdAt: 1,
+      creatorIdentityId: 'identity-1',
+      id: 'call-1',
+      networkId: 'network-1',
+      participantIds: ['identity-1'],
+      participants: [
+        {
+          connected: true,
+          identityId: 'identity-1',
+          lastHeartbeatAt: 2,
+          status: 'joined',
+        },
+      ],
+      scope: { conversationId: 'conversation-1', type: 'conversation' },
+      status: 'active',
+    } satisfies CallResource;
     const http = {
-      request: jest.fn().mockResolvedValue(undefined),
+      request: jest.fn().mockResolvedValue(call),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
@@ -740,7 +758,9 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await gateway.heartbeatCallParticipant(session, 'call-1');
+    await expect(
+      gateway.heartbeatCallParticipant(session, 'call-1'),
+    ).resolves.toBe(call);
 
     expect(http.request).toHaveBeenCalledWith(
       '/calls/call-1/participants/me/heartbeat',
