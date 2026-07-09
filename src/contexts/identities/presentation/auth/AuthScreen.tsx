@@ -134,7 +134,9 @@ export function AuthScreen({
       passwordConfirmation,
       selectedNetwork,
     }) &&
-    (mode !== 'login' || !useRecoveryKey || RecoveryKey.isValid(loginRecoveryKey)) &&
+    (mode !== 'login' ||
+      !useRecoveryKey ||
+      RecoveryKey.isValid(loginRecoveryKey)) &&
     (mode === 'login' || recoveryKeyConfirmed);
   const passkeyPrfAvailable = passkeyPrfSupport === 'available';
   const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
@@ -304,14 +306,6 @@ export function AuthScreen({
             showHelp={showInstallHelp}
           />
 
-          <NodeLoginSummary
-            availableNetworks={availableNetworks}
-            className="mb-5 lg:hidden"
-            ownerIdentityId={nodeOwnerId}
-            peerCount={peerCount}
-            peersLoading={peersLoading}
-          />
-
           <SegmentedControl
             value={mode}
             onChange={setMode}
@@ -339,7 +333,7 @@ export function AuthScreen({
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
                 placeholder="••••••••••••"
                 type="password"
                 autoComplete={
@@ -349,12 +343,12 @@ export function AuthScreen({
               />
             </Field>
             {mode === 'login' && (
-              <div className="rounded-2xl px-1 py-1">
+              <div className="px-1 py-1">
                 <button
                   type="button"
                   aria-pressed={useRecoveryKey}
                   onClick={() => setUseRecoveryKey((enabled) => !enabled)}
-                  className="flex w-full items-center gap-3 rounded-2xl py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
+                  className="flex w-full items-center gap-3 py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
                   data-testid="auth-use-recovery-key-toggle"
                 >
                   <AuthSwitch enabled={useRecoveryKey} />
@@ -368,7 +362,7 @@ export function AuthScreen({
                         onChange={(event) =>
                           setLoginRecoveryKey(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                        className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
                         placeholder="psrk1..."
                         type="password"
                         autoComplete="off"
@@ -393,7 +387,7 @@ export function AuthScreen({
                     onChange={(event) =>
                       setPasswordConfirmation(event.target.value)
                     }
-                    className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                    className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
                     placeholder="••••••••••••"
                     type="password"
                     autoComplete="new-password"
@@ -424,7 +418,7 @@ export function AuthScreen({
                     setPasskeyPrfEnabled((enabled) => !enabled)
                   }
                   className={cx(
-                    'flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition',
+                    'flex w-full items-start gap-3 px-1 py-2 text-left transition',
                     passkeyPrfAvailable
                       ? passkeyPrfEnabled
                         ? 'text-white'
@@ -465,7 +459,7 @@ export function AuthScreen({
             </div>
           )}
 
-          <div className="mt-6 flex items-center gap-3 rounded-2xl px-1 py-2">
+          <div className="mt-6 flex items-center gap-3 px-1 py-2">
             <button
               type="button"
               id="remember-me"
@@ -486,7 +480,7 @@ export function AuthScreen({
           </div>
 
           {error && (
-            <div className="mt-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
+            <div className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100">
               {error}
             </div>
           )}
@@ -494,10 +488,10 @@ export function AuthScreen({
           <button
             disabled={!canSubmit || state === 'loading'}
             className={cx(
-              'mt-6 w-full rounded-2xl px-5 py-4 text-sm font-black transition',
+              'ui-button ui-button-primary mt-6 w-full py-3',
               canSubmit && state !== 'loading'
-                ? 'glass-button bg-gradient-to-r from-cyan-300 to-fuchsia-500 text-white shadow-xl shadow-fuchsia-950/30 hover:scale-[1.01]'
-                : 'cursor-not-allowed bg-white/10 text-white/35',
+                ? ''
+                : 'cursor-not-allowed text-white/35',
             )}
             data-testid="auth-submit-button"
           >
@@ -515,6 +509,13 @@ export function AuthScreen({
             </p>
           )}
 
+          <NodeLoginSummary
+            availableNetworks={availableNetworks}
+            className="mt-5 lg:hidden"
+            ownerIdentityId={nodeOwnerId}
+            peerCount={peerCount}
+            peersLoading={peersLoading}
+          />
         </form>
       </div>
     </section>
@@ -588,7 +589,7 @@ function NodeLoginSummary({
   return (
     <div
       className={cx(
-        'grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-sm',
+        'grid gap-2 border-y border-white/10 py-3 text-sm',
         className,
       )}
     >

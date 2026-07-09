@@ -1026,18 +1026,18 @@ export function ManageCommunityDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl"
         data-state={transitionState}
       >
         <DialogHeader title={copy.communities.manage} onClose={close} />
         <CommunityManagementContextHeader community={community} />
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="ui-settings-layout mt-3">
           <CommunitySettingsNavigation
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             sections={sections}
           />
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="ui-settings-content flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid gap-5 lg:items-start">
                 {activeSection === 'profile' && (
@@ -1171,7 +1171,7 @@ export function ManageCommunityDialog({
                 />
               )}
               {error && (
-                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
+                <div className="ui-inline-notice mt-4 border-rose-300/50 bg-rose-500/10 text-rose-100">
                   {error}
                 </div>
               )}
@@ -1193,7 +1193,7 @@ export function ManageCommunityDialog({
                     state === 'loading' ||
                     !hasManageCommunityChanges
                   }
-                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="ui-button justify-self-end"
                 >
                   {activeSectionSaveLabel}
                 </button>
@@ -1231,8 +1231,8 @@ function CommunityManagementContextHeader({
   community: Community;
 }) {
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
+    <div className="mx-5 mt-3 flex items-center gap-3 border-b border-white/10 pb-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
         {community.name.slice(0, 1).toUpperCase()}
       </span>
       <div className="min-w-0">

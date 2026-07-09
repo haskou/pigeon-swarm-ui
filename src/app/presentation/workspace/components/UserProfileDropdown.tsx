@@ -223,7 +223,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       <button
         type="button"
         onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="flex w-full items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:bg-white/14"
+        className="flex w-full items-center gap-3 rounded-lg bg-white/[0.07] p-3 text-left transition hover:bg-white/10"
         aria-expanded={profileOpen}
         data-testid="own-profile-menu-button"
       >
@@ -261,7 +261,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       {profileOpen && (
         <div
           className={cx(
-            'absolute left-0 right-0 z-40 rounded-2xl border border-white/10 bg-[#0c102b]/95 p-3 shadow-2xl shadow-black/45 backdrop-blur-xl',
+            'ui-dialog-surface absolute left-0 right-0 z-40 p-3',
             activeCall
               ? 'bottom-[calc(100%+5.75rem)]'
               : 'bottom-[calc(100%+.5rem)]',
@@ -282,7 +282,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
             </div>
 
             {presenceError && (
-              <p className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-2 text-rose-100">
+              <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
                 {presenceError}
               </p>
             )}
@@ -291,14 +291,14 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.identityId}
               </div>
-              <div className="flex items-center gap-2 rounded-2xl bg-black/25 p-2">
+              <div className="ui-list-row py-2">
                 <span className="min-w-0 flex-1 truncate text-white/70">
                   {session.identity.id}
                 </span>
                 <button
                   type="button"
                   onClick={copyIdentityId}
-                  className="shrink-0 rounded-2xl bg-white px-2.5 py-1.5 font-black text-slate-950"
+                  className="ui-button min-h-0 shrink-0 px-2.5 py-1.5 text-xs"
                 >
                   {identityCopied ? copy.profile.copied : copy.profile.copy}
                 </button>
@@ -309,7 +309,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.profile.versions}
               </div>
-              <div className="grid gap-2 rounded-2xl bg-black/25 p-2">
+              <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
                 <ProfileVersionRow
                   href={
                     session.identity.identityExternalIdentifier
@@ -349,7 +349,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
           <button
             type="button"
             onClick={() => setProfileEditorOpen(true)}
-            className="mt-4 w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            className="ui-button mt-4 w-full"
             data-testid="edit-profile-button"
           >
             {copy.profile.edit}
@@ -358,7 +358,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
           <button
             type="button"
             onClick={onLogout}
-            className="mt-4 w-full rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
+            className="ui-button ui-button-danger mt-2 w-full"
           >
             {copy.profile.logout}
           </button>
@@ -414,9 +414,7 @@ function ProfileVersionRow({
           </div>
         ) : null}
       </div>
-      <div className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-black text-white/70">
-        {value}
-      </div>
+      <div className="shrink-0 font-black text-white/55">{value}</div>
     </>
   );
 
@@ -426,7 +424,7 @@ function ProfileVersionRow({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 transition hover:bg-white/8"
+        className="flex items-center justify-between gap-3 px-1 py-2 transition hover:bg-white/5"
       >
         {content}
       </a>
@@ -434,7 +432,7 @@ function ProfileVersionRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3 px-1 py-2">
       {content}
     </div>
   );
@@ -474,7 +472,7 @@ function ProfileAvatar({
   return (
     <div
       className={cx(
-        'relative grid shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        'relative grid shrink-0 place-items-center overflow-visible rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
         size === 'xl'
           ? 'h-16 w-16 text-2xl'
           : size === 'lg'
@@ -483,7 +481,7 @@ function ProfileAvatar({
         className,
       )}
     >
-      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-lg">
         <FallbackImage
           src={picture}
           alt=""

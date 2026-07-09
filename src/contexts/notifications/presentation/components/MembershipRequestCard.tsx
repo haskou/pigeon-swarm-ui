@@ -98,7 +98,7 @@ export function MembershipRequestCard({
   });
 
   return (
-    <article className="rounded-2xl border border-cyan-200/15 bg-cyan-300/10 p-4">
+    <article className="border-b border-cyan-200/15 py-4 first:pt-1 last:border-b-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
@@ -120,7 +120,7 @@ export function MembershipRequestCard({
         </span>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white/[0.07] p-3 text-xs text-white/55">
+      <div className="mt-3 border-y border-white/[0.08] py-3 text-xs text-white/55">
         <div className="flex items-center justify-between gap-3">
           <span>{copy.notifications.community}</span>
           <span className="truncate font-semibold text-white/70">
@@ -142,7 +142,7 @@ export function MembershipRequestCard({
               type="button"
               onClick={onAccept}
               disabled={working}
-              className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
+              className="ui-button ui-button-primary"
             >
               {copy.notifications.accept}
             </button>
@@ -150,7 +150,7 @@ export function MembershipRequestCard({
               type="button"
               onClick={onDecline}
               disabled={working}
-              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
+              className="ui-button"
             >
               {copy.notifications.decline}
             </button>

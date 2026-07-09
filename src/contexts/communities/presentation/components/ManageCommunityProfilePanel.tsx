@@ -52,7 +52,7 @@ export function ManageCommunityProfilePanel({
   onNameChange,
 }: ManageCommunityProfilePanelProps) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-black/25">
+    <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-black/10">
       <button
         type="button"
         onClick={() => bannerInputRef.current?.click()}
@@ -78,7 +78,7 @@ export function ManageCommunityProfilePanel({
         <button
           type="button"
           onClick={() => avatarInputRef.current?.click()}
-          className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
+          className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-lg border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
           aria-label={copy.communities.avatar}
         >
           {avatarPreview || currentAvatarUrl ? (
@@ -99,13 +99,13 @@ export function ManageCommunityProfilePanel({
             aria-label={copy.communities.name}
             value={name}
             onChange={(event) => onNameChange(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-lg font-black text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            className="ui-field-control px-4 py-3 text-lg font-black placeholder:text-white/30"
           />
           <textarea
             aria-label={copy.communities.description}
             value={description}
             onChange={(event) => onDescriptionChange(event.target.value)}
-            className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+            className="ui-field-control min-h-20 resize-none px-4 py-3 text-sm placeholder:text-white/30"
           />
           <CommunityPublicSettingsPanel
             autoJoinEnabled={autoJoinEnabled}

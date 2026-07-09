@@ -1,6 +1,4 @@
-import type {
-  CommunityRoleResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityRoleResource } from '../../../../shared/domain/pigeonResources.types';
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -58,8 +56,7 @@ export function ManageCommunityChannelsPanel({
   );
   const selectedChannel = useMemo(
     () =>
-      channelOrder.find((channel) => channel.id === selectedChannelId) ??
-      null,
+      channelOrder.find((channel) => channel.id === selectedChannelId) ?? null,
     [channelOrder, selectedChannelId],
   );
 
@@ -70,12 +67,12 @@ export function ManageCommunityChannelsPanel({
   }, [channelOrder, selectedChannel]);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+    <div className="ui-section py-3">
       <div className="mb-3 px-1 text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.channels}
       </div>
       <div className="grid min-h-0 gap-3 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="min-h-0 rounded-2xl border border-white/10 bg-black/20 p-2">
+        <div className="min-h-0 border-y border-white/10 py-2">
           <div className="max-h-[34vh] space-y-1 overflow-y-auto pr-1 sm:max-h-[46vh]">
             {channelOrder.map((channel) => (
               <ChannelListButton
@@ -115,7 +112,7 @@ export function ManageCommunityChannelsPanel({
             state={state}
           />
         ) : (
-          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/8 p-4 text-sm font-semibold text-white/45">
+          <div className="grid gap-3 border-y border-white/10 py-4 text-sm font-semibold text-white/45">
             <span>{copy.communities.noChannels}</span>
             {canSave && (
               <button
@@ -171,10 +168,7 @@ function ChannelCreateRow({
         aria-label={copy.communities.channelType}
       >
         {(['text', 'voice'] as const).map((type) => (
-          <option
-            key={type}
-            value={type}
-          >
+          <option key={type} value={type}>
             {type === 'voice'
               ? copy.communities.voiceChannel
               : copy.communities.textChannel}
@@ -264,7 +258,7 @@ function ChannelEditorPanel({
   );
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/8 p-3">
+    <div className="ui-list-block">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
         <div className="min-w-0">
           <label className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
@@ -396,7 +390,7 @@ function ChannelVisibilityRoles({
   const channelRoleIds = channelPermissionDrafts[channel.id] ?? ['everyone'];
 
   return (
-    <div className="mt-3 rounded-2xl bg-black/20 p-3">
+    <div className="mt-3 border-t border-white/10 pt-3">
       <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
         {copy.communities.visibleRoles}
       </div>
@@ -487,7 +481,7 @@ function ChannelDeleteConfirmation({
   state: 'idle' | 'loading';
 }) {
   return (
-    <div className="mt-3 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3">
+    <div className="ui-inline-notice mt-3 border-rose-300/40 bg-rose-500/10">
       <div className="text-xs font-bold text-rose-50/85">
         {copy.communities.deleteChannelConfirm}
       </div>

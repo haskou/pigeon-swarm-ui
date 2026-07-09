@@ -18,6 +18,8 @@ import {
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { ConversationPeer } from '../../domain/ConversationPeer';
@@ -379,243 +381,207 @@ export function CreateConversationDialog({
     >
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong flex h-[100dvh] w-full flex-col justify-center rounded-none [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-auto sm:min-h-0 sm:max-w-xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[88vh] sm:min-h-0 sm:max-w-xl"
         data-state={transitionState}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
-              {copy.dialog.createConversationTitle}
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-white/55">
-              {copy.dialog.createConversationBody}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={copy.dialog.close}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
-          >
-            ×
-          </button>
-        </div>
+        <DialogHeader
+          description={copy.dialog.createConversationBody}
+          title={copy.dialog.createConversationTitle}
+          onClose={close}
+        />
 
-        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-black/25 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('direct');
+        <div className="min-h-0 overflow-y-auto px-5 pb-5">
+          <SegmentedControl
+            className="mt-5"
+            value={mode}
+            onChange={(nextMode) => {
+              setMode(nextMode);
               setError(null);
             }}
-            className={
-              mode === 'direct'
-                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
-                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
-            }
-          >
-            {copy.dialog.directConversation}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('group');
-              setError(null);
-            }}
-            className={
-              mode === 'group'
-                ? 'rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950'
-                : 'rounded-2xl px-3 py-2 text-sm font-black text-white/60 transition hover:bg-white/10'
-            }
-          >
-            {copy.dialog.groupConversation}
-          </button>
-        </div>
+            options={[
+              { label: copy.dialog.directConversation, value: 'direct' },
+              { label: copy.dialog.groupConversation, value: 'group' },
+            ]}
+          />
 
-        {mode === 'direct' ? (
-          <>
-            <div className="mt-2">
-              <Field label={copy.identityLookup.label}>
-                <input
-                  value={peerIdentityId}
-                  onChange={(event) => setPeerIdentityId(event.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.identityLookup.placeholder}
-                  autoComplete="off"
-                  data-testid="create-conversation-recipient-input"
-                />
-                <IdentityLookupStatus status={remoteIdentityStatus} />
-              </Field>
-            </div>
-
-            {peerIdentity && peerDisplayName && (
-              <IdentityPreview
-                identity={peerIdentity}
-                name={peerDisplayName}
-                pictureUrl={peerPictureUrl}
-              />
-            )}
-            {existingDirectConversation && (
-              <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
-                {copy.dialog.directConversationAlreadyExists}
+          {mode === 'direct' ? (
+            <>
+              <div className="mt-2">
+                <Field label={copy.identityLookup.label}>
+                  <input
+                    value={peerIdentityId}
+                    onChange={(event) => setPeerIdentityId(event.target.value)}
+                    className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+                    placeholder={copy.identityLookup.placeholder}
+                    autoComplete="off"
+                    data-testid="create-conversation-recipient-input"
+                  />
+                  <IdentityLookupStatus status={remoteIdentityStatus} />
+                </Field>
               </div>
-            )}
-            {peerIdentity &&
-              lookupState === 'ready' &&
-              sharedNetworkIds.length === 0 && (
-                <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
-                  {copy.dialog.noSharedNetwork}
+
+              {peerIdentity && peerDisplayName && (
+                <IdentityPreview
+                  identity={peerIdentity}
+                  name={peerDisplayName}
+                  pictureUrl={peerPictureUrl}
+                />
+              )}
+              {existingDirectConversation && (
+                <div className="ui-inline-notice mt-3 border-amber-300/25 bg-amber-500/10 text-amber-100">
+                  {copy.dialog.directConversationAlreadyExists}
                 </div>
               )}
-            <div className="mt-2">
+              {peerIdentity &&
+                lookupState === 'ready' &&
+                sharedNetworkIds.length === 0 && (
+                  <div className="ui-inline-notice mt-3 border-amber-300/25 bg-amber-500/10 text-amber-100">
+                    {copy.dialog.noSharedNetwork}
+                  </div>
+                )}
+              <div className="mt-2">
+                <Field label={copy.dialog.sharedNetwork}>
+                  <GlassSelect
+                    ariaLabel={copy.dialog.selectSwarm}
+                    disabled={!peerIdentity || sharedNetworkIds.length === 0}
+                    value={selectedNetworkId}
+                    onChange={setSelectedNetworkId}
+                    data-testid="create-conversation-network-select"
+                    options={networkOptions}
+                  />
+                </Field>{' '}
+              </div>
+            </>
+          ) : (
+            <div className="mt-4 grid gap-3">
+              <Field label={copy.dialog.groupName}>
+                <input
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+                  placeholder={copy.dialog.groupNamePlaceholder}
+                  autoComplete="off"
+                />
+              </Field>
+
+              <Field label={copy.identityLookup.label}>
+                <div className="flex gap-2">
+                  <input
+                    value={groupIdentityInput}
+                    onChange={(event) =>
+                      setGroupIdentityInput(event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      void addGroupParticipant();
+                    }}
+                    className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm placeholder:text-white/30"
+                    placeholder={copy.identityLookup.placeholder}
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void addGroupParticipant()}
+                    disabled={!groupIdentityInput.trim() || state === 'loading'}
+                    className="ui-button"
+                  >
+                    {copy.dialog.addParticipant}
+                  </button>
+                </div>
+              </Field>
+              {groupIdentityLookupState === 'loading' && (
+                <div className="ui-inline-notice text-sm font-bold text-white/55">
+                  {copy.dialog.loadingIdentity}
+                </div>
+              )}
+              {groupIdentityPreview && (
+                <IdentityPreview
+                  identity={groupIdentityPreview.identity}
+                  name={identityPrimaryName(groupIdentityPreview.identity)}
+                  pictureUrl={groupIdentityPreview.pictureUrl}
+                />
+              )}
+
+              <div className="grid gap-2">
+                <div className="text-sm font-black text-white/70">
+                  {copy.dialog.groupParticipants}
+                </div>
+                {groupParticipants.length === 0 ? (
+                  <div className="ui-inline-notice text-sm text-white/45">
+                    {copy.dialog.groupNeedsParticipant}
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {groupParticipants.map(({ identity, pictureUrl }) => {
+                      const name = identityPrimaryName(identity);
+
+                      return (
+                        <div key={identity.id} className="ui-list-row">
+                          <Avatar name={name} pictureUrl={pictureUrl} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-black">{name}</p>
+                            <p className="truncate text-xs text-white/45">
+                              {identitySecondaryName(identity)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeGroupParticipant(identity.id)}
+                            className="ui-icon-button h-9 w-9 text-lg"
+                            aria-label={copy.dialog.removeParticipant}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {groupParticipants.length > 0 &&
+                groupSharedNetworkIds.length === 0 && (
+                  <div className="ui-inline-notice border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
+                    {copy.dialog.noSharedNetwork}
+                  </div>
+                )}
+
               <Field label={copy.dialog.sharedNetwork}>
                 <GlassSelect
-                  ariaLabel={copy.dialog.selectSwarm}
-                  disabled={!peerIdentity || sharedNetworkIds.length === 0}
-                  value={selectedNetworkId}
-                  onChange={setSelectedNetworkId}
-                  data-testid="create-conversation-network-select"
-                  options={networkOptions}
-                />
-              </Field>{' '}
-            </div>
-          </>
-        ) : (
-          <div className="mt-4 grid gap-3">
-            <Field label={copy.dialog.groupName}>
-              <input
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                placeholder={copy.dialog.groupNamePlaceholder}
-                autoComplete="off"
-              />
-            </Field>
-
-            <Field label={copy.identityLookup.label}>
-              <div className="flex gap-2">
-                <input
-                  value={groupIdentityInput}
-                  onChange={(event) =>
-                    setGroupIdentityInput(event.target.value)
+                  ariaLabel={copy.dialog.sharedNetwork}
+                  disabled={
+                    groupParticipants.length === 0 ||
+                    groupSharedNetworkIds.length === 0
                   }
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    void addGroupParticipant();
-                  }}
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-                  placeholder={copy.identityLookup.placeholder}
-                  autoComplete="off"
+                  value={groupNetworkId}
+                  onChange={setGroupNetworkId}
+                  options={groupNetworkOptions}
                 />
-                <button
-                  type="button"
-                  onClick={() => void addGroupParticipant()}
-                  disabled={!groupIdentityInput.trim() || state === 'loading'}
-                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {copy.dialog.addParticipant}
-                </button>
-              </div>
-            </Field>
-            {groupIdentityLookupState === 'loading' && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-white/55">
-                {copy.dialog.loadingIdentity}
-              </div>
-            )}
-            {groupIdentityPreview && (
-              <IdentityPreview
-                identity={groupIdentityPreview.identity}
-                name={identityPrimaryName(groupIdentityPreview.identity)}
-                pictureUrl={groupIdentityPreview.pictureUrl}
-              />
-            )}
-
-            <div className="grid gap-2">
-              <div className="text-sm font-black text-white/70">
-                {copy.dialog.groupParticipants}
-              </div>
-              {groupParticipants.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
-                  {copy.dialog.groupNeedsParticipant}
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  {groupParticipants.map(({ identity, pictureUrl }) => {
-                    const name = identityPrimaryName(identity);
-
-                    return (
-                      <div
-                        key={identity.id}
-                        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3"
-                      >
-                        <Avatar name={name} pictureUrl={pictureUrl} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-black">{name}</p>
-                          <p className="truncate text-xs text-white/45">
-                            {identitySecondaryName(identity)}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeGroupParticipant(identity.id)}
-                          className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 text-lg font-black text-white/70 transition hover:bg-white/15"
-                          aria-label={copy.dialog.removeParticipant}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              </Field>
             </div>
+          )}
 
-            {groupParticipants.length > 0 &&
-              groupSharedNetworkIds.length === 0 && (
-                <div className="rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-sm text-amber-100">
-                  {copy.dialog.noSharedNetwork}
-                </div>
-              )}
+          {error && (
+            <div className="ui-inline-notice mt-4 border-rose-300/50 bg-rose-500/10 text-rose-100">
+              {error}
+            </div>
+          )}
 
-            <Field label={copy.dialog.sharedNetwork}>
-              <GlassSelect
-                ariaLabel={copy.dialog.sharedNetwork}
-                disabled={
-                  groupParticipants.length === 0 ||
-                  groupSharedNetworkIds.length === 0
-                }
-                value={groupNetworkId}
-                onChange={setGroupNetworkId}
-                options={groupNetworkOptions}
-              />
-            </Field>
+          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} className="ui-button">
+              {copy.dialog.cancel}
+            </button>
+            <button
+              disabled={mode === 'direct' ? !canSubmitDirect : !canSubmitGroup}
+              className="ui-button ui-button-primary"
+              data-testid="create-conversation-submit-button"
+            >
+              {state === 'loading'
+                ? copy.dialog.createConversationLoading
+                : copy.dialog.createConversation}
+            </button>
           </div>
-        )}
-
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl px-5 py-3 text-sm font-black text-white/55 transition hover:bg-white/10 hover:text-white/80"
-          >
-            {copy.dialog.cancel}
-          </button>
-          <button
-            disabled={mode === 'direct' ? !canSubmitDirect : !canSubmitGroup}
-            className="rounded-2xl bg-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-fuchsia-950/30 transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
-            data-testid="create-conversation-submit-button"
-          >
-            {state === 'loading'
-              ? copy.dialog.createConversationLoading
-              : copy.dialog.createConversation}
-          </button>
         </div>
       </form>
     </div>
