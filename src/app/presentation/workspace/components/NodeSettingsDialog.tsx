@@ -19,7 +19,6 @@ import { DialogHeader } from '../../../../shared/presentation/components/DialogH
 import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
@@ -1221,26 +1220,22 @@ function ReplicationStatusPanel({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-4">
-        <MetricCard
+      <div className="divide-y divide-white/10 border-y border-white/10">
+        <NodeDetailRow
           label={copy.nodeSettings.replicationContents}
           value={String(summary?.contentCount ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationTotalSize}
           value={formatBytes(summary?.totalSizeBytes ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationResponsible}
           value={String(summary?.localResponsibleCount ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationReleasable}
           value={String(summary?.releasableCount ?? 0)}
-          variant="dark"
         />
       </div>
 
