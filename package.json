@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build",
+    "audit:visual": "playwright test e2e/visual-audit.spec.ts",
     "dev": "vite --host 0.0.0.0",
     "lint": "eslint \"src/{app/composition,contexts/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\"",
     "lint:fix": "eslint \"src/{app/composition,contexts/*/{domain,application,infrastructure},shared/{domain,infrastructure}}/**/*.ts\" --fix",

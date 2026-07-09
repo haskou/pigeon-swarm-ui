@@ -27,3 +27,34 @@ no networks, provide a fallback network id:
 ```bash
 E2E_NETWORK_ID=<network-id> yarn test:e2e
 ```
+
+## Visual audit
+
+The visual audit captures the login and the main authenticated UI states on
+desktop, tablet, and mobile. Screenshots and layout metrics are written to
+`visual-audit/` and are intentionally ignored by Git.
+
+```bash
+VISUAL_AUDIT_USER=<handle-or-identity-id> \
+VISUAL_AUDIT_PASSWORD=<password> \
+E2E_BASE_URL=http://127.0.0.1:5174 \
+yarn audit:visual
+```
+
+Run one viewport while iterating:
+
+```bash
+VISUAL_AUDIT_USER=<handle-or-identity-id> \
+VISUAL_AUDIT_PASSWORD=<password> \
+E2E_BASE_URL=http://127.0.0.1:5174 \
+yarn audit:visual --project=mobile-chromium
+```
+
+Optional environment variables:
+
+- `VISUAL_AUDIT_LANGUAGE`: `es` by default; accepts `en`.
+- `VISUAL_AUDIT_RECOVERY_KEY`: enables the recovery-key login path.
+- `VISUAL_AUDIT_OUTPUT_DIR`: overrides the default `visual-audit/` folder.
+
+Without credentials, the audit still captures the login screen and skips the
+authenticated states.
