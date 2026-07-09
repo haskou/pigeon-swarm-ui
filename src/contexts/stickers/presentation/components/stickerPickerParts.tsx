@@ -29,8 +29,10 @@ export function PickerTab({
       type="button"
       onClick={onClick}
       className={cx(
-        'rounded-xl px-3 py-2 text-xs font-black transition',
-        active ? 'bg-white text-slate-950' : 'text-white/55 hover:bg-white/10',
+        'border-b-2 px-3 py-2 text-xs font-bold transition',
+        active
+          ? 'border-cyan-300/80 bg-cyan-300/10 text-cyan-50'
+          : 'border-transparent text-white/55 hover:bg-white/[0.06] hover:text-white',
       )}
     >
       {label}
@@ -56,10 +58,10 @@ export function StickerShortcutBar({
             type="button"
             onClick={() => onSelect(shortcut.id)}
             className={cx(
-              'grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl text-lg transition',
+              'grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md border text-lg transition',
               activeShortcutId === shortcut.id
-                ? 'bg-white text-slate-950 shadow shadow-white/10'
-                : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white',
+                ? 'border-cyan-300/45 bg-cyan-300/10 text-cyan-50'
+                : 'border-white/5 bg-white/[0.03] text-white/70 hover:bg-white/[0.07] hover:text-white',
             )}
             aria-label={`Go to ${shortcut.label}`}
             title={shortcut.label}
