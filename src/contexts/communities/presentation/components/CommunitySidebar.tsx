@@ -176,7 +176,7 @@ export function CommunitySidebar({
                   <button
                     type="button"
                     onClick={onBannerOpen}
-                    className="grid h-20 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 transition hover:brightness-110"
+                    className="grid h-32 w-full place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950 transition hover:brightness-110"
                     aria-label={copy.communities.openBanner}
                   >
                     <img
@@ -186,7 +186,7 @@ export function CommunitySidebar({
                     />
                   </button>
                 ) : (
-                  <div className="grid h-20 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950">
+                  <div className="grid h-32 place-items-center overflow-hidden bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-5xl font-black text-slate-950">
                     {community.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}

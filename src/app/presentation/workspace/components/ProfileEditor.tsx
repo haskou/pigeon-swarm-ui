@@ -465,7 +465,7 @@ export function ProfileEditor({
                           maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
                           className={cx(
                             profileEditorInputClass,
-                            'text-lg font-black',
+                            'text-base font-semibold',
                           )}
                         />
                       </ProfileEditorField>
@@ -480,7 +480,7 @@ export function ProfileEditor({
                           placeholder="@ada"
                           className={cx(
                             profileEditorInputClass,
-                            'text-sm font-bold text-white/70',
+                            'text-sm font-medium text-white/75',
                           )}
                         />
                       </ProfileEditorField>
@@ -1128,7 +1128,7 @@ function ProfileEditorField({
   label: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/55">
+    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
       {label}
       {children}
     </label>

@@ -98,7 +98,7 @@ export function MembershipRequestCard({
   });
 
   return (
-    <article className="border-b border-cyan-200/15 py-4 first:pt-1 last:border-b-0">
+    <article className="rounded-md border border-white/10 border-l-2 border-l-fuchsia-300/45 bg-white/[0.025] px-4 py-4 shadow-sm shadow-black/10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">

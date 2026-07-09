@@ -113,7 +113,7 @@ export function NotificationsPanel({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {notifications.length === 0 &&
             pendingMembershipRequests.length === 0 && (
               <div className="py-10 text-center text-sm text-white/55">

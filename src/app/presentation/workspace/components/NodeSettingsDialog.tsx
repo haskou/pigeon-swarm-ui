@@ -400,75 +400,82 @@ export function NodeSettingsDialog({
 
               {activeSection === 'info' && (
                 <div className="grid content-start gap-3">
-                  <section className="ui-section py-3">
-                    {!node?.owner ? (
-                      <div>
-                        <h3 className="text-base font-black text-white">
-                          {copy.nodeSettings.unclaimedTitle}
-                        </h3>
-                        <p className="mt-1 text-sm leading-5 text-white/55">
-                          {copy.nodeSettings.unclaimedBody}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => void handleClaim()}
-                          disabled={loading !== null}
-                          className="mt-3 rounded-xl bg-fuchsia-500 px-3 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {loading === 'claim'
-                            ? copy.nodeSettings.saving
-                            : copy.nodeSettings.claim}
-                        </button>
+                  <section>
+                    <h3 className="ui-section-heading pt-0">
+                      {copy.nodeSettings.nodeDetails}
+                    </h3>
+                    <div className="overflow-hidden rounded-md border border-white/10 bg-black/10 px-4">
+                      <div className="py-4">
+                        {!node?.owner ? (
+                          <div>
+                            <h4 className="text-base font-bold text-white">
+                              {copy.nodeSettings.unclaimedTitle}
+                            </h4>
+                            <p className="mt-1 text-sm leading-5 text-white/55">
+                              {copy.nodeSettings.unclaimedBody}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void handleClaim()}
+                              disabled={loading !== null}
+                              className="ui-button ui-button-primary mt-3"
+                            >
+                              {loading === 'claim'
+                                ? copy.nodeSettings.saving
+                                : copy.nodeSettings.claim}
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-semibold text-white/55">
+                              {copy.nodeSettings.owner}
+                            </div>
+                            <NodeOwnerIdentity
+                              currentIdentity={session.identity}
+                              ownerIdentityId={node.owner}
+                            />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div>
-                        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                          {copy.nodeSettings.owner}
+
+                      <div className="border-t border-white/10 py-4">
+                        <div className="mb-1.5 text-sm font-semibold text-white/55">
+                          {copy.nodeSettings.nodeId}
                         </div>
-                        <NodeOwnerIdentity
-                          currentIdentity={session.identity}
-                          ownerIdentityId={node.owner}
-                        />
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
+                          <code
+                            className="min-w-0 truncate text-sm text-white/70"
+                            title={node?.id ?? undefined}
+                          >
+                            {node?.id ?? '--'}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => void copyNodeId()}
+                            disabled={!node?.id}
+                            className="ui-icon-button h-9 w-9 shrink-0"
+                            aria-label={copy.nodeSettings.copyNodeId}
+                            title={
+                              copiedNodeId
+                                ? copy.profile.copied
+                                : copy.nodeSettings.copyNodeId
+                            }
+                          >
+                            <CopyIcon copied={copiedNodeId} />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </section>
 
-                  <section className="ui-section py-3">
-                    <div className="mb-1.5 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                      {copy.nodeSettings.nodeId}
-                    </div>
-                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
-                      <code
-                        className="ui-field-control min-w-0 flex-1 truncate px-3 py-2 text-sm text-white/70"
-                        title={node?.id ?? undefined}
-                      >
-                        {node?.id ?? '--'}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => void copyNodeId()}
-                        disabled={!node?.id}
-                        className="ui-icon-button h-9 w-9 shrink-0"
-                        aria-label={copy.nodeSettings.copyNodeId}
-                        title={
-                          copiedNodeId
-                            ? copy.profile.copied
-                            : copy.nodeSettings.copyNodeId
+                      <NodeRuntimeSummary
+                        node={node}
+                        relayConfiguration={
+                          isOwner && relayConfigurationLoaded
+                            ? relayConfiguration
+                            : null
                         }
-                      >
-                        <CopyIcon copied={copiedNodeId} />
-                      </button>
+                      />
                     </div>
                   </section>
-
-                  <NodeRuntimeSummary
-                    node={node}
-                    relayConfiguration={
-                      isOwner && relayConfigurationLoaded
-                        ? relayConfiguration
-                        : null
-                    }
-                  />
 
                   {isOwner && (
                     <ReplicationStatusPanel
@@ -811,10 +818,7 @@ function NodeRuntimeSummary({
   relayConfiguration: NodeRelayConfiguration | null;
 }) {
   return (
-    <section className="ui-section py-3">
-      <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-        {copy.nodeSettings.nodeDetails}
-      </div>
+    <div className="border-t border-white/10 py-3">
       <div className="divide-y divide-white/10">
         {relayConfiguration ? (
           <NodeDetailRow
@@ -838,7 +842,7 @@ function NodeRuntimeSummary({
           />
         ) : null}
       </div>
-    </section>
+    </div>
   );
 }
 

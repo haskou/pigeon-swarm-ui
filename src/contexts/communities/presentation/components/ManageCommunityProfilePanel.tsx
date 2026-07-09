@@ -95,18 +95,24 @@ export function ManageCommunityProfilePanel({
           </span>
         </button>
         <div className="mt-4 grid gap-3">
-          <input
-            aria-label={copy.communities.name}
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            className="ui-field-control px-4 py-3 text-lg font-black placeholder:text-white/30"
-          />
-          <textarea
-            aria-label={copy.communities.description}
-            value={description}
-            onChange={(event) => onDescriptionChange(event.target.value)}
-            className="ui-field-control min-h-20 resize-none px-4 py-3 text-sm placeholder:text-white/30"
-          />
+          <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+            {copy.communities.name}
+            <input
+              aria-label={copy.communities.name}
+              value={name}
+              onChange={(event) => onNameChange(event.target.value)}
+              className="ui-field-control px-4 py-3 text-base font-semibold placeholder:text-white/30"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+            {copy.communities.description}
+            <textarea
+              aria-label={copy.communities.description}
+              value={description}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+              className="ui-field-control min-h-20 resize-none px-4 py-3 text-sm font-normal placeholder:text-white/30"
+            />
+          </label>
           <CommunityPublicSettingsPanel
             autoJoinEnabled={autoJoinEnabled}
             discoverable={discoverable}

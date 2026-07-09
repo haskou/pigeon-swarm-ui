@@ -173,7 +173,7 @@ export function NotificationCard({
       data-testid="notification-card"
       data-notification-id={notification.id}
       data-notification-type={notification.type}
-      className="border-b border-white/10 py-4 first:pt-1 last:border-b-0"
+      className="rounded-md border border-white/10 border-l-2 border-l-cyan-300/45 bg-white/[0.025] px-4 py-4 shadow-sm shadow-black/10"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

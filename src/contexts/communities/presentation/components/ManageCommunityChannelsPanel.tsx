@@ -67,10 +67,8 @@ export function ManageCommunityChannelsPanel({
   }, [channelOrder, selectedChannel]);
 
   return (
-    <div className="ui-section py-3">
-      <div className="mb-3 px-1 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-        {copy.communities.channels}
-      </div>
+    <div>
+      <div className="ui-section-heading pt-0">{copy.communities.channels}</div>
       <div className="grid min-h-0 gap-3 lg:grid-cols-[240px_minmax(0,1fr)]">
         <div className="min-h-0 border-y border-white/10 py-2">
           <div className="max-h-[34vh] space-y-1 overflow-y-auto pr-1 sm:max-h-[46vh]">
@@ -119,7 +117,7 @@ export function ManageCommunityChannelsPanel({
                 type="button"
                 onClick={onSave}
                 disabled={state === 'loading'}
-                className="justify-self-start rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                className="ui-button ui-button-primary justify-self-start"
               >
                 {saveLabel}
               </button>
@@ -156,7 +154,7 @@ function ChannelCreateRow({
           event.preventDefault();
           onChannelCreate();
         }}
-        className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+        className="ui-field-control h-10 min-w-0 flex-1 px-3 py-2 text-sm placeholder:text-white/30"
         placeholder={copy.communities.addChannelPlaceholder}
       />
       <select
@@ -164,7 +162,7 @@ function ChannelCreateRow({
         onChange={(event) =>
           onChannelTypeChange(event.target.value as 'text' | 'voice')
         }
-        className="h-10 w-24 shrink-0 rounded-xl border border-white/10 bg-black/25 px-2 text-xs font-black text-white outline-none focus:border-cyan-300/60"
+        className="ui-field-control h-10 w-24 shrink-0 px-2 text-xs font-bold"
         aria-label={copy.communities.channelType}
       >
         {(['text', 'voice'] as const).map((type) => (
@@ -179,7 +177,7 @@ function ChannelCreateRow({
         type="button"
         onClick={onChannelCreate}
         disabled={!channelName.trim() || disabled}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+        className="ui-button ui-button-primary h-10 w-10 shrink-0 p-0"
         aria-label={copy.communities.addInitialChannel}
       >
         +
@@ -204,10 +202,10 @@ function ChannelListButton({
       type="button"
       onClick={onSelect}
       className={cx(
-        'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-black transition',
+        'flex w-full items-center gap-2 rounded-md border-l-2 px-3 py-2 text-left text-sm font-bold transition',
         active
-          ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
-          : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ? 'border-cyan-300/80 bg-cyan-300/10 text-cyan-50'
+          : 'border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white',
       )}
     >
       <span className="grid w-5 shrink-0 place-items-center text-current/80">
@@ -269,14 +267,14 @@ function ChannelEditorPanel({
             onChange={(event) =>
               onChannelDraftChange(channel.id, event.target.value)
             }
-            className="h-10 w-full min-w-0 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-white outline-none focus:border-cyan-300/60"
+            className="ui-field-control h-10 min-w-0 px-3 py-2 text-sm font-semibold"
           />
         </div>
         <div>
           <div className="mb-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
             {copy.communities.channelType}
           </div>
-          <span className="inline-flex h-10 items-center gap-2 rounded-xl bg-black/25 px-3 text-xs font-black text-white/70">
+          <span className="inline-flex h-10 items-center gap-2 border-b border-white/10 px-1 text-xs font-semibold text-white/65">
             {channel.type === 'voice' ? <VoiceIcon /> : '#'}
             {channel.type === 'voice'
               ? copy.communities.voiceChannel
@@ -303,7 +301,7 @@ function ChannelEditorPanel({
           type="button"
           onClick={onSave}
           disabled={!canSave || state === 'loading'}
-          className="ml-auto rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+          className="ui-button ui-button-primary ml-auto"
         >
           {saveLabel}
         </button>
@@ -337,16 +335,11 @@ function ChannelDraftActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="rounded-full bg-black/25 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/40">
-        {channel.type === 'voice'
-          ? copy.communities.voiceChannel
-          : copy.communities.textChannel}
-      </span>
       <button
         type="button"
         onClick={() => onChannelMove(channel.id, -1)}
         disabled={index === 0}
-        className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+        className="ui-icon-button h-9 w-9 font-black disabled:cursor-not-allowed disabled:opacity-35"
         aria-label={copy.communities.moveChannelUp}
         title={copy.communities.moveChannelUp}
       >
@@ -356,7 +349,7 @@ function ChannelDraftActions({
         type="button"
         onClick={() => onChannelMove(channel.id, 1)}
         disabled={index === channelOrder.length - 1}
-        className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 font-black transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+        className="ui-icon-button h-9 w-9 font-black disabled:cursor-not-allowed disabled:opacity-35"
         aria-label={copy.communities.moveChannelDown}
         title={copy.communities.moveChannelDown}
       >
@@ -366,7 +359,7 @@ function ChannelDraftActions({
         type="button"
         onClick={() => onPendingChannelDeleteChange(channel.id)}
         disabled={state === 'loading'}
-        className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/15 text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-35"
+        className="ui-icon-button h-9 w-9 border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-35"
         aria-label={copy.communities.deleteChannel}
         title={copy.communities.deleteChannel}
       >
@@ -394,7 +387,7 @@ function ChannelVisibilityRoles({
       <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
         {copy.communities.visibleRoles}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid gap-1">
         {roles
           .filter((role) => role.id === 'everyone')
           .map((role) => (
@@ -406,11 +399,11 @@ function ChannelVisibilityRoles({
             />
           ))}
         {roles.some((role) => role.id !== 'everyone') && (
-          <div className="mt-1 w-full border-t border-white/10 pt-3">
+          <div className="mt-2 w-full border-t border-white/10 pt-3">
             <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/35">
               {copy.communities.visibleToSelectedRoles}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-1">
               {roles
                 .filter((role) => role.id !== 'everyone')
                 .map((role) => (
@@ -441,10 +434,10 @@ function RoleVisibilityOption({
   return (
     <label
       className={cx(
-        'inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition',
+        'flex w-full cursor-pointer items-center gap-3 border-l-2 px-3 py-2.5 text-sm font-semibold transition',
         selected
-          ? 'border-cyan-200/70 bg-cyan-200 text-slate-950'
-          : 'border-white/10 bg-white/8 text-white/70 hover:bg-white/12 hover:text-white',
+          ? 'border-l-cyan-300/80 bg-cyan-300/10 text-cyan-50'
+          : 'border-l-transparent text-white/65 hover:bg-white/[0.06] hover:text-white',
       )}
     >
       <input
