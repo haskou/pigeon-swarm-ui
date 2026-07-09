@@ -1,4 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
 import path from 'node:path';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -32,6 +33,9 @@ const outputRoot = path.resolve(
 const identity = process.env.VISUAL_AUDIT_USER?.trim();
 const password = process.env.VISUAL_AUDIT_PASSWORD ?? '';
 const recoveryKey = process.env.VISUAL_AUDIT_RECOVERY_KEY?.trim();
+const memberIdentity =
+  process.env.VISUAL_AUDIT_MEMBER_IDENTITY?.trim() ??
+  process.env.VISUAL_AUDIT_CALL_USER_A?.trim();
 const language = process.env.VISUAL_AUDIT_LANGUAGE === 'en' ? 'en' : 'es';
 
 test.describe('visual audit', () => {
@@ -81,13 +85,28 @@ test.describe('visual audit', () => {
     await capture(page, projectOutput, metrics, '02-workspace');
 
     await captureOptionalState({
+      action: () => attachAuditFiles(page, 1),
+      metrics,
+      name: '02a-composer-single-attachment',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureOptionalState({
+      action: () => attachAuditFiles(page, 2),
+      metrics,
+      name: '02b-composer-multiple-attachments',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await clearAuditAttachments(page);
+
+    await captureOptionalState({
       action: () => openEncryptionDetails(page),
       metrics,
       name: '03-conversation-encryption',
       outputDirectory: projectOutput,
       page,
     });
-
     await closeOverlay(page);
 
     await captureOptionalState({
@@ -97,7 +116,6 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
-
     await captureOptionalState({
       action: () =>
         clickFirstVisible(
@@ -125,7 +143,7 @@ test.describe('visual audit', () => {
     });
     await closeOverlay(page);
 
-    if (isCompactViewport(page)) {
+    if (isMobileViewport(page)) {
       await openHeaderMenu(page);
       await captureOptionalState({
         action: () =>
@@ -157,6 +175,20 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
+    await captureDialogSection({
+      label: /Packs guardados|Saved packs/i,
+      metrics,
+      name: '09a-sticker-manager-saved',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /Crear pack|Create pack/i,
+      metrics,
+      name: '09b-sticker-manager-create',
+      outputDirectory: projectOutput,
+      page,
+    });
     await closeOverlay(page);
     await closeStickerPicker(page);
 
@@ -171,6 +203,13 @@ test.describe('visual audit', () => {
         clickFirstVisible(page.getByTestId('create-conversation-button')),
       metrics,
       name: '11-create-conversation',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /^Grupo$|^Group$/i,
+      metrics,
+      name: '11a-create-group-conversation',
       outputDirectory: projectOutput,
       page,
     });
@@ -229,6 +268,27 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
+    await captureDialogSection({
+      label: /^Redes$|^Networks$/i,
+      metrics,
+      name: '16a-profile-networks',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /Seguridad|Security/i,
+      metrics,
+      name: '16b-profile-security',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /Llavero|Keychain/i,
+      metrics,
+      name: '16c-profile-keychain',
+      outputDirectory: projectOutput,
+      page,
+    });
     await closeOverlay(page);
 
     await openSidebar(page);
@@ -241,6 +301,27 @@ test.describe('visual audit', () => {
         ),
       metrics,
       name: '17-node-settings',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /^Redes(?:\s*\(\d+\))?$|^Networks(?:\s*\(\d+\))?$/i,
+      metrics,
+      name: '17a-node-networks',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /Configuraci[oó]n|Configuration/i,
+      metrics,
+      name: '17b-node-configuration',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureDialogSection({
+      label: /Pares(?:\s*\(\d+\))?|Peers(?:\s*\(\d+\))?/i,
+      metrics,
+      name: '17c-node-peers',
       outputDirectory: projectOutput,
       page,
     });
@@ -304,12 +385,40 @@ test.describe('visual audit', () => {
     await closeOverlay(page);
 
     await captureOptionalState({
-      action: () =>
-        clickFirstVisible(
+      action: async () => {
+        if (isCompactViewport(page)) await openHeaderMenu(page);
+
+        await clickFirstVisible(
           page.getByRole('button', { name: /Añadir miembro|Add member/i }),
-        ),
+        );
+      },
       metrics,
       name: '24-add-community-member',
+      outputDirectory: projectOutput,
+      page,
+    });
+    if (memberIdentity) {
+      await captureOptionalState({
+        action: async () => {
+          await page
+            .getByPlaceholder(/@usuario o ID p[uú]blica|@user or public ID/i)
+            .fill(memberIdentity);
+          await expect(
+            page
+              .locator('section.ui-dialog-surface')
+              .getByTestId('identity-member-row'),
+          ).toBeVisible({ timeout: 15_000 });
+        },
+        metrics,
+        name: '24a-add-community-member-preview',
+        outputDirectory: projectOutput,
+        page,
+      });
+    }
+    await captureDialogSection({
+      label: /Crear enlace de invitaci[oó]n|Create invite link/i,
+      metrics,
+      name: '24b-add-community-invite-link',
       outputDirectory: projectOutput,
       page,
     });
@@ -361,6 +470,20 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
+    await captureOptionalState({
+      action: async () => {
+        const expandMember = page
+          .locator('section.ui-dialog-surface button[aria-expanded="false"]')
+          .first();
+
+        await expandMember.scrollIntoViewIfNeeded({ timeout: 5_000 });
+        await expandMember.click({ timeout: 5_000 });
+      },
+      metrics,
+      name: '26c1-community-management-member-expanded',
+      outputDirectory: projectOutput,
+      page,
+    });
     await captureCommunityManagementSection({
       label: /Baneados|Banned/i,
       metrics,
@@ -405,6 +528,16 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Ver datos|View data/i }),
+        ),
+      metrics,
+      name: '28a-call-technical-data',
+      outputDirectory: projectOutput,
+      page,
+    });
     await closeOverlay(page);
     await leaveCall(page);
 
@@ -425,6 +558,7 @@ async function capture(
     animations: 'disabled',
     caret: 'hide',
     path: path.join(outputDirectory, `${name}.png`),
+    scale: 'css',
   });
 }
 
@@ -534,14 +668,84 @@ async function captureCommunityManagementSection({
     action: async () => {
       const navigationItem = page.getByRole('button', { name: label }).first();
 
-      await navigationItem.scrollIntoViewIfNeeded();
-      await navigationItem.click();
+      await navigationItem.scrollIntoViewIfNeeded({ timeout: 5_000 });
+      await navigationItem.click({ timeout: 5_000 });
     },
     metrics,
     name,
     outputDirectory,
     page,
   });
+}
+
+async function captureDialogSection({
+  label,
+  metrics,
+  name,
+  outputDirectory,
+  page,
+}: {
+  label: RegExp;
+  metrics: AuditMetric[];
+  name: string;
+  outputDirectory: string;
+  page: Page;
+}): Promise<void> {
+  await captureOptionalState({
+    action: async () => {
+      const item = page.getByRole('button', { name: label }).first();
+
+      await item.scrollIntoViewIfNeeded({ timeout: 5_000 });
+      await item.click({ timeout: 5_000 });
+    },
+    metrics,
+    name,
+    outputDirectory,
+    page,
+  });
+}
+
+async function attachAuditFiles(page: Page, batch: 1 | 2): Promise<void> {
+  const files =
+    batch === 1
+      ? [
+          {
+            buffer: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#223047"/><circle cx="320" cy="210" r="110" fill="#67d9e8"/><text x="320" y="390" text-anchor="middle" fill="white" font-size="42">Pigeon</text></svg>',
+            ),
+            mimeType: 'image/svg+xml',
+            name: 'pigeon-preview.svg',
+          },
+        ]
+      : [
+          {
+            buffer: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#362440"/><path d="M100 380 300 100l240 280z" fill="#db72e8"/></svg>',
+            ),
+            mimeType: 'image/svg+xml',
+            name: 'community-banner.svg',
+          },
+          {
+            buffer: Buffer.from('Visual audit attachment'),
+            mimeType: 'text/plain',
+            name: 'release-notes.txt',
+          },
+        ];
+
+  await page.getByTestId('composer-file-input').setInputFiles(files);
+  await expect(
+    page.getByText(/Adjuntos seleccionados|Selected attachments/i),
+  ).toBeVisible();
+}
+
+async function clearAuditAttachments(page: Page): Promise<void> {
+  const removeButtons = page.getByRole('button', {
+    name: /Quitar adjunto|Remove attachment/i,
+  });
+
+  while ((await removeButtons.count()) > 0) {
+    await removeButtons.first().click();
+  }
 }
 
 async function openEncryptionDetails(page: Page): Promise<void> {
@@ -670,6 +874,10 @@ async function isNavigationPanelVisible(page: Page): Promise<boolean> {
 
 function isCompactViewport(page: Page): boolean {
   return (page.viewportSize()?.width ?? 0) < 1024;
+}
+
+function isMobileViewport(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) < 640;
 }
 
 async function isVisibleInViewport(locator: Locator): Promise<boolean> {
