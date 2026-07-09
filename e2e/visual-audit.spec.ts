@@ -17,6 +17,14 @@ type AuditMetric = {
   };
 };
 
+type AuditManifest = {
+  capturedStates: string[];
+  skippedStates: Array<{
+    reason: string;
+    state: string;
+  }>;
+};
+
 const outputRoot = path.resolve(
   process.cwd(),
   process.env.VISUAL_AUDIT_OUTPUT_DIR ?? 'visual-audit',
@@ -54,7 +62,7 @@ test.describe('visual audit', () => {
           'Set VISUAL_AUDIT_USER and VISUAL_AUDIT_PASSWORD to capture authenticated states.',
         type: 'authenticated-states-skipped',
       });
-      writeMetrics(projectOutput, metrics);
+      writeAuditReport(projectOutput, metrics, testInfo.annotations);
 
       return;
     }
@@ -73,22 +81,88 @@ test.describe('visual audit', () => {
     await capture(page, projectOutput, metrics, '02-workspace');
 
     await captureOptionalState({
+      action: () => openEncryptionDetails(page),
+      metrics,
+      name: '03-conversation-encryption',
+      outputDirectory: projectOutput,
+      page,
+    });
+
+    await closeOverlay(page);
+
+    await captureOptionalState({
+      action: () => openHeaderMenu(page),
+      metrics,
+      name: '04-header-menu',
+      outputDirectory: projectOutput,
+      page,
+    });
+
+    await captureOptionalState({
       action: () =>
         clickFirstVisible(
           page.getByRole('button', {
-            name: /Abrir menu de conversacion|Open conversation menu/i,
+            name: /Ajustes de notificaciones|Notification settings/i,
           }),
         ),
       metrics,
-      name: '03-header-menu',
+      name: '05-notification-settings',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await openHeaderMenu(page);
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Ver datos|View data/i }),
+        ),
+      metrics,
+      name: '06-conversation-data',
       outputDirectory: projectOutput,
       page,
     });
     await closeOverlay(page);
 
     if (isCompactViewport(page)) {
+      await openHeaderMenu(page);
+      await captureOptionalState({
+        action: () =>
+          clickFirstVisible(
+            page.getByRole('button', { name: /Ver eventos|View events/i }),
+          ),
+        metrics,
+        name: '07-realtime-events',
+        outputDirectory: projectOutput,
+        page,
+      });
+      await closeOverlay(page);
+    }
+
+    await captureOptionalState({
+      action: () => openStickerPicker(page),
+      metrics,
+      name: '08-sticker-picker',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Gestionar|Manage/i }),
+        ),
+      metrics,
+      name: '09-sticker-manager',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+    await closeStickerPicker(page);
+
+    if (isCompactViewport(page)) {
       await openSidebar(page);
-      await capture(page, projectOutput, metrics, '04-sidebar');
+      await capture(page, projectOutput, metrics, '10-sidebar');
     }
 
     await openSidebar(page);
@@ -96,7 +170,32 @@ test.describe('visual audit', () => {
       action: () =>
         clickFirstVisible(page.getByTestId('create-conversation-button')),
       metrics,
-      name: '05-create-conversation',
+      name: '11-create-conversation',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await openSidebar(page);
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', {
+            name: /Añadir comunidad|Add community/i,
+          }),
+        ),
+      metrics,
+      name: '12-community-discovery',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /^Crear$|^Create$/i }),
+        ),
+      metrics,
+      name: '13-create-community',
       outputDirectory: projectOutput,
       page,
     });
@@ -107,7 +206,7 @@ test.describe('visual audit', () => {
       action: () =>
         clickFirstVisible(page.getByTestId('notifications-open-button')),
       metrics,
-      name: '06-notifications',
+      name: '14-notifications',
       outputDirectory: projectOutput,
       page,
     });
@@ -118,7 +217,7 @@ test.describe('visual audit', () => {
       action: () =>
         clickFirstVisible(page.getByTestId('own-profile-menu-button')),
       metrics,
-      name: '07-profile-menu',
+      name: '15-profile-menu',
       outputDirectory: projectOutput,
       page,
     });
@@ -126,7 +225,7 @@ test.describe('visual audit', () => {
     await captureOptionalState({
       action: () => clickFirstVisible(page.getByTestId('edit-profile-button')),
       metrics,
-      name: '08-profile-editor',
+      name: '16-profile-editor',
       outputDirectory: projectOutput,
       page,
     });
@@ -141,7 +240,7 @@ test.describe('visual audit', () => {
           }),
         ),
       metrics,
-      name: '09-node-settings',
+      name: '17-node-settings',
       outputDirectory: projectOutput,
       page,
     });
@@ -151,21 +250,82 @@ test.describe('visual audit', () => {
     await captureOptionalState({
       action: () => clickFirstVisible(firstCommunityButton(page)),
       metrics,
-      name: '10-community-workspace',
+      name: '18-community-workspace',
       outputDirectory: projectOutput,
       page,
     });
 
     await openSidebar(page);
-    await capture(page, projectOutput, metrics, '11-community-navigation');
+    await capture(page, projectOutput, metrics, '19-community-navigation');
 
     await captureOptionalState({
       action: () => clickFirstVisible(firstTextChannelButton(page)),
       metrics,
-      name: '12-community-channel',
+      name: '20-community-channel',
       outputDirectory: projectOutput,
       page,
     });
+
+    await captureOptionalState({
+      action: () => openEncryptionDetails(page),
+      metrics,
+      name: '21-community-encryption',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await openHeaderMenu(page);
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Ver datos|View data/i }),
+        ),
+      metrics,
+      name: '22-community-data',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await openHeaderMenu(page);
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', {
+            name: /Ajustes de notificaciones|Notification settings/i,
+          }),
+        ),
+      metrics,
+      name: '23-community-notification-settings',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Añadir miembro|Add member/i }),
+        ),
+      metrics,
+      name: '24-add-community-member',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+
+    await captureOptionalState({
+      action: () =>
+        clickFirstVisible(
+          page.getByRole('button', { name: /Crear encuesta|Create poll/i }),
+        ),
+      metrics,
+      name: '25-create-poll',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
 
     await openSidebar(page);
     await captureOptionalState({
@@ -176,12 +336,79 @@ test.describe('visual audit', () => {
           }),
         ),
       metrics,
-      name: '13-community-management',
+      name: '26-community-management',
       outputDirectory: projectOutput,
       page,
     });
+    await captureCommunityManagementSection({
+      label: /Canales|Channels/i,
+      metrics,
+      name: '26a-community-management-channels',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureCommunityManagementSection({
+      label: /^Roles$/i,
+      metrics,
+      name: '26b-community-management-roles',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureCommunityManagementSection({
+      label: /Miembros|Members/i,
+      metrics,
+      name: '26c-community-management-members',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureCommunityManagementSection({
+      label: /Baneados|Banned/i,
+      metrics,
+      name: '26d-community-management-banned',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureCommunityManagementSection({
+      label: /Invitaciones|Invitations/i,
+      metrics,
+      name: '26e-community-management-invitations',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureCommunityManagementSection({
+      label: /Auditor[ií]a|Audit|Registro de moderaci[oó]n|Moderation log/i,
+      metrics,
+      name: '26f-community-management-audit',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
 
-    writeMetrics(projectOutput, metrics);
+    await captureOptionalState({
+      action: () => joinFirstVoiceChannel(page),
+      metrics,
+      name: '27-call-compact',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await captureOptionalState({
+      action: async () => {
+        const compactCallBar = page.getByTestId('compact-call-bar');
+
+        await compactCallBar.press('Enter');
+        await expect(page.getByTestId('call-stage-dialog')).toBeVisible({
+          timeout: 10_000,
+        });
+      },
+      metrics,
+      name: '28-call-stage',
+      outputDirectory: projectOutput,
+      page,
+    });
+    await closeOverlay(page);
+    await leaveCall(page);
+
+    writeAuditReport(projectOutput, metrics, testInfo.annotations);
   });
 });
 
@@ -282,6 +509,79 @@ async function closeOverlay(page: Page): Promise<void> {
   await page.waitForTimeout(200);
 }
 
+async function openHeaderMenu(page: Page): Promise<void> {
+  await clickFirstVisible(
+    page.getByRole('button', {
+      name: /Abrir men[uú] de (conversaci[oó]n|comunidad)|Open (conversation|community) menu/i,
+    }),
+  );
+}
+
+async function captureCommunityManagementSection({
+  label,
+  metrics,
+  name,
+  outputDirectory,
+  page,
+}: {
+  label: RegExp;
+  metrics: AuditMetric[];
+  name: string;
+  outputDirectory: string;
+  page: Page;
+}): Promise<void> {
+  await captureOptionalState({
+    action: async () => {
+      const navigationItem = page.getByRole('button', { name: label }).first();
+
+      await navigationItem.scrollIntoViewIfNeeded();
+      await navigationItem.click();
+    },
+    metrics,
+    name,
+    outputDirectory,
+    page,
+  });
+}
+
+async function openEncryptionDetails(page: Page): Promise<void> {
+  await clickFirstVisible(
+    page.getByRole('button', {
+      name: /cifrado|encryption|texto plano|plaintext/i,
+    }),
+  );
+}
+
+async function openStickerPicker(page: Page): Promise<void> {
+  await clickFirstVisible(
+    page.getByRole('button', { name: /Abrir stickers|Open stickers/i }),
+  );
+}
+
+async function closeStickerPicker(page: Page): Promise<void> {
+  const pickerButton = page.getByRole('button', {
+    name: /Abrir stickers|Open stickers/i,
+  });
+
+  if (await isVisibleInViewport(pickerButton)) {
+    await clickFirstVisible(pickerButton);
+  }
+}
+
+async function joinFirstVoiceChannel(page: Page): Promise<void> {
+  await openSidebar(page);
+  await clickFirstVisible(firstVoiceChannelButton(page));
+  await expect(page.getByTestId('compact-call-bar')).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
+async function leaveCall(page: Page): Promise<void> {
+  const leave = page.getByRole('button', { name: /^Salir$|^Leave call$/i });
+
+  if (await isVisibleInViewport(leave)) await clickFirstVisible(leave);
+}
+
 async function dismissPushPrompt(page: Page): Promise<void> {
   const prompt = page.getByTestId('push-notification-prompt');
 
@@ -348,6 +648,12 @@ function firstTextChannelButton(page: Page): Locator {
   return page.locator('button').filter({ hasText: /^#\s+/ });
 }
 
+function firstVoiceChannelButton(page: Page): Locator {
+  return page.getByTitle(
+    /Unirse (a voz|al canal de voz)|Join (voice|voice channel)/i,
+  );
+}
+
 async function isNavigationPanelVisible(page: Page): Promise<boolean> {
   return (
     (await isVisibleInViewport(
@@ -395,9 +701,27 @@ async function isVisibleInViewport(locator: Locator): Promise<boolean> {
   return false;
 }
 
-function writeMetrics(outputDirectory: string, metrics: AuditMetric[]): void {
+function writeAuditReport(
+  outputDirectory: string,
+  metrics: AuditMetric[],
+  annotations: Array<{ description?: string; type: string }>,
+): void {
   writeFileSync(
     path.join(outputDirectory, 'metrics.json'),
     `${JSON.stringify(metrics, null, 2)}\n`,
+  );
+  const manifest: AuditManifest = {
+    capturedStates: metrics.map(({ state }) => state),
+    skippedStates: annotations
+      .filter(({ type }) => type.endsWith('-skipped'))
+      .map(({ description = 'No reason provided.', type }) => ({
+        reason: description,
+        state: type.replace(/-skipped$/, ''),
+      })),
+  };
+
+  writeFileSync(
+    path.join(outputDirectory, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
   );
 }
