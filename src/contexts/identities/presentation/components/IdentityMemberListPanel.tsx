@@ -119,7 +119,7 @@ export function IdentityMemberRow({
   const loadingProfile = !item.identity && !item.name;
   const displayName = loadingProfile
     ? ''
-    : item.name ?? memberName(item.identity, item.identityId);
+    : (item.name ?? memberName(item.identity, item.identityId));
   const handle = item.identity?.profile.handle?.trim();
   const bannerUrl = useIdentityBannerUrl(item.identity);
 
@@ -141,7 +141,7 @@ export function IdentityMemberRow({
           data-identity-id={item.identityId}
           data-banner-url=""
           className={cx(
-            'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
+            'relative flex h-16 min-h-16 w-full max-w-80 cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
             className,
           )}
         >
@@ -158,7 +158,7 @@ export function IdentityMemberRow({
         data-identity-id={item.identityId}
         data-banner-url=""
         className={cx(
-          'relative flex min-h-[64px] w-full cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
+          'relative flex h-16 min-h-16 w-full max-w-80 cursor-wait items-center gap-3 overflow-hidden rounded-2xl bg-[#4d4f62] p-3 text-left',
           className,
         )}
       >
@@ -191,7 +191,10 @@ export function IdentityMemberRow({
             fallback={displayName.slice(0, 1).toUpperCase()}
           />
         </span>
-        <PresenceStatusDot presence={item.presence} className="-bottom-1 -right-1" />
+        <PresenceStatusDot
+          presence={item.presence}
+          className="-bottom-1 -right-1"
+        />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-black">{displayName}</div>
@@ -212,7 +215,7 @@ export function IdentityMemberRow({
         data-identity-id={item.identityId}
         data-banner-url={bannerUrl ?? ''}
         className={cx(
-          'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
+          'relative flex h-16 min-h-16 w-full max-w-80 items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left',
           className,
         )}
       >
@@ -229,7 +232,7 @@ export function IdentityMemberRow({
       data-identity-id={item.identityId}
       data-banner-url={bannerUrl ?? ''}
       className={cx(
-        'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12',
+        'relative flex h-16 min-h-16 w-full max-w-80 items-center gap-3 overflow-hidden rounded-2xl bg-white/8 p-3 text-left transition hover:bg-white/12',
         className,
       )}
     >

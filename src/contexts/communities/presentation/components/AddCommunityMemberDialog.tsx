@@ -10,12 +10,11 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { Field } from '../../../identities/presentation/auth/Field';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { createCommunityInviteUrl } from '../view-models/communityInviteLink';
-import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { DialogHeader } from './communityDialogPrimitives';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { loadIdentityPicture } from './communityImages';
 
 type AddMemberMode = 'identity' | 'link';
@@ -181,9 +180,13 @@ export function AddCommunityMemberDialog({
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[84vh] sm:max-w-md">
-        <DialogHeader title={copy.communities.addMember} onClose={onClose} />
-        <div className="min-h-0 overflow-y-auto px-5 pb-5">
+      <section className="app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:min-h-[26rem] sm:max-h-[84vh] sm:max-w-2xl">
+        <DialogHeader
+          description={copy.communities.addMemberDescription}
+          title={copy.communities.addMember}
+          onClose={onClose}
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
           <SegmentedControl
             className="mt-5"
             onChange={setMode}
@@ -191,8 +194,8 @@ export function AddCommunityMemberDialog({
             value={mode}
           />
           {mode === 'identity' ? (
-            <>
-              <div className="mt-4">
+            <div className="mt-4 grid min-h-[18rem] content-start gap-5 sm:grid-cols-[minmax(0,1fr)_17rem]">
+              <div>
                 <Field label={copy.identityLookup.label}>
                   <input
                     autoFocus
@@ -207,37 +210,54 @@ export function AddCommunityMemberDialog({
                     placeholder={copy.identityLookup.placeholder}
                   />
                 </Field>
+                <p className="mt-2 text-xs leading-5 text-white/45">
+                  {copy.identityLookup.help}
+                </p>
+                {lookupState === 'loading' && (
+                  <div className="mt-4 flex items-center gap-2 border-y border-white/10 py-3 text-sm font-bold text-white/55">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+                    {copy.dialog.loadingIdentity}
+                  </div>
+                )}
               </div>
-              {lookupState === 'loading' && (
-                <div className="ui-inline-notice mt-3 text-sm font-bold text-white/55">
-                  {copy.dialog.loadingIdentity}
+              <div className="border-y border-white/10 py-3 sm:border-y-0 sm:border-l sm:py-0 sm:pl-5">
+                <div className="ui-section-heading pt-0">
+                  {copy.communities.memberPreview}
                 </div>
-              )}
-              {memberIdentity && lookupState === 'ready' && (
-                <IdentityPreviewCard
-                  identity={memberIdentity}
-                  pictureUrl={memberPictureUrl}
-                />
-              )}
-              <button
-                type="button"
-                onClick={() => void addMember()}
-                disabled={!memberIdentity || state === 'loading'}
-                className="ui-button ui-button-primary mt-4 w-full"
-              >
-                {copy.communities.addMember}
-              </button>
-            </>
+                {memberIdentity && lookupState === 'ready' ? (
+                  <IdentityMemberRow
+                    interactive={false}
+                    item={{
+                      identity: memberIdentity,
+                      identityId: memberIdentity.id,
+                      pictureUrl: memberPictureUrl,
+                    }}
+                  />
+                ) : (
+                  <p className="py-4 text-sm leading-6 text-white/40">
+                    {copy.communities.memberPreviewEmpty}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void addMember()}
+                  disabled={!memberIdentity || state === 'loading'}
+                  className="ui-button ui-button-primary mt-4 w-full"
+                >
+                  {copy.communities.addMember}
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="ui-section mt-4 py-3">
-              <div className="text-xs leading-5 text-white/55">
+            <div className="mt-4 grid min-h-[18rem] content-start gap-4 border-y border-white/10 py-5">
+              <div className="max-w-xl text-sm leading-6 text-white/55">
                 {copy.communities.linkHelp}
               </div>
               {inviteLink && (
                 <input
                   readOnly
                   value={inviteLink}
-                  className="ui-field-control mt-3 px-3 py-2 text-xs text-white/70"
+                  className="ui-field-control px-3 py-2 text-xs text-white/70"
                   onFocus={(event) => event.target.select()}
                 />
               )}
@@ -245,7 +265,7 @@ export function AddCommunityMemberDialog({
                 type="button"
                 onClick={() => void createInviteLink()}
                 disabled={linkState === 'loading'}
-                className="ui-button ui-button-primary mt-3 w-full"
+                className="ui-button ui-button-primary justify-self-start"
               >
                 {linkState === 'loading'
                   ? copy.profile.saving
@@ -264,36 +284,6 @@ export function AddCommunityMemberDialog({
       </section>
     </div>,
     document.body,
-  );
-}
-
-function IdentityPreviewCard({
-  identity,
-  pictureUrl,
-}: {
-  identity: IdentityResource;
-  pictureUrl: null | string;
-}) {
-  const name = identity.profile.name.trim() || shortId(identity.id);
-  const handle = identity.profile.handle?.trim();
-
-  return (
-    <div className="ui-list-row mt-3">
-      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950">
-        <FallbackImage
-          src={pictureUrl}
-          alt=""
-          className="h-full w-full object-cover"
-          fallback={name.slice(0, 1).toUpperCase()}
-        />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-black">{name}</p>
-        <p className="truncate text-xs text-white/45">
-          {handle ? `@${handle}` : identity.id}
-        </p>
-      </div>
-    </div>
   );
 }
 

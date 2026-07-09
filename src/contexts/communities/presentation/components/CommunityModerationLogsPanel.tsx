@@ -12,6 +12,8 @@ import {
   formatTime,
   shortId,
 } from '../../../../shared/presentation/formatting';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { identityPicture } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function CommunityModerationLogsPanel({
   community,
@@ -95,17 +97,19 @@ function ModerationLogRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">{title}</h3>
-          <p className="mt-1 text-sm text-white/55">
-            {copy.communities.moderationActor}{' '}
-            <span className="font-semibold text-white/80">
-              {identityLabel(log.actorIdentityId, identityLookup)}
-            </span>
+          <p className="mt-1 text-xs text-white/45">
+            {copy.communities.moderationActor}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-black text-white/55">
           {formatTime(log.createdAt)}
         </span>
       </div>
+
+      <ModerationActor
+        identityId={log.actorIdentityId}
+        identityLookup={identityLookup}
+      />
 
       <div className="mt-3 grid border-t border-white/10 text-xs text-white/55">
         <div className="grid gap-1 border-b border-white/10 py-2 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3">
@@ -127,6 +131,28 @@ function ModerationLogRow({
         ))}
       </div>
     </article>
+  );
+}
+
+function ModerationActor({
+  identityId,
+  identityLookup,
+}: {
+  identityId: string;
+  identityLookup: Record<string, IdentityResource>;
+}) {
+  const identity = identityLookup[identityId];
+
+  return (
+    <IdentityMemberRow
+      className="mt-3 !rounded-lg !bg-white/[0.04]"
+      interactive={false}
+      item={{
+        identity,
+        identityId,
+        pictureUrl: identity ? identityPicture(identity) : null,
+      }}
+    />
   );
 }
 
@@ -193,7 +219,9 @@ function detailLabel(value: unknown, roles: CommunityRoleResource[]): string {
 }
 
 function prettify(value: string): string {
-  return value.replace(/_/g, ' ');
+  const words = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+
+  return `${words.slice(0, 1).toUpperCase()}${words.slice(1)}`;
 }
 
 function permissionLabel(value: string): string {

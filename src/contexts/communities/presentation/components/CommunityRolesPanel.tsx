@@ -260,20 +260,16 @@ function PermissionToggle({
   return (
     <label
       className={cx(
-        'flex min-h-11 cursor-pointer items-center justify-between gap-3 border-b border-white/10 px-2 py-2 text-xs font-black transition last:border-b-0',
-        selected && sensitive
-          ? 'bg-amber-300/12 text-amber-50'
-          : selected
-            ? 'bg-cyan-300/10 text-cyan-50'
-            : sensitive
-              ? 'text-amber-50/80 hover:bg-amber-300/[0.06]'
-              : 'text-white/70 hover:bg-white/[0.05] hover:text-white',
+        'flex min-h-12 cursor-pointer items-center justify-between gap-3 border-b border-white/10 px-2 py-2 text-xs transition last:border-b-0 hover:bg-white/[0.04]',
+        sensitive ? 'text-amber-50/85' : 'text-white/75',
       )}
     >
       <span className="min-w-0">
-        <span className="block truncate">{permissionLabel(permission)}</span>
+        <span className="block truncate font-bold">
+          {permissionLabel(permission)}
+        </span>
         {sensitive && (
-          <span className="mt-0.5 block text-[0.6rem] uppercase tracking-[0.12em] opacity-70">
+          <span className="mt-0.5 block text-[0.6rem] font-black uppercase tracking-[0.12em] text-amber-200/55">
             {copy.communities.sensitivePermission}
           </span>
         )}
@@ -281,15 +277,20 @@ function PermissionToggle({
       <span
         aria-hidden="true"
         className={cx(
-          'grid h-5 w-5 shrink-0 place-items-center rounded border text-[0.65rem]',
+          'relative h-6 w-11 shrink-0 rounded-full border transition',
           selected
             ? sensitive
-              ? 'border-amber-100 bg-amber-100 text-amber-950'
-              : 'border-[#171426] bg-[#171426] text-white'
-            : 'border-white/35',
+              ? 'border-amber-200/35 bg-amber-300/45'
+              : 'border-cyan-200/30 bg-cyan-400/55'
+            : 'border-white/12 bg-white/10',
         )}
       >
-        {selected ? '✓' : ''}
+        <span
+          className={cx(
+            'absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-sm transition',
+            selected ? 'left-[1.3rem]' : 'left-0.5',
+          )}
+        />
       </span>
       <input
         type="checkbox"

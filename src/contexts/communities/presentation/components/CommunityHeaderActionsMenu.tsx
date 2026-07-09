@@ -14,6 +14,7 @@ type CommunityHeaderActionsMenuProps = {
   open: boolean;
   showCommunityKeyAction?: boolean;
   onClose: () => void;
+  onAddMember?: () => void;
   onCommunityDataOpen: () => void;
   onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
@@ -30,6 +31,7 @@ export function CommunityHeaderActionsMenu({
   open,
   showCommunityKeyAction = true,
   onClose,
+  onAddMember,
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
@@ -72,6 +74,17 @@ export function CommunityHeaderActionsMenu({
         className="app-context-menu absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
         data-state={state}
       >
+        {onAddMember ? (
+          <CommunityHeaderMenuAction
+            className="xl:hidden"
+            icon={<AddMemberMenuIcon />}
+            label={copy.communities.addMember}
+            onClick={() => {
+              onAddMember();
+              close();
+            }}
+          />
+        ) : null}
         {onOpenPins ? (
           <CommunityHeaderMenuAction
             icon={<PinMenuIcon />}
@@ -115,7 +128,9 @@ export function CommunityHeaderActionsMenu({
           <CommunityHeaderMenuAction
             icon={<KeyMenuIcon />}
             label={
-              hasCommunityKey ? copy.chat.copyPrivateKey : copy.chat.addPrivateKey
+              hasCommunityKey
+                ? copy.chat.copyPrivateKey
+                : copy.chat.addPrivateKey
             }
             onClick={onCommunityKeyOpen}
           />
@@ -123,12 +138,33 @@ export function CommunityHeaderActionsMenu({
         <CommunityHeaderMenuAction
           disabled={communityLeaving}
           icon={<LeaveMenuIcon />}
-          label={communityLeaving ? copy.communities.leaving : copy.communities.leave}
+          label={
+            communityLeaving ? copy.communities.leaving : copy.communities.leave
+          }
           onClick={onLeaveCommunity}
           tone="danger"
         />
       </div>
     </>
+  );
+}
+
+function AddMemberMenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M15.5 19a6.5 6.5 0 0 0-13 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM18.5 8v6M15.5 11h6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
