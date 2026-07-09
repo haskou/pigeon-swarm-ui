@@ -661,6 +661,7 @@ export function Composer({
           )}
           <input
             ref={fileInputRef}
+            data-testid="composer-file-input"
             type="file"
             multiple
             onChange={handleFilesSelected}
@@ -712,7 +713,9 @@ export function Composer({
             data-testid="message-send-button"
             className={cx(
               'shrink-0 items-center justify-center rounded-xl bg-white text-sm font-black text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-45',
-              showMobileSendButton ? 'inline-grid sm:inline-flex' : 'hidden sm:inline-flex',
+              showMobileSendButton
+                ? 'inline-grid sm:inline-flex'
+                : 'hidden sm:inline-flex',
               isEditing
                 ? 'px-3 py-2 sm:px-4'
                 : 'h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2',
