@@ -1,16 +1,9 @@
+import type { EncodedCallMediaFrame } from './EncodedCallMediaFrame';
+import type { EncodedCallMediaFrameStreams } from './EncodedCallMediaFrameStreams';
+import type { EncodedCallMediaStreamOwner } from './EncodedCallMediaStreamOwner';
+
 const frameMarker = new Uint8Array([0x50, 0x53, 0x43, 0x45, 0x31]);
 const nonceLength = 12;
-
-type EncodedFrame = RTCEncodedAudioFrame | RTCEncodedVideoFrame;
-
-type EncodedFrameStreams = {
-  readable: ReadableStream<EncodedFrame>;
-  writable: WritableStream<EncodedFrame>;
-};
-
-type EncodedStreamOwner = {
-  createEncodedStreams?: () => EncodedFrameStreams;
-};
 
 function base64ToBytes(value: string): Uint8Array {
   const binary = atob(value);
@@ -50,11 +43,14 @@ function hasEncryptedFrameMarker(bytes: Uint8Array): boolean {
   return frameMarker.every((byte, index) => bytes[index] === byte);
 }
 
-function isEncodedStreamOwner(value: unknown): value is EncodedStreamOwner {
+function isEncodedStreamOwner(
+  value: unknown,
+): value is EncodedCallMediaStreamOwner {
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as EncodedStreamOwner).createEncodedStreams === 'function'
+    typeof (value as EncodedCallMediaStreamOwner).createEncodedStreams ===
+      'function'
   );
 }
 
@@ -76,6 +72,32 @@ export class EncodedCallMediaCipher {
   private readonly configuredReceivers = new WeakSet<RTCRtpReceiver>();
 
   private readonly configuredSenders = new WeakSet<RTCRtpSender>();
+
+  private static configureEncodedStreams(
+    owner: EncodedCallMediaStreamOwner,
+    transform: TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>,
+  ): boolean {
+    let streams: EncodedCallMediaFrameStreams | undefined;
+
+    try {
+      streams = owner.createEncodedStreams?.();
+    } catch {
+      return false;
+    }
+
+    if (!streams) return false;
+
+    void streams.readable
+      .pipeThrough(transform)
+      .pipeTo(streams.writable)
+      .catch(() => undefined);
+
+    return true;
+  }
+
+  public static isSupported(): boolean {
+    return encodedStreamsSupported();
+  }
 
   public constructor(private readonly base64Key: string) {
     this.cryptoKey = this.importCryptoKey();
@@ -127,56 +149,41 @@ export class EncodedCallMediaCipher {
 
   private senderTransform(
     shouldEncrypt: () => boolean,
-  ): TransformStream<EncodedFrame, EncodedFrame> {
-    return new TransformStream<EncodedFrame, EncodedFrame>({
+  ): TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame> {
+    return new TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>({
       transform: async (frame, controller): Promise<void> => {
+        const transformedFrame = frame;
+
         if (shouldEncrypt()) {
-          frame.data = await this.encryptFrameData(frame.data);
+          transformedFrame.data = await this.encryptFrameData(
+            transformedFrame.data,
+          );
         }
 
-        controller.enqueue(frame);
+        controller.enqueue(transformedFrame);
       },
     });
   }
 
-  private receiverTransform(): TransformStream<EncodedFrame, EncodedFrame> {
-    return new TransformStream<EncodedFrame, EncodedFrame>({
+  private receiverTransform(): TransformStream<
+    EncodedCallMediaFrame,
+    EncodedCallMediaFrame
+  > {
+    return new TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>({
       transform: async (frame, controller): Promise<void> => {
         try {
-          frame.data = await this.decryptFrameData(frame.data);
-          controller.enqueue(frame);
+          const transformedFrame = frame;
+
+          transformedFrame.data = await this.decryptFrameData(
+            transformedFrame.data,
+          );
+          controller.enqueue(transformedFrame);
         } catch {
           // Drop frames that cannot be authenticated instead of passing
           // ciphertext to the media decoder.
         }
       },
     });
-  }
-
-  private static configureEncodedStreams(
-    owner: EncodedStreamOwner,
-    transform: TransformStream<EncodedFrame, EncodedFrame>,
-  ): boolean {
-    let streams: EncodedFrameStreams | undefined;
-
-    try {
-      streams = owner.createEncodedStreams?.();
-    } catch {
-      return false;
-    }
-
-    if (!streams) return false;
-
-    void streams.readable
-      .pipeThrough(transform)
-      .pipeTo(streams.writable)
-      .catch(() => undefined);
-
-    return true;
-  }
-
-  public static isSupported(): boolean {
-    return encodedStreamsSupported();
   }
 
   public configureSender(

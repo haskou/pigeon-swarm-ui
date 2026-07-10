@@ -120,6 +120,10 @@ export class CallPeerConnectionManager {
 
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
+  public static mediaEncryptionSupported(): boolean {
+    return EncodedCallMediaCipher.isSupported();
+  }
+
   private setRemoteAudioChannelVolume(
     audioKey: string,
     volumePercent: number,
@@ -1237,10 +1241,6 @@ export class CallPeerConnectionManager {
   public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {
     this.rtcConfigurationProvider = rtcConfigurationProvider;
     logCallDebug('peer-manager:configure');
-  }
-
-  public static mediaEncryptionSupported(): boolean {
-    return EncodedCallMediaCipher.isSupported();
   }
 
   public configureMediaEncryption(
