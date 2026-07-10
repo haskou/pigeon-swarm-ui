@@ -150,6 +150,7 @@ function ModerationActor({
       item={{
         identity,
         identityId,
+        name: identity ? undefined : shortId(identityId),
         pictureUrl: identity ? identityPicture(identity) : null,
       }}
     />
