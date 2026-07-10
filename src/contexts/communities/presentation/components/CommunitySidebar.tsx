@@ -149,9 +149,7 @@ export function CommunitySidebar({
       <button
         className={cx(
           'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-          mobileSidebarOpen
-            ? 'opacity-100'
-            : 'pointer-events-none opacity-0',
+          mobileSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={onMobileSidebarClose}
         aria-label={copy.workspace.closeSidebar}
@@ -166,14 +164,14 @@ export function CommunitySidebar({
       >
         <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
           <div className="lg:hidden">{mobileRail}</div>
-          <div className="glass-panel-strong flex h-full min-h-0 flex-col rounded-none p-4">
+          <div className="ui-sidebar flex h-full min-h-0 flex-col p-4">
             <div className="min-w-0">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {communityIsPublic
                   ? copy.communities.publicCommunity
                   : copy.communities.privateCommunity}
               </div>
-              <div className="mt-3 overflow-hidden rounded-2xl bg-white/8 text-left">
+              <div className="mt-3 overflow-hidden border-y border-white/10 text-left">
                 {bannerUrl ? (
                   <button
                     type="button"
@@ -192,18 +190,18 @@ export function CommunitySidebar({
                     {community.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <div className="p-4">
-                  <h2 className="truncate text-xl font-black">
+                <div className="py-3">
+                  <h2 className="truncate text-lg font-black">
                     {community.name}
                   </h2>
-                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
+                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-white/55">
                     {community.description}
                   </p>
                   {canManageCommunity && (
                     <button
                       type="button"
                       onClick={onManageOpen}
-                      className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-xl shadow-fuchsia-950/20 transition hover:bg-fuchsia-400"
+                      className="ui-button ui-button-primary mt-3 w-full"
                     >
                       {copy.communities.manage}
                     </button>

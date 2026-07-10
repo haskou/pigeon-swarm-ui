@@ -18,15 +18,15 @@ export function IpfsLinksPanel({ links }: { links: IpfsLink[] }) {
   };
 
   return (
-    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+    <div className="mb-4">
       <div className="text-xs font-black uppercase tracking-[0.16em] text-white/40">
         {copy.ipfs.links}
       </div>
-      <div className="mt-3 grid gap-2">
+      <div className="mt-2 divide-y divide-white/10 border-y border-white/10">
         {links.map((link) => (
           <div
             key={`${link.path}:${link.cid}`}
-            className="flex min-w-0 items-center gap-2 rounded-2xl bg-black/25 p-2 text-xs"
+            className="flex min-w-0 items-center gap-2 py-3 text-xs"
           >
             <a
               href={link.url}
@@ -44,7 +44,7 @@ export function IpfsLinksPanel({ links }: { links: IpfsLink[] }) {
             <button
               type="button"
               onClick={() => void copyUrl(link.url)}
-              className="shrink-0 rounded-xl bg-white/10 px-2.5 py-1.5 font-black text-white/65 transition hover:bg-white/15 hover:text-white"
+              className="ui-button min-h-8 shrink-0 px-2.5 py-1 text-xs"
             >
               {copiedUrl === link.url ? copy.profile.copied : copy.profile.copy}
             </button>
@@ -52,7 +52,7 @@ export function IpfsLinksPanel({ links }: { links: IpfsLink[] }) {
               href={link.url}
               target="_blank"
               rel="noreferrer"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
+              className="ui-icon-button h-8 w-8 shrink-0"
               aria-label={copy.ipfs.open}
             >
               ↗

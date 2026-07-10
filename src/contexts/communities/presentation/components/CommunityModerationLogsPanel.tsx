@@ -12,6 +12,8 @@ import {
   formatTime,
   shortId,
 } from '../../../../shared/presentation/formatting';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { identityPicture } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function CommunityModerationLogsPanel({
   community,
@@ -36,18 +38,18 @@ export function CommunityModerationLogsPanel({
   ];
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+    <section className="ui-list-block">
       <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.moderationLogs}
       </div>
       {logs.length === 0 ? (
-        <div className="rounded-2xl bg-white/8 p-4 text-sm text-white/45">
+        <div className="border-y border-white/10 py-5 text-sm text-white/45">
           {loading
             ? copy.communities.moderationLogsLoading
             : copy.communities.noModerationLogs}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-white/10 border-y border-white/10">
           {logs.map((log) => (
             <ModerationLogRow
               channels={channels}
@@ -64,14 +66,14 @@ export function CommunityModerationLogsPanel({
           type="button"
           onClick={onLoadMore}
           disabled={loading}
-          className="mt-4 rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+          className="ui-button mt-4 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {loading
             ? copy.communities.moderationLogsLoading
             : copy.communities.loadMoreModerationLogs}
         </button>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -91,15 +93,12 @@ function ModerationLogRow({
   const target = targetLabel(log, channels, roles, identityLookup);
 
   return (
-    <article className="rounded-2xl bg-white/8 p-4">
+    <article className="py-4 first:pt-2 last:pb-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">{title}</h3>
-          <p className="mt-1 text-sm text-white/55">
-            {copy.communities.moderationActor}{' '}
-            <span className="font-semibold text-white/80">
-              {identityLabel(log.actorIdentityId, identityLookup)}
-            </span>
+          <p className="mt-1 text-xs text-white/45">
+            {copy.communities.moderationActor}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-black text-white/55">
@@ -107,26 +106,54 @@ function ModerationLogRow({
         </span>
       </div>
 
-      <div className="mt-3 grid gap-2 rounded-2xl bg-black/20 p-3 text-xs text-white/55">
-        <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3">
+      <ModerationActor
+        identityId={log.actorIdentityId}
+        identityLookup={identityLookup}
+      />
+
+      <div className="mt-3 grid border-t border-white/10 text-xs text-white/55">
+        <div className="grid gap-1 border-b border-white/10 py-2 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3">
           <span className="min-w-0">{copy.communities.moderationTarget}</span>
-          <span className="min-w-0 break-words text-right font-semibold text-white/70">
+          <span className="min-w-0 break-all font-semibold text-white/70 sm:text-right">
             {target}
           </span>
         </div>
         {Object.entries(log.details ?? {}).map(([key, value]) => (
           <div
-            className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3"
+            className="grid gap-1 border-b border-white/10 py-2 last:border-b-0 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3"
             key={key}
           >
-            <span className="min-w-0">{prettify(key)}</span>
-            <span className="min-w-0 break-words text-right font-semibold text-white/70">
+            <span className="min-w-0 break-all">{prettify(key)}</span>
+            <span className="min-w-0 break-all font-semibold text-white/70 sm:text-right">
               {detailLabel(value, roles)}
             </span>
           </div>
         ))}
       </div>
     </article>
+  );
+}
+
+function ModerationActor({
+  identityId,
+  identityLookup,
+}: {
+  identityId: string;
+  identityLookup: Record<string, IdentityResource>;
+}) {
+  const identity = identityLookup[identityId];
+
+  return (
+    <IdentityMemberRow
+      className="mt-3 !rounded-lg !bg-white/[0.04]"
+      interactive={false}
+      item={{
+        identity,
+        identityId,
+        name: identity ? undefined : shortId(identityId),
+        pictureUrl: identity ? identityPicture(identity) : null,
+      }}
+    />
   );
 }
 
@@ -193,7 +220,9 @@ function detailLabel(value: unknown, roles: CommunityRoleResource[]): string {
 }
 
 function prettify(value: string): string {
-  return value.replace(/_/g, ' ');
+  const words = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+
+  return `${words.slice(0, 1).toUpperCase()}${words.slice(1)}`;
 }
 
 function permissionLabel(value: string): string {

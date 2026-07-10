@@ -1,4 +1,4 @@
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogHeader as SharedDialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 
 export function DialogHeader({
   onClose,
@@ -7,19 +7,7 @@ export function DialogHeader({
   onClose: () => void;
   title: string;
 }) {
-  return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-      <button
-        type="button"
-        onClick={onClose}
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-        aria-label={copy.dialog.close}
-      >
-        ×
-      </button>
-    </div>
-  );
+  return <SharedDialogHeader title={title} onClose={onClose} />;
 }
 
 export function VoiceIcon() {

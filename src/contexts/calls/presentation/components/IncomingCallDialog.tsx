@@ -32,8 +32,8 @@ export function IncomingCallDialog({
 
   return (
     <div className="fixed inset-0 z-[95] grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
-      <section className="glass-panel-strong w-full max-w-sm rounded-2xl p-5 text-center shadow-2xl shadow-black/50">
-        <div className="mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950">
+      <section className="ui-dialog-surface w-full max-w-sm p-5 text-center shadow-2xl shadow-black/50">
+        <div className="mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950">
           {caller?.picture ? (
             <img
               src={caller.picture}
@@ -57,14 +57,14 @@ export function IncomingCallDialog({
           <button
             type="button"
             onClick={onDecline}
-            className="rounded-2xl bg-rose-500 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-400"
+            className="ui-button border-rose-300/25 bg-rose-500/20 text-rose-50 hover:bg-rose-500/30"
           >
             {copy.calls.decline}
           </button>
           <button
             type="button"
             onClick={onAccept}
-            className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-300"
+            className="ui-button border-emerald-300/30 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
           >
             {copy.calls.answer}
           </button>

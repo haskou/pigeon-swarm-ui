@@ -47,6 +47,8 @@ import {
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 
@@ -59,7 +61,7 @@ const ImageCropEditor = lazy(() =>
 );
 
 const profileEditorInputClass =
-  'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-white/30 focus:border-cyan-300/50 focus:bg-black/25';
+  'ui-field-control px-4 py-3 placeholder:text-white/30';
 
 type ProfileEditorSection = 'keychain' | 'networks' | 'profile' | 'security';
 
@@ -148,8 +150,7 @@ export function ProfileEditor({
     localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
   const needsCurrentPasswordForPasskey =
     !wantsPasswordChange &&
-    (passkeyPrfChanged ||
-      (localPasskeyPrfChanged && localPasskeyPrfEnabled));
+    (passkeyPrfChanged || (localPasskeyPrfChanged && localPasskeyPrfEnabled));
   const needsRecoveryKeyForPasskey =
     needsCurrentPasswordForPasskey && hasRecoveryKey;
   const canChangePassword =
@@ -402,31 +403,21 @@ export function ProfileEditor({
       />
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 [--app-safe-area-fullscreen-desktop-padding:1.5rem] sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden sm:h-[88vh] sm:max-h-[88vh] sm:max-w-5xl"
         data-state={transitionState}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
-          <h2 className="text-xl font-black">{copy.profile.edit}</h2>
-          <button
-            type="button"
-            onClick={requestClose}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
+        <DialogHeader title={copy.profile.edit} onClose={requestClose} />
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
-          <ProfileEditorNavigation
+        <div className="ui-settings-layout">
+          <SettingsNavigation
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             sections={sections}
           />
-          <div className="profile-editor-scroll min-h-0 overflow-y-auto pr-1">
+          <div className="ui-settings-content profile-editor-scroll">
             <div className="mx-auto w-full max-w-3xl">
               {activeSection === 'profile' && (
-                <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/10">
+                <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-black/10">
                   <button
                     type="button"
                     onClick={() => bannerInputRef.current?.click()}
@@ -449,7 +440,7 @@ export function ProfileEditor({
                     <button
                       type="button"
                       onClick={() => pictureInputRef.current?.click()}
-                      className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-2xl border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
+                      className="group relative -mt-8 grid h-[4.75rem] w-[4.75rem] place-items-center overflow-hidden rounded-lg border-[3px] border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
                       aria-label={copy.profile.changePicture}
                     >
                       {picturePreview ? (
@@ -474,7 +465,7 @@ export function ProfileEditor({
                           maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
                           className={cx(
                             profileEditorInputClass,
-                            'text-lg font-black',
+                            'text-base font-semibold',
                           )}
                         />
                       </ProfileEditorField>
@@ -489,7 +480,7 @@ export function ProfileEditor({
                           placeholder="@ada"
                           className={cx(
                             profileEditorInputClass,
-                            'text-sm font-bold text-white/70',
+                            'text-sm font-medium text-white/75',
                           )}
                         />
                       </ProfileEditorField>
@@ -526,7 +517,7 @@ export function ProfileEditor({
               )}
               <div className="grid min-w-0 gap-3">
                 {activeSection === 'networks' && (
-                  <section className="rounded-2xl border border-white/[0.06] bg-black/10 px-4 py-3">
+                  <section className="ui-section py-3">
                     <div className="text-sm font-black text-white/70">
                       {copy.profile.networks}
                     </div>
@@ -573,7 +564,7 @@ export function ProfileEditor({
                         disabled={
                           !networkToAdd || nodeNetworkOptions.length === 0
                         }
-                        className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/25 disabled:hover:bg-white/5"
+                        className="ui-button"
                       >
                         {copy.profile.addNetwork}
                       </button>
@@ -581,7 +572,7 @@ export function ProfileEditor({
                   </section>
                 )}
                 {activeSection === 'security' && (
-                  <section className="rounded-2xl border border-white/[0.06] bg-black/10">
+                  <section className="ui-section">
                     <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
                       {copy.profile.security}
                     </div>
@@ -634,7 +625,7 @@ export function ProfileEditor({
                             type="password"
                           />
                           {hasRecoveryKey && (
-                            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
+                            <div className="ui-inline-notice border-amber-300/40 bg-amber-300/10">
                               <div className="text-xs font-black text-amber-50">
                                 {copy.profile.recoveryKeyRequiredTitle}
                               </div>
@@ -662,50 +653,52 @@ export function ProfileEditor({
                       </div>
                     )}
                     <div className="border-t border-white/[0.06] px-4 py-4">
-                        <div className="mb-3">
-                          <div className="text-sm font-black text-white/75">
-                            {copy.profile.localDeviceUnlockSection}
-                          </div>
-                          <p className="mt-1 text-xs leading-relaxed text-white/45">
-                            {copy.profile.localDeviceUnlockSectionHelp}
-                          </p>
+                      <div className="mb-3">
+                        <div className="text-sm font-black text-white/75">
+                          {copy.profile.localDeviceUnlockSection}
                         </div>
-                        <ProfileSwitchButton
-                          checked={deviceUnlockEnabled}
-                          disabled={!canEnableDeviceUnlock && !deviceUnlockEnabled}
-                          help={
-                            deviceUnlockEnabled
+                        <p className="mt-1 text-xs leading-relaxed text-white/45">
+                          {copy.profile.localDeviceUnlockSectionHelp}
+                        </p>
+                      </div>
+                      <ProfileSwitchButton
+                        checked={deviceUnlockEnabled}
+                        disabled={
+                          !canEnableDeviceUnlock && !deviceUnlockEnabled
+                        }
+                        help={
+                          deviceUnlockEnabled
+                            ? copy.profile.localDeviceUnlockHelp
+                            : passkeyPrfAvailable
                               ? copy.profile.localDeviceUnlockHelp
-                              : passkeyPrfAvailable
-                                ? copy.profile.localDeviceUnlockHelp
-                                : copy.profile.localDeviceUnlockUnavailable
-                          }
-                          label={copy.profile.localDeviceUnlock}
-                          onClick={toggleDeviceUnlock}
-                        />
-                        {needsCurrentPasswordForPasskey && (
-                          <div className="mt-4 grid gap-3">
+                              : copy.profile.localDeviceUnlockUnavailable
+                        }
+                        label={copy.profile.localDeviceUnlock}
+                        onClick={toggleDeviceUnlock}
+                      />
+                      {needsCurrentPasswordForPasskey && (
+                        <div className="mt-4 grid gap-3">
+                          <ProfileInput
+                            label={copy.profile.currentPassword}
+                            value={currentPasswordForPasskey}
+                            onChange={setCurrentPasswordForPasskey}
+                            placeholder="••••••••••••"
+                            type="password"
+                          />
+                          {needsRecoveryKeyForPasskey && (
                             <ProfileInput
-                              label={copy.profile.currentPassword}
-                              value={currentPasswordForPasskey}
-                              onChange={setCurrentPasswordForPasskey}
-                              placeholder="••••••••••••"
+                              label={copy.profile.recoveryKeyForPassword}
+                              value={passwordRecoveryKey}
+                              onChange={setPasswordRecoveryKey}
+                              placeholder="psrk1..."
                               type="password"
                             />
-                            {needsRecoveryKeyForPasskey && (
-                              <ProfileInput
-                                label={copy.profile.recoveryKeyForPassword}
-                                value={passwordRecoveryKey}
-                                onChange={setPasswordRecoveryKey}
-                                placeholder="psrk1..."
-                                type="password"
-                              />
-                            )}
-                            <p className="mt-2 text-xs leading-relaxed text-white/45">
-                              {copy.profile.currentPasswordForPasskeyHelp}
-                            </p>
-                          </div>
-                        )}
+                          )}
+                          <p className="mt-2 text-xs leading-relaxed text-white/45">
+                            {copy.profile.currentPasswordForPasskeyHelp}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}
@@ -721,7 +714,7 @@ export function ProfileEditor({
               </div>
 
               {error && (
-                <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                <div className="ui-inline-notice mt-4 border-rose-300/50 bg-rose-500/10 text-rose-100">
                   {error}
                 </div>
               )}
@@ -729,10 +722,10 @@ export function ProfileEditor({
           </div>
         </div>
 
-        <div className="mt-5 flex shrink-0 justify-end border-t border-white/[0.06] pt-4">
+        <div className="flex shrink-0 justify-end border-t border-white/[0.06] px-5 py-4">
           <button
             disabled={!canSubmit}
-            className="rounded-2xl border border-fuchsia-300/30 bg-fuchsia-500 px-5 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.08] disabled:text-white/45 disabled:hover:bg-white/[0.08]"
+            className="ui-button ui-button-primary px-5"
             data-testid="profile-save-button"
           >
             {state === 'loading' ? copy.profile.saving : copy.profile.save}
@@ -792,36 +785,6 @@ function ProfileInput({
         className={cx(profileEditorInputClass, 'text-sm font-normal')}
       />
     </label>
-  );
-}
-
-function ProfileEditorNavigation({
-  activeSection,
-  onSectionChange,
-  sections,
-}: {
-  activeSection: ProfileEditorSection;
-  onSectionChange: (section: ProfileEditorSection) => void;
-  sections: ReadonlyArray<readonly [ProfileEditorSection, string]>;
-}) {
-  return (
-    <nav className="mb-4 flex w-full max-w-full flex-wrap gap-2 overflow-visible rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1">
-      {sections.map(([section, label]) => (
-        <button
-          key={section}
-          type="button"
-          onClick={() => onSectionChange(section)}
-          className={cx(
-            'shrink-0 whitespace-nowrap rounded-xl border px-3 py-2 text-left text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 sm:block sm:w-full',
-            activeSection === section
-              ? 'border-white/10 bg-white/[0.09] text-white'
-              : 'border-transparent text-white/55 hover:bg-white/8',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </nav>
   );
 }
 
@@ -909,8 +872,8 @@ function KeychainSection({
   };
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-black/10">
-      <div className="border-b border-white/[0.06] px-4 py-3">
+    <section className="ui-section">
+      <div className="border-b border-white/[0.06] py-3">
         <div className="text-sm font-black text-white/70">
           {copy.profile.keychainTab}
         </div>
@@ -918,17 +881,14 @@ function KeychainSection({
           {copy.profile.keychainHelp}
         </p>
       </div>
-      <div className="grid gap-2 p-4">
+      <div>
         {entries.length === 0 ? (
-          <div className="rounded-2xl bg-white/[0.06] p-4 text-sm font-semibold text-white/45">
+          <div className="py-5 text-sm font-semibold text-white/45">
             {copy.profile.noKeychainKeys}
           </div>
         ) : (
           entries.map((entry) => (
-            <div
-              key={entry.id}
-              className="rounded-2xl border border-white/[0.06] bg-black/20 p-3"
-            >
+            <div key={entry.id} className="ui-list-block">
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-black text-white/80">
@@ -940,11 +900,11 @@ function KeychainSection({
                     </div>
                   )}
                 </div>
-                <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] font-black uppercase text-white/55">
+                <span className="shrink-0 text-[0.65rem] font-black uppercase text-white/45">
                   {entry.algorithm}
                 </span>
               </div>
-              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-xs">
+              <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-white/[0.06] pt-2 text-xs">
                 <span className="min-w-0 flex-1 truncate font-mono text-white/45">
                   ••••••••••••••••••••••••
                 </span>
@@ -1168,7 +1128,7 @@ function ProfileEditorField({
   label: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-black uppercase tracking-[0.16em] text-white/55">
+    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
       {label}
       {children}
     </label>

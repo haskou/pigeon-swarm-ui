@@ -8,6 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -80,35 +81,20 @@ export function NotificationScopeSettingsDialog({
         role="dialog"
         aria-modal="true"
         aria-label={copy.notifications.settingsTitle}
-        className="app-overlay-surface fixed left-1/2 top-1/2 z-[130] max-h-[86vh] w-[min(92vw,500px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-[#1f2029] p-5 text-white shadow-2xl shadow-black/50"
+        className="app-overlay-surface ui-dialog-surface fixed left-1/2 top-1/2 z-[130] flex max-h-[86vh] w-[min(92vw,500px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden text-white"
         data-state={state}
       >
-        <header className="mb-4 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="text-xl font-black leading-tight text-white">
-              {copy.notifications.settingsTitle}
-            </h2>
-            <p className="mt-1 truncate text-sm font-semibold text-white/50">
-              {target.title}
-              {target.subtitle ? (
-                <span className="font-medium text-white/35">
-                  {' '}
-                  · {target.subtitle}
-                </span>
-              ) : null}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.06] text-lg font-black leading-none text-white/50 transition hover:bg-white/[0.12] hover:text-white"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </header>
+        <DialogHeader
+          description={
+            target.subtitle
+              ? `${target.title} · ${target.subtitle}`
+              : target.title
+          }
+          title={copy.notifications.settingsTitle}
+          onClose={close}
+        />
 
-        <div className="space-y-5">
+        <div className="min-h-0 space-y-5 overflow-y-auto px-5 py-4">
           <section className="grid gap-2">
             <SectionTitle label={copy.notifications.receiveNotifications} />
             <NotificationLevelOption
@@ -153,7 +139,7 @@ export function NotificationScopeSettingsDialog({
                           : current.notificationLevel,
                     })
                   }
-                  className="min-h-10 rounded-xl border border-white/10 bg-white/[0.06] px-2 text-center text-sm font-black text-white/75 transition hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white"
+                  className="ui-button min-h-10 px-2 text-center text-sm"
                 >
                   {duration.label}
                 </button>
@@ -165,7 +151,7 @@ export function NotificationScopeSettingsDialog({
                 save({ mutedUntil: null, notificationLevel: 'none' })
               }
               className={cx(
-                'min-h-11 rounded-xl border px-3 text-center text-sm font-black transition',
+                'ui-button min-h-11 px-3 text-center text-sm',
                 muted && current.mutedUntil === null
                   ? 'border-violet-200/30 bg-violet-400/20 text-white'
                   : 'border-white/10 bg-white/[0.06] text-white/75 hover:border-violet-200/30 hover:bg-violet-400/10 hover:text-white',
@@ -177,7 +163,7 @@ export function NotificationScopeSettingsDialog({
 
           <section className="grid gap-3">
             <SectionTitle label={copy.notifications.advancedOptions} />
-            <div className="rounded-2xl bg-black/12 p-2">
+            <div className="border-y border-white/10 py-1">
               <ToggleGroup title={copy.notifications.mentionsOptions}>
                 <SwitchRow
                   checked={current.suppressEveryoneAndHere}
@@ -212,7 +198,7 @@ export function NotificationScopeSettingsDialog({
           </section>
 
           {error ? (
-            <div className="rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm font-black text-rose-100">
+            <div className="ui-inline-notice border-rose-300/20 bg-rose-500/10 text-sm font-bold text-rose-100">
               {error}
             </div>
           ) : null}
@@ -221,14 +207,14 @@ export function NotificationScopeSettingsDialog({
             <button
               type="button"
               onClick={() => onReset(target.scope)}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/10 hover:text-white"
+              className="ui-button"
             >
               {copy.notifications.restoreDefault}
             </button>
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-xl bg-[#8b6cff] px-5 py-2 text-sm font-black text-white shadow-lg shadow-[#8b6cff]/20 transition hover:bg-[#9b7dff]"
+              onClick={close}
+              className="ui-button ui-button-primary"
             >
               {copy.notifications.done}
             </button>
@@ -262,17 +248,17 @@ function NotificationLevelOption({
       type="button"
       onClick={onSelect}
       className={cx(
-        'flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border px-3 text-left text-sm font-black transition',
+        'flex min-h-12 w-full cursor-pointer items-center gap-3 border-l-2 px-3 text-left text-sm font-bold transition',
         checked
-          ? 'border-violet-200/30 bg-violet-400/20 text-white shadow-[inset_0_0_0_1px_rgba(196,181,253,0.08)]'
-          : 'border-transparent bg-white/[0.03] text-white/70 hover:bg-white/10 hover:text-white',
+          ? 'border-l-cyan-300/80 bg-cyan-300/10 text-cyan-50'
+          : 'border-l-transparent text-white/70 hover:bg-white/[0.06] hover:text-white',
       )}
     >
       <span
         className={cx(
           'grid h-5 w-5 shrink-0 place-items-center rounded-full border transition',
           checked
-            ? 'border-violet-200 bg-[#7f6cff]'
+            ? 'border-cyan-200 bg-cyan-400/70'
             : 'border-white/25 bg-transparent',
         )}
       >
@@ -310,7 +296,7 @@ function SwitchRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-1 text-sm font-black text-white/75 transition hover:bg-white/10 hover:text-white">
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 px-2 py-1 text-sm font-semibold text-white/75 transition hover:bg-white/[0.06] hover:text-white">
       <span className="min-w-0 flex-1 leading-5">{label}</span>
       <input
         type="checkbox"

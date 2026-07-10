@@ -26,7 +26,7 @@ export function MyPacksPanel({
 }) {
   if (ownPacks.length === 0) {
     return (
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/45">
+      <div className="mt-4 border-y border-white/10 p-3 text-sm text-white/45">
         {copy.stickers.createPackFirst}
       </div>
     );
@@ -85,7 +85,7 @@ export function SavedPacksPanel({
         <input
           value={packSearch}
           onChange={(event) => setPackSearch(event.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none"
+          className="ui-field-control px-3 py-2 text-sm"
           placeholder={copy.stickers.searchPacks}
         />
         {searchingPacks && (
@@ -223,7 +223,7 @@ function ManagePackStickers({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <div className="border-b border-white/10 py-3 last:border-b-0">
       <div className="mb-2 truncate text-sm font-black">{pack.name}</div>
       <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
         {pack.stickers.map((sticker) => (
@@ -231,7 +231,7 @@ function ManagePackStickers({
             <img
               src={stickerAssetUrl(sticker.assetCid)}
               alt={copy.stickers.stickerAlt}
-              className="aspect-square w-full rounded-xl bg-black/20 object-contain p-1"
+              className="aspect-square w-full rounded-md bg-black/20 object-contain p-1"
             />
             <button
               type="button"
@@ -282,7 +282,7 @@ function PackRow({
   saved: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <div className="border-b border-white/10 py-3 last:border-b-0">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-black">{pack.name}</div>
@@ -290,7 +290,7 @@ function PackRow({
         <button
           type="button"
           onClick={() => void onSavePack(pack.id, saved)}
-          className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white/70 transition hover:bg-white/15"
+          className="ui-button min-h-8 px-3 py-1 text-xs"
         >
           {saved ? copy.stickers.removePack : copy.stickers.savePack}
         </button>

@@ -107,10 +107,7 @@ function IdentityName({
   if (!identity && (!cachedName || cachedName === identityId)) {
     return (
       <div
-        className={cx(
-          className,
-          'h-14 animate-pulse rounded-2xl bg-white/10',
-        )}
+        className={cx(className, 'h-14 animate-pulse rounded-lg bg-white/10')}
       />
     );
   }
@@ -121,7 +118,7 @@ function IdentityName({
       onClick={() => onOpen(identityId)}
       className={cx(
         className,
-        'block w-full rounded-2xl text-left transition hover:ring-1 hover:ring-white/15',
+        'block w-full rounded-lg text-left transition hover:bg-white/[0.04]',
       )}
     >
       <IdentityMemberRow
@@ -176,7 +173,7 @@ export function NotificationCard({
       data-testid="notification-card"
       data-notification-id={notification.id}
       data-notification-type={notification.type}
-      className="rounded-2xl border border-white/10 bg-black/25 p-4"
+      className="rounded-md border border-white/10 border-l-2 border-l-cyan-300/45 bg-white/[0.025] px-4 py-4 shadow-sm shadow-black/10"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -210,7 +207,7 @@ export function NotificationCard({
         )}
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white/[0.07] p-3 text-xs text-white/55">
+      <div className="mt-3 border-y border-white/[0.08] py-3 text-xs text-white/55">
         <div className="mb-3 border-b border-white/10 pb-3">
           {previewIdentityId ? (
             <IdentityName
@@ -275,7 +272,7 @@ export function NotificationCard({
               onClick={() => onAccept(notification)}
               disabled={action === 'accept'}
               data-testid="notification-accept-button"
-              className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-50"
+              className="ui-button ui-button-primary"
             >
               {copy.notifications.accept}
             </button>
@@ -284,7 +281,7 @@ export function NotificationCard({
               onClick={() => onDecline(notification.id)}
               disabled={action === 'decline'}
               data-testid="notification-decline-button"
-              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/75 transition hover:bg-white/15 disabled:opacity-50"
+              className="ui-button"
             >
               {copy.notifications.decline}
             </button>
@@ -294,7 +291,7 @@ export function NotificationCard({
           type="button"
           onClick={() => onArchive(notification.id)}
           data-testid="notification-archive-button"
-          className="rounded-2xl bg-white/[0.07] px-3 py-2 text-sm font-black text-white/55 transition hover:bg-white/[0.12]"
+          className="ui-button"
         >
           {copy.notifications.archive}
         </button>

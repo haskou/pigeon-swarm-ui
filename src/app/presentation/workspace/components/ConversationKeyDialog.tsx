@@ -2,6 +2,8 @@ import { createPortal } from 'react-dom';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 
 export function ConversationKeyDialog({
   encryptedConversationKey,
@@ -25,81 +27,79 @@ export function ConversationKeyDialog({
   saving: boolean;
 }) {
   const isCopy = mode === 'copy';
+  const { close, state } = useCloseTransition(onClose);
 
-  useCloseOnEscape(onClose);
+  useCloseOnEscape(close);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={state}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
-      <section className="glass-panel-strong relative z-10 w-full max-w-xl rounded-2xl p-5 shadow-2xl shadow-black/40">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-black">
-              {isCopy
-                ? copy.chat.copyPrivateKeyTitle
-                : copy.chat.addPrivateKeyTitle}
-            </h2>
-            <p className="mt-1 text-sm text-white/55">
-              {isCopy
-                ? copy.chat.copyPrivateKeyBody
-                : copy.chat.addPrivateKeyBody}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            &times;
-          </button>
+      <section
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[84vh] sm:max-w-xl"
+        data-state={state}
+      >
+        <DialogHeader
+          description={
+            isCopy ? copy.chat.copyPrivateKeyBody : copy.chat.addPrivateKeyBody
+          }
+          title={
+            isCopy
+              ? copy.chat.copyPrivateKeyTitle
+              : copy.chat.addPrivateKeyTitle
+          }
+          onClose={close}
+        />
+        <div className="min-h-0 overflow-y-auto px-5 py-4">
+          {isCopy ? (
+            <>
+              <textarea
+                readOnly
+                value={encryptedConversationKey}
+                className="ui-field-control h-40 resize-none p-4 font-mono text-xs leading-5 text-white/70"
+              />
+              <button
+                type="button"
+                onClick={onCopy}
+                disabled={!encryptedConversationKey}
+                className="ui-button ui-button-primary mt-4 w-full"
+              >
+                {copy.chat.copyPrivateKeyAction}
+              </button>
+            </>
+          ) : (
+            <>
+              <textarea
+                value={input}
+                onChange={(event) => onInputChange(event.target.value)}
+                placeholder={copy.chat.addPrivateKeyPlaceholder}
+                className="ui-field-control h-40 resize-none p-4 font-mono text-xs leading-5 text-white/70"
+              />
+              <button
+                type="button"
+                onClick={onImport}
+                disabled={saving || !input.trim()}
+                className="ui-button ui-button-primary mt-4 w-full"
+              >
+                {saving
+                  ? copy.chat.addPrivateKeySaving
+                  : copy.chat.addPrivateKeyAction}
+              </button>
+            </>
+          )}
+          {error ? (
+            <div className="ui-inline-notice mt-4 border-rose-300/20 bg-rose-500/10 text-sm font-bold text-rose-100">
+              {error}
+            </div>
+          ) : null}
         </div>
-        {isCopy ? (
-          <>
-            <textarea
-              readOnly
-              value={encryptedConversationKey}
-              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none"
-            />
-            <button
-              type="button"
-              onClick={onCopy}
-              disabled={!encryptedConversationKey}
-              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
-            >
-              {copy.chat.copyPrivateKeyAction}
-            </button>
-          </>
-        ) : (
-          <>
-            <textarea
-              value={input}
-              onChange={(event) => onInputChange(event.target.value)}
-              placeholder={copy.chat.addPrivateKeyPlaceholder}
-              className="mt-5 h-40 w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 font-mono text-xs leading-5 text-white/70 outline-none transition focus:border-fuchsia-300/60"
-            />
-            <button
-              type="button"
-              onClick={onImport}
-              disabled={saving || !input.trim()}
-              className="mt-4 w-full rounded-2xl bg-fuchsia-500 px-4 py-3 font-black text-white transition hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35"
-            >
-              {saving
-                ? copy.chat.addPrivateKeySaving
-                : copy.chat.addPrivateKeyAction}
-            </button>
-          </>
-        )}
-        {error ? (
-          <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 text-sm font-bold text-rose-100">
-            {error}
-          </div>
-        ) : null}
       </section>
     </div>,
     document.body,

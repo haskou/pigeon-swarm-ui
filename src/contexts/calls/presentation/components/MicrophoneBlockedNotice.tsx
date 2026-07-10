@@ -15,8 +15,8 @@ export function MicrophoneBlockedNotice({
   return (
     <div
       className={cx(
-        'rounded-2xl border border-amber-300/25 bg-amber-300/10 text-left',
-        compact ? 'p-3' : 'w-full p-4',
+        'border-l-2 border-amber-300/45 bg-amber-300/[0.08] text-left',
+        compact ? 'px-3 py-2' : 'w-full px-4 py-3',
       )}
       onClick={(event) => event.stopPropagation()}
     >
@@ -31,7 +31,7 @@ export function MicrophoneBlockedNotice({
       >
         {microphoneErrorText(call.microphoneError)}
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onRetryMicrophone}

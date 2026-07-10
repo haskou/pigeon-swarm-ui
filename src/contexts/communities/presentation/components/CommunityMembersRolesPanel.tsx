@@ -9,7 +9,7 @@ import { communityRoleDisplayName } from '../view-models/communityRoleDisplayNam
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
-import { MemberRow } from './MemberRow';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { memberPrimaryName } from './communityMemberNames';
 
 type PendingMemberAction = {
@@ -50,27 +50,23 @@ export function CommunityMembersRolesPanel({
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] =
-    useState<PendingMemberAction>(null);
-  const visibleMemberIds = useMemo(
-    () => {
-      const banned = new Set(bannedMemberIds);
+  const [pendingAction, setPendingAction] = useState<PendingMemberAction>(null);
+  const visibleMemberIds = useMemo(() => {
+    const banned = new Set(bannedMemberIds);
 
-      return memberIds
-        .filter((identityId) => !banned.has(identityId))
-        .filter((identityId) =>
-          matchesMemberSearch(
-            identityId,
-            memberIdentities[identityId],
-            memberSearch,
-          ),
-        );
-    },
-    [bannedMemberIds, memberIdentities, memberIds, memberSearch],
-  );
+    return memberIds
+      .filter((identityId) => !banned.has(identityId))
+      .filter((identityId) =>
+        matchesMemberSearch(
+          identityId,
+          memberIdentities[identityId],
+          memberSearch,
+        ),
+      );
+  }, [bannedMemberIds, memberIdentities, memberIds, memberSearch]);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+    <section className="ui-list-block">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
           {copy.communities.members}
@@ -84,9 +80,9 @@ export function CommunityMembersRolesPanel({
           value={memberSearch}
         />
       </div>
-      <div className="space-y-1.5">
+      <div className="divide-y divide-white/10 border-y border-white/10">
         {visibleMemberIds.length === 0 ? (
-          <div className="rounded-2xl bg-white/8 p-4 text-sm font-semibold text-white/45">
+          <div className="py-5 text-sm font-semibold text-white/45">
             {copy.communities.noMatchingMembers}
           </div>
         ) : (
@@ -101,22 +97,20 @@ export function CommunityMembersRolesPanel({
             const selectedRoleIds = memberRoleDrafts[identityId] ?? [];
 
             return (
-              <div
-                key={identityId}
-                className="rounded-2xl border border-white/10 bg-white/6"
-              >
+              <div key={identityId} className="py-1">
                 <div className="flex items-center gap-2 p-1.5">
                   <div className="min-w-0 flex-1">
-                    <MemberRow
-                      compact
-                      identity={memberIdentities[identityId]}
-                      identityId={identityId}
+                    <IdentityMemberRow
+                      item={{
+                        identity: memberIdentities[identityId],
+                        identityId,
+                        owner: identityId === ownerIdentityId,
+                        pictureUrl: memberPictures[identityId] ?? null,
+                      }}
                       onClick={() =>
                         setExpandedMemberId(expanded ? null : identityId)
                       }
-                      owner={identityId === ownerIdentityId}
-                      pictureUrl={memberPictures[identityId] ?? null}
-                      showBanner={false}
+                      ownerLabel={copy.communities.owner}
                     />
                   </div>
                   <MemberRoleSummary
@@ -128,7 +122,7 @@ export function CommunityMembersRolesPanel({
                     onClick={() =>
                       setExpandedMemberId(expanded ? null : identityId)
                     }
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-black text-white/60 transition hover:bg-white/15 hover:text-white"
+                    className="ui-icon-button h-9 w-9 shrink-0"
                     aria-expanded={expanded}
                     aria-label={memberName}
                   >
@@ -136,11 +130,11 @@ export function CommunityMembersRolesPanel({
                   </button>
                 </div>
                 {expanded && canManageRoles && editableRoles.length > 0 && (
-                  <div className="mx-2 mb-2 rounded-2xl bg-black/20 p-3">
+                  <div className="mx-2 mb-2 border-t border-white/10 pt-3">
                     <div className="mb-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/35">
                       {copy.communities.assignRoles}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="divide-y divide-white/10 border-y border-white/10">
                       {editableRoles.map((role) => {
                         const selected = (
                           memberRoleDrafts[identityId] ?? []
@@ -155,14 +149,30 @@ export function CommunityMembersRolesPanel({
                             }
                             disabled={state === 'loading'}
                             className={cx(
-                              'rounded-full border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                              'flex min-h-11 w-full items-center justify-between gap-3 px-2 py-2 text-left text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-45',
                               selected
-                                ? 'border-cyan-200/70 bg-cyan-200 text-slate-950 shadow-lg shadow-cyan-950/20'
-                                : 'border-white/10 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white',
+                                ? 'text-cyan-50'
+                                : 'text-white/65 hover:bg-white/[0.04] hover:text-white',
                             )}
                             aria-pressed={selected}
                           >
-                            {communityRoleDisplayName(role)}
+                            <span>{communityRoleDisplayName(role)}</span>
+                            <span
+                              aria-hidden="true"
+                              className={cx(
+                                'relative h-6 w-11 shrink-0 rounded-full border transition',
+                                selected
+                                  ? 'border-cyan-200/30 bg-cyan-400/55'
+                                  : 'border-white/12 bg-white/10',
+                              )}
+                            >
+                              <span
+                                className={cx(
+                                  'absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-sm transition',
+                                  selected ? 'left-[1.3rem]' : 'left-0.5',
+                                )}
+                              />
+                            </span>
                           </button>
                         );
                       })}
@@ -170,7 +180,7 @@ export function CommunityMembersRolesPanel({
                   </div>
                 )}
                 {expanded && canManageRoles && editableRoles.length === 0 && (
-                  <div className="mx-2 mb-2 rounded-2xl bg-black/20 p-3 text-xs font-semibold text-white/45">
+                  <div className="mx-2 mb-2 border-t border-white/10 py-3 text-xs font-semibold text-white/45">
                     {copy.communities.noCustomRoles}
                   </div>
                 )}
@@ -183,7 +193,7 @@ export function CommunityMembersRolesPanel({
                           setPendingAction({ action: 'kick', identityId })
                         }
                         disabled={state === 'loading'}
-                        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="ui-button disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {copy.communities.kickMember}
                       </button>
@@ -195,7 +205,7 @@ export function CommunityMembersRolesPanel({
                           setPendingAction({ action: 'ban', identityId })
                         }
                         disabled={state === 'loading'}
-                        className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs font-black text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="ui-button border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {copy.communities.banMember}
                       </button>
@@ -242,7 +252,7 @@ export function CommunityMembersRolesPanel({
           })
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -253,33 +263,22 @@ function MemberRoleSummary({
   roles: CommunityRoleResource[];
   selectedRoleIds: string[];
 }) {
-  const selectedRoles = roles.filter((role) => selectedRoleIds.includes(role.id));
+  const selectedRoles = roles.filter((role) =>
+    selectedRoleIds.includes(role.id),
+  );
 
   if (selectedRoles.length === 0) {
     return (
-      <span className="hidden rounded-full bg-white/8 px-2 py-1 text-[0.65rem] font-black text-white/35 sm:inline-flex">
+      <span className="hidden text-[0.65rem] font-bold text-white/30 sm:inline-flex">
         {copy.communities.roles}
       </span>
     );
   }
 
   return (
-    <div className="hidden max-w-48 flex-wrap justify-end gap-1 sm:flex">
-      {selectedRoles.slice(0, 2).map((role) => (
-        <span
-          key={role.id}
-          className="max-w-24 truncate rounded-full bg-cyan-200/15 px-2 py-1 text-[0.65rem] font-black text-cyan-100"
-          title={communityRoleDisplayName(role)}
-        >
-          {communityRoleDisplayName(role)}
-        </span>
-      ))}
-      {selectedRoles.length > 2 && (
-        <span className="rounded-full bg-white/10 px-2 py-1 text-[0.65rem] font-black text-white/45">
-          +{selectedRoles.length - 2}
-        </span>
-      )}
-    </div>
+    <span className="hidden max-w-48 truncate text-right text-[0.65rem] font-bold text-cyan-100/70 sm:block">
+      {selectedRoles.map(communityRoleDisplayName).join(' · ')}
+    </span>
   );
 }
 

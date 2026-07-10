@@ -5,6 +5,8 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { collectIpfsLinks } from '../../../../shared/presentation/ipfsLinks';
 import { IpfsLinksPanel } from './IpfsLinksPanel';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { JsonDataViewer } from '../../../../shared/presentation/components/JsonDataViewer';
 
 export function RawMessageDialog({
   message,
@@ -18,12 +20,36 @@ export function RawMessageDialog({
     attachments: message.attachments,
     raw: message.raw,
   });
+  const decrypted = {
+    attachments: message.attachments,
+    content: message.content,
+    mentions: message.mentions,
+    originalContent: message.originalContent,
+    poll: message.poll,
+    sticker: message.sticker,
+  };
+  const derived = {
+    attachmentProgress: message.attachmentProgress,
+    authorIdentityId: message.authorIdentityId,
+    deliveryStatus: message.deliveryStatus,
+    edited: message.edited,
+    editedAt: message.editedAt,
+    encrypted: message.encrypted,
+    id: message.id,
+    kind: message.kind,
+    mine: message.mine,
+    reactions: message.reactions,
+    replyPreview: message.replyPreview,
+    replyToMessageId: message.replyToMessageId,
+    threadRootMessageId: message.threadRootMessageId,
+    timestamp: message.timestamp,
+  };
 
   useCloseOnEscape(close);
 
   return (
     <div
-      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4 backdrop-blur-md"
+      className="app-overlay-scrim fixed inset-0 z-[100] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
       data-state={state}
     >
       <button
@@ -33,25 +59,20 @@ export function RawMessageDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface glass-panel-strong relative z-10 flex max-h-[84vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-5 shadow-2xl shadow-black/40"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[84vh] sm:max-w-3xl"
         data-state={state}
       >
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-black">{copy.messages.rawTitle}</h2>
-          <button
-            type="button"
-            onClick={close}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            &times;
-          </button>
-        </div>
-        <div className="mt-4 min-h-0 overflow-auto">
+        <DialogHeader title={copy.messages.rawTitle} onClose={close} />
+        <div className="min-h-0 overflow-auto px-5 py-4">
           <IpfsLinksPanel links={ipfsLinks} />
-          <pre className="rounded-2xl bg-black/35 p-4 text-xs leading-5 text-white/70">
-            {JSON.stringify(message.raw, null, 2)}
-          </pre>
+          <JsonDataViewer
+            data={message}
+            sections={[
+              { label: copy.dataViewer.received, value: message.raw },
+              { label: copy.dataViewer.decrypted, value: decrypted },
+              { label: copy.dataViewer.derived, value: derived },
+            ]}
+          />
         </div>
       </section>
     </div>

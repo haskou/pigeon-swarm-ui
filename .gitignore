@@ -12,6 +12,7 @@ tests/coverage/*
 test-results/
 playwright-report/
 blob-report/
+/visual-audit/
 
 /var/log/*
 /var/cache/*

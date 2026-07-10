@@ -1,4 +1,4 @@
-import { cx } from '../../../../shared/presentation/cx';
+import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
 
 export type CommunitySettingsSection =
   | 'banned-members'
@@ -19,22 +19,10 @@ export function CommunitySettingsNavigation({
   sections: ReadonlyArray<readonly [CommunitySettingsSection, string]>;
 }) {
   return (
-    <nav className="mb-4 flex w-full max-w-full flex-wrap gap-2 overflow-visible rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1">
-      {sections.map(([section, label]) => (
-        <button
-          key={section}
-          type="button"
-          onClick={() => onSectionChange(section)}
-          className={cx(
-            'shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-left text-xs font-black transition sm:block sm:w-full',
-            activeSection === section
-              ? 'bg-[#c8c0d8]/85 text-[#171426] shadow-inner shadow-white/10'
-              : 'text-white/55 hover:bg-white/10',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </nav>
+    <SettingsNavigation
+      activeSection={activeSection}
+      onSectionChange={onSectionChange}
+      sections={sections}
+    />
   );
 }

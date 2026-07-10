@@ -1,11 +1,12 @@
 import type { CallSession } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { JsonDataViewer } from '../../../../shared/presentation/components/JsonDataViewer';
 
 export function CallDataPanel({ call }: { call: CallSession }) {
   const data = {
-    call: call.call ?? null,
-    frontend: {
+    serverCall: call.call ?? null,
+    derivedFrontend: {
       cameraEnabled: call.cameraEnabled,
       channelId: call.channelId,
       communityId: call.communityId,
@@ -18,7 +19,7 @@ export function CallDataPanel({ call }: { call: CallSession }) {
       subtitle: call.subtitle,
       title: call.title,
     },
-    participants: call.participants.map((participant) => ({
+    derivedParticipants: call.participants.map((participant) => ({
       audioLevel: participant.audioLevel,
       bitrateKbps: participant.bitrateKbps,
       codec: participant.codec,
@@ -40,13 +41,13 @@ export function CallDataPanel({ call }: { call: CallSession }) {
   };
 
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-[1.5rem] border border-white/10 bg-black/25 p-4">
-      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white/40">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-t border-white/10 pt-4">
+      <h3 className="mb-3 text-sm font-black text-white/80">
         {copy.calls.callData}
       </h3>
-      <pre className="mt-3 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/35 p-3 text-xs leading-relaxed text-white/70">
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <JsonDataViewer data={data} />
+      </div>
     </aside>
   );
 }

@@ -31,7 +31,7 @@ export function CallParticipantMetrics({
         <span>{connectionQualityLabel(quality)}</span>
       </button>
       {detailsOpen && (
-        <dl className="mt-2 grid w-full grid-cols-2 gap-1.5 text-left text-[0.58rem]">
+        <dl className="mt-2 w-full divide-y divide-white/10 border-y border-white/10 text-left text-[0.62rem]">
           <Metric
             label={copy.calls.callMetricLatency}
             value={formatMs(participant.latencyMs)}
@@ -84,15 +84,11 @@ export function CallParticipantMetrics({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className={cx(
-        'min-w-0 rounded-xl border border-white/8 bg-white/6 px-2 py-1.5',
-      )}
-    >
-      <dt className="text-[0.55rem] font-black uppercase text-white/35">
+    <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
+      <dt className="min-w-0 text-[0.55rem] font-black uppercase text-white/35">
         {label}
       </dt>
-      <dd className="mt-0.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-black leading-tight text-white/85">
+      <dd className="max-w-[65%] overflow-hidden text-ellipsis whitespace-nowrap text-right font-black leading-tight text-white/85">
         {value}
       </dd>
     </div>
@@ -173,7 +169,10 @@ function callParticipantConnectionQuality(
     return 'poor';
   }
 
-  if ((participant.latencyMs ?? 0) > 250 || (participant.packetsLost ?? 0) > 3) {
+  if (
+    (participant.latencyMs ?? 0) > 250 ||
+    (participant.packetsLost ?? 0) > 3
+  ) {
     return 'weak';
   }
 

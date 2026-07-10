@@ -299,7 +299,9 @@ function communityEncryptionDetails({
       : channelEncryptionReady
         ? ('ready' as const)
         : ('missing' as const),
-    subtitle: selectedChannel ? shortId(selectedChannel.id) : shortId(community.id),
+    subtitle: selectedChannel
+      ? shortId(selectedChannel.id)
+      : shortId(community.id),
     title: copy.encryption.communityTitle,
   };
 }
@@ -518,7 +520,8 @@ export function CommunityWorkspace({
         threads: visibleCommunityThreadSummaries({
           channelId: channel.id,
           hiddenThreadRootLabelKeys,
-          threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+          threads:
+            channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
         }),
       })),
     [channelThreadsByChannelId, hiddenThreadRootLabelKeys, textChannels],
@@ -2351,6 +2354,12 @@ export function CommunityWorkspace({
               hasCommunityKey={!!communityKey}
               notificationSetting={communityNotificationSetting}
               showCommunityKeyAction={!communityIsPublic}
+              onAddMember={
+                selectedChannel &&
+                (owner || currentPermissions.has('create_invites'))
+                  ? () => setMemberOpen(true)
+                  : undefined
+              }
               onClose={() => setCommunityMenuOpen(false)}
               onCommunityDataOpen={() => {
                 setCommunityDataOpen(true);

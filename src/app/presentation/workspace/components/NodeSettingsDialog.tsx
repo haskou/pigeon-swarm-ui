@@ -15,9 +15,10 @@ import { applicationContainer } from '../../../composition/applicationContainer'
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { MetricCard } from '../../../../shared/presentation/components/MetricCard';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
@@ -86,10 +87,7 @@ export function NodeSettingsDialog({
     ['info', copy.nodeSettings.infoTab],
     [
       'networks',
-      copy.nodeSettings.networksTab.replace(
-        '{count}',
-        String(networks.length),
-      ),
+      copy.nodeSettings.networksTab.replace('{count}', String(networks.length)),
     ],
     ['relay', copy.nodeSettings.relayTab],
     [
@@ -369,38 +367,27 @@ export function NodeSettingsDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface glass-panel-strong relative z-10 flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh]"
+        className="app-overlay-surface ui-dialog-surface relative z-10 flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden sm:h-[88vh] sm:max-h-[88vh]"
         data-state={transitionState}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
-          <div>
-            <h2 className="text-xl font-black">{copy.nodeSettings.title}</h2>
-            <p className="mt-1 text-sm text-white/50">
-              {copy.nodeSettings.body}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
+        <DialogHeader
+          description={copy.nodeSettings.body}
+          title={copy.nodeSettings.title}
+          onClose={close}
+        />
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5 sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
-          <NodeSettingsNavigation
+        <div className="ui-settings-layout">
+          <SettingsNavigation
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             sections={sections}
           />
-          <div className="subtle-scrollbar min-h-0 overflow-y-auto pr-1">
+          <div className="ui-settings-content subtle-scrollbar">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col">
               {(error || notice) && (
                 <div
                   className={cx(
-                    'mb-4 rounded-2xl border p-3 text-sm',
+                    'ui-inline-notice mb-4',
                     error
                       ? 'border-rose-300/25 bg-rose-500/15 text-rose-100'
                       : 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100',
@@ -412,75 +399,82 @@ export function NodeSettingsDialog({
 
               {activeSection === 'info' && (
                 <div className="grid content-start gap-3">
-                  <section className="rounded-2xl bg-black/20 p-3">
-                    {!node?.owner ? (
-                      <div>
-                        <h3 className="text-base font-black text-white">
-                          {copy.nodeSettings.unclaimedTitle}
-                        </h3>
-                        <p className="mt-1 text-sm leading-5 text-white/55">
-                          {copy.nodeSettings.unclaimedBody}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => void handleClaim()}
-                          disabled={loading !== null}
-                          className="mt-3 rounded-xl bg-fuchsia-500 px-3 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {loading === 'claim'
-                            ? copy.nodeSettings.saving
-                            : copy.nodeSettings.claim}
-                        </button>
+                  <section>
+                    <h3 className="ui-section-heading pt-0">
+                      {copy.nodeSettings.nodeDetails}
+                    </h3>
+                    <div className="overflow-hidden rounded-md border border-white/10 bg-black/10 px-4">
+                      <div className="py-4">
+                        {!node?.owner ? (
+                          <div>
+                            <h4 className="text-base font-bold text-white">
+                              {copy.nodeSettings.unclaimedTitle}
+                            </h4>
+                            <p className="mt-1 text-sm leading-5 text-white/55">
+                              {copy.nodeSettings.unclaimedBody}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void handleClaim()}
+                              disabled={loading !== null}
+                              className="ui-button ui-button-primary mt-3"
+                            >
+                              {loading === 'claim'
+                                ? copy.nodeSettings.saving
+                                : copy.nodeSettings.claim}
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-semibold text-white/55">
+                              {copy.nodeSettings.owner}
+                            </div>
+                            <NodeOwnerIdentity
+                              currentIdentity={session.identity}
+                              ownerIdentityId={node.owner}
+                            />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div>
-                        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                          {copy.nodeSettings.owner}
+
+                      <div className="border-t border-white/10 py-4">
+                        <div className="mb-1.5 text-sm font-semibold text-white/55">
+                          {copy.nodeSettings.nodeId}
                         </div>
-                        <NodeOwnerIdentity
-                          currentIdentity={session.identity}
-                          ownerIdentityId={node.owner}
-                        />
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
+                          <code
+                            className="min-w-0 truncate text-sm text-white/70"
+                            title={node?.id ?? undefined}
+                          >
+                            {node?.id ?? '--'}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => void copyNodeId()}
+                            disabled={!node?.id}
+                            className="ui-icon-button h-9 w-9 shrink-0"
+                            aria-label={copy.nodeSettings.copyNodeId}
+                            title={
+                              copiedNodeId
+                                ? copy.profile.copied
+                                : copy.nodeSettings.copyNodeId
+                            }
+                          >
+                            <CopyIcon copied={copiedNodeId} />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </section>
 
-                  <section className="rounded-2xl bg-black/20 p-3">
-                    <div className="mb-1.5 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                      {copy.nodeSettings.nodeId}
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <code
-                        className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70"
-                        title={node?.id ?? undefined}
-                      >
-                        {node?.id ?? '--'}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => void copyNodeId()}
-                        disabled={!node?.id}
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label={copy.nodeSettings.copyNodeId}
-                        title={
-                          copiedNodeId
-                            ? copy.profile.copied
-                            : copy.nodeSettings.copyNodeId
+                      <NodeRuntimeSummary
+                        node={node}
+                        relayConfiguration={
+                          isOwner && relayConfigurationLoaded
+                            ? relayConfiguration
+                            : null
                         }
-                      >
-                        <CopyIcon copied={copiedNodeId} />
-                      </button>
+                      />
                     </div>
                   </section>
-
-                  <NodeRuntimeSummary
-                    node={node}
-                    relayConfiguration={
-                      isOwner && relayConfigurationLoaded
-                        ? relayConfiguration
-                        : null
-                    }
-                  />
 
                   {isOwner && (
                     <ReplicationStatusPanel
@@ -501,7 +495,7 @@ export function NodeSettingsDialog({
                   )}
 
                   {canCreatePublicNetwork && (
-                    <div className="grid gap-3 rounded-2xl border border-amber-200/20 bg-amber-300/10 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                    <div className="ui-inline-notice grid gap-3 border-amber-200/40 bg-amber-300/10 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
                       <NetworkLockBadge publicNetwork />
                       <p className="min-w-0 text-xs leading-relaxed text-amber-50/70">
                         {copy.nodeSettings.publicNetworkBody}
@@ -510,7 +504,7 @@ export function NodeSettingsDialog({
                         type="button"
                         onClick={() => void handleCreatePublicNetwork()}
                         disabled={loading !== null}
-                        className="rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="ui-button ui-button-primary"
                       >
                         {loading === 'public'
                           ? copy.nodeSettings.saving
@@ -528,7 +522,7 @@ export function NodeSettingsDialog({
                         <div
                           key={network.id}
                           className={cx(
-                            'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border p-3 text-left transition',
+                            'ui-list-row grid w-full grid-cols-[minmax(0,1fr)_auto] text-left transition',
                             publicNetwork
                               ? 'border-amber-200/20 bg-amber-300/10 text-amber-50'
                               : 'border-emerald-200/15 bg-emerald-300/10 text-white',
@@ -552,7 +546,7 @@ export function NodeSettingsDialog({
                             <button
                               type="button"
                               onClick={() => void copyNetworkCode(network)}
-                              className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15"
+                              className="ui-icon-button"
                               aria-label={
                                 canShareNetworkKey
                                   ? copy.nodeSettings.copyCode
@@ -577,7 +571,7 @@ export function NodeSettingsDialog({
                                   void handleRemoveNetwork(network)
                                 }
                                 disabled={loading !== null}
-                                className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                                className="ui-icon-button ui-button-danger"
                                 aria-label={copy.nodeSettings.removeNetwork}
                                 title={copy.nodeSettings.removeNetwork}
                               >
@@ -594,7 +588,7 @@ export function NodeSettingsDialog({
                     <div className="grid gap-3 lg:grid-cols-2">
                       <form
                         onSubmit={handleCreateNetwork}
-                        className="rounded-2xl bg-black/20 p-4"
+                        className="ui-section p-4"
                       >
                         <label className="block">
                           <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -605,7 +599,7 @@ export function NodeSettingsDialog({
                             onChange={(event) =>
                               setCreateName(event.target.value)
                             }
-                            className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                            className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
                             placeholder={copy.nodeSettings.createPlaceholder}
                             required
                           />
@@ -613,7 +607,7 @@ export function NodeSettingsDialog({
                         <button
                           type="submit"
                           disabled={loading !== null || !createName.trim()}
-                          className="mt-3 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="ui-button ui-button-primary mt-3 w-full"
                         >
                           {loading === 'create'
                             ? copy.nodeSettings.saving
@@ -621,10 +615,7 @@ export function NodeSettingsDialog({
                         </button>
                       </form>
 
-                      <form
-                        onSubmit={handleJoin}
-                        className="rounded-2xl bg-black/20 p-4"
-                      >
+                      <form onSubmit={handleJoin} className="ui-section p-4">
                         <label className="block">
                           <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
                             {copy.nodeSettings.joinLabel}
@@ -634,7 +625,7 @@ export function NodeSettingsDialog({
                             onChange={(event) =>
                               setJoinCode(event.target.value)
                             }
-                            className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                            className="ui-field-control min-h-24 resize-none px-4 py-3 text-sm placeholder:text-white/30"
                             placeholder={copy.network.inviteCodePlaceholder}
                             required
                           />
@@ -642,7 +633,7 @@ export function NodeSettingsDialog({
                         <button
                           type="submit"
                           disabled={loading !== null || !canJoinNetwork}
-                          className="mt-3 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="ui-button mt-3 w-full"
                         >
                           {loading === 'join'
                             ? copy.nodeSettings.saving
@@ -657,11 +648,11 @@ export function NodeSettingsDialog({
               {activeSection === 'relay' && (
                 <div className="grid content-start gap-3">
                   {!isOwner ? (
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-white/55">
+                    <div className="ui-inline-notice text-sm text-white/55">
                       {copy.nodeSettings.ownerOnlyRelay}
                     </div>
                   ) : relayLoading ? (
-                    <div className="rounded-2xl bg-black/20 p-5 text-sm text-white/55">
+                    <div className="py-5 text-sm text-white/55">
                       {copy.nodeSettings.relayLoading}
                     </div>
                   ) : (
@@ -670,7 +661,7 @@ export function NodeSettingsDialog({
                       onSubmit={handleSaveRelayConfiguration}
                     >
                       {relayError && (
-                        <div className="rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+                        <div className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
                           {relayError}
                         </div>
                       )}
@@ -682,7 +673,7 @@ export function NodeSettingsDialog({
                       <button
                         type="submit"
                         disabled={relaySaving}
-                        className="justify-self-end rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="ui-button ui-button-primary justify-self-end"
                       >
                         {relaySaving
                           ? copy.nodeSettings.saving
@@ -713,36 +704,6 @@ export function NodeSettingsDialog({
 
 function isPublicNodeNetwork(network: NodeNetwork): boolean {
   return PUBLIC_NETWORK_NAMES.has(network.name.trim().toLowerCase());
-}
-
-function NodeSettingsNavigation({
-  activeSection,
-  onSectionChange,
-  sections,
-}: {
-  activeSection: NodeSettingsSection;
-  onSectionChange: (section: NodeSettingsSection) => void;
-  sections: ReadonlyArray<readonly [NodeSettingsSection, string]>;
-}) {
-  return (
-    <nav className="mb-4 flex w-full max-w-full flex-wrap gap-2 overflow-visible rounded-2xl bg-black/20 p-2 sm:mb-0 sm:block sm:space-y-1">
-      {sections.map(([section, label]) => (
-        <button
-          key={section}
-          type="button"
-          onClick={() => onSectionChange(section)}
-          className={cx(
-            'shrink-0 whitespace-nowrap rounded-xl border px-3 py-2 text-left text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 sm:block sm:w-full',
-            activeSection === section
-              ? 'border-white/10 bg-white/[0.09] text-white'
-              : 'border-transparent text-white/55 hover:bg-white/8',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </nav>
-  );
 }
 
 function networkDisplayName(network: NodeNetwork): string {
@@ -822,12 +783,7 @@ function CopyIcon({ copied }: { copied: boolean }) {
   }
 
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
         d="M9 8.5h8.5v10H9zM6.5 15.5V5.5H15"
         stroke="currentColor"
@@ -841,12 +797,7 @@ function CopyIcon({ copied }: { copied: boolean }) {
 
 function TrashIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
         d="M6 7h12M10 7V5h4v2m-6 3 .5 8h7l.5-8"
         stroke="currentColor"
@@ -866,10 +817,7 @@ function NodeRuntimeSummary({
   relayConfiguration: NodeRelayConfiguration | null;
 }) {
   return (
-    <section className="rounded-2xl bg-black/20 p-3">
-      <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-        {copy.nodeSettings.nodeDetails}
-      </div>
+    <div className="border-t border-white/10 py-3">
       <div className="divide-y divide-white/10">
         {relayConfiguration ? (
           <NodeDetailRow
@@ -893,7 +841,7 @@ function NodeRuntimeSummary({
           />
         ) : null}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -909,7 +857,10 @@ function NodeDetailRow({
   return (
     <div className="grid gap-1 py-1.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
       <div className="text-white/45">{label}</div>
-      <div className="min-w-0 truncate font-black text-white/75" title={title ?? value}>
+      <div
+        className="min-w-0 truncate font-black text-white/75"
+        title={title ?? value}
+      >
         {value}
       </div>
     </div>
@@ -932,7 +883,7 @@ function PeerStatusPanel({
   const sortedPeers = useMemo(() => sortedPeersByLastSeen(peers), [peers]);
 
   return (
-    <section className="flex min-h-[28rem] flex-1 flex-col rounded-2xl bg-black/10 p-4">
+    <section className="flex min-h-[28rem] flex-1 flex-col">
       <div className="mb-4 shrink-0">
         <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
           {copy.peers.title}
@@ -943,7 +894,7 @@ function PeerStatusPanel({
         <PeerSkeletonList />
       ) : sortedPeers.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center py-8">
-          <div className="w-full max-w-md rounded-2xl border border-dashed border-white/15 bg-black/15 p-5 text-center">
+          <div className="w-full max-w-md border-y border-dashed border-white/15 py-5 text-center">
             <div className="text-sm font-black text-white/75">
               {copy.peers.emptyTitle}
             </div>
@@ -973,10 +924,7 @@ function PeerSkeletonList() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 3 }, (_, index) => (
-        <div
-          key={index}
-          className="rounded-2xl border border-white/10 bg-black/15 p-3"
-        >
+        <div key={index} className="ui-list-block">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="h-4 w-40 rounded-full bg-white/10" />
@@ -1006,7 +954,7 @@ function PeerSummary({
   peer: Peer;
 }) {
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/15 p-3 text-xs">
+    <article className="ui-list-block text-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate font-black text-white">
@@ -1193,10 +1141,7 @@ function formatPeerLastSeen(lastSeenAt: number): string {
   if (elapsedMinutes <= 0) return copy.peers.seenJustNow;
   if (elapsedMinutes === 1) return copy.peers.seenMinuteAgo;
 
-  return copy.peers.seenMinutesAgo.replace(
-    '{count}',
-    String(elapsedMinutes),
-  );
+  return copy.peers.seenMinutesAgo.replace('{count}', String(elapsedMinutes));
 }
 
 function nodeTypeLabel(
@@ -1225,7 +1170,8 @@ function relayStatusLabel(
     | undefined,
 ): string {
   if (!relay?.enabled) return copy.nodeSettings.relayDisabled;
-  if (relay.running && relay.advertised) return copy.nodeSettings.relayAdvertised;
+  if (relay.running && relay.advertised)
+    return copy.nodeSettings.relayAdvertised;
   if (relay.running) return copy.nodeSettings.relayRunning;
   if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
 
@@ -1262,7 +1208,7 @@ function ReplicationStatusPanel({
   const summary = status?.summary;
 
   return (
-    <section className="rounded-2xl bg-black/20 p-3">
+    <section className="ui-section py-3">
       <div className="mb-3">
         <div>
           <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -1274,37 +1220,33 @@ function ReplicationStatusPanel({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-4">
-        <MetricCard
+      <div className="divide-y divide-white/10 border-y border-white/10">
+        <NodeDetailRow
           label={copy.nodeSettings.replicationContents}
           value={String(summary?.contentCount ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationTotalSize}
           value={formatBytes(summary?.totalSizeBytes ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationResponsible}
           value={String(summary?.localResponsibleCount ?? 0)}
-          variant="dark"
         />
-        <MetricCard
+        <NodeDetailRow
           label={copy.nodeSettings.replicationReleasable}
           value={String(summary?.releasableCount ?? 0)}
-          variant="dark"
         />
       </div>
 
       {error && (
-        <div className="mt-3 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+        <div className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100">
           {error}
         </div>
       )}
 
       {!error && !loading && status?.summary.contentCount === 0 && (
-        <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/55">
+        <div className="mt-3 border-t border-white/10 py-4 text-sm text-white/55">
           {copy.nodeSettings.replicationEmpty}
         </div>
       )}

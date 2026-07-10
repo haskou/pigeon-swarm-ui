@@ -24,6 +24,7 @@ import { GlassSelect } from '../../../../shared/presentation/components/glassSel
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { communityDiscoveryCanAutoJoin } from './communityDiscoveryCanAutoJoin';
 
 type CommunityDiscoveryDialogProps = {
@@ -117,7 +118,7 @@ export function CommunityDiscoveryDialog({
           item.id === community.id
             ? {
                 ...item,
-              membershipRequest: request,
+                membershipRequest: request,
                 membershipStatus:
                   request.status === 'accepted' ? 'member' : 'requested',
               }
@@ -143,32 +144,19 @@ export function CommunityDiscoveryDialog({
         aria-label={copy.dialog.close}
       />
       <section
-        className="app-overlay-surface app-safe-area-fullscreen-surface glass-panel-strong relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden rounded-none shadow-2xl shadow-black/40 sm:h-[88vh] sm:max-h-[88vh] sm:max-w-4xl sm:rounded-2xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden sm:h-[88vh] sm:max-h-[88vh] sm:max-w-4xl"
         data-state={transitionState}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
-              {copy.communities.discoverTitle}
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-white/55">
-              {copy.communities.discoverHint}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label={copy.dialog.close}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 font-black"
-          >
-            x
-          </button>
-        </div>
-        {headerControl}
+        <DialogHeader
+          description={copy.communities.discoverHint}
+          title={copy.communities.discoverTitle}
+          onClose={close}
+        />
+        <div className="px-5">{headerControl}</div>
 
         <form
           onSubmit={submitSearch}
-          className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]"
+          className="mt-4 grid gap-3 px-5 sm:grid-cols-[minmax(0,1fr)_220px]"
         >
           <ClearableSearchInput
             ariaLabel={copy.communities.discoverSearch}
@@ -187,12 +175,12 @@ export function CommunityDiscoveryDialog({
         </form>
 
         {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
+          <div className="ui-inline-notice mx-5 mt-4 border-rose-300/25 bg-rose-500/10 text-sm text-rose-100">
             {error}
           </div>
         )}
 
-        <div className="subtle-scrollbar mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-3">
+        <div className="subtle-scrollbar mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-5">
           {state === 'loading' ? (
             <CommunityDiscoverySkeleton />
           ) : communities.length === 0 ? (
@@ -225,7 +213,7 @@ function CommunityDiscoverySkeleton() {
     <div className="space-y-3" aria-label={copy.communities.discoverLoading}>
       {Array.from({ length: 4 }, (_, index) => (
         <article
-          className="animate-pulse rounded-2xl border border-white/10 bg-black/25 p-4"
+          className="animate-pulse rounded-md border border-white/10 bg-black/15 p-4"
           key={index}
         >
           <div className="flex gap-3">
@@ -253,7 +241,7 @@ function CommunityDiscoveryEmptyState({
   networkName: string;
 }) {
   return (
-    <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-center">
+    <div className="grid min-h-56 place-items-center border-y border-dashed border-white/15 p-6 text-center">
       <div className="max-w-sm">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/8 text-2xl">
           #
@@ -314,7 +302,7 @@ function CommunityDiscoveryRow({
   const showActionButton = community.membershipStatus === 'none';
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-white/18 hover:bg-white/5">
+    <article className="rounded-md border border-white/10 bg-black/15 p-4 transition hover:border-white/18 hover:bg-white/[0.04]">
       <div className="flex gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-sm font-black text-slate-950">
           <FallbackImage
@@ -355,10 +343,8 @@ function CommunityDiscoveryRow({
             onClick={onRequestJoin}
             disabled={!canRequest || disabled}
             className={cx(
-              'h-11 shrink-0 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55',
-              canRequest
-                ? 'bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-950/30 hover:bg-fuchsia-400'
-                : 'bg-white/10 text-white/70',
+              'ui-button h-11 shrink-0',
+              canRequest ? 'ui-button-primary' : 'text-white/55',
             )}
           >
             {membershipStatusLabel(community)}

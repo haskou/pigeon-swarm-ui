@@ -47,19 +47,20 @@ export const CompactCallBar = memo(function CompactCallBar({
   return (
     <aside
       role="button"
+      data-testid="compact-call-bar"
       tabIndex={0}
       onClick={onOpenStage}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onOpenStage();
       }}
-      className="mb-2 cursor-pointer rounded-2xl border border-white/10 bg-[#151722] p-2.5 shadow-xl shadow-black/35 transition hover:bg-[#191b29]"
+      className="mb-2 cursor-pointer rounded-lg border border-white/10 bg-[#151722] p-2.5 shadow-xl shadow-black/35 transition hover:bg-[#191b29]"
     >
       <div className="flex flex-col gap-2.5">
         {screenParticipant?.screenStream && (
           <CompactScreenPreview participant={screenParticipant} />
         )}
         <div className="flex min-w-0 items-start gap-2.5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-400/15 text-emerald-200">
             <SpeakerIcon />
           </div>
           <CompactCallTitle call={call} subtitle={subtitle} />
@@ -86,7 +87,7 @@ export const CompactCallBar = memo(function CompactCallBar({
               event.stopPropagation();
               onEnd();
             }}
-            className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-rose-200/40 bg-rose-500 text-white shadow-lg shadow-rose-950/30 ring-2 ring-rose-500/20 transition hover:bg-rose-400 hover:ring-rose-300/35"
             aria-label={copy.calls.leave}
             title={copy.calls.leave}
           >

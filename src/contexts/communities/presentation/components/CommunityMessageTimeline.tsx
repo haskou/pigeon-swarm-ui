@@ -162,7 +162,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
         className="h-full overflow-x-hidden overflow-y-auto p-4 sm:p-6"
       >
         {messageState === 'loading' ? (
-          <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+          <div className="mx-auto mb-4 w-fit px-4 py-2 text-xs font-black text-white/50">
             {copy.chat.loadingEvents}
           </div>
         ) : null}
@@ -170,8 +170,10 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
           {!messageCursor &&
             visibleMessages.length > 0 &&
             messageState !== 'loading' && (
-              <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                {copy.chat.noMoreMessages}
+              <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                <span className="h-px flex-1 bg-white/[0.07]" />
+                <span>{copy.chat.noMoreMessages}</span>
+                <span className="h-px flex-1 bg-white/[0.07]" />
               </div>
             )}
           {missingCommunityKey && (
@@ -204,7 +206,8 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
 
               if (entry.type === 'poll') {
                 const { item } = entry;
-                const mine = item.poll.creatorIdentityId === session.identity.id;
+                const mine =
+                  item.poll.creatorIdentityId === session.identity.id;
 
                 return (
                   <Fragment key={entry.id}>
@@ -327,7 +330,10 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                           memberIdentities,
                         )}
                         replyImage={messageReplyImage(message, replyMessage)}
-                        replySticker={messageReplySticker(message, replyMessage)}
+                        replySticker={messageReplySticker(
+                          message,
+                          replyMessage,
+                        )}
                         replyAuthorName={
                           replyMessage
                             ? memberPrimaryName(
@@ -354,7 +360,8 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                                   entry.threadSummary.lastMessage
                                     .authorIdentityId
                                 ],
-                                entry.threadSummary.lastMessage.authorIdentityId,
+                                entry.threadSummary.lastMessage
+                                  .authorIdentityId,
                               )
                             : undefined
                         }

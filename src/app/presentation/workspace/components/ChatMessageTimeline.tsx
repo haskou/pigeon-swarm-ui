@@ -246,13 +246,13 @@ function MessageTimelineContent({
             />
           ),
         )}
-        {timelineEntries.length === 0 && messageState !== 'loading' && (
-          missingConversationKeyContent && !hasConversationKey ? (
+        {timelineEntries.length === 0 &&
+          messageState !== 'loading' &&
+          (missingConversationKeyContent && !hasConversationKey ? (
             <>{missingConversationKeyContent}</>
           ) : (
             <EmptyTimelineState hasConversationKey={hasConversationKey} />
-          )
-        )}
+          ))}
         <div ref={bottomRef} />
       </div>
     </>
@@ -353,7 +353,9 @@ function MessageTimelineItem({
               replyMessage,
               identityNames,
             )}
-            replyPreview={replyMessage?.content ?? message.replyPreview?.content}
+            replyPreview={
+              replyMessage?.content ?? message.replyPreview?.content
+            }
             reserveAvatarSpace={false}
             showAvatar={isGroupConversation && startsNewAuthorRun}
             threadAuthorName={
@@ -456,7 +458,7 @@ function noopPollVote(): Promise<void> {
 
 function LoadingOlderMessages() {
   return (
-    <div className="mx-auto mb-4 w-fit rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white/60">
+    <div className="mx-auto mb-4 w-fit px-4 py-2 text-xs font-black text-white/50">
       {copy.chat.loadingEvents}
     </div>
   );
@@ -464,8 +466,10 @@ function LoadingOlderMessages() {
 
 function ReachedMessageStart() {
   return (
-    <div className="mx-auto w-fit rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-      {copy.chat.noMoreMessages}
+    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+      <span className="h-px flex-1 bg-white/[0.07]" />
+      <span>{copy.chat.noMoreMessages}</span>
+      <span className="h-px flex-1 bg-white/[0.07]" />
     </div>
   );
 }
@@ -477,7 +481,7 @@ function EmptyTimelineState({
 }) {
   if (hasConversationKey) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-center text-sm text-white/55">
+      <div className="py-12 text-center text-sm text-white/55">
         {copy.chat.emptyMessages}
       </div>
     );

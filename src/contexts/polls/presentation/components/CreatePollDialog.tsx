@@ -5,6 +5,9 @@ import type { PollOption } from '../../../../shared/domain/pigeonResources.types
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { cx } from '../../../../shared/presentation/cx';
 
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 10;
@@ -22,7 +25,9 @@ export function CreatePollDialog({
     question: string;
   }) => Promise<void>;
 }) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
@@ -64,112 +69,127 @@ export function CreatePollDialog({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] grid place-items-center bg-black/60 p-4 backdrop-blur-md">
+    <div
+      className="app-overlay-scrim fixed inset-0 z-[120] grid place-items-stretch bg-black/60 p-0 backdrop-blur-md sm:place-items-center sm:p-4"
+      data-state={transitionState}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={close}
         aria-label={copy.dialog.close}
       />
       <form
         onSubmit={(event) => void submit(event)}
-        className="glass-panel-strong relative z-10 w-full max-w-lg rounded-2xl p-5 shadow-2xl shadow-black/40"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[88vh] sm:max-w-lg"
+        data-state={transitionState}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-black">{copy.polls.create}</h2>
-            <p className="mt-1 text-sm text-white/50">
-              {copy.polls.createBody}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
-        </div>
-        <label className="mt-5 block">
-          <span className="text-xs font-black uppercase tracking-[0.14em] text-white/35">
-            {copy.polls.question}
-          </span>
-          <textarea
-            value={question}
-            maxLength={QUESTION_MAX_LENGTH}
-            onChange={(event) => setQuestion(event.target.value)}
-            className="mt-2 min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/60"
-          />
-        </label>
-        <div className="mt-4 grid gap-2">
-          <div className="text-xs font-black uppercase tracking-[0.14em] text-white/35">
-            {copy.polls.options}
-          </div>
-          {options.map((option, index) => (
-            <div key={index} className="flex gap-2">
-              <input
-                value={option}
-                maxLength={OPTION_MAX_LENGTH}
-                onChange={(event) =>
-                  setOptions((current) =>
-                    current.map((candidate, candidateIndex) =>
-                      candidateIndex === index ? event.target.value : candidate,
-                    ),
-                  )
-                }
-                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/60"
-                placeholder={`${copy.polls.option} ${index + 1}`}
-              />
-              {options.length > MIN_OPTIONS && (
-                <button
-                  type="button"
-                  onClick={() =>
+        <DialogHeader
+          description={copy.polls.createBody}
+          title={copy.polls.create}
+          onClose={close}
+        />
+        <div className="min-h-0 overflow-y-auto px-5 pb-5">
+          <label className="mt-4 block">
+            <span className="text-sm font-semibold text-white/65">
+              {copy.polls.question}
+            </span>
+            <textarea
+              value={question}
+              maxLength={QUESTION_MAX_LENGTH}
+              onChange={(event) => setQuestion(event.target.value)}
+              className="ui-field-control mt-2 min-h-20 resize-none px-4 py-3 text-sm"
+            />
+          </label>
+          <div className="mt-4 grid gap-2">
+            <div className="text-sm font-semibold text-white/65">
+              {copy.polls.options}
+            </div>
+            {options.map((option, index) => (
+              <div key={index} className="flex gap-2">
+                <input
+                  value={option}
+                  maxLength={OPTION_MAX_LENGTH}
+                  onChange={(event) =>
                     setOptions((current) =>
-                      current.filter(
-                        (_, candidateIndex) => candidateIndex !== index,
+                      current.map((candidate, candidateIndex) =>
+                        candidateIndex === index
+                          ? event.target.value
+                          : candidate,
                       ),
                     )
                   }
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-rose-500/15 text-sm font-black text-rose-100 transition hover:bg-rose-500/25"
-                  aria-label={copy.polls.removeOption}
-                  title={copy.polls.removeOption}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          {options.length < MAX_OPTIONS && (
-            <button
-              type="button"
-              onClick={() => setOptions((current) => [...current, ''])}
-              className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              + {copy.polls.option}
-            </button>
-          )}
-        </div>
-        <label className="mt-4 flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-3 text-sm font-black text-white/75">
-          <input
-            type="checkbox"
-            checked={allowsMultipleVotes}
-            onChange={(event) => setAllowsMultipleVotes(event.target.checked)}
-          />
-          {copy.polls.multipleVotes}
-        </label>
-        {error && (
-          <div className="mt-4 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-3 text-xs text-rose-100">
-            {error}
+                  className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm"
+                  placeholder={`${copy.polls.option} ${index + 1}`}
+                />
+                {options.length > MIN_OPTIONS && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOptions((current) =>
+                        current.filter(
+                          (_, candidateIndex) => candidateIndex !== index,
+                        ),
+                      )
+                    }
+                    className="ui-icon-button h-12 w-12 shrink-0 border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
+                    aria-label={copy.polls.removeOption}
+                    title={copy.polls.removeOption}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            {options.length < MAX_OPTIONS && (
+              <button
+                type="button"
+                onClick={() => setOptions((current) => [...current, ''])}
+                className="ui-button"
+              >
+                + {copy.polls.option}
+              </button>
+            )}
           </div>
-        )}
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-5 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {loading ? copy.polls.creating : copy.polls.create}
-        </button>
+          <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 border-y border-white/10 px-1 py-2 text-sm font-semibold text-white/75 transition hover:bg-white/[0.04] hover:text-white">
+            <span className="min-w-0 flex-1">{copy.polls.multipleVotes}</span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={allowsMultipleVotes}
+              onChange={(event) => setAllowsMultipleVotes(event.target.checked)}
+              className="sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={cx(
+                'relative h-6 w-11 shrink-0 rounded-full border transition',
+                allowsMultipleVotes
+                  ? 'border-cyan-200/30 bg-cyan-400/65'
+                  : 'border-white/12 bg-white/12',
+              )}
+            >
+              <span
+                className={cx(
+                  'absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-sm transition',
+                  allowsMultipleVotes ? 'left-[1.3rem]' : 'left-0.5',
+                )}
+              />
+            </span>
+          </label>
+          {error && (
+            <div className="ui-inline-notice mt-4 border-rose-300/25 bg-rose-500/10 text-xs text-rose-100">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="ui-button ui-button-primary mt-5 w-full"
+          >
+            {loading ? copy.polls.creating : copy.polls.create}
+          </button>
+        </div>
       </form>
     </div>,
     document.body,

@@ -11,6 +11,8 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { stickerAssetUrl } from './stickerPressPreview';
 import {
   cachedGetMyStickers,
@@ -29,7 +31,9 @@ export function StickerPackPreviewDialog({
   session: Session;
   sticker: StickerMessageReference;
 }) {
-  useCloseOnEscape(onClose);
+  const { close, state: transitionState } = useCloseTransition(onClose);
+
+  useCloseOnEscape(close);
 
   const [pack, setPack] = useState<StickerPackResource | null>(null);
   const [savedPackIds, setSavedPackIds] = useState<Set<string>>(
@@ -99,94 +103,85 @@ export function StickerPackPreviewDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[170] grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
-      onMouseDown={onClose}
+      className="app-overlay-scrim fixed inset-0 z-[170] grid place-items-stretch bg-black/70 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+      data-state={transitionState}
+      onMouseDown={close}
     >
       <div
-        className="max-h-[86vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#17171d] p-5 text-white shadow-2xl"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface flex h-[100dvh] w-full flex-col overflow-hidden text-white sm:h-auto sm:max-h-[86vh] sm:max-w-lg"
+        data-state={transitionState}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="mb-4 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
-              {copy.stickers.stickerPack}
+        <DialogHeader
+          kicker={copy.stickers.stickerPack}
+          title={pack?.name ?? copy.stickers.stickerPack}
+          onClose={close}
+        />
+        <div className="min-h-0 overflow-y-auto px-5 py-4">
+          {error && (
+            <div className="ui-inline-notice mb-3 border-rose-300/25 bg-rose-500/10 text-sm text-rose-100">
+              {error}
             </div>
-            <h2 className="truncate text-xl font-black">
-              {pack?.name ?? copy.stickers.stickerPack}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={copy.dialog.close}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15"
-          >
-            x
-          </button>
+          )}
+          {loading ? (
+            <div className="grid min-h-40 place-items-center text-sm text-white/45">
+              {copy.app.loading}
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => void sendSticker(sticker)}
+                className="mb-4 flex w-full justify-center border-y border-white/10 p-4 transition hover:bg-white/[0.04]"
+                title={copy.stickers.sendSticker}
+              >
+                <img
+                  src={stickerAssetUrl(sticker.assetCid)}
+                  alt={copy.stickers.stickerAlt}
+                  decoding="async"
+                  className="max-h-48 max-w-full object-contain"
+                />
+              </button>
+              {pack && pack.stickers.length > 0 && (
+                <div className="mb-4 grid grid-cols-5 gap-2 sm:grid-cols-6">
+                  {pack.stickers.map((packSticker) => (
+                    <button
+                      key={packSticker.id}
+                      type="button"
+                      onClick={() =>
+                        void sendSticker({
+                          assetCid: packSticker.assetCid,
+                          packId: pack.id,
+                          stickerId: packSticker.id,
+                        })
+                      }
+                      className="grid aspect-square place-items-center rounded-md bg-black/20 p-1 transition hover:bg-white/10"
+                      title={copy.stickers.sendSticker}
+                    >
+                      <img
+                        src={stickerAssetUrl(packSticker.assetCid)}
+                        alt={copy.stickers.stickerAlt}
+                        decoding="async"
+                        loading="lazy"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void toggleSaved()}
+                disabled={saving}
+                className="ui-button ui-button-primary w-full"
+              >
+                {saved
+                  ? copy.stickers.removeStickerPack
+                  : copy.stickers.addStickerPack}
+              </button>
+            </>
+          )}
         </div>
-        {error && (
-          <div className="mb-3 rounded-xl border border-rose-300/25 bg-rose-500/15 p-3 text-sm text-rose-100">
-            {error}
-          </div>
-        )}
-        {loading ? (
-          <div className="grid min-h-40 place-items-center text-sm text-white/45">
-            {copy.app.loading}
-          </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => void sendSticker(sticker)}
-              className="mb-4 flex w-full justify-center rounded-2xl bg-white/5 p-4 transition hover:bg-white/10"
-              title={copy.stickers.sendSticker}
-            >
-              <img
-                src={stickerAssetUrl(sticker.assetCid)}
-                alt={copy.stickers.stickerAlt}
-                decoding="async"
-                className="max-h-48 max-w-full object-contain"
-              />
-            </button>
-            {pack && pack.stickers.length > 0 && (
-              <div className="mb-4 grid grid-cols-5 gap-2 sm:grid-cols-6">
-                {pack.stickers.map((packSticker) => (
-                  <button
-                    key={packSticker.id}
-                    type="button"
-                    onClick={() =>
-                      void sendSticker({
-                        assetCid: packSticker.assetCid,
-                        packId: pack.id,
-                        stickerId: packSticker.id,
-                      })
-                    }
-                    className="grid aspect-square place-items-center rounded-xl bg-black/20 p-1 transition hover:bg-white/10"
-                    title={copy.stickers.sendSticker}
-                  >
-                    <img
-                      src={stickerAssetUrl(packSticker.assetCid)}
-                      alt={copy.stickers.stickerAlt}
-                      decoding="async"
-                      loading="lazy"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => void toggleSaved()}
-              disabled={saving}
-              className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-100 disabled:opacity-45"
-            >
-              {saved
-                ? copy.stickers.removeStickerPack
-                : copy.stickers.addStickerPack}
-            </button>
-          </>
-        )}
       </div>
     </div>,
     document.body,

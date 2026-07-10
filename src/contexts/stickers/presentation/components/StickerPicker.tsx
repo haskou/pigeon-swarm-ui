@@ -328,7 +328,7 @@ export function StickerPicker({
         </svg>
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(25.625rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40 sm:w-[min(25.625rem,calc(100vw-3rem))]">
+        <div className="absolute bottom-full left-0 z-40 mb-3 w-[min(25.625rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-white/10 bg-[#17171d] text-white shadow-2xl shadow-black/40 sm:w-[min(25.625rem,calc(100vw-3rem))]">
           <div className="flex items-center gap-1 border-b border-white/10 bg-white/5 p-2">
             <PickerTab
               active={tab === 'stickers'}
@@ -344,7 +344,7 @@ export function StickerPicker({
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
-                className="ml-auto rounded-xl px-3 py-2 text-xs font-black text-white/60 transition hover:bg-white/10 hover:text-white"
+                className="ui-button ml-auto min-h-8 px-3 py-1 text-xs"
               >
                 {copy.stickers.manage}
               </button>
@@ -361,10 +361,7 @@ export function StickerPicker({
                 onSelect={scrollToStickerSection}
                 shortcuts={stickerShortcuts}
               />
-              <div
-                className="mb-3"
-                onKeyDown={searchPacksOnEnter}
-              >
+              <div className="mb-3" onKeyDown={searchPacksOnEnter}>
                 <ClearableSearchInput
                   ariaLabel={copy.stickers.searchStickers}
                   clearLabel={copy.stickers.clearStickerSearch}
@@ -375,7 +372,7 @@ export function StickerPicker({
                 />
               </div>
               {error && (
-                <div className="mb-3 rounded-xl border border-rose-300/25 bg-rose-500/15 p-2 text-xs text-rose-100">
+                <div className="ui-inline-notice mb-3 border-rose-300/25 bg-rose-500/10 text-xs text-rose-100">
                   {error}
                 </div>
               )}
@@ -420,7 +417,7 @@ export function StickerPicker({
               {!loading &&
                 savedPacks.length === 0 &&
                 explorePacks.length === 0 && (
-                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/45">
+                  <div className="mt-4 border-y border-white/10 p-4 text-center text-sm text-white/45">
                     {copy.stickers.noStickerPacks}
                   </div>
                 )}
@@ -504,7 +501,7 @@ function StickerPanelLoading() {
 function StickerManagerLoading() {
   return (
     <div className="fixed inset-0 z-[160] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="rounded-2xl border border-white/10 bg-[#17171d] px-5 py-4 text-sm text-white/45 shadow-2xl">
+      <div className="ui-dialog-surface px-5 py-4 text-sm text-white/45 shadow-2xl">
         {copy.app.loading}
       </div>
     </div>

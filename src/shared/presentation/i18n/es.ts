@@ -21,6 +21,7 @@ export const es = {
     previewVideo: 'Previsualizar video',
     previousImage: 'Imagen anterior',
     publicUnencrypted: 'Media público sin cifrar en chat cifrado',
+    file: 'Archivo',
     shareIpfs: 'Copiar enlace',
   },
 
@@ -264,6 +265,8 @@ export const es = {
     addInitialChannel: 'Añadir canal',
     addMember: 'Añadir miembro',
     addMemberCreateInviteLink: 'Crear enlace de invitación',
+    addMemberDescription:
+      'Invita una identidad concreta o crea un enlace seguro para compartir.',
     addMemberFindIdentity: 'Buscar identidad',
     appearInDiscovery: 'Aparecer en Descubrir',
     appearInDiscoveryHelp:
@@ -357,6 +360,9 @@ export const es = {
     manage: 'Gestionar comunidad',
     memberCount: '{count} miembro',
     memberError: 'No se pudo añadir el miembro.',
+    memberPreview: 'Identidad encontrada',
+    memberPreviewEmpty:
+      'La identidad aparecerá aquí antes de enviar la invitación.',
     memberIdentity: identityLookup.label,
     memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'No se pudieron guardar los roles del miembro.',
@@ -502,6 +508,7 @@ export const es = {
     placeholder: 'Escribe un mensaje',
     publicAttachments: 'Los adjuntos usaran almacenamiento publico',
     removeAttachment: 'Quitar adjunto',
+    selectedAttachments: 'Adjuntos seleccionados · {count}',
     roleMention: 'Rol',
     send: 'Enviar',
     sending: 'Enviando',
@@ -622,6 +629,18 @@ export const es = {
   ipfs: {
     links: 'Enlaces IPFS',
     open: 'Abrir enlace IPFS',
+  },
+  dataViewer: {
+    additional: 'Datos adicionales',
+    array: 'Array ({count})',
+    copied: 'JSON copiado',
+    copyJson: 'Copiar JSON',
+    decrypted: 'Contenido descifrado',
+    derived: 'Derivado en este dispositivo',
+    description:
+      'Separa los datos recibidos del servidor, el contenido descifrado localmente y los valores derivados por la interfaz.',
+    object: 'Objeto ({count})',
+    received: 'Recibido del servidor',
   },
   messages: {
     addReaction: 'Anadir reaccion',

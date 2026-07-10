@@ -19,6 +19,7 @@ export const en = {
     previewVideo: 'Preview video',
     previousImage: 'Previous image',
     publicUnencrypted: 'Public unencrypted media in encrypted chat',
+    file: 'File',
     shareIpfs: 'Copy IPFS link',
   },
   date: {
@@ -280,6 +281,8 @@ export const en = {
     addInitialChannel: 'Add channel',
     addMember: 'Add member',
     addMemberCreateInviteLink: 'Create invite link',
+    addMemberDescription:
+      'Invite a specific identity or create a secure link to share.',
     addMemberFindIdentity: 'Find identity',
     appearInDiscovery: 'Appear in Discover',
     appearInDiscoveryHelp:
@@ -371,6 +374,9 @@ export const en = {
     loadMoreModerationLogs: 'Load more',
     manage: 'Manage community',
     memberError: 'The member could not be added.',
+    memberPreview: 'Identity found',
+    memberPreviewEmpty:
+      'The identity will appear here before the invitation is sent.',
     memberIdentity: identityLookup.label,
     memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'Member roles could not be saved.',
@@ -520,6 +526,7 @@ export const en = {
     placeholder: 'Write a message',
     publicAttachments: 'Attachments will use public storage',
     removeAttachment: 'Remove attachment',
+    selectedAttachments: 'Selected attachments · {count}',
     roleMention: 'Role',
     send: 'Send',
     sending: 'Sending',
@@ -754,6 +761,18 @@ export const en = {
   ipfs: {
     links: 'IPFS links',
     open: 'Open IPFS link',
+  },
+  dataViewer: {
+    additional: 'Additional data',
+    array: 'Array ({count})',
+    copied: 'JSON copied',
+    copyJson: 'Copy JSON',
+    decrypted: 'Decrypted content',
+    derived: 'Derived on this device',
+    description:
+      'Separates data received from the server, content decrypted locally, and values derived by the interface.',
+    object: 'Object ({count})',
+    received: 'Received from server',
   },
   messages: {
     addReaction: 'Add reaction',
