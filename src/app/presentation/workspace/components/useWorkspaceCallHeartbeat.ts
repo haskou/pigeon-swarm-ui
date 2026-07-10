@@ -13,24 +13,20 @@ type WorkspaceCallHeartbeatInput = {
     mediaConnections: CallParticipantMediaConnection[],
   ) => Promise<void>;
   mediaConnections: () => CallParticipantMediaConnection[];
-  onHeartbeatFailureLimit: () => void;
 };
 
 export function useWorkspaceCallHeartbeat({
   activeCall,
   heartbeat,
   mediaConnections,
-  onHeartbeatFailureLimit,
 }: WorkspaceCallHeartbeatInput): void {
   const heartbeatRef = useRef(heartbeat);
   const mediaConnectionsRef = useRef(mediaConnections);
-  const onHeartbeatFailureLimitRef = useRef(onHeartbeatFailureLimit);
 
   useEffect(() => {
     heartbeatRef.current = heartbeat;
     mediaConnectionsRef.current = mediaConnections;
-    onHeartbeatFailureLimitRef.current = onHeartbeatFailureLimit;
-  }, [heartbeat, mediaConnections, onHeartbeatFailureLimit]);
+  }, [heartbeat, mediaConnections]);
 
   useEffect(() => {
     if (!activeCall || activeCall.status !== 'live') return undefined;
@@ -48,7 +44,6 @@ export function useWorkspaceCallHeartbeat({
           throw caught;
         }
       },
-      onFailureLimit: () => onHeartbeatFailureLimitRef.current(),
     });
   }, [activeCall?.id, activeCall?.status]);
 }

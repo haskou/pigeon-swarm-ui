@@ -1892,7 +1892,6 @@ export function GlassWorkspace({
     activeCall,
     heartbeat: heartbeatActiveCall,
     mediaConnections: callMediaConnections,
-    onHeartbeatFailureLimit: leaveActiveCall,
   });
 
   useEffect(() => {
