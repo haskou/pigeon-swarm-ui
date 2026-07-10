@@ -10,6 +10,16 @@ export function joinedRemotePeerIdentityIds(
     .map((participant) => participant.identityId);
 }
 
+export function participantJoinWasAccepted(
+  call: CallResource,
+  identityId: string,
+): boolean {
+  return call.participants.some(
+    (participant) =>
+      participant.identityId === identityId && participant.status === 'joined',
+  );
+}
+
 export function signalingRemotePeerIdentityIds(
   call: CallResource,
   currentIdentityId: string,

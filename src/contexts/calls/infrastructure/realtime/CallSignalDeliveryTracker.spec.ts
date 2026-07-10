@@ -32,6 +32,30 @@ describe('CallSignalDeliveryTracker', () => {
     expect(acknowledge).toHaveBeenCalledTimes(2);
   });
 
+  it('reserves a signal while its first delivery is still being applied', async () => {
+    let finishApplying: (() => void) | undefined;
+    const apply = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishApplying = resolve;
+        }),
+    );
+    const acknowledge = jest.fn();
+    const tracker = new CallSignalDeliveryTracker();
+    const delivery = { expiresAt: 200, signalId: 'signal-1' };
+
+    const first = tracker.receive(delivery, apply, acknowledge, 100);
+    const duplicate = tracker.receive(delivery, apply, acknowledge, 101);
+
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(acknowledge).not.toHaveBeenCalled();
+
+    finishApplying?.();
+    await Promise.all([first, duplicate]);
+
+    expect(acknowledge).toHaveBeenCalledTimes(2);
+  });
+
   it('does not apply or acknowledge expired signals', async () => {
     const apply = jest.fn().mockResolvedValue(undefined);
     const acknowledge = jest.fn();
@@ -62,5 +86,23 @@ describe('CallSignalDeliveryTracker', () => {
     ).rejects.toThrow('invalid signal');
 
     expect(acknowledge).not.toHaveBeenCalled();
+  });
+
+  it('allows retrying a signal after application fails', async () => {
+    const apply = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('invalid signal'))
+      .mockResolvedValueOnce(undefined);
+    const acknowledge = jest.fn();
+    const tracker = new CallSignalDeliveryTracker();
+    const delivery = { expiresAt: 200, signalId: 'signal-1' };
+
+    await expect(
+      tracker.receive(delivery, apply, acknowledge, 100),
+    ).rejects.toThrow('invalid signal');
+    await tracker.receive(delivery, apply, acknowledge, 101);
+
+    expect(apply).toHaveBeenCalledTimes(2);
+    expect(acknowledge).toHaveBeenCalledTimes(1);
   });
 });

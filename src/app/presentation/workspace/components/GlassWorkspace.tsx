@@ -76,6 +76,7 @@ import {
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallMicrophoneCapture } from '../../../../contexts/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
 import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
@@ -1773,16 +1774,13 @@ export function GlassWorkspace({
         sessionRef.current,
         pendingCall.id,
       );
-      const joinedParticipant = call.participants.find(
-        (participant) =>
-          participant.identityId === sessionRef.current.identity.id,
-      );
-
-      if (!joinedParticipant?.connected) {
+      if (!participantJoinWasAccepted(call, sessionRef.current.identity.id)) {
         logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
-          participantConnected: joinedParticipant?.connected,
-          participantStatus: joinedParticipant?.status,
+          participantStatus: call.participants.find(
+            (participant) =>
+              participant.identityId === sessionRef.current.identity.id,
+          )?.status,
         });
         stopLocalAudio(localStream);
 

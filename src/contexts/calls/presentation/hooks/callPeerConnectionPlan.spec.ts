@@ -2,6 +2,7 @@ import type { CallResource } from '../../domain/callSession.types';
 
 import {
   joinedRemotePeerIdentityIds,
+  participantJoinWasAccepted,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from './callPeerConnectionPlan';
@@ -14,6 +15,17 @@ describe('callPeerConnectionPlan', () => {
     });
 
     expect(joinedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+  });
+
+  it('accepts a joined participant before its first heartbeat lease connects', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[0].connected = false;
+
+    expect(participantJoinWasAccepted(call, 'alice')).toBe(true);
   });
 
   it('does not connect ringing or left participants', () => {

@@ -1,6 +1,8 @@
 import type { CallSignalDeliveryInput } from './CallSignalDeliveryInput';
 
 export class CallSignalDeliveryTracker {
+  private readonly inFlight = new Map<string, Promise<void>>();
+
   private readonly processed = new Map<string, number>();
 
   public constructor(private readonly maximumEntries = 512) {}
@@ -36,10 +38,27 @@ export class CallSignalDeliveryTracker {
       return;
     }
 
-    await apply();
+    const currentDelivery = this.inFlight.get(input.signalId);
 
-    this.processed.set(input.signalId, input.expiresAt);
-    this.trimToLimit();
-    acknowledge();
+    if (currentDelivery) {
+      await currentDelivery;
+      acknowledge();
+
+      return;
+    }
+
+    const delivery = apply();
+
+    this.inFlight.set(input.signalId, delivery);
+
+    try {
+      await delivery;
+
+      this.processed.set(input.signalId, input.expiresAt);
+      this.trimToLimit();
+      acknowledge();
+    } finally {
+      this.inFlight.delete(input.signalId);
+    }
   }
 }
