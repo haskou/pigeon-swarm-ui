@@ -12,8 +12,18 @@ const callResource = (overrides: Partial<CallResource> = {}): CallResource => ({
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   participants: [
-    { identityId: 'identity-a', status: 'joined' },
-    { identityId: 'identity-b', status: 'ringing' },
+    {
+      connected: true,
+      identityId: 'identity-a',
+      mediaConnections: [],
+      status: 'joined',
+    },
+    {
+      connected: false,
+      identityId: 'identity-b',
+      mediaConnections: [],
+      status: 'ringing',
+    },
   ],
   scope: { conversationId: 'conversation-a', type: 'conversation' },
   status: 'active',
@@ -28,6 +38,13 @@ describe('Call', () => {
     call.joinParticipant(participantId, new Timestamp(200));
 
     expect(call.hasParticipantStatus(participantId, 'joined')).toBe(true);
+    expect(
+      call
+        .toResource()
+        .participants.find(
+          (participant) => participant.identityId === 'identity-b',
+        )?.connected,
+    ).toBe(false);
     expect(call.pullDomainEvents()).toHaveLength(1);
   });
 

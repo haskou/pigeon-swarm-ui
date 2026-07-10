@@ -32,7 +32,7 @@ export function CallButton({
             ? 'cursor-not-allowed bg-white/5 text-white/30'
             : active
               ? 'bg-fuchsia-500 text-white hover:bg-fuchsia-400'
-            : 'bg-white/10 text-white/75 hover:bg-white/15',
+              : 'bg-white/10 text-white/75 hover:bg-white/15',
       )}
       aria-label={label}
       title={label}

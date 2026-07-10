@@ -17,13 +17,20 @@ function candidateById(
 
 function candidateProtocol(candidate?: BrowserRtcStats): string | undefined {
   return typeof candidate?.protocol === 'string'
-    ? candidate.protocol.toUpperCase()
+    ? candidate.protocol.toLowerCase()
     : undefined;
 }
 
-function candidateType(candidate?: BrowserRtcStats): string | undefined {
-  return typeof candidate?.candidateType === 'string'
-    ? candidate.candidateType
+function candidateType(
+  candidate?: BrowserRtcStats,
+): 'host' | 'prflx' | 'relay' | 'srflx' | undefined {
+  const value = candidate?.candidateType;
+
+  return value === 'host' ||
+    value === 'prflx' ||
+    value === 'relay' ||
+    value === 'srflx'
+    ? value
     : undefined;
 }
 
@@ -71,29 +78,60 @@ function audioInboundStats(report: RTCStats): AudioInboundStats {
 }
 
 function candidatePairStats(
-  report: RTCStats,
+  report: BrowserRtcStats | undefined,
   reportsById: Map<string, BrowserRtcStats>,
 ): CandidatePairStats {
-  const stats = report as BrowserRtcStats;
-
-  if (stats.type !== 'candidate-pair' || stats.state !== 'succeeded') {
+  if (!report || report.type !== 'candidate-pair') {
     return {};
   }
 
-  const localCandidate = candidateById(reportsById, stats.localCandidateId);
-  const remoteCandidate = candidateById(reportsById, stats.remoteCandidateId);
+  const localCandidate = candidateById(reportsById, report.localCandidateId);
+  const remoteCandidate = candidateById(reportsById, report.remoteCandidateId);
   const localCandidateType = candidateType(localCandidate);
   const remoteCandidateType = candidateType(remoteCandidate);
+  const protocol =
+    candidateProtocol(localCandidate) ?? candidateProtocol(remoteCandidate);
 
   return {
     connectionPath: connectionPathFromCandidateTypes(
       localCandidateType,
       remoteCandidateType,
     ),
-    latencyMs: msFromSecondsStat(stats.currentRoundTripTime),
-    transport:
-      candidateProtocol(localCandidate) ?? candidateProtocol(remoteCandidate),
+    latencyMs: msFromSecondsStat(report.currentRoundTripTime),
+    localCandidateType,
+    protocol,
+    relayProtocol: stringStat(localCandidate?.relayProtocol)?.toLowerCase(),
+    relayUrl: stringStat(localCandidate?.url),
+    remoteCandidateType,
+    transport: protocol,
   };
+}
+
+function selectedCandidatePair(
+  reports: BrowserRtcStats[],
+  reportsById: Map<string, BrowserRtcStats>,
+): BrowserRtcStats | undefined {
+  const transport = reports.find(
+    (report) =>
+      report.type === 'transport' &&
+      typeof report.selectedCandidatePairId === 'string',
+  );
+  const selectedId = stringStat(transport?.selectedCandidatePairId);
+
+  if (selectedId) return reportsById.get(selectedId);
+
+  return (
+    reports.find(
+      (report) =>
+        report.type === 'candidate-pair' &&
+        report.state === 'succeeded' &&
+        report.nominated === true,
+    ) ??
+    reports.find(
+      (report) =>
+        report.type === 'candidate-pair' && report.state === 'succeeded',
+    )
+  );
 }
 
 function mergeAudioInboundStats(
@@ -119,11 +157,13 @@ function mergeCandidatePairStats(
   accumulator: MediaStatsAccumulator,
   candidatePair: CandidatePairStats,
 ): MediaStatsAccumulator {
+  const definedCandidatePair = Object.fromEntries(
+    Object.entries(candidatePair).filter(([, value]) => value !== undefined),
+  ) as CandidatePairStats;
+
   return {
     ...accumulator,
-    connectionPath: candidatePair.connectionPath ?? accumulator.connectionPath,
-    latencyMs: candidatePair.latencyMs ?? accumulator.latencyMs,
-    transport: candidatePair.transport ?? accumulator.transport,
+    ...definedCandidatePair,
   };
 }
 
@@ -142,10 +182,13 @@ export async function collectPeerMediaStats(
   const reports = await peer.getStats();
   let accumulator: MediaStatsAccumulator = {};
   const reportsById = new Map<string, BrowserRtcStats>();
+  const browserReports: BrowserRtcStats[] = [];
 
   reports.forEach((report) => {
     const statsReport = report as BrowserRtcStats;
     const reportId = stringStat(statsReport.id);
+
+    browserReports.push(statsReport);
 
     if (reportId) reportsById.set(reportId, statsReport);
   });
@@ -153,11 +196,17 @@ export async function collectPeerMediaStats(
   reports.forEach((report) => {
     const statsReport = report as unknown as RTCStats;
     const inbound = audioInboundStats(statsReport);
-    const candidatePair = candidatePairStats(statsReport, reportsById);
 
     accumulator = mergeAudioInboundStats(accumulator, inbound);
-    accumulator = mergeCandidatePairStats(accumulator, candidatePair);
   });
+
+  accumulator = mergeCandidatePairStats(
+    accumulator,
+    candidatePairStats(
+      selectedCandidatePair(browserReports, reportsById),
+      reportsById,
+    ),
+  );
 
   return {
     ...definedPeerStats({
@@ -170,7 +219,12 @@ export async function collectPeerMediaStats(
       connectionPath: accumulator.connectionPath,
       jitterMs: accumulator.jitterMs,
       latencyMs: accumulator.latencyMs,
+      localCandidateType: accumulator.localCandidateType,
       packetsLost: accumulator.packetsLost,
+      protocol: accumulator.protocol,
+      relayProtocol: accumulator.relayProtocol,
+      relayUrl: accumulator.relayUrl,
+      remoteCandidateType: accumulator.remoteCandidateType,
       transport: accumulator.transport,
     }),
     connectionState: peer.connectionState,

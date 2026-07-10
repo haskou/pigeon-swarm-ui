@@ -1,6 +1,8 @@
 import type {
   CallIceServerConfig,
+  CallParticipantMediaConnection,
   CallResource,
+  CallSignalDelivery,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
@@ -410,8 +412,13 @@ export class PigeonApplication {
   public async heartbeatCallParticipant(
     session: Session,
     callId: string,
-  ): Promise<void> {
-    await this.calls.heartbeatParticipant(session, callId);
+    mediaConnections: CallParticipantMediaConnection[],
+  ): Promise<CallResource> {
+    return await this.calls.heartbeatParticipant(
+      session,
+      callId,
+      mediaConnections,
+    );
   }
 
   public async endCall(session: Session, callId: string): Promise<void> {
@@ -422,8 +429,8 @@ export class PigeonApplication {
     session: Session,
     callId: string,
     signal: CallSignalPayload,
-  ): Promise<void> {
-    await this.calls.sendSignal(session, callId, signal);
+  ): Promise<CallSignalDelivery> {
+    return await this.calls.sendSignal(session, callId, signal);
   }
 
   public async connectRealtime(
@@ -445,6 +452,13 @@ export class PigeonApplication {
     input: RealtimeTypingInput,
   ): void {
     this.realtimeApplication.sendTyping(socket, input);
+  }
+
+  public acknowledgeRealtimeCallSignal(
+    socket: WebSocket,
+    signalId: string,
+  ): void {
+    this.realtimeApplication.acknowledgeCallSignal(socket, signalId);
   }
 
   public async getPushVapidPublicKey(): Promise<{

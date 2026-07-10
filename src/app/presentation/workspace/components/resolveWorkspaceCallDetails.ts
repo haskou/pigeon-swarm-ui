@@ -127,7 +127,7 @@ function callParticipantIds(call: CallResource): string[] {
   if (call.scope.type !== 'community_channel') return call.participantIds;
 
   return call.participants
-    .filter((participant) => participant.status === 'joined')
+    .filter((participant) => participant.connected)
     .map((participant) => participant.identityId);
 }
 

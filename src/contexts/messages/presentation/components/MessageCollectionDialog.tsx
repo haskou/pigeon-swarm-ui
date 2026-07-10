@@ -5,6 +5,7 @@ import type {
   MessageAttachment,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   identityDisplayName,
@@ -19,6 +20,7 @@ export type MessageCollectionAction = {
 
 export function MessageCollectionDialog({
   actions = [],
+  description,
   emptyLabel,
   identityNames,
   identityPictures = {},
@@ -29,6 +31,7 @@ export function MessageCollectionDialog({
   title,
 }: {
   actions?: MessageCollectionAction[];
+  description?: string;
   emptyLabel: string;
   identityNames: Record<string, string>;
   identityPictures?: Record<string, string | undefined>;
@@ -42,38 +45,28 @@ export function MessageCollectionDialog({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[80] bg-black/60"
+        className="app-overlay-scrim fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-label={copy.dialog.close}
       />
-      <section className="fixed left-1/2 top-1/2 z-[90] flex max-h-[min(720px,calc(100dvh-2rem))] w-[min(560px,calc(100vw-1rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#15172d] shadow-2xl shadow-black/45">
-        <header className="border-b border-white/10 px-5 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-black text-white">
-                {title}
-              </h2>
-              {subtitle ? (
-                <div className="mt-1 text-sm text-white/50">{subtitle}</div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/8 text-lg font-black text-white/70 transition hover:bg-white/12 hover:text-white"
-              aria-label={copy.dialog.close}
-            >
-              ×
-            </button>
+      <section className="ui-dialog-surface fixed left-1/2 top-1/2 z-[90] flex max-h-[min(720px,calc(100dvh-1rem))] w-[min(640px,calc(100vw-1rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden">
+        <DialogHeader
+          description={description}
+          title={title}
+          onClose={onClose}
+        />
+        {subtitle ? (
+          <div className="mx-5 mb-3 border-l-2 border-rose-300/50 pl-3 text-sm text-rose-100">
+            {subtitle}
           </div>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
           {messages.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-sm font-semibold text-white/50">
+            <div className="grid min-h-48 place-items-center border-y border-dashed border-white/10 px-5 text-center text-sm font-semibold text-white/45">
               {emptyLabel}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-white/10 border-y border-white/10">
               {messages.map((message) => (
                 <MessageCollectionItem
                   actions={actions}
@@ -112,14 +105,14 @@ function MessageCollectionItem({
   const authorPicture = identityPictures[message.authorIdentityId];
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/5 p-3">
+    <article className="py-4">
       <button
         type="button"
         disabled={!onMessageOpen}
         onClick={() => onMessageOpen?.(message)}
         className="flex w-full min-w-0 gap-3 text-left disabled:cursor-default"
       >
-        <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
+        <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-xs font-black text-slate-950">
           {authorPicture ? (
             <img
               alt=""
@@ -139,13 +132,13 @@ function MessageCollectionItem({
               {new Date(message.timestamp).toLocaleString()}
             </span>
           </span>
-          <span className="mt-2 block line-clamp-4 whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-white/80">
+          <span className="mt-1.5 block line-clamp-4 whitespace-pre-wrap break-words text-sm leading-6 text-white/80">
             {content}
           </span>
         </span>
       </button>
       {actions.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2 flex justify-end">
           {actions.map((action) => (
             <button
               type="button"
@@ -153,8 +146,8 @@ function MessageCollectionItem({
               onClick={() => action.onClick(message)}
               className={
                 action.tone === 'danger'
-                  ? 'rounded-2xl bg-rose-500/15 px-3 py-1.5 text-xs font-black text-rose-100 transition hover:bg-rose-500/25'
-                  : 'rounded-2xl bg-white/8 px-3 py-1.5 text-xs font-black text-white/70 transition hover:bg-white/12 hover:text-white'
+                  ? 'ui-button h-8 px-3 text-xs text-rose-200 hover:bg-rose-500/10'
+                  : 'ui-button h-8 px-3 text-xs'
               }
             >
               {action.label}

@@ -5,9 +5,19 @@ export function joinedRemotePeerIdentityIds(
   currentIdentityId: string,
 ): string[] {
   return call.participants
-    .filter((participant) => participant.status === 'joined')
+    .filter((participant) => participant.connected)
     .filter((participant) => participant.identityId !== currentIdentityId)
     .map((participant) => participant.identityId);
+}
+
+export function participantJoinWasAccepted(
+  call: CallResource,
+  identityId: string,
+): boolean {
+  return call.participants.some(
+    (participant) =>
+      participant.identityId === identityId && participant.status === 'joined',
+  );
 }
 
 export function signalingRemotePeerIdentityIds(
@@ -15,9 +25,7 @@ export function signalingRemotePeerIdentityIds(
   currentIdentityId: string,
 ): string[] {
   return call.participants
-    .filter((participant) =>
-      participant.status === 'joined' || participant.status === 'ringing',
-    )
+    .filter((participant) => participant.connected)
     .filter((participant) => participant.identityId !== currentIdentityId)
     .map((participant) => participant.identityId);
 }

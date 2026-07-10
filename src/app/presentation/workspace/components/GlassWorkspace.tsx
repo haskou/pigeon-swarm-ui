@@ -17,6 +17,7 @@ import type { Peer } from '../../../../contexts/networks/application/list-peers/
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   CallParticipant,
+  CallParticipantMediaConnection,
   CallParticipantStatus,
   CallResource,
   CallSignalType,
@@ -39,6 +40,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type {
+  NetworkSynchronizationStatus,
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
@@ -74,6 +76,8 @@ import {
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallMicrophoneCapture } from '../../../../contexts/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
+import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import {
@@ -83,6 +87,7 @@ import {
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
+  acknowledgeRealtimeCallSignal,
   sendRealtimeTyping,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
@@ -139,10 +144,12 @@ import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import {
+  callIdFromRealtimeEvent,
   callSignalTypeAttribute,
   communityAttribute,
   communityChannelAttribute,
   eventAggregateId,
+  numberAttribute,
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
@@ -323,6 +330,8 @@ export function GlassWorkspace({
     title: string;
   } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
+  const [networkSynchronizationStatus, setNetworkSynchronizationStatus] =
+    useState<NetworkSynchronizationStatus | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
     string[]
@@ -367,6 +376,7 @@ export function GlassWorkspace({
   const notifiedIncomingCallIdsRef = useRef(new Set<string>());
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
+  const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -376,6 +386,7 @@ export function GlassWorkspace({
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
+    callMediaConnections,
     endCall,
     receiveSignal,
     reconcileCall,
@@ -1191,7 +1202,7 @@ export function GlassWorkspace({
             ? [
                 ...new Set(
                   call.participants
-                    .filter((participant) => participant.status === 'joined')
+                    .filter((participant) => participant.connected)
                     .map((participant) => participant.identityId),
                 ),
               ]
@@ -1296,7 +1307,7 @@ export function GlassWorkspace({
 
       if (
         details.kind === 'one-to-one' &&
-        currentParticipant?.status === 'joined' &&
+        currentParticipant?.connected &&
         currentActiveCall?.id !== call.id
       ) {
         logCallDebug('workspace:call:joined-on-another-device', {
@@ -1437,8 +1448,7 @@ export function GlassWorkspace({
           call.id !== exceptCallId &&
           call.participants.some(
             (participant) =>
-              participant.identityId === identityId &&
-              participant.status === 'joined',
+              participant.identityId === identityId && participant.connected,
           ),
       );
 
@@ -1536,6 +1546,7 @@ export function GlassWorkspace({
             callId: call.id,
             conversationId: input.conversationId,
             participantStatuses: call.participants.map((participant) => ({
+              connected: participant.connected,
               identityId: participant.identityId,
               status: participant.status,
             })),
@@ -1763,15 +1774,13 @@ export function GlassWorkspace({
         sessionRef.current,
         pendingCall.id,
       );
-      const joinedParticipant = call.participants.find(
-        (participant) =>
-          participant.identityId === sessionRef.current.identity.id,
-      );
-
-      if (joinedParticipant?.status !== 'joined') {
+      if (!participantJoinWasAccepted(call, sessionRef.current.identity.id)) {
         logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
-          participantStatus: joinedParticipant?.status,
+          participantStatus: call.participants.find(
+            (participant) =>
+              participant.identityId === sessionRef.current.identity.id,
+          )?.status,
         });
         stopLocalAudio(localStream);
 
@@ -1781,6 +1790,7 @@ export function GlassWorkspace({
       logCallDebug('workspace:incoming-call:joined', {
         callId: call.id,
         participantStatuses: call.participants.map((participant) => ({
+          connected: participant.connected,
           identityId: participant.identityId,
           status: participant.status,
         })),
@@ -1862,16 +1872,26 @@ export function GlassWorkspace({
     removeCurrentIdentityFromVoicePresence,
   ]);
 
-  const heartbeatActiveCall = useCallback(async (callId: string) => {
-    await applicationContainer.heartbeatCallParticipant(
-      sessionRef.current,
-      callId,
-    );
-  }, []);
+  const heartbeatActiveCall = useCallback(
+    async (
+      callId: string,
+      mediaConnections: CallParticipantMediaConnection[],
+    ) => {
+      const call = await applicationContainer.heartbeatCallParticipant(
+        sessionRef.current,
+        callId,
+        mediaConnections,
+      );
+
+      reconcileCallResourceRef.current(call);
+    },
+    [],
+  );
 
   useWorkspaceCallHeartbeat({
     activeCall,
     heartbeat: heartbeatActiveCall,
+    mediaConnections: callMediaConnections,
     onHeartbeatFailureLimit: leaveActiveCall,
   });
 
@@ -1913,8 +1933,7 @@ export function GlassWorkspace({
             call.scope.type === 'community_channel' &&
             call.participants.some(
               (participant) =>
-                participant.identityId === identityId &&
-                participant.status === 'joined',
+                participant.identityId === identityId && participant.connected,
             ),
         );
 
@@ -3281,8 +3300,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('calls.')) {
-        const eventCallId =
-          eventAggregateId(event) ?? stringAttribute(event, 'callId');
+        const eventCallId = callIdFromRealtimeEvent(event);
 
         logCallDebug('workspace:realtime-call-event', {
           activeCallId: activeCallRef.current?.id,
@@ -3299,26 +3317,37 @@ export function GlassWorkspace({
           );
           const signalType = callSignalTypeAttribute(event);
           const payload = recordAttribute(event, 'payload');
+          const expiresAt = numberAttribute(event, 'expiresAt');
+          const signalId = stringAttribute(event, 'signalId');
 
           if (
             callId &&
             senderIdentityId &&
             recipientIdentityId === session.identity.id &&
             signalType &&
-            payload
+            payload &&
+            expiresAt !== undefined &&
+            signalId
           ) {
-            void receiveSignal({
-              callId,
-              payload,
-              senderIdentityId,
-              signalType,
-            }).catch(() => undefined);
+            void callSignalDeliveriesRef.current
+              .receive(
+                { expiresAt, signalId },
+                async () =>
+                  await receiveSignal({
+                    callId,
+                    payload,
+                    senderIdentityId,
+                    signalType,
+                  }),
+                () => acknowledgeRealtimeCallSignal(session, signalId),
+              )
+              .catch(() => undefined);
           }
 
           return;
         }
 
-        const callId = eventAggregateId(event);
+        const callId = eventCallId;
 
         if (!callId) return;
 
@@ -3329,6 +3358,7 @@ export function GlassWorkspace({
               activeCallId: activeCallRef.current?.id,
               callId: call.id,
               participantStatuses: call.participants.map((participant) => ({
+                connected: participant.connected,
                 identityId: participant.identityId,
                 status: participant.status,
               })),
@@ -4035,9 +4065,16 @@ export function GlassWorkspace({
     onConnected: () => {
       setRealtimeStatus('connected');
     },
-    onDisconnected: () => setRealtimeStatus('reconnecting'),
+    onDisconnected: () => {
+      setNetworkSynchronizationStatus(null);
+      setRealtimeStatus('reconnecting');
+    },
     onDomainEvent: handleRealtimeEvent,
-    onReconnecting: () => setRealtimeStatus('reconnecting'),
+    onNetworkSynchronizationStatus: setNetworkSynchronizationStatus,
+    onReconnecting: () => {
+      setNetworkSynchronizationStatus(null);
+      setRealtimeStatus('reconnecting');
+    },
     onTyping: handleRealtimeTyping,
   });
   const conversationTypingIdentityIds = activeTypingIdentityIds(
@@ -4623,6 +4660,7 @@ export function GlassWorkspace({
               tone: 'danger',
             },
           ]}
+          description={copy.messages.pinnedMessagesBody}
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading
@@ -4666,6 +4704,7 @@ export function GlassWorkspace({
             node={node}
             nodeNetworks={nodeNetworks}
             nodeSettingsOpen={nodeSettingsOpen}
+            networkSynchronizationStatus={networkSynchronizationStatus}
             notificationAction={notificationAction}
             notificationError={notificationError}
             notificationSettingsError={notificationSettingsError}

@@ -135,6 +135,8 @@ function callParticipantStatus(
   participant: CallParticipant,
   call: CallSession,
 ): string {
+  if (participant.connected === false) return 'disconnected';
+
   if (participant.identityId === call.currentIdentityId) return call.status;
 
   if (participant.connectionState) return participant.connectionState;

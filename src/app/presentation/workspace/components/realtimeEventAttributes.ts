@@ -29,6 +29,17 @@ export function recordAttribute(
     : undefined;
 }
 
+export function numberAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): number | undefined {
+  const value = event.attributes[key];
+
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
 export function communityChannelAttribute(
   event: RealtimeDomainEvent,
   key: string,
@@ -86,6 +97,16 @@ export function callSignalTypeAttribute(
   return value === 'answer' || value === 'ice_candidate' || value === 'offer'
     ? value
     : undefined;
+}
+
+export function callIdFromRealtimeEvent(
+  event: RealtimeDomainEvent,
+): string | undefined {
+  if (event.type === 'calls.v1.participant_lease.was_updated') {
+    return stringAttribute(event, 'callId');
+  }
+
+  return eventAggregateId(event) ?? stringAttribute(event, 'callId');
 }
 
 export function eventAggregateId(

@@ -1,5 +1,6 @@
 import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
+import type { CallResource } from '../../contexts/calls/domain/callSession.types';
 import type {
   ConversationKeyEntry,
   IdentityResource,
@@ -728,8 +729,26 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('sends call participant heartbeat', async () => {
+    const call = {
+      createdAt: 1,
+      creatorIdentityId: 'identity-1',
+      id: 'call-1',
+      networkId: 'network-1',
+      participantIds: ['identity-1'],
+      participants: [
+        {
+          connected: true,
+          identityId: 'identity-1',
+          lastHeartbeatAt: 2,
+          mediaConnections: [],
+          status: 'joined',
+        },
+      ],
+      scope: { conversationId: 'conversation-1', type: 'conversation' },
+      status: 'active',
+    } satisfies CallResource;
     const http = {
-      request: jest.fn().mockResolvedValue(undefined),
+      request: jest.fn().mockResolvedValue(call),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
@@ -739,17 +758,57 @@ describe(PigeonApiGateway.name, () => {
       password: 'secret',
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
+    const mediaConnections = [
+      {
+        localCandidateType: 'relay' as const,
+        protocol: 'udp',
+        remoteIdentityId: 'identity-2',
+        state: 'connected' as const,
+      },
+    ];
 
-    await gateway.heartbeatCallParticipant(session, 'call-1');
+    await expect(
+      gateway.heartbeatCallParticipant(session, 'call-1', mediaConnections),
+    ).resolves.toBe(call);
 
     expect(http.request).toHaveBeenCalledWith(
       '/calls/call-1/participants/me/heartbeat',
       {
-        body: JSON.stringify({}),
+        body: JSON.stringify({ mediaConnections }),
         headers: { 'X-Signature': 'http-signature' },
         method: 'POST',
       },
     );
+  });
+
+  it('returns retryable call signal delivery metadata', async () => {
+    const delivery = { expiresAt: 200, signalId: 'signal-1' };
+    const http = {
+      request: jest.fn().mockResolvedValue(delivery),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+    const signal = {
+      payload: { candidate: 'candidate' },
+      recipientIdentityId: 'identity-2',
+      signalType: 'ice_candidate' as const,
+    };
+
+    await expect(
+      gateway.sendCallSignal(session, 'call-1', signal),
+    ).resolves.toEqual(delivery);
+
+    expect(http.request).toHaveBeenCalledWith('/calls/call-1/signals', {
+      body: JSON.stringify(signal),
+      headers: { 'X-Signature': 'http-signature' },
+      method: 'POST',
+    });
   });
 
   it('loads IPFS replication status with signed identity headers', async () => {

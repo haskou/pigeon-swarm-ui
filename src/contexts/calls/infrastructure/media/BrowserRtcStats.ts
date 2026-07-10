@@ -8,8 +8,12 @@ export type BrowserRtcStats = RTCStats & {
   kind?: unknown;
   localCandidateId?: unknown;
   mimeType?: unknown;
+  nominated?: unknown;
   packetsLost?: unknown;
   protocol?: unknown;
+  relayProtocol?: unknown;
   remoteCandidateId?: unknown;
+  selectedCandidatePairId?: unknown;
   state?: unknown;
+  url?: unknown;
 };

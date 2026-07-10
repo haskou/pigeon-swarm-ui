@@ -130,7 +130,9 @@ function screenShareTechnicalDetails(
     },
     {
       label: copy.calls.streamFrameRate,
-      value: settings?.frameRate ? `${Math.round(settings.frameRate)} fps` : '-',
+      value: settings?.frameRate
+        ? `${Math.round(settings.frameRate)} fps`
+        : '-',
     },
     {
       label: copy.calls.streamDisplaySurface,

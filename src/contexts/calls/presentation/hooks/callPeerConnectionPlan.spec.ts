@@ -2,18 +2,30 @@ import type { CallResource } from '../../domain/callSession.types';
 
 import {
   joinedRemotePeerIdentityIds,
+  participantJoinWasAccepted,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from './callPeerConnectionPlan';
 
 describe('callPeerConnectionPlan', () => {
-  it('uses joined participants from the call resource even when UI participants are not hydrated yet', () => {
+  it('uses connected participants from the call resource even when UI participants are not hydrated yet', () => {
     const call = callResource({
       currentIdentityId: 'alice',
       remoteIdentityId: 'bob',
     });
 
     expect(joinedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+  });
+
+  it('accepts a joined participant before its first heartbeat lease connects', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[0].connected = false;
+
+    expect(participantJoinWasAccepted(call, 'alice')).toBe(true);
   });
 
   it('does not connect ringing or left participants', () => {
@@ -23,30 +35,63 @@ describe('callPeerConnectionPlan', () => {
     });
 
     call.participants.push(
-      { identityId: 'carol', status: 'ringing' },
-      { identityId: 'den', status: 'left' },
+      {
+        connected: false,
+        identityId: 'carol',
+        mediaConnections: [],
+        status: 'ringing',
+      },
+      {
+        connected: false,
+        identityId: 'den',
+        mediaConnections: [],
+        status: 'left',
+      },
+      {
+        connected: false,
+        identityId: 'eve',
+        mediaConnections: [],
+        status: 'joined',
+      },
     );
 
     expect(joinedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
   });
 
-  it('can signal ringing participants before they accept the call', () => {
+  it('signals only participants with an active backend lease', () => {
     const call = callResource({
       currentIdentityId: 'alice',
       remoteIdentityId: 'bob',
     });
 
     call.participants.push(
-      { identityId: 'carol', status: 'ringing' },
-      { identityId: 'den', status: 'left' },
-      { identityId: 'eve', status: 'declined' },
-      { identityId: 'frank', status: 'missed' },
+      {
+        connected: false,
+        identityId: 'carol',
+        mediaConnections: [],
+        status: 'ringing',
+      },
+      {
+        connected: false,
+        identityId: 'den',
+        mediaConnections: [],
+        status: 'left',
+      },
+      {
+        connected: false,
+        identityId: 'eve',
+        mediaConnections: [],
+        status: 'declined',
+      },
+      {
+        connected: false,
+        identityId: 'frank',
+        mediaConnections: [],
+        status: 'missed',
+      },
     );
 
-    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual([
-      'bob',
-      'carol',
-    ]);
+    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
   });
 
   it('chooses a stable initial offerer for both peers', () => {
@@ -70,13 +115,17 @@ function callResource({
     participantIds: [currentIdentityId, remoteIdentityId],
     participants: [
       {
+        connected: true,
         identityId: currentIdentityId,
         joinedAt: 1_780_000_000_000,
+        mediaConnections: [],
         status: 'joined',
       },
       {
+        connected: true,
         identityId: remoteIdentityId,
         joinedAt: 1_780_000_000_001,
+        mediaConnections: [],
         status: 'joined',
       },
     ],

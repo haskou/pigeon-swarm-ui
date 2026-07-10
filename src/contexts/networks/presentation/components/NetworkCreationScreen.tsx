@@ -79,9 +79,9 @@ export function NetworkCreationScreen({
           <img
             src="/logo.png"
             alt="Pigeon Swarm"
-            className="h-16 w-16 rounded-2xl border border-white/15 shadow-lg"
+            className="h-14 w-14 rounded-xl border border-white/15 shadow-lg"
           />
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl">
+          <h1 className="mt-5 text-3xl font-black text-white sm:text-4xl">
             {copy.network.title}
           </h1>
           <p className="mt-3 max-w-lg text-base leading-relaxed text-white/65">
@@ -112,7 +112,7 @@ export function NetworkCreationScreen({
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
                 placeholder={copy.network.namePlaceholder}
                 autoComplete="name"
                 required
@@ -123,7 +123,7 @@ export function NetworkCreationScreen({
               <textarea
                 value={inviteCode}
                 onChange={(event) => setInviteCode(event.target.value)}
-                className="min-h-32 w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
+                className="ui-field-control min-h-32 resize-none px-4 py-3 text-sm placeholder:text-white/30"
                 placeholder={copy.network.inviteCodePlaceholder}
                 autoComplete="off"
                 required
@@ -133,10 +133,10 @@ export function NetworkCreationScreen({
         </div>
 
         {canConfigureRelay && (
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/15">
+          <div className="mt-5 border-y border-white/10">
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-sm font-black text-white/75 transition hover:bg-white/[0.03]"
+              className="flex w-full items-center justify-between gap-3 py-4 text-left text-sm font-black text-white/75 transition hover:text-white"
               aria-expanded={configureRelay}
               onClick={() => setConfigureRelay((current) => !current)}
             >
@@ -144,7 +144,7 @@ export function NetworkCreationScreen({
               <span
                 aria-hidden="true"
                 className={cx(
-                  'grid h-8 w-8 place-items-center rounded-xl bg-white/[0.06] text-white/60 transition-transform',
+                  'grid h-8 w-8 place-items-center text-white/60 transition-transform',
                   configureRelay && 'rotate-180',
                 )}
               >
@@ -152,7 +152,7 @@ export function NetworkCreationScreen({
               </span>
             </button>
             {configureRelay && (
-              <div className="border-t border-white/10 p-4 pt-3">
+              <div className="border-t border-white/10 py-4">
                 <p className="mb-4 text-sm leading-6 text-white/50">
                   {copy.network.configureRelayBody}
                 </p>
@@ -168,14 +168,14 @@ export function NetworkCreationScreen({
         )}
 
         {error && (
-          <div className="mt-5 rounded-2xl border border-rose-300/25 bg-rose-500/15 p-4 text-sm text-rose-100">
+          <div className="ui-inline-notice mt-5 border-rose-300/25 bg-rose-500/15 text-sm text-rose-100">
             {error}
           </div>
         )}
 
         <button
           disabled={loading}
-          className="glass-button mt-6 w-full rounded-2xl bg-[#274279] px-5 py-4 text-sm font-black text-white shadow-xl shadow-[#0b162f]/30 transition hover:scale-[1.01] hover:bg-[#31508e] disabled:cursor-not-allowed disabled:opacity-45"
+          className="ui-button ui-button-primary mt-6 w-full py-3"
         >
           {loading
             ? copy.network.loadingSubmit
@@ -192,12 +192,7 @@ export function NetworkCreationScreen({
 
 function ChevronDownIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
         d="m7 10 5 5 5-5"
         stroke="currentColor"

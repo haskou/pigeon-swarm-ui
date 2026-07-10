@@ -190,6 +190,48 @@ describe(RealtimeGateway.name, () => {
     });
   });
 
+  it('forwards live network synchronization snapshots', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/'),
+      new RequestSigner(),
+    );
+    const session = {
+      identity: { id: 'identity-1' },
+      keyPair: {
+        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const onMessage = jest.fn();
+    const status = {
+      changedAt: 1_770_000_000_000,
+      networks: [
+        {
+          connectedPeerIds: ['peer-1'],
+          convergedStoreCount: 2,
+          id: 'network-1',
+          name: 'Alpha network',
+          replicationPeerIds: ['peer-1'],
+          state: 'converged',
+          stores: [],
+          totalStoreCount: 2,
+          type: 'private',
+        },
+      ],
+    };
+
+    await gateway.connect(session, onMessage);
+    WebSocketMock.instances[0]?.emitMessage(
+      JSON.stringify({ status, type: 'network_synchronization_status' }),
+    );
+
+    expect(onMessage).toHaveBeenCalledWith({
+      status,
+      type: 'network_synchronization_status',
+    });
+  });
+
   it('parses typing messages from the socket', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
     const gateway = new RealtimeGateway(

@@ -1,4 +1,5 @@
 import type {
+  CallParticipantMediaConnection,
   CallSignalType,
   ScreenShareQualityPreset,
 } from '../../domain/callSession.types';
@@ -38,6 +39,8 @@ export type { PeerMediaStats } from './collectPeerMediaStats';
 
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
+
+  private latestPeerStats: Record<string, PeerMediaStats> = {};
 
   private readonly pendingPeerCreations = new Map<
     string,
@@ -1217,6 +1220,7 @@ export class CallPeerConnectionManager {
     this.localScreenStreams.clear();
     this.previousStatsSamples.clear();
     this.localStream = null;
+    this.latestPeerStats = {};
     this.rtcConfigurationProvider = null;
     this.deafened = false;
   }
@@ -1243,6 +1247,26 @@ export class CallPeerConnectionManager {
       stats[identityId] = peerStats;
     }
 
+    this.latestPeerStats = stats;
+
     return stats;
+  }
+
+  public mediaConnections(): CallParticipantMediaConnection[] {
+    return Object.entries(this.latestPeerStats)
+      .slice(0, 32)
+      .map(([remoteIdentityId, stats]) => ({
+        ...(stats.localCandidateType
+          ? { localCandidateType: stats.localCandidateType }
+          : {}),
+        ...(stats.protocol ? { protocol: stats.protocol } : {}),
+        ...(stats.relayProtocol ? { relayProtocol: stats.relayProtocol } : {}),
+        ...(stats.relayUrl ? { relayUrl: stats.relayUrl } : {}),
+        ...(stats.remoteCandidateType
+          ? { remoteCandidateType: stats.remoteCandidateType }
+          : {}),
+        remoteIdentityId,
+        state: stats.connectionState,
+      }));
   }
 }

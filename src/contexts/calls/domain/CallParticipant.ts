@@ -1,4 +1,5 @@
 import type { IdentityResource } from '../../../shared/domain/pigeonResources.types';
+import type { CallParticipantMediaConnection } from './CallParticipantMediaConnection';
 import type { CallParticipantStatus } from './CallParticipantStatus';
 
 export type CallParticipant = {
@@ -7,12 +8,15 @@ export type CallParticipant = {
   codec?: string;
   connectionPath?: 'direct' | 'relay' | 'unknown';
   connectionState?: RTCPeerConnectionState;
+  connected?: boolean;
   deafened?: boolean;
   identity?: IdentityResource;
   identityId: string;
   iceState?: RTCIceConnectionState;
   jitterMs?: number;
+  lastHeartbeatAt?: number;
   latencyMs?: number;
+  mediaConnections?: CallParticipantMediaConnection[];
   mediaStream?: MediaStream;
   muted: boolean;
   name: string;

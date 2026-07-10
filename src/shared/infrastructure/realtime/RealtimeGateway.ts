@@ -3,6 +3,7 @@ import type { RealtimeTypingInput } from './RealtimeTypingInput';
 
 export type { RealtimeDomainEvent } from './RealtimeDomainEvent';
 export type { RealtimeMessage } from './RealtimeMessage';
+export type { NetworkSynchronizationStatus } from '../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 export type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 export type { RealtimeTypingInput } from './RealtimeTypingInput';
 import type { Session } from '../../domain/pigeonResources.types';
@@ -12,6 +13,7 @@ import { IdentityId } from '../../../contexts/identities/domain/value-objects/Id
 import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
 import { RequestSigner } from '../http/RequestSigner';
+import { RealtimeCallSignalAcknowledgementPublisher } from './RealtimeCallSignalAcknowledgementPublisher';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
 import {
   RealtimeHeartbeat,
@@ -28,6 +30,9 @@ export class RealtimeGateway {
   private readonly connection: RealtimeConnectionUrl;
 
   private readonly heartbeat = new RealtimeHeartbeat();
+
+  private readonly callSignalAcknowledgements =
+    new RealtimeCallSignalAcknowledgementPublisher();
 
   private readonly parser = new RealtimeMessageParser();
 
@@ -157,5 +162,11 @@ export class RealtimeGateway {
 
   public sendTyping(socket: WebSocket, input: RealtimeTypingInput): void {
     this.typing.send(socket, input, (event, data) => this.debug(event, data));
+  }
+
+  public acknowledgeCallSignal(socket: WebSocket, signalId: string): void {
+    this.callSignalAcknowledgements.send(socket, signalId, (event, data) =>
+      this.debug(event, data),
+    );
   }
 }

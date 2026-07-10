@@ -22,6 +22,7 @@ import { DialogHeader } from '../../../../shared/presentation/components/DialogH
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { ConversationPeer } from '../../domain/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -381,7 +382,7 @@ export function CreateConversationDialog({
     >
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-panel ui-dialog-surface flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[88vh] sm:min-h-0 sm:max-w-xl"
+        className="app-overlay-surface app-safe-area-panel ui-dialog-surface flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[88vh] sm:min-h-[32rem] sm:max-w-2xl"
         data-state={transitionState}
       >
         <DialogHeader
@@ -405,8 +406,8 @@ export function CreateConversationDialog({
           />
 
           {mode === 'direct' ? (
-            <>
-              <div className="mt-2">
+            <div className="mt-4 grid min-h-[18rem] content-start gap-5 sm:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="grid content-start gap-4">
                 <Field label={copy.identityLookup.label}>
                   <input
                     value={peerIdentityId}
@@ -418,28 +419,6 @@ export function CreateConversationDialog({
                   />
                   <IdentityLookupStatus status={remoteIdentityStatus} />
                 </Field>
-              </div>
-
-              {peerIdentity && peerDisplayName && (
-                <IdentityPreview
-                  identity={peerIdentity}
-                  name={peerDisplayName}
-                  pictureUrl={peerPictureUrl}
-                />
-              )}
-              {existingDirectConversation && (
-                <div className="ui-inline-notice mt-3 border-amber-300/25 bg-amber-500/10 text-amber-100">
-                  {copy.dialog.directConversationAlreadyExists}
-                </div>
-              )}
-              {peerIdentity &&
-                lookupState === 'ready' &&
-                sharedNetworkIds.length === 0 && (
-                  <div className="ui-inline-notice mt-3 border-amber-300/25 bg-amber-500/10 text-amber-100">
-                    {copy.dialog.noSharedNetwork}
-                  </div>
-                )}
-              <div className="mt-2">
                 <Field label={copy.dialog.sharedNetwork}>
                   <GlassSelect
                     ariaLabel={copy.dialog.selectSwarm}
@@ -449,9 +428,40 @@ export function CreateConversationDialog({
                     data-testid="create-conversation-network-select"
                     options={networkOptions}
                   />
-                </Field>{' '}
+                </Field>
+                {existingDirectConversation ? (
+                  <div className="border-l-2 border-amber-300/50 pl-3 text-sm text-amber-100">
+                    {copy.dialog.directConversationAlreadyExists}
+                  </div>
+                ) : null}
+                {peerIdentity &&
+                lookupState === 'ready' &&
+                sharedNetworkIds.length === 0 ? (
+                  <div className="border-l-2 border-amber-300/50 pl-3 text-sm text-amber-100">
+                    {copy.dialog.noSharedNetwork}
+                  </div>
+                ) : null}
               </div>
-            </>
+              <div className="border-y border-white/10 py-3 sm:border-y-0 sm:border-l sm:py-0 sm:pl-5">
+                <div className="ui-section-heading pt-0">
+                  {copy.communities.memberPreview}
+                </div>
+                {peerIdentity && peerDisplayName ? (
+                  <IdentityMemberRow
+                    interactive={false}
+                    item={{
+                      identity: peerIdentity,
+                      identityId: peerIdentity.id,
+                      pictureUrl: peerPictureUrl,
+                    }}
+                  />
+                ) : (
+                  <p className="py-4 text-sm leading-6 text-white/40">
+                    {copy.communities.memberPreviewEmpty}
+                  </p>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="mt-4 grid gap-3">
               <Field label={copy.dialog.groupName}>

@@ -78,4 +78,52 @@ describe(collectPeerMediaStats.name, () => {
       speaking: false,
     });
   });
+
+  it('reports the candidate pair selected by the transport', async () => {
+    const stats = await collectPeerMediaStats(
+      peerWithStats([
+        {
+          id: 'transport',
+          selectedCandidatePairId: 'selected-pair',
+          timestamp: 1,
+          type: 'transport',
+        } as RTCStats,
+        {
+          currentRoundTripTime: 0.05,
+          id: 'selected-pair',
+          localCandidateId: 'local',
+          remoteCandidateId: 'remote',
+          state: 'succeeded',
+          timestamp: 1,
+          type: 'candidate-pair',
+        } as RTCStats,
+        {
+          candidateType: 'relay',
+          id: 'local',
+          protocol: 'udp',
+          relayProtocol: 'udp',
+          timestamp: 1,
+          type: 'local-candidate',
+          url: 'turn:relay.example:3478?transport=udp',
+        } as RTCStats,
+        {
+          candidateType: 'srflx',
+          id: 'remote',
+          protocol: 'udp',
+          timestamp: 1,
+          type: 'remote-candidate',
+        } as RTCStats,
+      ]),
+    );
+
+    expect(stats).toMatchObject({
+      connectionPath: 'relay',
+      latencyMs: 50,
+      localCandidateType: 'relay',
+      protocol: 'udp',
+      relayProtocol: 'udp',
+      relayUrl: 'turn:relay.example:3478?transport=udp',
+      remoteCandidateType: 'srflx',
+    });
+  });
 });

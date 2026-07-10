@@ -28,6 +28,7 @@ export const en = {
   },
   identityLookup,
   auth: {
+    changeIdentity: 'Change identity',
     apiLabel: 'API',
     createIdentity: 'Create identity',
     createIdentityShort: 'Create',
@@ -74,6 +75,7 @@ export const en = {
     nodePeersLoading: 'Searching...',
     nodePeersOne: '1 peer',
     nodeSummaryTitle: 'Local node',
+    identityPreviewVersion: 'Identity v{version}',
     passwordConfirmLabel: 'Repeat password',
     passwordLabel: 'Password',
     passwordRequirementItems: {
@@ -277,6 +279,9 @@ export const en = {
     you: 'You',
   },
   communities: {
+    accessSetupBody:
+      'Choose the network, visibility, and how other people can join.',
+    accessSetupTitle: 'Access',
     addChannelPlaceholder: 'Add channel',
     addInitialChannel: 'Add channel',
     addMember: 'Add member',
@@ -350,6 +355,10 @@ export const en = {
     empty: 'No communities yet. Create one from the rail.',
     emptyChannel: 'No messages in this channel yet.',
     initialChannelName: 'Channel name',
+    initialChannelRequired: 'Add at least one channel to continue.',
+    profileSetupBody:
+      'Choose a recognizable name and image. You can change them later.',
+    profileSetupTitle: 'Community profile',
     initialChannels: 'Initial channels',
     initialChannelsBody:
       'Add the channels that will be created with the community.',
@@ -803,6 +812,8 @@ export const en = {
     pin: 'Pin',
     pinError: 'The message could not be pinned.',
     pinned: 'Pinned',
+    pinnedMessagesBody:
+      'Messages saved so everyone in the chat can find them quickly.',
     pinnedMessages: 'Pinned messages',
     viewPinned: 'View pins',
     reply: 'Reply',
@@ -850,6 +861,7 @@ export const en = {
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
   nodeSettings: {
+    addNetwork: 'Add private network',
     body: 'Manage the networks this local node participates in.',
     claim: 'Claim node',
     claimAvailable: 'Ready to claim',
@@ -870,6 +882,8 @@ export const en = {
     infoTab: 'Info',
     networkIdCopied: 'Network ID copied.',
     networks: 'Node networks',
+    networksBody: 'Networks this node can use to discover and share content.',
+    networksEmpty: 'This node does not belong to any network yet.',
     networksTab: 'Networks ({count})',
     nodeId: 'Node ID',
     nodeDetails: 'Node details',
@@ -927,43 +941,70 @@ export const en = {
     relayTab: 'Configuration',
     relayLoading: 'Loading configuration...',
     publicAccessBody:
-      'Optional public address used by services that need to be reached from outside this network.',
-    publicAccessTitle: 'Public access',
+      'Enable this only when other devices need to reach this node directly over the Internet.',
+    publicAccessTitle: 'Remote access',
+    remoteAccess: 'Enable remote access',
+    remoteAccessBody:
+      'Lets you configure the public address and services this node exposes outside your local network.',
     publicNetworkPort: 'Public network port',
+    publicNetworkPortBody:
+      'Optional. Exposes the public network from this node.',
     callsRelayPort: 'Calls port',
+    callsRelayPortBody:
+      'Optional. Relays calls when a direct connection is unavailable.',
     manualRelayMultiaddrs: 'Manual connection addresses',
     manualRelayMultiaddrsBody:
       'Optional. One address per line for private networks when you do not want to rely on automatic discovery.',
     ownerOnlyRelay: 'Only the node owner can change this configuration.',
     privateRelayBody:
-      'Find published node addresses for private networks, or allow this node to relay private network traffic.',
-    privateRelayDiscoverRecords: 'Find published node addresses',
+      'Find relay nodes that help reach your private networks when this device cannot be contacted directly.',
+    privateRelayDiscoverRecords: 'Find relay nodes',
+    privateRelayDiscoverRecordsBody:
+      'Automatically finds nodes that help connect devices in your private networks.',
     privateRelayDiscoveryOnlyBody:
       'Client mode: this node can find private network relays without exposing a port range.',
     privateRelayEnabledSetting: 'Enable relay for private networks',
+    privateRelayEnabledBody:
+      'Lets other nodes in your private networks connect through this node.',
     privateRelayPortEnd: 'Port end',
     privateRelayPortRangeHelp:
       'You need one port for each private network served by this node. One network can use 4172-4172; three networks need at least 4172-4174.',
     privateRelayPortStart: 'Port start',
-    privateRelayTitle: 'Private network connection',
-    replication: 'Replication status',
+    privateRelayTitle: 'Relay nodes',
+    replication: 'Data stored on this node',
     replicationActiveNodes: 'Active',
-    replicationBody: 'Node replication diagnostics.',
-    replicationContents: 'Contents',
+    replicationBody:
+      'Summarizes the content kept by this node and the space it can release when needed.',
+    replicationContents: 'Stored items',
     replicationDesired: 'Desired',
-    replicationEmpty: 'No replicated content reported by this node.',
-    replicationError: 'Replication status could not be loaded.',
+    replicationEmpty: 'This node does not keep replicated content yet.',
+    replicationError: 'Local data status could not be loaded.',
     replicationKeepLocal: 'Keep local',
     replicationKnown: 'Known',
     replicationKnownNodes: 'Known nodes',
     replicationLoading: 'Loading...',
     replicationRefresh: 'Refresh',
-    replicationReleasable: 'Can release',
+    replicationReleasable: 'Can be released',
     replicationReleaseLocal: 'Can release',
-    replicationResponsible: 'Responsible for',
+    replicationResponsible: 'Assigned to this node',
     replicationResponsibleNodes: 'Responsible nodes',
     replicationStandby: 'Standby',
-    replicationTotalSize: 'Total size',
+    replicationTotalSize: 'Space used',
+    synchronizationAwaitingSnapshot:
+      'Waiting for the live node status snapshot...',
+    synchronizationBody:
+      'Checks whether local data groups are up to date with the available network connections.',
+    synchronizationChangedAt: 'Last change: {date}',
+    synchronizationConnection: '{count} network connection',
+    synchronizationConnections: '{count} network connections',
+    synchronizationConverged: 'Synchronized',
+    synchronizationEmpty:
+      'This node does not report synchronized networks yet.',
+    synchronizationStores: '{converged} of {total} synchronized',
+    synchronizationProgress: '{percentage}% synchronized',
+    synchronizationSyncing: 'Synchronizing',
+    synchronizationTitle: 'Network synchronization',
+    synchronizationWaitingForPeers: 'Waiting for connections',
     saving: 'Saving...',
     server: 'Node',
     title: 'Node settings',
@@ -1132,6 +1173,8 @@ export const en = {
     changePicture: 'Change profile picture',
     communityRoles: 'Community roles',
     copied: 'Copied',
+    copySensitiveKeyConfirm:
+      'This key can decrypt private content. If you copy it unencrypted, anyone or any application with clipboard access could read it. Are you sure you want to continue?',
     copy: 'Copy',
     currentPassword: 'Current password',
     currentPasswordForPasskeyHelp:

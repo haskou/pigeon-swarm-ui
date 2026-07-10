@@ -122,6 +122,12 @@ function SecretRow({ secret }: { secret: EncryptionDetailsSecret }) {
 
   const copyValue = async () => {
     if (!value || !navigator.clipboard) return;
+    if (
+      secret.sensitive &&
+      !window.confirm(copy.profile.copySensitiveKeyConfirm)
+    ) {
+      return;
+    }
 
     await navigator.clipboard.writeText(value);
     setCopied(true);

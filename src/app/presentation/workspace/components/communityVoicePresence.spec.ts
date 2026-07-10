@@ -18,9 +18,24 @@ describe('communityVoicePresence', () => {
       communityCall({
         channelId: 'voice-1',
         participants: [
-          { identityId: 'denis', status: 'joined' },
-          { identityId: 'hasko', status: 'joined' },
-          { identityId: 'old-user', status: 'left' },
+          {
+            connected: true,
+            identityId: 'denis',
+            mediaConnections: [],
+            status: 'joined',
+          },
+          {
+            connected: true,
+            identityId: 'hasko',
+            mediaConnections: [],
+            status: 'joined',
+          },
+          {
+            connected: false,
+            identityId: 'old-user',
+            mediaConnections: [],
+            status: 'left',
+          },
         ],
       }),
     ];
@@ -48,7 +63,14 @@ describe('communityVoicePresence', () => {
     const calls = [
       communityCall({
         channelId: 'voice-1',
-        participants: [{ identityId: 'denis', status: 'joined' }],
+        participants: [
+          {
+            connected: true,
+            identityId: 'denis',
+            mediaConnections: [],
+            status: 'joined',
+          },
+        ],
       }),
     ];
     const communities = [community];

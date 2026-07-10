@@ -15,6 +15,7 @@ interface AuthFormFieldsProps {
   availableNetworks: Array<{ id: string; name: string }>;
   handle: string;
   identityId: string;
+  identitySelected: boolean;
   mode: AuthMode;
   name: string;
   networks: string;
@@ -28,19 +29,21 @@ interface AuthFormFieldsProps {
 
 export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
   if (props.mode === 'login') {
+    if (props.identitySelected) return <></>;
+
     return (
       <Field label={copy.identityLookup.label}>
         <input
           value={props.identityId}
           onChange={(event) => props.onIdentityIdChange(event.target.value)}
-	          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-	          placeholder={copy.identityLookup.placeholder}
-	          autoComplete="username"
-	          autoCapitalize="none"
-	          autoCorrect="off"
-	          data-testid="auth-identity-input"
-	          spellCheck={false}
-	        />
+          className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+          placeholder={copy.identityLookup.placeholder}
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          data-testid="auth-identity-input"
+          spellCheck={false}
+        />
         <p className="mt-2 text-xs leading-relaxed text-white/40">
           {copy.identityLookup.help}
         </p>
@@ -50,33 +53,35 @@ export function AuthFormFields(props: AuthFormFieldsProps): ReactElement {
 
   return (
     <>
-      <Field label={copy.auth.profileNameLabel}>
-        <input
-          value={props.name}
-          onChange={(event) => props.onNameChange(event.target.value)}
-          maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
-          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-          placeholder="Ada"
-          autoComplete="name"
-          data-testid="auth-name-input"
-        />
-      </Field>
-      <Field label={copy.auth.handleLabel}>
-        <input
-          value={props.handle}
-          onChange={(event) =>
-            props.onHandleChange(normalizeHandleInput(event.target.value))
-          }
-          maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
-	          className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-	          placeholder="@ada"
-	          autoComplete="username"
-	          autoCapitalize="none"
-	          autoCorrect="off"
-	          data-testid="auth-handle-input"
-	          spellCheck={false}
-	        />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={copy.auth.profileNameLabel}>
+          <input
+            value={props.name}
+            onChange={(event) => props.onNameChange(event.target.value)}
+            maxLength={IDENTITY_PROFILE_NAME_MAX_LENGTH}
+            className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+            placeholder="Ada"
+            autoComplete="name"
+            data-testid="auth-name-input"
+          />
+        </Field>
+        <Field label={copy.auth.handleLabel}>
+          <input
+            value={props.handle}
+            onChange={(event) =>
+              props.onHandleChange(normalizeHandleInput(event.target.value))
+            }
+            maxLength={IDENTITY_PROFILE_HANDLE_MAX_LENGTH}
+            className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+            placeholder="@ada"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            data-testid="auth-handle-input"
+            spellCheck={false}
+          />
+        </Field>
+      </div>
       <NetworkField {...props} />
     </>
   );
@@ -111,13 +116,13 @@ function NetworkField(props: {
       <input
         value={props.networks}
         onChange={(event) => props.onNetworksChange(event.target.value)}
-	        className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-300/60"
-	        placeholder="uuid-public, uuid-private"
-	        autoCapitalize="none"
-	        autoCorrect="off"
-	        data-testid="auth-networks-input"
-	        spellCheck={false}
-	      />
+        className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+        placeholder="uuid-public, uuid-private"
+        autoCapitalize="none"
+        autoCorrect="off"
+        data-testid="auth-networks-input"
+        spellCheck={false}
+      />
     </Field>
   );
 }

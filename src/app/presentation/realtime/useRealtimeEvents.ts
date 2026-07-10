@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 import type {
+  NetworkSynchronizationStatus,
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
@@ -15,6 +16,9 @@ type RealtimeHandlers = {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onDomainEvent: (event: RealtimeDomainEvent) => void;
+  onNetworkSynchronizationStatus?: (
+    status: NetworkSynchronizationStatus,
+  ) => void;
   onReconnecting?: () => void;
   onTyping?: (message: RealtimeTypingMessage) => void;
 };
@@ -148,6 +152,14 @@ async function connectRealtime(
 
         if (message.type === 'heartbeat_ack') return;
 
+        if (message.type === 'network_synchronization_status') {
+          notifySubscribers(connection, (handlers) =>
+            handlers.onNetworkSynchronizationStatus?.(message.status),
+          );
+
+          return;
+        }
+
         if (message.type === 'typing') {
           notifySubscribers(connection, (handlers) =>
             handlers.onTyping?.(message),
@@ -225,4 +237,17 @@ export function sendRealtimeTyping(
   if (!socket) return;
 
   applicationContainer.sendRealtimeTyping(socket, input);
+}
+
+export function acknowledgeRealtimeCallSignal(
+  session: Session,
+  signalId: string,
+): void {
+  const socket = realtimeConnections.get(
+    realtimeConnectionKey(session),
+  )?.socket;
+
+  if (!socket) return;
+
+  applicationContainer.acknowledgeRealtimeCallSignal(socket, signalId);
 }

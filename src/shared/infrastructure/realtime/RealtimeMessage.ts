@@ -1,3 +1,4 @@
+import type { NetworkSynchronizationStatus } from '../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { RealtimeDomainEvent } from './RealtimeDomainEvent';
 import type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 
@@ -14,5 +15,9 @@ export type RealtimeMessage =
   | {
       event: RealtimeDomainEvent;
       type: 'domain_event';
+    }
+  | {
+      status: NetworkSynchronizationStatus;
+      type: 'network_synchronization_status';
     }
   | RealtimeTypingMessage;

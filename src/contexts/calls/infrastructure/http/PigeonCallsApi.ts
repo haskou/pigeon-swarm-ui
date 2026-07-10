@@ -3,9 +3,13 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type {
   CallIceServerConfig,
+  CallParticipantMediaConnection,
   CallResource,
+  CallSignalDelivery,
   CallSignalPayload,
 } from '../../domain/callSession.types';
+
+import { CallSignalRequestBody } from './CallSignalRequestBody';
 
 export class PigeonCallsApi {
   public constructor(
@@ -99,13 +103,17 @@ export class PigeonCallsApi {
     });
   }
 
-  public async heartbeat(session: Session, callId: string): Promise<void> {
+  public async heartbeat(
+    session: Session,
+    callId: string,
+    mediaConnections: CallParticipantMediaConnection[],
+  ): Promise<CallResource> {
     const path = `/calls/${encodeURIComponent(
       callId,
     )}/participants/me/heartbeat`;
-    const body = {};
+    const body = { mediaConnections };
 
-    await this.http.request(path, {
+    return await this.http.request<CallResource>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
@@ -125,16 +133,13 @@ export class PigeonCallsApi {
     session: Session,
     callId: string,
     signal: CallSignalPayload,
-  ): Promise<void> {
+  ): Promise<CallSignalDelivery> {
     const path = `/calls/${encodeURIComponent(callId)}/signals`;
-    const body = {
-      payload: signal.payload,
-      recipientIdentityId: signal.recipientIdentityId,
-      signalType: signal.signalType,
-    };
+    const requestBody = new CallSignalRequestBody(signal);
+    const body = requestBody.body();
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
+    return await this.http.request<CallSignalDelivery>(path, {
+      body: requestBody.toString(),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });

@@ -26,6 +26,7 @@ export const es = {
   },
 
   auth: {
+    changeIdentity: 'Cambiar identidad',
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
     fallbackNetworksLabel: 'Redes, separadas por comas',
@@ -72,6 +73,7 @@ export const es = {
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
     nodeSummaryTitle: 'Nodo local',
+    identityPreviewVersion: 'Identidad v{version}',
     passkeyPrf: 'Proteger con desbloqueo del dispositivo',
     passkeyPrfChecking: 'Comprobando si este navegador lo permite...',
     passkeyPrfHelp:
@@ -261,6 +263,9 @@ export const es = {
     you: 'Tu',
   },
   communities: {
+    accessSetupBody:
+      'Elige la red, la visibilidad y cómo podrán unirse otras personas.',
+    accessSetupTitle: 'Acceso',
     addChannelPlaceholder: 'Añadir canal',
     addInitialChannel: 'Añadir canal',
     addMember: 'Añadir miembro',
@@ -335,6 +340,10 @@ export const es = {
     emptyChannel: 'Aún no hay mensajes en este canal.',
     encryptionNote: 'Los mensajes están cifrados de extremo a extremo.',
     initialChannelName: 'Nombre del canal',
+    initialChannelRequired: 'Añade al menos un canal para continuar.',
+    profileSetupBody:
+      'Elige un nombre y una imagen reconocibles. Podrás cambiarlos más adelante.',
+    profileSetupTitle: 'Perfil de la comunidad',
     initialChannels: 'Canales iniciales',
     initialChannelsBody:
       'Añade los canales que se crearán junto con la comunidad.',
@@ -667,6 +676,8 @@ export const es = {
     pin: 'Fijar',
     pinError: 'No se pudo fijar el mensaje.',
     pinned: 'Fijado',
+    pinnedMessagesBody:
+      'Mensajes guardados para que las personas del chat puedan encontrarlos rápidamente.',
     pinnedMessages: 'Mensajes fijados',
     rawTitle: 'Datos del mensaje',
     reactionError: 'No se pudo actualizar la reaccion.',
@@ -716,6 +727,7 @@ export const es = {
     unknownError: 'Error desconocido. Poetico, pero poco util.',
   },
   nodeSettings: {
+    addNetwork: 'Añadir red privada',
     body: 'Gestiona las redes en las que participa este nodo local.',
     claim: 'Reclamar nodo',
     claimAvailable: 'Listo para reclamar',
@@ -736,6 +748,9 @@ export const es = {
     joinSuccess: 'Red anadida al nodo.',
     networkIdCopied: 'ID de red copiado.',
     networks: 'Redes del nodo',
+    networksBody:
+      'Redes que este nodo puede usar para descubrir y compartir contenido.',
+    networksEmpty: 'Este nodo todavía no pertenece a ninguna red.',
     networksTab: 'Redes ({count})',
     nodeDetails: 'Detalles del nodo',
     nodeId: 'ID del nodo',
@@ -786,42 +801,67 @@ export const es = {
     relayTab: 'Configuración',
     relayLoading: 'Cargando configuración...',
     publicAccessBody:
-      'Opcional. Dirección pública usada por los servicios que deben ser accesibles desde fuera de esta red.',
-    publicAccessTitle: 'Acceso público',
+      'Activa esta opción solo si otros dispositivos deben conectarse directamente a este nodo desde Internet.',
+    publicAccessTitle: 'Acceso remoto',
+    remoteAccess: 'Habilitar acceso remoto',
+    remoteAccessBody:
+      'Permite configurar la dirección pública y los servicios que este nodo ofrece desde fuera de tu red local.',
     publicNetworkPort: 'Puerto de red pública',
+    publicNetworkPortBody: 'Opcional. Expone la red pública desde este nodo.',
     callsRelayPort: 'Puerto de llamadas',
+    callsRelayPortBody:
+      'Opcional. Permite retransmitir llamadas cuando no hay conexión directa.',
     manualRelayMultiaddrs: 'Direcciones manuales de conexión',
     manualRelayMultiaddrsBody:
       'Opcional. Una dirección por línea para redes privadas cuando no quieras depender del descubrimiento automático.',
     ownerOnlyRelay:
       'Solo el propietario del nodo puede cambiar esta configuración.',
     privateRelayBody:
-      'Busca direcciones de nodos publicadas para redes privadas o permite que este nodo haga de relay para redes privadas.',
-    privateRelayDiscoverRecords: 'Buscar direcciones de nodos publicadas',
+      'Encuentra nodos de enlace para comunicarte con tus redes privadas aunque este dispositivo no sea accesible directamente.',
+    privateRelayDiscoverRecords: 'Buscar nodos de enlace',
+    privateRelayDiscoverRecordsBody:
+      'Busca automáticamente nodos que ayudan a conectar los dispositivos de tus redes privadas.',
     privateRelayDiscoveryOnlyBody:
       'Modo cliente: este nodo puede encontrar relays de redes privadas sin exponer un rango de puertos.',
     privateRelayEnabledSetting: 'Habilitar relay para redes privadas',
+    privateRelayEnabledBody:
+      'Permite que otros nodos de tus redes privadas se conecten a través de este nodo.',
     privateRelayPortEnd: 'Puerto final',
     privateRelayPortRangeHelp:
       'Necesitas un puerto por cada red privada servida por este nodo. Una red puede usar 4172-4172; tres redes necesitan al menos 4172-4174.',
     privateRelayPortStart: 'Puerto inicial',
-    privateRelayTitle: 'Conexión de redes privadas',
+    privateRelayTitle: 'Nodos de enlace',
     removeNetwork: 'Eliminar red',
     removeNetworkConfirm:
       'Eliminar {name} de este nodo? Se borraran el storage IPFS local y la metadata de esta red.',
     removeNetworkError: 'No se pudo eliminar la red de este nodo.',
     removeNetworkSuccess: 'Red eliminada del nodo.',
     removeUnavailable: 'Eliminar red no disponible en la API',
-    replication: 'Estado de replicacion',
-    replicationBody: 'Diagnóstico de replicación del nodo.',
-    replicationContents: 'Contenidos',
-    replicationEmpty: 'Este nodo no informa contenido replicado.',
-    replicationError: 'No se pudo cargar el estado de replicacion.',
+    replication: 'Datos guardados en este nodo',
+    replicationBody:
+      'Resume el contenido que conserva este nodo y el espacio que puede liberar cuando sea necesario.',
+    replicationContents: 'Elementos guardados',
+    replicationEmpty: 'Este nodo todavía no conserva contenido replicado.',
+    replicationError: 'No se pudo cargar el estado de los datos locales.',
     replicationLoading: 'Cargando...',
     replicationRefresh: 'Actualizar',
-    replicationReleasable: 'Puede liberar',
-    replicationResponsible: 'Responsable de',
-    replicationTotalSize: 'Tamano total',
+    replicationReleasable: 'Se pueden liberar',
+    replicationResponsible: 'Asignados a este nodo',
+    replicationTotalSize: 'Espacio usado',
+    synchronizationAwaitingSnapshot:
+      'Esperando el estado en tiempo real del nodo...',
+    synchronizationBody:
+      'Comprueba si los grupos de datos locales están al día con las conexiones de red disponibles.',
+    synchronizationChangedAt: 'Último cambio: {date}',
+    synchronizationConnection: '{count} conexión de red',
+    synchronizationConnections: '{count} conexiones de red',
+    synchronizationConverged: 'Sincronizada',
+    synchronizationEmpty: 'Este nodo todavía no informa redes sincronizadas.',
+    synchronizationStores: '{converged} de {total} sincronizados',
+    synchronizationProgress: '{percentage}% sincronizado',
+    synchronizationSyncing: 'Sincronizando',
+    synchronizationTitle: 'Sincronización de redes',
+    synchronizationWaitingForPeers: 'Esperando conexiones',
     saving: 'Guardando...',
     server: 'Nodo',
     title: 'Ajustes del nodo',
@@ -989,6 +1029,8 @@ export const es = {
     changePicture: 'Cambiar imagen de perfil',
     communityRoles: 'Roles de comunidad',
     copied: 'Copiado',
+    copySensitiveKeyConfirm:
+      'Esta clave permite descifrar contenido privado. Si la copias sin cifrar, cualquier persona o aplicación con acceso al portapapeles podría leerla. ¿Seguro que quieres continuar?',
     copy: 'Copiar',
     currentPassword: 'Contraseña actual',
     currentPasswordForPasskeyHelp:

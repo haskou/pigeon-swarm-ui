@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
@@ -120,6 +121,7 @@ interface WorkspaceDialogsProps {
   node: (NodeInfo & { owner: null | string }) | null;
   nodeNetworks: NodeNetwork[];
   nodeSettingsOpen: boolean;
+  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
   notificationAction: 'accept' | 'archive' | 'decline' | 'refresh' | null;
   notificationError: string | null;
   notificationSettingsError: null | string;
@@ -254,7 +256,9 @@ function MobileInspectorDialog(
       <Inspector
         session={props.session}
         activeConversation={props.activeConversation}
-        activeConversationPeerIdentityId={props.activeConversationPeerIdentityId}
+        activeConversationPeerIdentityId={
+          props.activeConversationPeerIdentityId
+        }
         identityNames={props.identityNames}
         identityPictures={props.identityPictures}
         identityProfiles={props.identityProfiles}
@@ -367,7 +371,9 @@ function isPinnedMessage(
   message: ChatMessage,
   pinnedMessageIds: ReadonlySet<string>,
 ): boolean {
-  return pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId);
+  return (
+    pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId)
+  );
 }
 
 function CreateDialogs(
@@ -489,6 +495,7 @@ function NodeSettingsOverlay(
   return (
     <Suspense fallback={null}>
       <NodeSettingsDialog
+        networkSynchronizationStatus={props.networkSynchronizationStatus}
         networks={props.nodeNetworks}
         node={props.node}
         onClose={props.onCloseNodeSettings}

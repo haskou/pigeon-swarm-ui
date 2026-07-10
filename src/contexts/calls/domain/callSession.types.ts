@@ -9,4 +9,6 @@ export type { CallSignalPayload } from './CallSignalPayload';
 export type { CallIceServerConfig } from './CallIceServerConfig';
 export type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 export type { CallParticipant } from './CallParticipant';
+export type { CallParticipantMediaConnection } from './CallParticipantMediaConnection';
+export type { CallSignalDelivery } from './CallSignalDelivery';
 export type { CallSession } from './CallSession';

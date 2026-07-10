@@ -1,52 +1,54 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipantMediaConnection } from '../../../../contexts/calls/domain/callSession.types';
 
 import { logCallWarning } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
+import { startCallHeartbeatLoop } from './startCallHeartbeatLoop';
 
 type WorkspaceCallHeartbeatInput = {
   activeCall: Pick<CallSession, 'id' | 'status'> | null;
-  heartbeat: (callId: string) => Promise<void>;
+  heartbeat: (
+    callId: string,
+    mediaConnections: CallParticipantMediaConnection[],
+  ) => Promise<void>;
+  mediaConnections: () => CallParticipantMediaConnection[];
   onHeartbeatFailureLimit: () => void;
 };
 
 export function useWorkspaceCallHeartbeat({
   activeCall,
   heartbeat,
+  mediaConnections,
   onHeartbeatFailureLimit,
 }: WorkspaceCallHeartbeatInput): void {
+  const heartbeatRef = useRef(heartbeat);
+  const mediaConnectionsRef = useRef(mediaConnections);
+  const onHeartbeatFailureLimitRef = useRef(onHeartbeatFailureLimit);
+
+  useEffect(() => {
+    heartbeatRef.current = heartbeat;
+    mediaConnectionsRef.current = mediaConnections;
+    onHeartbeatFailureLimitRef.current = onHeartbeatFailureLimit;
+  }, [heartbeat, mediaConnections, onHeartbeatFailureLimit]);
+
   useEffect(() => {
     if (!activeCall || activeCall.status !== 'live') return undefined;
 
-    let failedHeartbeats = 0;
-    let stopped = false;
-
-    const sendHeartbeat = () => {
-      void heartbeat(activeCall.id)
-        .then(() => {
-          failedHeartbeats = 0;
-        })
-        .catch((caught) => {
-          failedHeartbeats += 1;
+    return startCallHeartbeatLoop({
+      callId: activeCall.id,
+      heartbeat: async (callId) => {
+        try {
+          await heartbeatRef.current(callId, mediaConnectionsRef.current());
+        } catch (caught) {
           logCallWarning('workspace:call-heartbeat:failed', {
-            callId: activeCall.id,
+            callId,
             error: caught,
-            failedHeartbeats,
           });
-
-          if (!stopped && failedHeartbeats >= 3) {
-            stopped = true;
-            onHeartbeatFailureLimit();
-          }
-        });
-    };
-
-    sendHeartbeat();
-    const interval = window.setInterval(sendHeartbeat, 2000);
-
-    return () => {
-      stopped = true;
-      window.clearInterval(interval);
-    };
-  }, [activeCall?.id, activeCall?.status, heartbeat, onHeartbeatFailureLimit]);
+          throw caught;
+        }
+      },
+      onFailureLimit: () => onHeartbeatFailureLimitRef.current(),
+    });
+  }, [activeCall?.id, activeCall?.status]);
 }
