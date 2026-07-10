@@ -3,7 +3,9 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type {
   CallIceServerConfig,
+  CallParticipantMediaConnection,
   CallResource,
+  CallSignalDelivery,
   CallSignalPayload,
 } from '../../domain/callSession.types';
 
@@ -102,11 +104,12 @@ export class PigeonCallsApi {
   public async heartbeat(
     session: Session,
     callId: string,
+    mediaConnections: CallParticipantMediaConnection[],
   ): Promise<CallResource> {
     const path = `/calls/${encodeURIComponent(
       callId,
     )}/participants/me/heartbeat`;
-    const body = {};
+    const body = { mediaConnections };
 
     return await this.http.request<CallResource>(path, {
       body: JSON.stringify(body),
@@ -128,7 +131,7 @@ export class PigeonCallsApi {
     session: Session,
     callId: string,
     signal: CallSignalPayload,
-  ): Promise<void> {
+  ): Promise<CallSignalDelivery> {
     const path = `/calls/${encodeURIComponent(callId)}/signals`;
     const body = {
       payload: signal.payload,
@@ -136,7 +139,7 @@ export class PigeonCallsApi {
       signalType: signal.signalType,
     };
 
-    await this.http.request(path, {
+    return await this.http.request<CallSignalDelivery>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',

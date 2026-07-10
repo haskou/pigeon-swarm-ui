@@ -17,6 +17,7 @@ import type { Peer } from '../../../../contexts/networks/application/list-peers/
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   CallParticipant,
+  CallParticipantMediaConnection,
   CallParticipantStatus,
   CallResource,
   CallSignalType,
@@ -75,6 +76,7 @@ import {
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallMicrophoneCapture } from '../../../../contexts/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import {
@@ -84,6 +86,7 @@ import {
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
+  acknowledgeRealtimeCallSignal,
   sendRealtimeTyping,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
@@ -145,6 +148,7 @@ import {
   communityAttribute,
   communityChannelAttribute,
   eventAggregateId,
+  numberAttribute,
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
@@ -371,6 +375,7 @@ export function GlassWorkspace({
   const notifiedIncomingCallIdsRef = useRef(new Set<string>());
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
+  const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -380,6 +385,7 @@ export function GlassWorkspace({
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
+    callMediaConnections,
     endCall,
     receiveSignal,
     reconcileCall,
@@ -1868,18 +1874,26 @@ export function GlassWorkspace({
     removeCurrentIdentityFromVoicePresence,
   ]);
 
-  const heartbeatActiveCall = useCallback(async (callId: string) => {
-    const call = await applicationContainer.heartbeatCallParticipant(
-      sessionRef.current,
-      callId,
-    );
+  const heartbeatActiveCall = useCallback(
+    async (
+      callId: string,
+      mediaConnections: CallParticipantMediaConnection[],
+    ) => {
+      const call = await applicationContainer.heartbeatCallParticipant(
+        sessionRef.current,
+        callId,
+        mediaConnections,
+      );
 
-    reconcileCallResourceRef.current(call);
-  }, []);
+      reconcileCallResourceRef.current(call);
+    },
+    [],
+  );
 
   useWorkspaceCallHeartbeat({
     activeCall,
     heartbeat: heartbeatActiveCall,
+    mediaConnections: callMediaConnections,
     onHeartbeatFailureLimit: leaveActiveCall,
   });
 
@@ -3305,20 +3319,31 @@ export function GlassWorkspace({
           );
           const signalType = callSignalTypeAttribute(event);
           const payload = recordAttribute(event, 'payload');
+          const expiresAt = numberAttribute(event, 'expiresAt');
+          const signalId = stringAttribute(event, 'signalId');
 
           if (
             callId &&
             senderIdentityId &&
             recipientIdentityId === session.identity.id &&
             signalType &&
-            payload
+            payload &&
+            expiresAt !== undefined &&
+            signalId
           ) {
-            void receiveSignal({
-              callId,
-              payload,
-              senderIdentityId,
-              signalType,
-            }).catch(() => undefined);
+            void callSignalDeliveriesRef.current
+              .receive(
+                { expiresAt, signalId },
+                async () =>
+                  await receiveSignal({
+                    callId,
+                    payload,
+                    senderIdentityId,
+                    signalType,
+                  }),
+                () => acknowledgeRealtimeCallSignal(session, signalId),
+              )
+              .catch(() => undefined);
           }
 
           return;
@@ -4637,6 +4662,7 @@ export function GlassWorkspace({
               tone: 'danger',
             },
           ]}
+          description={copy.messages.pinnedMessagesBody}
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading

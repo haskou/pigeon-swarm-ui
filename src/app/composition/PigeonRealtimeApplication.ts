@@ -27,4 +27,8 @@ export class PigeonRealtimeApplication {
   public sendTyping(socket: WebSocket, input: RealtimeTypingInput): void {
     this.realtime.sendTyping(socket, input);
   }
+
+  public acknowledgeCallSignal(socket: WebSocket, signalId: string): void {
+    this.realtime.acknowledgeCallSignal(socket, signalId);
+  }
 }

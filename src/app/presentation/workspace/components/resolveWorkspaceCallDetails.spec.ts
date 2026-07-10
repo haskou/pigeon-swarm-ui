@@ -22,8 +22,18 @@ describe(resolveWorkspaceCallDetails.name, () => {
     const call = callResource({
       participantIds: ['identity-1', 'identity-2'],
       participants: [
-        { connected: true, identityId: 'identity-1', status: 'joined' },
-        { connected: false, identityId: 'identity-2', status: 'left' },
+        {
+          connected: true,
+          identityId: 'identity-1',
+          mediaConnections: [],
+          status: 'joined',
+        },
+        {
+          connected: false,
+          identityId: 'identity-2',
+          mediaConnections: [],
+          status: 'left',
+        },
       ],
       scope: {
         channelId: 'voice-1',
@@ -101,8 +111,18 @@ function callResource(overrides: Partial<CallResource> = {}): CallResource {
     networkId: 'network-1',
     participantIds: ['identity-1', 'identity-2'],
     participants: [
-      { connected: true, identityId: 'identity-1', status: 'joined' },
-      { connected: true, identityId: 'identity-2', status: 'joined' },
+      {
+        connected: true,
+        identityId: 'identity-1',
+        mediaConnections: [],
+        status: 'joined',
+      },
+      {
+        connected: true,
+        identityId: 'identity-2',
+        mediaConnections: [],
+        status: 'joined',
+      },
     ],
     scope: { conversationId: 'conversation-1', type: 'conversation' },
     status: 'active',

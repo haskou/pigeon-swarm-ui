@@ -238,3 +238,16 @@ export function sendRealtimeTyping(
 
   applicationContainer.sendRealtimeTyping(socket, input);
 }
+
+export function acknowledgeRealtimeCallSignal(
+  session: Session,
+  signalId: string,
+): void {
+  const socket = realtimeConnections.get(
+    realtimeConnectionKey(session),
+  )?.socket;
+
+  if (!socket) return;
+
+  applicationContainer.acknowledgeRealtimeCallSignal(socket, signalId);
+}

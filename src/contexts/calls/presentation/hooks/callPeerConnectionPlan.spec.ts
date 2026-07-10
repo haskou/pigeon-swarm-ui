@@ -23,9 +23,24 @@ describe('callPeerConnectionPlan', () => {
     });
 
     call.participants.push(
-      { connected: false, identityId: 'carol', status: 'ringing' },
-      { connected: false, identityId: 'den', status: 'left' },
-      { connected: false, identityId: 'eve', status: 'joined' },
+      {
+        connected: false,
+        identityId: 'carol',
+        mediaConnections: [],
+        status: 'ringing',
+      },
+      {
+        connected: false,
+        identityId: 'den',
+        mediaConnections: [],
+        status: 'left',
+      },
+      {
+        connected: false,
+        identityId: 'eve',
+        mediaConnections: [],
+        status: 'joined',
+      },
     );
 
     expect(joinedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
@@ -38,10 +53,30 @@ describe('callPeerConnectionPlan', () => {
     });
 
     call.participants.push(
-      { connected: false, identityId: 'carol', status: 'ringing' },
-      { connected: false, identityId: 'den', status: 'left' },
-      { connected: false, identityId: 'eve', status: 'declined' },
-      { connected: false, identityId: 'frank', status: 'missed' },
+      {
+        connected: false,
+        identityId: 'carol',
+        mediaConnections: [],
+        status: 'ringing',
+      },
+      {
+        connected: false,
+        identityId: 'den',
+        mediaConnections: [],
+        status: 'left',
+      },
+      {
+        connected: false,
+        identityId: 'eve',
+        mediaConnections: [],
+        status: 'declined',
+      },
+      {
+        connected: false,
+        identityId: 'frank',
+        mediaConnections: [],
+        status: 'missed',
+      },
     );
 
     expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
@@ -71,12 +106,14 @@ function callResource({
         connected: true,
         identityId: currentIdentityId,
         joinedAt: 1_780_000_000_000,
+        mediaConnections: [],
         status: 'joined',
       },
       {
         connected: true,
         identityId: remoteIdentityId,
         joinedAt: 1_780_000_000_001,
+        mediaConnections: [],
         status: 'joined',
       },
     ],

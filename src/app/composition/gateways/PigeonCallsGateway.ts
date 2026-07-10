@@ -1,6 +1,8 @@
 import type {
   CallIceServerConfig,
+  CallParticipantMediaConnection,
   CallResource,
+  CallSignalDelivery,
   CallSignalPayload,
 } from '../../../contexts/calls/domain/callSession.types';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
@@ -52,8 +54,9 @@ export class PigeonCallsGateway {
   public async heartbeat(
     session: Session,
     callId: string,
+    mediaConnections: CallParticipantMediaConnection[],
   ): Promise<CallResource> {
-    return await this.calls.heartbeat(session, callId);
+    return await this.calls.heartbeat(session, callId, mediaConnections);
   }
 
   public async end(session: Session, callId: string): Promise<void> {
@@ -64,7 +67,7 @@ export class PigeonCallsGateway {
     session: Session,
     callId: string,
     signal: CallSignalPayload,
-  ): Promise<void> {
-    await this.calls.sendSignal(session, callId, signal);
+  ): Promise<CallSignalDelivery> {
+    return await this.calls.sendSignal(session, callId, signal);
   }
 }

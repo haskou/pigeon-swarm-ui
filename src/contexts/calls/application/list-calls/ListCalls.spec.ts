@@ -14,7 +14,12 @@ describe(ListCalls.name, () => {
       networkId: 'network-1',
       participantIds: ['identity-1'],
       participants: [
-        { connected: true, identityId: 'identity-1', status: 'joined' },
+        {
+          connected: true,
+          identityId: 'identity-1',
+          mediaConnections: [],
+          status: 'joined',
+        },
       ],
       scope: { conversationId: 'conversation-1', type: 'conversation' },
       status: 'active',

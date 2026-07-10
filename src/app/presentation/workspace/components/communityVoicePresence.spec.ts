@@ -18,9 +18,24 @@ describe('communityVoicePresence', () => {
       communityCall({
         channelId: 'voice-1',
         participants: [
-          { connected: true, identityId: 'denis', status: 'joined' },
-          { connected: true, identityId: 'hasko', status: 'joined' },
-          { connected: false, identityId: 'old-user', status: 'left' },
+          {
+            connected: true,
+            identityId: 'denis',
+            mediaConnections: [],
+            status: 'joined',
+          },
+          {
+            connected: true,
+            identityId: 'hasko',
+            mediaConnections: [],
+            status: 'joined',
+          },
+          {
+            connected: false,
+            identityId: 'old-user',
+            mediaConnections: [],
+            status: 'left',
+          },
         ],
       }),
     ];
@@ -49,7 +64,12 @@ describe('communityVoicePresence', () => {
       communityCall({
         channelId: 'voice-1',
         participants: [
-          { connected: true, identityId: 'denis', status: 'joined' },
+          {
+            connected: true,
+            identityId: 'denis',
+            mediaConnections: [],
+            status: 'joined',
+          },
         ],
       }),
     ];

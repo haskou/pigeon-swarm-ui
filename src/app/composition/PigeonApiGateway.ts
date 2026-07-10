@@ -9,7 +9,9 @@ import {
 
 import type {
   CallIceServerConfig,
+  CallParticipantMediaConnection,
   CallResource,
+  CallSignalDelivery,
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
@@ -1382,8 +1384,9 @@ export class PigeonApiGateway {
   public async heartbeatCallParticipant(
     session: Session,
     callId: string,
+    mediaConnections: CallParticipantMediaConnection[],
   ): Promise<CallResource> {
-    return await this.calls.heartbeat(session, callId);
+    return await this.calls.heartbeat(session, callId, mediaConnections);
   }
 
   public async endCall(session: Session, callId: string): Promise<void> {
@@ -1395,8 +1398,8 @@ export class PigeonApiGateway {
     session: Session,
     callId: string,
     signal: CallSignalPayload,
-  ): Promise<void> {
-    await this.calls.sendSignal(session, callId, signal);
+  ): Promise<CallSignalDelivery> {
+    return await this.calls.sendSignal(session, callId, signal);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {

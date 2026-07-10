@@ -29,6 +29,17 @@ export function recordAttribute(
     : undefined;
 }
 
+export function numberAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): number | undefined {
+  const value = event.attributes[key];
+
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
 export function communityChannelAttribute(
   event: RealtimeDomainEvent,
   key: string,

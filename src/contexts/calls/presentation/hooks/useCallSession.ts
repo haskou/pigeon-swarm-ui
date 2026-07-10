@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   CallParticipant,
+  CallParticipantMediaConnection,
   CallIceServerConfig,
   CallMicrophoneErrorCode,
   CallResource,
@@ -65,6 +66,7 @@ type ReconcileCallInput = Omit<
 
 export function useCallSession(): {
   activeCall: CallSession | null;
+  callMediaConnections: () => CallParticipantMediaConnection[];
   endCall: () => void;
   receiveSignal: (input: ReceivedSignal) => Promise<void>;
   reconcileCall: (call: CallResource, input: ReconcileCallInput) => void;
@@ -90,6 +92,10 @@ export function useCallSession(): {
   const pendingSignalsRef = useRef(new Map<string, ReceivedSignal[]>());
   const sendSignalRef = useRef<SignalSender | null>(null);
   const startingCallIdRef = useRef<string | null>(null);
+  const callMediaConnections = useCallback(
+    () => peerManager.mediaConnections(),
+    [peerManager],
+  );
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -99,8 +105,12 @@ export function useCallSession(): {
     if (!activeCall) return undefined;
 
     let cancelled = false;
+    let refreshInFlight = false;
 
     const refreshStats = async () => {
+      if (refreshInFlight) return;
+
+      refreshInFlight = true;
       const stats = await peerManager
         .collectStats()
         .catch((): Record<string, PeerMediaStats> => ({}));
@@ -109,6 +119,7 @@ export function useCallSession(): {
       const localAudioLevel = mediaManager.localAudioLevel();
       const screenStream = mediaManager.screenPreviewStream();
 
+      refreshInFlight = false;
       if (cancelled) return;
 
       setActiveCall((current) => {
@@ -157,7 +168,7 @@ export function useCallSession(): {
     void refreshStats();
     const interval = window.setInterval(() => {
       void refreshStats();
-    }, 250);
+    }, 500);
 
     return () => {
       cancelled = true;
@@ -724,6 +735,7 @@ export function useCallSession(): {
 
   return {
     activeCall,
+    callMediaConnections,
     endCall,
     receiveSignal,
     reconcileCall,
@@ -822,6 +834,8 @@ function mergeParticipantStatuses(
       connected: resourceParticipant?.connected ?? participant.connected,
       lastHeartbeatAt:
         resourceParticipant?.lastHeartbeatAt ?? participant.lastHeartbeatAt,
+      mediaConnections:
+        resourceParticipant?.mediaConnections ?? participant.mediaConnections,
       status: resourceParticipant?.status ?? participant.status,
     };
   });

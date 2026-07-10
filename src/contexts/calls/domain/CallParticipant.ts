@@ -1,4 +1,5 @@
 import type { IdentityResource } from '../../../shared/domain/pigeonResources.types';
+import type { CallParticipantMediaConnection } from './CallParticipantMediaConnection';
 import type { CallParticipantStatus } from './CallParticipantStatus';
 
 export type CallParticipant = {
@@ -15,6 +16,7 @@ export type CallParticipant = {
   jitterMs?: number;
   lastHeartbeatAt?: number;
   latencyMs?: number;
+  mediaConnections?: CallParticipantMediaConnection[];
   mediaStream?: MediaStream;
   muted: boolean;
   name: string;
