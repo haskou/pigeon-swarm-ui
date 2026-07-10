@@ -111,8 +111,8 @@ function ModerationLogRow({
         identityLookup={identityLookup}
       />
 
-      <div className="mt-3 grid border-t border-white/10 text-xs text-white/55">
-        <div className="grid gap-1 border-b border-white/10 py-2 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3">
+      <div className="mt-3 grid gap-2 text-xs text-white/55">
+        <div className="grid gap-1 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3">
           <span className="min-w-0">{copy.communities.moderationTarget}</span>
           <span className="min-w-0 break-all font-semibold text-white/70 sm:text-right">
             {target}
@@ -120,12 +120,12 @@ function ModerationLogRow({
         </div>
         {Object.entries(log.details ?? {}).map(([key, value]) => (
           <div
-            className="grid gap-1 border-b border-white/10 py-2 last:border-b-0 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3"
+            className="grid gap-1 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3"
             key={key}
           >
             <span className="min-w-0 break-all">{prettify(key)}</span>
             <span className="min-w-0 break-all font-semibold text-white/70 sm:text-right">
-              {detailLabel(value, roles)}
+              {detailLabel(value, roles, channels, identityLookup)}
             </span>
           </div>
         ))}
@@ -198,25 +198,44 @@ function identityLabel(
   return shortId(identityId);
 }
 
-function detailLabel(value: unknown, roles: CommunityRoleResource[]): string {
+function detailLabel(
+  value: unknown,
+  roles: CommunityRoleResource[],
+  channels: CommunityChannel[],
+  identityLookup: Record<string, IdentityResource>,
+): string {
   if (Array.isArray(value)) {
     return value
-      .map((item) =>
-        typeof item === 'string'
-          ? (roles.find((role) => role.id === item)?.name ??
-            permissionLabel(item))
-          : String(item),
-      )
+      .map((item) => detailLabel(item, roles, channels, identityLookup))
       .join(', ');
   }
 
   if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value);
+    return Object.entries(value)
+      .map(
+        ([key, nestedValue]) =>
+          `${prettify(key)}: ${detailLabel(
+            nestedValue,
+            roles,
+            channels,
+            identityLookup,
+          )}`,
+      )
+      .join(' · ');
   }
 
   if (value === undefined || value === null) return '—';
 
-  return String(value);
+  if (typeof value !== 'string') return String(value);
+
+  return (
+    roles.find((role) => role.id === value)?.name ??
+    channels.find((channel) => channel.id === value)?.name ??
+    (identityLookup[value]
+      ? identityLabel(value, identityLookup)
+      : undefined) ??
+    permissionLabel(value)
+  );
 }
 
 function prettify(value: string): string {

@@ -33,12 +33,20 @@ export function CommunityPublicSettingsPanel({
         framed ? 'rounded-2xl border border-white/10 bg-black/20 p-4' : ''
       }
     >
+      {visibility && onVisibilityChange && (
+        <CommunityVisibilitySelector
+          disabled={disabled}
+          onChange={onVisibilityChange}
+          value={visibility}
+        />
+      )}
+      <div className="my-3 h-px bg-white/10" />
       <CommunityDiscoverySwitch
         checked={discoverable}
         disabled={disabled}
         onChange={onDiscoverableChange}
       />
-      {showAutoJoin && (
+      {showAutoJoin ? (
         <>
           <div className="my-3 h-px bg-white/10" />
           <CommunityAutoJoinSwitch
@@ -47,14 +55,7 @@ export function CommunityPublicSettingsPanel({
             onChange={onAutoJoinChange}
           />
         </>
-      )}
-      {visibility && onVisibilityChange && (
-        <CommunityVisibilitySelector
-          disabled={disabled}
-          onChange={onVisibilityChange}
-          value={visibility}
-        />
-      )}
+      ) : null}
     </section>
   );
 }

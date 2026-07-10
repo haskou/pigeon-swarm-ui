@@ -220,7 +220,7 @@ export function CreateCommunityDialog({
       />
       <form
         onSubmit={handleSubmit}
-        className="app-overlay-surface app-safe-area-fullscreen-surface ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden sm:h-[92vh] sm:max-h-[92vh] sm:max-w-5xl"
+        className="app-overlay-surface app-safe-area-fullscreen-surface ui-dialog-surface relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden sm:h-[92vh] sm:max-h-[92vh] sm:max-w-4xl"
         data-state={transitionState}
       >
         <DialogHeader
@@ -230,17 +230,18 @@ export function CreateCommunityDialog({
         />
         <div className="px-5">{headerControl}</div>
 
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-5">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-start">
-            <div className="grid gap-4">
-              <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-black/10">
-                <div className="px-4 pt-4 text-sm font-semibold text-white/55">
-                  {copy.communities.preview}
-                </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5">
+          <div className="mx-auto grid w-full max-w-3xl gap-8">
+            <section>
+              <SectionHeading
+                body={copy.communities.profileSetupBody}
+                title={copy.communities.profileSetupTitle}
+              />
+              <div className="relative overflow-hidden rounded-md bg-black/15">
                 <button
                   type="button"
                   onClick={() => bannerInputRef.current?.click()}
-                  className="group relative mt-3 block aspect-[3/1] w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
+                  className="group relative block aspect-[3/1] min-h-28 w-full overflow-hidden bg-gradient-to-br from-slate-900 via-fuchsia-950 to-cyan-900"
                   aria-label={copy.communities.banner}
                 >
                   {bannerPreview ? (
@@ -258,152 +259,162 @@ export function CreateCommunityDialog({
                     ✎
                   </span>
                 </button>
-                <div className="relative px-4 pb-4">
-                  <button
-                    type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    className="group relative -mt-8 grid h-20 w-20 place-items-center overflow-hidden rounded-lg border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-3xl font-black text-slate-950 shadow-xl shadow-black/35"
-                    aria-label={copy.communities.avatar}
-                  >
-                    {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      name.slice(0, 1).toUpperCase() || 'C'
-                    )}
-                    <span className="absolute inset-0 grid place-items-center bg-black/0 text-2xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-                      ✎
-                    </span>
-                  </button>
-                  <div className="mt-4 grid gap-3">
-                    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
-                      {copy.communities.name}
-                      <input
-                        aria-label={copy.communities.name}
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        className="ui-field-control px-4 py-3 text-base font-semibold placeholder:text-white/30"
-                        placeholder={copy.communities.namePlaceholder}
-                        autoComplete="off"
-                      />
-                    </label>
-                    <label className="grid gap-1.5 text-sm font-semibold text-white/65">
-                      {copy.communities.description}
-                      <textarea
-                        aria-label={copy.communities.description}
-                        value={description}
-                        onChange={(event) => setDescription(event.target.value)}
-                        className="ui-field-control min-h-24 resize-none px-4 py-3 text-sm placeholder:text-white/30"
-                        placeholder={copy.communities.descriptionPlaceholder}
-                      />
-                    </label>
-                  </div>
-                </div>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="sr-only"
-                />
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBannerChange}
-                  className="sr-only"
-                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="group absolute bottom-3 left-4 grid h-16 w-16 place-items-center overflow-hidden rounded-md border-4 border-[#1f1f27] bg-gradient-to-br from-cyan-300 to-fuchsia-400 text-2xl font-black text-slate-950 shadow-xl shadow-black/35"
+                  aria-label={copy.communities.avatar}
+                >
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    name.slice(0, 1).toUpperCase() || 'C'
+                  )}
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 text-xl text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                    ✎
+                  </span>
+                </button>
               </div>
+              <div className="mt-4 grid gap-4">
+                <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+                  {copy.communities.name}
+                  <input
+                    aria-label={copy.communities.name}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="ui-field-control px-4 py-3 text-base font-semibold placeholder:text-white/30"
+                    placeholder={copy.communities.namePlaceholder}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-semibold text-white/65">
+                  {copy.communities.description}
+                  <textarea
+                    aria-label={copy.communities.description}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    className="ui-field-control min-h-20 resize-none px-4 py-3 text-sm placeholder:text-white/30"
+                    placeholder={copy.communities.descriptionPlaceholder}
+                  />
+                </label>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="sr-only"
+              />
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBannerChange}
+                className="sr-only"
+              />
+            </section>
 
-              <div className="ui-section py-3">
-                <div className="mb-3 text-sm font-semibold text-white/65">
+            <section className="border-t border-white/10 pt-7">
+              <SectionHeading
+                body={copy.communities.accessSetupBody}
+                title={copy.communities.accessSetupTitle}
+              />
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-white/65">
                   {copy.communities.network}
-                </div>
+                </span>
                 <GlassSelect
                   ariaLabel={copy.communities.network}
                   value={networkId}
                   onChange={setNetworkId}
                   options={networkOptions}
                 />
-                <p className="mt-3 text-xs leading-relaxed text-white/45">
-                  {copy.communities.networkCreateHelp}
-                </p>
-              </div>
-              <CommunityPublicSettingsPanel
-                autoJoinEnabled={autoJoinEnabled}
-                discoverable={discoverable}
-                disabled={state === 'loading'}
-                framed={false}
-                onAutoJoinChange={setAutoJoinEnabled}
-                onDiscoverableChange={setDiscoverable}
-                onVisibilityChange={setVisibility}
-                visibility={visibility}
-              />
-            </div>
-
-            <div className="ui-section py-3">
-              <div className="text-sm font-semibold text-white/65">
-                {copy.communities.initialChannels}
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-white/45">
-                {copy.communities.initialChannelsBody}
+              </label>
+              <p className="mt-3 text-xs leading-relaxed text-white/45">
+                {copy.communities.networkCreateHelp}
               </p>
-              <div className="mt-4 flex flex-col gap-2">
+              <div className="mt-5">
+                <CommunityPublicSettingsPanel
+                  autoJoinEnabled={autoJoinEnabled}
+                  discoverable={discoverable}
+                  disabled={state === 'loading'}
+                  framed={false}
+                  onAutoJoinChange={setAutoJoinEnabled}
+                  onDiscoverableChange={setDiscoverable}
+                  onVisibilityChange={setVisibility}
+                  visibility={visibility}
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-white/10 pt-7">
+              <SectionHeading
+                body={copy.communities.initialChannelsBody}
+                title={copy.communities.initialChannels}
+              />
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
                 <input
                   value={channelName}
                   onChange={(event) => setChannelName(event.target.value)}
                   className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm placeholder:text-white/30"
                   placeholder={copy.communities.initialChannelName}
                 />
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <GlassSelect
-                    ariaLabel={copy.communities.channels}
-                    value={channelType}
-                    onChange={(value) =>
-                      setChannelType(value === 'voice' ? 'voice' : 'text')
-                    }
-                    options={[
-                      { label: copy.communities.textChannel, value: 'text' },
-                      { label: copy.communities.voiceChannel, value: 'voice' },
-                    ]}
-                  />
-                  <button
-                    type="button"
-                    onClick={addChannel}
-                    disabled={!canAddChannel}
-                    className="ui-button"
-                  >
-                    {copy.communities.addInitialChannel}
-                  </button>
-                </div>
+                <GlassSelect
+                  ariaLabel={copy.communities.channels}
+                  value={channelType}
+                  onChange={(value) =>
+                    setChannelType(value === 'voice' ? 'voice' : 'text')
+                  }
+                  options={[
+                    { label: copy.communities.textChannel, value: 'text' },
+                    { label: copy.communities.voiceChannel, value: 'voice' },
+                  ]}
+                />
+                <button
+                  type="button"
+                  onClick={addChannel}
+                  disabled={!canAddChannel}
+                  className="ui-button"
+                >
+                  {copy.communities.addInitialChannel}
+                </button>
                 {channelInputError ? (
-                  <p className="text-xs font-bold text-rose-200">
+                  <p className="text-xs font-bold text-rose-200 sm:col-span-3">
                     {channelInputError}
                   </p>
                 ) : null}
               </div>
-              {channels.length > 0 && (
-                <div className="mt-3 divide-y divide-white/10 border-y border-white/10">
-                  {channels.map((channel, index) => (
+              <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
+                {channels.map((channel, index) => (
+                  <div
+                    key={`${channel.type}:${channel.name}:${index}`}
+                    className="flex min-h-12 items-center justify-between gap-3 py-2"
+                  >
+                    <span className="min-w-0 truncate text-sm font-semibold text-white/70">
+                      {channel.type === 'voice' ? '◖' : '#'} {channel.name}
+                    </span>
                     <button
                       type="button"
-                      key={`${channel.type}:${channel.name}:${index}`}
                       onClick={() => removeChannel(index)}
-                      className="flex w-full items-center justify-between gap-3 px-1 py-2.5 text-left text-sm font-semibold text-white/70 transition hover:bg-rose-500/10 hover:text-rose-100"
+                      className="ui-icon-button h-8 w-8 text-white/45 hover:text-rose-100"
                       title={copy.messages.delete}
+                      aria-label={copy.messages.delete}
                     >
-                      <span>
-                        {channelTypeLabel(channel.type)} · #{channel.name}
-                      </span>
                       <span aria-hidden="true">×</span>
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+              {channels.length === 0 ? (
+                <p className="mt-4 text-sm text-rose-100/75">
+                  {copy.communities.initialChannelRequired}
+                </p>
+              ) : null}
+            </section>
           </div>
 
           {error && (
@@ -448,10 +459,13 @@ export function CreateCommunityDialog({
   );
 }
 
-function channelTypeLabel(type: InitialChannelDraft['type']): string {
-  return type === 'voice'
-    ? copy.communities.voiceChannel
-    : copy.communities.textChannel;
+function SectionHeading({ body, title }: { body: string; title: string }) {
+  return (
+    <div className="mb-4">
+      <h3 className="text-base font-black text-white/85">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-white/45">{body}</p>
+    </div>
+  );
 }
 
 function channelValidationError(

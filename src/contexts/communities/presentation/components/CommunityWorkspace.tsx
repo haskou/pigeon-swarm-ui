@@ -2703,6 +2703,7 @@ export function CommunityWorkspace({
                 ]
               : []
           }
+          description={copy.messages.pinnedMessagesBody}
           emptyLabel={
             messageCollection.state === 'loading'
               ? copy.app.loading

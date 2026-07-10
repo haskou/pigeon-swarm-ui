@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/presentation/formatting';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { identityPicture } from '../../../identities/presentation/view-models/identityDisplay';
+import { cx } from '../../../../shared/presentation/cx';
 
 export function CommunityInvitationsPanel({
   canApproveRequests,
@@ -79,7 +80,7 @@ export function CommunityInvitationsPanel({
             {copy.communities.noMembershipRequests}
           </div>
         ) : (
-          <div className="divide-y divide-white/10 border-y border-white/10">
+          <div className="divide-y-2 divide-white/15 border-y border-white/15">
             {requests.map((request) => (
               <MembershipRequestRow
                 canApproveRequests={canApproveRequests}
@@ -129,7 +130,14 @@ function MembershipRequestRow({
     (canApproveRequests || canRejectRequests);
 
   return (
-    <article className="py-4 first:pt-2 last:pb-2">
+    <article
+      className={cx(
+        'border-l-2 px-3 py-5 even:bg-white/[0.025]',
+        request.status === 'pending'
+          ? 'border-l-amber-300/45'
+          : 'border-l-white/10',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
@@ -153,27 +161,21 @@ function MembershipRequestRow({
         identityLookup={identityLookup}
       />
 
-      <div className="mt-3 grid border-t border-white/10 text-xs text-white/55">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2">
-          <span>{copy.notifications.community}</span>
-          <span className="truncate font-semibold text-white/70">
-            {community.name}
-          </span>
-        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/45">
+        <span className="font-semibold text-white/65">{community.name}</span>
+        <span aria-hidden="true">·</span>
+        <span>{formatTime(request.createdAt)}</span>
         {targetIdentityId !== actorIdentityId && (
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 py-2">
-            <span>{copy.communities.targetMember}</span>
-            <span className="truncate font-semibold text-white/70">
-              {identityLabel(targetIdentityId, identityLookup)}
+          <>
+            <span aria-hidden="true">·</span>
+            <span>
+              {copy.communities.targetMember}:{' '}
+              <strong className="font-semibold text-white/65">
+                {identityLabel(targetIdentityId, identityLookup)}
+              </strong>
             </span>
-          </div>
+          </>
         )}
-        <div className="flex items-center justify-between gap-3 py-2">
-          <span>{copy.notifications.createdAt}</span>
-          <span className="font-semibold text-white/70">
-            {formatTime(request.createdAt)}
-          </span>
-        </div>
       </div>
 
       {canAct && (

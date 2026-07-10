@@ -17,7 +17,7 @@ export function CommunityVisibilitySelector({
   value,
 }: CommunityVisibilitySelectorProps) {
   return (
-    <fieldset className="border-t border-white/10 pt-4">
+    <fieldset>
       <legend className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
         {copy.communities.visibility}
       </legend>
