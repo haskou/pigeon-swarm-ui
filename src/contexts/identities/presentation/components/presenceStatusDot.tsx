@@ -17,7 +17,9 @@ export function PresenceStatusDot({
   presence?: IdentityPresence;
   size?: 'lg' | 'md' | 'sm';
 }) {
-  const status = presence?.status ?? 'disconnected';
+  if (!presence) return null;
+
+  const status = presence.status;
   const label = presenceLabel(presence);
 
   return (

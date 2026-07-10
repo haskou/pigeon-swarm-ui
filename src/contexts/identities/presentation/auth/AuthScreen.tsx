@@ -63,6 +63,7 @@ export function AuthScreen({
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState('');
+  const [identityPreviewLookup, setIdentityPreviewLookup] = useState('');
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [networks, setNetworks] = useState('');
@@ -89,6 +90,9 @@ export function AuthScreen({
     { label: copy.auth.login, value: 'login' },
     { label: copy.auth.createIdentityShort, value: 'create' },
   ] satisfies Array<{ label: string; value: AuthMode }>;
+  const loginIdentityPreview = useIdentityPreview(
+    mode === 'login' ? identityPreviewLookup || undefined : undefined,
+  );
 
   useEffect(() => {
     if (availableNetworks.length > 0 && !selectedNetwork) {
@@ -104,6 +108,24 @@ export function AuthScreen({
       setRememberMe(true);
     }
   }, []);
+
+  useEffect(() => {
+    const lookup = normalizeIdentityLogin(identityId);
+
+    if (mode !== 'login' || !lookup) {
+      setIdentityPreviewLookup('');
+
+      return undefined;
+    }
+
+    setIdentityPreviewLookup('');
+
+    const timeout = window.setTimeout(() => {
+      setIdentityPreviewLookup(lookup);
+    }, 350);
+
+    return () => window.clearTimeout(timeout);
+  }, [identityId, mode]);
 
   useEffect(() => {
     let mounted = true;
@@ -250,7 +272,7 @@ export function AuthScreen({
               alt="Pigeon Swarm"
               className="floaty h-28 w-28 rounded-2xl shadow-2xl shadow-indigo-950/40"
             />
-            <h1 className="mt-8 max-w-xl text-6xl font-black tracking-[-.07em]">
+            <h1 className="mt-8 max-w-xl text-5xl font-black">
               {copy.auth.heroTitle}
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/65">
@@ -318,6 +340,7 @@ export function AuthScreen({
               availableNetworks={availableNetworks}
               handle={handle}
               identityId={identityId}
+              identitySelected={Boolean(loginIdentityPreview.identity)}
               mode={mode}
               name={name}
               networks={networks}
@@ -328,6 +351,16 @@ export function AuthScreen({
               onNetworksChange={setNetworks}
               onSelectedNetworkChange={setSelectedNetwork}
             />
+
+            {mode === 'login' && loginIdentityPreview.identity ? (
+              <LoginIdentityPreview
+                onClear={() => {
+                  setIdentityId('');
+                  setIdentityPreviewLookup('');
+                }}
+                preview={loginIdentityPreview}
+              />
+            ) : null}
 
             <Field label={copy.auth.passwordLabel}>
               <input
@@ -597,10 +630,11 @@ function NodeLoginSummary({
         {copy.auth.nodeSummaryTitle}
       </div>
       {ownerIdentityId ? (
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2">
           <div className="shrink-0 text-white/45">{copy.auth.nodeOwner}</div>
-          <div className="ml-auto w-full max-w-[18rem]">
+          <div className="min-w-0 max-w-56 flex-1">
             <IdentityMemberRow
+              className="!h-12 !min-h-12 !max-w-none !rounded-xl !p-2"
               interactive={false}
               item={{
                 identity: owner.identity ?? undefined,
@@ -637,6 +671,76 @@ function NodeLoginSummary({
       />
     </div>
   );
+}
+
+function LoginIdentityPreview({
+  onClear,
+  preview,
+}: {
+  onClear: () => void;
+  preview: ReturnType<typeof useIdentityPreview>;
+}): ReactElement | null {
+  if (!preview.identity) return null;
+
+  return (
+    <Field label={copy.identityLookup.label}>
+      <div
+        className="ui-field-control flex items-center gap-2 p-1.5"
+        data-testid="auth-identity-preview"
+      >
+        <IdentityMemberRow
+          className="!h-14 !min-h-14 !max-w-none !rounded-xl !bg-transparent !p-2"
+          interactive={false}
+          item={{
+            identity: preview.identity,
+            identityId: preview.identity.id,
+            pictureUrl: preview.pictureUrl,
+          }}
+        />
+        <div className="hidden shrink-0 text-right text-xs sm:block">
+          <div className="font-black text-white/65">
+            {copy.auth.identityPreviewVersion.replace(
+              '{version}',
+              String(preview.identity.version),
+            )}
+          </div>
+          <div className="mt-1 text-white/35">
+            {formatIdentityPreviewDate(preview.identity.timestamp)}
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label={copy.auth.changeIdentity}
+          className="ui-icon-button h-10 w-10 shrink-0"
+          onClick={onClear}
+        >
+          <span aria-hidden="true" className="text-xl leading-none">
+            ×
+          </span>
+        </button>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-3 px-1 text-xs sm:hidden">
+        <span className="font-black text-white/55">
+          {copy.auth.identityPreviewVersion.replace(
+            '{version}',
+            String(preview.identity.version),
+          )}
+        </span>
+        <span className="truncate text-right text-white/35">
+          {formatIdentityPreviewDate(preview.identity.timestamp)}
+        </span>
+      </div>
+    </Field>
+  );
+}
+
+function formatIdentityPreviewDate(timestamp: number): string {
+  if (!Number.isFinite(timestamp)) return '';
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(timestamp));
 }
 
 function availableNetworksLabel(availableNetworks: NodeNetwork[]): string {
