@@ -864,10 +864,17 @@ function KeychainSection({
     session,
   });
 
-  const copyValue = async (entryId: string, value: string) => {
-    if (navigator.clipboard) await navigator.clipboard.writeText(value);
+  const copyValue = async (entry: KeychainDisplayEntry) => {
+    if (
+      entry.sensitive &&
+      !window.confirm(copy.profile.copySensitiveKeyConfirm)
+    ) {
+      return;
+    }
 
-    setCopiedKey(entryId);
+    if (navigator.clipboard) await navigator.clipboard.writeText(entry.key);
+
+    setCopiedKey(entry.id);
     window.setTimeout(() => setCopiedKey(null), 1600);
   };
 
@@ -910,7 +917,7 @@ function KeychainSection({
                 </span>
                 <button
                   type="button"
-                  onClick={() => void copyValue(entry.id, entry.key)}
+                  onClick={() => void copyValue(entry)}
                   className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/70 transition hover:bg-white/15 hover:text-white"
                 >
                   {copiedKey === entry.id
@@ -930,6 +937,7 @@ type KeychainDisplayEntry = {
   algorithm: string;
   id: string;
   key: string;
+  sensitive?: boolean;
   subtitle?: string;
   title: string;
 };
@@ -1008,6 +1016,7 @@ function keychainConversationDisplayEntry({
       algorithm: entry.algorithm,
       id: entryId,
       key: entry.key,
+      sensitive: true,
       subtitle: community?.description || undefined,
       title: `${copy.profile.communityKey} · ${
         community?.name ?? shortId(entry.conversationId || entryId)
@@ -1049,6 +1058,7 @@ function keychainConversationDisplayEntry({
     algorithm: entry.algorithm,
     id: entryId,
     key: entry.key,
+    sensitive: true,
     subtitle: peerName,
     title: `${copy.profile.conversationKey} · ${title}`,
   };
