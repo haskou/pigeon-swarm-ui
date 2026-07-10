@@ -87,11 +87,11 @@ function PinnedMessagesButton({ onPinsOpen }: { onPinsOpen: () => void }) {
     <button
       type="button"
       onClick={onPinsOpen}
-      className="hidden h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/8 text-white/65 transition hover:bg-white/12 hover:text-white sm:grid"
+      className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl text-white/45 transition hover:bg-white/8 hover:text-white sm:grid"
       title={copy.messages.pinnedMessages}
       aria-label={copy.messages.pinnedMessages}
     >
-      <PinIcon className="h-4 w-4" />
+      <PinIcon className="h-[1.125rem] w-[1.125rem]" />
     </button>
   );
 }
