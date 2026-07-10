@@ -13,7 +13,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
@@ -27,6 +26,7 @@ import { useIdentityPreview } from '../../../../contexts/identities/presentation
 import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
 import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
+import { NodeNetworksPanel } from './NodeNetworksPanel';
 
 interface NodeSettingsDialogProps {
   networkSynchronizationStatus: NetworkSynchronizationStatus | null;
@@ -38,8 +38,6 @@ interface NodeSettingsDialogProps {
   peers: Peer[];
   session: Session;
 }
-
-const PUBLIC_NETWORK_NAMES = new Set(['public', 'public network']);
 
 type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
 
@@ -57,18 +55,13 @@ export function NodeSettingsDialog({
 
   useCloseOnEscape(close);
 
-  const [joinCode, setJoinCode] = useState('');
-  const [createName, setCreateName] = useState('');
   const [activeSection, setActiveSection] =
     useState<NodeSettingsSection>('info');
-  const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
   const [copiedNodeId, setCopiedNodeId] = useState(false);
   const [copiedPeerId, setCopiedPeerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loading, setLoading] = useState<
-    'claim' | 'create' | 'join' | 'public' | 'remove' | null
-  >(null);
+  const [claimLoading, setClaimLoading] = useState(false);
   const [replicationError, setReplicationError] = useState<string | null>(null);
   const [replicationLoading, setReplicationLoading] = useState(true);
   const [replicationStatus, setReplicationStatus] =
@@ -81,11 +74,6 @@ export function NodeSettingsDialog({
   const [relayLoading, setRelayLoading] = useState(false);
   const [relaySaving, setRelaySaving] = useState(false);
   const isOwner = node?.owner === session.identity.id;
-  const hasPublicNetwork = networks.some(isPublicNodeNetwork);
-  const canCreatePublicNetwork =
-    !!node && !hasPublicNetwork && (!node.owner || isOwner);
-  const canRemoveNetworks = !!node && (!node.owner || isOwner);
-  const canJoinNetwork = isNetworkInviteCode(joinCode);
   const sections: ReadonlyArray<readonly [NodeSettingsSection, string]> = [
     ['info', copy.nodeSettings.infoTab],
     [
@@ -180,7 +168,7 @@ export function NodeSettingsDialog({
   const handleClaim = async () => {
     setError(null);
     setNotice(null);
-    setLoading('claim');
+    setClaimLoading(true);
     try {
       await applicationContainer.claimNode(session);
       await onNetworksUpdated();
@@ -188,103 +176,7 @@ export function NodeSettingsDialog({
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.nodeSettings.error));
     }
-    setLoading(null);
-  };
-
-  const handleJoin = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!canJoinNetwork) return;
-
-    setError(null);
-    setNotice(null);
-    setLoading('join');
-    try {
-      const invite = NetworkInviteCode.decode(joinCode);
-
-      await applicationContainer.joinNodeNetwork(
-        session,
-        invite.id,
-        invite.name,
-        invite.key,
-      );
-      setJoinCode('');
-      await onNetworksUpdated();
-      setNotice(copy.nodeSettings.joinSuccess);
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
-    }
-    setLoading(null);
-  };
-
-  const handleCreateNetwork = async (event: FormEvent) => {
-    event.preventDefault();
-    const name = createName.trim();
-
-    if (!name) return;
-
-    setError(null);
-    setNotice(null);
-    setLoading('create');
-    try {
-      await applicationContainer.createNodeNetwork(session, name);
-      setCreateName('');
-      await onNetworksUpdated();
-      setNotice(copy.nodeSettings.createSuccess);
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
-    }
-    setLoading(null);
-  };
-
-  const handleCreatePublicNetwork = async () => {
-    if (!canCreatePublicNetwork) return;
-
-    setError(null);
-    setNotice(null);
-    setLoading('public');
-    try {
-      await applicationContainer.createPublicNodeNetwork(
-        node?.owner ? session : undefined,
-      );
-      await onNetworksUpdated();
-      setNotice(copy.nodeSettings.publicNetworkSuccess);
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.nodeSettings.error));
-    }
-    setLoading(null);
-  };
-
-  const handleRemoveNetwork = async (network: NodeNetwork) => {
-    if (!canRemoveNetworks || loading !== null) return;
-
-    const confirmed = window.confirm(
-      copy.nodeSettings.removeNetworkConfirm.replace(
-        '{name}',
-        networkDisplayName(network),
-      ),
-    );
-
-    if (!confirmed) return;
-
-    setError(null);
-    setNotice(null);
-    setLoading('remove');
-    try {
-      await applicationContainer.removeNodeNetwork(
-        network.id,
-        node?.owner ? session : undefined,
-      );
-      setCopiedNetworkId((current) =>
-        current === network.id ? null : current,
-      );
-      await onNetworksUpdated();
-      setNotice(copy.nodeSettings.removeNetworkSuccess);
-    } catch (caught) {
-      setError(
-        toUserErrorMessage(caught, copy.nodeSettings.removeNetworkError),
-      );
-    }
-    setLoading(null);
+    setClaimLoading(false);
   };
 
   const copyNodeId = async () => {
@@ -294,32 +186,6 @@ export function NodeSettingsDialog({
     setCopiedNodeId(true);
     setNotice(copy.nodeSettings.nodeIdCopied);
     window.setTimeout(() => setCopiedNodeId(false), 1800);
-  };
-
-  const copyNetworkCode = async (network: NodeNetwork) => {
-    if (!navigator.clipboard) return;
-
-    const canShareNetworkKey = isOwner && !!network.key;
-    const text = canShareNetworkKey
-      ? NetworkInviteCode.encode({
-          id: network.id,
-          key: network.key!,
-          name: network.name,
-        })
-      : network.id;
-
-    await navigator.clipboard.writeText(text);
-    setCopiedNetworkId(network.id);
-    setNotice(
-      canShareNetworkKey
-        ? copy.nodeSettings.codeCopied
-        : copy.nodeSettings.networkIdCopied,
-    );
-    window.setTimeout(() => {
-      setCopiedNetworkId((current) =>
-        current === network.id ? null : current,
-      );
-    }, 1800);
   };
 
   const copyPeerId = async (peerId: string) => {
@@ -401,13 +267,13 @@ export function NodeSettingsDialog({
               )}
 
               {activeSection === 'info' && (
-                <div className="grid content-start gap-3">
+                <div className="grid content-start gap-7">
                   <section>
                     <h3 className="ui-section-heading pt-0">
                       {copy.nodeSettings.nodeDetails}
                     </h3>
-                    <div className="overflow-hidden rounded-md border border-white/10 bg-black/10 px-4">
-                      <div className="py-4">
+                    <div>
+                      <div className="pb-4">
                         {!node?.owner ? (
                           <div>
                             <h4 className="text-base font-bold text-white">
@@ -419,10 +285,10 @@ export function NodeSettingsDialog({
                             <button
                               type="button"
                               onClick={() => void handleClaim()}
-                              disabled={loading !== null}
+                              disabled={claimLoading}
                               className="ui-button ui-button-primary mt-3"
                             >
-                              {loading === 'claim'
+                              {claimLoading
                                 ? copy.nodeSettings.saving
                                 : copy.nodeSettings.claim}
                             </button>
@@ -440,7 +306,7 @@ export function NodeSettingsDialog({
                         )}
                       </div>
 
-                      <div className="border-t border-white/10 py-4">
+                      <div className="py-3">
                         <div className="mb-1.5 text-sm font-semibold text-white/55">
                           {copy.nodeSettings.nodeId}
                         </div>
@@ -495,164 +361,13 @@ export function NodeSettingsDialog({
               )}
 
               {activeSection === 'networks' && (
-                <div className="grid content-start gap-3">
-                  {!node?.owner && (
-                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/55">
-                      {copy.nodeSettings.unclaimedNetworkNote}
-                    </div>
-                  )}
-
-                  {canCreatePublicNetwork && (
-                    <div className="ui-inline-notice grid gap-3 border-amber-200/40 bg-amber-300/10 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-                      <NetworkLockBadge publicNetwork />
-                      <p className="min-w-0 text-xs leading-relaxed text-amber-50/70">
-                        {copy.nodeSettings.publicNetworkBody}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleCreatePublicNetwork()}
-                        disabled={loading !== null}
-                        className="ui-button ui-button-primary"
-                      >
-                        {loading === 'public'
-                          ? copy.nodeSettings.saving
-                          : copy.nodeSettings.createPublicNetwork}
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    {networks.map((network) => {
-                      const publicNetwork = isPublicNodeNetwork(network);
-                      const canShareNetworkKey = isOwner && !!network.key;
-
-                      return (
-                        <div
-                          key={network.id}
-                          className={cx(
-                            'ui-list-row grid w-full grid-cols-[minmax(0,1fr)_auto] text-left transition',
-                            publicNetwork
-                              ? 'border-amber-200/20 bg-amber-300/10 text-amber-50'
-                              : 'border-emerald-200/15 bg-emerald-300/10 text-white',
-                          )}
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <NetworkLockBadge publicNetwork={publicNetwork} />
-                            <div className="min-w-0">
-                              <div className="truncate font-black">
-                                {networkDisplayName(network)}
-                              </div>
-                              <div
-                                className="truncate text-xs text-white/45"
-                                title={network.id}
-                              >
-                                {network.id}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void copyNetworkCode(network)}
-                              className="ui-icon-button"
-                              aria-label={
-                                canShareNetworkKey
-                                  ? copy.nodeSettings.copyCode
-                                  : copy.nodeSettings.copyNetworkId
-                              }
-                              title={
-                                copiedNetworkId === network.id
-                                  ? copy.profile.copied
-                                  : canShareNetworkKey
-                                    ? copy.nodeSettings.copyCode
-                                    : copy.nodeSettings.copyNetworkId
-                              }
-                            >
-                              <CopyIcon
-                                copied={copiedNetworkId === network.id}
-                              />
-                            </button>
-                            {canRemoveNetworks && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void handleRemoveNetwork(network)
-                                }
-                                disabled={loading !== null}
-                                className="ui-icon-button ui-button-danger"
-                                aria-label={copy.nodeSettings.removeNetwork}
-                                title={copy.nodeSettings.removeNetwork}
-                              >
-                                <TrashIcon />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {isOwner && (
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      <form
-                        onSubmit={handleCreateNetwork}
-                        className="ui-section p-4"
-                      >
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                            {copy.nodeSettings.createLabel}
-                          </span>
-                          <input
-                            value={createName}
-                            onChange={(event) =>
-                              setCreateName(event.target.value)
-                            }
-                            className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
-                            placeholder={copy.nodeSettings.createPlaceholder}
-                            required
-                          />
-                        </label>
-                        <button
-                          type="submit"
-                          disabled={loading !== null || !createName.trim()}
-                          className="ui-button ui-button-primary mt-3 w-full"
-                        >
-                          {loading === 'create'
-                            ? copy.nodeSettings.saving
-                            : copy.nodeSettings.create}
-                        </button>
-                      </form>
-
-                      <form onSubmit={handleJoin} className="ui-section p-4">
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-white/35">
-                            {copy.nodeSettings.joinLabel}
-                          </span>
-                          <textarea
-                            value={joinCode}
-                            onChange={(event) =>
-                              setJoinCode(event.target.value)
-                            }
-                            className="ui-field-control min-h-24 resize-none px-4 py-3 text-sm placeholder:text-white/30"
-                            placeholder={copy.network.inviteCodePlaceholder}
-                            required
-                          />
-                        </label>
-                        <button
-                          type="submit"
-                          disabled={loading !== null || !canJoinNetwork}
-                          className="ui-button mt-3 w-full"
-                        >
-                          {loading === 'join'
-                            ? copy.nodeSettings.saving
-                            : copy.nodeSettings.join}
-                        </button>
-                      </form>
-                    </div>
-                  )}
-                </div>
+                <NodeNetworksPanel
+                  networks={networks}
+                  node={node}
+                  onNetworksUpdated={onNetworksUpdated}
+                  session={session}
+                />
               )}
-
               {activeSection === 'relay' && (
                 <div className="grid content-start gap-3">
                   {!isOwner ? (
@@ -710,66 +425,6 @@ export function NodeSettingsDialog({
   );
 }
 
-function isPublicNodeNetwork(network: NodeNetwork): boolean {
-  return PUBLIC_NETWORK_NAMES.has(network.name.trim().toLowerCase());
-}
-
-function networkDisplayName(network: NodeNetwork): string {
-  return isPublicNodeNetwork(network)
-    ? copy.nodeSettings.publicNetworkName
-    : network.name;
-}
-
-function isNetworkInviteCode(value: string): boolean {
-  if (!value.trim()) return false;
-
-  try {
-    NetworkInviteCode.decode(value);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function NetworkLockBadge({ publicNetwork }: { publicNetwork: boolean }) {
-  return (
-    <span
-      className={cx(
-        'grid h-9 w-9 shrink-0 place-items-center rounded-2xl border',
-        publicNetwork
-          ? 'border-amber-200/35 bg-amber-300/20 text-amber-200'
-          : 'border-emerald-200/30 bg-emerald-300/15 text-emerald-200',
-      )}
-      aria-label={
-        publicNetwork
-          ? copy.nodeSettings.publicNetworkName
-          : copy.nodeSettings.privateNetwork
-      }
-      title={
-        publicNetwork
-          ? copy.nodeSettings.publicNetworkName
-          : copy.nodeSettings.privateNetwork
-      }
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        className="h-4 w-4"
-      >
-        <path
-          d="M7.75 10V8.25a4.25 4.25 0 0 1 8.5 0V10m-9 0h9.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5Z"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.8"
-        />
-      </svg>
-    </span>
-  );
-}
-
 function CopyIcon({ copied }: { copied: boolean }) {
   if (copied) {
     return (
@@ -803,20 +458,6 @@ function CopyIcon({ copied }: { copied: boolean }) {
   );
 }
 
-function TrashIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-      <path
-        d="M6 7h12M10 7V5h4v2m-6 3 .5 8h7l.5-8"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
 function NodeRuntimeSummary({
   node,
   relayConfiguration,
@@ -825,8 +466,8 @@ function NodeRuntimeSummary({
   relayConfiguration: NodeRelayConfiguration | null;
 }) {
   return (
-    <div className="border-t border-white/10 py-3">
-      <div className="divide-y divide-white/10">
+    <div className="py-2">
+      <div className="grid gap-1">
         {relayConfiguration ? (
           <NodeDetailRow
             label={copy.nodeSettings.privateRelayDiscoverRecords}
@@ -1210,7 +851,7 @@ function NetworkSynchronizationPanel({
   status: NetworkSynchronizationStatus | null;
 }) {
   return (
-    <section className="ui-section py-3">
+    <section className="border-t border-white/10 pt-6">
       <div className="mb-3">
         <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
           {copy.nodeSettings.synchronizationTitle}
@@ -1221,18 +862,18 @@ function NetworkSynchronizationPanel({
       </div>
 
       {!status ? (
-        <div className="border-y border-white/10 py-4 text-sm text-white/55">
+        <div className="py-3 text-sm text-white/55">
           {copy.nodeSettings.synchronizationAwaitingSnapshot}
         </div>
       ) : status.networks.length === 0 ? (
-        <div className="border-y border-white/10 py-4 text-sm text-white/55">
+        <div className="py-3 text-sm text-white/55">
           {copy.nodeSettings.synchronizationEmpty}
         </div>
       ) : (
-        <div className="divide-y divide-white/10 border-y border-white/10">
+        <div className="grid gap-2">
           {status.networks.map((network) => (
             <div
-              className="flex flex-col gap-1.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              className="flex flex-col gap-1.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               key={network.id}
             >
               <div className="min-w-0">
@@ -1240,14 +881,9 @@ function NetworkSynchronizationPanel({
                   {network.name}
                 </div>
                 <div className="mt-1 text-xs text-white/45">
-                  {copy.nodeSettings.synchronizationStores
-                    .replace('{converged}', String(network.convergedStoreCount))
-                    .replace('{total}', String(network.totalStoreCount))}
+                  {networkSynchronizationProgressLabel(network)}
                   {' · '}
-                  {copy.nodeSettings.synchronizationConnectedPeers.replace(
-                    '{count}',
-                    String(network.connectedPeerIds.length),
-                  )}
+                  {networkConnectionCountLabel(network.connectedPeerIds.length)}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-black">
@@ -1282,6 +918,19 @@ function NetworkSynchronizationPanel({
   );
 }
 
+function networkSynchronizationProgressLabel(
+  network: NetworkSynchronizationStatus['networks'][number],
+): string {
+  const total = network.totalStoreCount;
+  const percentage =
+    total <= 0 ? 0 : Math.round((network.convergedStoreCount / total) * 100);
+
+  return copy.nodeSettings.synchronizationProgress.replace(
+    '{percentage}',
+    String(percentage),
+  );
+}
+
 function networkSynchronizationStateLabel(
   state: NetworkSynchronizationStatus['networks'][number]['state'],
 ): string {
@@ -1289,6 +938,14 @@ function networkSynchronizationStateLabel(
   if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
 
   return copy.nodeSettings.synchronizationWaitingForPeers;
+}
+
+function networkConnectionCountLabel(count: number): string {
+  return (
+    count === 1
+      ? copy.nodeSettings.synchronizationConnection
+      : copy.nodeSettings.synchronizationConnections
+  ).replace('{count}', String(count));
 }
 
 function ReplicationStatusPanel({
@@ -1303,7 +960,7 @@ function ReplicationStatusPanel({
   const summary = status?.summary;
 
   return (
-    <section className="ui-section py-3">
+    <section className="border-t border-white/10 pt-6">
       <div className="mb-3">
         <div>
           <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -1315,7 +972,7 @@ function ReplicationStatusPanel({
         </div>
       </div>
 
-      <div className="divide-y divide-white/10 border-y border-white/10">
+      <div className="grid gap-x-8 sm:grid-cols-2">
         <NodeDetailRow
           label={copy.nodeSettings.replicationContents}
           value={String(summary?.contentCount ?? 0)}
@@ -1341,7 +998,7 @@ function ReplicationStatusPanel({
       )}
 
       {!error && !loading && status?.summary.contentCount === 0 && (
-        <div className="mt-3 border-t border-white/10 py-4 text-sm text-white/55">
+        <div className="mt-3 py-3 text-sm text-white/55">
           {copy.nodeSettings.replicationEmpty}
         </div>
       )}
