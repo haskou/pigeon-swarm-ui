@@ -9,6 +9,8 @@ import type {
   CallSignalPayload,
 } from '../../domain/callSession.types';
 
+import { CallSignalRequestBody } from './CallSignalRequestBody';
+
 export class PigeonCallsApi {
   public constructor(
     private readonly http: HttpJsonClient,
@@ -133,14 +135,11 @@ export class PigeonCallsApi {
     signal: CallSignalPayload,
   ): Promise<CallSignalDelivery> {
     const path = `/calls/${encodeURIComponent(callId)}/signals`;
-    const body = {
-      payload: signal.payload,
-      recipientIdentityId: signal.recipientIdentityId,
-      signalType: signal.signalType,
-    };
+    const requestBody = new CallSignalRequestBody(signal);
+    const body = requestBody.body();
 
     return await this.http.request<CallSignalDelivery>(path, {
-      body: JSON.stringify(body),
+      body: requestBody.toString(),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
