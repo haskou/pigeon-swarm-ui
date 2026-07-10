@@ -9,7 +9,6 @@ describe(startCallHeartbeatLoop.name, () => {
     const stop = startCallHeartbeatLoop({
       callId: 'call-1',
       heartbeat,
-      onFailureLimit: jest.fn(),
     });
 
     await flushPromises();
@@ -33,7 +32,6 @@ describe(startCallHeartbeatLoop.name, () => {
     const stop = startCallHeartbeatLoop({
       callId: 'call-1',
       heartbeat,
-      onFailureLimit: jest.fn(),
     });
 
     jest.advanceTimersByTime(6000);
@@ -47,14 +45,16 @@ describe(startCallHeartbeatLoop.name, () => {
     stop();
   });
 
-  it('stops after the configured number of consecutive failures', async () => {
-    const heartbeat = jest.fn().mockRejectedValue(new Error('offline'));
-    const onFailureLimit = jest.fn();
-
+  it('continues retrying after consecutive heartbeat failures', async () => {
+    const heartbeat = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(undefined);
     startCallHeartbeatLoop({
       callId: 'call-1',
       heartbeat,
-      onFailureLimit,
     });
 
     await flushPromises();
@@ -62,11 +62,10 @@ describe(startCallHeartbeatLoop.name, () => {
     await flushPromises();
     jest.advanceTimersByTime(2000);
     await flushPromises();
-    jest.advanceTimersByTime(10_000);
+    jest.advanceTimersByTime(2000);
     await flushPromises();
 
-    expect(heartbeat).toHaveBeenCalledTimes(3);
-    expect(onFailureLimit).toHaveBeenCalledTimes(1);
+    expect(heartbeat).toHaveBeenCalledTimes(4);
   });
 });
 
