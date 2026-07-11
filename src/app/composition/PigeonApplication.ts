@@ -112,18 +112,6 @@ import {
 import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
 import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
 import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
-import { AcceptConversationInvitation } from '../../contexts/notifications/application/accept-conversation-invitation/AcceptConversationInvitation';
-import { AcceptConversationInvitationMessage } from '../../contexts/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
-import { ListNotificationSettings } from '../../contexts/notifications/application/list-notification-settings/ListNotificationSettings';
-import { ListNotificationSettingsMessage } from '../../contexts/notifications/application/list-notification-settings/messages/ListNotificationSettingsMessage';
-import { ListNotifications } from '../../contexts/notifications/application/list-notifications/ListNotifications';
-import { ListNotificationsMessage } from '../../contexts/notifications/application/list-notifications/messages/ListNotificationsMessage';
-import { ResetNotificationSettingMessage } from '../../contexts/notifications/application/reset-notification-setting/messages/ResetNotificationSettingMessage';
-import { ResetNotificationSetting } from '../../contexts/notifications/application/reset-notification-setting/ResetNotificationSetting';
-import { SaveNotificationSettingMessage } from '../../contexts/notifications/application/save-notification-setting/messages/SaveNotificationSettingMessage';
-import { SaveNotificationSetting } from '../../contexts/notifications/application/save-notification-setting/SaveNotificationSetting';
-import { UpdateNotificationMessage } from '../../contexts/notifications/application/update-notification/messages/UpdateNotificationMessage';
-import { UpdateNotification } from '../../contexts/notifications/application/update-notification/UpdateNotification';
 import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
 import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
 import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
@@ -137,41 +125,19 @@ import {
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
-
-function pushSubscriptionPayload(subscription: PushSubscriptionJSON): {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: { auth: string; p256dh: string };
-} {
-  if (
-    !subscription.endpoint ||
-    !subscription.keys?.auth ||
-    !subscription.keys.p256dh
-  ) {
-    throw new Error('Invalid push subscription.');
-  }
-
-  return {
-    endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime,
-    keys: {
-      auth: subscription.keys.auth,
-      p256dh: subscription.keys.p256dh,
-    },
-  };
-}
 
 export class PigeonApplication {
   private readonly calls: PigeonCallsApplication;
 
   private readonly communities: PigeonCommunitiesApplication;
 
+  private readonly notifications: PigeonNotificationsApplication;
+
   private readonly gateway: PigeonApiGateway;
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
-
-  private readonly acceptInvitationUseCase: AcceptConversationInvitation;
 
   private readonly createConversationUseCase: CreateConversation;
 
@@ -195,10 +161,6 @@ export class PigeonApplication {
 
   private readonly listNodeNetworksUseCase: ListNodeNetworks;
 
-  private readonly listNotificationsUseCase: ListNotifications;
-
-  private readonly listNotificationSettingsUseCase: ListNotificationSettings;
-
   private readonly listPeersUseCase: ListPeers;
 
   private readonly listStickerPacksUseCase: ListStickerPacks;
@@ -221,12 +183,6 @@ export class PigeonApplication {
 
   private readonly votePollUseCase: VotePoll;
 
-  private readonly updateNotificationUseCase: UpdateNotification;
-
-  private readonly resetNotificationSettingUseCase: ResetNotificationSetting;
-
-  private readonly saveNotificationSettingUseCase: SaveNotificationSetting;
-
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
@@ -234,8 +190,8 @@ export class PigeonApplication {
     this.gateway = gateway;
     this.calls = new PigeonCallsApplication(gateway);
     this.communities = new PigeonCommunitiesApplication(gateway);
+    this.notifications = new PigeonNotificationsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
-    this.acceptInvitationUseCase = new AcceptConversationInvitation(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.createNetworkUseCase = new CreateNetwork({
@@ -260,13 +216,8 @@ export class PigeonApplication {
       remove: async (networkId, session) =>
         await gateway.removeNetwork(networkId.toString(), session),
     });
-    this.listNotificationSettingsUseCase = new ListNotificationSettings({
-      listNotificationSettings: async (session) =>
-        await gateway.listNotificationSettings(session),
-    });
     this.listConversationsUseCase = new ListConversations(gateway);
     this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
-    this.listNotificationsUseCase = new ListNotifications(gateway);
     this.listPeersUseCase = new ListPeers(gateway);
     this.listStickerPacksUseCase = new ListStickerPacks({
       list: async (message) =>
@@ -298,14 +249,6 @@ export class PigeonApplication {
         ),
     });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
-    this.resetNotificationSettingUseCase = new ResetNotificationSetting({
-      resetNotificationSetting: async (session, scope) =>
-        await gateway.resetNotificationSetting(session, scope),
-    });
-    this.saveNotificationSettingUseCase = new SaveNotificationSetting({
-      saveNotificationSetting: async (session, setting) =>
-        await gateway.saveNotificationSetting(session, setting),
-    });
     this.sendMessageUseCase = new SendMessage(gateway);
     this.votePollUseCase = new VotePoll({
       vote: async (message) =>
@@ -315,7 +258,6 @@ export class PigeonApplication {
           message.getOptionIds().map((optionId) => optionId.toString()),
         ),
     });
-    this.updateNotificationUseCase = new UpdateNotification(gateway);
   }
 
   public async acceptConversationInvitation(
@@ -326,8 +268,9 @@ export class PigeonApplication {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
-    return await this.acceptInvitationUseCase.accept(
-      new AcceptConversationInvitationMessage({ notification, session }),
+    return await this.notifications.acceptConversationInvitation(
+      session,
+      notification,
     );
   }
 
@@ -465,27 +408,21 @@ export class PigeonApplication {
     enabled: boolean;
     publicKey?: string;
   }> {
-    return await this.gateway.getPushVapidPublicKey();
+    return await this.notifications.getPushVapidPublicKey();
   }
 
   public async registerPushSubscription(
     session: Session,
     subscription: PushSubscriptionJSON,
   ): Promise<void> {
-    await this.gateway.registerPushSubscription(
-      session,
-      pushSubscriptionPayload(subscription),
-    );
+    await this.notifications.registerPushSubscription(session, subscription);
   }
 
   public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionJSON,
   ): Promise<void> {
-    await this.gateway.deletePushSubscription(
-      session,
-      pushSubscriptionPayload(subscription),
-    );
+    await this.notifications.deletePushSubscription(session, subscription);
   }
 
   public async createConversation(
@@ -1448,17 +1385,13 @@ export class PigeonApplication {
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
-    return await this.listNotificationsUseCase.list(
-      new ListNotificationsMessage(session),
-    );
+    return await this.notifications.list(session);
   }
 
   public async listNotificationSettings(
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
-    return await this.listNotificationSettingsUseCase.list(
-      new ListNotificationSettingsMessage(session),
-    );
+    return await this.notifications.listNotificationSettings(session);
   }
 
   public async listPeers(): Promise<Peer[]> {
@@ -1668,30 +1601,20 @@ export class PigeonApplication {
     notificationId: string,
     state: 'accepted' | 'declined',
   ): Promise<NotificationResource> {
-    return await this.updateNotificationUseCase.update(
-      new UpdateNotificationMessage({
-        notificationId,
-        session,
-        state,
-      }),
-    );
+    return await this.notifications.update(session, notificationId, state);
   }
 
   public async saveNotificationSetting(
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
-    return await this.saveNotificationSettingUseCase.save(
-      new SaveNotificationSettingMessage({ session, setting }),
-    );
+    return await this.notifications.saveNotificationSetting(session, setting);
   }
 
   public async resetNotificationSetting(
     session: Session,
     scope: NotificationSettingScope,
   ): Promise<void> {
-    await this.resetNotificationSettingUseCase.reset(
-      new ResetNotificationSettingMessage({ scope, session }),
-    );
+    await this.notifications.resetNotificationSetting(session, scope);
   }
 }
