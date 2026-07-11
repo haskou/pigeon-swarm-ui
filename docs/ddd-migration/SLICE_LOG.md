@@ -379,3 +379,25 @@
 - Risks: concrete HTTP and media adapters remain behind the compatibility
   gateway until the infrastructure milestone replaces those bindings
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-009: Move poll application boundary into context
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep poll creation, reads, votes, removal, and closing inside the polls
+  context with an explicit application port.
+- Changed files:
+  - `contexts/polls/application/PigeonPollsApplication.ts`
+  - `contexts/polls/application/ports/PollApplicationPort.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: poll lifecycle operations and validated vote
+  identifiers preserve their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - poll application and context suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: poll HTTP transport remains implemented by the compatibility gateway
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

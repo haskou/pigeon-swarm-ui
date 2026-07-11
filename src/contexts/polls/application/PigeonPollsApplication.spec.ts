@@ -1,16 +1,17 @@
 import type {
   PollResource,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
 
 describe(PigeonPollsApplication.name, () => {
   it('votes through validated poll and option identifiers', async () => {
     const gateway = {
       votePoll: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<
+      ConstructorParameters<typeof PigeonPollsApplication>[0]
+    >;
     const session = {
       identity: { id: 'identity-1' },
     } as unknown as Session;

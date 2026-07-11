@@ -2,16 +2,16 @@ import type {
   CreatePollInput,
   PollResource,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { PollApplicationPort } from './ports/PollApplicationPort';
 
-import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
-import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { VotePollMessage } from './vote-poll/messages/VotePollMessage';
+import { VotePoll } from './vote-poll/VotePoll';
 
 export class PigeonPollsApplication {
   private readonly votePoll: VotePoll;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: PollApplicationPort) {
     this.votePoll = new VotePoll({
       vote: async (message) =>
         await gateway.votePoll(

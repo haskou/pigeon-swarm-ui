@@ -6,10 +6,10 @@ import { PigeonIdentitiesApplication } from '../../contexts/identities/applicati
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
+import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
-import { PigeonPollsApplication } from './PigeonPollsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonSessionApplication } from './PigeonSessionApplication';
 
