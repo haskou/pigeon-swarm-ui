@@ -4,7 +4,7 @@ import type {
   CommunityPermission,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { MessageEditPolicy } from '../../../messages/domain/MessageEditPolicy';
+import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
@@ -37,7 +37,7 @@ export class CommunityWorkspaceDialogActions {
     message: ChatMessage,
     currentIdentityId: string,
   ): boolean {
-    return MessageEditPolicy.canEdit(message, currentIdentityId);
+    return MessageEditability.canEdit(message, currentIdentityId);
   }
 
   public static canOpenConversation({

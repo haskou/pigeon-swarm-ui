@@ -1,52 +1,72 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
-
+import { MessageReactionEntry } from '../entities/MessageReactionEntry';
 import { MessageAuthorId } from '../value-objects/MessageAuthorId';
+import { MessageContent } from '../value-objects/MessageContent';
+import { MessageDeliveryState } from '../value-objects/MessageDeliveryState';
+import { MessageId } from '../value-objects/MessageId';
+import { MessageKind } from '../value-objects/MessageKind';
 import { MessageReactionEmoji } from '../value-objects/MessageReactionEmoji';
+import { MessageVisibility } from '../value-objects/MessageVisibility';
 import { Message } from './Message';
 
-const chatMessage = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
-  attachments: [],
-  authorIdentityId: 'author-a',
-  content: 'Hello',
-  encrypted: false,
-  id: 'message-a',
-  mine: false,
-  raw: {},
-  reactions: [],
-  timestamp: 100,
-  ...overrides,
-});
+const message = (reactions: readonly MessageReactionEntry[] = []): Message =>
+  Message.reconstitute(
+    MessageId.fromString('message-a'),
+    MessageAuthorId.fromString('author-a'),
+    MessageContent.fromString('Hello'),
+    MessageDeliveryState.delivered(),
+    MessageKind.message(),
+    MessageVisibility.readable(),
+    reactions,
+  );
 
 describe('Message', () => {
   it('adds a reaction once per author and emoji', () => {
-    const message = Message.fromChatMessage(chatMessage());
+    const aggregate = message();
     const authorId = MessageAuthorId.fromString('author-b');
     const emoji = MessageReactionEmoji.fromString('👍');
 
-    message.addReaction(authorId, emoji, new Timestamp(200));
-    message.addReaction(authorId, emoji, new Timestamp(300));
+    aggregate.addReaction(authorId, emoji, new Timestamp(200));
+    aggregate.addReaction(authorId, emoji, new Timestamp(300));
 
-    expect(message.hasReaction(authorId, emoji)).toBe(true);
-    expect(message.reactionCount()).toBe(1);
-    expect(message.pullDomainEvents()).toHaveLength(3);
+    expect(aggregate.hasReaction(authorId, emoji)).toBe(true);
+    expect(aggregate.reactionCount()).toBe(1);
+    expect(aggregate.pullDomainEvents()).toHaveLength(3);
   });
 
   it('removes a matching reaction without exposing reaction internals', () => {
-    const message = Message.fromChatMessage(
-      chatMessage({
-        reactions: [
-          { authorIdentityId: 'author-b', createdAt: 200, emoji: '👍' },
-        ],
-      }),
-    );
+    const aggregate = message([
+      new MessageReactionEntry(
+        MessageAuthorId.fromString('author-b'),
+        MessageReactionEmoji.fromString('👍'),
+        new Timestamp(200),
+      ),
+    ]);
     const authorId = MessageAuthorId.fromString('author-b');
     const emoji = MessageReactionEmoji.fromString('👍');
 
-    message.removeReaction(authorId, emoji);
+    aggregate.removeReaction(authorId, emoji);
 
-    expect(message.hasReaction(authorId, emoji)).toBe(false);
-    expect(message.reactionCount()).toBe(0);
+    expect(aggregate.hasReaction(authorId, emoji)).toBe(false);
+    expect(aggregate.reactionCount()).toBe(0);
+  });
+
+  it('allows its author to edit a delivered readable text message', () => {
+    const aggregate = message();
+    const author = MessageAuthorId.fromString('author-a');
+
+    aggregate.edit(author, MessageContent.fromString('Updated'));
+
+    expect(
+      aggregate.getContent().isEqual(MessageContent.fromString('Updated')),
+    ).toBe(true);
+    expect(aggregate.pullDomainEvents()).toHaveLength(1);
+  });
+
+  it('does not allow a non-author to edit a message', () => {
+    expect(
+      message().canBeEditedBy(MessageAuthorId.fromString('author-b')),
+    ).toBe(false);
   });
 });

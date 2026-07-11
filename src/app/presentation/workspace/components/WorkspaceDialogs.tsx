@@ -23,7 +23,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { MessageEditPolicy } from '../../../../contexts/messages/domain/MessageEditPolicy';
+import { MessageEditability } from '../../../../contexts/messages/presentation/view-models/MessageEditability';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -314,7 +314,7 @@ function MessageActionDialogs(
         onEdit={
           contextMenuMessage &&
           !contextMenuFromThread &&
-          MessageEditPolicy.canEdit(
+          MessageEditability.canEdit(
             contextMenuMessage,
             props.session.identity.id,
           )

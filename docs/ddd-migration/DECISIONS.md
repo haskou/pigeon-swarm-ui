@@ -24,3 +24,15 @@
 - Consequences: Each migration slice introduces a model only when it owns an
   actual rule; read models remain lightweight.
 - Related slices: `IDENTITY-001`, `MESSAGE-001`, `COMMUNITY-001`
+
+## ADR-0003: Aggregates do not serialize presentation read models
+
+- Date: 2026-07-11
+- Status: accepted
+- Context: `ChatMessage` currently crosses the message aggregate boundary.
+- Decision: Aggregates expose domain behavior and domain objects. Presentation
+  and infrastructure mappers own conversion to and from `ChatMessage` and API
+  resources.
+- Consequences: Resource compatibility cannot dictate the aggregate state; the
+  UI keeps its existing read model without placing serialization in domain.
+- Related slices: `MESSAGE-001`

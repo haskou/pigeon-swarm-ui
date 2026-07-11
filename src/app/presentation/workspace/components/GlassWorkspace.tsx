@@ -57,7 +57,7 @@ import { MessageCollection } from '../../../../contexts/messages/domain/MessageC
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import { MessageScrollAnchor } from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
-import { MessageReactions } from '../../../../contexts/messages/domain/MessageReactions';
+import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { SharedNetworkSelection } from '../../../../contexts/networks/domain/SharedNetworkSelection';
@@ -1812,7 +1812,7 @@ export function GlassWorkspace({
     setMessages((current) =>
       current.map((item) =>
         item.id === message.id
-          ? MessageReactions.update(
+          ? MessageReactionUpdater.update(
               item,
               session.identity.id,
               emoji,
@@ -1843,7 +1843,7 @@ export function GlassWorkspace({
       setMessages((current) =>
         current.map((item) =>
           item.id === message.id
-            ? MessageReactions.update(
+            ? MessageReactionUpdater.update(
                 item,
                 session.identity.id,
                 emoji,
@@ -2619,7 +2619,7 @@ export function GlassWorkspace({
             setMessages((current) =>
               current.map((message) =>
                 message.id === messageId
-                  ? MessageReactions.update(
+                  ? MessageReactionUpdater.update(
                       message,
                       reactionAuthorId,
                       emoji,

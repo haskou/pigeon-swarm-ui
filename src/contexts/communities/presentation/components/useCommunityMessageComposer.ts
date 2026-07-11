@@ -29,7 +29,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { PendingMessageAttachments } from '../../../attachments/domain/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
-import { MessageReactions } from '../../../messages/domain/MessageReactions';
+import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -357,7 +357,7 @@ export function useCommunityMessageComposer({
     setMessages((current) =>
       current.map((item) =>
         item.id === message.id
-          ? MessageReactions.update(
+          ? MessageReactionUpdater.update(
               item,
               session.identity.id,
               emoji,
@@ -390,7 +390,7 @@ export function useCommunityMessageComposer({
       setMessages((current) =>
         current.map((item) =>
           item.id === message.id
-            ? MessageReactions.update(
+            ? MessageReactionUpdater.update(
                 item,
                 session.identity.id,
                 emoji,

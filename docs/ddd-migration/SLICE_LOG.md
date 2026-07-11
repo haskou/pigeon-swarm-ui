@@ -50,3 +50,25 @@
   and notification contexts
 - Next slice: complete `INFRA-002` by replacing `PigeonApiGateway` consumers
   with context ports; then `IDENTITY-001`
+
+## Slice MESSAGE-001: Behavior-rich message lifecycle model
+
+- Date: 2026-07-11
+- Size: M
+- Status: in progress
+- Goal: Stop using `ChatMessage` and API-shaped reaction records as domain
+  state. Keep those shapes at the presentation/infrastructure boundary while
+  the message aggregate owns editability and reaction lifecycle behavior.
+- Planned changes:
+  - represent message state with value objects instead of boolean/type checks
+    spread across presentation code
+  - make reactions domain entities owned by the message aggregate
+  - replace `Message.toChatMessage()` with a presentation mapper
+  - move `MessageEditPolicy` callers behind a presentation adapter
+- Behavior changed/preserved: preserve current edit-menu eligibility and
+  optimistic reaction behavior
+- Contracts changed: none
+- Validation level: L2
+- Risks: encrypted or special message types must remain non-editable exactly as
+  before
+- Next slice: complete `INFRA-002` after the message model is verified

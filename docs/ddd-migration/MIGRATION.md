@@ -38,26 +38,27 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `INFRA-002`
-- Title: Move remaining context-specific gateway seams
-- Size: L
+- Id: `MESSAGE-001`
+- Title: Establish a behavior-rich message lifecycle model
+- Size: M
 - Status: in progress
-- Business capability: Context-owned transport, cache, and signing adapters
-- Source area: `src/app/composition/PigeonApiGateway*` and remaining
-  composition compatibility adapters
-- Target boundary: `src/contexts/*/infrastructure/http` and `crypto`
-- Target files/folders: real adapters only; no placeholder folders
-- Expected files: identities, notifications, attachments, stickers and shared
-  request-cache adapters plus composition wiring
-- Compatibility constraints: Existing UI/application method contracts remain
-  stable while consumers migrate to context ports
+- Business capability: Message editability and reaction lifecycle
+- Source area: `src/contexts/messages/domain` and its presentation read model
+- Target boundary: Message aggregate, reaction entity/value objects, and a
+  presentation mapper for `ChatMessage`
+- Target files/folders: `domain/aggregates`, `domain/entities`,
+  `domain/value-objects`, and `presentation/view-models`
+- Compatibility constraints: REST, websocket, encrypted payload, and
+  `ChatMessage` rendering contracts remain stable
 - Validation level: L2
-- Affected behavior/tests: calls, node networks, presence, push subscriptions,
-  identity and message bootstrap
-- Tests/checks run: typecheck, lint, targeted moved-adapter tests
+- Affected behavior/tests: context-menu edit availability and optimistic
+  reaction updates in conversations and community channels
+- Tests/checks run: domain unit tests, affected presentation tests, typecheck,
+  and lint
 - Full-suite status: deferred until the infrastructure milestone closes
-- Done criteria: no context-specific HTTP gateway remains in
-  `src/app/composition`; the compatibility facade is replaced by context ports
+- Done criteria: The aggregate no longer stores or returns `ChatMessage`; the
+  edit and reaction rules are expressed with domain objects; `ChatMessage`
+  remains a presentation read model
 
 ## Risks
 
@@ -78,7 +79,7 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `INFRA-002`: finish context ports and remove the compatibility facade.
-2. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
-3. `MESSAGE-001`: message command workflow and message resource mapper seam.
+1. `MESSAGE-001`: establish a message lifecycle model and read-model mapper.
+2. `INFRA-002`: finish context ports and remove the compatibility facade.
+3. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
 4. `COMMUNITY-001`: community membership/channel aggregate behavior.
