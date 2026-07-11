@@ -1200,7 +1200,7 @@ export function GlassWorkspace({
   }, [session, setConversations]);
 
   const refreshSession = useCallback(async () => {
-    const result = await applicationContainer.refreshSession(session);
+    const result = await applicationContainer.session.refresh(session);
 
     setSession(result.session);
     setConversations(result.conversations);

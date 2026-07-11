@@ -1,10 +1,12 @@
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type {
+  IdentityPresence,
   IdentityResource,
   LocalKeychain,
   LoginResult,
   Session,
+  SelectablePresenceStatus,
 } from '../../shared/domain/pigeonResources.types';
 
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
@@ -66,6 +68,20 @@ export class PigeonIdentitiesApplication {
     );
   }
 
+  public async getPresence(
+    session: Session,
+    identityId: string,
+  ): Promise<IdentityPresence> {
+    return await this.gateway.getPresence(session, identityId);
+  }
+
+  public async getPresences(
+    session: Session,
+    identityIds: string[],
+  ): Promise<IdentityPresence[]> {
+    return await this.gateway.getPresences(session, identityIds);
+  }
+
   public async publishKeychain(
     session: Session,
     nextKeychain: LocalKeychain,
@@ -112,5 +128,12 @@ export class PigeonIdentitiesApplication {
       newPassword,
       options,
     );
+  }
+
+  public async updatePresence(
+    session: Session,
+    status: SelectablePresenceStatus,
+  ): Promise<IdentityPresence> {
+    return await this.gateway.updatePresence(session, { status });
   }
 }

@@ -53,7 +53,7 @@ export function useWorkspacePresence({
     const preference = readPresencePreference(session.identity.id);
 
     presencePreferenceRef.current = preference;
-    applicationContainer.setRealtimeHeartbeatActivityMode(
+    applicationContainer.realtime.setHeartbeatActivityMode(
       session,
       !preference || preference === 'available' ? 'auto' : 'inactive',
     );
@@ -106,7 +106,7 @@ export function useWorkspacePresence({
     (status: SelectablePresenceStatus) => {
       presencePreferenceRef.current = status;
       writePresencePreference(sessionRef.current.identity.id, status);
-      applicationContainer.setRealtimeHeartbeatActivityMode(
+      applicationContainer.realtime.setHeartbeatActivityMode(
         sessionRef.current,
         status === 'available' ? 'auto' : 'inactive',
       );
@@ -138,7 +138,7 @@ export function useWorkspacePresence({
     lastLocalActivityPresenceRefreshAtRef.current = now;
     localActivityPresenceRefreshInFlightRef.current = true;
     void applicationContainer
-      .updatePresence(sessionRef.current, { status: nextStatus })
+      .identities.updatePresence(sessionRef.current, nextStatus)
       .then(mergePresence)
       .catch(() => undefined)
       .finally(() => {
@@ -198,7 +198,7 @@ export function useWorkspacePresence({
     let cancelled = false;
 
     void applicationContainer
-      .getPresences(session, presenceIdentityIds)
+      .identities.getPresences(session, presenceIdentityIds)
       .then((presences) => {
         if (cancelled) return;
 
@@ -218,7 +218,7 @@ export function useWorkspacePresence({
           if (ownPresence?.status === preferredStatus) return;
 
           void applicationContainer
-            .updatePresence(session, { status: preferredStatus })
+            .identities.updatePresence(session, preferredStatus)
             .then(mergePresence)
             .catch(() => undefined);
 
@@ -234,7 +234,7 @@ export function useWorkspacePresence({
         }
 
         void applicationContainer
-          .updatePresence(session, { status: 'available' })
+          .identities.updatePresence(session, 'available')
           .then(mergePresence)
           .catch(() => undefined);
       })

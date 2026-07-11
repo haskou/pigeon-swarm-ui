@@ -166,9 +166,8 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     setPresenceError(null);
     onPresenceStatusSelected?.(status);
     try {
-      const nextPresence = await applicationContainer.updatePresence(session, {
-        status,
-      });
+      const nextPresence =
+        await applicationContainer.identities.updatePresence(session, status);
 
       onPresenceChange?.(nextPresence);
     } catch {

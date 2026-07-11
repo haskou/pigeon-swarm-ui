@@ -124,7 +124,7 @@ export function useAppBootstrap(): {
     void loadApplicationContainer()
       .then(async (applicationContainer) => {
         const [result] = await Promise.all([
-          applicationContainer.restoreRememberedSession(
+          applicationContainer.session.restoreRemembered(
             savedCredentials.identityId,
             setRestoreProgressStep,
           ),
