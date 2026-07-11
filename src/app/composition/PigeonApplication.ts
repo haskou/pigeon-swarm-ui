@@ -3,11 +3,11 @@ import { PigeonCommunitiesApplication } from '../../contexts/communities/applica
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
+import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
-import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonSessionApplication } from './PigeonSessionApplication';

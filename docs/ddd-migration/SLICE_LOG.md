@@ -329,3 +329,27 @@
 - Risks: notification HTTP and invitation/keychain orchestration still use the
   compatibility gateway as their concrete adapter
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-007: Move node and network application boundary into context
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Keep network creation, joining, removal, peer queries, relay
+  configuration, claiming, and replication reads inside the networks context.
+- Changed files:
+  - `contexts/networks/application/PigeonNetworksApplication.ts`
+  - `contexts/networks/application/ports/NodeApplicationPort.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: anonymous and node-owned network flows, public
+  network setup, peer listing, relay configuration, port checks, and replication
+  status preserve their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - network application and context suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: node HTTP transport remains implemented by the context gateway; this
+  slice only removes its application dependency on composition
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

@@ -1,17 +1,20 @@
-import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Session } from '../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { NodeNetwork } from './list-node-networks/NodeNetwork';
 
-import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 
 describe(PigeonNetworksApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonNodeGateway> {
+  type Dependencies = ConstructorParameters<
+    typeof PigeonNetworksApplication
+  >[0];
+
+  function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
       createNetwork: jest.fn(),
       getNetworks: jest.fn(),
       joinNetwork: jest.fn(),
       removeNetwork: jest.fn(),
-    } as unknown as jest.Mocked<PigeonNodeGateway>;
+    } as unknown as jest.Mocked<Dependencies>;
   }
 
   const session = {

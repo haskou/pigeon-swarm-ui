@@ -1,26 +1,26 @@
-import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
   IpfsReplicationStatus,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { NodeRelayConfiguration } from './configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from './configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from './configure-node-relay/NodeRelayPortCheckTarget';
+import type { NodeNetwork } from './list-node-networks/NodeNetwork';
+import type { Peer } from './list-peers/Peer';
+import type { NodeApplicationPort } from './ports/NodeApplicationPort';
 
-import { CreateNetwork } from '../../contexts/networks/application/create-network/CreateNetwork';
-import { CreateNetworkMessage } from '../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
-import { CreatePublicNetwork } from '../../contexts/networks/application/create-public-network/CreatePublicNetwork';
-import { CreatePublicNetworkMessage } from '../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
-import { JoinNetwork } from '../../contexts/networks/application/join-network/JoinNetwork';
-import { JoinNetworkMessage } from '../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
-import { ListNodeNetworks } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import { ListNodeNetworksMessage } from '../../contexts/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
-import { ListPeers } from '../../contexts/networks/application/list-peers/ListPeers';
-import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
-import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
-import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
-import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
+import { CreateNetwork } from './create-network/CreateNetwork';
+import { CreateNetworkMessage } from './create-network/messages/CreateNetworkMessage';
+import { CreatePublicNetwork } from './create-public-network/CreatePublicNetwork';
+import { CreatePublicNetworkMessage } from './create-public-network/messages/CreatePublicNetworkMessage';
+import { JoinNetwork } from './join-network/JoinNetwork';
+import { JoinNetworkMessage } from './join-network/messages/JoinNetworkMessage';
+import { ListNodeNetworks } from './list-node-networks/ListNodeNetworks';
+import { ListNodeNetworksMessage } from './list-node-networks/messages/ListNodeNetworksMessage';
+import { ListPeers } from './list-peers/ListPeers';
+import { ListPeersMessage } from './list-peers/messages/ListPeersMessage';
+import { RemoveNodeNetworkMessage } from './remove-node-network/messages/RemoveNodeNetworkMessage';
+import { RemoveNodeNetwork } from './remove-node-network/RemoveNodeNetwork';
 
 export class PigeonNetworksApplication {
   private readonly createNetwork: CreateNetwork;
@@ -35,7 +35,7 @@ export class PigeonNetworksApplication {
 
   private readonly removeNetwork: RemoveNodeNetwork;
 
-  public constructor(private readonly gateway: PigeonNodeGateway) {
+  public constructor(private readonly gateway: NodeApplicationPort) {
     this.createNetwork = new CreateNetwork({
       create: async (name) => await gateway.createNetwork(name.toString()),
     });
