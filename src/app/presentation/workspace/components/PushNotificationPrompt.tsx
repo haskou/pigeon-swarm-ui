@@ -1,4 +1,5 @@
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 
 type PushNotificationPromptProps = {
   enableState: 'error' | 'idle' | 'loading';
@@ -61,27 +62,12 @@ export function PushNotificationPrompt({
                 : copy.notifications.enablePush}
             </button>
           </div>
-          <button
-            type="button"
+          <DialogCloseButton
+            ariaLabel={copy.notifications.enablePushDismiss}
             onClick={onDismiss}
-            data-testid="push-notification-dismiss-button"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/65 transition hover:bg-white/15 hover:text-white"
-            aria-label={copy.notifications.enablePushDismiss}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-4 w-4"
-            >
-              <path
-                d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </button>
+            testId="push-notification-dismiss-button"
+          />
         </div>
       </div>
     </div>
