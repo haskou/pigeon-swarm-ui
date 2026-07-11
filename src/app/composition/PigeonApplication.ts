@@ -1,10 +1,3 @@
-import type {
-  CallIceServerConfig,
-  CallParticipantMediaConnection,
-  CallResource,
-  CallSignalDelivery,
-  CallSignalPayload,
-} from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
@@ -63,8 +56,6 @@ import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 export class PigeonApplication {
-  private readonly calls: PigeonCallsApplication;
-
   private readonly communities: PigeonCommunitiesApplication;
 
   private readonly notifications: PigeonNotificationsApplication;
@@ -76,6 +67,8 @@ export class PigeonApplication {
   private readonly realtimeApplication: PigeonRealtimeApplication;
 
   public readonly attachments: PigeonAttachmentsApplication;
+
+  public readonly calls: PigeonCallsApplication;
 
   public readonly conversations: PigeonConversationsApplication;
 
@@ -123,23 +116,6 @@ export class PigeonApplication {
     await this.networks.claimNode(session);
   }
 
-  public async listCalls(session: Session): Promise<CallResource[]> {
-    return await this.calls.list(session);
-  }
-
-  public async getCall(
-    session: Session,
-    callId: string,
-  ): Promise<CallResource> {
-    return await this.calls.get(session, callId);
-  }
-
-  public async getCallIceServers(
-    session: Session,
-  ): Promise<CallIceServerConfig> {
-    return await this.calls.getIceServers(session);
-  }
-
   public async getIpfsReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatus> {
@@ -165,60 +141,6 @@ export class PigeonApplication {
     input: { status: SelectablePresenceStatus },
   ): Promise<IdentityPresence> {
     return await this.gateway.updatePresence(session, input);
-  }
-
-  public async startConversationCall(
-    session: Session,
-    conversationId: string,
-  ): Promise<CallResource> {
-    return await this.calls.startConversation(session, conversationId);
-  }
-
-  public async startCommunityChannelCall(
-    session: Session,
-    communityId: string,
-    channelId: string,
-  ): Promise<CallResource> {
-    return await this.calls.startCommunityChannel(
-      session,
-      communityId,
-      channelId,
-    );
-  }
-
-  public async joinCall(
-    session: Session,
-    callId: string,
-  ): Promise<CallResource> {
-    return await this.calls.join(session, callId);
-  }
-
-  public async leaveCall(session: Session, callId: string): Promise<void> {
-    await this.calls.leave(session, callId);
-  }
-
-  public async heartbeatCallParticipant(
-    session: Session,
-    callId: string,
-    mediaConnections: CallParticipantMediaConnection[],
-  ): Promise<CallResource> {
-    return await this.calls.heartbeatParticipant(
-      session,
-      callId,
-      mediaConnections,
-    );
-  }
-
-  public async endCall(session: Session, callId: string): Promise<void> {
-    await this.calls.end(session, callId);
-  }
-
-  public async sendCallSignal(
-    session: Session,
-    callId: string,
-    signal: CallSignalPayload,
-  ): Promise<CallSignalDelivery> {
-    return await this.calls.sendSignal(session, callId, signal);
   }
 
   public async connectRealtime(

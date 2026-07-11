@@ -56,12 +56,12 @@ export function useCallDeparture({
   const leaveCallResource = useCallback(
     async (call: CallResource): Promise<void> => {
       if (callDetailsForResource(call).kind === 'one-to-one') {
-        await applicationContainer.endCall(session, call.id);
+        await applicationContainer.calls.end(session, call.id);
 
         return;
       }
 
-      await applicationContainer.leaveCall(session, call.id);
+      await applicationContainer.calls.leave(session, call.id);
     },
     [callDetailsForResource, session],
   );
@@ -120,15 +120,15 @@ export function useCallDeparture({
     if (!callId) return;
 
     const request = shouldEndForEveryone
-      ? applicationContainer.endCall(session, callId)
-      : applicationContainer.leaveCall(session, callId);
+      ? applicationContainer.calls.end(session, callId)
+      : applicationContainer.calls.leave(session, callId);
 
     void request
       .then(async () => {
         if (!isCommunityVoiceCall) return;
 
         await applicationContainer
-          .getCall(session, callId)
+          .calls.get(session, callId)
           .then(reconcileCallResource)
           .catch(() => onCommunitiesReload());
       })

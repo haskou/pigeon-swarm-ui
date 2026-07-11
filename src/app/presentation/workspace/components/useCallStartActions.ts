@@ -136,7 +136,7 @@ export function useCallStartActions({
             conversationId: input.conversationId,
           });
 
-          return await applicationContainer.startConversationCall(
+          return await applicationContainer.calls.startConversation(
             sessionRef.current,
             input.conversationId,
           );
@@ -255,7 +255,7 @@ export function useCallStartActions({
           channelId: channel.id,
           communityId: activeCommunity.id,
         });
-        const call = await applicationContainer.startCommunityChannelCall(
+        const call = await applicationContainer.calls.startCommunityChannel(
           sessionRef.current,
           activeCommunity.id,
           channel.id,
@@ -336,7 +336,7 @@ export function useCallStartActions({
 
     void (async () => {
       const latestCall = await applicationContainer
-        .getCall(sessionRef.current, pendingCall.id)
+        .calls.get(sessionRef.current, pendingCall.id)
         .catch(() => pendingCall);
       const currentParticipant = latestCall.participants.find(
         (participant) =>
@@ -370,7 +370,7 @@ export function useCallStartActions({
         callId: pendingCall.id,
       });
 
-      const call = await applicationContainer.joinCall(
+      const call = await applicationContainer.calls.join(
         sessionRef.current,
         pendingCall.id,
       );
@@ -435,7 +435,7 @@ export function useCallStartActions({
     setIncomingCall(null);
     stopIncomingCallSound();
     void applicationContainer
-      .leaveCall(sessionRef.current, callId)
+      .calls.leave(sessionRef.current, callId)
       .catch(() => undefined);
   }, [incomingCall]);
 

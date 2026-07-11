@@ -410,7 +410,7 @@ export function GlassWorkspace({
     if (activeRequest) return activeRequest;
 
     const request = applicationContainer
-      .listCalls(sessionRef.current)
+      .calls.list(sessionRef.current)
       .finally(() => {
         if (callListRequestRef.current === request) {
           callListRequestRef.current = null;
@@ -1039,7 +1039,7 @@ export function GlassWorkspace({
           recipientIdentityId,
           signalType,
         });
-        await applicationContainer.sendCallSignal(sessionRef.current, callId, {
+        await applicationContainer.calls.sendSignal(sessionRef.current, callId, {
           payload,
           recipientIdentityId,
           signalType,
@@ -1049,7 +1049,7 @@ export function GlassWorkspace({
   );
   const loadCallIceConfig = useCallback(async () => {
     try {
-      return await applicationContainer.getCallIceServers(sessionRef.current);
+      return await applicationContainer.calls.getIceServers(sessionRef.current);
     } catch (caught) {
       logCallError('workspace:call:ice-config-unavailable', caught);
 
@@ -1084,7 +1084,7 @@ export function GlassWorkspace({
       callId: string,
       mediaConnections: CallParticipantMediaConnection[],
     ) => {
-      const call = await applicationContainer.heartbeatCallParticipant(
+      const call = await applicationContainer.calls.heartbeatParticipant(
         sessionRef.current,
         callId,
         mediaConnections,
@@ -1151,7 +1151,7 @@ export function GlassWorkspace({
           await Promise.all(
             staleJoinedCalls.map((call) =>
               applicationContainer
-                .leaveCall(sessionRef.current, call.id)
+                .calls.leave(sessionRef.current, call.id)
                 .catch(() => undefined),
             ),
           );
@@ -2451,7 +2451,7 @@ export function GlassWorkspace({
         if (!callId) return;
 
         void applicationContainer
-          .getCall(sessionRef.current, callId)
+          .calls.get(sessionRef.current, callId)
           .then((call) => {
             logCallDebug('workspace:realtime-call-event:resource-loaded', {
               activeCallId: activeCallRef.current?.id,
