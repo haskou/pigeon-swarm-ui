@@ -108,7 +108,7 @@ export function useNotifications({
     try {
       setNotifications(
         mergeNotificationOverrides(
-          await applicationContainer.listNotifications(currentSession),
+          await applicationContainer.notifications.list(currentSession),
           notificationOverridesRef.current,
         ),
       );
@@ -149,7 +149,7 @@ export function useNotifications({
       setError(null);
 
       try {
-        const result = await applicationContainer.acceptConversationInvitation(
+        const result = await applicationContainer.notifications.acceptConversationInvitation(
           currentSession,
           notification,
         );
@@ -209,7 +209,7 @@ export function useNotifications({
 
       try {
         replaceNotification(
-          await applicationContainer.updateNotification(
+          await applicationContainer.notifications.update(
             currentSession,
             notificationId,
             'declined',

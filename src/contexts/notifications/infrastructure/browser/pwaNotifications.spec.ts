@@ -9,13 +9,16 @@ import {
 
 jest.mock('../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    deletePushSubscription: jest.fn(),
-    getPushVapidPublicKey: jest.fn(),
-    registerPushSubscription: jest.fn(),
+    notifications: {
+      deletePushSubscription: jest.fn(),
+      getPushVapidPublicKey: jest.fn(),
+      registerPushSubscription: jest.fn(),
+    },
   },
 }));
 
 const mockedApplicationContainer = jest.mocked(applicationContainer);
+const mockedNotifications = mockedApplicationContainer.notifications;
 const currentVapidPublicKey =
   'BCWL2DKOOVa23vOI4hzvPv7I5ckKuUybPqzoFt0xb4DrcpV4OUasxryIsfvebrxmNzbR5gJTMN6sVojhPWAiPpE';
 
@@ -169,7 +172,7 @@ function installDocumentVisibility(input: {
 }
 
 function mockCurrentVapidPublicKey(): void {
-  mockedApplicationContainer.getPushVapidPublicKey.mockResolvedValue({
+  mockedNotifications.getPushVapidPublicKey.mockResolvedValue({
     enabled: true,
     publicKey: currentVapidPublicKey,
   });
@@ -217,12 +220,8 @@ describe(ensurePwaPushSubscription.name, () => {
     );
 
     expect(requestPermission).not.toHaveBeenCalled();
-    expect(
-      mockedApplicationContainer.getPushVapidPublicKey,
-    ).not.toHaveBeenCalled();
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).not.toHaveBeenCalled();
+    expect(mockedNotifications.getPushVapidPublicKey).not.toHaveBeenCalled();
+    expect(mockedNotifications.registerPushSubscription).not.toHaveBeenCalled();
   });
 
   it('requests permission from the explicit enable flow before loading VAPID settings', async () => {
@@ -232,7 +231,7 @@ describe(ensurePwaPushSubscription.name, () => {
       permission: 'default',
       requestedPermission: 'granted',
     });
-    mockedApplicationContainer.getPushVapidPublicKey.mockImplementation(() => {
+    mockedNotifications.getPushVapidPublicKey.mockImplementation(() => {
       calls.push('vapid');
 
       return Promise.resolve({
@@ -246,9 +245,10 @@ describe(ensurePwaPushSubscription.name, () => {
     ).resolves.toBe('granted');
 
     expect(calls).toEqual(['permission', 'vapid']);
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledWith(session(), subscriptionJson);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledWith(
+      session(),
+      subscriptionJson,
+    );
   });
 
   it('reuses the same explicit enable flow when activation is requested twice at once', async () => {
@@ -267,9 +267,9 @@ describe(ensurePwaPushSubscription.name, () => {
 
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledTimes(1);
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledTimes(1);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it('does not register a subscription when the explicit permission request is denied', async () => {
@@ -283,12 +283,8 @@ describe(ensurePwaPushSubscription.name, () => {
     ).resolves.toBe('permission_denied');
 
     expect(requestPermission).toHaveBeenCalledTimes(1);
-    expect(
-      mockedApplicationContainer.getPushVapidPublicKey,
-    ).not.toHaveBeenCalled();
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).not.toHaveBeenCalled();
+    expect(mockedNotifications.getPushVapidPublicKey).not.toHaveBeenCalled();
+    expect(mockedNotifications.registerPushSubscription).not.toHaveBeenCalled();
   });
 
   it('reports the current permission only when service workers and notifications are supported', () => {
@@ -325,17 +321,19 @@ describe(ensurePwaPushSubscription.name, () => {
 
     await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
-    expect(
-      mockedApplicationContainer.deletePushSubscription,
-    ).toHaveBeenCalledWith(session(), oldSubscriptionJson);
+    expect(mockedNotifications.deletePushSubscription).toHaveBeenCalledWith(
+      session(),
+      oldSubscriptionJson,
+    );
     expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith({
       applicationServerKey: currentApplicationServerKey(),
       userVisibleOnly: true,
     });
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledWith(session(), subscriptionJson);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledWith(
+      session(),
+      subscriptionJson,
+    );
   });
 
   it('replaces an existing subscription whose browser JSON is not deliverable', async () => {
@@ -353,17 +351,16 @@ describe(ensurePwaPushSubscription.name, () => {
 
     await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
-    expect(
-      mockedApplicationContainer.deletePushSubscription,
-    ).not.toHaveBeenCalled();
+    expect(mockedNotifications.deletePushSubscription).not.toHaveBeenCalled();
     expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith({
       applicationServerKey: currentApplicationServerKey(),
       userVisibleOnly: true,
     });
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledWith(session(), subscriptionJson);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledWith(
+      session(),
+      subscriptionJson,
+    );
   });
 
   it('replaces an existing subscription when the browser hides the subscribed VAPID key', async () => {
@@ -388,17 +385,19 @@ describe(ensurePwaPushSubscription.name, () => {
 
     await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
 
-    expect(
-      mockedApplicationContainer.deletePushSubscription,
-    ).toHaveBeenCalledWith(session(), oldSubscriptionJson);
+    expect(mockedNotifications.deletePushSubscription).toHaveBeenCalledWith(
+      session(),
+      oldSubscriptionJson,
+    );
     expect(existingUnsubscribe).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith({
       applicationServerKey: currentApplicationServerKey(),
       userVisibleOnly: true,
     });
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledWith(session(), subscriptionJson);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledWith(
+      session(),
+      subscriptionJson,
+    );
   });
 
   it('does not show a local notification while the page is visible and focused', async () => {
@@ -445,7 +444,7 @@ describe(ensurePwaPushSubscription.name, () => {
 
   it('reports server_disabled when VAPID settings are disabled', async () => {
     installPushBrowser({ permission: 'granted' });
-    mockedApplicationContainer.getPushVapidPublicKey.mockResolvedValue({
+    mockedNotifications.getPushVapidPublicKey.mockResolvedValue({
       enabled: false,
     });
 
@@ -453,9 +452,7 @@ describe(ensurePwaPushSubscription.name, () => {
       'server_disabled',
     );
 
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).not.toHaveBeenCalled();
+    expect(mockedNotifications.registerPushSubscription).not.toHaveBeenCalled();
   });
 
   it('does not require a global PushManager when the registration exposes pushManager', async () => {
@@ -468,9 +465,10 @@ describe(ensurePwaPushSubscription.name, () => {
     mockCurrentVapidPublicKey();
 
     await expect(ensurePwaPushSubscription(session())).resolves.toBe('granted');
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).toHaveBeenCalledWith(session(), subscriptionJson);
+    expect(mockedNotifications.registerPushSubscription).toHaveBeenCalledWith(
+      session(),
+      subscriptionJson,
+    );
   });
 
   it('reports unsupported when the service worker registration has no pushManager', async () => {
@@ -483,8 +481,6 @@ describe(ensurePwaPushSubscription.name, () => {
     await expect(ensurePwaPushSubscription(session())).resolves.toBe(
       'unsupported',
     );
-    expect(
-      mockedApplicationContainer.registerPushSubscription,
-    ).not.toHaveBeenCalled();
+    expect(mockedNotifications.registerPushSubscription).not.toHaveBeenCalled();
   });
 });

@@ -23,10 +23,6 @@ import type {
   LocalKeychain,
   LoginResult,
   MessageResource,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationSettingScope,
-  NotificationResource,
   Session,
   SelectablePresenceStatus,
 } from '../../shared/domain/pigeonResources.types';
@@ -58,8 +54,6 @@ import { PigeonStickersApplication } from './PigeonStickersApplication';
 export class PigeonApplication {
   private readonly communities: PigeonCommunitiesApplication;
 
-  private readonly notifications: PigeonNotificationsApplication;
-
   private readonly networks: PigeonNetworksApplication;
 
   private readonly gateway: PigeonApiGateway;
@@ -75,6 +69,8 @@ export class PigeonApplication {
   public readonly identities: PigeonIdentitiesApplication;
 
   public readonly messages: PigeonMessagesApplication;
+
+  public readonly notifications: PigeonNotificationsApplication;
 
   public readonly polls: PigeonPollsApplication;
 
@@ -96,20 +92,6 @@ export class PigeonApplication {
     this.polls = new PigeonPollsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.stickers = new PigeonStickersApplication(gateway);
-  }
-
-  public async acceptConversationInvitation(
-    session: Session,
-    notification: NotificationResource,
-  ): Promise<{
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-    notification: NotificationResource;
-  }> {
-    return await this.notifications.acceptConversationInvitation(
-      session,
-      notification,
-    );
   }
 
   public async claimNode(session: Session): Promise<void> {
@@ -169,27 +151,6 @@ export class PigeonApplication {
     signalId: string,
   ): void {
     this.realtimeApplication.acknowledgeCallSignal(socket, signalId);
-  }
-
-  public async getPushVapidPublicKey(): Promise<{
-    enabled: boolean;
-    publicKey?: string;
-  }> {
-    return await this.notifications.getPushVapidPublicKey();
-  }
-
-  public async registerPushSubscription(
-    session: Session,
-    subscription: PushSubscriptionJSON,
-  ): Promise<void> {
-    await this.notifications.registerPushSubscription(session, subscription);
-  }
-
-  public async deletePushSubscription(
-    session: Session,
-    subscription: PushSubscriptionJSON,
-  ): Promise<void> {
-    await this.notifications.deletePushSubscription(session, subscription);
   }
 
   public async createNetwork(name: string): Promise<void> {
@@ -790,18 +751,6 @@ export class PigeonApplication {
     return await this.networks.list(session);
   }
 
-  public async listNotifications(
-    session: Session,
-  ): Promise<NotificationResource[]> {
-    return await this.notifications.list(session);
-  }
-
-  public async listNotificationSettings(
-    session: Session,
-  ): Promise<NotificationScopeSetting[]> {
-    return await this.notifications.listNotificationSettings(session);
-  }
-
   public async listPeers(): Promise<Peer[]> {
     return await this.networks.peers();
   }
@@ -832,27 +781,5 @@ export class PigeonApplication {
         result.conversations,
       ),
     };
-  }
-
-  public async updateNotification(
-    session: Session,
-    notificationId: string,
-    state: 'accepted' | 'declined',
-  ): Promise<NotificationResource> {
-    return await this.notifications.update(session, notificationId, state);
-  }
-
-  public async saveNotificationSetting(
-    session: Session,
-    setting: NotificationScopeSettingInput,
-  ): Promise<NotificationScopeSetting> {
-    return await this.notifications.saveNotificationSetting(session, setting);
-  }
-
-  public async resetNotificationSetting(
-    session: Session,
-    scope: NotificationSettingScope,
-  ): Promise<void> {
-    await this.notifications.resetNotificationSetting(session, scope);
   }
 }
