@@ -130,6 +130,7 @@ import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
+import { useCallDeparture } from './useCallDeparture';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -1063,6 +1064,22 @@ export function GlassWorkspace({
     reconcileCallResourceRef.current = reconcileCallResource;
   }, [reconcileCallResource]);
 
+  const {
+    cleanupJoinedCalls,
+    leaveActiveCall,
+    leaveCurrentCallForSwitch,
+    removeCurrentIdentityFromVoicePresence,
+  } = useCallDeparture({
+    activeCall,
+    callDetailsForResource,
+    endCall,
+    listCalls: listCallsForWorkspace,
+    onCommunitiesReload,
+    reconcileCallResource,
+    session,
+    setCommunities,
+  });
+
   const callSignalSender = useCallback(
     (callId: string) =>
       async (
@@ -1092,81 +1109,6 @@ export function GlassWorkspace({
       throw new Error(copy.calls.iceServersUnavailable);
     }
   }, []);
-  const removeCurrentIdentityFromVoicePresence = useCallback(() => {
-    const identityId = sessionRef.current.identity.id;
-
-    setCommunities((current) =>
-      current.map((community) => ({
-        ...community,
-        voiceChannels: (community.voiceChannels ?? []).map((channel) => ({
-          ...channel,
-          connectedIdentityIds: (channel.connectedIdentityIds ?? []).filter(
-            (connectedIdentityId) => connectedIdentityId !== identityId,
-          ),
-        })),
-      })),
-    );
-  }, [setCommunities]);
-  const leaveCallResource = useCallback(
-    async (call: CallResource): Promise<void> => {
-      const details = callDetailsForResource(call);
-
-      if (details.kind === 'one-to-one') {
-        await applicationContainer.endCall(sessionRef.current, call.id);
-
-        return;
-      }
-
-      await applicationContainer.leaveCall(sessionRef.current, call.id);
-    },
-    [callDetailsForResource],
-  );
-  const cleanupJoinedCalls = useCallback(
-    async (exceptCallId?: string): Promise<void> => {
-      const identityId = sessionRef.current.identity.id;
-      const calls = await listCallsForWorkspace();
-      const joinedCalls = calls.filter(
-        (call) =>
-          call.status === 'active' &&
-          call.id !== exceptCallId &&
-          call.participants.some(
-            (participant) =>
-              participant.identityId === identityId && participant.connected,
-          ),
-      );
-
-      if (joinedCalls.length === 0) return;
-
-      await Promise.all(
-        joinedCalls.map((call) =>
-          leaveCallResource(call).catch(() => undefined),
-        ),
-      );
-      removeCurrentIdentityFromVoicePresence();
-    },
-    [
-      leaveCallResource,
-      listCallsForWorkspace,
-      removeCurrentIdentityFromVoicePresence,
-    ],
-  );
-  const leaveCurrentCallForSwitch = useCallback(async (): Promise<void> => {
-    const current = activeCall;
-
-    if (!current) return;
-
-    endCall();
-    removeCurrentIdentityFromVoicePresence();
-
-    if (current.call) {
-      await leaveCallResource(current.call).catch(() => undefined);
-    }
-  }, [
-    activeCall,
-    endCall,
-    leaveCallResource,
-    removeCurrentIdentityFromVoicePresence,
-  ]);
   const startConversationCall = useCallback(
     (input: {
       conversationId: string;
@@ -1521,39 +1463,6 @@ export function GlassWorkspace({
       .leaveCall(sessionRef.current, callId)
       .catch(() => undefined);
   }, [incomingCall]);
-
-  const leaveActiveCall = useCallback(() => {
-    const callId = activeCall?.id;
-    const isCommunityVoiceCall = activeCall?.kind === 'community-voice';
-    const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
-
-    endCall();
-    removeCurrentIdentityFromVoicePresence();
-    playEndedCallSound();
-
-    if (!callId) return;
-
-    const request = shouldEndForEveryone
-      ? applicationContainer.endCall(sessionRef.current, callId)
-      : applicationContainer.leaveCall(sessionRef.current, callId);
-
-    void request
-      .then(async () => {
-        if (!isCommunityVoiceCall) return;
-
-        await applicationContainer
-          .getCall(sessionRef.current, callId)
-          .then((call) => reconcileCallResourceRef.current(call))
-          .catch(() => onCommunitiesReload());
-      })
-      .catch(() => undefined);
-  }, [
-    activeCall?.id,
-    activeCall?.kind,
-    endCall,
-    onCommunitiesReload,
-    removeCurrentIdentityFromVoicePresence,
-  ]);
 
   const heartbeatActiveCall = useCallback(
     async (
