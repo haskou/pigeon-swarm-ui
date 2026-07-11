@@ -256,3 +256,27 @@
 - Risks: the compatibility gateway still supplies the concrete capabilities;
   the next infrastructure slices will replace those bindings progressively
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-004: Move identity application boundary into context
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep identity login, registration, profile, passkey protection, keychain
+  publication, and presence orchestration inside the identities context.
+- Changed files:
+  - `contexts/identities/application/PigeonIdentitiesApplication.ts`
+  - `contexts/identities/application/ports/Identity*Port.ts`
+  - `app/composition/PigeonApplication.ts` registration adapter and wiring
+- Behavior changed/preserved: login progress, registration options, profile
+  updates, local passkey unlock, keychain publication, and presence operations
+  preserve their existing workflows
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - identity application and composition suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: identity HTTP/material orchestration remains in the compatibility
+  gateway until the identity infrastructure slice
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

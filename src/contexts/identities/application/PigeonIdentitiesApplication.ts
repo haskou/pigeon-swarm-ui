@@ -1,5 +1,3 @@
-import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
-import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type {
   IdentityPresence,
   IdentityResource,
@@ -7,35 +5,48 @@ import type {
   LoginResult,
   Session,
   SelectablePresenceStatus,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { IdentityUpdateProfileInput } from '../domain/IdentitySignaturePayloadFactory';
+import type { IdentityKeychainPort } from './ports/IdentityKeychainPort';
+import type { IdentityPresencePort } from './ports/IdentityPresencePort';
+import type { IdentityProfilePort } from './ports/IdentityProfilePort';
+import type { IdentityProtectionPort } from './ports/IdentityProtectionPort';
+import type { LoginIdentityPort } from './ports/LoginIdentityPort';
+import type { LoginIdentityProgressReporter } from './ports/LoginIdentityProgressReporter';
+import type { RegisterIdentityPort } from './ports/RegisterIdentityPort';
 
-import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
-import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
-import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
-import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
-import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { LoginIdentity } from './login-identity/LoginIdentity';
+import { LoginIdentityMessage } from './login-identity/messages/LoginIdentityMessage';
+import { RegisterIdentityMessage } from './register-identity/messages/RegisterIdentityMessage';
+import { RegisterIdentity } from './register-identity/RegisterIdentity';
 
 export class PigeonIdentitiesApplication {
   private readonly loginIdentity: LoginIdentity;
 
   private readonly registerIdentity: RegisterIdentity;
 
-  public constructor(
-    private readonly gateway: PigeonApiGateway,
-    private readonly presence: PigeonPresenceGateway,
-  ) {
-    this.loginIdentity = new LoginIdentity(gateway);
-    this.registerIdentity = new RegisterIdentity({
-      register: async (name, password, networks, handle, options) =>
-        await gateway.register(
-          name.toString(),
-          password,
-          networks.toPrimitives(),
-          handle?.toString(),
-          options,
-        ),
-    });
+  private readonly keychain: IdentityKeychainPort;
+
+  private readonly presence: IdentityPresencePort;
+
+  private readonly profile: IdentityProfilePort;
+
+  private readonly protection: IdentityProtectionPort;
+
+  public constructor(dependencies: {
+    keychain: IdentityKeychainPort;
+    login: LoginIdentityPort;
+    presence: IdentityPresencePort;
+    profile: IdentityProfilePort;
+    protection: IdentityProtectionPort;
+    register: RegisterIdentityPort;
+  }) {
+    this.keychain = dependencies.keychain;
+    this.presence = dependencies.presence;
+    this.profile = dependencies.profile;
+    this.protection = dependencies.protection;
+    this.loginIdentity = new LoginIdentity(dependencies.login);
+    this.registerIdentity = new RegisterIdentity(dependencies.register);
   }
 
   public async configureLocalPasskeyUnlock(
@@ -44,7 +55,7 @@ export class PigeonIdentitiesApplication {
     enabled: boolean,
     recoveryKey?: string,
   ): Promise<void> {
-    await this.gateway.configureLocalPasskeyUnlock(
+    await this.protection.configureLocalPasskeyUnlock(
       session,
       password,
       enabled,
@@ -53,7 +64,7 @@ export class PigeonIdentitiesApplication {
   }
 
   public async get(identityId: string): Promise<IdentityResource> {
-    return await this.gateway.getIdentity(identityId);
+    return await this.profile.getIdentity(identityId);
   }
 
   public async login(
@@ -90,11 +101,11 @@ export class PigeonIdentitiesApplication {
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.gateway.publishKeychain(session, nextKeychain);
+    return await this.keychain.publishKeychain(session, nextKeychain);
   }
 
   public async refresh(identityId: string): Promise<IdentityResource> {
-    return await this.gateway.refreshIdentity(identityId);
+    return await this.profile.refreshIdentity(identityId);
   }
 
   public async register(
@@ -126,7 +137,7 @@ export class PigeonIdentitiesApplication {
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {
-    return await this.gateway.updateIdentityProfile(
+    return await this.profile.updateIdentityProfile(
       session,
       profile,
       newPassword,

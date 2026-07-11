@@ -1,11 +1,11 @@
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
+import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
-import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
@@ -54,10 +54,23 @@ export class PigeonApplication {
       roles: gateway,
     });
     this.conversations = new PigeonConversationsApplication(gateway);
-    this.identities = new PigeonIdentitiesApplication(
-      gateway,
-      gateway.presence,
-    );
+    this.identities = new PigeonIdentitiesApplication({
+      keychain: gateway,
+      login: gateway,
+      presence: gateway.presence,
+      profile: gateway,
+      protection: gateway,
+      register: {
+        register: async (name, password, networks, handle, options) =>
+          await gateway.register(
+            name.toString(),
+            password,
+            networks.toPrimitives(),
+            handle?.toString(),
+            options,
+          ),
+      },
+    });
     this.messages = new PigeonMessagesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication(gateway);
