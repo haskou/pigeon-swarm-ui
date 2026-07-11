@@ -77,7 +77,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `MESSAGE-001`: establish a message lifecycle model and read-model mapper.
-2. `INFRA-002`: finish context ports and remove the compatibility facade.
-3. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
-4. `COMMUNITY-001`: community membership/channel aggregate behavior.
+1. `INFRA-002C`: extract the next context-owned capability from the compatibility facade.
+2. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
+3. `COMMUNITY-001`: community membership/channel aggregate behavior.

@@ -4,7 +4,6 @@ import {
   PublicKey,
   StringValueObject,
   SymmetricKey,
-  UUID,
 } from '@haskou/value-objects';
 
 import type { PublishedCommunityKey } from '../../contexts/communities/infrastructure/crypto/PublishedCommunityKey';
@@ -15,7 +14,6 @@ import type { CommunityInviteLinkInput } from '../../contexts/communities/infras
 import type { ConversationInvitationType } from '../../contexts/conversations/infrastructure/http/ConversationInvitationType';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import type { EncryptMessagePayloadInput } from '../../contexts/messages/infrastructure/crypto/EncryptMessagePayloadInput';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
 import type { MessageProjectionPort } from '../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
@@ -90,12 +88,12 @@ import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { clearLocalPasskeyUnlock } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
-import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
+import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
@@ -150,6 +148,8 @@ export class PigeonApiGateway {
   private readonly keychains: KeychainCipher;
 
   private readonly messagesApi: PigeonMessagesApi;
+
+  private readonly messageCommands: PigeonMessageCommandsApi;
 
   private readonly messages: MessageProjector;
 
@@ -230,6 +230,14 @@ export class PigeonApiGateway {
       signer,
       this.requestCache,
       projection,
+    );
+    this.messageCommands = new PigeonMessageCommandsApi(
+      http,
+      signer,
+      this.messagesApi,
+      projection,
+      this.files,
+      this.messageSignatures,
     );
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsGateway(
@@ -424,50 +432,6 @@ export class PigeonApiGateway {
     }
 
     return decrypted;
-  }
-
-  private async createLinkPreviewForContent(
-    session: Session,
-    content: string,
-  ): Promise<MessageLinkPreview | undefined> {
-    const url = MessageLinkPreviews.firstUrl(content);
-
-    if (!url) return undefined;
-
-    return await this.createLinkPreview(session, url).catch(() => undefined);
-  }
-
-  private async createLinkPreviewForMessage(
-    session: Session,
-    content: string,
-    options: SendMessageOptions,
-  ): Promise<MessageLinkPreview | undefined> {
-    if (options.linkPreview || options.sticker) return options.linkPreview;
-
-    return await this.createLinkPreviewForContent(session, content);
-  }
-
-  private encryptMessagePayload(input: EncryptMessagePayloadInput): string {
-    return SymmetricKey.fromBase64(input.key.key)
-      .encrypt(
-        JSON.stringify({
-          attachments: input.messageAttachments,
-          authorIdentityId: input.session.identity.id,
-          content: input.sticker ? '' : input.content,
-          conversationId: input.conversationId,
-          ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
-          ...(input.replyPreview ? { reply: input.replyPreview } : {}),
-          ...(input.sticker ? { sticker: input.sticker } : {}),
-          ...(input.threadRootMessageId
-            ? { threadRootMessageId: input.threadRootMessageId }
-            : {}),
-          timestamp: input.timestamp,
-          type:
-            input.eventType ??
-            (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
-        }),
-      )
-      .toString();
   }
 
   private async projectMessageDirect(
@@ -2336,87 +2300,12 @@ export class PigeonApiGateway {
     content: string,
     options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
-    const {
-      attachments = [],
-      attachmentUpload,
-      onAttachmentProgress,
-      previousMessageIds = [],
-      replyPreview,
-      replyToMessageId,
-      threadRootMessageId,
-    } = options;
-    const key = ConversationKeychain.entry(
-      session.keychain,
-      session.identity.id,
+    return await this.messageCommands.send(
+      session,
       conversationId,
-    );
-
-    if (!key) {
-      throw new Error(copy.messages.missingConversationKey);
-    }
-
-    const timestamp = Date.now();
-    const messageAttachments = await this.publishMessageAttachments(
-      session,
-      attachments,
-      onAttachmentProgress,
-      attachmentUpload,
-    );
-    const linkPreview = await this.createLinkPreviewForMessage(
-      session,
       content,
       options,
     );
-    const encryptedPayload = this.encryptMessagePayload({
-      content,
-      conversationId,
-      eventType: threadRootMessageId
-        ? options.sticker
-          ? 'ThreadStickerMessageSent'
-          : 'ThreadMessageSent'
-        : undefined,
-      key,
-      linkPreview,
-      messageAttachments,
-      replyPreview,
-      session,
-      sticker: options.sticker,
-      threadRootMessageId,
-      timestamp,
-    });
-    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.messageSignatures.createSent({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt: timestamp,
-          encryptedPayload,
-          id,
-          previousMessageIds,
-          replyToMessageId,
-        }),
-      ),
-    );
-    const body = {
-      createdAt: timestamp,
-      encryptedPayload,
-      id,
-      previousMessageIds,
-      ...(replyToMessageId ? { replyToMessageId } : {}),
-      signature: signature.toString(),
-    };
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages`;
-    const created = await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-
-    return await this.decryptMessage(session, conversationId, created);
   }
 
   public async editMessage(
@@ -2426,64 +2315,13 @@ export class PigeonApiGateway {
     content: string,
     options: EditMessageOptions = {},
   ): Promise<ChatMessage> {
-    const key = ConversationKeychain.entry(
-      session.keychain,
-      session.identity.id,
+    return await this.messageCommands.edit(
+      session,
       conversationId,
-    );
-
-    if (!key) {
-      throw new Error(copy.messages.missingConversationKey);
-    }
-
-    const timestamp = Date.now();
-    const linkPreview =
-      options.linkPreview ??
-      (await this.createLinkPreviewForContent(session, content));
-    const encryptedPayload = this.encryptMessagePayload({
+      messageId,
       content,
-      conversationId,
-      eventType: 'MessageEdited',
-      key,
-      linkPreview,
-      messageAttachments: [],
-      session,
-      timestamp,
-    });
-    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
-    const previousMessageIds = [messageId];
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.messageSignatures.createEdited({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt: timestamp,
-          encryptedPayload,
-          id,
-          targetMessageId: messageId,
-        }),
-      ),
+      options,
     );
-    /* eslint-disable perfectionist/sort-objects */
-    const body = {
-      id,
-      createdAt: timestamp,
-      encryptedPayload,
-      previousMessageIds,
-      signature: signature.toString(),
-    };
-    /* eslint-enable perfectionist/sort-objects */
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-    const edited = await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
-
-    return await this.decryptMessage(session, conversationId, edited);
   }
 
   public async deleteMessage(
@@ -2491,34 +2329,7 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    const createdAt = Date.now();
-    const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.messageSignatures.createDeleted({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt,
-          id,
-          targetMessageId: messageId,
-        }),
-      ),
-    );
-    const body = {
-      createdAt,
-      id,
-      signature: signature.toString(),
-    };
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    await this.messageCommands.delete(session, conversationId, messageId);
   }
 
   public async addMessageReaction(

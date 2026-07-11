@@ -207,3 +207,28 @@
   conversation HTTP/application port migration is complete
 - Next slice: `INFRA-002`, replace composition gateway consumers by capability
   owned ports and adapters
+
+## Slice INFRA-002B: Extract message command adapter from compatibility gateway
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Move message send, edit, delete, attachment publication, encryption,
+  signing, and link-preview orchestration into message infrastructure.
+- Changed files:
+  - `contexts/messages/infrastructure/http/PigeonMessageCommandsApi.ts`
+  - `contexts/messages/infrastructure/http/MessageAttachmentPublisher.ts`
+  - `contexts/messages/infrastructure/http/PigeonMessageCommandsApi.spec.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: message command paths, encrypted payloads,
+  attachment publication, link previews, signatures, and response projection
+  remain unchanged at the public boundary
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - command, message adapter, and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: identity, community, network, notification, and remaining keychain
+  workflows still use the compatibility gateway
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability
