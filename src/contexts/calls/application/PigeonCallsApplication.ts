@@ -1,20 +1,20 @@
+import type { Session } from '../../../shared/domain/pigeonResources.types';
 import type {
   CallIceServerConfig,
   CallParticipantMediaConnection,
   CallResource,
   CallSignalDelivery,
   CallSignalPayload,
-} from '../../contexts/calls/domain/callSession.types';
-import type { Session } from '../../shared/domain/pigeonResources.types';
+} from '../domain/callSession.types';
+import type { CallApplicationPort } from './ports/CallApplicationPort';
 
-import { ListCalls } from '../../contexts/calls/application/list-calls/ListCalls';
-import { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
-import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
+import { ListCalls } from './list-calls/ListCalls';
+import { ListCallsMessage } from './list-calls/messages/ListCallsMessage';
 
 export class PigeonCallsApplication {
   private readonly listCallsUseCase: ListCalls;
 
-  public constructor(private readonly gateway: PigeonCallsGateway) {
+  public constructor(private readonly gateway: CallApplicationPort) {
     this.listCallsUseCase = new ListCalls({
       list: async (message) => await gateway.list(message.getSession()),
     });

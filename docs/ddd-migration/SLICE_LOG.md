@@ -280,3 +280,27 @@
 - Risks: identity HTTP/material orchestration remains in the compatibility
   gateway until the identity infrastructure slice
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-005: Move call application boundary into context
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep call listing, lifecycle, heartbeat, signaling, and ICE-server
+  orchestration inside the calls context.
+- Changed files:
+  - `contexts/calls/application/PigeonCallsApplication.ts`
+  - `contexts/calls/application/ports/CallApplicationPort.ts`
+  - `contexts/calls/application/PigeonCallsApplication.spec.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: call creation, joining, leaving, heartbeat,
+  signaling, ICE-server retrieval, and listing preserve their contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - call application and composition suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: call transport remains implemented by the context HTTP gateway; only
+  the application boundary moved in this slice
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability
