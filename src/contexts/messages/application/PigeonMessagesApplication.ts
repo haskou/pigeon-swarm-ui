@@ -7,25 +7,25 @@ import type {
   MessageResource,
   SendMessageOptions,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { MessagesGateway } from './ports/MessagesGateway';
 
-import { AddMessageReaction } from '../../contexts/messages/application/add-message-reaction/AddMessageReaction';
-import { AddMessageReactionMessage } from '../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
-import { DeleteMessage } from '../../contexts/messages/application/delete-message/DeleteMessage';
-import { DeleteMessageMessage } from '../../contexts/messages/application/delete-message/messages/DeleteMessageMessage';
-import { EditMessage } from '../../contexts/messages/application/edit-message/EditMessage';
-import { EditMessageMessage } from '../../contexts/messages/application/edit-message/messages/EditMessageMessage';
-import { LoadMessage } from '../../contexts/messages/application/load-message/LoadMessage';
-import { LoadMessageMessage } from '../../contexts/messages/application/load-message/messages/LoadMessageMessage';
-import { LoadMessagesAround } from '../../contexts/messages/application/load-messages-around/LoadMessagesAround';
-import { LoadMessagesAroundMessage } from '../../contexts/messages/application/load-messages-around/messages/LoadMessagesAroundMessage';
-import { LoadMessages } from '../../contexts/messages/application/load-messages/LoadMessages';
-import { LoadMessagesMessage } from '../../contexts/messages/application/load-messages/messages/LoadMessagesMessage';
-import { RemoveMessageReactionMessage } from '../../contexts/messages/application/remove-message-reaction/messages/RemoveMessageReactionMessage';
-import { RemoveMessageReaction } from '../../contexts/messages/application/remove-message-reaction/RemoveMessageReaction';
-import { SendMessageMessage } from '../../contexts/messages/application/send-message/messages/SendMessageMessage';
-import { SendMessage } from '../../contexts/messages/application/send-message/SendMessage';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { AddMessageReaction } from './add-message-reaction/AddMessageReaction';
+import { AddMessageReactionMessage } from './add-message-reaction/messages/AddMessageReactionMessage';
+import { DeleteMessage } from './delete-message/DeleteMessage';
+import { DeleteMessageMessage } from './delete-message/messages/DeleteMessageMessage';
+import { EditMessage } from './edit-message/EditMessage';
+import { EditMessageMessage } from './edit-message/messages/EditMessageMessage';
+import { LoadMessage } from './load-message/LoadMessage';
+import { LoadMessageMessage } from './load-message/messages/LoadMessageMessage';
+import { LoadMessagesAround } from './load-messages-around/LoadMessagesAround';
+import { LoadMessagesAroundMessage } from './load-messages-around/messages/LoadMessagesAroundMessage';
+import { LoadMessages } from './load-messages/LoadMessages';
+import { LoadMessagesMessage } from './load-messages/messages/LoadMessagesMessage';
+import { RemoveMessageReactionMessage } from './remove-message-reaction/messages/RemoveMessageReactionMessage';
+import { RemoveMessageReaction } from './remove-message-reaction/RemoveMessageReaction';
+import { SendMessageMessage } from './send-message/messages/SendMessageMessage';
+import { SendMessage } from './send-message/SendMessage';
 
 export class PigeonMessagesApplication {
   private readonly addReaction: AddMessageReaction;
@@ -44,7 +44,7 @@ export class PigeonMessagesApplication {
 
   private readonly sendMessage: SendMessage;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: MessagesGateway) {
     this.addReaction = new AddMessageReaction(gateway);
     this.deleteMessage = new DeleteMessage(gateway);
     this.editMessage = new EditMessage(gateway);

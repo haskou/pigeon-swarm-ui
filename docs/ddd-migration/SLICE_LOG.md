@@ -114,6 +114,29 @@
 - Next slice: `INFRA-002`, replace composition gateway consumers by capability
   owned ports and adapters
 
+## Slice APPLICATION-001: Move message application boundary into its context
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep message workflows and their application boundary under the
+  messages context instead of `app/composition`.
+- Changed files:
+  - `contexts/messages/application/PigeonMessagesApplication.ts`
+  - `contexts/messages/application/ports/MessagesGateway.ts`
+  - composition root wiring and moved application tests
+- Behavior changed/preserved: message send/load/edit/delete/reaction, draft,
+  pin, and thread operations preserved
+- Contracts changed: none
+- Validation level: L1
+- Tests/checks:
+  - message and application composition suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: `PigeonApiGateway` still implements the port temporarily; its HTTP and
+  crypto responsibilities are being extracted by `INFRA-002`
+- Next slice: `INFRA-002`, replace the temporary gateway implementation
+
 ## Slice CONVERSATION-001: Conversation aggregate without resource state
 
 - Date: 2026-07-11

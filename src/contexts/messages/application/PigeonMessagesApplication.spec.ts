@@ -1,18 +1,18 @@
 import type {
   ChatMessage,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { MessagesGateway } from './ports/MessagesGateway';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonMessagesApplication } from './PigeonMessagesApplication';
 
 describe(PigeonMessagesApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonApiGateway> {
+  function gatewayDouble(): jest.Mocked<MessagesGateway> {
     return {
       addMessageReaction: jest.fn(),
       loadMessages: jest.fn(),
       sendMessage: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<MessagesGateway>;
   }
 
   const session = {
