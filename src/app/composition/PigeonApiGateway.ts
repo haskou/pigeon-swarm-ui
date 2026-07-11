@@ -17,6 +17,7 @@ import type { LoginIdentityProgressReporter } from '../../contexts/identities/ap
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { EncryptMessagePayloadInput } from '../../contexts/messages/infrastructure/crypto/EncryptMessagePayloadInput';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
+import type { MessageProjectionPort } from '../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
 import type {
   ChatMessage,
@@ -35,9 +36,7 @@ import type {
   CommunityChannelDraft,
   CommunityChannelMessagePinsResource,
   ConversationDraft,
-  ConversationDraftsResource,
   ConversationKeyEntry,
-  ConversationMessagePinsResource,
   ConversationResource,
   CreatePollInput,
   EditMessageOptions,
@@ -97,7 +96,7 @@ import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypt
 import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
-import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
+import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
@@ -136,8 +135,6 @@ export class PigeonApiGateway {
 
   private readonly conversations: ConversationMapper;
 
-  private readonly draftPayloads: DraftPayloadCipher;
-
   private readonly files: PigeonFilesGateway;
 
   private readonly http: HttpJsonClient;
@@ -152,7 +149,7 @@ export class PigeonApiGateway {
 
   private readonly keychains: KeychainCipher;
 
-  private readonly linkPreviews: PigeonLinkPreviewsApi;
+  private readonly messagesApi: PigeonMessagesApi;
 
   private readonly messages: MessageProjector;
 
@@ -205,7 +202,6 @@ export class PigeonApiGateway {
       (key: string) => this.requestCache.invalidate(key),
     );
     this.conversations = conversations;
-    this.draftPayloads = new DraftPayloadCipher();
     this.files = new PigeonFilesGateway(
       new PigeonFilesApi(http, signer, attachmentCipher),
     );
@@ -215,9 +211,26 @@ export class PigeonApiGateway {
     this.identities = new PigeonIdentityGateway(http);
     this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
     this.keychains = keychains;
-    this.linkPreviews = new PigeonLinkPreviewsApi(http, signer);
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
+    const projection: MessageProjectionPort = {
+      decrypt: async (session, conversationId, message) =>
+        await this.decryptMessage(session, conversationId, message),
+      decryptMany: async (session, conversationId, messageResources, signal) =>
+        await this.decryptMessages(
+          session,
+          conversationId,
+          messageResources,
+          signal,
+        ),
+      list: (value) => this.messages.list(value),
+    };
+    this.messagesApi = new PigeonMessagesApi(
+      http,
+      signer,
+      this.requestCache,
+      projection,
+    );
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsGateway(
       new PigeonNotificationsApi(
@@ -619,69 +632,6 @@ export class PigeonApiGateway {
       peerIdentityId: '',
       version: 2,
     };
-  }
-
-  private messagesPath(
-    conversationId: string,
-    before?: null | string,
-    limit = 30,
-  ): string {
-    const query = new URLSearchParams({ limit: `${limit}` });
-
-    if (before) {
-      query.set('beforeMessageId', before);
-    }
-
-    return `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages?${query.toString()}`;
-  }
-
-  private messagePath(conversationId: string, messageId: string): string {
-    return `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-  }
-
-  private messageReactionsPath(
-    conversationId: string,
-    messageId: string,
-  ): string {
-    return `${this.messagePath(conversationId, messageId)}/reactions`;
-  }
-
-  private communityChannelMessageReactionsPath(
-    communityId: string,
-    channelId: string,
-    messageId: string,
-  ): string {
-    return `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
-      messageId,
-    )}/reactions`;
-  }
-
-  private messagesAroundPath(
-    conversationId: string,
-    messageId: string,
-  ): string {
-    const query = new URLSearchParams({ after: '20', before: '20' });
-
-    return `${this.messagePath(
-      conversationId,
-      messageId,
-    )}/around?${query.toString()}`;
-  }
-
-  private invalidateConversationPinsCache(
-    session: Session,
-    conversationId: string,
-  ): void {
-    this.requestCache.invalidateForSession(
-      `/conversations/${encodeURIComponent(conversationId)}/pins`,
-      session,
-    );
   }
 
   private invalidateCommunityChannelPinsCache(
@@ -2062,7 +2012,7 @@ export class PigeonApiGateway {
     session: Session,
     url: string,
   ): Promise<MessageLinkPreview> {
-    return await this.linkPreviews.create(session, url);
+    return await this.messagesApi.createLinkPreview(session, url);
   }
 
   public async loadMessages(
@@ -2071,31 +2021,12 @@ export class PigeonApiGateway {
     before?: null | string,
     limitOrOptions: MessageLoadOptions | number = 30,
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    const options =
-      typeof limitOrOptions === 'number'
-        ? { limit: limitOrOptions }
-        : limitOrOptions;
-    const limit = options.limit ?? 30;
-    const path = this.messagesPath(conversationId, before, limit);
-    const raw = await this.requestCache.load(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<unknown>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+    return await this.messagesApi.loadMessages(
+      session,
+      conversationId,
+      before,
+      limitOrOptions,
     );
-    const normalized = this.messages.list(raw);
-
-    return {
-      messages: await this.decryptMessages(
-        session,
-        conversationId,
-        normalized.messages,
-        options.signal,
-      ),
-      nextCursor: normalized.nextCursor,
-    };
   }
 
   public async loadMessage(
@@ -2103,15 +2034,11 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<ChatMessage | null> {
-    const path = this.messagePath(conversationId, messageId);
-    const message = await this.http.request<MessageResource>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    if (message.type === 'deleted') return null;
-
-    return await this.decryptMessage(session, conversationId, message);
+    return await this.messagesApi.loadMessage(
+      session,
+      conversationId,
+      messageId,
+    );
   }
 
   public async loadMessagesAround(
@@ -2123,23 +2050,11 @@ export class PigeonApiGateway {
     nextCursor?: null | string;
     previousCursor?: null | string;
   }> {
-    const path = this.messagesAroundPath(conversationId, messageId);
-    const raw = await this.http.request<unknown>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-    const envelope = raw as {
-      messages?: MessageResource[];
-      nextCursor?: null | string;
-      previousCursor?: null | string;
-    };
-    const messages = envelope.messages ?? [];
-
-    return {
-      messages: await this.decryptMessages(session, conversationId, messages),
-      nextCursor: envelope.nextCursor ?? null,
-      previousCursor: envelope.previousCursor ?? null,
-    };
+    return await this.messagesApi.loadMessagesAround(
+      session,
+      conversationId,
+      messageId,
+    );
   }
 
   public async loadMessageThread(
@@ -2148,57 +2063,19 @@ export class PigeonApiGateway {
     messageId: string,
     options: { limit?: number } = {},
   ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
-    const path = `${this.messagePath(conversationId, messageId)}/thread`;
-    const query = new URLSearchParams({
-      limit: String(options.limit ?? 50),
-    });
-    const result = await this.http.request<{
-      messages?: MessageResource[];
-      nextBeforeMessageId?: null | string;
-    }>(`${path}?${query.toString()}`, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return {
-      messages: await this.decryptMessages(
-        session,
-        conversationId,
-        result.messages ?? [],
-      ),
-      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
-    };
+    return await this.messagesApi.loadMessageThread(
+      session,
+      conversationId,
+      messageId,
+      options,
+    );
   }
 
   public async listMessagePins(
     session: Session,
     conversationId: string,
   ): Promise<MessagePin[]> {
-    const path = `/conversations/${encodeURIComponent(conversationId)}/pins`;
-
-    return await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
-      async () => {
-        const result = await this.http.request<ConversationMessagePinsResource>(
-          path,
-          {
-            headers: await this.signer.headers(session, 'GET', path),
-            method: 'GET',
-          },
-        );
-        const messages = await this.decryptMessages(
-          session,
-          conversationId,
-          result.pins.map((pin) => pin.message),
-        );
-
-        return result.pins.map((pin, index) => ({
-          ...pin,
-          message: messages[index],
-        }));
-      },
-      { ttlMs: startupReadCacheTtlMs },
-    );
+    return await this.messagesApi.listMessagePins(session, conversationId);
   }
 
   public async pinMessage(
@@ -2206,13 +2083,7 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    const path = `${this.messagePath(conversationId, messageId)}/pin`;
-
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'POST', path),
-      method: 'POST',
-    });
-    this.invalidateConversationPinsCache(session, conversationId);
+    await this.messagesApi.pinMessage(session, conversationId, messageId);
   }
 
   public async unpinMessage(
@@ -2220,43 +2091,13 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    const path = `${this.messagePath(conversationId, messageId)}/pin`;
-
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
-    this.invalidateConversationPinsCache(session, conversationId);
+    await this.messagesApi.unpinMessage(session, conversationId, messageId);
   }
 
   public async listConversationDrafts(
     session: Session,
   ): Promise<ConversationDraft[]> {
-    const path = '/conversations/me/drafts';
-
-    return await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
-      async () => {
-        const result = await this.http.request<ConversationDraftsResource>(
-          path,
-          {
-            headers: await this.signer.headers(session, 'GET', path),
-            method: 'GET',
-          },
-        );
-
-        return await Promise.all(
-          result.drafts.map(async (draft) => ({
-            ...draft,
-            content: await this.draftPayloads.decrypt(
-              session,
-              draft.encryptedPayload,
-            ),
-          })),
-        );
-      },
-      { ttlMs: startupReadCacheTtlMs },
-    );
+    return await this.messagesApi.listConversationDrafts(session);
   }
 
   public async saveConversationDraft(
@@ -2265,33 +2106,19 @@ export class PigeonApiGateway {
     content: string,
     updatedAt = Date.now(),
   ): Promise<ConversationDraft> {
-    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
-    const encryptedPayload = this.draftPayloads.encrypt(session, content);
-    const body = { encryptedPayload, updatedAt };
-    const draft = await this.http.request<Omit<ConversationDraft, 'content'>>(
-      path,
-      {
-        body: JSON.stringify(body),
-        headers: await this.signer.headers(session, 'PUT', path, body),
-        method: 'PUT',
-      },
+    return await this.messagesApi.saveConversationDraft(
+      session,
+      conversationId,
+      content,
+      updatedAt,
     );
-    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
-
-    return { ...draft, content };
   }
 
   public async deleteConversationDraft(
     session: Session,
     conversationId: string,
   ): Promise<void> {
-    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
-
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
-    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
+    await this.messagesApi.deleteConversationDraft(session, conversationId);
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
@@ -2700,14 +2527,12 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = this.messageReactionsPath(conversationId, messageId);
-    const body = { emoji };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    await this.messagesApi.addMessageReaction(
+      session,
+      conversationId,
+      messageId,
+      emoji,
+    );
   }
 
   public async removeMessageReaction(
@@ -2716,14 +2541,12 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = this.messageReactionsPath(conversationId, messageId);
-    const body = { emoji };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    await this.messagesApi.removeMessageReaction(
+      session,
+      conversationId,
+      messageId,
+      emoji,
+    );
   }
 
   public async updateNotification(

@@ -160,6 +160,30 @@
 - Next slice: `INFRA-002`, extract the HTTP and workflow adapters from the
   compatibility gateway
 
+## Slice INFRA-002A: Extract message HTTP adapter from compatibility gateway
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Move message timeline, thread, pin, draft, reaction, and link-preview
+  transport into context-owned infrastructure.
+- Changed files:
+  - `contexts/messages/infrastructure/http/PigeonMessagesApi.ts`
+  - `contexts/messages/infrastructure/crypto/MessageProjectionPort.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: signed paths, cache keys, decryption flow, draft
+  encryption, and response projections preserved
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - `PigeonMessagesApi.spec.ts`
+  - gateway and message context suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: message send/edit/delete encryption orchestration remains in the
+  compatibility gateway and is the next message transport extraction
+- Next slice: `INFRA-002B`, extract message command encryption and signing
+
 ## Slice CONVERSATION-001: Conversation aggregate without resource state
 
 - Date: 2026-07-11
