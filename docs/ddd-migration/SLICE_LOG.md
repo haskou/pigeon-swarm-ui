@@ -137,6 +137,29 @@
   crypto responsibilities are being extracted by `INFRA-002`
 - Next slice: `INFRA-002`, replace the temporary gateway implementation
 
+## Slice APPLICATION-002: Move conversation application boundary into context
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep conversation creation, listing, invitation, and read-state
+  workflows inside the conversations context.
+- Changed files:
+  - `contexts/conversations/application/PigeonConversationsApplication.ts`
+  - `contexts/conversations/application/ports/ConversationsGateway.ts`
+  - composition root wiring and moved application tests
+- Behavior changed/preserved: direct and group creation, listing, invitations,
+  and read-until operations preserved
+- Contracts changed: none
+- Validation level: L1
+- Tests/checks:
+  - conversation, message, and composition suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: `PigeonApiGateway` still supplies the temporary port implementation
+- Next slice: `INFRA-002`, extract the HTTP and workflow adapters from the
+  compatibility gateway
+
 ## Slice CONVERSATION-001: Conversation aggregate without resource state
 
 - Date: 2026-07-11

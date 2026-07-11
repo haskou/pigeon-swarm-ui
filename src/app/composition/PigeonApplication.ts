@@ -1,10 +1,10 @@
+import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
-import { PigeonConversationsApplication } from './PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';

@@ -1,18 +1,18 @@
 import type {
   ConversationResource,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { ConversationsGateway } from './ports/ConversationsGateway';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonConversationsApplication } from './PigeonConversationsApplication';
 
 describe(PigeonConversationsApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonApiGateway> {
+  function gatewayDouble(): jest.Mocked<ConversationsGateway> {
     return {
       createConversation: jest.fn(),
       listConversations: jest.fn(),
       markConversationReadUntil: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<ConversationsGateway>;
   }
 
   const session = {

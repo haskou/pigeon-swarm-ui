@@ -2,18 +2,18 @@ import type {
   ConversationResource,
   LocalKeychain,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { ConversationsGateway } from './ports/ConversationsGateway';
 
-import { CreateConversation } from '../../contexts/conversations/application/create-conversation/CreateConversation';
-import { CreateConversationMessage } from '../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
+import { CreateConversation } from './create-conversation/CreateConversation';
+import { CreateConversationMessage } from './create-conversation/messages/CreateConversationMessage';
 import {
   CreateGroupConversation,
   type CreateGroupConversationInput,
-} from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
-import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
-import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
-import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
-import { PigeonApiGateway } from './PigeonApiGateway';
+} from './create-group-conversation/CreateGroupConversation';
+import { CreateGroupConversationMessage } from './create-group-conversation/messages/CreateGroupConversationMessage';
+import { ListConversations } from './list-conversations/ListConversations';
+import { ListConversationsMessage } from './list-conversations/messages/ListConversationsMessage';
 
 export class PigeonConversationsApplication {
   private readonly createConversation: CreateConversation;
@@ -22,7 +22,7 @@ export class PigeonConversationsApplication {
 
   private readonly listConversations: ListConversations;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: ConversationsGateway) {
     this.createConversation = new CreateConversation(gateway);
     this.createGroupConversation = new CreateGroupConversation(gateway);
     this.listConversations = new ListConversations(gateway);
