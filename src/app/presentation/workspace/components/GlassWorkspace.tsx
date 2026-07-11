@@ -132,6 +132,7 @@ import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallDeparture } from './useCallDeparture';
 import { useCallStartActions } from './useCallStartActions';
+import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -736,58 +737,21 @@ export function GlassWorkspace({
       [activeConversation.id]: previousDraft,
     }));
   }, [activeConversation?.id, editingMessage?.previousDraft, setDrafts]);
-  const notificationAwareConversations = useMemo(
-    () =>
-      conversations.map((conversation) => {
-        const setting = NotificationSettingsPolicy.resolve(
-          notificationSettingsByScopeKey,
-          {
-            conversationId: conversation.id,
-            type: 'conversation',
-          },
-        );
-
-        return NotificationSettingsPolicy.isMuted(setting)
-          ? { ...conversation, unreadCount: 0 }
-          : conversation;
-      }),
-    [conversations, notificationSettingsByScopeKey],
-  );
-  const conversationNotificationSettingFor = useCallback(
-    (conversation: ConversationResource) =>
-      NotificationSettingsPolicy.resolve(notificationSettingsByScopeKey, {
-        conversationId: conversation.id,
-        type: 'conversation',
-      }),
-    [notificationSettingsByScopeKey],
-  );
-  const openConversationNotificationSettings = useCallback(
-    (conversation: ConversationResource, title: string) => {
-      const networkName = conversation.networkId
-        ? (nodeNetworks.find((network) => network.id === conversation.networkId)
-            ?.name ?? conversation.networkId)
-        : copy.profile.noNetworks;
-
-      openNotificationSettings({
-        scope: {
-          conversationId: conversation.id,
-          type: 'conversation',
-        },
-        subtitle: networkName,
-        title,
-      });
-    },
-    [nodeNetworks, openNotificationSettings],
-  );
-  const toggleConversationNotificationMute = useCallback(
-    (conversation: ConversationResource) => {
-      toggleNotificationMute({
-        conversationId: conversation.id,
-        type: 'conversation',
-      });
-    },
-    [toggleNotificationMute],
-  );
+  const {
+    communitySettingFor: communityNotificationSettingFor,
+    conversationSettingFor: conversationNotificationSettingFor,
+    conversationsWithNotificationState: notificationAwareConversations,
+    openCommunitySettings: openCommunityNotificationSettings,
+    openConversationSettings: openConversationNotificationSettings,
+    toggleCommunityMute: toggleCommunityNotificationMute,
+    toggleConversationMute: toggleConversationNotificationMute,
+  } = useWorkspaceNotificationActions({
+    conversations,
+    nodeNetworks,
+    openSettings: openNotificationSettings,
+    settingsByScopeKey: notificationSettingsByScopeKey,
+    toggleMute: toggleNotificationMute,
+  });
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
     useUnreadMessages(notificationAwareConversations);
   useEffect(() => {
@@ -3263,40 +3227,6 @@ export function GlassWorkspace({
       });
     },
     [activeCommunity?.id, sendTyping],
-  );
-  const communityNotificationSettingFor = useCallback(
-    (community: Community) =>
-      NotificationSettingsPolicy.resolve(notificationSettingsByScopeKey, {
-        communityId: community.id,
-        type: 'community',
-      }),
-    [notificationSettingsByScopeKey],
-  );
-  const openCommunityNotificationSettings = useCallback(
-    (community: Community) => {
-      const network = nodeNetworks.find(
-        (item) => item.id === community.networkId,
-      );
-
-      openNotificationSettings({
-        scope: {
-          communityId: community.id,
-          type: 'community',
-        },
-        subtitle: network?.name ?? community.networkId,
-        title: community.name,
-      });
-    },
-    [nodeNetworks, openNotificationSettings],
-  );
-  const toggleCommunityNotificationMute = useCallback(
-    (community: Community) => {
-      toggleNotificationMute({
-        communityId: community.id,
-        type: 'community',
-      });
-    },
-    [toggleNotificationMute],
   );
   const leaveCommunityFromRail = useCallback(
     async (community: Community) => {
