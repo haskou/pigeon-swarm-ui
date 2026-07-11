@@ -62,8 +62,6 @@ import type {
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 
-import { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
-import { PublishMessageAttachments } from '../../contexts/attachments/application/publish-message-attachments/PublishMessageAttachments';
 import { CreateConversation } from '../../contexts/conversations/application/create-conversation/CreateConversation';
 import { CreateConversationMessage } from '../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
 import {
@@ -101,6 +99,7 @@ import {
   type RealtimeTypingInput,
 } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
@@ -110,6 +109,8 @@ import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 export class PigeonApplication {
+  private readonly attachments: PigeonAttachmentsApplication;
+
   private readonly calls: PigeonCallsApplication;
 
   private readonly communities: PigeonCommunitiesApplication;
@@ -148,8 +149,6 @@ export class PigeonApplication {
 
   private readonly sendMessageUseCase: SendMessage;
 
-  private readonly publishMessageAttachmentsUseCase: PublishMessageAttachments;
-
   private readonly votePollUseCase: VotePoll;
 
   public constructor(
@@ -157,6 +156,7 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.gateway = gateway;
+    this.attachments = new PigeonAttachmentsApplication(gateway);
     this.calls = new PigeonCallsApplication(gateway);
     this.communities = new PigeonCommunitiesApplication(gateway);
     this.identities = new PigeonIdentitiesApplication(gateway);
@@ -173,15 +173,6 @@ export class PigeonApplication {
     this.loadMessageUseCase = new LoadMessage(gateway);
     this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
-    this.publishMessageAttachmentsUseCase = new PublishMessageAttachments({
-      publish: async (message) =>
-        await gateway.publishMessageAttachments(
-          message.getSession(),
-          message.getAttachments(),
-          message.getProgressReporter(),
-          message.getOptions(),
-        ),
-    });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
     this.sendMessageUseCase = new SendMessage(gateway);
     this.votePollUseCase = new VotePoll({
@@ -906,13 +897,11 @@ export class PigeonApplication {
     onProgress?: (progress: AttachmentProgress) => void,
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
-    return await this.publishMessageAttachmentsUseCase.publish(
-      new PublishMessageAttachmentsMessage({
-        attachments,
-        onProgress,
-        options,
-        session,
-      }),
+    return await this.attachments.publish(
+      session,
+      attachments,
+      onProgress,
+      options,
     );
   }
 
@@ -1030,14 +1019,14 @@ export class PigeonApplication {
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    return await this.gateway.getPublicFile(cid);
+    return await this.attachments.getPublicFile(cid);
   }
 
   public async downloadAttachment(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    return await this.gateway.downloadAttachment(attachment, onProgress);
+    return await this.attachments.download(attachment, onProgress);
   }
 
   public async deleteMessage(
@@ -1168,7 +1157,7 @@ export class PigeonApplication {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.gateway.uploadPublicFile(session, file);
+    return await this.attachments.uploadPublic(session, file);
   }
 
   public async uploadStickerAsset(
