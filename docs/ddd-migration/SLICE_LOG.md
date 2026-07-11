@@ -476,3 +476,29 @@
 - Risks: community invitation orchestration and identity material creation still
   remain in the compatibility gateway
 - Next slice: extract community invitation coordination
+
+## Slice INFRA-002E: Extract community invitation coordination
+
+- Date: 2026-07-11
+- Size: L
+- Status: completed
+- Goal: Move public/private community invitations, invite-link envelopes,
+  signed invite requests, keychain publication, and invite acceptance out of
+  the compatibility gateway.
+- Changed files:
+  - `contexts/communities/infrastructure/http/PigeonCommunityInvitationApi.ts`
+  - `contexts/communities/infrastructure/http/PigeonCommunityInvitationApi.spec.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: public communities remain keyless, private
+  communities keep symmetric key publication, encrypted invitations keep their
+  recipient wrapping and signatures, and invite links preserve their payload
+  envelope and acceptance flow
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - community invitation, application, and gateway suites (68 tests)
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: identity material creation and message projection remain the largest
+  responsibilities still owned by the compatibility gateway
+- Next slice: extract identity material creation and login orchestration
