@@ -448,3 +448,31 @@
 - Risks: identity material and conversation/community invitation orchestration
   still remain in the compatibility gateway
 - Next slice: extract conversation lifecycle and invitation coordination
+
+## Slice INFRA-002D: Extract conversation lifecycle and invitation coordination
+
+- Date: 2026-07-11
+- Size: L
+- Status: completed
+- Goal: Move one-to-one/group conversation creation, key generation, keychain
+  publication, conversation POSTs, and encrypted invitations out of the
+  compatibility gateway.
+- Changed files:
+  - `contexts/conversations/infrastructure/http/PigeonConversationCommandsApi.ts`
+  - `contexts/conversations/infrastructure/http/PigeonConversationCommandsApi.spec.ts`
+  - `contexts/conversations/infrastructure/http/ConversationIdentityReader.ts`
+  - `contexts/conversations/infrastructure/http/ConversationKeychainPublisher.ts`
+  - `contexts/conversations/infrastructure/http/GroupConversationInput.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: deterministic one-to-one IDs, random group keys,
+  signed conversation creation, keychain versioning, recipient key wrapping,
+  invitation types, and conversation-list cache invalidation are preserved
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - conversation command, application, and gateway suites (73 tests)
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: community invitation orchestration and identity material creation still
+  remain in the compatibility gateway
+- Next slice: extract community invitation coordination

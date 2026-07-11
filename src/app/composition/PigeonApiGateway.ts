@@ -11,7 +11,6 @@ import type { CommunityChannelMessageEditInput } from '../../contexts/communitie
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkBody } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkBody';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
-import type { ConversationInvitationType } from '../../contexts/conversations/infrastructure/http/ConversationInvitationType';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
@@ -79,6 +78,7 @@ import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
+import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
@@ -119,7 +119,6 @@ import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
-import { uniqueSorted } from './PigeonApiGateway/uniqueSorted';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -131,6 +130,8 @@ const startupReadCacheTtlMs = 1500;
 
 export class PigeonApiGateway {
   private readonly communities: PigeonCommunitiesApi;
+
+  private readonly conversationCommands: PigeonConversationCommandsApi;
 
   private readonly conversations: ConversationMapper;
 
@@ -215,6 +216,15 @@ export class PigeonApiGateway {
       http,
       signer,
       keychains,
+      this.requestCache,
+    );
+    this.conversationCommands = new PigeonConversationCommandsApi(
+      http,
+      signer,
+      this.conversations,
+      this.ids,
+      this.identities,
+      this.keychainApi,
       this.requestCache,
     );
     this.messageSignatures = new MessageSignaturePayloadFactory();
@@ -467,47 +477,6 @@ export class PigeonApiGateway {
     );
   }
 
-  private async createConversationInvitation(
-    session: Session,
-    peerIdentity: IdentityResource,
-    keyEntry: ConversationKeyEntry,
-    type: ConversationInvitationType = 'conversation_invitation',
-  ): Promise<void> {
-    const path = '/notifications/';
-    const recipientKeyEntry = {
-      ...keyEntry,
-      peerIdentityId: session.identity.id,
-    };
-    const encryptedConversationKey = PublicKey.fromPEM(
-      peerIdentity.encryptedKeyPair.publicKey,
-    )
-      .encrypt(JSON.stringify(recipientKeyEntry))
-      .toString();
-    const inviterSignature = await signSessionPayload(
-      session,
-      JSON.stringify({
-        conversationId: keyEntry.conversationId,
-        encryptedConversationKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: peerIdentity.id,
-      }),
-    );
-    const body = {
-      conversationId: keyEntry.conversationId,
-      encryptedConversationKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: peerIdentity.id,
-      type,
-    };
-
-    await this.http.request<NotificationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-  }
-
   private async createCommunityInvitationNotification(
     session: Session,
     communityId: string,
@@ -568,28 +537,6 @@ export class PigeonApiGateway {
     });
   }
 
-  private createConversationKeyEntry(
-    identityId: string,
-    peerIdentityId: string,
-    networkId: string,
-  ): ConversationKeyEntry {
-    const conversationId = this.deterministicConversationId(
-      identityId,
-      peerIdentityId,
-      networkId,
-    );
-
-    return {
-      algorithm: 'aes-256-gcm',
-      conversationId,
-      createdAt: Date.now(),
-      key: SymmetricKey.generate().valueOf(),
-      kind: 'conversation',
-      peerIdentityId,
-      version: 2,
-    };
-  }
-
   private createGroupConversationKeyEntry(
     conversationId: string,
   ): ConversationKeyEntry {
@@ -615,68 +562,6 @@ export class PigeonApiGateway {
       )}/channels/${encodeURIComponent(channelId)}/pins`,
       session,
     );
-  }
-
-  private async postConversation(
-    session: Session,
-    peerIdentityId: string,
-    published: {
-      keychain: LocalKeychain;
-      keychainExternalIdentifier: string;
-    },
-    networkId: string,
-  ): Promise<ConversationResource> {
-    const body = {
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-      networkId,
-      participantIds: [session.identity.id, peerIdentityId].sort(),
-      type: 'one-to-one',
-    };
-    const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(
-        {
-          ...session,
-          keychain: published.keychain,
-          keychainExternalIdentifier: published.keychainExternalIdentifier,
-        },
-        'POST',
-        path,
-        body,
-      ),
-      method: 'POST',
-    });
-    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
-
-    return this.conversations.normalize(created, peerIdentityId);
-  }
-
-  private async postGroupConversation(
-    session: Session,
-    input: {
-      keychainExternalIdentifier: null | string;
-      name: string;
-      networkId: string;
-      participantIds: string[];
-    },
-  ): Promise<ConversationResource> {
-    const body = {
-      keychainExternalIdentifier: input.keychainExternalIdentifier,
-      name: input.name,
-      networkId: input.networkId,
-      participantIds: input.participantIds,
-      type: 'group',
-    };
-    const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
-    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
-
-    return this.conversations.normalize(created);
   }
 
   private withConversationKey(
@@ -1397,39 +1282,11 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const peerIdentity = await this.getIdentity(peerIdentityId.trim());
-    const keyEntry = await this.createConversationKeyEntry(
-      session.identity.id,
-      peerIdentity.id,
+    return await this.conversationCommands.create(
+      session,
+      peerIdentityId,
       networkId,
     );
-    const published = await this.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
-    );
-    const conversation = await this.postConversation(
-      session,
-      peerIdentity.id,
-      published,
-      networkId,
-    );
-    const serverKeyEntry = { ...keyEntry, conversationId: conversation.id };
-
-    await this.createConversationInvitation(
-      session,
-      peerIdentity,
-      serverKeyEntry,
-    );
-
-    return {
-      conversation,
-      keychain: this.withServerConversationId(
-        published.keychain,
-        keyEntry,
-        conversation.id,
-      ),
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
   }
 
   public async createGroupConversation(
@@ -1440,45 +1297,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const participantIds = uniqueSorted([
-      session.identity.id,
-      ...input.participantIds,
-    ]);
-    const conversation = await this.postGroupConversation(session, {
-      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-      name: input.name.trim(),
-      networkId: input.networkId,
-      participantIds,
-    });
-    const keyEntry = await this.createGroupConversationKeyEntry(
-      conversation.id,
-    );
-    const published = await this.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
-    );
-    const invitedIdentities = await Promise.all(
-      participantIds
-        .filter((identityId) => identityId !== session.identity.id)
-        .map((identityId) => this.getIdentity(identityId)),
-    );
-
-    await Promise.all(
-      invitedIdentities.map((identity) =>
-        this.createConversationInvitation(
-          session,
-          identity,
-          keyEntry,
-          'group_conversation_invitation',
-        ),
-      ),
-    );
-
-    return {
-      conversation,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+    return await this.conversationCommands.createGroup(session, input);
   }
 
   public async createGroupConversationInvitation(
@@ -1486,20 +1305,10 @@ export class PigeonApiGateway {
     conversationId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    const keyEntry = session.keychain.conversations[conversationId];
-
-    if (!keyEntry) {
-      throw new Error(copy.messages.missingConversationKey);
-    }
-
-    const recipientIdentity = await this.getIdentity(
-      recipientIdentityId.trim(),
-    );
-
-    await this.createConversationInvitation(
+    await this.conversationCommands.invite(
       session,
-      recipientIdentity,
-      keyEntry,
+      conversationId,
+      recipientIdentityId,
       'group_conversation_invitation',
     );
   }
