@@ -127,6 +127,7 @@ import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import { useConversationThread } from './useConversationThread';
+import { useConversationPins } from './useConversationPins';
 import {
   callIdFromRealtimeEvent,
   callSignalTypeAttribute,
@@ -279,11 +280,6 @@ export function GlassWorkspace({
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
-  const [messageCollection, setMessageCollection] =
-    useState<MessageCollectionState | null>(null);
-  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
@@ -493,6 +489,21 @@ export function GlassWorkspace({
     closeMessageContextMenu: () => setMessageContextMenu(null),
     session,
     setMessages,
+  });
+  const {
+    collection: messageCollection,
+    open: openPinnedMessages,
+    pin: pinMessage,
+    pinnedMessageIds,
+    setCollection: setMessageCollection,
+    setPinnedMessageIds,
+    unpin: unpinMessage,
+    unpinFromCollection: unpinMessageFromDialog,
+  } = useConversationPins({
+    activeConversation,
+    closeMessageContextMenu: () => setMessageContextMenu(null),
+    onError: setSendError,
+    session,
   });
   const activeConversationNotificationScope = useMemo(
     () =>
@@ -1735,95 +1746,6 @@ export function GlassWorkspace({
     } finally {
       setMessageLoadState('idle');
     }
-  };
-
-  const openPinnedMessages = async () => {
-    if (!activeConversation?.id) return;
-
-    setMessageCollection({
-      error: null,
-      messages: [],
-      state: 'loading',
-    });
-    try {
-      const pins = await applicationContainer.messages.listPins(
-        session,
-        activeConversation.id,
-      );
-
-      setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
-      setMessageCollection({
-        error: null,
-        messages: pins.map((pin) => pin.message),
-        state: 'ready',
-      });
-    } catch (caught) {
-      setMessageCollection({
-        error: toUserErrorMessage(caught, copy.messages.pinError),
-        messages: [],
-        state: 'ready',
-      });
-    }
-  };
-
-  const pinMessage = async (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setSendError(null);
-    try {
-      await applicationContainer.messages.pin(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      setPinnedMessageIds((current) => new Set(current).add(message.id));
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.pinError));
-    }
-  };
-
-  const unpinMessageFromDialog = async (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    try {
-      await applicationContainer.messages.unpin(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      setPinnedMessageIds((current) => {
-        const next = new Set(current);
-
-        next.delete(message.id);
-
-        return next;
-      });
-      setMessageCollection((current) =>
-        current
-          ? {
-              ...current,
-              messages: current.messages.filter(
-                (item) => item.id !== message.id,
-              ),
-            }
-          : current,
-      );
-    } catch (caught) {
-      setMessageCollection((current) =>
-        current
-          ? {
-              ...current,
-              error: toUserErrorMessage(caught, copy.messages.unpinError),
-            }
-          : current,
-      );
-    }
-  };
-
-  const unpinMessage = async (message: ChatMessage) => {
-    setMessageContextMenu(null);
-    await unpinMessageFromDialog(message);
   };
 
   const handleDeleteMessage = async (message: ChatMessage) => {
