@@ -90,8 +90,6 @@ import { SendMessageMessage } from '../../contexts/messages/application/send-mes
 import { SendMessage } from '../../contexts/messages/application/send-message/SendMessage';
 import { type NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
-import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
-import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
 import {
   RealtimeGateway,
   type RealtimeHeartbeatActivityMode,
@@ -105,6 +103,7 @@ import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
+import { PigeonPollsApplication } from './PigeonPollsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonStickersApplication } from './PigeonStickersApplication';
 
@@ -118,6 +117,8 @@ export class PigeonApplication {
   private readonly identities: PigeonIdentitiesApplication;
 
   private readonly notifications: PigeonNotificationsApplication;
+
+  private readonly polls: PigeonPollsApplication;
 
   private readonly networks: PigeonNetworksApplication;
 
@@ -149,8 +150,6 @@ export class PigeonApplication {
 
   private readonly sendMessageUseCase: SendMessage;
 
-  private readonly votePollUseCase: VotePoll;
-
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
@@ -162,6 +161,7 @@ export class PigeonApplication {
     this.identities = new PigeonIdentitiesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
+    this.polls = new PigeonPollsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.stickers = new PigeonStickersApplication(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
@@ -175,14 +175,6 @@ export class PigeonApplication {
     this.loadMessagesUseCase = new LoadMessages(gateway);
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
     this.sendMessageUseCase = new SendMessage(gateway);
-    this.votePollUseCase = new VotePoll({
-      vote: async (message) =>
-        await gateway.votePoll(
-          message.getSession(),
-          message.getPollId().toString(),
-          message.getOptionIds().map((optionId) => optionId.toString()),
-        ),
-    });
   }
 
   public async acceptConversationInvitation(
@@ -916,14 +908,14 @@ export class PigeonApplication {
     session: Session,
     input: CreatePollInput,
   ): Promise<PollResource> {
-    return await this.gateway.createPoll(session, input);
+    return await this.polls.create(session, input);
   }
 
   public async getPoll(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.gateway.getPoll(session, pollId);
+    return await this.polls.get(session, pollId);
   }
 
   public async votePoll(
@@ -931,23 +923,21 @@ export class PigeonApplication {
     pollId: string,
     optionIds: string[],
   ): Promise<PollResource> {
-    return await this.votePollUseCase.vote(
-      new VotePollMessage({ optionIds, pollId, session }),
-    );
+    return await this.polls.vote(session, pollId, optionIds);
   }
 
   public async removePollVote(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.gateway.removePollVote(session, pollId);
+    return await this.polls.removeVote(session, pollId);
   }
 
   public async closePoll(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.gateway.closePoll(session, pollId);
+    return await this.polls.close(session, pollId);
   }
 
   public async createNodeNetwork(
