@@ -40,8 +40,6 @@ import type {
 import type {
   NetworkSynchronizationStatus,
   RealtimeDomainEvent,
-  RealtimeTypingInput,
-  RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
@@ -83,7 +81,6 @@ import { IdentityId } from '../../../../contexts/identities/domain/value-objects
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
   acknowledgeRealtimeCallSignal,
-  sendRealtimeTyping,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
@@ -101,14 +98,6 @@ import {
   conversationNotificationPreview,
 } from '../../../../contexts/notifications/presentation/view-models/notificationPreviews';
 import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
-import {
-  activeTypingIdentityIds,
-  communityTypingKey,
-  expireTypingEntries,
-  type TypingEntries,
-  typingInputKey,
-  updateTypingEntries,
-} from '../typingEntries';
 import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
@@ -133,6 +122,7 @@ import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallDeparture } from './useCallDeparture';
 import { useCallStartActions } from './useCallStartActions';
 import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
+import { useWorkspaceTyping } from './useWorkspaceTyping';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -276,13 +266,6 @@ export function GlassWorkspace({
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
-  const [conversationTypingEntries, setConversationTypingEntries] =
-    useState<TypingEntries>({});
-  const [communityTypingEntries, setCommunityTypingEntries] =
-    useState<TypingEntries>({});
-  const typingSentRef = useRef(
-    new Map<string, { active: boolean; sentAt: number }>(),
-  );
   const draftSyncTimersRef = useRef(new Map<string, number>());
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
@@ -3120,62 +3103,18 @@ export function GlassWorkspace({
     ],
   );
 
-  const handleRealtimeTyping = useCallback(
-    (message: RealtimeTypingMessage) => {
-      if (message.identityId === session.identity.id) return;
-
-      const expiresAt = Date.now() + 5000;
-
-      if (message.scope === 'conversation') {
-        setConversationTypingEntries((current) =>
-          updateTypingEntries(
-            current,
-            message.conversationId,
-            message.identityId,
-            message.active ? expiresAt : null,
-          ),
-        );
-
-        return;
-      }
-
-      setCommunityTypingEntries((current) =>
-        updateTypingEntries(
-          current,
-          communityTypingKey(message.communityId, message.channelId),
-          message.identityId,
-          message.active ? expiresAt : null,
-        ),
-      );
-    },
-    [session.identity.id],
-  );
-  const sendTyping = useCallback(
-    (input: RealtimeTypingInput) => {
-      const key = typingInputKey(input);
-      const current = typingSentRef.current.get(key);
-      const now = Date.now();
-
-      if (input.active && current?.active && now - current.sentAt < 2500) {
-        return;
-      }
-
-      if (!input.active && current && !current.active) return;
-
-      typingSentRef.current.set(key, { active: input.active, sentAt: now });
-      sendRealtimeTyping(session, input);
-    },
-    [session],
-  );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setConversationTypingEntries(expireTypingEntries);
-      setCommunityTypingEntries(expireTypingEntries);
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
+  const {
+    communityTypingIdentityIds,
+    conversationTypingIdentityIds,
+    receive: handleRealtimeTyping,
+    sendCommunityTyping,
+    sendConversationTyping,
+  } = useWorkspaceTyping({
+    activeCommunityChannelId,
+    activeCommunityId: activeCommunity?.id ?? null,
+    activeConversationId: activeConversation?.id ?? null,
+    session,
+  });
 
   useRealtimeEvents(session, {
     onConnected: () => {
@@ -3193,41 +3132,6 @@ export function GlassWorkspace({
     },
     onTyping: handleRealtimeTyping,
   });
-  const conversationTypingIdentityIds = activeTypingIdentityIds(
-    conversationTypingEntries,
-    activeConversation?.id,
-  );
-  const communityTypingIdentityIds = activeTypingIdentityIds(
-    communityTypingEntries,
-    activeCommunity && activeCommunityChannelId
-      ? communityTypingKey(activeCommunity.id, activeCommunityChannelId)
-      : null,
-  );
-  const sendConversationTyping = useCallback(
-    (active: boolean) => {
-      if (!activeConversation?.id) return;
-
-      sendTyping({
-        active,
-        conversationId: activeConversation.id,
-        scope: 'conversation',
-      });
-    },
-    [activeConversation?.id, sendTyping],
-  );
-  const sendCommunityTyping = useCallback(
-    (channelId: string, active: boolean) => {
-      if (!activeCommunity?.id) return;
-
-      sendTyping({
-        active,
-        channelId,
-        communityId: activeCommunity.id,
-        scope: 'community_channel',
-      });
-    },
-    [activeCommunity?.id, sendTyping],
-  );
   const leaveCommunityFromRail = useCallback(
     async (community: Community) => {
       if (!window.confirm(copy.communities.leaveConfirm)) return;
