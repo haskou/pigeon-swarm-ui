@@ -74,10 +74,6 @@ import { CreateGroupConversationMessage } from '../../contexts/conversations/app
 import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
 import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
 import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
-import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
-import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
-import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
-import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
 import { AddMessageReaction } from '../../contexts/messages/application/add-message-reaction/AddMessageReaction';
 import { AddMessageReactionMessage } from '../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
 import { DeleteMessage } from '../../contexts/messages/application/delete-message/DeleteMessage';
@@ -109,6 +105,7 @@ import {
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
@@ -117,6 +114,8 @@ export class PigeonApplication {
   private readonly calls: PigeonCallsApplication;
 
   private readonly communities: PigeonCommunitiesApplication;
+
+  private readonly identities: PigeonIdentitiesApplication;
 
   private readonly notifications: PigeonNotificationsApplication;
 
@@ -146,10 +145,6 @@ export class PigeonApplication {
 
   private readonly loadMessagesAroundUseCase: LoadMessagesAround;
 
-  private readonly loginIdentityUseCase: LoginIdentity;
-
-  private readonly registerIdentityUseCase: RegisterIdentity;
-
   private readonly removeMessageReactionUseCase: RemoveMessageReaction;
 
   private readonly sendMessageUseCase: SendMessage;
@@ -165,6 +160,7 @@ export class PigeonApplication {
     this.gateway = gateway;
     this.calls = new PigeonCallsApplication(gateway);
     this.communities = new PigeonCommunitiesApplication(gateway);
+    this.identities = new PigeonIdentitiesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
@@ -183,7 +179,6 @@ export class PigeonApplication {
     this.loadMessageUseCase = new LoadMessage(gateway);
     this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
-    this.loginIdentityUseCase = new LoginIdentity(gateway);
     this.publishMessageAttachmentsUseCase = new PublishMessageAttachments({
       publish: async (message) =>
         await gateway.publishMessageAttachments(
@@ -191,16 +186,6 @@ export class PigeonApplication {
           message.getAttachments(),
           message.getProgressReporter(),
           message.getOptions(),
-        ),
-    });
-    this.registerIdentityUseCase = new RegisterIdentity({
-      register: async (name, password, networks, handle, options) =>
-        await gateway.register(
-          name.toString(),
-          password,
-          networks.toPrimitives(),
-          handle?.toString(),
-          options,
         ),
     });
     this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
@@ -1043,11 +1028,11 @@ export class PigeonApplication {
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.gateway.getIdentity(identityId);
+    return await this.identities.get(identityId);
   }
 
   public async refreshIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.gateway.refreshIdentity(identityId);
+    return await this.identities.refresh(identityId);
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
@@ -1163,7 +1148,7 @@ export class PigeonApplication {
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {
-    return await this.gateway.updateIdentityProfile(
+    return await this.identities.updateProfile(
       session,
       profile,
       newPassword,
@@ -1177,7 +1162,7 @@ export class PigeonApplication {
     enabled: boolean,
     recoveryKey?: string,
   ): Promise<void> {
-    await this.gateway.configureLocalPasskeyUnlock(
+    await this.identities.configureLocalPasskeyUnlock(
       session,
       password,
       enabled,
@@ -1346,7 +1331,7 @@ export class PigeonApplication {
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.gateway.publishKeychain(session, nextKeychain);
+    return await this.identities.publishKeychain(session, nextKeychain);
   }
 
   public async loadMessages(
@@ -1467,13 +1452,11 @@ export class PigeonApplication {
     onProgress?: LoginIdentityProgressReporter,
     recoveryKey?: string,
   ): Promise<LoginResult> {
-    return await this.loginIdentityUseCase.login(
-      new LoginIdentityMessage({
-        identityId,
-        onProgress,
-        password,
-        recoveryKey,
-      }),
+    return await this.identities.login(
+      identityId,
+      password,
+      onProgress,
+      recoveryKey,
     );
   }
 
@@ -1512,15 +1495,12 @@ export class PigeonApplication {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
-    return await this.registerIdentityUseCase.register(
-      new RegisterIdentityMessage({
-        handle,
-        name,
-        networks,
-        passkeyPrfEnabled: options.passkeyPrfEnabled,
-        password,
-        recoveryKey: options.recoveryKey,
-      }),
+    return await this.identities.register(
+      name,
+      password,
+      networks,
+      handle,
+      options,
     );
   }
 
