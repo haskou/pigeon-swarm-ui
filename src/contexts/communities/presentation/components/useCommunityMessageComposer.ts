@@ -477,7 +477,7 @@ export function useCommunityMessageComposer({
     const delivery = sendQueueRef.current.then(async () => {
       try {
         const messageAttachments =
-          await applicationContainer.publishMessageAttachments(
+          await applicationContainer.attachments.publish(
             session,
             payload.attachments,
             (progress) => {

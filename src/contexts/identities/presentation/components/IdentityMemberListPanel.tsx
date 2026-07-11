@@ -294,7 +294,7 @@ function useIdentityBannerUrl(identity?: IdentityResource): string | null {
 
     setBannerUrl(null);
     void applicationContainer
-      .getPublicFile(bannerCid)
+      .attachments.getPublicFile(bannerCid)
       .then((content) => {
         if (!cancelled) {
           setBannerUrl(publicFileObjectUrl(content));

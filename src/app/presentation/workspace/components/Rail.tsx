@@ -710,7 +710,7 @@ function CommunityRailAvatar({ community }: { community: Community }) {
 async function loadRailAvatar(cid: string): Promise<null | string> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const content = await applicationContainer.getPublicFile(cid);
+      const content = await applicationContainer.attachments.getPublicFile(cid);
 
       return publicFileObjectUrl(content);
     } catch {

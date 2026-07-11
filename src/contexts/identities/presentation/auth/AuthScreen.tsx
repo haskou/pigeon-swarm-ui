@@ -207,13 +207,13 @@ export function AuthScreen({
       const applicationContainer = await loadApplicationContainer();
       const result =
         mode === 'login'
-          ? await applicationContainer.login(
+          ? await applicationContainer.identities.login(
               normalizeIdentityLogin(identityId),
               password,
               setLoginProgressStep,
               useRecoveryKey ? loginRecoveryKey.trim() || undefined : undefined,
             )
-          : await applicationContainer.register(
+          : await applicationContainer.identities.register(
               name,
               password,
               registrationNetworks({

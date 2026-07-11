@@ -1422,7 +1422,7 @@ export function CommunityWorkspace({
         try {
           return [
             identityId,
-            await applicationContainer.getIdentity(
+            await applicationContainer.identities.get(
               IdentityId.normalize(identityId),
             ),
           ] as const;

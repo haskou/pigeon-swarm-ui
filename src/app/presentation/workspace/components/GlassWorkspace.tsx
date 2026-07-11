@@ -2266,7 +2266,7 @@ export function GlassWorkspace({
   const handleConversationKeyImported = async (
     keyEntry: ConversationKeyEntry,
   ) => {
-    const result = await applicationContainer.publishKeychain(session, {
+    const result = await applicationContainer.identities.publishKeychain(session, {
       ...session.keychain,
       conversations: {
         ...session.keychain.conversations,
@@ -2390,7 +2390,7 @@ export function GlassWorkspace({
 
         if (identityId) {
           void applicationContainer
-            .refreshIdentity(IdentityId.normalize(identityId))
+            .identities.refresh(IdentityId.normalize(identityId))
             .then(rememberIdentity)
             .catch(() => undefined);
         }
@@ -2557,7 +2557,7 @@ export function GlassWorkspace({
       if (event.type.startsWith('identities.')) {
         if (event.aggregate_id === session.identity.id) {
           void applicationContainer
-            .getIdentity(session.identity.id)
+            .identities.get(session.identity.id)
             .then((identity) => setSession({ ...session, identity }))
             .catch(() => undefined);
         }

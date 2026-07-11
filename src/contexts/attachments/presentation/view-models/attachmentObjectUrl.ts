@@ -13,7 +13,7 @@ export async function attachmentObjectUrl(
     return URL.createObjectURL(attachment.localFile);
   }
 
-  const blob = await applicationContainer.downloadAttachment(
+  const blob = await applicationContainer.attachments.download(
     attachment,
     onProgress,
   );

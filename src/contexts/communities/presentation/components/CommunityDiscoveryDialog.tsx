@@ -286,7 +286,7 @@ function CommunityDiscoveryRow({
     let cancelled = false;
 
     void applicationContainer
-      .getPublicFile(avatar)
+      .attachments.getPublicFile(avatar)
       .then((content) => publicFileObjectUrl(content))
       .then((url) => {
         if (!cancelled) setAvatarUrl(url);

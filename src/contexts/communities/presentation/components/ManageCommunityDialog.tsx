@@ -267,7 +267,7 @@ export function ManageCommunityDialog({
           const identity =
             identityId === session.identity.id
               ? session.identity
-              : await applicationContainer.getIdentity(
+              : await applicationContainer.identities.get(
                   IdentityId.normalize(identityId),
                 );
           const pictureUrl = await loadIdentityPicture(identity);
@@ -340,7 +340,7 @@ export function ManageCommunityDialog({
           const identity =
             identityId === session.identity.id
               ? session.identity
-              : await applicationContainer.getIdentity(
+              : await applicationContainer.identities.get(
                   IdentityId.normalize(identityId),
                 );
 

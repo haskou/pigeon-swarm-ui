@@ -72,7 +72,7 @@ export function AddCommunityMemberDialog({
     setLookupState('loading');
     const timeout = window.setTimeout(() => {
       void applicationContainer
-        .getIdentity(identityId)
+        .identities.get(identityId)
         .then((identity) => {
           if (cancelled) return;
 

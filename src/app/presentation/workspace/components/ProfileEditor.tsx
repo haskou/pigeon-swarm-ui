@@ -271,7 +271,7 @@ export function ProfileEditor({
     let active = true;
 
     void applicationContainer
-      .getPublicFile(banner)
+      .attachments.getPublicFile(banner)
       .then((content) => {
         if (active) setBannerPreview(publicFileObjectUrl(content));
       })
@@ -330,15 +330,21 @@ export function ProfileEditor({
 
       if (hasRemoteChanges) {
         const pictureCid = pictureFile
-          ? (await applicationContainer.uploadPublicFile(session, pictureFile))
+          ? (await applicationContainer.attachments.uploadPublic(
+              session,
+              pictureFile,
+            ))
               .cid
           : session.identity.profile.picture?.trim() || undefined;
         const bannerCid = bannerFile
-          ? (await applicationContainer.uploadPublicFile(session, bannerFile))
+          ? (await applicationContainer.attachments.uploadPublic(
+              session,
+              bannerFile,
+            ))
               .cid
           : session.identity.profile.banner?.trim() || undefined;
 
-        identity = await applicationContainer.updateIdentityProfile(
+        identity = await applicationContainer.identities.updateProfile(
           session,
           {
             banner: bannerCid,
@@ -363,7 +369,7 @@ export function ProfileEditor({
       }
 
       if (shouldConfigureLocalPasskeyPrf) {
-        await applicationContainer.configureLocalPasskeyUnlock(
+        await applicationContainer.identities.configureLocalPasskeyUnlock(
           { ...session, identity },
           wantsPasswordChange ? newPassword : currentPasswordForPasskey,
           localPasskeyPrfEnabled,

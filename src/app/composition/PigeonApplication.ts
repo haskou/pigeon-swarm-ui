@@ -6,13 +6,10 @@ import type {
   CallSignalPayload,
 } from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
-import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
   ChatMessage,
   Community,
   CommunityChannel,
@@ -32,21 +29,17 @@ import type {
   ConversationDraft,
   ConversationResource,
   EditMessageOptions,
-  IdentityResource,
   IdentityPresence,
   IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
   MessageLinkPreview,
-  MessageAttachment,
   MessagePin,
   MessageResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationSettingScope,
   NotificationResource,
-  PublicFileContent,
-  PublicFileUpload,
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
@@ -78,15 +71,11 @@ import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 export class PigeonApplication {
-  private readonly attachments: PigeonAttachmentsApplication;
-
   private readonly calls: PigeonCallsApplication;
 
   private readonly communities: PigeonCommunitiesApplication;
 
   private readonly conversations: PigeonConversationsApplication;
-
-  private readonly identities: PigeonIdentitiesApplication;
 
   private readonly messages: PigeonMessagesApplication;
 
@@ -97,6 +86,10 @@ export class PigeonApplication {
   private readonly gateway: PigeonApiGateway;
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
+
+  public readonly attachments: PigeonAttachmentsApplication;
+
+  public readonly identities: PigeonIdentitiesApplication;
 
   public readonly polls: PigeonPollsApplication;
 
@@ -822,20 +815,6 @@ export class PigeonApplication {
     );
   }
 
-  public async publishMessageAttachments(
-    session: Session,
-    attachments: File[],
-    onProgress?: (progress: AttachmentProgress) => void,
-    options?: AttachmentUploadOptions,
-  ): Promise<MessageAttachment[]> {
-    return await this.attachments.publish(
-      session,
-      attachments,
-      onProgress,
-      options,
-    );
-  }
-
   public async createLinkPreview(
     session: Session,
     url: string,
@@ -901,25 +880,6 @@ export class PigeonApplication {
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
     return await this.networks.getNodeInfo();
-  }
-
-  public async getIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.identities.get(identityId);
-  }
-
-  public async refreshIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.identities.refresh(identityId);
-  }
-
-  public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    return await this.attachments.getPublicFile(cid);
-  }
-
-  public async downloadAttachment(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<Blob> {
-    return await this.attachments.download(attachment, onProgress);
   }
 
   public async deleteMessage(
@@ -1006,45 +966,6 @@ export class PigeonApplication {
     );
   }
 
-  public async updateIdentityProfile(
-    session: Session,
-    profile: IdentityUpdateProfileInput,
-    newPassword?: string,
-    options: {
-      currentPassword?: string;
-      passkeyPrfEnabled?: boolean;
-      recoveryKey?: string;
-    } = {},
-  ): Promise<IdentityResource> {
-    return await this.identities.updateProfile(
-      session,
-      profile,
-      newPassword,
-      options,
-    );
-  }
-
-  public async configureLocalPasskeyUnlock(
-    session: Session,
-    password: string,
-    enabled: boolean,
-    recoveryKey?: string,
-  ): Promise<void> {
-    await this.identities.configureLocalPasskeyUnlock(
-      session,
-      password,
-      enabled,
-      recoveryKey,
-    );
-  }
-
-  public async uploadPublicFile(
-    session: Session,
-    file: File,
-  ): Promise<PublicFileUpload> {
-    return await this.attachments.uploadPublic(session, file);
-  }
-
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
@@ -1077,13 +998,6 @@ export class PigeonApplication {
 
   public async listPeers(): Promise<Peer[]> {
     return await this.networks.peers();
-  }
-
-  public async publishKeychain(
-    session: Session,
-    nextKeychain: LocalKeychain,
-  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.identities.publishKeychain(session, nextKeychain);
   }
 
   public async loadMessages(
@@ -1187,20 +1101,6 @@ export class PigeonApplication {
     await this.messages.deleteDraft(session, conversationId);
   }
 
-  public async login(
-    identityId: string,
-    password: string,
-    onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
-  ): Promise<LoginResult> {
-    return await this.identities.login(
-      identityId,
-      password,
-      onProgress,
-      recoveryKey,
-    );
-  }
-
   public async restoreRememberedSession(
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
@@ -1227,22 +1127,6 @@ export class PigeonApplication {
         result.conversations,
       ),
     };
-  }
-
-  public async register(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
-  ): Promise<LoginResult> {
-    return await this.identities.register(
-      name,
-      password,
-      networks,
-      handle,
-      options,
-    );
   }
 
   public async sendMessage(

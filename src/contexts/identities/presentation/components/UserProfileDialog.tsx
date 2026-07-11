@@ -108,7 +108,7 @@ export function UserProfileDialog({
     let active = true;
 
     void applicationContainer
-      .getPublicFile(bannerCid)
+      .attachments.getPublicFile(bannerCid)
       .then((content) => {
         if (active) setBannerUrl(publicFileObjectUrl(content));
       })

@@ -43,7 +43,7 @@ describe(PigeonApplication.name, () => {
       {} as unknown as RealtimeGateway,
     );
 
-    await application.register(
+    await application.identities.register(
       'Ada Lovelace',
       'secret-password',
       ['network-1'],

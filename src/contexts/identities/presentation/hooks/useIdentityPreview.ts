@@ -40,7 +40,7 @@ export function useIdentityPreview(
         const identity =
           fallbackIdentity?.id === identityId
             ? fallbackIdentity
-            : await applicationContainer.getIdentity(identityId);
+            : await applicationContainer.identities.get(identityId);
         const pictureUrl = await loadIdentityPictureUrl(identity);
 
         if (!cancelled) {
@@ -76,7 +76,7 @@ async function loadIdentityPictureUrl(
 
   try {
     return publicFileObjectUrl(
-      await applicationContainer.getPublicFile(pictureCid),
+      await applicationContainer.attachments.getPublicFile(pictureCid),
     );
   } catch {
     return null;

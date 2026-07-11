@@ -105,13 +105,14 @@ export function useCommunityKeyDialog({
         peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
         version: 2,
       };
-      const published = await applicationContainer.publishKeychain(session, {
+      const published =
+        await applicationContainer.identities.publishKeychain(session, {
         ...session.keychain,
         conversations: {
           ...session.keychain.conversations,
           [community.id]: keyEntry,
         },
-      });
+        });
 
       onSessionUpdated({
         ...session,
