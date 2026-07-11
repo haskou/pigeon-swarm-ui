@@ -304,3 +304,28 @@
 - Risks: call transport remains implemented by the context HTTP gateway; only
   the application boundary moved in this slice
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-006: Move notification application boundary into context
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Keep notification decisions, settings, invitation acceptance, and push
+  subscription orchestration inside the notifications context.
+- Changed files:
+  - `contexts/notifications/application/PigeonNotificationsApplication.ts`
+  - `contexts/notifications/application/ports/PushNotificationPort.ts`
+  - `contexts/notifications/infrastructure/http/toPushSubscriptionPayload.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: notification listing, state changes, settings,
+  invitation key acceptance, VAPID lookup, and browser subscription validation
+  preserve their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - notification application and context suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: notification HTTP and invitation/keychain orchestration still use the
+  compatibility gateway as their concrete adapter
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

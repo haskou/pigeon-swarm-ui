@@ -3,11 +3,11 @@ import { PigeonCommunitiesApplication } from '../../contexts/communities/applica
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
+import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
-import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonSessionApplication } from './PigeonSessionApplication';
@@ -73,7 +73,15 @@ export class PigeonApplication {
     });
     this.messages = new PigeonMessagesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway.node);
-    this.notifications = new PigeonNotificationsApplication(gateway);
+    this.notifications = new PigeonNotificationsApplication({
+      acceptInvitation: gateway,
+      listNotifications: gateway,
+      listNotificationSettings: gateway,
+      push: gateway,
+      resetNotificationSetting: gateway,
+      saveNotificationSetting: gateway,
+      updateNotification: gateway,
+    });
     this.polls = new PigeonPollsApplication(gateway);
     this.realtime = new PigeonRealtimeApplication(realtime);
     this.session = new PigeonSessionApplication(gateway);
