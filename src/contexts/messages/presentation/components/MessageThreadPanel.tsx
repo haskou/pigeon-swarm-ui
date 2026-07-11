@@ -11,6 +11,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import {
   messageReplyImage,
@@ -147,14 +148,10 @@ export function MessageThreadPanel({
               {title}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <DialogCloseButton
             className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/8 text-xl font-black text-white/70 transition hover:bg-white/12 hover:text-white"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
+            onClick={onClose}
+          />
         </div>
         <div className="mt-4">
           <MessageBubble

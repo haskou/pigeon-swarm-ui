@@ -4,6 +4,7 @@ import type {
 } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 import { callParticipantDisplayName } from './callParticipantDisplayName';
 import { ScreenShareStreamControls } from './ScreenShareStreamControls';
 import { VideoPreview } from './VideoPreview';
@@ -48,14 +49,10 @@ export function ExpandedScreenShare({
             </p>
             <p className="text-xs text-white/45">{copy.calls.screen}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <DialogCloseButton
             className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
-            aria-label={copy.dialog.close}
-          >
-            x
-          </button>
+            onClick={onClose}
+          />
         </header>
         <div className="min-h-0 flex-1 bg-black">
           <VideoPreview
