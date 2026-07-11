@@ -1,4 +1,4 @@
-import type { MessageResource } from './MessageResource';
+import type { MessageResource } from '../infrastructure/http/MessageResource';
 
 export type MessagePinResource = {
   createdAt: number;

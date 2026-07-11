@@ -1,10 +1,10 @@
-import type { CommunityMessageMention } from '../../communities/domain/communityResources.types';
+import type { CommunityMessageMention } from '../../../communities/domain/communityResources.types';
 import type {
   PollOption,
   PollResource,
   PollScope,
   PollVote,
-} from '../../polls/domain/pollResources.types';
+} from '../../../polls/domain/pollResources.types';
 import type { MessageReaction } from './MessageReaction';
 
 export type MessageResource = {

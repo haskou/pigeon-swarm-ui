@@ -75,6 +75,8 @@
   - `contexts/messages/presentation/view-models/MessageEditability.ts`
   - moved `MessageProjector` and `PollMessageProjection` to message
     infrastructure crypto
+  - moved `ChatMessage` to presentation view models and message API resources
+    to infrastructure HTTP
 - Behavior changed/preserved: preserve current edit-menu eligibility and
   optimistic reaction behavior
 - Contracts changed: none
