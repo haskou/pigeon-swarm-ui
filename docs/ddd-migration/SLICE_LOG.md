@@ -401,3 +401,26 @@
   - `yarn lint`
 - Risks: poll HTTP transport remains implemented by the compatibility gateway
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-010: Move session application boundary into identities
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Keep remembered-session restoration and refresh orchestration near the
+  identity lifecycle while preserving conversation activity ordering.
+- Changed files:
+  - `contexts/identities/application/PigeonSessionApplication.ts`
+  - `contexts/identities/application/ports/SessionApplicationPort.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: session refresh, remembered-session restoration,
+  progress reporting, and latest-activity conversation ordering are preserved
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - identity application and session suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: workspace bootstrap still crosses context boundaries by necessity; the
+  session port keeps that coordination explicit
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

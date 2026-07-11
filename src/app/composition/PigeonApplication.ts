@@ -3,6 +3,7 @@ import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonC
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
+import { PigeonSessionApplication } from '../../contexts/identities/application/PigeonSessionApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
@@ -11,7 +12,6 @@ import { PigeonStickersApplication } from '../../contexts/stickers/application/P
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
-import { PigeonSessionApplication } from './PigeonSessionApplication';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsApplication;

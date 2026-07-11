@@ -1,14 +1,14 @@
-import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type {
   LoginResult,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { LoginIdentityProgressReporter } from './ports/LoginIdentityProgressReporter';
+import type { SessionApplicationPort } from './ports/SessionApplicationPort';
 
-import { ConversationTimeline } from '../../contexts/conversations/application/list-conversations/ConversationTimeline';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { ConversationTimeline } from '../../conversations/application/list-conversations/ConversationTimeline';
 
 export class PigeonSessionApplication {
-  public constructor(private readonly gateway: PigeonApiGateway) {}
+  public constructor(private readonly gateway: SessionApplicationPort) {}
 
   private sortConversations(result: LoginResult): LoginResult {
     return {
