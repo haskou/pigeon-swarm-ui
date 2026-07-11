@@ -1,10 +1,4 @@
 import {
-  EncryptedPayload,
-  PublicKey,
-  StringValueObject,
-  SymmetricKey,
-} from '@haskou/value-objects';
-import {
   type MouseEvent,
   type ReactNode,
   type SetStateAction,
@@ -106,6 +100,7 @@ import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
+import { useCommunityKeyDialog } from './useCommunityKeyDialog';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 import { communityMessageIdentityIds } from './communityMessageIdentityIds';
@@ -457,15 +452,6 @@ export function CommunityWorkspace({
   const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
   const [communityDataOpen, setCommunityDataOpen] = useState(false);
   const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
-  const [communityKeyDialog, setCommunityKeyDialog] = useState<
-    'add' | 'copy' | null
-  >(null);
-  const [communityKeyEncrypted, setCommunityKeyEncrypted] = useState('');
-  const [communityKeyError, setCommunityKeyError] = useState<string | null>(
-    null,
-  );
-  const [communityKeyInput, setCommunityKeyInput] = useState('');
-  const [communityKeySaving, setCommunityKeySaving] = useState(false);
   const [communityMenuOpen, setCommunityMenuOpen] = useState(false);
   const [communityLeaveError, setCommunityLeaveError] = useState<string | null>(
     null,
@@ -512,6 +498,24 @@ export function CommunityWorkspace({
     message: ChatMessage;
   } | null>(null);
   const communityKey = session.keychain.conversations[community.id];
+  const {
+    close: closeCommunityKeyDialog,
+    copyEncryptedKey: copyCommunityKey,
+    dialog: communityKeyDialog,
+    encryptedKey: communityKeyEncrypted,
+    error: communityKeyError,
+    importKey: importCommunityKey,
+    input: communityKeyInput,
+    openAdd: openAddCommunityKeyDialog,
+    openCopy: openCopyCommunityKeyDialog,
+    saving: communityKeySaving,
+    setInput: setCommunityKeyInput,
+  } = useCommunityKeyDialog({
+    community,
+    communityKey,
+    onSessionUpdated,
+    session,
+  });
   const communityIsPublic = community.visibility === 'public';
   const textChannelsWithThreads = useMemo(
     () =>
@@ -1662,107 +1666,6 @@ export function CommunityWorkspace({
       anchor,
     );
   };
-  const closeCommunityKeyDialog = () => {
-    setCommunityKeyDialog(null);
-    setCommunityKeyEncrypted('');
-    setCommunityKeyError(null);
-    setCommunityKeyInput('');
-    setCommunityKeySaving(false);
-  };
-  const openCopyCommunityKeyDialog = () => {
-    if (!communityKey) {
-      setCommunityKeyError(copy.chat.copyPrivateKeyUnavailable);
-      setCommunityKeyDialog('copy');
-
-      return;
-    }
-
-    try {
-      const encrypted = PublicKey.fromPEM(
-        session.identity.encryptedKeyPair.publicKey,
-      )
-        .encrypt(JSON.stringify(communityKey))
-        .toString();
-
-      setCommunityKeyEncrypted(encrypted);
-      setCommunityKeyError(null);
-    } catch {
-      setCommunityKeyError(copy.chat.copyPrivateKeyError);
-    }
-
-    setCommunityKeyDialog('copy');
-  };
-  const importCommunityKey = async () => {
-    const encryptedPayload = communityKeyInput.trim();
-
-    if (!encryptedPayload) {
-      setCommunityKeyError(copy.chat.addPrivateKeyRequired);
-
-      return;
-    }
-
-    setCommunityKeySaving(true);
-    setCommunityKeyError(null);
-
-    try {
-      const decrypted = session.keyPair.decrypt(
-        new EncryptedPayload(encryptedPayload),
-      );
-      const parsed = JSON.parse(
-        decrypted.toString(),
-      ) as Partial<ConversationKeyEntry>;
-
-      if (
-        !parsed.conversationId ||
-        new StringValueObject(
-          parsed.conversationId,
-          Number.MAX_SAFE_INTEGER,
-        ).isNotEqual(
-          new StringValueObject(community.id, Number.MAX_SAFE_INTEGER),
-        ) ||
-        parsed.algorithm !== 'aes-256-gcm' ||
-        !parsed.key ||
-        parsed.kind !== 'community' ||
-        parsed.version !== 2
-      ) {
-        throw new Error(copy.chat.addPrivateKeyError);
-      }
-
-      SymmetricKey.fromBase64(parsed.key);
-      const keyEntry: ConversationKeyEntry = {
-        algorithm: 'aes-256-gcm',
-        conversationId: community.id,
-        createdAt: parsed.createdAt ?? Date.now(),
-        key: parsed.key,
-        kind: 'community',
-        peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
-        version: 2,
-      };
-      const published = await applicationContainer.publishKeychain(session, {
-        ...session.keychain,
-        conversations: {
-          ...session.keychain.conversations,
-          [community.id]: keyEntry,
-        },
-      });
-
-      onSessionUpdated({
-        ...session,
-        keychain: published.keychain,
-        keychainExternalIdentifier: published.keychainExternalIdentifier,
-      });
-      closeCommunityKeyDialog();
-    } catch {
-      setCommunityKeyError(copy.chat.addPrivateKeyError);
-    } finally {
-      setCommunityKeySaving(false);
-    }
-  };
-  const copyCommunityKey = async () => {
-    if (navigator.clipboard && communityKeyEncrypted) {
-      await navigator.clipboard.writeText(communityKeyEncrypted);
-    }
-  };
   const leaveCommunity = async () => {
     if (communityLeaving) return;
 
@@ -2369,8 +2272,7 @@ export function CommunityWorkspace({
                 if (communityKey) {
                   openCopyCommunityKeyDialog();
                 } else {
-                  setCommunityKeyError(null);
-                  setCommunityKeyDialog('add');
+                  openAddCommunityKeyDialog();
                 }
 
                 setCommunityMenuOpen(false);
@@ -2526,8 +2428,7 @@ export function CommunityWorkspace({
               invitationInviterName={invitationInviterName}
               newChannelMessageCount={newChannelMessageCount}
               onAddCommunityKey={() => {
-                setCommunityKeyError(null);
-                setCommunityKeyDialog('add');
+                openAddCommunityKeyDialog();
               }}
               onInvitationAccept={onInvitationAccept}
               onAttachmentOpen={(attachment) =>
