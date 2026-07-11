@@ -1,7 +1,7 @@
 import type {
   Community,
   LocalKeychain,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 export type CreateCommunityResult = {
   community: Community;

@@ -232,3 +232,27 @@
 - Risks: identity, community, network, notification, and remaining keychain
   workflows still use the compatibility gateway
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-003: Move community application boundary into context
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Keep community orchestration inside the communities context and make
+  its external capabilities explicit through segregated application ports.
+- Changed files:
+  - `contexts/communities/application/PigeonCommunitiesApplication.ts`
+  - `contexts/communities/application/ports/Community*Port.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: community creation, membership, roles, channels,
+  invitations, keychain publication, media upload, and leave reconciliation
+  preserve their existing workflows
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - community application, composition, and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: the compatibility gateway still supplies the concrete capabilities;
+  the next infrastructure slices will replace those bindings progressively
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

@@ -2,20 +2,18 @@ import type {
   Community,
   LocalKeychain,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+
+type CommunityApplicationDependencies = ConstructorParameters<
+  typeof PigeonCommunitiesApplication
+>[0];
 
 function gatewayDouble(overrides: {
   leaveCommunity: jest.Mock<Promise<Community>, [Session, string]>;
-}): PigeonApiGateway & {
-  publishKeychain: jest.Mock<
-    Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }>,
-    [Session, LocalKeychain]
-  >;
-} {
+}): CommunityApplicationDependencies {
   const publishKeychain = jest
     .fn<
       Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }>,
@@ -29,10 +27,16 @@ function gatewayDouble(overrides: {
     );
 
   return {
-    ...overrides,
-    publishKeychain,
-  } as unknown as PigeonApiGateway & {
-    publishKeychain: typeof publishKeychain;
+    channels: {} as CommunityApplicationDependencies['channels'],
+    directory: {} as CommunityApplicationDependencies['directory'],
+    invitations: {} as CommunityApplicationDependencies['invitations'],
+    keychain: {
+      publishKeychain,
+    },
+    media: {} as CommunityApplicationDependencies['media'],
+    membership:
+      overrides as unknown as CommunityApplicationDependencies['membership'],
+    roles: {} as CommunityApplicationDependencies['roles'],
   };
 }
 
@@ -110,7 +114,7 @@ describe(PigeonCommunitiesApplication.name, () => {
 
     const result = await application.leave(session(), 'community-1');
 
-    expect(gateway.publishKeychain).toHaveBeenCalledWith(session(), {
+    expect(gateway.keychain.publishKeychain).toHaveBeenCalledWith(session(), {
       conversations: {},
       version: 1,
     });
@@ -131,7 +135,7 @@ describe(PigeonCommunitiesApplication.name, () => {
 
     const result = await application.leave(session(), 'community-1');
 
-    expect(gateway.publishKeychain).toHaveBeenCalledWith(session(), {
+    expect(gateway.keychain.publishKeychain).toHaveBeenCalledWith(session(), {
       conversations: {},
       version: 1,
     });

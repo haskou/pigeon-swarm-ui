@@ -1,10 +1,10 @@
+import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
-import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
@@ -44,7 +44,15 @@ export class PigeonApplication {
   ) {
     this.attachments = new PigeonAttachmentsApplication(gateway);
     this.calls = new PigeonCallsApplication(gateway.calls);
-    this.communities = new PigeonCommunitiesApplication(gateway);
+    this.communities = new PigeonCommunitiesApplication({
+      channels: gateway,
+      directory: gateway,
+      invitations: gateway,
+      keychain: gateway,
+      media: gateway,
+      membership: gateway,
+      roles: gateway,
+    });
     this.conversations = new PigeonConversationsApplication(gateway);
     this.identities = new PigeonIdentitiesApplication(
       gateway,
