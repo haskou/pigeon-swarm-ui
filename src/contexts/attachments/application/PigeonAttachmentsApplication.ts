@@ -5,16 +5,16 @@ import type {
   PublicFileContent,
   PublicFileUpload,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { AttachmentApplicationPort } from './ports/AttachmentApplicationPort';
 
-import { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
-import { PublishMessageAttachments } from '../../contexts/attachments/application/publish-message-attachments/PublishMessageAttachments';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { PublishMessageAttachmentsMessage } from './publish-message-attachments/messages/PublishMessageAttachmentsMessage';
+import { PublishMessageAttachments } from './publish-message-attachments/PublishMessageAttachments';
 
 export class PigeonAttachmentsApplication {
   private readonly publishMessageAttachments: PublishMessageAttachments;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: AttachmentApplicationPort) {
     this.publishMessageAttachments = new PublishMessageAttachments({
       publish: async (message) =>
         await gateway.publishMessageAttachments(

@@ -1,3 +1,4 @@
+import { PigeonAttachmentsApplication } from '../../contexts/attachments/application/PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
@@ -5,13 +6,12 @@ import { PigeonIdentitiesApplication } from '../../contexts/identities/applicati
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
+import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
-import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonSessionApplication } from './PigeonSessionApplication';
-import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsApplication;

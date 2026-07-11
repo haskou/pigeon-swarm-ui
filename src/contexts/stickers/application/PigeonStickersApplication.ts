@@ -7,16 +7,16 @@ import type {
   StickerPackInput,
   StickerPackResource,
   StickerResource,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
+import type { StickerApplicationPort } from './ports/StickerApplicationPort';
 
-import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
-import { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { ListStickerPacks } from './list-sticker-packs/ListStickerPacks';
+import { ListStickerPacksMessage } from './list-sticker-packs/messages/ListStickerPacksMessage';
 
 export class PigeonStickersApplication {
   private readonly listStickerPacks: ListStickerPacks;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: StickerApplicationPort) {
     this.listStickerPacks = new ListStickerPacks({
       list: async (message) =>
         await gateway.listStickerPacks({

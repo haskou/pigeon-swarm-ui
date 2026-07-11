@@ -1,18 +1,21 @@
 import type {
   MessageAttachment,
   Session,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 
 describe(PigeonAttachmentsApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonApiGateway> {
+  type Dependencies = ConstructorParameters<
+    typeof PigeonAttachmentsApplication
+  >[0];
+
+  function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
       downloadAttachment: jest.fn(),
       publishMessageAttachments: jest.fn(),
       uploadPublicFile: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<Dependencies>;
   }
 
   const session = {

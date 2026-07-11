@@ -353,3 +353,29 @@
 - Risks: node HTTP transport remains implemented by the context gateway; this
   slice only removes its application dependency on composition
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice APPLICATION-008: Move attachment and sticker boundaries into contexts
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Keep attachment publication/download and sticker-pack workflows inside
+  their owning contexts instead of coupling them to the composition gateway.
+- Changed files:
+  - `contexts/attachments/application/PigeonAttachmentsApplication.ts`
+  - `contexts/attachments/application/ports/AttachmentApplicationPort.ts`
+  - `contexts/stickers/application/PigeonStickersApplication.ts`
+  - `contexts/stickers/application/ports/StickerApplicationPort.ts`
+  - `app/composition/PigeonApplication.ts` composition wiring
+- Behavior changed/preserved: attachment upload/download, sticker CRUD, pack
+  listing, favorites, usage tracking, and asset URL generation preserve their
+  existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - attachment and sticker application/context suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: concrete HTTP and media adapters remain behind the compatibility
+  gateway until the infrastructure milestone replaces those bindings
+- Next slice: `INFRA-002C`, extract the next context-owned gateway capability

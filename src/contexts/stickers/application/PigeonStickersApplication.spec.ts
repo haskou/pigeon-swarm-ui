@@ -1,18 +1,21 @@
 import type {
   Session,
   StickerPackResource,
-} from '../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 describe(PigeonStickersApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonApiGateway> {
+  type Dependencies = ConstructorParameters<
+    typeof PigeonStickersApplication
+  >[0];
+
+  function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
       apiUrl: jest.fn(),
       listStickerPacks: jest.fn(),
       markStickerUsed: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<Dependencies>;
   }
 
   it('lists packs through a validated owner filter', async () => {
