@@ -94,8 +94,6 @@ import { type NodeNetwork } from '../../contexts/networks/application/list-node-
 import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
 import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
-import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
-import { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 import {
   RealtimeGateway,
   type RealtimeHeartbeatActivityMode,
@@ -109,6 +107,7 @@ import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+import { PigeonStickersApplication } from './PigeonStickersApplication';
 
 export class PigeonApplication {
   private readonly calls: PigeonCallsApplication;
@@ -125,6 +124,8 @@ export class PigeonApplication {
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
 
+  private readonly stickers: PigeonStickersApplication;
+
   private readonly createConversationUseCase: CreateConversation;
 
   private readonly createGroupConversationUseCase: CreateGroupConversation;
@@ -136,8 +137,6 @@ export class PigeonApplication {
   private readonly addMessageReactionUseCase: AddMessageReaction;
 
   private readonly listConversationsUseCase: ListConversations;
-
-  private readonly listStickerPacksUseCase: ListStickerPacks;
 
   private readonly loadMessagesUseCase: LoadMessages;
 
@@ -164,18 +163,13 @@ export class PigeonApplication {
     this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
+    this.stickers = new PigeonStickersApplication(gateway);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.editMessageUseCase = new EditMessage(gateway);
     this.listConversationsUseCase = new ListConversations(gateway);
-    this.listStickerPacksUseCase = new ListStickerPacks({
-      list: async (message) =>
-        await gateway.listStickerPacks({
-          ownerIdentityId: message.getOwnerIdentityId(),
-        }),
-    });
     this.loadMessageUseCase = new LoadMessage(gateway);
     this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
@@ -1181,7 +1175,7 @@ export class PigeonApplication {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.gateway.uploadStickerAsset(session, file);
+    return await this.stickers.uploadAsset(session, file);
   }
 
   public async listStickerPacks(
@@ -1189,24 +1183,22 @@ export class PigeonApplication {
       ownerIdentityId?: string;
     } = {},
   ): Promise<StickerPackResource[]> {
-    return await this.listStickerPacksUseCase.list(
-      new ListStickerPacksMessage(input),
-    );
+    return await this.stickers.list(input);
   }
 
   public async getStickerPack(packId: string): Promise<StickerPackResource> {
-    return await this.gateway.getStickerPack(packId);
+    return await this.stickers.getPack(packId);
   }
 
   public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    return await this.gateway.getMyStickers(session);
+    return await this.stickers.getMyStickers(session);
   }
 
   public async createStickerPack(
     session: Session,
     input: StickerPackInput,
   ): Promise<StickerPackResource> {
-    return await this.gateway.createStickerPack(session, input);
+    return await this.stickers.createPack(session, input);
   }
 
   public async updateStickerPack(
@@ -1214,7 +1206,7 @@ export class PigeonApplication {
     packId: string,
     input: Partial<StickerPackInput>,
   ): Promise<StickerPackResource> {
-    return await this.gateway.updateStickerPack(session, packId, input);
+    return await this.stickers.updatePack(session, packId, input);
   }
 
   public async addStickerToPack(
@@ -1222,7 +1214,7 @@ export class PigeonApplication {
     packId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.gateway.addStickerToPack(session, packId, input);
+    return await this.stickers.addToPack(session, packId, input);
   }
 
   public async updateSticker(
@@ -1231,7 +1223,7 @@ export class PigeonApplication {
     stickerId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.gateway.updateSticker(session, packId, stickerId, input);
+    return await this.stickers.update(session, packId, stickerId, input);
   }
 
   public async deleteSticker(
@@ -1239,21 +1231,21 @@ export class PigeonApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.deleteSticker(session, packId, stickerId);
+    await this.stickers.delete(session, packId, stickerId);
   }
 
   public async saveStickerPack(
     session: Session,
     packId: string,
   ): Promise<void> {
-    await this.gateway.saveStickerPack(session, packId);
+    await this.stickers.savePack(session, packId);
   }
 
   public async unsaveStickerPack(
     session: Session,
     packId: string,
   ): Promise<void> {
-    await this.gateway.unsaveStickerPack(session, packId);
+    await this.stickers.unsavePack(session, packId);
   }
 
   public async favoriteSticker(
@@ -1261,7 +1253,7 @@ export class PigeonApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.favoriteSticker(session, packId, stickerId);
+    await this.stickers.favorite(session, packId, stickerId);
   }
 
   public async unfavoriteSticker(
@@ -1269,22 +1261,18 @@ export class PigeonApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.unfavoriteSticker(session, packId, stickerId);
+    await this.stickers.unfavorite(session, packId, stickerId);
   }
 
   public async markStickerUsed(
     session: Session,
     sticker: StickerMessageReference,
   ): Promise<void> {
-    await this.gateway.markStickerUsed(
-      session,
-      sticker.packId,
-      sticker.stickerId,
-    );
+    await this.stickers.markUsed(session, sticker);
   }
 
   public stickerAssetUrl(assetCid: string): string {
-    return this.gateway.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
+    return this.stickers.assetUrl(assetCid);
   }
 
   public async listConversations(
