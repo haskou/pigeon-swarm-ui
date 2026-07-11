@@ -13,6 +13,7 @@ import { LoginIdentity } from '../../contexts/identities/application/login-ident
 import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
 import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
+import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 export class PigeonIdentitiesApplication {
@@ -20,7 +21,10 @@ export class PigeonIdentitiesApplication {
 
   private readonly registerIdentity: RegisterIdentity;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(
+    private readonly gateway: PigeonApiGateway,
+    private readonly presence: PigeonPresenceGateway,
+  ) {
     this.loginIdentity = new LoginIdentity(gateway);
     this.registerIdentity = new RegisterIdentity({
       register: async (name, password, networks, handle, options) =>
@@ -72,14 +76,14 @@ export class PigeonIdentitiesApplication {
     session: Session,
     identityId: string,
   ): Promise<IdentityPresence> {
-    return await this.gateway.getPresence(session, identityId);
+    return await this.presence.get(session, identityId);
   }
 
   public async getPresences(
     session: Session,
     identityIds: string[],
   ): Promise<IdentityPresence[]> {
-    return await this.gateway.getPresences(session, identityIds);
+    return await this.presence.getMany(session, identityIds);
   }
 
   public async publishKeychain(
@@ -134,6 +138,6 @@ export class PigeonIdentitiesApplication {
     session: Session,
     status: SelectablePresenceStatus,
   ): Promise<IdentityPresence> {
-    return await this.gateway.updatePresence(session, { status });
+    return await this.presence.update(session, status);
   }
 }

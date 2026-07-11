@@ -46,7 +46,10 @@ export class PigeonApplication {
     this.calls = new PigeonCallsApplication(gateway.calls);
     this.communities = new PigeonCommunitiesApplication(gateway);
     this.conversations = new PigeonConversationsApplication(gateway);
-    this.identities = new PigeonIdentitiesApplication(gateway);
+    this.identities = new PigeonIdentitiesApplication(
+      gateway,
+      gateway.presence,
+    );
     this.messages = new PigeonMessagesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication(gateway);

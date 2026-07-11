@@ -35,7 +35,6 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
   IdentityResource,
-  IdentityPresence,
   KeychainResource,
   LocalKeychain,
   LoginResult,
@@ -56,7 +55,6 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
-  SelectablePresenceStatus,
   StickerInput,
   StickerPackInput,
   StickerPackResource,
@@ -115,6 +113,7 @@ import { PigeonIdentityGateway } from './gateways/PigeonIdentityGateway';
 import { PigeonIdentityKeyProtectionGateway } from './gateways/PigeonIdentityKeyProtectionGateway';
 import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonNotificationsGateway } from './gateways/PigeonNotificationsGateway';
+import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
 import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
 import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
@@ -163,8 +162,6 @@ export class PigeonApiGateway {
 
   private readonly notifications: PigeonNotificationsGateway;
 
-  private readonly presence: PigeonPresenceApi;
-
   private readonly polls: PigeonPollsApi;
 
   private readonly push: PigeonPushGateway;
@@ -178,6 +175,8 @@ export class PigeonApiGateway {
   public readonly calls: PigeonCallsGateway;
 
   public readonly node: PigeonNodeGateway;
+
+  public readonly presence: PigeonPresenceGateway;
 
   public constructor(
     http: HttpJsonClient = new HttpJsonClient(
@@ -236,7 +235,10 @@ export class PigeonApiGateway {
           session,
         ),
     );
-    this.presence = new PigeonPresenceApi(http, signer);
+    this.presence = new PigeonPresenceGateway(
+      new PigeonPresenceApi(http, signer),
+      this.requestCache,
+    );
     this.polls = new PigeonPollsApi(http, signer);
     this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
     this.signer = signer;
@@ -890,26 +892,6 @@ export class PigeonApiGateway {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
   }
 
-  public async getPresence(
-    session: Session,
-    identityId: string,
-  ): Promise<IdentityPresence> {
-    return await this.presence.get(session, identityId);
-  }
-
-  public async getPresences(
-    session: Session,
-    identityIds: string[],
-  ): Promise<IdentityPresence[]> {
-    const uniqueIdentityIds = [...new Set(identityIds.filter(Boolean))].sort();
-
-    return await this.requestCache.load(
-      `GET /presence/ ${session.identity.id} ${uniqueIdentityIds.join('\u0000')}`,
-      () => this.presence.getMany(session, uniqueIdentityIds),
-      { ttlMs: startupReadCacheTtlMs },
-    );
-  }
-
   public async getPushVapidPublicKey(): Promise<{
     enabled: boolean;
     publicKey?: string;
@@ -929,13 +911,6 @@ export class PigeonApiGateway {
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
     await this.push.deleteSubscription(session, subscription);
-  }
-
-  public async updatePresence(
-    session: Session,
-    input: { status: SelectablePresenceStatus },
-  ): Promise<IdentityPresence> {
-    return await this.presence.update(session, input);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
