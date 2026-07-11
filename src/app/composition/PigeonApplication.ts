@@ -62,15 +62,7 @@ import type {
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 
-import { CreateConversation } from '../../contexts/conversations/application/create-conversation/CreateConversation';
-import { CreateConversationMessage } from '../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
-import {
-  CreateGroupConversation,
-  type CreateGroupConversationInput,
-} from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
-import { CreateGroupConversationMessage } from '../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
-import { ListConversations } from '../../contexts/conversations/application/list-conversations/ListConversations';
-import { ListConversationsMessage } from '../../contexts/conversations/application/list-conversations/messages/ListConversationsMessage';
+import { type CreateGroupConversationInput } from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
 import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
 import { AddMessageReaction } from '../../contexts/messages/application/add-message-reaction/AddMessageReaction';
 import { AddMessageReactionMessage } from '../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
@@ -100,6 +92,7 @@ import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsApplication } from './PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+import { PigeonConversationsApplication } from './PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
@@ -113,6 +106,8 @@ export class PigeonApplication {
   private readonly calls: PigeonCallsApplication;
 
   private readonly communities: PigeonCommunitiesApplication;
+
+  private readonly conversations: PigeonConversationsApplication;
 
   private readonly identities: PigeonIdentitiesApplication;
 
@@ -128,17 +123,11 @@ export class PigeonApplication {
 
   private readonly stickers: PigeonStickersApplication;
 
-  private readonly createConversationUseCase: CreateConversation;
-
-  private readonly createGroupConversationUseCase: CreateGroupConversation;
-
   private readonly deleteMessageUseCase: DeleteMessage;
 
   private readonly editMessageUseCase: EditMessage;
 
   private readonly addMessageReactionUseCase: AddMessageReaction;
-
-  private readonly listConversationsUseCase: ListConversations;
 
   private readonly loadMessagesUseCase: LoadMessages;
 
@@ -158,18 +147,16 @@ export class PigeonApplication {
     this.attachments = new PigeonAttachmentsApplication(gateway);
     this.calls = new PigeonCallsApplication(gateway);
     this.communities = new PigeonCommunitiesApplication(gateway);
+    this.conversations = new PigeonConversationsApplication(gateway);
     this.identities = new PigeonIdentitiesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.polls = new PigeonPollsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.stickers = new PigeonStickersApplication(gateway);
-    this.createConversationUseCase = new CreateConversation(gateway);
-    this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.editMessageUseCase = new EditMessage(gateway);
-    this.listConversationsUseCase = new ListConversations(gateway);
     this.loadMessageUseCase = new LoadMessage(gateway);
     this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
     this.loadMessagesUseCase = new LoadMessages(gateway);
@@ -351,9 +338,7 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.createConversationUseCase.create(
-      new CreateConversationMessage({ networkId, peerIdentityId, session }),
-    );
+    return await this.conversations.create(session, peerIdentityId, networkId);
   }
 
   public async createGroupConversation(
@@ -364,9 +349,7 @@ export class PigeonApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.createGroupConversationUseCase.create(
-      new CreateGroupConversationMessage({ group: input, session }),
-    );
+    return await this.conversations.createGroup(session, input);
   }
 
   public async createNetwork(name: string): Promise<void> {
@@ -513,7 +496,7 @@ export class PigeonApplication {
     conversationId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    await this.gateway.createGroupConversationInvitation(
+    await this.conversations.inviteToGroup(
       session,
       conversationId,
       recipientIdentityId,
@@ -1257,9 +1240,7 @@ export class PigeonApplication {
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
-    return await this.listConversationsUseCase.list(
-      new ListConversationsMessage(session),
-    );
+    return await this.conversations.list(session);
   }
 
   public async markConversationReadUntil(
@@ -1267,11 +1248,7 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.gateway.markConversationReadUntil(
-      session,
-      conversationId,
-      messageId,
-    );
+    await this.conversations.markReadUntil(session, conversationId, messageId);
   }
 
   public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
