@@ -618,7 +618,7 @@ export function ChatColumn({
     setGroupInviteLoading(true);
     setGroupInviteError(null);
     try {
-      await applicationContainer.createGroupConversationInvitation(
+      await applicationContainer.conversations.inviteToGroup(
         session,
         activeConversation.id,
         recipientIdentityId,

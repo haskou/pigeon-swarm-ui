@@ -252,7 +252,7 @@ export function CreateConversationDialog({
       setError(null);
 
       try {
-        const result = await applicationContainer.createGroupConversation(
+        const result = await applicationContainer.conversations.createGroup(
           session,
           {
             name: groupName.trim(),
@@ -308,7 +308,7 @@ export function CreateConversationDialog({
     setError(null);
 
     try {
-      const result = await applicationContainer.createConversation(
+      const result = await applicationContainer.conversations.create(
         session,
         identityLookup,
         selectedNetworkId,

@@ -10,7 +10,6 @@ import type { NodeRelayConfiguration } from '../../contexts/networks/application
 import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type {
-  ChatMessage,
   Community,
   CommunityChannel,
   CommunityChannelDraft,
@@ -26,28 +25,21 @@ import type {
   CommunityVisibility,
   CommunityVoiceChannel,
   ConversationKeyEntry,
-  ConversationDraft,
-  ConversationResource,
-  EditMessageOptions,
   IdentityPresence,
   IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
-  MessageLinkPreview,
-  MessagePin,
   MessageResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationSettingScope,
   NotificationResource,
-  SendMessageOptions,
   Session,
   SelectablePresenceStatus,
 } from '../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 
-import { type CreateGroupConversationInput } from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
 import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
 import { type NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
@@ -75,10 +67,6 @@ export class PigeonApplication {
 
   private readonly communities: PigeonCommunitiesApplication;
 
-  private readonly conversations: PigeonConversationsApplication;
-
-  private readonly messages: PigeonMessagesApplication;
-
   private readonly notifications: PigeonNotificationsApplication;
 
   private readonly networks: PigeonNetworksApplication;
@@ -89,7 +77,11 @@ export class PigeonApplication {
 
   public readonly attachments: PigeonAttachmentsApplication;
 
+  public readonly conversations: PigeonConversationsApplication;
+
   public readonly identities: PigeonIdentitiesApplication;
+
+  public readonly messages: PigeonMessagesApplication;
 
   public readonly polls: PigeonPollsApplication;
 
@@ -278,29 +270,6 @@ export class PigeonApplication {
     await this.notifications.deletePushSubscription(session, subscription);
   }
 
-  public async createConversation(
-    session: Session,
-    peerIdentityId: string,
-    networkId: string,
-  ): Promise<{
-    conversation: ConversationResource;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    return await this.conversations.create(session, peerIdentityId, networkId);
-  }
-
-  public async createGroupConversation(
-    session: Session,
-    input: CreateGroupConversationInput,
-  ): Promise<{
-    conversation: ConversationResource;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    return await this.conversations.createGroup(session, input);
-  }
-
   public async createNetwork(name: string): Promise<void> {
     await this.networks.create(name);
   }
@@ -438,18 +407,6 @@ export class PigeonApplication {
     keychainExternalIdentifier: null | string;
   }> {
     return await this.communities.leave(session, communityId);
-  }
-
-  public async createGroupConversationInvitation(
-    session: Session,
-    conversationId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    await this.conversations.inviteToGroup(
-      session,
-      conversationId,
-      recipientIdentityId,
-    );
   }
 
   public async createCommunityInvitation(
@@ -815,13 +772,6 @@ export class PigeonApplication {
     );
   }
 
-  public async createLinkPreview(
-    session: Session,
-    url: string,
-  ): Promise<MessageLinkPreview> {
-    return await this.messages.createLinkPreview(session, url);
-  }
-
   public async createNodeNetwork(
     session: Session,
     name: string,
@@ -882,58 +832,6 @@ export class PigeonApplication {
     return await this.networks.getNodeInfo();
   }
 
-  public async deleteMessage(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.messages.delete(session, conversationId, messageId);
-  }
-
-  public async editMessage(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    content: string,
-    options: EditMessageOptions = {},
-  ): Promise<ChatMessage> {
-    return await this.messages.edit(
-      session,
-      conversationId,
-      messageId,
-      content,
-      options,
-    );
-  }
-
-  public async addMessageReaction(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<void> {
-    await this.messages.addReactionTo(
-      session,
-      conversationId,
-      messageId,
-      emoji,
-    );
-  }
-
-  public async removeMessageReaction(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    emoji: string,
-  ): Promise<void> {
-    await this.messages.removeReactionFrom(
-      session,
-      conversationId,
-      messageId,
-      emoji,
-    );
-  }
-
   public async addCommunityChannelMessageReaction(
     session: Session,
     communityId: string,
@@ -966,20 +864,6 @@ export class PigeonApplication {
     );
   }
 
-  public async listConversations(
-    session: Session,
-  ): Promise<ConversationResource[]> {
-    return await this.conversations.list(session);
-  }
-
-  public async markConversationReadUntil(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.conversations.markReadUntil(session, conversationId, messageId);
-  }
-
   public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
     return await this.networks.list(session);
   }
@@ -998,107 +882,6 @@ export class PigeonApplication {
 
   public async listPeers(): Promise<Peer[]> {
     return await this.networks.peers();
-  }
-
-  public async loadMessages(
-    session: Session,
-    conversationId: string,
-    before?: null | string,
-    options?: { limit?: number; signal?: AbortSignal },
-  ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.messages.load(session, conversationId, before, options);
-  }
-
-  public async loadMessage(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<ChatMessage | null> {
-    return await this.messages.loadOne(session, conversationId, messageId);
-  }
-
-  public async decryptMessageResource(
-    session: Session,
-    conversationId: string,
-    message: MessageResource,
-  ): Promise<ChatMessage> {
-    return await this.messages.decrypt(session, conversationId, message);
-  }
-
-  public async loadMessagesAround(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<{
-    messages: ChatMessage[];
-    nextCursor?: null | string;
-    previousCursor?: null | string;
-  }> {
-    return await this.messages.loadAround(session, conversationId, messageId);
-  }
-
-  public async loadMessageThread(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    options: { limit?: number } = {},
-  ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
-    return await this.messages.loadThread(
-      session,
-      conversationId,
-      messageId,
-      options,
-    );
-  }
-
-  public async listMessagePins(
-    session: Session,
-    conversationId: string,
-  ): Promise<MessagePin[]> {
-    return await this.messages.listPins(session, conversationId);
-  }
-
-  public async pinMessage(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.messages.pin(session, conversationId, messageId);
-  }
-
-  public async unpinMessage(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.messages.unpin(session, conversationId, messageId);
-  }
-
-  public async listConversationDrafts(
-    session: Session,
-  ): Promise<ConversationDraft[]> {
-    return await this.messages.listDrafts(session);
-  }
-
-  public async saveConversationDraft(
-    session: Session,
-    conversationId: string,
-    content: string,
-    updatedAt = Date.now(),
-  ): Promise<ConversationDraft> {
-    return await this.messages.saveDraft(
-      session,
-      conversationId,
-      content,
-      updatedAt,
-    );
-  }
-
-  public async deleteConversationDraft(
-    session: Session,
-    conversationId: string,
-  ): Promise<void> {
-    await this.messages.deleteDraft(session, conversationId);
   }
 
   public async restoreRememberedSession(
@@ -1127,15 +910,6 @@ export class PigeonApplication {
         result.conversations,
       ),
     };
-  }
-
-  public async sendMessage(
-    session: Session,
-    conversationId: string,
-    content: string,
-    options: SendMessageOptions = {},
-  ): Promise<ChatMessage> {
-    return await this.messages.send(session, conversationId, content, options);
   }
 
   public async updateNotification(

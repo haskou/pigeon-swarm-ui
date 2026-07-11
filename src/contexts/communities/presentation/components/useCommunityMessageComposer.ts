@@ -711,6 +711,6 @@ async function createLinkPreviewForContent(session: Session, content: string) {
   if (!url) return undefined;
 
   return await applicationContainer
-    .createLinkPreview(session, url)
+    .messages.createLinkPreview(session, url)
     .catch(() => undefined);
 }

@@ -218,7 +218,7 @@ async function preloadInitialConversationMessages(
   if (!conversationId) return null;
 
   try {
-    const result = await applicationContainer.loadMessages(
+    const result = await applicationContainer.messages.load(
       session,
       conversationId,
       null,

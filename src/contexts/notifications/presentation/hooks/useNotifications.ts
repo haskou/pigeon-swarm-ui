@@ -161,7 +161,7 @@ export function useNotifications({
         const conversations =
           notification.type === 'community_invitation'
             ? undefined
-            : await applicationContainer.listConversations(nextSession);
+            : await applicationContainer.conversations.list(nextSession);
         const communityId =
           notification.type === 'community_invitation'
             ? notification.payload.communityId

@@ -515,7 +515,7 @@ export function GlassWorkspace({
 
     const cancelIdleWork = runWhenBrowserIdle(() => {
       void applicationContainer
-        .listMessagePins(session, activeConversation.id)
+        .messages.listPins(session, activeConversation.id)
         .then((pins) => {
           if (!cancelled) {
             setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
@@ -566,7 +566,7 @@ export function GlassWorkspace({
     let cancelled = false;
 
     void applicationContainer
-      .listConversationDrafts(session)
+      .messages.listDrafts(session)
       .then((remoteDrafts) => {
         if (cancelled) return;
 
@@ -600,14 +600,14 @@ export function GlassWorkspace({
 
         if (value.trim()) {
           void applicationContainer
-            .saveConversationDraft(session, conversationId, value)
+            .messages.saveDraft(session, conversationId, value)
             .catch(() => undefined);
 
           return;
         }
 
         void applicationContainer
-          .deleteConversationDraft(session, conversationId)
+          .messages.deleteDraft(session, conversationId)
           .catch(() => undefined);
       }, 700);
 
@@ -1192,7 +1192,7 @@ export function GlassWorkspace({
   }, [activeConversationId, conversations]);
 
   const refreshConversations = useCallback(async () => {
-    const next = await applicationContainer.listConversations(session);
+    const next = await applicationContainer.conversations.list(session);
 
     setConversations(next);
 
@@ -1236,7 +1236,7 @@ export function GlassWorkspace({
         ),
       );
       void applicationContainer
-        .markConversationReadUntil(
+        .conversations.markReadUntil(
           sessionRef.current,
           conversationId,
           lastMessage.id,
@@ -1270,7 +1270,7 @@ export function GlassWorkspace({
       setMessageLoadState('loading');
       setSendError(null);
       try {
-        const result = await applicationContainer.loadMessages(
+        const result = await applicationContainer.messages.load(
           sessionRef.current,
           conversationId,
           null,
@@ -1418,7 +1418,7 @@ export function GlassWorkspace({
     setMessageLoadState('loading');
     requestAnimationFrame(restorePreviousViewport);
     try {
-      const result = await applicationContainer.loadMessages(
+      const result = await applicationContainer.messages.load(
         sessionRef.current,
         activeConversation.id,
         requestedCursor,
@@ -1534,7 +1534,7 @@ export function GlassWorkspace({
         const lastMessageId = MessageCollection.lastDeliveredMessageTarget(
           messagesRef.current,
         )?.id;
-        const sent = await applicationContainer.sendMessage(
+        const sent = await applicationContainer.messages.send(
           session,
           conversationId,
           payload.content,
@@ -1694,7 +1694,7 @@ export function GlassWorkspace({
     setSendError(null);
     setMessageLoadState('loading');
     try {
-      const result = await applicationContainer.loadMessagesAround(
+      const result = await applicationContainer.messages.loadAround(
         session,
         activeConversation.id,
         messageId,
@@ -1733,7 +1733,7 @@ export function GlassWorkspace({
       state: 'loading',
     });
     try {
-      const result = await applicationContainer.loadMessageThread(
+      const result = await applicationContainer.messages.loadThread(
         session,
         activeConversation.id,
         message.id,
@@ -1776,7 +1776,7 @@ export function GlassWorkspace({
       state: 'loading',
     });
     try {
-      const pins = await applicationContainer.listMessagePins(
+      const pins = await applicationContainer.messages.listPins(
         session,
         activeConversation.id,
       );
@@ -1802,7 +1802,7 @@ export function GlassWorkspace({
     setMessageContextMenu(null);
     setSendError(null);
     try {
-      await applicationContainer.pinMessage(
+      await applicationContainer.messages.pin(
         session,
         activeConversation.id,
         message.id,
@@ -1817,7 +1817,7 @@ export function GlassWorkspace({
     if (!activeConversation?.id) return;
 
     try {
-      await applicationContainer.unpinMessage(
+      await applicationContainer.messages.unpin(
         session,
         activeConversation.id,
         message.id,
@@ -1919,7 +1919,7 @@ export function GlassWorkspace({
       current ? { ...current, error: null } : current,
     );
     try {
-      const editEvent = await applicationContainer.editMessage(
+      const editEvent = await applicationContainer.messages.edit(
         session,
         activeConversation.id,
         targetMessage.id,
@@ -1962,7 +1962,7 @@ export function GlassWorkspace({
       current ? { ...current, error: null } : current,
     );
     try {
-      await applicationContainer.deleteMessage(
+      await applicationContainer.messages.delete(
         session,
         activeConversation.id,
         message.id,
@@ -1995,7 +1995,7 @@ export function GlassWorkspace({
     if (!activeConversation?.id || !conversationThread) return;
 
     const rootMessage = conversationThread.root;
-    const sent = await applicationContainer.sendMessage(
+    const sent = await applicationContainer.messages.send(
       session,
       activeConversation.id,
       content,
@@ -2037,7 +2037,7 @@ export function GlassWorkspace({
     if (!activeConversation?.id || !conversationThread) return;
 
     const rootMessage = conversationThread.root;
-    const sent = await applicationContainer.sendMessage(
+    const sent = await applicationContainer.messages.send(
       session,
       activeConversation.id,
       '',
@@ -2076,7 +2076,7 @@ export function GlassWorkspace({
     setMessageContextMenu(null);
     setSendError(null);
     try {
-      await applicationContainer.deleteMessage(
+      await applicationContainer.messages.delete(
         session,
         activeConversation.id,
         message.id,
@@ -2106,7 +2106,7 @@ export function GlassWorkspace({
 
     setSendError(null);
     try {
-      const editEvent = await applicationContainer.editMessage(
+      const editEvent = await applicationContainer.messages.edit(
         session,
         activeConversation.id,
         editingMessage.message.id,
@@ -2146,14 +2146,14 @@ export function GlassWorkspace({
 
     try {
       if (reacted) {
-        await applicationContainer.removeMessageReaction(
+        await applicationContainer.messages.removeReactionFrom(
           session,
           conversationId,
           message.id,
           emoji,
         );
       } else {
-        await applicationContainer.addMessageReaction(
+        await applicationContainer.messages.addReactionTo(
           session,
           conversationId,
           message.id,
@@ -2227,7 +2227,7 @@ export function GlassWorkspace({
 
       if (!sharedNetworkId) throw new Error(copy.dialog.noSharedNetwork);
 
-      const result = await applicationContainer.createConversation(
+      const result = await applicationContainer.conversations.create(
         sessionRef.current,
         identityId,
         sharedNetworkId,
@@ -2330,7 +2330,7 @@ export function GlassWorkspace({
       shouldAutoScroll: boolean,
     ) => {
       try {
-        const message = await applicationContainer.loadMessage(
+        const message = await applicationContainer.messages.loadOne(
           session,
           conversationId,
           messageId,
@@ -3005,7 +3005,7 @@ export function GlassWorkspace({
             if (!activeConversationKeyId) return;
 
             void applicationContainer
-              .decryptMessageResource(session, conversationId, timelineMessage)
+              .messages.decrypt(session, conversationId, timelineMessage)
               .then((message: ChatMessage) =>
                 applyRealtimeConversationMessage(
                   conversationId,
