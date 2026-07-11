@@ -14,7 +14,6 @@ import type { RequestSigner } from '../../shared/infrastructure/http/RequestSign
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { decryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
-import { RecoveryKey } from '../../contexts/identities/domain/value-objects/RecoveryKey';
 import {
   loadLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
@@ -2031,7 +2030,9 @@ describe(PigeonApiGateway.name, () => {
     const internals = gateway as unknown as {
       createIdentityMaterial: jest.Mock;
       hydrateLoginSession: jest.Mock;
-      saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+      identityKeyProtection: {
+        saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+      };
     };
 
     internals.createIdentityMaterial = jest.fn().mockResolvedValue({
@@ -2040,7 +2041,7 @@ describe(PigeonApiGateway.name, () => {
       masterKey,
     });
     internals.hydrateLoginSession = jest.fn().mockResolvedValue(loginResult);
-    internals.saveLocalPasskeyMasterKeyUnlock = jest
+    internals.identityKeyProtection.saveLocalPasskeyMasterKeyUnlock = jest
       .fn()
       .mockRejectedValue(new Error('cancelled'));
 
@@ -2050,7 +2051,9 @@ describe(PigeonApiGateway.name, () => {
       }),
     ).resolves.toBe(loginResult);
 
-    expect(internals.saveLocalPasskeyMasterKeyUnlock).toHaveBeenCalledWith({
+    expect(
+      internals.identityKeyProtection.saveLocalPasskeyMasterKeyUnlock,
+    ).toHaveBeenCalledWith({
       displayName: 'Ada',
       identityId: identity.id,
       masterKey,
@@ -2099,7 +2102,9 @@ describe(PigeonApiGateway.name, () => {
     const internals = gateway as unknown as {
       createIdentityMaterial: jest.Mock;
       hydrateLoginSession: jest.Mock;
-      saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+      identityKeyProtection: {
+        saveLocalPasskeyMasterKeyUnlock: jest.Mock;
+      };
     };
 
     internals.createIdentityMaterial = jest.fn().mockResolvedValue({
@@ -2108,7 +2113,7 @@ describe(PigeonApiGateway.name, () => {
       masterKey,
     });
     internals.hydrateLoginSession = jest.fn().mockResolvedValue(loginResult);
-    internals.saveLocalPasskeyMasterKeyUnlock = jest.fn();
+    internals.identityKeyProtection.saveLocalPasskeyMasterKeyUnlock = jest.fn();
 
     await expect(
       gateway.register('Ada', 'secret', ['network-1'], 'ada', {
@@ -2116,82 +2121,9 @@ describe(PigeonApiGateway.name, () => {
       }),
     ).resolves.toBe(loginResult);
 
-    expect(internals.saveLocalPasskeyMasterKeyUnlock).not.toHaveBeenCalled();
-  });
-
-  it('keeps passkey PRF registration enabled when a recovery key is also created', () => {
-    const gateway = new PigeonApiGateway();
-    const internals = gateway as unknown as {
-      registrationPasskeyPrfMode(input: {
-        displayName: string;
-        enabled?: boolean;
-        identityId: string;
-        recoveryKey?: RecoveryKey;
-      }): unknown;
-    };
-
-    const mode = internals.registrationPasskeyPrfMode({
-      displayName: 'Ada',
-      enabled: true,
-      identityId: 'identity-1',
-      recoveryKey: RecoveryKey.generate(),
-    });
-
-    expect(mode).toEqual({
-      displayName: 'Ada',
-      identityId: 'identity-1',
-      mode: 'create',
-    });
-  });
-
-  it('preserves existing passkey PRF during profile updates unless explicitly disabled', () => {
-    const gateway = new PigeonApiGateway();
-    const passkeyPrf = {
-      algorithm: 'webauthn-prf',
-      credentialId: 'credential-id',
-      salt: 'salt',
-      version: 1,
-    } satisfies NonNullable<
-      IdentityResource['masterKeyDerivation']['passkeyPrf']
-    >;
-    const currentIdentity = {
-      masterKeyDerivation: {
-        algorithm: 'scrypt',
-        N: 2 ** 18,
-        p: 1,
-        passkeyPrf,
-        r: 8,
-        salt: 'master-salt',
-        version: 1,
-      },
-    } as IdentityResource;
-    const internals = gateway as unknown as {
-      profilePasskeyPrfMode(input: {
-        currentIdentity: IdentityResource;
-        enabled?: boolean;
-        identityId: string;
-        profileName: string;
-      }): unknown;
-    };
-
     expect(
-      internals.profilePasskeyPrfMode({
-        currentIdentity,
-        identityId: 'identity-1',
-        profileName: 'Ada',
-      }),
-    ).toEqual({
-      mode: 'preserve',
-      protection: passkeyPrf,
-    });
-    expect(
-      internals.profilePasskeyPrfMode({
-        currentIdentity,
-        enabled: false,
-        identityId: 'identity-1',
-        profileName: 'Ada',
-      }),
-    ).toBeUndefined();
+      internals.identityKeyProtection.saveLocalPasskeyMasterKeyUnlock,
+    ).not.toHaveBeenCalled();
   });
 
   it('refreshes the current identity reference before signing profile updates', async () => {
