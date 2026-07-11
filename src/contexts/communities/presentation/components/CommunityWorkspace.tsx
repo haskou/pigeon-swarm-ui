@@ -48,7 +48,6 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { Composer } from '../../../messages/presentation/components/Composer';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
-import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
 import {
   profileAnchorFromTarget,
@@ -85,7 +84,6 @@ import {
   type CommunityThreadState,
   hiddenCommunityThreadSummaryKeysFromMessages,
   isThreadRootMessage,
-  placeholderThreadRootMessage,
   threadRootLabelKey,
   threadTitleFromMessage,
   visibleCommunityThreadSummaries,
@@ -96,6 +94,7 @@ import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
 import { useCommunityThreadActions } from './useCommunityThreadActions';
+import { useCommunityThreadNavigation } from './useCommunityThreadNavigation';
 import { useCommunityMentions } from './useCommunityMentions';
 import { useCommunityPinnedMessages } from './useCommunityPinnedMessages';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
@@ -841,147 +840,21 @@ export function CommunityWorkspace({
     },
     [],
   );
-  const openMessageThread = useCallback(
-    async (message: ChatMessage) => {
-      const channelId = message.raw.channelId ?? selectedChannelId;
-
-      if (!channelId) return;
-
-      if (channelId !== selectedChannelId) handleChannelSelected(channelId);
-
-      setMessageContextMenu(null);
-      setThreadPanel({
-        channelId,
-        draft: '',
-        editingMessage: null,
-        error: null,
-        messages: [],
-        replyTarget: null,
-        root: message,
-        state: 'loading',
-      });
-      try {
-        const result =
-          await applicationContainer.listCommunityChannelMessageThread(
-            session,
-            community.id,
-            channelId,
-            message.id,
-          );
-        const threadMessages = await projectChannelMessages(
-          channelId,
-          result.messages,
-        );
-        const visibleThreadMessages = ThreadMessageVisibility.forRoot(
-          message.id,
-          ThreadMessageVisibility.markAsThreadMessages(
-            message.id,
-            threadMessages,
-          ),
-        );
-
-        setThreadPanel({
-          channelId,
-          draft: '',
-          editingMessage: null,
-          error: null,
-          messages: visibleThreadMessages,
-          replyTarget: null,
-          root: message,
-          state: 'ready',
-        });
-        if (visibleThreadMessages.length > 0) {
-          const lastReply =
-            visibleThreadMessages[visibleThreadMessages.length - 1];
-
-          upsertChannelThreadSummary(channelId, {
-            lastReplyAt: lastReply.timestamp,
-            lastReplyMessageId: lastReply.id,
-            replyCount: visibleThreadMessages.length,
-            rootMessageId: message.id,
-          });
-        }
-      } catch (caught) {
-        setThreadPanel({
-          channelId,
-          draft: '',
-          editingMessage: null,
-          error: toUserErrorMessage(caught, copy.messages.threadError),
-          messages: [],
-          replyTarget: null,
-          root: message,
-          state: 'ready',
-        });
-      }
-    },
-    [
-      community.id,
-      handleChannelSelected,
-      projectChannelMessages,
-      selectedChannelId,
-      session,
-      upsertChannelThreadSummary,
-    ],
-  );
-  const loadThreadRootMessage = useCallback(
-    async (
-      channelId: string,
-      rootMessageId: string,
-    ): Promise<ChatMessage | null> => {
-      const loadedRoot = messages.find(
-        (message) => message.id === rootMessageId,
-      );
-
-      if (loadedRoot) return loadedRoot;
-
-      let beforeMessageId: null | string | undefined;
-
-      for (let page = 0; page < 8; page += 1) {
-        const result = await applicationContainer.listCommunityChannelMessages(
-          session,
-          community.id,
-          channelId,
-          { beforeMessageId: beforeMessageId ?? undefined },
-        );
-        const loadedMessages = await projectChannelMessages(
-          channelId,
-          result.messages,
-        );
-        const root = loadedMessages.find(
-          (message) => message.id === rootMessageId,
-        );
-
-        if (root) return root;
-
-        if (!result.nextBeforeMessageId) break;
-
-        beforeMessageId = result.nextBeforeMessageId;
-      }
-
-      return null;
-    },
-    [community.id, messages, projectChannelMessages, session],
-  );
-  const openMessageThreadFromSummary = useCallback(
-    async (channelId: string, threadSummary: CommunityChannelThreadSummary) => {
-      const root =
-        (await loadThreadRootMessage(channelId, threadSummary.rootMessageId)) ??
-        placeholderThreadRootMessage({
-          channelId,
-          communityId: community.id,
-          currentIdentityId: session.identity.id,
-          rootMessageId: threadSummary.rootMessageId,
-        });
-
-      await openMessageThread(root);
-    },
-    [
-      community.id,
-      loadThreadRootMessage,
-      openMessageThread,
-      session.identity.id,
-    ],
-  );
+  const {
+    open: openMessageThread,
+    openFromSummary: openMessageThreadFromSummary,
+  } = useCommunityThreadNavigation({
+    communityId: community.id,
+    currentIdentityId: session.identity.id,
+    messages,
+    onChannelSelected: handleChannelSelected,
+    projectMessages: projectChannelMessages,
+    selectedChannelId,
+    session,
+    setMessageContextMenu,
+    setThreadPanel,
+    upsertSummary: upsertChannelThreadSummary,
+  });
   const activeVoiceChannelId =
     activeCall?.kind === 'community-voice' &&
     activeCall.communityId === community.id
