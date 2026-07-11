@@ -94,24 +94,8 @@ import { RemoveMessageReactionMessage } from '../../contexts/messages/applicatio
 import { RemoveMessageReaction } from '../../contexts/messages/application/remove-message-reaction/RemoveMessageReaction';
 import { SendMessageMessage } from '../../contexts/messages/application/send-message/messages/SendMessageMessage';
 import { SendMessage } from '../../contexts/messages/application/send-message/SendMessage';
-import { CreateNetwork } from '../../contexts/networks/application/create-network/CreateNetwork';
-import { CreateNetworkMessage } from '../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
-import { CreatePublicNetwork } from '../../contexts/networks/application/create-public-network/CreatePublicNetwork';
-import { CreatePublicNetworkMessage } from '../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
-import { JoinNetwork } from '../../contexts/networks/application/join-network/JoinNetwork';
-import { JoinNetworkMessage } from '../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
-import {
-  ListNodeNetworks,
-  type NodeNetwork,
-} from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import { ListNodeNetworksMessage } from '../../contexts/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
-import {
-  ListPeers,
-  type Peer,
-} from '../../contexts/networks/application/list-peers/ListPeers';
-import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
-import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
-import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import { type NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import { VotePollMessage } from '../../contexts/polls/application/vote-poll/messages/VotePollMessage';
 import { VotePoll } from '../../contexts/polls/application/vote-poll/VotePoll';
 import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
@@ -125,6 +109,7 @@ import {
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
+import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
@@ -135,6 +120,8 @@ export class PigeonApplication {
 
   private readonly notifications: PigeonNotificationsApplication;
 
+  private readonly networks: PigeonNetworksApplication;
+
   private readonly gateway: PigeonApiGateway;
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
@@ -143,14 +130,6 @@ export class PigeonApplication {
 
   private readonly createGroupConversationUseCase: CreateGroupConversation;
 
-  private readonly createNetworkUseCase: CreateNetwork;
-
-  private readonly createPublicNetworkUseCase: CreatePublicNetwork;
-
-  private readonly joinNetworkUseCase: JoinNetwork;
-
-  private readonly removeNodeNetworkUseCase: RemoveNodeNetwork;
-
   private readonly deleteMessageUseCase: DeleteMessage;
 
   private readonly editMessageUseCase: EditMessage;
@@ -158,10 +137,6 @@ export class PigeonApplication {
   private readonly addMessageReactionUseCase: AddMessageReaction;
 
   private readonly listConversationsUseCase: ListConversations;
-
-  private readonly listNodeNetworksUseCase: ListNodeNetworks;
-
-  private readonly listPeersUseCase: ListPeers;
 
   private readonly listStickerPacksUseCase: ListStickerPacks;
 
@@ -190,35 +165,15 @@ export class PigeonApplication {
     this.gateway = gateway;
     this.calls = new PigeonCallsApplication(gateway);
     this.communities = new PigeonCommunitiesApplication(gateway);
+    this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.createConversationUseCase = new CreateConversation(gateway);
     this.createGroupConversationUseCase = new CreateGroupConversation(gateway);
-    this.createNetworkUseCase = new CreateNetwork({
-      create: async (name) => await gateway.createNetwork(name.toString()),
-    });
-    this.createPublicNetworkUseCase = new CreatePublicNetwork({
-      createPublic: async (session) =>
-        await gateway.createPublicNetwork(session),
-    });
     this.addMessageReactionUseCase = new AddMessageReaction(gateway);
     this.deleteMessageUseCase = new DeleteMessage(gateway);
     this.editMessageUseCase = new EditMessage(gateway);
-    this.joinNetworkUseCase = new JoinNetwork({
-      joinNetwork: async (id, name, key) =>
-        await gateway.joinNetwork(
-          id.toString(),
-          name.toString(),
-          key.toString(),
-        ),
-    });
-    this.removeNodeNetworkUseCase = new RemoveNodeNetwork({
-      remove: async (networkId, session) =>
-        await gateway.removeNetwork(networkId.toString(), session),
-    });
     this.listConversationsUseCase = new ListConversations(gateway);
-    this.listNodeNetworksUseCase = new ListNodeNetworks(gateway);
-    this.listPeersUseCase = new ListPeers(gateway);
     this.listStickerPacksUseCase = new ListStickerPacks({
       list: async (message) =>
         await gateway.listStickerPacks({
@@ -275,7 +230,7 @@ export class PigeonApplication {
   }
 
   public async claimNode(session: Session): Promise<void> {
-    await this.gateway.claimNode(session);
+    await this.networks.claimNode(session);
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
@@ -298,7 +253,7 @@ export class PigeonApplication {
   public async getIpfsReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatus> {
-    return await this.gateway.getIpfsReplicationStatus(session);
+    return await this.networks.getReplicationStatus(session);
   }
 
   public async getPresence(
@@ -453,7 +408,7 @@ export class PigeonApplication {
   }
 
   public async createNetwork(name: string): Promise<void> {
-    await this.createNetworkUseCase.create(new CreateNetworkMessage(name));
+    await this.networks.create(name);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -1031,13 +986,11 @@ export class PigeonApplication {
     session: Session,
     name: string,
   ): Promise<void> {
-    await this.gateway.createNetwork(name, session);
+    await this.networks.createForNode(session, name);
   }
 
   public async createPublicNodeNetwork(session?: Session): Promise<void> {
-    await this.createPublicNetworkUseCase.create(
-      new CreatePublicNetworkMessage(session),
-    );
+    await this.networks.createPublic(session);
   }
 
   public async joinNetwork(
@@ -1045,9 +998,7 @@ export class PigeonApplication {
     name: string,
     key: string,
   ): Promise<void> {
-    await this.joinNetworkUseCase.join(
-      new JoinNetworkMessage({ id, key, name }),
-    );
+    await this.networks.join(id, name, key);
   }
 
   public async joinNodeNetwork(
@@ -1056,32 +1007,27 @@ export class PigeonApplication {
     name: string,
     key: string,
   ): Promise<void> {
-    await this.gateway.joinNetwork(id, name, key, session);
+    await this.networks.joinForNode(session, id, name, key);
   }
 
   public async removeNodeNetwork(
     networkId: string,
     session?: Session,
   ): Promise<NodeNetwork[]> {
-    return await this.removeNodeNetworkUseCase.remove(
-      new RemoveNodeNetworkMessage({ networkId, session }),
-    );
+    return await this.networks.remove(networkId, session);
   }
 
   public async getNodeRelayConfiguration(
     session: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.getNodeRelayConfiguration(session);
+    return await this.networks.getRelayConfiguration(session);
   }
 
   public async updateNodeRelayConfiguration(
     configuration: NodeRelayConfiguration,
     session?: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.updateNodeRelayConfiguration(
-      configuration,
-      session,
-    );
+    return await this.networks.updateRelayConfiguration(configuration, session);
   }
 
   public async checkNodeRelayPorts(
@@ -1089,11 +1035,11 @@ export class PigeonApplication {
     checks: NodeRelayPortCheckTarget[],
     session: Session,
   ): Promise<NodeRelayPortCheckResource> {
-    return await this.gateway.checkNodeRelayPorts(publicHost, checks, session);
+    return await this.networks.checkRelayPorts(publicHost, checks, session);
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.gateway.getNodeInfo();
+    return await this.networks.getNodeInfo();
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
@@ -1377,9 +1323,7 @@ export class PigeonApplication {
   }
 
   public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
-    return await this.listNodeNetworksUseCase.list(
-      new ListNodeNetworksMessage(session),
-    );
+    return await this.networks.list(session);
   }
 
   public async listNotifications(
@@ -1395,7 +1339,7 @@ export class PigeonApplication {
   }
 
   public async listPeers(): Promise<Peer[]> {
-    return await this.listPeersUseCase.list(new ListPeersMessage());
+    return await this.networks.peers();
   }
 
   public async publishKeychain(
