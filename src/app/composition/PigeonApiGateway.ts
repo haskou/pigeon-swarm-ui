@@ -75,7 +75,6 @@ import type {
   StickerPackResource,
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
-import type { CachedIdentity } from './PigeonApiGateway/CachedIdentity';
 import type { CachedRequestOptions } from './PigeonApiGateway/CachedRequestOptions';
 import type { CommunityChannelMessageEditInput } from './PigeonApiGateway/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './PigeonApiGateway/CommunityChannelMessageInput';
@@ -125,6 +124,7 @@ import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
 import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
 import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
+import { PigeonIdentityGateway } from './gateways/PigeonIdentityGateway';
 import { PigeonIdentityKeyProtectionGateway } from './gateways/PigeonIdentityKeyProtectionGateway';
 import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonNotificationsGateway } from './gateways/PigeonNotificationsGateway';
@@ -143,7 +143,6 @@ const defaultKeychain: LocalKeychain = {
 };
 
 const messageDecryptBatchSize = 8;
-const identityCacheTtlMs = 2 * 60 * 1000;
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonApiGateway {
@@ -162,6 +161,8 @@ export class PigeonApiGateway {
   private readonly ids: ConversationIdFactory;
 
   private readonly identitySignatures: IdentitySignaturePayloadFactory;
+
+  private readonly identities: PigeonIdentityGateway;
 
   private readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
 
@@ -186,13 +187,6 @@ export class PigeonApiGateway {
   private readonly push: PigeonPushGateway;
 
   private readonly requestCache = new PigeonRequestCache();
-
-  private readonly identityCache = new Map<string, CachedIdentity>();
-
-  private readonly pendingIdentityRequests = new Map<
-    string,
-    Promise<IdentityResource>
-  >();
 
   private readonly signer: RequestSigner;
 
@@ -232,6 +226,7 @@ export class PigeonApiGateway {
     this.http = http;
     this.ids = ids;
     this.identitySignatures = new IdentitySignaturePayloadFactory();
+    this.identities = new PigeonIdentityGateway(http);
     this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
     this.keychains = keychains;
     this.linkPreviews = new PigeonLinkPreviewsApi(http, signer);
@@ -359,22 +354,6 @@ export class PigeonApiGateway {
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
-  }
-
-  private cacheIdentity(
-    identity: IdentityResource,
-    lookupIdentityId?: string,
-  ): void {
-    const entry = {
-      expiresAt: Date.now() + identityCacheTtlMs,
-      identity,
-    };
-
-    this.identityCache.set(IdentityId.normalize(identity.id), entry);
-
-    if (lookupIdentityId) {
-      this.identityCache.set(IdentityId.normalize(lookupIdentityId), entry);
-    }
   }
 
   private async decryptMessages(
@@ -1967,36 +1946,11 @@ export class PigeonApiGateway {
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
-    const normalizedIdentityId = IdentityId.normalize(identityId);
-    const cached = this.identityCache.get(normalizedIdentityId);
-
-    if (cached && Date.now() < cached.expiresAt) return cached.identity;
-
-    return await this.refreshIdentity(normalizedIdentityId);
+    return await this.identities.get(identityId);
   }
 
   public async refreshIdentity(identityId: string): Promise<IdentityResource> {
-    const normalizedIdentityId = IdentityId.normalize(identityId);
-    const pending = this.pendingIdentityRequests.get(normalizedIdentityId);
-
-    if (pending) return await pending;
-
-    const request = this.http
-      .request<IdentityResource>(
-        `/identities/${encodeURIComponent(normalizedIdentityId)}`,
-      )
-      .then((identity) => {
-        this.cacheIdentity(identity, normalizedIdentityId);
-
-        return identity;
-      })
-      .finally(() => {
-        this.pendingIdentityRequests.delete(normalizedIdentityId);
-      });
-
-    this.pendingIdentityRequests.set(normalizedIdentityId, request);
-
-    return await request;
+    return await this.identities.refresh(identityId);
   }
 
   public async updateIdentityProfile(
@@ -2054,7 +2008,7 @@ export class PigeonApiGateway {
       method: 'PUT',
     });
 
-    this.cacheIdentity(updatedIdentity);
+    this.identities.remember(updatedIdentity);
 
     if (options.passkeyPrfEnabled === false) {
       clearLocalPasskeyUnlock(identityId);
