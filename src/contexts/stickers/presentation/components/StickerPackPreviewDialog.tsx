@@ -73,9 +73,9 @@ export function StickerPackPreviewDialog({
     setError(null);
     try {
       if (saved) {
-        await applicationContainer.unsaveStickerPack(session, sticker.packId);
+        await applicationContainer.stickers.unsavePack(session, sticker.packId);
       } else {
-        await applicationContainer.saveStickerPack(session, sticker.packId);
+        await applicationContainer.stickers.savePack(session, sticker.packId);
       }
       invalidateStickerCaches();
 

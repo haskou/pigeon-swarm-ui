@@ -31,7 +31,6 @@ import type {
   ConversationKeyEntry,
   ConversationDraft,
   ConversationResource,
-  CreatePollInput,
   EditMessageOptions,
   IdentityResource,
   IdentityPresence,
@@ -42,22 +41,15 @@ import type {
   MessageAttachment,
   MessagePin,
   MessageResource,
-  MyStickersResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationSettingScope,
   NotificationResource,
-  PollResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
   Session,
   SelectablePresenceStatus,
-  StickerInput,
-  StickerMessageReference,
-  StickerPackInput,
-  StickerPackResource,
-  StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
@@ -100,15 +92,15 @@ export class PigeonApplication {
 
   private readonly notifications: PigeonNotificationsApplication;
 
-  private readonly polls: PigeonPollsApplication;
-
   private readonly networks: PigeonNetworksApplication;
 
   private readonly gateway: PigeonApiGateway;
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
 
-  private readonly stickers: PigeonStickersApplication;
+  public readonly polls: PigeonPollsApplication;
+
+  public readonly stickers: PigeonStickersApplication;
 
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
@@ -851,42 +843,6 @@ export class PigeonApplication {
     return await this.messages.createLinkPreview(session, url);
   }
 
-  public async createPoll(
-    session: Session,
-    input: CreatePollInput,
-  ): Promise<PollResource> {
-    return await this.polls.create(session, input);
-  }
-
-  public async getPoll(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.polls.get(session, pollId);
-  }
-
-  public async votePoll(
-    session: Session,
-    pollId: string,
-    optionIds: string[],
-  ): Promise<PollResource> {
-    return await this.polls.vote(session, pollId, optionIds);
-  }
-
-  public async removePollVote(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.polls.removeVote(session, pollId);
-  }
-
-  public async closePoll(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.polls.close(session, pollId);
-  }
-
   public async createNodeNetwork(
     session: Session,
     name: string,
@@ -1087,110 +1043,6 @@ export class PigeonApplication {
     file: File,
   ): Promise<PublicFileUpload> {
     return await this.attachments.uploadPublic(session, file);
-  }
-
-  public async uploadStickerAsset(
-    session: Session,
-    file: File,
-  ): Promise<PublicFileUpload> {
-    return await this.stickers.uploadAsset(session, file);
-  }
-
-  public async listStickerPacks(
-    input: {
-      ownerIdentityId?: string;
-    } = {},
-  ): Promise<StickerPackResource[]> {
-    return await this.stickers.list(input);
-  }
-
-  public async getStickerPack(packId: string): Promise<StickerPackResource> {
-    return await this.stickers.getPack(packId);
-  }
-
-  public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    return await this.stickers.getMyStickers(session);
-  }
-
-  public async createStickerPack(
-    session: Session,
-    input: StickerPackInput,
-  ): Promise<StickerPackResource> {
-    return await this.stickers.createPack(session, input);
-  }
-
-  public async updateStickerPack(
-    session: Session,
-    packId: string,
-    input: Partial<StickerPackInput>,
-  ): Promise<StickerPackResource> {
-    return await this.stickers.updatePack(session, packId, input);
-  }
-
-  public async addStickerToPack(
-    session: Session,
-    packId: string,
-    input: StickerInput,
-  ): Promise<StickerResource> {
-    return await this.stickers.addToPack(session, packId, input);
-  }
-
-  public async updateSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-    input: StickerInput,
-  ): Promise<StickerResource> {
-    return await this.stickers.update(session, packId, stickerId, input);
-  }
-
-  public async deleteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickers.delete(session, packId, stickerId);
-  }
-
-  public async saveStickerPack(
-    session: Session,
-    packId: string,
-  ): Promise<void> {
-    await this.stickers.savePack(session, packId);
-  }
-
-  public async unsaveStickerPack(
-    session: Session,
-    packId: string,
-  ): Promise<void> {
-    await this.stickers.unsavePack(session, packId);
-  }
-
-  public async favoriteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickers.favorite(session, packId, stickerId);
-  }
-
-  public async unfavoriteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickers.unfavorite(session, packId, stickerId);
-  }
-
-  public async markStickerUsed(
-    session: Session,
-    sticker: StickerMessageReference,
-  ): Promise<void> {
-    await this.stickers.markUsed(session, sticker);
-  }
-
-  public stickerAssetUrl(assetCid: string): string {
-    return this.stickers.assetUrl(assetCid);
   }
 
   public async listConversations(

@@ -542,7 +542,7 @@ export function useCommunityMessageComposer({
         );
 
         if (payload.sticker) {
-          void applicationContainer.markStickerUsed(session, payload.sticker);
+          void applicationContainer.stickers.markUsed(session, payload.sticker);
         }
 
         if (renderInChannel) {

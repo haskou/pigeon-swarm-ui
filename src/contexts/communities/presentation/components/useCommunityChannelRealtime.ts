@@ -94,7 +94,7 @@ export function useCommunityChannelRealtime({
 
       if (pollId) {
         void applicationContainer
-          .getPoll(session, pollId)
+          .polls.get(session, pollId)
           .then(upsertPoll)
           .catch(() => undefined);
       }

@@ -20,7 +20,7 @@ type StickerPressPreviewState = {
 };
 
 export function stickerAssetUrl(assetCid: string): string {
-  return applicationContainer.stickerAssetUrl(assetCid);
+  return applicationContainer.stickers.assetUrl(assetCid);
 }
 
 export function useStickerPressPreview(assetCid: string) {

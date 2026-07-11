@@ -328,7 +328,7 @@ export function ChatColumn({
   }) => {
     if (!activeConversation) return;
 
-    const poll = await applicationContainer.createPoll(session, {
+    const poll = await applicationContainer.polls.create(session, {
       allowsMultipleVotes: input.allowsMultipleVotes,
       conversationId: activeConversation.id,
       options: input.options,
@@ -340,14 +340,14 @@ export function ChatColumn({
   };
   const votePoll = async (poll: PollResource, optionIds: string[]) => {
     upsertPoll(
-      await applicationContainer.votePoll(session, poll.id, optionIds),
+      await applicationContainer.polls.vote(session, poll.id, optionIds),
     );
   };
   const removePollVote = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.removePollVote(session, poll.id));
+    upsertPoll(await applicationContainer.polls.removeVote(session, poll.id));
   };
   const closePoll = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.closePoll(session, poll.id));
+    upsertPoll(await applicationContainer.polls.close(session, poll.id));
   };
 
   useEffect(() => {
@@ -368,7 +368,7 @@ export function ChatColumn({
     if (!pollId) return;
 
     void applicationContainer
-      .getPoll(session, pollId)
+      .polls.get(session, pollId)
       .then((loadedPoll) => {
         if (loadedPoll.scope.type === 'group_conversation') {
           upsertPoll(loadedPoll);

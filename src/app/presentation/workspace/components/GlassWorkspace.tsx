@@ -1563,7 +1563,7 @@ export function GlassWorkspace({
         );
 
         if (payload.sticker) {
-          void applicationContainer.markStickerUsed(session, payload.sticker);
+          void applicationContainer.stickers.markUsed(session, payload.sticker);
         }
 
         setMessages((current) =>
@@ -2057,7 +2057,7 @@ export function GlassWorkspace({
       },
     );
 
-    void applicationContainer.markStickerUsed(session, sticker);
+    void applicationContainer.stickers.markUsed(session, sticker);
     setConversationThread((current) =>
       current
         ? {

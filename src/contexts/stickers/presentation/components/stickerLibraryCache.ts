@@ -37,7 +37,7 @@ export async function cachedListStickerPacks(): Promise<StickerPackResource[]> {
     return stickerPacksCache.value;
   }
 
-  const packs = await applicationContainer.listStickerPacks();
+  const packs = await applicationContainer.stickers.list();
   stickerPacksCache = {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: packs,
@@ -54,7 +54,7 @@ export async function cachedGetMyStickers(
 
   if (cached && cached.expiresAt > now) return cached.value;
 
-  const library = await applicationContainer.getMyStickers(session);
+  const library = await applicationContainer.stickers.getMyStickers(session);
   myStickersCache.set(session.identity.id, {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: library,
@@ -71,7 +71,7 @@ export async function cachedGetStickerPack(
 
   if (cached && cached.expiresAt > now) return cached.value;
 
-  const pack = await applicationContainer.getStickerPack(packId);
+  const pack = await applicationContainer.stickers.getPack(packId);
   stickerPackCache.set(packId, {
     expiresAt: now + STICKER_CACHE_TTL_MS,
     value: pack,
