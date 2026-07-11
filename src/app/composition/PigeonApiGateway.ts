@@ -133,6 +133,7 @@ import { API_SERVER_URL } from '../API_SERVER_URL';
 import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
 import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
 import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
+import { PigeonNotificationsGateway } from './gateways/PigeonNotificationsGateway';
 import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
 import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
@@ -179,7 +180,7 @@ export class PigeonApiGateway {
 
   private readonly node: PigeonNodeGateway;
 
-  private readonly notifications: PigeonNotificationsApi;
+  private readonly notifications: PigeonNotificationsGateway;
 
   private readonly presence: PigeonPresenceApi;
 
@@ -244,14 +245,18 @@ export class PigeonApiGateway {
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
-    this.notifications = new PigeonNotificationsApi(
-      http,
-      signer,
-      <T>(
-        key: string,
-        loader: () => Promise<T>,
-        options?: CachedRequestOptions,
-      ) => this.cachedRequest(key, loader, options),
+    this.notifications = new PigeonNotificationsGateway(
+      new PigeonNotificationsApi(
+        http,
+        signer,
+        <T>(
+          key: string,
+          loader: () => Promise<T>,
+          options?: CachedRequestOptions,
+        ) => this.cachedRequest(key, loader, options),
+      ),
+      (session) =>
+        this.invalidateSessionCacheKey('/notification-settings/', session),
     );
     this.presence = new PigeonPresenceApi(http, signer);
     this.polls = new PigeonPollsApi(http, signer);
@@ -2579,11 +2584,7 @@ export class PigeonApiGateway {
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
-    const saved = await this.notifications.saveSetting(session, setting);
-
-    this.invalidateSessionCacheKey('/notification-settings/', session);
-
-    return saved;
+    return await this.notifications.saveSetting(session, setting);
   }
 
   public async resetNotificationSetting(
@@ -2591,7 +2592,6 @@ export class PigeonApiGateway {
     scope: NotificationSettingScope,
   ): Promise<void> {
     await this.notifications.resetSetting(session, scope);
-    this.invalidateSessionCacheKey('/notification-settings/', session);
   }
 
   public async createLinkPreview(
