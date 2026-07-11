@@ -14,7 +14,7 @@ import type { ResetNotificationSettingPort } from './ports/ResetNotificationSett
 import type { SaveNotificationSettingPort } from './ports/SaveNotificationSettingPort';
 import type { UpdateNotificationPort } from './ports/UpdateNotificationPort';
 
-import { pushSubscriptionPayload } from '../infrastructure/http/toPushSubscriptionPayload';
+import { PushSubscriptionPayloadFactory } from '../infrastructure/http/PushSubscriptionPayloadFactory';
 import { AcceptConversationInvitation } from './accept-conversation-invitation/AcceptConversationInvitation';
 import { AcceptConversationInvitationMessage } from './accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
 import { ListNotificationSettings } from './list-notification-settings/ListNotificationSettings';
@@ -103,7 +103,7 @@ export class PigeonNotificationsApplication {
   ): Promise<void> {
     await this.push.deletePushSubscription(
       session,
-      pushSubscriptionPayload(subscription),
+      PushSubscriptionPayloadFactory.from(subscription),
     );
   }
 
@@ -134,7 +134,7 @@ export class PigeonNotificationsApplication {
   ): Promise<void> {
     await this.push.registerPushSubscription(
       session,
-      pushSubscriptionPayload(subscription),
+      PushSubscriptionPayloadFactory.from(subscription),
     );
   }
 

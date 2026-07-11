@@ -315,7 +315,7 @@
 - Changed files:
   - `contexts/notifications/application/PigeonNotificationsApplication.ts`
   - `contexts/notifications/application/ports/PushNotificationPort.ts`
-  - `contexts/notifications/infrastructure/http/toPushSubscriptionPayload.ts`
+  - `contexts/notifications/infrastructure/http/PushSubscriptionPayloadFactory.ts`
   - `app/composition/PigeonApplication.ts` composition wiring
 - Behavior changed/preserved: notification listing, state changes, settings,
   invitation key acceptance, VAPID lookup, and browser subscription validation
