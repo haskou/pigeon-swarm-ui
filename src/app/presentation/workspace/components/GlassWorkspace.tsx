@@ -17,7 +17,6 @@ import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http
 import type {
   CallParticipant,
   CallParticipantMediaConnection,
-  CallParticipantStatus,
   CallResource,
   CallSignalType,
   CallSession,
@@ -120,7 +119,6 @@ import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrows
 import {
   playAnsweredCallSound,
   playEndedCallSound,
-  playIncomingCallSound,
   playNotificationSound,
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
@@ -132,6 +130,7 @@ import { useCommunitySelection } from './useCommunitySelection';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
+import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -315,12 +314,6 @@ export function GlassWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [groupInviteRequest, setGroupInviteRequest] = useState(0);
   const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<{
-    call: CallResource;
-    caller?: CallParticipant;
-    participants: CallParticipant[];
-    title: string;
-  } | null>(null);
   const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [networkSynchronizationStatus, setNetworkSynchronizationStatus] =
     useState<NetworkSynchronizationStatus | null>(null);
@@ -371,10 +364,6 @@ export function GlassWorkspace({
   const messagesRef = useRef<ChatMessage[]>(initialPreloadedMessages);
   const activeCallRef = useRef<CallSession | null>(null);
   const callActionInProgressRef = useRef(false);
-  const callParticipantStatusesRef = useRef<
-    Record<string, Record<string, CallParticipantStatus>>
-  >({});
-  const notifiedIncomingCallIdsRef = useRef(new Set<string>());
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
   const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
@@ -470,14 +459,6 @@ export function GlassWorkspace({
   useEffect(() => {
     messageStateRef.current = messageState;
   }, [messageState]);
-
-  useEffect(() => {
-    if (!incomingCall) return undefined;
-
-    playIncomingCallSound();
-
-    return stopIncomingCallSound;
-  }, [incomingCall?.call.id]);
 
   const setMessageLoadState = useCallback((state: LoadState) => {
     messageStateRef.current = state;
@@ -1077,195 +1058,19 @@ export function GlassWorkspace({
       session.keychain,
     ],
   );
-  const reconcileCallResource = useCallback(
-    (call: CallResource) => {
-      const currentActiveCall = activeCallRef.current;
-      const details = callDetailsForResource(call);
-      const currentParticipant = call.participants.find(
-        (participant) => participant.identityId === session.identity.id,
-      );
-      const previousParticipantStatuses =
-        callParticipantStatusesRef.current[call.id] ?? {};
-      const nextParticipantStatuses = Object.fromEntries(
-        call.participants.map((participant) => [
-          participant.identityId,
-          participant.status,
-        ]),
-      ) as Record<string, CallParticipantStatus>;
-      const remoteParticipantLeftActiveCommunityVoice =
-        call.scope.type === 'community_channel' &&
-        currentActiveCall?.id === call.id &&
-        call.status === 'active' &&
-        call.participants.some(
-          (participant) =>
-            participant.identityId !== session.identity.id &&
-            previousParticipantStatuses[participant.identityId] === 'joined' &&
-            participant.status === 'left',
-        );
-
-      callParticipantStatusesRef.current = {
-        ...callParticipantStatusesRef.current,
-        [call.id]: nextParticipantStatuses,
-      };
-
-      if (remoteParticipantLeftActiveCommunityVoice) {
-        playEndedCallSound();
-      }
-
-      if (
-        details.kind === 'one-to-one' &&
-        incomingCall?.call.id === call.id &&
-        currentParticipant?.status !== 'ringing'
-      ) {
-        setIncomingCall(null);
-        stopIncomingCallSound();
-      }
-
-      if (call.scope.type === 'community_channel') {
-        const communityId = call.scope.communityId;
-        const channelId = call.scope.channelId;
-        const connectedIdentityIds =
-          call.status === 'active'
-            ? [
-                ...new Set(
-                  call.participants
-                    .filter((participant) => participant.connected)
-                    .map((participant) => participant.identityId),
-                ),
-              ]
-            : [];
-
-        setCommunities((current) =>
-          current.map((community) => {
-            if (community.id !== communityId) return community;
-
-            return {
-              ...community,
-              voiceChannels: (community.voiceChannels ?? []).map((channel) =>
-                channel.id === channelId
-                  ? { ...channel, connectedIdentityIds }
-                  : channel,
-              ),
-            };
-          }),
-        );
-      }
-
-      if (call.status !== 'active') {
-        if (incomingCall?.call.id === call.id) setIncomingCall(null);
-
-        if (currentActiveCall?.id === call.id) {
-          logCallWarning('workspace:call:ended-by-resource-status', {
-            callId: call.id,
-            status: call.status,
-          });
-          playEndedCallSound();
-          endCall();
-        }
-
-        return;
-      }
-
-      if (details.kind === 'group') {
-        if (incomingCall?.call.id === call.id) setIncomingCall(null);
-
-        if (currentActiveCall?.id === call.id) {
-          logCallWarning('workspace:call:ended-unsupported-group-call', {
-            callId: call.id,
-          });
-          playEndedCallSound();
-          endCall();
-        }
-
-        return;
-      }
-
-      if (
-        details.kind === 'one-to-one' &&
-        currentActiveCall?.id === call.id &&
-        call.participants.some(
-          (participant) =>
-            participant.identityId !== session.identity.id &&
-            ['declined', 'left', 'missed'].includes(participant.status),
-        )
-      ) {
-        const remoteParticipant = call.participants.find(
-          (participant) => participant.identityId !== session.identity.id,
-        );
-
-        logCallWarning('workspace:call:ended-by-remote-participant-status', {
-          callId: call.id,
-          remoteIdentityId: remoteParticipant?.identityId,
-          remoteStatus: remoteParticipant?.status,
-        });
-        playEndedCallSound();
-        endCall();
-
-        return;
-      }
-
-      if (currentParticipant?.status === 'ringing') {
-        if (details.kind === 'community-voice') return;
-
-        const caller = details.participants.find(
-          (participant) => participant.identityId === call.creatorIdentityId,
-        );
-
-        if (!notifiedIncomingCallIdsRef.current.has(call.id)) {
-          notifiedIncomingCallIdsRef.current.add(call.id);
-          void showPwaNotification({
-            body: details.subtitle
-              ? `${details.title} · ${details.subtitle}`
-              : details.title,
-            tag: `call-${call.id}`,
-            title: copy.calls.incoming,
-          });
-        }
-
-        setIncomingCall({
-          call,
-          caller,
-          participants: details.participants,
-          title: details.title,
-        });
-
-        return;
-      }
-
-      if (
-        details.kind === 'one-to-one' &&
-        currentParticipant?.connected &&
-        currentActiveCall?.id !== call.id
-      ) {
-        logCallDebug('workspace:call:joined-on-another-device', {
-          callId: call.id,
-          identityId: session.identity.id,
-        });
-
-        return;
-      }
-
-      if (currentActiveCall?.id === call.id) reconcileCall(call, details);
-    },
-    [
+  const { incomingCall, reconcileCallResource, setIncomingCall } =
+    useCallResourceReconciliation({
+      activeCall,
       callDetailsForResource,
+      currentIdentityId: session.identity.id,
       endCall,
-      incomingCall?.call.id,
       reconcileCall,
-      session.identity.id,
       setCommunities,
-    ],
-  );
+    });
 
   useEffect(() => {
     reconcileCallResourceRef.current = reconcileCallResource;
   }, [reconcileCallResource]);
-
-  useEffect(() => {
-    if (!activeCall?.call) return;
-
-    reconcileCall(activeCall.call, callDetailsForResource(activeCall.call));
-  }, [activeCall?.call, callDetailsForResource, reconcileCall]);
 
   const callSignalSender = useCallback(
     (callId: string) =>
