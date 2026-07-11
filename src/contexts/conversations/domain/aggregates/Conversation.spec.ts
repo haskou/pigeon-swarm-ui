@@ -1,25 +1,24 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
-
+import { ConversationId } from '../value-objects/ConversationId';
 import { ConversationParticipantId } from '../value-objects/ConversationParticipantId';
 import { Conversation } from './Conversation';
 
-const conversationResource = (
-  overrides: Partial<ConversationResource> = {},
-): ConversationResource => ({
-  id: 'conversation-a',
-  latestMessageAt: 100,
-  networkId: 'network-a',
-  participantIds: ['identity-a', 'identity-b'],
-  ...overrides,
-});
+const conversation = (): Conversation =>
+  Conversation.reconstitute(
+    ConversationId.fromString('conversation-a'),
+    'network-a',
+    [
+      ConversationParticipantId.fromString('identity-a'),
+      ConversationParticipantId.fromString('identity-b'),
+    ],
+    new Timestamp(100),
+    'one-to-one',
+  );
 
 describe('Conversation', () => {
   it('resolves the one-to-one peer through participant value objects', () => {
-    const conversation = Conversation.fromResource(conversationResource());
-
-    const peer = conversation.peerIdentity(
+    const peer = conversation().peerIdentity(
       ConversationParticipantId.fromString('identity-a'),
     );
 
@@ -29,13 +28,12 @@ describe('Conversation', () => {
   });
 
   it('bumps activity only when the new timestamp is more recent', () => {
-    const conversation = Conversation.fromResource(conversationResource());
+    const aggregate = conversation();
 
-    expect(conversation.bumpActivity(new Timestamp(50)).latestMessageAt).toBe(
-      100,
-    );
-    expect(conversation.bumpActivity(new Timestamp(150)).latestMessageAt).toBe(
-      150,
-    );
+    aggregate.bumpActivity(new Timestamp(50));
+    expect(aggregate.latestMessageAt().valueOf()).toBe(100);
+
+    aggregate.bumpActivity(new Timestamp(150));
+    expect(aggregate.latestMessageAt().valueOf()).toBe(150);
   });
 });

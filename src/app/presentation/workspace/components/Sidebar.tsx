@@ -22,7 +22,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { loadPublicImage } from '../../../../contexts/communities/presentation/components/communityImages';
-import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityBanner,

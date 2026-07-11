@@ -23,7 +23,7 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
-import { ConversationPeer } from '../../domain/ConversationPeer';
+import { ConversationPeer } from '../view-models/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState =

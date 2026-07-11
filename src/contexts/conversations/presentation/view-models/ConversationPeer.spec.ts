@@ -1,7 +1,7 @@
 import type {
   ConversationResource,
   LocalKeychain,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { ConversationPeer } from './ConversationPeer';
 

@@ -51,8 +51,8 @@ import { useAttachmentDownload } from '../../../../contexts/attachments/presenta
 import { CommunityAccessPolicy } from '../../../../contexts/communities/domain/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
 import { ConversationKeychain } from '../../../../contexts/conversations/domain/ConversationKeychain';
-import { ConversationTimeline } from '../../../../contexts/conversations/domain/ConversationTimeline';
-import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
+import { ConversationTimeline } from '../../../../contexts/conversations/application/list-conversations/ConversationTimeline';
+import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';

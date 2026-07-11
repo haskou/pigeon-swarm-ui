@@ -4,7 +4,7 @@ import type {
   Session,
 } from '../../shared/domain/pigeonResources.types';
 
-import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
+import { ConversationTimeline } from '../../contexts/conversations/application/list-conversations/ConversationTimeline';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 export class PigeonSessionApplication {

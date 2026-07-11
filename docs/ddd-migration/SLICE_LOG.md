@@ -90,3 +90,27 @@
   before
 - Next slice: `INFRA-002`, replace composition gateway consumers by capability
   owned ports and adapters
+
+## Slice CONVERSATION-001: Conversation aggregate without resource state
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Keep conversation identity, participants, activity and peer rules in
+  the aggregate instead of storing the REST resource as domain state.
+- Changed files:
+  - `contexts/conversations/domain/aggregates/Conversation.ts`
+  - `contexts/conversations/application/list-conversations/ConversationTimeline.ts`
+  - `contexts/conversations/presentation/view-models/ConversationPeer.ts`
+- Behavior changed/preserved: conversation ordering, activity bumping, group
+  peer exclusion, and keychain peer fallback preserved
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - conversation, message, and identity login suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: `ConversationResource` remains a boundary read model until the
+  conversation HTTP/application port migration is complete
+- Next slice: `INFRA-002`, replace composition gateway consumers by capability
+  owned ports and adapters

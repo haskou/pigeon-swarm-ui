@@ -1,33 +1,47 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type {
-  ConversationResource,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
-
 import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
 import { ConversationId } from '../value-objects/ConversationId';
 import { ConversationParticipantId } from '../value-objects/ConversationParticipantId';
 
 export class Conversation extends AggregateRoot {
-  public static fromResource(resource: ConversationResource): Conversation {
-    return new Conversation(resource);
+  public static reconstitute(
+    id: ConversationId,
+    networkId: string,
+    participants: readonly ConversationParticipantId[],
+    latestMessageAt: Timestamp,
+    type: 'group' | 'one-to-one',
+    peerIdentityId?: ConversationParticipantId,
+  ): Conversation {
+    return new Conversation(
+      id,
+      networkId,
+      [...participants],
+      latestMessageAt,
+      type,
+      peerIdentityId,
+    );
   }
 
-  private constructor(private readonly resource: ConversationResource) {
+  private constructor(
+    private readonly id: ConversationId,
+    private readonly networkId: string,
+    private readonly participants: ConversationParticipantId[],
+    private latestActivityAt: Timestamp,
+    private readonly type: 'group' | 'one-to-one',
+    private readonly explicitPeerIdentityId?: ConversationParticipantId,
+  ) {
     super();
   }
 
-  public bumpActivity(timestamp: Timestamp): ConversationResource {
-    const latestMessageAt = timestamp.isAfter(this.latestMessageAt())
-      ? timestamp.valueOf()
-      : this.latestMessageAt().valueOf();
-
-    return { ...this.resource, latestMessageAt };
+  public bumpActivity(timestamp: Timestamp): void {
+    if (timestamp.isAfter(this.latestActivityAt)) {
+      this.latestActivityAt = timestamp;
+    }
   }
 
   public getId(): ConversationId {
-    return ConversationId.fromString(this.resource.id);
+    return this.id;
   }
 
   public isMoreRecentThan(conversation: Conversation): boolean {
@@ -35,48 +49,25 @@ export class Conversation extends AggregateRoot {
   }
 
   public latestMessageAt(): Timestamp {
-    return new Timestamp(Number(this.resource.latestMessageAt ?? 0));
+    return this.latestActivityAt;
   }
 
   public peerIdentity(
     currentIdentityId: ConversationParticipantId,
-    keychain?: LocalKeychain,
+    fallbackPeerIdentityId?: ConversationParticipantId,
   ): ConversationParticipantId | undefined {
-    const peerIdentityId = this.peerIdentityId(
-      currentIdentityId.toString(),
-      keychain,
-    );
-
-    return peerIdentityId
-      ? ConversationParticipantId.fromString(peerIdentityId)
-      : undefined;
-  }
-
-  public peerIdentityId(
-    currentIdentityId: string,
-    keychain?: LocalKeychain,
-  ): string | undefined {
-    if (this.resource.type === 'group' || this.getId().isGroupConversation()) {
+    if (this.type === 'group' || this.getId().isGroupConversation()) {
       return undefined;
     }
 
-    if (this.resource.peerIdentityId) return this.resource.peerIdentityId;
+    if (this.explicitPeerIdentityId) return this.explicitPeerIdentityId;
 
-    const participantIds =
-      this.resource.participantIdentityIds ??
-      this.resource.participantIds ??
-      this.resource.participants ??
-      [];
-    const currentParticipantId =
-      ConversationParticipantId.fromString(currentIdentityId);
-    const participantPeer = participantIds.find((identityId) =>
-      ConversationParticipantId.fromString(identityId).isNotEqual(
-        currentParticipantId,
-      ),
+    const participantPeer = this.participants.find((participantId) =>
+      participantId.isNotEqual(currentIdentityId),
     );
 
     if (participantPeer) return participantPeer;
 
-    return keychain?.conversations[this.resource.id]?.peerIdentityId;
+    return fallbackPeerIdentityId;
   }
 }
