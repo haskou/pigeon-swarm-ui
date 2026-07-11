@@ -8,10 +8,6 @@ const poll = 'poll';
 const sticker = 'sticker';
 
 export class MessageKind extends StringValueObject {
-  private constructor(value: MessageKindPrimitive) {
-    super(value);
-  }
-
   public static callEvent(): MessageKind {
     return new MessageKind(callEvent);
   }
@@ -38,6 +34,10 @@ export class MessageKind extends StringValueObject {
 
   public static sticker(): MessageKind {
     return new MessageKind(sticker);
+  }
+
+  private constructor(value: MessageKindPrimitive) {
+    super(value);
   }
 
   public isEditableText(): boolean {

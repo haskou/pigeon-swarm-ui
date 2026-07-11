@@ -2,7 +2,7 @@ import type {
   ChatMessage,
   MessageResource,
   PollResource,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 export class PollMessageProjection {
   public static fromMessageResource(

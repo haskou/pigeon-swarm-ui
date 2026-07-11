@@ -1,6 +1,6 @@
 import { SymmetricKey } from '@haskou/value-objects';
 
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { MessageProjector } from './MessageProjector';
 

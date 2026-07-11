@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
-import type { MessageResource } from '../../../shared/domain/pigeonResources.types';
+import type { MessageResource } from '../../../../shared/domain/pigeonResources.types';
 
 export type MessageListEnvelope = {
   cursor?: string | null;

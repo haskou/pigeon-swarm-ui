@@ -55,7 +55,7 @@
 
 - Date: 2026-07-11
 - Size: M
-- Status: in progress
+- Status: completed
 - Goal: Stop using `ChatMessage` and API-shaped reaction records as domain
   state. Keep those shapes at the presentation/infrastructure boundary while
   the message aggregate owns editability and reaction lifecycle behavior.
@@ -65,10 +65,26 @@
   - make reactions domain entities owned by the message aggregate
   - replace `Message.toChatMessage()` with a presentation mapper
   - move `MessageEditPolicy` callers behind a presentation adapter
+- Changed files:
+  - `contexts/messages/domain/aggregates/Message.ts`
+  - `contexts/messages/domain/entities/MessageReactionEntry.ts`
+  - `contexts/messages/domain/value-objects/MessageDeliveryState.ts`
+  - `contexts/messages/domain/value-objects/MessageKind.ts`
+  - `contexts/messages/domain/value-objects/MessageVisibility.ts`
+  - `contexts/messages/presentation/view-models/MessageReadModelMapper.ts`
+  - `contexts/messages/presentation/view-models/MessageEditability.ts`
+  - moved `MessageProjector` and `PollMessageProjection` to message
+    infrastructure crypto
 - Behavior changed/preserved: preserve current edit-menu eligibility and
   optimistic reaction behavior
 - Contracts changed: none
 - Validation level: L2
+- Tests/checks:
+  - message context tests
+  - gateway and message projection tests
+  - `yarn typecheck`
+  - `yarn lint`
 - Risks: encrypted or special message types must remain non-editable exactly as
   before
-- Next slice: complete `INFRA-002` after the message model is verified
+- Next slice: `INFRA-002`, replace composition gateway consumers by capability
+  owned ports and adapters

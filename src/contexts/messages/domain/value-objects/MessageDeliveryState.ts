@@ -7,10 +7,6 @@ const failed = 'failed';
 const pending = 'pending';
 
 export class MessageDeliveryState extends StringValueObject {
-  private constructor(value: MessageDeliveryStatePrimitive) {
-    super(value);
-  }
-
   public static delivered(): MessageDeliveryState {
     return new MessageDeliveryState(delivered);
   }
@@ -33,6 +29,10 @@ export class MessageDeliveryState extends StringValueObject {
 
   public static pending(): MessageDeliveryState {
     return new MessageDeliveryState(pending);
+  }
+
+  private constructor(value: MessageDeliveryStatePrimitive) {
+    super(value);
   }
 
   public isDelivered(): boolean {

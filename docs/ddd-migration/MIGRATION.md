@@ -38,27 +38,25 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `MESSAGE-001`
-- Title: Establish a behavior-rich message lifecycle model
-- Size: M
+- Id: `INFRA-002`
+- Title: Remove the compatibility gateway from context consumers
+- Size: L
 - Status: in progress
-- Business capability: Message editability and reaction lifecycle
-- Source area: `src/contexts/messages/domain` and its presentation read model
-- Target boundary: Message aggregate, reaction entity/value objects, and a
-  presentation mapper for `ChatMessage`
-- Target files/folders: `domain/aggregates`, `domain/entities`,
-  `domain/value-objects`, and `presentation/view-models`
-- Compatibility constraints: REST, websocket, encrypted payload, and
-  `ChatMessage` rendering contracts remain stable
+- Business capability: Context-owned application workflows and transport
+- Source area: `src/app/composition/PigeonApiGateway.ts`
+- Target boundary: context application services and context infrastructure
+  adapters
+- Target files/folders: `contexts/*/application` and their owning
+  `infrastructure/http` or `crypto` modules
+- Compatibility constraints: REST, websocket, encrypted payload, and existing
+  presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: context-menu edit availability and optimistic
-  reaction updates in conversations and community channels
-- Tests/checks run: domain unit tests, affected presentation tests, typecheck,
-  and lint
+- Affected behavior/tests: application bootstrap, messages, conversations,
+  communities, identities, notifications, and attachments
+- Tests/checks run: typecheck, lint, message context tests, and gateway tests
 - Full-suite status: deferred until the infrastructure milestone closes
-- Done criteria: The aggregate no longer stores or returns `ChatMessage`; the
-  edit and reaction rules are expressed with domain objects; `ChatMessage`
-  remains a presentation read model
+- Done criteria: no context behavior is reached through `PigeonApiGateway`; it
+  is reduced to composition wiring or removed
 
 ## Risks
 

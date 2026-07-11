@@ -1,4 +1,4 @@
-import type { MessageListEnvelope } from './MessageListEnvelope';
+import type { MessageListEnvelope } from '../http/MessageListEnvelope';
 import type { MessageProjectionCopy } from './MessageProjectionCopy';
 import type { MessageReactionRecord } from './MessageReactionRecord';
 import type { PlainMessage } from './PlainMessage';
@@ -12,9 +12,9 @@ import type {
   MessageReaction,
   MessageResource,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { ConversationKeychain } from '../../conversations/domain/ConversationKeychain';
+import { ConversationKeychain } from '../../../conversations/domain/ConversationKeychain';
 import { PollMessageProjection } from './PollMessageProjection';
 
 export class MessageProjector {
