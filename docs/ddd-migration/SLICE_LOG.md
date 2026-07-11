@@ -424,3 +424,27 @@
 - Risks: workspace bootstrap still crosses context boundaries by necessity; the
   session port keeps that coordination explicit
 - Next slice: `INFRA-002C`, extract the next context-owned gateway capability
+
+## Slice INFRA-002C: Extract keychain HTTP and crypto coordination
+
+- Date: 2026-07-11
+- Size: M
+- Status: completed
+- Goal: Move remote keychain loading, cache policy, encryption/decryption, and
+  publication out of the compatibility gateway into identity infrastructure.
+- Changed files:
+  - `contexts/identities/infrastructure/http/PigeonKeychainApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonKeychainApi.spec.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: signed keychain reads, 1.5 second startup cache,
+  master-key decryption, versioned publication, and cache invalidation preserve
+  their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - keychain and gateway suites (66 tests)
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: identity material and conversation/community invitation orchestration
+  still remain in the compatibility gateway
+- Next slice: extract conversation lifecycle and invitation coordination

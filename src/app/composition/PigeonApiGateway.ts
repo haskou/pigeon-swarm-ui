@@ -84,6 +84,7 @@ import { IdentityId } from '../../contexts/identities/domain/value-objects/Ident
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
@@ -145,7 +146,7 @@ export class PigeonApiGateway {
 
   private readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
 
-  private readonly keychains: KeychainCipher;
+  private readonly keychainApi: PigeonKeychainApi;
 
   private readonly messagesApi: PigeonMessagesApi;
 
@@ -210,7 +211,12 @@ export class PigeonApiGateway {
     this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.identities = new PigeonIdentityGateway(http);
     this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
-    this.keychains = keychains;
+    this.keychainApi = new PigeonKeychainApi(
+      http,
+      signer,
+      keychains,
+      this.requestCache,
+    );
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;
     const projection: MessageProjectionPort = {
@@ -1664,11 +1670,11 @@ export class PigeonApiGateway {
     return identity;
   }
 
-  public async decryptKeychain(
+  public decryptKeychain(
     session: Session,
     keychain: KeychainResource,
-  ): Promise<LocalKeychain> {
-    return await this.keychains.decrypt(session, keychain);
+  ): LocalKeychain {
+    return this.keychainApi.decrypt(session, keychain);
   }
 
   public async decryptMessage(
@@ -2086,17 +2092,7 @@ export class PigeonApiGateway {
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
-    const path = `/keychains/${encodeURIComponent(session.identity.id)}`;
-
-    return await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
-      async () =>
-        await this.http.request<KeychainResource>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-      { ttlMs: startupReadCacheTtlMs },
-    );
+    return await this.keychainApi.load(session);
   }
 
   public async login(
@@ -2231,29 +2227,7 @@ export class PigeonApiGateway {
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    const path = '/keychains/';
-    const encrypted = await this.keychains.encryptForPublish(
-      session,
-      nextKeychain,
-    );
-    const published = await this.http.request<{
-      keychainExternalIdentifier: string;
-      ownerIdentityId: string;
-      version: number;
-    }>(path, {
-      body: JSON.stringify(encrypted.body),
-      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
-      method: 'POST',
-    });
-    this.requestCache.invalidateForSession(
-      `/keychains/${encodeURIComponent(session.identity.id)}`,
-      session,
-    );
-
-    return {
-      keychain: encrypted.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+    return await this.keychainApi.publish(session, nextKeychain);
   }
 
   public async register(

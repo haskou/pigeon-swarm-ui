@@ -77,6 +77,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `INFRA-002C`: extract the next context-owned capability from the compatibility facade.
-2. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
-3. `COMMUNITY-001`: community membership/channel aggregate behavior.
+1. `INFRA-002D`: extract conversation lifecycle and invitation coordination.
+2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
+3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
