@@ -50,7 +50,7 @@ export function NodeNetworksPanel({
     try {
       const invite = NetworkInviteCode.decode(joinCode);
 
-      await applicationContainer.joinNodeNetwork(
+      await applicationContainer.networks.joinForNode(
         session,
         invite.id,
         invite.name,
@@ -73,7 +73,7 @@ export function NodeNetworksPanel({
 
     beginMutation('create');
     try {
-      await applicationContainer.createNodeNetwork(session, name);
+      await applicationContainer.networks.createForNode(session, name);
       setCreateName('');
       await onNetworksUpdated();
       setNotice(copy.nodeSettings.createSuccess);
@@ -89,7 +89,7 @@ export function NodeNetworksPanel({
 
     beginMutation('public');
     try {
-      await applicationContainer.createPublicNodeNetwork(
+      await applicationContainer.networks.createPublic(
         node?.owner ? session : undefined,
       );
       await onNetworksUpdated();
@@ -114,7 +114,7 @@ export function NodeNetworksPanel({
 
     beginMutation('remove');
     try {
-      await applicationContainer.removeNodeNetwork(
+      await applicationContainer.networks.remove(
         network.id,
         node?.owner ? session : undefined,
       );

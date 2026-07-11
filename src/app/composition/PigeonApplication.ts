@@ -1,7 +1,4 @@
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
-import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type {
   Community,
   CommunityChannel,
@@ -19,7 +16,6 @@ import type {
   CommunityVoiceChannel,
   ConversationKeyEntry,
   IdentityPresence,
-  IpfsReplicationStatus,
   LocalKeychain,
   LoginResult,
   MessageResource,
@@ -30,8 +26,6 @@ import type { CommunityChannelMessageEditInput } from './CommunityChannelMessage
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 
 import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
-import { type NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import {
   RealtimeGateway,
   type RealtimeHeartbeatActivityMode,
@@ -54,8 +48,6 @@ import { PigeonStickersApplication } from './PigeonStickersApplication';
 export class PigeonApplication {
   private readonly communities: PigeonCommunitiesApplication;
 
-  private readonly networks: PigeonNetworksApplication;
-
   private readonly gateway: PigeonApiGateway;
 
   private readonly realtimeApplication: PigeonRealtimeApplication;
@@ -69,6 +61,8 @@ export class PigeonApplication {
   public readonly identities: PigeonIdentitiesApplication;
 
   public readonly messages: PigeonMessagesApplication;
+
+  public readonly networks: PigeonNetworksApplication;
 
   public readonly notifications: PigeonNotificationsApplication;
 
@@ -92,16 +86,6 @@ export class PigeonApplication {
     this.polls = new PigeonPollsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.stickers = new PigeonStickersApplication(gateway);
-  }
-
-  public async claimNode(session: Session): Promise<void> {
-    await this.networks.claimNode(session);
-  }
-
-  public async getIpfsReplicationStatus(
-    session: Session,
-  ): Promise<IpfsReplicationStatus> {
-    return await this.networks.getReplicationStatus(session);
   }
 
   public async getPresence(
@@ -151,10 +135,6 @@ export class PigeonApplication {
     signalId: string,
   ): void {
     this.realtimeApplication.acknowledgeCallSignal(socket, signalId);
-  }
-
-  public async createNetwork(name: string): Promise<void> {
-    await this.networks.create(name);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -655,66 +635,6 @@ export class PigeonApplication {
     );
   }
 
-  public async createNodeNetwork(
-    session: Session,
-    name: string,
-  ): Promise<void> {
-    await this.networks.createForNode(session, name);
-  }
-
-  public async createPublicNodeNetwork(session?: Session): Promise<void> {
-    await this.networks.createPublic(session);
-  }
-
-  public async joinNetwork(
-    id: string,
-    name: string,
-    key: string,
-  ): Promise<void> {
-    await this.networks.join(id, name, key);
-  }
-
-  public async joinNodeNetwork(
-    session: Session,
-    id: string,
-    name: string,
-    key: string,
-  ): Promise<void> {
-    await this.networks.joinForNode(session, id, name, key);
-  }
-
-  public async removeNodeNetwork(
-    networkId: string,
-    session?: Session,
-  ): Promise<NodeNetwork[]> {
-    return await this.networks.remove(networkId, session);
-  }
-
-  public async getNodeRelayConfiguration(
-    session: Session,
-  ): Promise<NodeRelayConfiguration> {
-    return await this.networks.getRelayConfiguration(session);
-  }
-
-  public async updateNodeRelayConfiguration(
-    configuration: NodeRelayConfiguration,
-    session?: Session,
-  ): Promise<NodeRelayConfiguration> {
-    return await this.networks.updateRelayConfiguration(configuration, session);
-  }
-
-  public async checkNodeRelayPorts(
-    publicHost: string,
-    checks: NodeRelayPortCheckTarget[],
-    session: Session,
-  ): Promise<NodeRelayPortCheckResource> {
-    return await this.networks.checkRelayPorts(publicHost, checks, session);
-  }
-
-  public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.networks.getNodeInfo();
-  }
-
   public async addCommunityChannelMessageReaction(
     session: Session,
     communityId: string,
@@ -745,14 +665,6 @@ export class PigeonApplication {
       messageId,
       emoji,
     );
-  }
-
-  public async listNodeNetworks(session?: Session): Promise<NodeNetwork[]> {
-    return await this.networks.list(session);
-  }
-
-  public async listPeers(): Promise<Peer[]> {
-    return await this.networks.peers();
   }
 
   public async restoreRememberedSession(

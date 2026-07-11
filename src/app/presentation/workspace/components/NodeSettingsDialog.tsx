@@ -108,7 +108,7 @@ export function NodeSettingsDialog({
       setReplicationLoading(true);
       try {
         const status =
-          await applicationContainer.getIpfsReplicationStatus(session);
+          await applicationContainer.networks.getReplicationStatus(session);
 
         if (!cancelled) setReplicationStatus(status);
       } catch (caught) {
@@ -146,7 +146,7 @@ export function NodeSettingsDialog({
       setRelayLoading(true);
       try {
         const configuration =
-          await applicationContainer.getNodeRelayConfiguration(session);
+          await applicationContainer.networks.getRelayConfiguration(session);
 
         if (!cancelled) {
           setRelayConfiguration(normalizeNodeRelayConfiguration(configuration));
@@ -175,7 +175,7 @@ export function NodeSettingsDialog({
     setNotice(null);
     setClaimLoading(true);
     try {
-      await applicationContainer.claimNode(session);
+      await applicationContainer.networks.claimNode(session);
       await onNetworksUpdated();
       setNotice(copy.nodeSettings.claimSuccess);
     } catch (caught) {
@@ -213,7 +213,7 @@ export function NodeSettingsDialog({
     setRelayError(null);
     setRelaySaving(true);
     try {
-      const saved = await applicationContainer.updateNodeRelayConfiguration(
+      const saved = await applicationContainer.networks.updateRelayConfiguration(
         relayConfiguration,
         session,
       );
