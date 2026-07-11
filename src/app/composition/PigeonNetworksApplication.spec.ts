@@ -1,17 +1,17 @@
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Session } from '../../shared/domain/pigeonResources.types';
 
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 
 describe(PigeonNetworksApplication.name, () => {
-  function gatewayDouble(): jest.Mocked<PigeonApiGateway> {
+  function gatewayDouble(): jest.Mocked<PigeonNodeGateway> {
     return {
       createNetwork: jest.fn(),
-      getNodeNetworks: jest.fn(),
+      getNetworks: jest.fn(),
       joinNetwork: jest.fn(),
       removeNetwork: jest.fn(),
-    } as unknown as jest.Mocked<PigeonApiGateway>;
+    } as unknown as jest.Mocked<PigeonNodeGateway>;
   }
 
   const session = {
@@ -44,11 +44,11 @@ describe(PigeonNetworksApplication.name, () => {
     const networks = [
       { id: 'network-1', name: 'Development network' },
     ] as NodeNetwork[];
-    gateway.getNodeNetworks.mockResolvedValue(networks);
+    gateway.getNetworks.mockResolvedValue(networks);
     const application = new PigeonNetworksApplication(gateway);
 
     await expect(application.list(session)).resolves.toBe(networks);
-    expect(gateway.getNodeNetworks).toHaveBeenCalledWith(session);
+    expect(gateway.getNetworks).toHaveBeenCalledWith(session);
   });
 
   it('joins portable network credentials through validated messages', async () => {

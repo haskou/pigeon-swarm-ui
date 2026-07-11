@@ -7,20 +7,8 @@ import {
   UUID,
 } from '@haskou/value-objects';
 
-import type {
-  CallIceServerConfig,
-  CallParticipantMediaConnection,
-  CallResource,
-  CallSignalDelivery,
-  CallSignalPayload,
-} from '../../contexts/calls/domain/callSession.types';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import type { NodeRelayConfiguration } from '../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import type {
   ChatMessage,
   Community,
@@ -48,7 +36,6 @@ import type {
   AttachmentUploadOptions,
   IdentityResource,
   IdentityPresence,
-  IpfsReplicationStatus,
   KeychainResource,
   LocalKeychain,
   LoginResult,
@@ -146,8 +133,6 @@ const messageDecryptBatchSize = 8;
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonApiGateway {
-  private readonly calls: PigeonCallsGateway;
-
   private readonly communities: PigeonCommunitiesApi;
 
   private readonly conversations: ConversationMapper;
@@ -176,8 +161,6 @@ export class PigeonApiGateway {
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
-  private readonly node: PigeonNodeGateway;
-
   private readonly notifications: PigeonNotificationsGateway;
 
   private readonly presence: PigeonPresenceApi;
@@ -191,6 +174,10 @@ export class PigeonApiGateway {
   private readonly signer: RequestSigner;
 
   private readonly stickers: PigeonStickersGateway;
+
+  public readonly calls: PigeonCallsGateway;
+
+  public readonly node: PigeonNodeGateway;
 
   public constructor(
     http: HttpJsonClient = new HttpJsonClient(
@@ -903,51 +890,6 @@ export class PigeonApiGateway {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
   }
 
-  public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.node.getInfo();
-  }
-
-  public async claimNode(session: Session): Promise<void> {
-    await this.node.claim(session);
-  }
-
-  public async getNodeNetworks(
-    session?: Session,
-  ): Promise<{ id: string; key?: null | string; name: string }[]> {
-    return await this.node.getNetworks(session);
-  }
-
-  public async getPeers(): Promise<Peer[]> {
-    return await this.node.getPeers();
-  }
-
-  public async getIpfsReplicationStatus(
-    session: Session,
-  ): Promise<IpfsReplicationStatus> {
-    return await this.node.getIpfsReplicationStatus(session);
-  }
-
-  public async getNodeRelayConfiguration(
-    session: Session,
-  ): Promise<NodeRelayConfiguration> {
-    return await this.node.getRelayConfiguration(session);
-  }
-
-  public async updateNodeRelayConfiguration(
-    configuration: NodeRelayConfiguration,
-    session?: Session,
-  ): Promise<NodeRelayConfiguration> {
-    return await this.node.updateRelayConfiguration(configuration, session);
-  }
-
-  public async checkNodeRelayPorts(
-    publicHost: string,
-    checks: NodeRelayPortCheckTarget[],
-    session: Session,
-  ): Promise<NodeRelayPortCheckResource> {
-    return await this.node.checkRelayPorts(publicHost, checks, session);
-  }
-
   public async getPresence(
     session: Session,
     identityId: string,
@@ -994,91 +936,6 @@ export class PigeonApiGateway {
     input: { status: SelectablePresenceStatus },
   ): Promise<IdentityPresence> {
     return await this.presence.update(session, input);
-  }
-
-  public async listCalls(session: Session): Promise<CallResource[]> {
-    return await this.requestCache.load(
-      this.requestCache.keyForSession('/calls/', session),
-      async () => await this.calls.list(session),
-      { ttlMs: startupReadCacheTtlMs },
-    );
-  }
-
-  public async getCall(
-    session: Session,
-    callId: string,
-  ): Promise<CallResource> {
-    return await this.calls.get(session, callId);
-  }
-
-  public async getCallIceServers(
-    session: Session,
-  ): Promise<CallIceServerConfig> {
-    return await this.calls.getIceServers(session);
-  }
-
-  public async startConversationCall(
-    session: Session,
-    conversationId: string,
-  ): Promise<CallResource> {
-    const call = await this.calls.startConversation(session, conversationId);
-
-    this.requestCache.invalidateForSession('/calls/', session);
-
-    return call;
-  }
-
-  public async startCommunityChannelCall(
-    session: Session,
-    communityId: string,
-    channelId: string,
-  ): Promise<CallResource> {
-    const call = await this.calls.startCommunityChannel(
-      session,
-      communityId,
-      channelId,
-    );
-
-    this.requestCache.invalidateForSession('/calls/', session);
-
-    return call;
-  }
-
-  public async joinCall(
-    session: Session,
-    callId: string,
-  ): Promise<CallResource> {
-    const call = await this.calls.join(session, callId);
-
-    this.requestCache.invalidateForSession('/calls/', session);
-
-    return call;
-  }
-
-  public async leaveCall(session: Session, callId: string): Promise<void> {
-    await this.calls.leave(session, callId);
-    this.requestCache.invalidateForSession('/calls/', session);
-  }
-
-  public async heartbeatCallParticipant(
-    session: Session,
-    callId: string,
-    mediaConnections: CallParticipantMediaConnection[],
-  ): Promise<CallResource> {
-    return await this.calls.heartbeat(session, callId, mediaConnections);
-  }
-
-  public async endCall(session: Session, callId: string): Promise<void> {
-    await this.calls.end(session, callId);
-    this.requestCache.invalidateForSession('/calls/', session);
-  }
-
-  public async sendCallSignal(
-    session: Session,
-    callId: string,
-    signal: CallSignalPayload,
-  ): Promise<CallSignalDelivery> {
-    return await this.calls.sendSignal(session, callId, signal);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -2164,30 +2021,6 @@ export class PigeonApiGateway {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     return await this.files.downloadAttachment(attachment, onProgress);
-  }
-
-  public async createNetwork(name: string, session?: Session): Promise<void> {
-    await this.node.createNetwork(name, session);
-  }
-
-  public async createPublicNetwork(session?: Session): Promise<void> {
-    await this.node.createPublicNetwork(session);
-  }
-
-  public async joinNetwork(
-    id: string,
-    name: string,
-    key: string,
-    session?: Session,
-  ): Promise<void> {
-    await this.node.joinNetwork(id, name, key, session);
-  }
-
-  public async removeNetwork(
-    networkId: string,
-    session?: Session,
-  ): Promise<NodeNetwork[]> {
-    return await this.node.removeNetwork(networkId, session);
   }
 
   public async listConversations(

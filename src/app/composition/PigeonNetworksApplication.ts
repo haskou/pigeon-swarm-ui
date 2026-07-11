@@ -20,7 +20,7 @@ import { ListPeers } from '../../contexts/networks/application/list-peers/ListPe
 import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
 import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
 import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 
 export class PigeonNetworksApplication {
   private readonly createNetwork: CreateNetwork;
@@ -35,7 +35,7 @@ export class PigeonNetworksApplication {
 
   private readonly removeNetwork: RemoveNodeNetwork;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: PigeonNodeGateway) {
     this.createNetwork = new CreateNetwork({
       create: async (name) => await gateway.createNetwork(name.toString()),
     });
@@ -51,8 +51,12 @@ export class PigeonNetworksApplication {
           key.toString(),
         ),
     });
-    this.listNetworks = new ListNodeNetworks(gateway);
-    this.listPeers = new ListPeers(gateway);
+    this.listNetworks = new ListNodeNetworks({
+      getNodeNetworks: async (session) => await gateway.getNetworks(session),
+    });
+    this.listPeers = new ListPeers({
+      getPeers: async () => await gateway.getPeers(),
+    });
     this.removeNetwork = new RemoveNodeNetwork({
       remove: async (networkId, session) =>
         await gateway.removeNetwork(networkId.toString(), session),
@@ -64,11 +68,11 @@ export class PigeonNetworksApplication {
     checks: NodeRelayPortCheckTarget[],
     session: Session,
   ): Promise<NodeRelayPortCheckResource> {
-    return await this.gateway.checkNodeRelayPorts(publicHost, checks, session);
+    return await this.gateway.checkRelayPorts(publicHost, checks, session);
   }
 
   public async claimNode(session: Session): Promise<void> {
-    await this.gateway.claimNode(session);
+    await this.gateway.claim(session);
   }
 
   public async create(name: string): Promise<void> {
@@ -86,13 +90,13 @@ export class PigeonNetworksApplication {
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.gateway.getNodeInfo();
+    return await this.gateway.getInfo();
   }
 
   public async getRelayConfiguration(
     session: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.getNodeRelayConfiguration(session);
+    return await this.gateway.getRelayConfiguration(session);
   }
 
   public async getReplicationStatus(
@@ -135,9 +139,6 @@ export class PigeonNetworksApplication {
     configuration: NodeRelayConfiguration,
     session?: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.updateNodeRelayConfiguration(
-      configuration,
-      session,
-    );
+    return await this.gateway.updateRelayConfiguration(configuration, session);
   }
 }

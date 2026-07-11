@@ -43,12 +43,12 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.attachments = new PigeonAttachmentsApplication(gateway);
-    this.calls = new PigeonCallsApplication(gateway);
+    this.calls = new PigeonCallsApplication(gateway.calls);
     this.communities = new PigeonCommunitiesApplication(gateway);
     this.conversations = new PigeonConversationsApplication(gateway);
     this.identities = new PigeonIdentitiesApplication(gateway);
     this.messages = new PigeonMessagesApplication(gateway);
-    this.networks = new PigeonNetworksApplication(gateway);
+    this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.polls = new PigeonPollsApplication(gateway);
     this.realtime = new PigeonRealtimeApplication(realtime);

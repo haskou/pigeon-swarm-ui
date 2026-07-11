@@ -9,14 +9,14 @@ import type { Session } from '../../shared/domain/pigeonResources.types';
 
 import { ListCalls } from '../../contexts/calls/application/list-calls/ListCalls';
 import { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
-import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
 
 export class PigeonCallsApplication {
   private readonly listCallsUseCase: ListCalls;
 
-  public constructor(private readonly gateway: PigeonApiGateway) {
+  public constructor(private readonly gateway: PigeonCallsGateway) {
     this.listCallsUseCase = new ListCalls({
-      list: async (message) => await gateway.listCalls(message.getSession()),
+      list: async (message) => await gateway.list(message.getSession()),
     });
   }
 
@@ -25,18 +25,18 @@ export class PigeonCallsApplication {
   }
 
   public async get(session: Session, callId: string): Promise<CallResource> {
-    return await this.gateway.getCall(session, callId);
+    return await this.gateway.get(session, callId);
   }
 
   public async getIceServers(session: Session): Promise<CallIceServerConfig> {
-    return await this.gateway.getCallIceServers(session);
+    return await this.gateway.getIceServers(session);
   }
 
   public async startConversation(
     session: Session,
     conversationId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startConversationCall(session, conversationId);
+    return await this.gateway.startConversation(session, conversationId);
   }
 
   public async startCommunityChannel(
@@ -44,7 +44,7 @@ export class PigeonCallsApplication {
     communityId: string,
     channelId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startCommunityChannelCall(
+    return await this.gateway.startCommunityChannel(
       session,
       communityId,
       channelId,
@@ -52,11 +52,11 @@ export class PigeonCallsApplication {
   }
 
   public async join(session: Session, callId: string): Promise<CallResource> {
-    return await this.gateway.joinCall(session, callId);
+    return await this.gateway.join(session, callId);
   }
 
   public async leave(session: Session, callId: string): Promise<void> {
-    await this.gateway.leaveCall(session, callId);
+    await this.gateway.leave(session, callId);
   }
 
   public async heartbeatParticipant(
@@ -64,15 +64,11 @@ export class PigeonCallsApplication {
     callId: string,
     mediaConnections: CallParticipantMediaConnection[],
   ): Promise<CallResource> {
-    return await this.gateway.heartbeatCallParticipant(
-      session,
-      callId,
-      mediaConnections,
-    );
+    return await this.gateway.heartbeat(session, callId, mediaConnections);
   }
 
   public async end(session: Session, callId: string): Promise<void> {
-    await this.gateway.endCall(session, callId);
+    await this.gateway.end(session, callId);
   }
 
   public async sendSignal(
@@ -80,6 +76,6 @@ export class PigeonCallsApplication {
     callId: string,
     signal: CallSignalPayload,
   ): Promise<CallSignalDelivery> {
-    return await this.gateway.sendCallSignal(session, callId, signal);
+    return await this.gateway.sendSignal(session, callId, signal);
   }
 }

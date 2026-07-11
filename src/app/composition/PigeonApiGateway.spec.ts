@@ -69,7 +69,7 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as RequestSigner;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.getNodeNetworks()).resolves.toBe(response.networks);
+    await expect(gateway.node.getNetworks()).resolves.toBe(response.networks);
 
     expect(signer.headers).not.toHaveBeenCalled();
     expect(http.request).toHaveBeenCalledWith('/node/networks/', {
@@ -94,7 +94,7 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.getNodeNetworks(session)).resolves.toBe(
+    await expect(gateway.node.getNetworks(session)).resolves.toBe(
       response.networks,
     );
 
@@ -118,7 +118,7 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as RequestSigner;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.createPublicNetwork()).resolves.toBeUndefined();
+    await expect(gateway.node.createPublicNetwork()).resolves.toBeUndefined();
 
     expect(signer.headers).not.toHaveBeenCalled();
     expect(http.request).toHaveBeenCalledWith('/node/networks/public/', {
@@ -140,7 +140,9 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.createPublicNetwork(session)).resolves.toBeUndefined();
+    await expect(
+      gateway.node.createPublicNetwork(session),
+    ).resolves.toBeUndefined();
 
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -165,7 +167,7 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as RequestSigner;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.removeNetwork('network-1')).resolves.toBe(
+    await expect(gateway.node.removeNetwork('network-1')).resolves.toBe(
       response.networks,
     );
 
@@ -192,9 +194,9 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.removeNetwork('network-1', session)).resolves.toBe(
-      response.networks,
-    );
+    await expect(
+      gateway.node.removeNetwork('network-1', session),
+    ).resolves.toBe(response.networks);
 
     expect(signer.headers).toHaveBeenCalledWith(
       session,
@@ -767,7 +769,7 @@ describe(PigeonApiGateway.name, () => {
     ];
 
     await expect(
-      gateway.heartbeatCallParticipant(session, 'call-1', mediaConnections),
+      gateway.calls.heartbeat(session, 'call-1', mediaConnections),
     ).resolves.toBe(call);
 
     expect(http.request).toHaveBeenCalledWith(
@@ -800,7 +802,7 @@ describe(PigeonApiGateway.name, () => {
     };
 
     await expect(
-      gateway.sendCallSignal(session, 'call-1', signal),
+      gateway.calls.sendSignal(session, 'call-1', signal),
     ).resolves.toEqual(delivery);
 
     expect(http.request).toHaveBeenCalledWith('/calls/call-1/signals', {
@@ -850,7 +852,7 @@ describe(PigeonApiGateway.name, () => {
     const gateway = new PigeonApiGateway(http, signer);
     const path = '/ipfs/replication/status';
 
-    await expect(gateway.getIpfsReplicationStatus(session)).resolves.toBe(
+    await expect(gateway.node.getIpfsReplicationStatus(session)).resolves.toBe(
       response,
     );
 
