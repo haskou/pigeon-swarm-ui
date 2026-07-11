@@ -1,14 +1,14 @@
-import type { NodeRelayConfiguration } from '../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NodeNetwork } from '../../../contexts/networks/application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../../contexts/networks/application/list-peers/ListPeers';
 import type {
   IpfsReplicationStatus,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
+import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
+import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
+import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
+import type { Peer } from '../../application/list-peers/ListPeers';
 
-import { PigeonNodeApi } from '../../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import { PigeonNodeApi } from './PigeonNodeApi';
 
 export class PigeonNodeGateway {
   public constructor(private readonly node: PigeonNodeApi) {}

@@ -9,7 +9,7 @@ import type { Session } from '../../shared/domain/pigeonResources.types';
 
 import { ListCalls } from '../../contexts/calls/application/list-calls/ListCalls';
 import { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
-import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
+import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 
 export class PigeonCallsApplication {
   private readonly listCallsUseCase: ListCalls;

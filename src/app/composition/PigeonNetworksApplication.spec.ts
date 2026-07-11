@@ -1,7 +1,7 @@
 import type { NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Session } from '../../shared/domain/pigeonResources.types';
 
-import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
+import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 
 describe(PigeonNetworksApplication.name, () => {

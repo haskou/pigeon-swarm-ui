@@ -74,6 +74,7 @@ import type { PublishedCommunityKey } from './PigeonApiGateway/PublishedCommunit
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
+import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 import { encryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
@@ -91,6 +92,7 @@ import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/M
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 import { NotificationDecision } from '../../contexts/notifications/domain/NotificationDecision';
 import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
@@ -107,11 +109,9 @@ import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
-import { PigeonCallsGateway } from './gateways/PigeonCallsGateway';
 import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
 import { PigeonIdentityGateway } from './gateways/PigeonIdentityGateway';
 import { PigeonIdentityKeyProtectionGateway } from './gateways/PigeonIdentityKeyProtectionGateway';
-import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
 import { PigeonNotificationsGateway } from './gateways/PigeonNotificationsGateway';
 import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
 import { PigeonPushGateway } from './gateways/PigeonPushGateway';

@@ -20,7 +20,7 @@ import { ListPeers } from '../../contexts/networks/application/list-peers/ListPe
 import { ListPeersMessage } from '../../contexts/networks/application/list-peers/messages/ListPeersMessage';
 import { RemoveNodeNetworkMessage } from '../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
 import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
-import { PigeonNodeGateway } from './gateways/PigeonNodeGateway';
+import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 
 export class PigeonNetworksApplication {
   private readonly createNetwork: CreateNetwork;
