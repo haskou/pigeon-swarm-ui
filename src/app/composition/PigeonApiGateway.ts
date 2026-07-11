@@ -76,7 +76,6 @@ import type {
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 import type { CachedIdentity } from './PigeonApiGateway/CachedIdentity';
-import type { CachedRequestEntry } from './PigeonApiGateway/CachedRequestEntry';
 import type { CachedRequestOptions } from './PigeonApiGateway/CachedRequestOptions';
 import type { CommunityChannelMessageEditInput } from './PigeonApiGateway/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './PigeonApiGateway/CommunityChannelMessageInput';
@@ -133,6 +132,7 @@ import { PigeonPushGateway } from './gateways/PigeonPushGateway';
 import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
 import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
 import { hasEncryptedPayload } from './PigeonApiGateway/hasEncryptedPayload';
+import { PigeonRequestCache } from './PigeonApiGateway/PigeonRequestCache';
 import { throwIfMessageLoadAborted } from './PigeonApiGateway/throwIfMessageLoadAborted';
 import { uniqueSorted } from './PigeonApiGateway/uniqueSorted';
 import { yieldAfterMessageDecryptBatch } from './PigeonApiGateway/yieldAfterMessageDecryptBatch';
@@ -185,10 +185,7 @@ export class PigeonApiGateway {
 
   private readonly push: PigeonPushGateway;
 
-  private readonly requestCache = new Map<
-    string,
-    CachedRequestEntry<unknown>
-  >();
+  private readonly requestCache = new PigeonRequestCache();
 
   private readonly identityCache = new Map<string, CachedIdentity>();
 
@@ -223,9 +220,9 @@ export class PigeonApiGateway {
         key: string,
         loader: () => Promise<T>,
         options?: CachedRequestOptions,
-      ) => this.cachedRequest(key, loader, options),
+      ) => this.requestCache.load(key, loader, options),
       new DraftPayloadCipher(),
-      (key: string) => this.invalidateCachedRequest(key),
+      (key: string) => this.requestCache.invalidate(key),
     );
     this.conversations = conversations;
     this.draftPayloads = new DraftPayloadCipher();
@@ -249,10 +246,13 @@ export class PigeonApiGateway {
           key: string,
           loader: () => Promise<T>,
           options?: CachedRequestOptions,
-        ) => this.cachedRequest(key, loader, options),
+        ) => this.requestCache.load(key, loader, options),
       ),
       (session) =>
-        this.invalidateSessionCacheKey('/notification-settings/', session),
+        this.requestCache.invalidateForSession(
+          '/notification-settings/',
+          session,
+        ),
     );
     this.presence = new PigeonPresenceApi(http, signer);
     this.polls = new PigeonPollsApi(http, signer);
@@ -706,74 +706,11 @@ export class PigeonApiGateway {
     )}/around?${query.toString()}`;
   }
 
-  private async cachedRequest<T>(
-    key: string,
-    loader: () => Promise<T>,
-    options: CachedRequestOptions = {},
-  ): Promise<T> {
-    const now = Date.now();
-    const cached = this.requestCache.get(key) as
-      | CachedRequestEntry<T>
-      | undefined;
-
-    if (cached && (!cached.settled || cached.expiresAt > now)) {
-      return await cached.promise;
-    }
-
-    if (cached) this.requestCache.delete(key);
-
-    const entry: CachedRequestEntry<T> = {
-      expiresAt: Number.POSITIVE_INFINITY,
-      promise: Promise.resolve(undefined as T),
-      settled: false,
-    };
-
-    entry.promise = Promise.resolve()
-      .then(loader)
-      .then((result) => {
-        entry.settled = true;
-        entry.expiresAt = Date.now() + (options.ttlMs ?? 0);
-
-        if (!options.ttlMs && this.requestCache.get(key) === entry) {
-          this.requestCache.delete(key);
-        }
-
-        return result;
-      })
-      .catch((caught: unknown) => {
-        if (this.requestCache.get(key) === entry) {
-          this.requestCache.delete(key);
-        }
-
-        throw caught;
-      });
-
-    this.requestCache.set(key, entry);
-
-    return await entry.promise;
-  }
-
-  private sessionCacheKey(
-    method: 'GET',
-    path: string,
-    session: Session,
-  ): string {
-    return `${method} ${path} ${session.identity.id}`;
-  }
-
-  private invalidateSessionCacheKey(path: string, session: Session): void {
-    this.requestCache.delete(this.sessionCacheKey('GET', path, session));
-  }
-
-  private invalidateCachedRequest(key: string): void {
-    this.requestCache.delete(key);
-  }
-
   private invalidateConversationPinsCache(
     session: Session,
     conversationId: string,
   ): void {
-    this.invalidateSessionCacheKey(
+    this.requestCache.invalidateForSession(
       `/conversations/${encodeURIComponent(conversationId)}/pins`,
       session,
     );
@@ -784,7 +721,7 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): void {
-    this.invalidateSessionCacheKey(
+    this.requestCache.invalidateForSession(
       `/communities/${encodeURIComponent(
         communityId,
       )}/channels/${encodeURIComponent(channelId)}/pins`,
@@ -822,7 +759,7 @@ export class PigeonApiGateway {
       ),
       method: 'POST',
     });
-    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
+    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
     return this.conversations.normalize(created, peerIdentityId);
   }
@@ -849,7 +786,7 @@ export class PigeonApiGateway {
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
-    this.invalidateSessionCacheKey('/conversations/?limit=30', session);
+    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
     return this.conversations.normalize(created);
   }
@@ -1045,7 +982,7 @@ export class PigeonApiGateway {
   ): Promise<IdentityPresence[]> {
     const uniqueIdentityIds = [...new Set(identityIds.filter(Boolean))].sort();
 
-    return await this.cachedRequest(
+    return await this.requestCache.load(
       `GET /presence/ ${session.identity.id} ${uniqueIdentityIds.join('\u0000')}`,
       () => this.presence.getMany(session, uniqueIdentityIds),
       { ttlMs: startupReadCacheTtlMs },
@@ -1081,8 +1018,8 @@ export class PigeonApiGateway {
   }
 
   public async listCalls(session: Session): Promise<CallResource[]> {
-    return await this.cachedRequest(
-      this.sessionCacheKey('GET', '/calls/', session),
+    return await this.requestCache.load(
+      this.requestCache.keyForSession('/calls/', session),
       async () => await this.calls.list(session),
       { ttlMs: startupReadCacheTtlMs },
     );
@@ -1107,7 +1044,7 @@ export class PigeonApiGateway {
   ): Promise<CallResource> {
     const call = await this.calls.startConversation(session, conversationId);
 
-    this.invalidateSessionCacheKey('/calls/', session);
+    this.requestCache.invalidateForSession('/calls/', session);
 
     return call;
   }
@@ -1123,7 +1060,7 @@ export class PigeonApiGateway {
       channelId,
     );
 
-    this.invalidateSessionCacheKey('/calls/', session);
+    this.requestCache.invalidateForSession('/calls/', session);
 
     return call;
   }
@@ -1134,14 +1071,14 @@ export class PigeonApiGateway {
   ): Promise<CallResource> {
     const call = await this.calls.join(session, callId);
 
-    this.invalidateSessionCacheKey('/calls/', session);
+    this.requestCache.invalidateForSession('/calls/', session);
 
     return call;
   }
 
   public async leaveCall(session: Session, callId: string): Promise<void> {
     await this.calls.leave(session, callId);
-    this.invalidateSessionCacheKey('/calls/', session);
+    this.requestCache.invalidateForSession('/calls/', session);
   }
 
   public async heartbeatCallParticipant(
@@ -1154,7 +1091,7 @@ export class PigeonApiGateway {
 
   public async endCall(session: Session, callId: string): Promise<void> {
     await this.calls.end(session, callId);
-    this.invalidateSessionCacheKey('/calls/', session);
+    this.requestCache.invalidateForSession('/calls/', session);
   }
 
   public async sendCallSignal(
@@ -1271,7 +1208,10 @@ export class PigeonApiGateway {
       communityId,
     );
 
-    this.invalidateSessionCacheKey('/communities/membership-requests', session);
+    this.requestCache.invalidateForSession(
+      '/communities/membership-requests',
+      session,
+    );
 
     return request;
   }
@@ -1292,7 +1232,10 @@ export class PigeonApiGateway {
       requestId,
       status,
     );
-    this.invalidateSessionCacheKey('/communities/membership-requests', session);
+    this.requestCache.invalidateForSession(
+      '/communities/membership-requests',
+      session,
+    );
 
     if (status === 'accepted' && request.type === 'request') {
       const hasCommunityKey = Boolean(
@@ -1560,7 +1503,7 @@ export class PigeonApiGateway {
       updatedAt,
     );
 
-    this.invalidateSessionCacheKey('/communities/me/drafts', session);
+    this.requestCache.invalidateForSession('/communities/me/drafts', session);
 
     return draft;
   }
@@ -1571,7 +1514,7 @@ export class PigeonApiGateway {
     channelId: string,
   ): Promise<void> {
     await this.communities.deleteChannelDraft(session, communityId, channelId);
-    this.invalidateSessionCacheKey('/communities/me/drafts', session);
+    this.requestCache.invalidateForSession('/communities/me/drafts', session);
   }
 
   public async searchCommunityChannelMessages(
@@ -2297,8 +2240,8 @@ export class PigeonApiGateway {
     session: Session,
   ): Promise<ConversationResource[]> {
     const path = '/conversations/?limit=30';
-    const raw = await this.cachedRequest(
-      this.sessionCacheKey('GET', path, session),
+    const raw = await this.requestCache.load(
+      this.requestCache.keyForSession(path, session),
       async () =>
         await this.http.request<unknown>(path, {
           headers: await this.signer.headers(session, 'GET', path),
@@ -2372,7 +2315,7 @@ export class PigeonApiGateway {
         : limitOrOptions;
     const limit = options.limit ?? 30;
     const path = this.messagesPath(conversationId, before, limit);
-    const raw = await this.cachedRequest(
+    const raw = await this.requestCache.load(
       `GET ${path} ${session.identity.id}`,
       async () =>
         await this.http.request<unknown>(path, {
@@ -2471,8 +2414,8 @@ export class PigeonApiGateway {
   ): Promise<MessagePin[]> {
     const path = `/conversations/${encodeURIComponent(conversationId)}/pins`;
 
-    return await this.cachedRequest(
-      this.sessionCacheKey('GET', path, session),
+    return await this.requestCache.load(
+      this.requestCache.keyForSession(path, session),
       async () => {
         const result = await this.http.request<ConversationMessagePinsResource>(
           path,
@@ -2529,8 +2472,8 @@ export class PigeonApiGateway {
   ): Promise<ConversationDraft[]> {
     const path = '/conversations/me/drafts';
 
-    return await this.cachedRequest(
-      this.sessionCacheKey('GET', path, session),
+    return await this.requestCache.load(
+      this.requestCache.keyForSession(path, session),
       async () => {
         const result = await this.http.request<ConversationDraftsResource>(
           path,
@@ -2571,7 +2514,7 @@ export class PigeonApiGateway {
         method: 'PUT',
       },
     );
-    this.invalidateSessionCacheKey('/conversations/me/drafts', session);
+    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
 
     return { ...draft, content };
   }
@@ -2586,14 +2529,14 @@ export class PigeonApiGateway {
       headers: await this.signer.headers(session, 'DELETE', path),
       method: 'DELETE',
     });
-    this.invalidateSessionCacheKey('/conversations/me/drafts', session);
+    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
     const path = `/keychains/${encodeURIComponent(session.identity.id)}`;
 
-    return await this.cachedRequest(
-      this.sessionCacheKey('GET', path, session),
+    return await this.requestCache.load(
+      this.requestCache.keyForSession(path, session),
       async () =>
         await this.http.request<KeychainResource>(path, {
           headers: await this.signer.headers(session, 'GET', path),
@@ -2749,7 +2692,7 @@ export class PigeonApiGateway {
       headers: await this.signer.headers(session, 'POST', path, encrypted.body),
       method: 'POST',
     });
-    this.invalidateSessionCacheKey(
+    this.requestCache.invalidateForSession(
       `/keychains/${encodeURIComponent(session.identity.id)}`,
       session,
     );
