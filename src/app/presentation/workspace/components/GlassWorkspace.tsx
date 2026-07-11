@@ -69,8 +69,8 @@ import {
   logCallError,
   logCallWarning,
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
-import { CallMicrophoneCapture } from '../../../../contexts/calls/infrastructure/media/CallMicrophoneCapture';
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
 import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
 import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
@@ -113,7 +113,6 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
-import { writeJsonToLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 import { cx } from '../../../../shared/presentation/cx';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import {
@@ -146,10 +145,6 @@ import {
 } from './realtimeEventAttributes';
 import { ChatColumn } from './ChatColumn';
 import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
-import {
-  callAudioStorageKey,
-  loadCallNoiseCancellationEnabled,
-} from './workspacePersistence';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import {
   communitiesWithCallVoicePresence,
@@ -330,8 +325,6 @@ export function GlassWorkspace({
     promptDismissed: pushPromptDismissed,
     promptReady: pushPromptReady,
   } = usePushNotificationRegistration(session);
-  const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
-    useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
   const communityVoiceTopologyKey = useMemo(
     () => communityVoiceChannelTopologyKey(communities),
     [communities],
@@ -391,6 +384,16 @@ export function GlassWorkspace({
     toggleScreenShare,
   } = useCallSession();
   const {
+    noiseCancellationEnabled: callNoiseCancellationEnabled,
+    requestOptionalLocalAudio,
+    stopLocalAudio,
+    toggleCallNoiseCancellation,
+  } = useCallMediaAccess({
+    identityId: session.identity.id,
+    onError: setSendError,
+    toggleNoiseCancellation,
+  });
+  const {
     clearSidebarGesture,
     handleWorkspacePointerDown,
     handleWorkspacePointerMove,
@@ -439,18 +442,6 @@ export function GlassWorkspace({
       seenCommunityMembershipRequests.get(session.identity.id),
     );
   }, [session.identity.id]);
-
-  useEffect(() => {
-    setCallNoiseCancellationEnabled(
-      loadCallNoiseCancellationEnabled(session.identity.id),
-    );
-  }, [session.identity.id]);
-
-  useEffect(() => {
-    writeJsonToLocalStorage(callAudioStorageKey(session.identity.id), {
-      noiseCancellationEnabled: callNoiseCancellationEnabled,
-    });
-  }, [callNoiseCancellationEnabled, session.identity.id]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -1101,46 +1092,6 @@ export function GlassWorkspace({
       throw new Error(copy.calls.iceServersUnavailable);
     }
   }, []);
-  const requestLocalAudio = useCallback(async (): Promise<MediaStream> => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(copy.calls.microphoneUnavailable);
-    }
-
-    try {
-      return await CallMicrophoneCapture.capture(navigator.mediaDevices, {
-        noiseCancellationEnabled: callNoiseCancellationEnabled,
-      });
-    } catch {
-      throw new Error(copy.calls.microphoneUnavailable);
-    }
-  }, [callNoiseCancellationEnabled]);
-  const requestOptionalLocalAudio = useCallback(
-    async (
-      event: string,
-      context: Record<string, unknown>,
-    ): Promise<MediaStream | null> =>
-      await requestLocalAudio().catch((caught): null => {
-        logCallWarning(event, {
-          ...context,
-          error: caught,
-        });
-
-        return null;
-      }),
-    [requestLocalAudio],
-  );
-  const stopLocalAudio = (stream: MediaStream | null) => {
-    CallMicrophoneCapture.stop(stream);
-  };
-  const toggleCallNoiseCancellation = useCallback(() => {
-    const enabled = !callNoiseCancellationEnabled;
-
-    setCallNoiseCancellationEnabled(enabled);
-    void toggleNoiseCancellation(enabled).catch((caught) => {
-      setCallNoiseCancellationEnabled(!enabled);
-      setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
-    });
-  }, [callNoiseCancellationEnabled, toggleNoiseCancellation]);
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     const identityId = sessionRef.current.identity.id;
 
@@ -1319,7 +1270,7 @@ export function GlassWorkspace({
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
-      requestLocalAudio,
+      requestOptionalLocalAudio,
       startCall,
     ],
   );
@@ -1555,7 +1506,7 @@ export function GlassWorkspace({
     incomingCall,
     leaveCurrentCallForSwitch,
     loadCallIceConfig,
-    requestLocalAudio,
+    requestOptionalLocalAudio,
     startCall,
   ]);
 
