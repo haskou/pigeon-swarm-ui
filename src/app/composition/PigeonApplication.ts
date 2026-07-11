@@ -64,22 +64,6 @@ import type { CommunityChannelMessageInput } from './CommunityChannelMessageInpu
 
 import { type CreateGroupConversationInput } from '../../contexts/conversations/application/create-group-conversation/CreateGroupConversation';
 import { ConversationTimeline } from '../../contexts/conversations/domain/ConversationTimeline';
-import { AddMessageReaction } from '../../contexts/messages/application/add-message-reaction/AddMessageReaction';
-import { AddMessageReactionMessage } from '../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
-import { DeleteMessage } from '../../contexts/messages/application/delete-message/DeleteMessage';
-import { DeleteMessageMessage } from '../../contexts/messages/application/delete-message/messages/DeleteMessageMessage';
-import { EditMessage } from '../../contexts/messages/application/edit-message/EditMessage';
-import { EditMessageMessage } from '../../contexts/messages/application/edit-message/messages/EditMessageMessage';
-import { LoadMessage } from '../../contexts/messages/application/load-message/LoadMessage';
-import { LoadMessageMessage } from '../../contexts/messages/application/load-message/messages/LoadMessageMessage';
-import { LoadMessagesAround } from '../../contexts/messages/application/load-messages-around/LoadMessagesAround';
-import { LoadMessagesAroundMessage } from '../../contexts/messages/application/load-messages-around/messages/LoadMessagesAroundMessage';
-import { LoadMessages } from '../../contexts/messages/application/load-messages/LoadMessages';
-import { LoadMessagesMessage } from '../../contexts/messages/application/load-messages/messages/LoadMessagesMessage';
-import { RemoveMessageReactionMessage } from '../../contexts/messages/application/remove-message-reaction/messages/RemoveMessageReactionMessage';
-import { RemoveMessageReaction } from '../../contexts/messages/application/remove-message-reaction/RemoveMessageReaction';
-import { SendMessageMessage } from '../../contexts/messages/application/send-message/messages/SendMessageMessage';
-import { SendMessage } from '../../contexts/messages/application/send-message/SendMessage';
 import { type NodeNetwork } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import { type Peer } from '../../contexts/networks/application/list-peers/ListPeers';
 import {
@@ -94,6 +78,7 @@ import { PigeonCallsApplication } from './PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from './PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from './PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
+import { PigeonMessagesApplication } from './PigeonMessagesApplication';
 import { PigeonNetworksApplication } from './PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from './PigeonNotificationsApplication';
 import { PigeonPollsApplication } from './PigeonPollsApplication';
@@ -111,6 +96,8 @@ export class PigeonApplication {
 
   private readonly identities: PigeonIdentitiesApplication;
 
+  private readonly messages: PigeonMessagesApplication;
+
   private readonly notifications: PigeonNotificationsApplication;
 
   private readonly polls: PigeonPollsApplication;
@@ -123,22 +110,6 @@ export class PigeonApplication {
 
   private readonly stickers: PigeonStickersApplication;
 
-  private readonly deleteMessageUseCase: DeleteMessage;
-
-  private readonly editMessageUseCase: EditMessage;
-
-  private readonly addMessageReactionUseCase: AddMessageReaction;
-
-  private readonly loadMessagesUseCase: LoadMessages;
-
-  private readonly loadMessageUseCase: LoadMessage;
-
-  private readonly loadMessagesAroundUseCase: LoadMessagesAround;
-
-  private readonly removeMessageReactionUseCase: RemoveMessageReaction;
-
-  private readonly sendMessageUseCase: SendMessage;
-
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
@@ -149,19 +120,12 @@ export class PigeonApplication {
     this.communities = new PigeonCommunitiesApplication(gateway);
     this.conversations = new PigeonConversationsApplication(gateway);
     this.identities = new PigeonIdentitiesApplication(gateway);
+    this.messages = new PigeonMessagesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway);
     this.notifications = new PigeonNotificationsApplication(gateway);
     this.polls = new PigeonPollsApplication(gateway);
     this.realtimeApplication = new PigeonRealtimeApplication(realtime);
     this.stickers = new PigeonStickersApplication(gateway);
-    this.addMessageReactionUseCase = new AddMessageReaction(gateway);
-    this.deleteMessageUseCase = new DeleteMessage(gateway);
-    this.editMessageUseCase = new EditMessage(gateway);
-    this.loadMessageUseCase = new LoadMessage(gateway);
-    this.loadMessagesAroundUseCase = new LoadMessagesAround(gateway);
-    this.loadMessagesUseCase = new LoadMessages(gateway);
-    this.removeMessageReactionUseCase = new RemoveMessageReaction(gateway);
-    this.sendMessageUseCase = new SendMessage(gateway);
   }
 
   public async acceptConversationInvitation(
@@ -884,7 +848,7 @@ export class PigeonApplication {
     session: Session,
     url: string,
   ): Promise<MessageLinkPreview> {
-    return await this.gateway.createLinkPreview(session, url);
+    return await this.messages.createLinkPreview(session, url);
   }
 
   public async createPoll(
@@ -1007,9 +971,7 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.deleteMessageUseCase.delete(
-      new DeleteMessageMessage({ conversationId, messageId, session }),
-    );
+    await this.messages.delete(session, conversationId, messageId);
   }
 
   public async editMessage(
@@ -1019,14 +981,12 @@ export class PigeonApplication {
     content: string,
     options: EditMessageOptions = {},
   ): Promise<ChatMessage> {
-    return await this.editMessageUseCase.edit(
-      new EditMessageMessage({
-        content,
-        conversationId,
-        messageId,
-        options,
-        session,
-      }),
+    return await this.messages.edit(
+      session,
+      conversationId,
+      messageId,
+      content,
+      options,
     );
   }
 
@@ -1036,13 +996,11 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.addMessageReactionUseCase.add(
-      new AddMessageReactionMessage({
-        conversationId,
-        emoji,
-        messageId,
-        session,
-      }),
+    await this.messages.addReactionTo(
+      session,
+      conversationId,
+      messageId,
+      emoji,
     );
   }
 
@@ -1052,13 +1010,11 @@ export class PigeonApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.removeMessageReactionUseCase.remove(
-      new RemoveMessageReactionMessage({
-        conversationId,
-        emoji,
-        messageId,
-        session,
-      }),
+    await this.messages.removeReactionFrom(
+      session,
+      conversationId,
+      messageId,
+      emoji,
     );
   }
 
@@ -1284,14 +1240,7 @@ export class PigeonApplication {
     before?: null | string,
     options?: { limit?: number; signal?: AbortSignal },
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.loadMessagesUseCase.load(
-      new LoadMessagesMessage({
-        before,
-        conversationId,
-        options,
-        session,
-      }),
-    );
+    return await this.messages.load(session, conversationId, before, options);
   }
 
   public async loadMessage(
@@ -1299,9 +1248,7 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<ChatMessage | null> {
-    return await this.loadMessageUseCase.load(
-      new LoadMessageMessage({ conversationId, messageId, session }),
-    );
+    return await this.messages.loadOne(session, conversationId, messageId);
   }
 
   public async decryptMessageResource(
@@ -1309,7 +1256,7 @@ export class PigeonApplication {
     conversationId: string,
     message: MessageResource,
   ): Promise<ChatMessage> {
-    return await this.gateway.decryptMessage(session, conversationId, message);
+    return await this.messages.decrypt(session, conversationId, message);
   }
 
   public async loadMessagesAround(
@@ -1321,9 +1268,7 @@ export class PigeonApplication {
     nextCursor?: null | string;
     previousCursor?: null | string;
   }> {
-    return await this.loadMessagesAroundUseCase.loadAround(
-      new LoadMessagesAroundMessage({ conversationId, messageId, session }),
-    );
+    return await this.messages.loadAround(session, conversationId, messageId);
   }
 
   public async loadMessageThread(
@@ -1332,7 +1277,7 @@ export class PigeonApplication {
     messageId: string,
     options: { limit?: number } = {},
   ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
-    return await this.gateway.loadMessageThread(
+    return await this.messages.loadThread(
       session,
       conversationId,
       messageId,
@@ -1344,7 +1289,7 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
   ): Promise<MessagePin[]> {
-    return await this.gateway.listMessagePins(session, conversationId);
+    return await this.messages.listPins(session, conversationId);
   }
 
   public async pinMessage(
@@ -1352,7 +1297,7 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.gateway.pinMessage(session, conversationId, messageId);
+    await this.messages.pin(session, conversationId, messageId);
   }
 
   public async unpinMessage(
@@ -1360,13 +1305,13 @@ export class PigeonApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.gateway.unpinMessage(session, conversationId, messageId);
+    await this.messages.unpin(session, conversationId, messageId);
   }
 
   public async listConversationDrafts(
     session: Session,
   ): Promise<ConversationDraft[]> {
-    return await this.gateway.listConversationDrafts(session);
+    return await this.messages.listDrafts(session);
   }
 
   public async saveConversationDraft(
@@ -1375,7 +1320,7 @@ export class PigeonApplication {
     content: string,
     updatedAt = Date.now(),
   ): Promise<ConversationDraft> {
-    return await this.gateway.saveConversationDraft(
+    return await this.messages.saveDraft(
       session,
       conversationId,
       content,
@@ -1387,7 +1332,7 @@ export class PigeonApplication {
     session: Session,
     conversationId: string,
   ): Promise<void> {
-    await this.gateway.deleteConversationDraft(session, conversationId);
+    await this.messages.deleteDraft(session, conversationId);
   }
 
   public async login(
@@ -1454,14 +1399,7 @@ export class PigeonApplication {
     content: string,
     options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
-    return await this.sendMessageUseCase.send(
-      new SendMessageMessage({
-        content,
-        conversationId,
-        options,
-        session,
-      }),
-    );
+    return await this.messages.send(session, conversationId, content, options);
   }
 
   public async updateNotification(
