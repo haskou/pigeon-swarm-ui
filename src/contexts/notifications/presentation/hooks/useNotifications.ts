@@ -250,7 +250,7 @@ async function listCommunitiesAfterCommunityAccept(
   communityId?: string,
 ): Promise<Community[]> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const communities = await applicationContainer.listCommunities(session);
+    const communities = await applicationContainer.communities.list(session);
 
     if (
       !communityId ||
@@ -264,5 +264,5 @@ async function listCommunitiesAfterCommunityAccept(
     );
   }
 
-  return await applicationContainer.listCommunities(session);
+  return await applicationContainer.communities.list(session);
 }

@@ -86,7 +86,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     try {
       const applicationContainer = await loadApplicationContainer();
       const nextCommunities =
-        await applicationContainer.listCommunities(session);
+        await applicationContainer.communities.list(session);
 
       rememberCommunities(nextCommunities);
       setLoadedIdentityId(identityId);

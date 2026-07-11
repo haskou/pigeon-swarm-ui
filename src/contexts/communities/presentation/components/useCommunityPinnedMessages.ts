@@ -50,7 +50,7 @@ export function useCommunityPinnedMessages({
 
     setCollection({ error: null, messages: [], state: 'loading' });
     try {
-      const result = await applicationContainer.listCommunityChannelMessagePins(
+      const result = await applicationContainer.communities.listChannelMessagePins(
         session,
         communityId,
         selectedChannelId,
@@ -85,7 +85,7 @@ export function useCommunityPinnedMessages({
     let cancelled = false;
 
     void applicationContainer
-      .listCommunityChannelMessagePins(session, communityId, selectedChannelId)
+      .communities.listChannelMessagePins(session, communityId, selectedChannelId)
       .then((result) => {
         if (!cancelled) {
           setMessageIds(new Set(result.pins.map((pin) => pin.messageId)));
@@ -142,7 +142,7 @@ export function useCommunityPinnedMessages({
 
       closeMessageMenu();
       try {
-        await applicationContainer.pinCommunityChannelMessage(
+        await applicationContainer.communities.pinChannelMessage(
           session,
           communityId,
           channelId,
@@ -173,7 +173,7 @@ export function useCommunityPinnedMessages({
       if (!channelId || !canManageMessages) return;
 
       try {
-        await applicationContainer.unpinCommunityChannelMessage(
+        await applicationContainer.communities.unpinChannelMessage(
           session,
           communityId,
           channelId,

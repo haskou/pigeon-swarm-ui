@@ -3137,7 +3137,7 @@ export function GlassWorkspace({
       if (!window.confirm(copy.communities.leaveConfirm)) return;
 
       try {
-        const result = await applicationContainer.leaveCommunity(
+        const result = await applicationContainer.communities.leave(
           session,
           community.id,
         );
@@ -3733,7 +3733,7 @@ export function GlassWorkspace({
 
               if (request.status === 'accepted') {
                 void applicationContainer
-                  .getCommunity(sessionRef.current, request.communityId)
+                  .communities.get(sessionRef.current, request.communityId)
                   .then((community) => {
                     setCommunities((current) => [
                       community,

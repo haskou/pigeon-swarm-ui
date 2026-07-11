@@ -60,7 +60,7 @@ export function useCommunityThreadNavigation({
       setThreadPanel(initialThreadState(channelId, message, 'loading'));
       try {
         const result =
-          await applicationContainer.listCommunityChannelMessageThread(
+          await applicationContainer.communities.listChannelMessageThread(
             session,
             communityId,
             channelId,
@@ -119,7 +119,7 @@ export function useCommunityThreadNavigation({
       let beforeMessageId: null | string | undefined;
 
       for (let page = 0; page < 8; page += 1) {
-        const result = await applicationContainer.listCommunityChannelMessages(
+        const result = await applicationContainer.communities.listChannelMessages(
           session,
           communityId,
           channelId,

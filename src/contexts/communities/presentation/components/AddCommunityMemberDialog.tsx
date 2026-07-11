@@ -103,7 +103,7 @@ export function AddCommunityMemberDialog({
     setState('loading');
     setError(null);
     try {
-      const result = await applicationContainer.createCommunityInvitation(
+      const result = await applicationContainer.communities.createInvitation(
         session,
         communityId,
         identityId,
@@ -134,7 +134,7 @@ export function AddCommunityMemberDialog({
     setLinkState('loading');
     setError(null);
     try {
-      const result = await applicationContainer.createCommunityInviteLink(
+      const result = await applicationContainer.communities.createInviteLink(
         session,
         communityId,
       );

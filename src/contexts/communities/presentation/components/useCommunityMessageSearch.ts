@@ -68,13 +68,13 @@ export function useCommunityMessageSearch({
     try {
       const result =
         scope === 'channel' && selectedChannelId
-          ? await applicationContainer.searchCommunityChannelMessages(
+          ? await applicationContainer.communities.searchChannelMessages(
               session,
               communityId,
               selectedChannelId,
               { limit: 20, query: trimmedQuery },
             )
-          : await applicationContainer.searchCommunityMessages(
+          : await applicationContainer.communities.searchMessages(
               session,
               communityId,
               { limit: 20, query: trimmedQuery },

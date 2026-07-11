@@ -76,7 +76,7 @@ export function CommunityDiscoveryDialog({
       setError(null);
 
       void applicationContainer
-        .discoverCommunities(session, { networkId, query })
+        .communities.discover(session, { networkId, query })
         .then((result) => {
           if (!cancelled) setCommunities(result);
         })
@@ -108,7 +108,7 @@ export function CommunityDiscoveryDialog({
     setJoinCommunityId(community.id);
     setError(null);
     try {
-      const request = await applicationContainer.createCommunityJoinRequest(
+      const request = await applicationContainer.communities.createJoinRequest(
         session,
         community.id,
       );

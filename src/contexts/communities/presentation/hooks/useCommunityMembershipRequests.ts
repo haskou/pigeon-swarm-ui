@@ -52,7 +52,7 @@ export function useCommunityMembershipRequests({
     setError(null);
     try {
       setRequests(
-        await applicationContainer.listCommunityMembershipRequests(
+        await applicationContainer.communities.listMembershipRequests(
           currentSession,
         ),
       );
@@ -74,7 +74,7 @@ export function useCommunityMembershipRequests({
       setError(null);
       try {
         const updated =
-          await applicationContainer.updateCommunityMembershipRequest(
+          await applicationContainer.communities.updateMembershipRequest(
             currentSession,
             requestId,
             status,

@@ -49,7 +49,7 @@ export function usePendingCommunityInvite({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      const invite = await applicationContainer.getCommunityInviteLink(
+      const invite = await applicationContainer.communities.getInviteLink(
         pendingCommunityInvite.token,
       );
       const keyEntry = await communityInviteKeyEntry(
@@ -66,7 +66,7 @@ export function usePendingCommunityInvite({
 
       if (keyEntry) {
         const accepted =
-          await applicationContainer.acceptCommunityInviteLinkWithKey(
+          await applicationContainer.communities.acceptInviteLinkWithKey(
             nextSession,
             pendingCommunityInvite.token,
             keyEntry,
@@ -79,7 +79,7 @@ export function usePendingCommunityInvite({
           keychainExternalIdentifier: accepted.keychainExternalIdentifier,
         };
       } else {
-        acceptedCommunity = await applicationContainer.acceptCommunityInviteLink(
+        acceptedCommunity = await applicationContainer.communities.acceptInviteLink(
           nextSession,
           pendingCommunityInvite.token,
         );

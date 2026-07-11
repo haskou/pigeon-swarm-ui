@@ -534,7 +534,7 @@ export function CommunityWorkspace({
 
     const cancelIdleWork = runWhenBrowserIdle(() => {
       void applicationContainer
-        .listCommunityChannels(session, community.id)
+        .communities.listChannels(session, community.id)
         .then((channels) => {
           if (cancelled) return;
 
@@ -589,7 +589,7 @@ export function CommunityWorkspace({
       beforeMessageId?: string,
       options: { limit?: number } = {},
     ) => {
-      const result = await applicationContainer.listCommunityChannelMessages(
+      const result = await applicationContainer.communities.listChannelMessages(
         session,
         community.id,
         channelId,
@@ -665,14 +665,14 @@ export function CommunityWorkspace({
 
         if (value.trim()) {
           void applicationContainer
-            .saveCommunityChannelDraft(session, community.id, channelId, value)
+            .communities.saveChannelDraft(session, community.id, channelId, value)
             .catch(() => undefined);
 
           return;
         }
 
         void applicationContainer
-          .deleteCommunityChannelDraft(session, community.id, channelId)
+          .communities.deleteChannelDraft(session, community.id, channelId)
           .catch(() => undefined);
       }, 700);
 
@@ -924,7 +924,7 @@ export function CommunityWorkspace({
           page += 1
         ) {
           const result =
-            await applicationContainer.listCommunityChannelMessages(
+            await applicationContainer.communities.listChannelMessages(
               session,
               community.id,
               channel.channelId,
@@ -1152,7 +1152,7 @@ export function CommunityWorkspace({
     let cancelled = false;
 
     void applicationContainer
-      .listCommunityDrafts(session)
+      .communities.listDrafts(session)
       .then((remoteDrafts) => {
         if (cancelled) return;
 
@@ -1293,7 +1293,7 @@ export function CommunityWorkspace({
     setCommunityLeaveError(null);
 
     try {
-      const result = await applicationContainer.leaveCommunity(
+      const result = await applicationContainer.communities.leave(
         session,
         community.id,
       );
@@ -1359,7 +1359,7 @@ export function CommunityWorkspace({
     let cancelled = false;
 
     void applicationContainer
-      .getCommunity(session, community.id)
+      .communities.get(session, community.id)
       .then((freshCommunity) => {
         if (!cancelled) onCommunityUpdatedRef.current(freshCommunity);
       })

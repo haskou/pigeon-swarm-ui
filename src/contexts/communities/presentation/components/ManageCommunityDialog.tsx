@@ -401,7 +401,7 @@ export function ManageCommunityDialog({
   );
 
   const refreshCommunity = async () => {
-    const freshCommunity = await applicationContainer.getCommunity(
+    const freshCommunity = await applicationContainer.communities.get(
       session,
       community.id,
     );
@@ -441,7 +441,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.assignCommunityMemberRoles(
+      await applicationContainer.communities.assignMemberRoles(
         session,
         community.id,
         identityId,
@@ -490,7 +490,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const role = await applicationContainer.createCommunityRole(
+      const role = await applicationContainer.communities.createRole(
         session,
         community.id,
         {
@@ -515,7 +515,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.updateCommunityRole(
+      await applicationContainer.communities.updateRole(
         session,
         community.id,
         selectedRole.id,
@@ -538,7 +538,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.deleteCommunityRole(
+      await applicationContainer.communities.deleteRole(
         session,
         community.id,
         role.id,
@@ -556,7 +556,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.banCommunityMember(
+      await applicationContainer.communities.banMember(
         session,
         community.id,
         identityId,
@@ -574,7 +574,7 @@ export function ManageCommunityDialog({
     setError(null);
     try {
       const requests =
-        await applicationContainer.listCommunityMembershipRequests(session);
+        await applicationContainer.communities.listMembershipRequests(session);
 
       setMembershipRequests(
         requests.filter((request) => request.communityId === community.id),
@@ -590,7 +590,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const page = await applicationContainer.listCommunityModerationLogs(
+      const page = await applicationContainer.communities.listModerationLogs(
         session,
         community.id,
         { limit: 50 },
@@ -613,7 +613,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const page = await applicationContainer.listCommunityModerationLogs(
+      const page = await applicationContainer.communities.listModerationLogs(
         session,
         community.id,
         { beforeLogId: nextModerationLogId, limit: 50 },
@@ -638,7 +638,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      const request = await applicationContainer.addCommunityMember(
+      const request = await applicationContainer.communities.addMember(
         session,
         community.id,
         identityId,
@@ -664,7 +664,7 @@ export function ManageCommunityDialog({
     setError(null);
     try {
       const request =
-        await applicationContainer.updateCommunityMembershipRequest(
+        await applicationContainer.communities.updateMembershipRequest(
           session,
           requestId,
           status,
@@ -688,7 +688,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.kickCommunityMember(
+      await applicationContainer.communities.kickMember(
         session,
         community.id,
         identityId,
@@ -705,7 +705,7 @@ export function ManageCommunityDialog({
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.unbanCommunityMember(
+      await applicationContainer.communities.unbanMember(
         session,
         community.id,
         identityId,
@@ -766,7 +766,7 @@ export function ManageCommunityDialog({
     let updatedCommunity = currentCommunity;
 
     for (const channelId of deletedChannelIds) {
-      updatedCommunity = await applicationContainer.deleteCommunityChannel(
+      updatedCommunity = await applicationContainer.communities.deleteChannel(
         session,
         community.id,
         channelId,
@@ -781,14 +781,14 @@ export function ManageCommunityDialog({
     nextName: string,
   ): Promise<CommunityChannel> => {
     if (channel.type === 'text') {
-      return await applicationContainer.createCommunityTextChannel(
+      return await applicationContainer.communities.createTextChannel(
         session,
         community.id,
         nextName,
       );
     }
 
-    return await applicationContainer.createCommunityVoiceChannel(
+    return await applicationContainer.communities.createVoiceChannel(
       session,
       community.id,
       nextName,
@@ -809,7 +809,7 @@ export function ManageCommunityDialog({
       return savedChannel;
     }
 
-    return await applicationContainer.updateCommunityChannelPermissions(
+    return await applicationContainer.communities.updateChannelPermissions(
       session,
       community.id,
       savedChannel.id,
@@ -831,7 +831,7 @@ export function ManageCommunityDialog({
     const savedChannel = channel.pending
       ? await createManagedChannel(channel, nextName)
       : nextName !== channel.name
-        ? await applicationContainer.renameCommunityChannel(
+        ? await applicationContainer.communities.renameChannel(
             session,
             community.id,
             channel.id,
@@ -885,7 +885,7 @@ export function ManageCommunityDialog({
       let updatedCommunity = community;
 
       if (hasProfileChanges) {
-        updatedCommunity = await applicationContainer.updateCommunity(
+        updatedCommunity = await applicationContainer.communities.update(
           session,
           community.id,
           {

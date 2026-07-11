@@ -245,7 +245,7 @@ export function useCommunityMessageComposer({
             communityKey: session.keychain.conversations[community.id],
           }),
         };
-    const edited = await applicationContainer.editCommunityChannelMessage(
+    const edited = await applicationContainer.communities.editChannelMessage(
       session,
       community.id,
       channelId,
@@ -312,7 +312,7 @@ export function useCommunityMessageComposer({
     }
 
     setError(null);
-    await applicationContainer.deleteCommunityChannelMessage(
+    await applicationContainer.communities.deleteChannelMessage(
       session,
       community.id,
       channelId,
@@ -369,7 +369,7 @@ export function useCommunityMessageComposer({
 
     try {
       if (reacted) {
-        await applicationContainer.removeCommunityChannelMessageReaction(
+        await applicationContainer.communities.removeChannelMessageReaction(
           session,
           community.id,
           channelId,
@@ -377,7 +377,7 @@ export function useCommunityMessageComposer({
           emoji,
         );
       } else {
-        await applicationContainer.addCommunityChannelMessageReaction(
+        await applicationContainer.communities.addChannelMessageReaction(
           session,
           community.id,
           channelId,
@@ -525,7 +525,7 @@ export function useCommunityMessageComposer({
               }),
             };
         const created =
-          await applicationContainer.createCommunityChannelMessage(
+          await applicationContainer.communities.createChannelMessage(
             session,
             community.id,
             payload.channelId,
