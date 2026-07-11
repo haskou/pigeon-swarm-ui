@@ -126,6 +126,7 @@ import { useWorkspaceTyping } from './useWorkspaceTyping';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
+import { useConversationThread } from './useConversationThread';
 import {
   callIdFromRealtimeEvent,
   callSignalTypeAttribute,
@@ -280,8 +281,6 @@ export function GlassWorkspace({
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [messageCollection, setMessageCollection] =
     useState<MessageCollectionState | null>(null);
-  const [conversationThread, setConversationThread] =
-    useState<ConversationThreadState | null>(null);
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -409,8 +408,8 @@ export function GlassWorkspace({
 
     if (activeRequest) return activeRequest;
 
-    const request = applicationContainer
-      .calls.list(sessionRef.current)
+    const request = applicationContainer.calls
+      .list(sessionRef.current)
       .finally(() => {
         if (callListRequestRef.current === request) {
           callListRequestRef.current = null;
@@ -476,6 +475,25 @@ export function GlassWorkspace({
       ) ?? conversations[0],
     [activeConversationId, conversations],
   );
+  const {
+    cancelEditing: cancelConversationThreadEdit,
+    cancelReplying: cancelConversationThreadReply,
+    edit: handleEditConversationThreadMessage,
+    open: openMessageThread,
+    remove: handleDeleteConversationThreadMessage,
+    send: sendConversationThreadMessage,
+    sendSticker: sendConversationThreadSticker,
+    setThread: setConversationThread,
+    startEditing: startEditingConversationThreadMessage,
+    startReplying: startReplyingToConversationThreadMessage,
+    thread: conversationThread,
+    updateDraft: updateConversationThreadDraft,
+  } = useConversationThread({
+    activeConversation,
+    closeMessageContextMenu: () => setMessageContextMenu(null),
+    session,
+    setMessages,
+  });
   const activeConversationNotificationScope = useMemo(
     () =>
       activeConversation
@@ -514,8 +532,8 @@ export function GlassWorkspace({
     let cancelled = false;
 
     const cancelIdleWork = runWhenBrowserIdle(() => {
-      void applicationContainer
-        .messages.listPins(session, activeConversation.id)
+      void applicationContainer.messages
+        .listPins(session, activeConversation.id)
         .then((pins) => {
           if (!cancelled) {
             setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
@@ -565,8 +583,8 @@ export function GlassWorkspace({
   useEffect(() => {
     let cancelled = false;
 
-    void applicationContainer
-      .messages.listDrafts(session)
+    void applicationContainer.messages
+      .listDrafts(session)
       .then((remoteDrafts) => {
         if (cancelled) return;
 
@@ -599,15 +617,15 @@ export function GlassWorkspace({
         draftSyncTimersRef.current.delete(conversationId);
 
         if (value.trim()) {
-          void applicationContainer
-            .messages.saveDraft(session, conversationId, value)
+          void applicationContainer.messages
+            .saveDraft(session, conversationId, value)
             .catch(() => undefined);
 
           return;
         }
 
-        void applicationContainer
-          .messages.deleteDraft(session, conversationId)
+        void applicationContainer.messages
+          .deleteDraft(session, conversationId)
           .catch(() => undefined);
       }, 700);
 
@@ -1039,11 +1057,15 @@ export function GlassWorkspace({
           recipientIdentityId,
           signalType,
         });
-        await applicationContainer.calls.sendSignal(sessionRef.current, callId, {
-          payload,
-          recipientIdentityId,
-          signalType,
-        });
+        await applicationContainer.calls.sendSignal(
+          sessionRef.current,
+          callId,
+          {
+            payload,
+            recipientIdentityId,
+            signalType,
+          },
+        );
       },
     [],
   );
@@ -1150,8 +1172,8 @@ export function GlassWorkspace({
         ) {
           await Promise.all(
             staleJoinedCalls.map((call) =>
-              applicationContainer
-                .calls.leave(sessionRef.current, call.id)
+              applicationContainer.calls
+                .leave(sessionRef.current, call.id)
                 .catch(() => undefined),
             ),
           );
@@ -1235,12 +1257,8 @@ export function GlassWorkspace({
             : conversation,
         ),
       );
-      void applicationContainer
-        .conversations.markReadUntil(
-          sessionRef.current,
-          conversationId,
-          lastMessage.id,
-        )
+      void applicationContainer.conversations
+        .markReadUntil(sessionRef.current, conversationId, lastMessage.id)
         .catch(() => undefined);
     },
     [clearUnreadMessages, setConversations],
@@ -1719,54 +1737,6 @@ export function GlassWorkspace({
     }
   };
 
-  const openMessageThread = async (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setConversationThread({
-      draft: '',
-      editingMessage: null,
-      error: null,
-      messages: [],
-      replyTarget: null,
-      root: message,
-      state: 'loading',
-    });
-    try {
-      const result = await applicationContainer.messages.loadThread(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-
-      setConversationThread({
-        draft: '',
-        editingMessage: null,
-        error: null,
-        messages: ThreadMessageVisibility.forRoot(
-          message.id,
-          ThreadMessageVisibility.markAsThreadMessages(
-            message.id,
-            result.messages,
-          ),
-        ),
-        replyTarget: null,
-        root: message,
-        state: 'ready',
-      });
-    } catch (caught) {
-      setConversationThread({
-        draft: '',
-        editingMessage: null,
-        error: toUserErrorMessage(caught, copy.messages.threadError),
-        messages: [],
-        replyTarget: null,
-        root: message,
-        state: 'ready',
-      });
-    }
-  };
-
   const openPinnedMessages = async () => {
     if (!activeConversation?.id) return;
 
@@ -1854,220 +1824,6 @@ export function GlassWorkspace({
   const unpinMessage = async (message: ChatMessage) => {
     setMessageContextMenu(null);
     await unpinMessageFromDialog(message);
-  };
-
-  const updateConversationThreadDraft = (value: string) => {
-    setConversationThread((current) =>
-      current ? { ...current, draft: value } : current,
-    );
-  };
-
-  const startEditingConversationThreadMessage = (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setConversationThread((current) =>
-      current
-        ? {
-            ...current,
-            draft: message.content,
-            editingMessage: {
-              message,
-              previousDraft: current.draft,
-            },
-            replyTarget: null,
-          }
-        : current,
-    );
-  };
-
-  const cancelConversationThreadEdit = () => {
-    setConversationThread((current) =>
-      current
-        ? {
-            ...current,
-            draft: current.editingMessage?.previousDraft ?? '',
-            editingMessage: null,
-          }
-        : current,
-    );
-  };
-  const startReplyingToConversationThreadMessage = (message: ChatMessage) => {
-    setMessageContextMenu(null);
-    setConversationThread((current) =>
-      current
-        ? {
-            ...current,
-            editingMessage: null,
-            replyTarget: message,
-          }
-        : current,
-    );
-  };
-  const cancelConversationThreadReply = () => {
-    setConversationThread((current) =>
-      current ? { ...current, replyTarget: null } : current,
-    );
-  };
-
-  const handleEditConversationThreadMessage = async (content: string) => {
-    if (!activeConversation?.id || !conversationThread?.editingMessage) return;
-
-    const targetMessage = conversationThread.editingMessage.message;
-
-    setConversationThread((current) =>
-      current ? { ...current, error: null } : current,
-    );
-    try {
-      const editEvent = await applicationContainer.messages.edit(
-        session,
-        activeConversation.id,
-        targetMessage.id,
-        content,
-      );
-
-      setMessages((current) =>
-        mergeConversationMessageIfTargetExists(current, editEvent),
-      );
-      setConversationThread((current) =>
-        current
-          ? {
-              ...mergeConversationThreadMessage(current, editEvent),
-              draft: '',
-              editingMessage: null,
-              error: null,
-              replyTarget: null,
-            }
-          : current,
-      );
-    } catch (caught) {
-      setConversationThread((current) =>
-        current
-          ? {
-              ...current,
-              error: toUserErrorMessage(caught, copy.messages.editError),
-            }
-          : current,
-      );
-    }
-  };
-
-  const handleDeleteConversationThreadMessage = async (
-    message: ChatMessage,
-  ) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setConversationThread((current) =>
-      current ? { ...current, error: null } : current,
-    );
-    try {
-      await applicationContainer.messages.delete(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      setMessages((current) =>
-        current.filter((item) => item.id !== message.id),
-      );
-      setConversationThread((current) => {
-        if (!current) return current;
-
-        return removeConversationThreadMessage(current, message.id);
-      });
-    } catch (caught) {
-      setConversationThread((current) =>
-        current
-          ? {
-              ...current,
-              error: toUserErrorMessage(caught, copy.messages.deleteError),
-            }
-          : current,
-      );
-    }
-  };
-
-  const sendConversationThreadMessage = async (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ) => {
-    if (!activeConversation?.id || !conversationThread) return;
-
-    const rootMessage = conversationThread.root;
-    const sent = await applicationContainer.messages.send(
-      session,
-      activeConversation.id,
-      content,
-      {
-        attachments,
-        attachmentUpload: {
-          ...attachmentUpload,
-          networkId: activeConversation.networkId,
-        },
-        previousMessageIds:
-          conversationThread.messages.length > 0
-            ? [
-                conversationThread.messages[
-                  conversationThread.messages.length - 1
-                ].id,
-              ]
-            : [rootMessage.id],
-        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
-        replyToMessageId: rootMessage.id,
-        threadRootMessageId: rootMessage.id,
-      },
-    );
-
-    setConversationThread((current) =>
-      current
-        ? {
-            ...current,
-            draft: '',
-            messages: MessageCollection.merge(current.messages, [sent]),
-            replyTarget: null,
-          }
-        : current,
-    );
-  };
-
-  const sendConversationThreadSticker = async (
-    sticker: StickerMessageReference,
-  ) => {
-    if (!activeConversation?.id || !conversationThread) return;
-
-    const rootMessage = conversationThread.root;
-    const sent = await applicationContainer.messages.send(
-      session,
-      activeConversation.id,
-      '',
-      {
-        previousMessageIds:
-          conversationThread.messages.length > 0
-            ? [
-                conversationThread.messages[
-                  conversationThread.messages.length - 1
-                ].id,
-              ]
-            : [rootMessage.id],
-        replyPreview: replyPreviewFromMessage(conversationThread.replyTarget),
-        replyToMessageId: rootMessage.id,
-        sticker,
-        threadRootMessageId: rootMessage.id,
-      },
-    );
-
-    void applicationContainer.stickers.markUsed(session, sticker);
-    setConversationThread((current) =>
-      current
-        ? {
-            ...current,
-            draft: '',
-            messages: MessageCollection.merge(current.messages, [sent]),
-            replyTarget: null,
-          }
-        : current,
-    );
   };
 
   const handleDeleteMessage = async (message: ChatMessage) => {
@@ -2266,13 +2022,16 @@ export function GlassWorkspace({
   const handleConversationKeyImported = async (
     keyEntry: ConversationKeyEntry,
   ) => {
-    const result = await applicationContainer.identities.publishKeychain(session, {
-      ...session.keychain,
-      conversations: {
-        ...session.keychain.conversations,
-        [keyEntry.conversationId]: keyEntry,
+    const result = await applicationContainer.identities.publishKeychain(
+      session,
+      {
+        ...session.keychain,
+        conversations: {
+          ...session.keychain.conversations,
+          [keyEntry.conversationId]: keyEntry,
+        },
       },
-    });
+    );
 
     setSession({
       ...session,
@@ -2389,8 +2148,8 @@ export function GlassWorkspace({
           eventAggregateId(event) ?? stringAttribute(event, 'identityId', 'id');
 
         if (identityId) {
-          void applicationContainer
-            .identities.refresh(IdentityId.normalize(identityId))
+          void applicationContainer.identities
+            .refresh(IdentityId.normalize(identityId))
             .then(rememberIdentity)
             .catch(() => undefined);
         }
@@ -2450,8 +2209,8 @@ export function GlassWorkspace({
 
         if (!callId) return;
 
-        void applicationContainer
-          .calls.get(sessionRef.current, callId)
+        void applicationContainer.calls
+          .get(sessionRef.current, callId)
           .then((call) => {
             logCallDebug('workspace:realtime-call-event:resource-loaded', {
               activeCallId: activeCallRef.current?.id,
@@ -2556,8 +2315,8 @@ export function GlassWorkspace({
 
       if (event.type.startsWith('identities.')) {
         if (event.aggregate_id === session.identity.id) {
-          void applicationContainer
-            .identities.get(session.identity.id)
+          void applicationContainer.identities
+            .get(session.identity.id)
             .then((identity) => setSession({ ...session, identity }))
             .catch(() => undefined);
         }
@@ -3004,8 +2763,8 @@ export function GlassWorkspace({
 
             if (!activeConversationKeyId) return;
 
-            void applicationContainer
-              .messages.decrypt(session, conversationId, timelineMessage)
+            void applicationContainer.messages
+              .decrypt(session, conversationId, timelineMessage)
               .then((message: ChatMessage) =>
                 applyRealtimeConversationMessage(
                   conversationId,
@@ -3732,8 +3491,8 @@ export function GlassWorkspace({
               ]);
 
               if (request.status === 'accepted') {
-                void applicationContainer
-                  .communities.get(sessionRef.current, request.communityId)
+                void applicationContainer.communities
+                  .get(sessionRef.current, request.communityId)
                   .then((community) => {
                     setCommunities((current) => [
                       community,
