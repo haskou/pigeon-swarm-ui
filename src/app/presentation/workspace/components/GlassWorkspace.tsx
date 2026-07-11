@@ -6,7 +6,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -60,10 +59,7 @@ import { ConversationPeer } from '../../../../contexts/conversations/domain/Conv
 import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
-import {
-  MessageScrollAnchor,
-  type MessageScrollAnchorSnapshot,
-} from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
+import { MessageScrollAnchor } from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
 import { MessageReactions } from '../../../../contexts/messages/domain/MessageReactions';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
@@ -93,15 +89,13 @@ import {
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
 import {
-  currentPwaNotificationPermission,
   deletePwaPushSubscription,
-  ensurePwaPushSubscription,
-  type PwaNotificationPermission,
   showPwaNotification,
 } from '../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
 import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
 import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
+import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
 import {
   communityNotificationPreview,
@@ -131,16 +125,14 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import {
-  PushNotificationPrompt,
-  type PushNotificationPromptState,
-} from './PushNotificationPrompt';
+import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail } from './Rail';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 import { useCommunitySelection } from './useCommunitySelection';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
+import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import {
@@ -336,29 +328,38 @@ export function GlassWorkspace({
   const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
     string[]
   >(() => seenCommunityMembershipRequests.get(session.identity.id));
-  const [pushPermission, setPushPermission] =
-    useState<PwaNotificationPermission>(() =>
-      currentPwaNotificationPermission(),
-    );
-  const [pushEnableState, setPushEnableState] =
-    useState<PushNotificationPromptState>('idle');
-  const [pushEnableError, setPushEnableError] = useState<string | null>(null);
-  const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
-  const [pushPromptReady, setPushPromptReady] = useState(false);
+  const {
+    dismissPrompt: dismissPushPrompt,
+    enable: enablePushNotifications,
+    enableError: pushEnableError,
+    enableState: pushEnableState,
+    permission: pushPermission,
+    promptDismissed: pushPromptDismissed,
+    promptReady: pushPromptReady,
+  } = usePushNotificationRegistration(session);
   const [callNoiseCancellationEnabled, setCallNoiseCancellationEnabled] =
     useState(() => loadCallNoiseCancellationEnabled(session.identity.id));
   const communityVoiceTopologyKey = useMemo(
     () => communityVoiceChannelTopologyKey(communities),
     [communities],
   );
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const clearNewMessageCount = useCallback(() => setNewMessageCount(0), []);
   const initialRenderedCommunityIdRef = useRef<string | null>(null);
-  const lastScrollTopRef = useRef(0);
-  const keepMessageBottomUntilRef = useRef(0);
-  const messageScrollAnchorRef = useRef<MessageScrollAnchorSnapshot | null>(
-    null,
-  );
+  const {
+    bottomRef,
+    isScrolledNearBottom,
+    jumpToLatestMessages,
+    keepMessageBottomUntilRef,
+    lastScrollTopRef,
+    messageScrollAnchorRef,
+    scrollMessagesToBottom,
+    scrollerRef,
+  } = useMessageViewport({
+    layoutKey: activeConversationId,
+    messageCount: messages.length,
+    messageState,
+    onJumpToLatest: clearNewMessageCount,
+  });
   const messageCursorRef = useRef<string | null>(
     preloadedConversationMessages?.nextCursor ?? null,
   );
@@ -382,7 +383,6 @@ export function GlassWorkspace({
   );
   const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
-  const pushEnableInFlightRef = useRef(false);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     activeCall,
@@ -483,56 +483,6 @@ export function GlassWorkspace({
     messageStateRef.current = state;
     setMessageState(state);
   }, []);
-  const refreshPushPermission = useCallback(() => {
-    setPushPermission(currentPwaNotificationPermission());
-  }, []);
-  const enablePushNotifications = useCallback(async () => {
-    if (pushEnableInFlightRef.current) return;
-
-    pushEnableInFlightRef.current = true;
-    setPushEnableState('loading');
-    setPushEnableError(null);
-
-    try {
-      const registrationState = await ensurePwaPushSubscription(session, {
-        requestPermission: true,
-      });
-
-      if (registrationState === 'granted') {
-        setPushPermission('granted');
-        setPushPromptDismissed(true);
-        setPushEnableState('idle');
-        setPushEnableError(null);
-
-        return;
-      }
-
-      refreshPushPermission();
-
-      if (registrationState === 'permission_denied') {
-        setPushEnableState('error');
-        setPushEnableError(copy.notifications.enablePushDenied);
-
-        return;
-      }
-
-      setPushEnableState('error');
-      setPushEnableError(
-        registrationState === 'server_disabled'
-          ? copy.notifications.enablePushServerDisabled
-          : copy.notifications.enablePushUnsupported,
-      );
-    } catch (caught) {
-      refreshPushPermission();
-      setPushEnableState('error');
-      setPushEnableError(
-        toUserErrorMessage(caught, copy.notifications.enablePushError),
-      );
-    } finally {
-      pushEnableInFlightRef.current = false;
-    }
-  }, [refreshPushPermission, session]);
-
   const suppressMessageLoadsBriefly = useCallback(() => {
     suppressMessageLoadsUntilRef.current = Date.now() + 800;
   }, []);
@@ -994,29 +944,6 @@ export function GlassWorkspace({
     session,
     visibleNotifications,
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    const cancelIdleWork = runWhenBrowserIdle(() => {
-      void ensurePwaPushSubscription(session)
-        .catch(() => undefined)
-        .finally(() => {
-          if (!cancelled) refreshPushPermission();
-        });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelIdleWork();
-    };
-  }, [refreshPushPermission, session]);
-
-  useEffect(() => {
-    setPushPromptReady(false);
-    const timeoutId = window.setTimeout(() => setPushPromptReady(true), 2800);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [session.identity.id]);
 
   const logout = () => {
     void deletePwaPushSubscription(session).catch(() => undefined);
@@ -1997,114 +1924,6 @@ export function GlassWorkspace({
     setSession(result.session);
     setConversations(result.conversations);
   }, [session, setConversations, setSession]);
-
-  const scrollMessagesToBottom = useCallback(
-    (behavior: ScrollBehavior = 'auto', keepPinned = false) => {
-      const pinUntil = keepPinned ? Date.now() + 5000 : 0;
-      const scroll = () => {
-        if (keepPinned && keepMessageBottomUntilRef.current !== pinUntil) {
-          return;
-        }
-
-        const scroller = scrollerRef.current;
-
-        if (!scroller) return;
-
-        MessageScrollAnchor.scrollToBottom(scroller, behavior);
-        lastScrollTopRef.current = scroller.scrollTop;
-      };
-
-      if (keepPinned) {
-        keepMessageBottomUntilRef.current = pinUntil;
-      }
-
-      requestAnimationFrame(() => {
-        scroll();
-        requestAnimationFrame(scroll);
-        window.setTimeout(scroll, 120);
-        window.setTimeout(scroll, 450);
-      });
-    },
-    [],
-  );
-  const isScrolledNearBottom = useCallback(() => {
-    const scroller = scrollerRef.current;
-
-    if (!scroller) return true;
-
-    return (
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96
-    );
-  }, []);
-  const jumpToLatestMessages = useCallback(() => {
-    setNewMessageCount(0);
-    scrollMessagesToBottom('smooth');
-  }, [scrollMessagesToBottom]);
-
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-
-    if (!scroller) return undefined;
-
-    const handleMediaLayoutChange = () => {
-      const restoredTop = MessageScrollAnchor.restore(
-        scroller,
-        messageScrollAnchorRef.current,
-      );
-
-      if (restoredTop !== null) {
-        lastScrollTopRef.current = restoredTop;
-
-        return;
-      }
-
-      messageScrollAnchorRef.current = null;
-
-      if (Date.now() > keepMessageBottomUntilRef.current) return;
-
-      requestAnimationFrame(() => {
-        lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
-      });
-    };
-
-    scroller.addEventListener('load', handleMediaLayoutChange, true);
-    scroller.addEventListener('loadedmetadata', handleMediaLayoutChange, true);
-    scroller.addEventListener('canplay', handleMediaLayoutChange, true);
-
-    return () => {
-      scroller.removeEventListener('load', handleMediaLayoutChange, true);
-      scroller.removeEventListener(
-        'loadedmetadata',
-        handleMediaLayoutChange,
-        true,
-      );
-      scroller.removeEventListener('canplay', handleMediaLayoutChange, true);
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (Date.now() > keepMessageBottomUntilRef.current) return undefined;
-
-    const scroller = scrollerRef.current;
-
-    if (!scroller) return undefined;
-
-    const scroll = () => {
-      if (
-        scrollerRef.current !== scroller ||
-        Date.now() > keepMessageBottomUntilRef.current
-      ) {
-        return;
-      }
-
-      lastScrollTopRef.current = MessageScrollAnchor.scrollToBottom(scroller);
-    };
-    const frame = requestAnimationFrame(scroll);
-
-    scroll();
-
-    return () => cancelAnimationFrame(frame);
-  }, [activeConversation?.id, messageState, messages.length]);
 
   const closeTransientUi = useCallback(() => {
     setMessageContextMenu(null);
@@ -4645,7 +4464,7 @@ export function GlassWorkspace({
         <PushNotificationPrompt
           enableState={pushEnableState}
           error={pushEnableError}
-          onDismiss={() => setPushPromptDismissed(true)}
+          onDismiss={dismissPushPrompt}
           onEnable={() => void enablePushNotifications()}
         />
       ) : null}
