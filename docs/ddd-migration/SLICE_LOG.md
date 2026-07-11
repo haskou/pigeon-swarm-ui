@@ -502,3 +502,26 @@
 - Risks: identity material creation and message projection remain the largest
   responsibilities still owned by the compatibility gateway
 - Next slice: extract identity material creation and login orchestration
+
+## Slice INFRA-002F: Extract conversation read transport
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Move cached conversation listing and read-until transport out of the
+  compatibility gateway and into conversation infrastructure.
+- Changed files:
+  - `contexts/conversations/infrastructure/http/PigeonConversationsApi.ts`
+  - `contexts/conversations/infrastructure/http/PigeonConversationsApi.spec.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and wiring
+- Behavior changed/preserved: signed conversation listing, 1.5 second cache
+  policy, response mapping, and read-until requests preserve their contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - conversation, community, and gateway suites (68 focused tests)
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: identity material creation remains the largest remaining private
+  workflow in the compatibility gateway
+- Next slice: extract identity material creation and login orchestration

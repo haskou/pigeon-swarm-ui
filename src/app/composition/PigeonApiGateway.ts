@@ -75,6 +75,7 @@ import { ConversationIdFactory } from '../../contexts/conversations/domain/Conve
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
+import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
@@ -122,14 +123,14 @@ const defaultKeychain: LocalKeychain = {
 };
 
 const messageDecryptBatchSize = 8;
-const startupReadCacheTtlMs = 1500;
-
 export class PigeonApiGateway {
   private readonly communities: PigeonCommunitiesApi;
 
   private readonly communityInvitations: PigeonCommunityInvitationApi;
 
   private readonly conversationCommands: PigeonConversationCommandsApi;
+
+  private readonly conversationsApi: PigeonConversationsApi;
 
   private readonly conversations: ConversationMapper;
 
@@ -202,6 +203,12 @@ export class PigeonApiGateway {
       (key: string) => this.requestCache.invalidate(key),
     );
     this.conversations = conversations;
+    this.conversationsApi = new PigeonConversationsApi(
+      http,
+      signer,
+      this.conversations,
+      this.requestCache,
+    );
     this.files = new PigeonFilesGateway(
       new PigeonFilesApi(http, signer, attachmentCipher),
     );
@@ -1462,18 +1469,7 @@ export class PigeonApiGateway {
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
-    const path = '/conversations/?limit=30';
-    const raw = await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
-      async () =>
-        await this.http.request<unknown>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-      { ttlMs: startupReadCacheTtlMs },
-    );
-
-    return this.conversations.list(raw);
+    return await this.conversationsApi.list(session);
   }
 
   public async markConversationReadUntil(
@@ -1481,16 +1477,11 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    const path = `/conversations/${encodeURIComponent(
+    await this.conversationsApi.markReadUntil(
+      session,
       conversationId,
-    )}/messages/read-until`;
-    const body = { messageId };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
+      messageId,
+    );
   }
 
   public async listNotifications(
