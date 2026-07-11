@@ -76,13 +76,11 @@ import {
 import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
 import {
   CommunityMentionPanel,
-  type CommunityMentionSuggestion,
 } from './communityMentionPanel';
 import {
   mergeChatMessages,
   resolveCommunityChannelId,
 } from './communityWorkspaceHelpers';
-import { findMentionTrigger } from './communityMentionTrigger';
 import {
   type CommunityThreadState,
   hiddenCommunityThreadSummaryKeysFromMessages,
@@ -93,12 +91,12 @@ import {
   visibleCommunityThreadSummaries,
 } from './communityThreadState';
 import { useCommunityMembers } from './useCommunityMembers';
-import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
 import { useCommunityThreadActions } from './useCommunityThreadActions';
+import { useCommunityMentions } from './useCommunityMentions';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 import { communityMessageIdentityIds } from './communityMessageIdentityIds';
@@ -1392,119 +1390,20 @@ export function CommunityWorkspace({
 
     return labels;
   }, [messages, threadPanel, threadRootLabels]);
-  const mentionSuggestions = useMemo(() => {
-    if (!selectedChannel) return [];
-
-    const trigger = findMentionTrigger(draft);
-
-    if (!trigger) return [];
-
-    const query = trigger.query.toLowerCase();
-    const accessibleMemberIds = new Set(
-      CommunityAccessPolicy.membersWithChannelAccess(
-        community,
-        selectedChannel,
-      ),
-    );
-    const memberSuggestions = members
-      .filter((member) => accessibleMemberIds.has(member.identityId))
-      .map((member) => {
-        const label = memberDisplayName(member.identity, member.identityId);
-        const handle = member.identity?.profile.handle?.trim();
-
-        return {
-          description: handle ? `@${handle}` : copy.composer.identityMention,
-          id: member.identityId,
-          label,
-          mention: { targetId: member.identityId, type: 'identity' } as const,
-          token: `@${handle || label}`,
-        };
-      })
-      .filter((suggestion) =>
-        `${suggestion.label} ${suggestion.description}`
-          .toLowerCase()
-          .includes(query),
-      );
-    const roleSuggestions =
-      currentPermissions.has('mention_roles') && community.roles
-        ? community.roles
-            .filter(
-              (role) =>
-                !role.builtIn && role.name.toLowerCase().includes(query),
-            )
-            .map((role) => ({
-              description: copy.composer.roleMention,
-              id: role.id,
-              label: role.name,
-              mention: { targetId: role.id, type: 'role' } as const,
-              token: `@${role.name}`,
-            }))
-        : [];
-    const specialSuggestionCandidates: Array<CommunityMentionSuggestion | null> =
-      [
-        currentPermissions.has('mention_everyone')
-          ? {
-              description: copy.composer.everyoneMention,
-              id: 'everyone',
-              label: 'everyone',
-              mention: { type: 'everyone' } as const,
-              token: '@everyone',
-            }
-          : null,
-        currentPermissions.has('mention_here')
-          ? {
-              description: copy.composer.hereMention,
-              id: 'here',
-              label: 'here',
-              mention: { type: 'here' } as const,
-              token: '@here',
-            }
-          : null,
-      ];
-    const specialSuggestions = specialSuggestionCandidates.filter(
-      (suggestion): suggestion is CommunityMentionSuggestion =>
-        Boolean(suggestion && suggestion.label.includes(query)),
-    );
-
-    return [
-      ...specialSuggestions,
-      ...roleSuggestions,
-      ...memberSuggestions,
-    ].slice(0, 8);
-  }, [community, currentPermissions, draft, members, selectedChannel]);
-  const insertMention = useCallback(
-    (token: string) => {
-      const trigger = findMentionTrigger(draft);
-
-      if (!trigger) return;
-
-      setSelectedChannelDraft(
-        `${draft.slice(0, trigger.start)}${token} ${draft.slice(trigger.end)}`,
-      );
-    },
-    [draft, setSelectedChannelDraft],
-  );
-  const mentionTokens = useMemo(
-    () =>
-      selectedChannel
-        ? CommunityMessageMentions.tokens({
-            channel: selectedChannel,
-            community,
-            identities: memberIdentities,
-            permissions: currentPermissions,
-          })
-        : [],
-    [community, currentPermissions, memberIdentities, selectedChannel],
-  );
-  const autocompleteMention = useCallback(() => {
-    const suggestion = mentionSuggestions[0];
-
-    if (!suggestion) return false;
-
-    insertMention(suggestion.token);
-
-    return true;
-  }, [insertMention, mentionSuggestions]);
+  const {
+    autocomplete: autocompleteMention,
+    insert: insertMention,
+    suggestions: mentionSuggestions,
+    tokens: mentionTokens,
+  } = useCommunityMentions({
+    community,
+    draft,
+    identities: memberIdentities,
+    members,
+    permissions: currentPermissions,
+    selectedChannel,
+    setDraft: setSelectedChannelDraft,
+  });
   const channelEncryptionReady =
     !!selectedChannel &&
     (communityIsPublic ||
