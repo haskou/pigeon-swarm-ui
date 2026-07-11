@@ -1,17 +1,17 @@
 import type { KeyPair, SymmetricKey } from '@haskou/value-objects';
 
-import type { IdentityUpdateProfileInput } from '../../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import type { UserRootKeyPasskeyPrfInput } from '../../../contexts/identities/infrastructure/crypto/UserRootKeyPasskeyPrfInput';
 import type {
   IdentityResource,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityUpdateProfileInput } from '../../domain/IdentitySignaturePayloadFactory';
 import type { IdentityProfileKeyProtectionOptions } from './IdentityProfileKeyProtectionOptions';
+import type { UserRootKeyPasskeyPrfInput } from './UserRootKeyPasskeyPrfInput';
 
-import { RecoveryKey } from '../../../contexts/identities/domain/value-objects/RecoveryKey';
-import { UserRootKeyProtector } from '../../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';
-import { saveLocalPasskeyUnlock } from '../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
-import { copy } from '../../../shared/presentation/i18n/copy';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+import { saveLocalPasskeyUnlock } from '../storage/localPasskeyUnlock';
+import { UserRootKeyProtector } from './UserRootKeyProtector';
 
 export class PigeonIdentityKeyProtectionGateway {
   public constructor(

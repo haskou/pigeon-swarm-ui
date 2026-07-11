@@ -1,10 +1,10 @@
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonRequestCache } from './PigeonRequestCache';
+import { RequestCache } from './RequestCache';
 
-describe(PigeonRequestCache.name, () => {
+describe(RequestCache.name, () => {
   it('shares an in-flight request for the same key', async () => {
-    const cache = new PigeonRequestCache();
+    const cache = new RequestCache();
     let resolveRequest: ((value: string) => void) | undefined;
     const loader = jest.fn(
       async () =>
@@ -25,7 +25,7 @@ describe(PigeonRequestCache.name, () => {
 
   it('keeps settled values only for the configured TTL', async () => {
     jest.useFakeTimers();
-    const cache = new PigeonRequestCache();
+    const cache = new RequestCache();
     const loader = jest
       .fn<Promise<string>, []>()
       .mockResolvedValueOnce('first')
@@ -48,7 +48,7 @@ describe(PigeonRequestCache.name, () => {
   });
 
   it('evicts failed requests so they can be retried', async () => {
-    const cache = new PigeonRequestCache();
+    const cache = new RequestCache();
     const loader = jest
       .fn<Promise<string>, []>()
       .mockRejectedValueOnce(new Error('offline'))
@@ -60,7 +60,7 @@ describe(PigeonRequestCache.name, () => {
   });
 
   it('isolates session cache keys by identity', () => {
-    const cache = new PigeonRequestCache();
+    const cache = new RequestCache();
     const first = { identity: { id: 'identity-1' } } as unknown as Session;
     const second = { identity: { id: 'identity-2' } } as unknown as Session;
 

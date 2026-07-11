@@ -1,4 +1,4 @@
-import type { EncryptedCommunityKey } from '../../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import type { EncryptedCommunityKey } from '../crypto/communityInviteKeyEnvelope';
 import type { CommunityInviteLinkBody } from './CommunityInviteLinkBody';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 

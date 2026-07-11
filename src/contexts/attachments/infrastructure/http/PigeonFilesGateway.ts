@@ -8,9 +8,9 @@ import type {
   PublicFileContent,
   PublicFileUpload,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { PigeonFilesApi } from '../../../contexts/attachments/infrastructure/http/PigeonFilesApi';
+import { PigeonFilesApi } from './PigeonFilesApi';
 
 export class PigeonFilesGateway {
   public constructor(private readonly files: PigeonFilesApi) {}

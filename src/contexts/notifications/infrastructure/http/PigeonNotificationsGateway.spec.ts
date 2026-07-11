@@ -2,9 +2,9 @@ import type {
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { PigeonNotificationsApi } from '../../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
+import { PigeonNotificationsApi } from './PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from './PigeonNotificationsGateway';
 
 describe(PigeonNotificationsGateway.name, () => {

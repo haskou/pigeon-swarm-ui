@@ -13,7 +13,7 @@ import { LoginIdentity } from '../../contexts/identities/application/login-ident
 import { LoginIdentityMessage } from '../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RegisterIdentityMessage } from '../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
 import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
-import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
+import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 
 export class PigeonIdentitiesApplication {

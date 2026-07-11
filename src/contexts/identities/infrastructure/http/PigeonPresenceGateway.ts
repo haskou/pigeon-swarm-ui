@@ -2,18 +2,18 @@ import type {
   IdentityPresence,
   SelectablePresenceStatus,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
-import type { CachedRequestOptions } from '../PigeonApiGateway/CachedRequestOptions';
+} from '../../../../shared/domain/pigeonResources.types';
+import type { RequestCacheOptions } from '../../../../shared/infrastructure/http/RequestCacheOptions';
 
-import { PigeonPresenceApi } from '../../../contexts/identities/infrastructure/http/PigeonPresenceApi';
-import { PigeonRequestCache } from '../PigeonApiGateway/PigeonRequestCache';
+import { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
+import { PigeonPresenceApi } from './PigeonPresenceApi';
 
 const presenceCacheTtlMs = 1500;
 
 export class PigeonPresenceGateway {
   public constructor(
     private readonly presence: PigeonPresenceApi,
-    private readonly requestCache: PigeonRequestCache,
+    private readonly requestCache: RequestCache,
   ) {}
 
   public async get(
@@ -29,7 +29,7 @@ export class PigeonPresenceGateway {
   ): Promise<IdentityPresence[]> {
     const uniqueIdentityIds = [...new Set(identityIds.filter(Boolean))].sort();
     const key = `GET /presence/ ${session.identity.id} ${uniqueIdentityIds.join('\u0000')}`;
-    const options: CachedRequestOptions = { ttlMs: presenceCacheTtlMs };
+    const options: RequestCacheOptions = { ttlMs: presenceCacheTtlMs };
 
     return await this.requestCache.load(
       key,

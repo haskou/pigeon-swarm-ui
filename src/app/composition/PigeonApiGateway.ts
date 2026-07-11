@@ -7,8 +7,17 @@ import {
   UUID,
 } from '@haskou/value-objects';
 
+import type { PublishedCommunityKey } from '../../contexts/communities/infrastructure/crypto/PublishedCommunityKey';
+import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
+import type { CommunityInviteLinkBody } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkBody';
+import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
+import type { ConversationInvitationType } from '../../contexts/conversations/infrastructure/http/ConversationInvitationType';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import type { EncryptMessagePayloadInput } from '../../contexts/messages/infrastructure/crypto/EncryptMessagePayloadInput';
+import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
+import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
 import type {
   ChatMessage,
   Community,
@@ -60,22 +69,15 @@ import type {
   StickerPackResource,
   StickerResource,
 } from '../../shared/domain/pigeonResources.types';
-import type { CachedRequestOptions } from './PigeonApiGateway/CachedRequestOptions';
-import type { CommunityChannelMessageEditInput } from './PigeonApiGateway/CommunityChannelMessageEditInput';
-import type { CommunityChannelMessageInput } from './PigeonApiGateway/CommunityChannelMessageInput';
-import type { CommunityInviteLinkBody } from './PigeonApiGateway/CommunityInviteLinkBody';
-import type { CommunityInviteLinkInput } from './PigeonApiGateway/CommunityInviteLinkInput';
-import type { ConversationInvitationType } from './PigeonApiGateway/ConversationInvitationType';
-import type { EncryptMessagePayloadInput } from './PigeonApiGateway/EncryptMessagePayloadInput';
-import type { MessageDecryptWorker } from './PigeonApiGateway/MessageDecryptWorker';
-import type { MessageLoadOptions } from './PigeonApiGateway/MessageLoadOptions';
-import type { PublishedCommunityKey } from './PigeonApiGateway/PublishedCommunityKey';
+import type { RequestCacheOptions } from '../../shared/infrastructure/http/RequestCacheOptions';
 
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
+import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 import { encryptCommunityInviteKey } from '../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
+import { buildCommunityInviteLinkBody } from '../../contexts/communities/infrastructure/http/buildCommunityInviteLinkBody';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
@@ -83,45 +85,43 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
+import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
+import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { clearLocalPasskeyUnlock } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { MessageLinkPreviews } from '../../contexts/messages/domain/MessageLinkPreviews';
 import { MessageProjector } from '../../contexts/messages/domain/MessageProjector';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
+import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
 import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
+import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 import { NotificationDecision } from '../../contexts/notifications/domain/NotificationDecision';
 import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
+import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
 import {
   PigeonPushApi,
   type PushSubscriptionPayload,
 } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
+import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
 import { signSessionPayload } from '../../shared/infrastructure/crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
+import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
-import { PigeonFilesGateway } from './gateways/PigeonFilesGateway';
-import { PigeonIdentityGateway } from './gateways/PigeonIdentityGateway';
-import { PigeonIdentityKeyProtectionGateway } from './gateways/PigeonIdentityKeyProtectionGateway';
-import { PigeonNotificationsGateway } from './gateways/PigeonNotificationsGateway';
-import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
-import { PigeonPushGateway } from './gateways/PigeonPushGateway';
-import { PigeonStickersGateway } from './gateways/PigeonStickersGateway';
-import { buildCommunityInviteLinkBody } from './PigeonApiGateway/buildCommunityInviteLinkBody';
-import { hasEncryptedPayload } from './PigeonApiGateway/hasEncryptedPayload';
-import { PigeonRequestCache } from './PigeonApiGateway/PigeonRequestCache';
-import { throwIfMessageLoadAborted } from './PigeonApiGateway/throwIfMessageLoadAborted';
 import { uniqueSorted } from './PigeonApiGateway/uniqueSorted';
-import { yieldAfterMessageDecryptBatch } from './PigeonApiGateway/yieldAfterMessageDecryptBatch';
 
 const defaultKeychain: LocalKeychain = {
   conversations: {},
@@ -156,7 +156,7 @@ export class PigeonApiGateway {
 
   private readonly messages: MessageProjector;
 
-  private messageDecryptWorker: MessageDecryptWorker | null = null;
+  private messageDecryptWorker: MessageDecryptWorkerPort | null = null;
 
   private readonly messageSignatures: MessageSignaturePayloadFactory;
 
@@ -166,7 +166,7 @@ export class PigeonApiGateway {
 
   private readonly push: PigeonPushGateway;
 
-  private readonly requestCache = new PigeonRequestCache();
+  private readonly requestCache = new RequestCache();
 
   private readonly signer: RequestSigner;
 
@@ -199,7 +199,7 @@ export class PigeonApiGateway {
       <T>(
         key: string,
         loader: () => Promise<T>,
-        options?: CachedRequestOptions,
+        options?: RequestCacheOptions,
       ) => this.requestCache.load(key, loader, options),
       new DraftPayloadCipher(),
       (key: string) => this.requestCache.invalidate(key),
@@ -226,7 +226,7 @@ export class PigeonApiGateway {
         <T>(
           key: string,
           loader: () => Promise<T>,
-          options?: CachedRequestOptions,
+          options?: RequestCacheOptions,
         ) => this.requestCache.load(key, loader, options),
       ),
       (session) =>
@@ -465,7 +465,7 @@ export class PigeonApiGateway {
     return await this.messages.toChatMessage(session, conversationId, message);
   }
 
-  private async getMessageDecryptWorker(): Promise<MessageDecryptWorker> {
+  private async getMessageDecryptWorker(): Promise<MessageDecryptWorkerPort> {
     if (this.messageDecryptWorker) return this.messageDecryptWorker;
 
     const { MessageDecryptWorkerClient } =

@@ -38,25 +38,26 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `INFRA-001`
-- Title: Move context HTTP gateways out of app composition
+- Id: `INFRA-002`
+- Title: Move remaining context-specific gateway seams
 - Size: L
-- Status: completed
+- Status: in progress
 - Business capability: Context-owned transport, cache, and signing adapters
-- Source area: `src/app/composition/PigeonApiGateway*` and `gateways/*`
+- Source area: `src/app/composition/PigeonApiGateway*` and remaining
+  composition compatibility adapters
 - Target boundary: `src/contexts/*/infrastructure/http` and `crypto`
 - Target files/folders: real adapters only; no placeholder folders
-- Expected files: calls, networks, identities, notifications, attachments, and
-  stickers gateway adapters plus composition wiring
+- Expected files: identities, notifications, attachments, stickers and shared
+  request-cache adapters plus composition wiring
 - Compatibility constraints: Existing UI/application method contracts remain
   stable while consumers migrate to context ports
 - Validation level: L2
 - Affected behavior/tests: calls, node networks, presence, push subscriptions,
   identity and message bootstrap
-- Tests/checks run: typecheck, lint, targeted calls/networks adapter tests
-- Full-suite status: deferred until the broader infrastructure milestone
+- Tests/checks run: typecheck, lint, targeted moved-adapter tests
+- Full-suite status: deferred until the infrastructure milestone closes
 - Done criteria: no context-specific HTTP gateway remains in
-  `src/app/composition`; app composition has no transport behavior
+  `src/app/composition`; the compatibility facade is replaced by context ports
 
 ## Risks
 
@@ -77,7 +78,7 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `INFRA-002`: move remaining context-specific gateways and cache seams.
+1. `INFRA-002`: finish context ports and remove the compatibility facade.
 2. `IDENTITY-001`: identity/session/keychain lifecycle model and ports.
 3. `MESSAGE-001`: message command workflow and message resource mapper seam.
 4. `COMMUNITY-001`: community membership/channel aggregate behavior.

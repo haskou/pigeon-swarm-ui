@@ -27,15 +27,26 @@
 
 - Date: 2026-07-11
 - Size: L
-- Status: planned
+- Status: in progress
 - Goal: Move remaining context-specific gateways and their owned cache/crypto
-  collaborators out of `src/app/composition`.
-- Changed files: none yet
+  collaborators out of `src/app/composition`, leaving a temporary compatibility
+  seam only until application consumers migrate.
+- Changed files:
+  - moved attachments, identities, notifications and stickers gateways to their
+    context infrastructure folders
+  - moved generic request cache to `shared/infrastructure/http`
+  - moved message/community/conversation transport inputs from app composition
+    to their owning context infrastructure folders
+  - removed duplicated community channel message input types from app
 - Behavior changed/preserved: behavior preserved
 - Contracts changed: none
 - Validation level: L2
-- Tests/checks: pending
+- Tests/checks:
+  - `yarn typecheck`
+  - `yarn lint`
+  - targeted migrated-adapter tests: 6 suites, 83 tests
 - Decisions: ADR-0001
 - Risks: keychain and invitation flows cross identity, conversation, community
   and notification contexts
-- Next slice: `IDENTITY-001`
+- Next slice: complete `INFRA-002` by replacing `PigeonApiGateway` consumers
+  with context ports; then `IDENTITY-001`

@@ -4,7 +4,7 @@ import type {
   Session,
 } from '../../shared/domain/pigeonResources.types';
 
-import { PigeonPresenceGateway } from './gateways/PigeonPresenceGateway';
+import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonIdentitiesApplication } from './PigeonIdentitiesApplication';
 

@@ -1,9 +1,9 @@
 import type {
   ChatMessage,
   MessageResource,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-export type MessageDecryptWorker = {
+export type MessageDecryptWorkerPort = {
   decrypt(
     request: {
       conversationId: string;

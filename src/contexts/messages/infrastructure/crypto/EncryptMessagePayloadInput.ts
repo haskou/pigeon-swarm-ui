@@ -5,7 +5,7 @@ import type {
   MessageReplyPreview,
   Session,
   StickerMessageReference,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 export type EncryptMessagePayloadInput = {
   content: string;

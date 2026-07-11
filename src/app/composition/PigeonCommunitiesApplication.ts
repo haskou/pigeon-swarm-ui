@@ -1,5 +1,7 @@
 import { SymmetricKey } from '@haskou/value-objects';
 
+import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type {
   Community,
   CommunityChannel,
@@ -19,8 +21,6 @@ import type {
   MessageResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
-import type { CommunityChannelMessageEditInput } from './PigeonCommunitiesApplication/CommunityChannelMessageEditInput';
-import type { CommunityChannelMessageInput } from './PigeonCommunitiesApplication/CommunityChannelMessageInput';
 import type { CommunityImageCids } from './PigeonCommunitiesApplication/CommunityImageCids';
 import type { CreateCommunityInput } from './PigeonCommunitiesApplication/CreateCommunityInput';
 import type { CreateCommunityResult } from './PigeonCommunitiesApplication/CreateCommunityResult';

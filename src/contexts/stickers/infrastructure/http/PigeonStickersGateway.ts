@@ -6,9 +6,9 @@ import type {
   StickerPackInput,
   StickerPackResource,
   StickerResource,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { PigeonStickersApi } from '../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { PigeonStickersApi } from './PigeonStickersApi';
 
 export class PigeonStickersGateway {
   public constructor(private readonly stickers: PigeonStickersApi) {}

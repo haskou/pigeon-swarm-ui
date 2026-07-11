@@ -1,9 +1,9 @@
-import type { Session } from '../../../shared/domain/pigeonResources.types';
-import type { CachedRequestEntry } from './CachedRequestEntry';
-import type { CachedRequestOptions } from './CachedRequestOptions';
+import type { Session } from '../../domain/pigeonResources.types';
+import type { RequestCacheEntry } from './RequestCacheEntry';
+import type { RequestCacheOptions } from './RequestCacheOptions';
 
-export class PigeonRequestCache {
-  private readonly entries = new Map<string, CachedRequestEntry<unknown>>();
+export class RequestCache {
+  private readonly entries = new Map<string, RequestCacheEntry<unknown>>();
 
   public invalidate(key: string): void {
     this.entries.delete(key);
@@ -20,10 +20,10 @@ export class PigeonRequestCache {
   public async load<T>(
     key: string,
     loader: () => Promise<T>,
-    options: CachedRequestOptions = {},
+    options: RequestCacheOptions = {},
   ): Promise<T> {
     const now = Date.now();
-    const cached = this.entries.get(key) as CachedRequestEntry<T> | undefined;
+    const cached = this.entries.get(key) as RequestCacheEntry<T> | undefined;
 
     if (cached && (!cached.settled || cached.expiresAt > now)) {
       return await cached.promise;
@@ -31,7 +31,7 @@ export class PigeonRequestCache {
 
     if (cached) this.entries.delete(key);
 
-    const entry: CachedRequestEntry<T> = {
+    const entry: RequestCacheEntry<T> = {
       expiresAt: Number.POSITIVE_INFINITY,
       promise: Promise.resolve(undefined as T),
       settled: false,

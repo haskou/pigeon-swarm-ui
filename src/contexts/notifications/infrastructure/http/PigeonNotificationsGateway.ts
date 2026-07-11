@@ -1,14 +1,14 @@
-import type { NotificationDecision } from '../../../contexts/notifications/domain/NotificationDecision';
-import type { NotificationId } from '../../../contexts/notifications/domain/NotificationId';
 import type {
   NotificationResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationSettingScope,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationDecision } from '../../domain/NotificationDecision';
+import type { NotificationId } from '../../domain/NotificationId';
 
-import { PigeonNotificationsApi } from '../../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
+import { PigeonNotificationsApi } from './PigeonNotificationsApi';
 
 export class PigeonNotificationsGateway {
   public constructor(

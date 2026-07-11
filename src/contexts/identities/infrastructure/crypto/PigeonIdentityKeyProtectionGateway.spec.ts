@@ -3,11 +3,11 @@ import { KeyPair, SymmetricKey } from '@haskou/value-objects';
 import type {
   IdentityResource,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
-import { UserRootKeyProtector } from '../../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';
-import { copy } from '../../../shared/presentation/i18n/copy';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { PigeonIdentityKeyProtectionGateway } from './PigeonIdentityKeyProtectionGateway';
+import { UserRootKeyProtector } from './UserRootKeyProtector';
 
 describe(PigeonIdentityKeyProtectionGateway.name, () => {
   function identityWithPasskey(): IdentityResource {

@@ -1,8 +1,8 @@
-import type { IdentityResource } from '../../../shared/domain/pigeonResources.types';
-import type { HttpJsonClient } from '../../../shared/infrastructure/http/HttpJsonClient';
-import type { CachedIdentity } from '../PigeonApiGateway/CachedIdentity';
+import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
+import type { CachedIdentity } from './CachedIdentity';
 
-import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 const identityCacheTtlMs = 2 * 60 * 1000;
 
