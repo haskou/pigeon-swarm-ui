@@ -91,6 +91,29 @@
 - Next slice: `INFRA-002`, replace composition gateway consumers by capability
   owned ports and adapters
 
+## Slice CONTRACT-001: Move conversation and message DTOs to infrastructure
+
+- Date: 2026-07-11
+- Size: S
+- Status: completed
+- Goal: Stop presenting REST resources for conversations, drafts, and pins as
+  domain files.
+- Changed files:
+  - `contexts/conversations/infrastructure/http/ConversationResource.ts`
+  - `contexts/messages/infrastructure/http/*Resource.ts`
+  - context barrel exports and domain-to-contract imports
+- Behavior changed/preserved: wire shapes and public imports preserved
+- Contracts changed: none
+- Validation level: L1
+- Tests/checks:
+  - message and conversation suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: additional community, identity, notification, network, poll, and
+  sticker resources remain to be classified and moved in later slices
+- Next slice: `INFRA-002`, replace composition gateway consumers by capability
+  owned ports and adapters
+
 ## Slice CONVERSATION-001: Conversation aggregate without resource state
 
 - Date: 2026-07-11
