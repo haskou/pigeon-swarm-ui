@@ -52,6 +52,8 @@ function gatewayDouble(overrides: {
     keychain: {
       publishKeychain,
     },
+    leaveCommunity:
+      overrides as unknown as CommunityApplicationDependencies['leaveCommunity'],
     listCommunities: {} as CommunityApplicationDependencies['listCommunities'],
     media: {} as CommunityApplicationDependencies['media'],
     members:

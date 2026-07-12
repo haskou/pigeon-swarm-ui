@@ -425,19 +425,6 @@ export class PigeonApiGateway {
     return this.messageDecryptWorker;
   }
 
-  private invalidateCommunityChannelPinsCache(
-    session: Session,
-    communityId: string,
-    channelId: string,
-  ): void {
-    this.requestCache.invalidateForSession(
-      `/communities/${encodeURIComponent(
-        communityId,
-      )}/channels/${encodeURIComponent(channelId)}/pins`,
-      session,
-    );
-  }
-
   public apiUrl(path: string): string {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
   }
@@ -464,14 +451,14 @@ export class PigeonApiGateway {
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
-    return await this.communities.list(session);
+    return await this.communityGateway.listCommunities(session);
   }
 
   public async getCommunity(
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    return await this.communities.get(session, communityId);
+    return await this.communityGateway.getCommunity(session, communityId);
   }
 
   public async listCommunityModerationLogs(
@@ -479,7 +466,7 @@ export class PigeonApiGateway {
     communityId: string,
     input?: { beforeLogId?: string; limit?: number },
   ): Promise<CommunityModerationLogPage> {
-    return await this.communities.listModerationLogs(
+    return await this.communityGateway.listCommunityModerationLogs(
       session,
       communityId,
       input,
@@ -490,7 +477,7 @@ export class PigeonApiGateway {
     session: Session,
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
-    return await this.communities.discover(session, input);
+    return await this.communityGateway.discoverCommunities(session, input);
   }
 
   public async createCommunity(
@@ -506,7 +493,7 @@ export class PigeonApiGateway {
       visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
-    return await this.communities.create(session, input);
+    return await this.communityGateway.createCommunity(session, input);
   }
 
   public async updateCommunity(
@@ -521,7 +508,11 @@ export class PigeonApiGateway {
       name?: string;
     },
   ): Promise<Community> {
-    return await this.communities.update(session, communityId, input);
+    return await this.communityGateway.updateCommunity(
+      session,
+      communityId,
+      input,
+    );
   }
 
   public async addCommunityMember(
@@ -529,7 +520,7 @@ export class PigeonApiGateway {
     communityId: string,
     identityId: string,
   ): Promise<CommunityMembershipRequest> {
-    return await this.communities.inviteMember(
+    return await this.communityGateway.addCommunityMember(
       session,
       communityId,
       identityId,
@@ -541,7 +532,11 @@ export class PigeonApiGateway {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.communities.banMember(session, communityId, identityId);
+    return await this.communityGateway.banCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
   }
 
   public async unbanCommunityMember(
@@ -549,7 +544,11 @@ export class PigeonApiGateway {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.communities.unbanMember(session, communityId, identityId);
+    return await this.communityGateway.unbanCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
   }
 
   public async kickCommunityMember(
@@ -557,30 +556,27 @@ export class PigeonApiGateway {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.communities.kickMember(session, communityId, identityId);
+    return await this.communityGateway.kickCommunityMember(
+      session,
+      communityId,
+      identityId,
+    );
   }
 
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
   ): Promise<CommunityMembershipRequest> {
-    const request = await this.communities.createJoinRequest(
+    return await this.communityGateway.createCommunityJoinRequest(
       session,
       communityId,
     );
-
-    this.requestCache.invalidateForSession(
-      '/communities/membership-requests',
-      session,
-    );
-
-    return request;
   }
 
   public async listCommunityMembershipRequests(
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
-    return await this.communities.listMembershipRequests(session);
+    return await this.communityGateway.listCommunityMembershipRequests(session);
   }
 
   public async updateCommunityMembershipRequest(
@@ -588,56 +584,35 @@ export class PigeonApiGateway {
     requestId: string,
     status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
   ): Promise<CommunityMembershipRequest> {
-    const request = await this.communities.updateMembershipRequest(
+    return await this.communityGateway.updateCommunityMembershipRequest(
       session,
       requestId,
       status,
     );
-    this.requestCache.invalidateForSession(
-      '/communities/membership-requests',
-      session,
-    );
-
-    if (status === 'accepted' && request.type === 'request') {
-      const hasCommunityKey = Boolean(
-        session.keychain.conversations[request.communityId],
-      );
-
-      if (!hasCommunityKey) {
-        const community = await this.getCommunity(session, request.communityId);
-
-        if (community.visibility === 'public') return request;
-      }
-
-      await this.communityInvitations.notifyMember(
-        session,
-        request.communityId,
-        request.identityId,
-      );
-    }
-
-    return request;
   }
 
   public async leaveCommunity(
     session: Session,
     communityId: string,
   ): Promise<Community> {
-    return await this.communities.leave(session, communityId);
+    return await this.communityGateway.leaveCommunity(session, communityId);
   }
 
   public async listCommunityMembers(
     session: Session,
     communityId: string,
   ): Promise<string[]> {
-    return await this.communities.listMembers(session, communityId);
+    return await this.communityGateway.listCommunityMembers(
+      session,
+      communityId,
+    );
   }
 
   public async listCommunityRoles(
     session: Session,
     communityId: string,
   ): Promise<CommunityRoleResource[]> {
-    return await this.communities.listRoles(session, communityId);
+    return await this.communityGateway.listCommunityRoles(session, communityId);
   }
 
   public async createCommunityRole(
@@ -645,7 +620,11 @@ export class PigeonApiGateway {
     communityId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.communities.createRole(session, communityId, input);
+    return await this.communityGateway.createCommunityRole(
+      session,
+      communityId,
+      input,
+    );
   }
 
   public async updateCommunityRole(
@@ -654,7 +633,7 @@ export class PigeonApiGateway {
     roleId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.communities.updateRole(
+    return await this.communityGateway.updateCommunityRole(
       session,
       communityId,
       roleId,
@@ -667,7 +646,11 @@ export class PigeonApiGateway {
     communityId: string,
     roleId: string,
   ): Promise<void> {
-    await this.communities.deleteRole(session, communityId, roleId);
+    await this.communityGateway.deleteCommunityRole(
+      session,
+      communityId,
+      roleId,
+    );
   }
 
   public async assignCommunityMemberRoles(
@@ -676,7 +659,7 @@ export class PigeonApiGateway {
     identityId: string,
     roleIds: string[],
   ): Promise<Community> {
-    return await this.communities.assignMemberRoles(
+    return await this.communityGateway.assignCommunityMemberRoles(
       session,
       communityId,
       identityId,
@@ -689,7 +672,11 @@ export class PigeonApiGateway {
     communityId: string,
     name: string,
   ): Promise<CommunityTextChannel> {
-    return await this.communities.createTextChannel(session, communityId, name);
+    return await this.communityGateway.createCommunityTextChannel(
+      session,
+      communityId,
+      name,
+    );
   }
 
   public async createCommunityVoiceChannel(
@@ -697,7 +684,7 @@ export class PigeonApiGateway {
     communityId: string,
     name: string,
   ): Promise<CommunityVoiceChannel> {
-    return await this.communities.createVoiceChannel(
+    return await this.communityGateway.createCommunityVoiceChannel(
       session,
       communityId,
       name,
@@ -708,7 +695,10 @@ export class PigeonApiGateway {
     session: Session,
     communityId: string,
   ): Promise<CommunityChannel[]> {
-    return await this.communities.listChannels(session, communityId);
+    return await this.communityGateway.listCommunityChannels(
+      session,
+      communityId,
+    );
   }
 
   public async renameCommunityChannel(
@@ -717,7 +707,7 @@ export class PigeonApiGateway {
     channelId: string,
     name: string,
   ): Promise<CommunityChannel> {
-    return await this.communities.renameChannel(
+    return await this.communityGateway.renameCommunityChannel(
       session,
       communityId,
       channelId,
@@ -730,7 +720,7 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): Promise<Community> {
-    return await this.communities.deleteChannel(
+    return await this.communityGateway.deleteCommunityChannel(
       session,
       communityId,
       channelId,
@@ -743,7 +733,7 @@ export class PigeonApiGateway {
     channelId: string,
     visibleRoleIds: string[],
   ): Promise<CommunityChannel> {
-    return await this.communities.updateChannelPermissions(
+    return await this.communityGateway.updateCommunityChannelPermissions(
       session,
       communityId,
       channelId,
@@ -757,7 +747,7 @@ export class PigeonApiGateway {
     channelId: string,
     input: CommunityChannelMessageInput,
   ): Promise<MessageResource> {
-    return await this.communities.createChannelMessage(
+    return await this.communityGateway.createCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -774,7 +764,7 @@ export class PigeonApiGateway {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.communities.listChannelMessages(
+    return await this.communityGateway.listCommunityChannelMessages(
       session,
       communityId,
       channelId,
@@ -792,7 +782,7 @@ export class PigeonApiGateway {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.communities.listChannelMessageThread(
+    return await this.communityGateway.listCommunityChannelMessageThread(
       session,
       communityId,
       channelId,
@@ -806,7 +796,7 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): Promise<CommunityChannelMessagePinsResource> {
-    return await this.communities.listChannelMessagePins(
+    return await this.communityGateway.listCommunityChannelMessagePins(
       session,
       communityId,
       channelId,
@@ -819,13 +809,12 @@ export class PigeonApiGateway {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.communities.pinChannelMessage(
+    await this.communityGateway.pinCommunityChannelMessage(
       session,
       communityId,
       channelId,
       messageId,
     );
-    this.invalidateCommunityChannelPinsCache(session, communityId, channelId);
   }
 
   public async unpinCommunityChannelMessage(
@@ -834,19 +823,18 @@ export class PigeonApiGateway {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.communities.unpinChannelMessage(
+    await this.communityGateway.unpinCommunityChannelMessage(
       session,
       communityId,
       channelId,
       messageId,
     );
-    this.invalidateCommunityChannelPinsCache(session, communityId, channelId);
   }
 
   public async listCommunityDrafts(
     session: Session,
   ): Promise<CommunityChannelDraft[]> {
-    return await this.communities.listDrafts(session);
+    return await this.communityGateway.listCommunityDrafts(session);
   }
 
   public async saveCommunityChannelDraft(
@@ -856,17 +844,13 @@ export class PigeonApiGateway {
     content: string,
     updatedAt = Date.now(),
   ): Promise<CommunityChannelDraft> {
-    const draft = await this.communities.saveChannelDraft(
+    return await this.communityGateway.saveCommunityChannelDraft(
       session,
       communityId,
       channelId,
       content,
       updatedAt,
     );
-
-    this.requestCache.invalidateForSession('/communities/me/drafts', session);
-
-    return draft;
   }
 
   public async deleteCommunityChannelDraft(
@@ -874,8 +858,11 @@ export class PigeonApiGateway {
     communityId: string,
     channelId: string,
   ): Promise<void> {
-    await this.communities.deleteChannelDraft(session, communityId, channelId);
-    this.requestCache.invalidateForSession('/communities/me/drafts', session);
+    await this.communityGateway.deleteCommunityChannelDraft(
+      session,
+      communityId,
+      channelId,
+    );
   }
 
   public async searchCommunityChannelMessages(
@@ -888,7 +875,7 @@ export class PigeonApiGateway {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.communities.searchChannelMessages(
+    return await this.communityGateway.searchCommunityChannelMessages(
       session,
       communityId,
       channelId,
@@ -905,7 +892,7 @@ export class PigeonApiGateway {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.communities.searchCommunityMessages(
+    return await this.communityGateway.searchCommunityMessages(
       session,
       communityId,
       input,
@@ -918,7 +905,7 @@ export class PigeonApiGateway {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.communities.deleteChannelMessage(
+    await this.communityGateway.deleteCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -933,7 +920,7 @@ export class PigeonApiGateway {
     messageId: string,
     input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
-    return await this.communities.editChannelMessage(
+    return await this.communityGateway.editCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -949,7 +936,7 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.communities.addChannelMessageReaction(
+    await this.communityGateway.addCommunityChannelMessageReaction(
       session,
       communityId,
       channelId,
@@ -965,7 +952,7 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.communities.removeChannelMessageReaction(
+    await this.communityGateway.removeCommunityChannelMessageReaction(
       session,
       communityId,
       channelId,
@@ -1078,7 +1065,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: null | string;
   }> {
-    return await this.communityInvitations.create(
+    return await this.communityGateway.createCommunityInvitation(
       session,
       communityId,
       recipientIdentityId,
@@ -1096,7 +1083,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: null | string;
   }> {
-    return await this.communityInvitations.createInviteLink(
+    return await this.communityGateway.createCommunityInviteLink(
       session,
       communityId,
       input,
@@ -1106,14 +1093,14 @@ export class PigeonApiGateway {
   public async getCommunityInviteLink(
     inviteToken: string,
   ): Promise<CommunityInviteLinkResource> {
-    return await this.communityInvitations.getInviteLink(inviteToken);
+    return await this.communityGateway.getCommunityInviteLink(inviteToken);
   }
 
   public async acceptCommunityInviteLink(
     session: Session,
     inviteToken: string,
   ): Promise<Community> {
-    return await this.communityInvitations.acceptInviteLink(
+    return await this.communityGateway.acceptCommunityInviteLink(
       session,
       inviteToken,
     );
@@ -1128,7 +1115,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.communityInvitations.acceptInviteLinkWithKey(
+    return await this.communityGateway.acceptCommunityInviteLinkWithKey(
       session,
       inviteToken,
       keyEntry,

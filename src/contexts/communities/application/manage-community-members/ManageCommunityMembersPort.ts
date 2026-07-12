@@ -29,5 +29,4 @@ export interface ManageCommunityMembersPort {
     session: Session,
     communityId: string,
   ): Promise<string[]>;
-  leaveCommunity(session: Session, communityId: string): Promise<Community>;
 }

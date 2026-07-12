@@ -30,6 +30,7 @@ import type { LeaveCommunityResult } from './create-community/LeaveCommunityResu
 import type { DiscoverCommunitiesPort } from './discover-communities/DiscoverCommunitiesPort';
 import type { GetCommunityInviteLinkPort } from './get-community-invite-link/GetCommunityInviteLinkPort';
 import type { GetCommunityPort } from './get-community/GetCommunityPort';
+import type { LeaveCommunityPort } from './leave-community/LeaveCommunityPort';
 import type { ListCommunitiesPort } from './list-communities/ListCommunitiesPort';
 import type { ListCommunityModerationLogsPort } from './list-community-moderation-logs/ListCommunityModerationLogsPort';
 import type { ManageCommunityChannelDraftsPort } from './manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
@@ -44,10 +45,10 @@ import type { ReadCommunityChannelMessagesPort } from './read-community-channel-
 import type { UpdateCommunityPort } from './update-community/UpdateCommunityPort';
 import type { CommunityMediaPort } from './upload-community-media/CommunityMediaPort';
 
-import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
-import { ConversationKeychain } from '../../conversations/domain/ConversationKeychain';
 import { CreateCommunity } from './create-community/CreateCommunity';
 import { CreateCommunityMessage } from './create-community/messages/CreateCommunityMessage';
+import { LeaveCommunity } from './leave-community/LeaveCommunity';
+import { LeaveCommunityMessage } from './leave-community/messages/LeaveCommunityMessage';
 import { ListCommunities } from './list-communities/ListCommunities';
 import { ListCommunitiesMessage } from './list-communities/messages/ListCommunitiesMessage';
 
@@ -84,6 +85,8 @@ export class PigeonCommunitiesApplication {
 
   private readonly listCommunitiesUseCase: ListCommunities;
 
+  private readonly leaveCommunityUseCase: LeaveCommunity;
+
   private readonly media: CommunityMediaPort;
 
   private readonly moderationLogs: ListCommunityModerationLogsPort;
@@ -110,6 +113,7 @@ export class PigeonCommunitiesApplication {
     communityInviteLinkCreator: CreateCommunityInviteLinkPort;
     communityInviteLinkGetter: GetCommunityInviteLinkPort;
     keychain: CommunityKeychainPort;
+    leaveCommunity: LeaveCommunityPort;
     listCommunities: ListCommunitiesPort;
     media: CommunityMediaPort;
     members: ManageCommunityMembersPort;
@@ -137,6 +141,10 @@ export class PigeonCommunitiesApplication {
     this.communityInviteLinkCreator = dependencies.communityInviteLinkCreator;
     this.communityInviteLinkGetter = dependencies.communityInviteLinkGetter;
     this.keychain = dependencies.keychain;
+    this.leaveCommunityUseCase = new LeaveCommunity(
+      dependencies.leaveCommunity,
+      dependencies.keychain,
+    );
     this.media = dependencies.media;
     this.members = dependencies.members;
     this.membershipRequests = dependencies.membershipRequests;
@@ -156,14 +164,6 @@ export class PigeonCommunitiesApplication {
     if (typeof value === 'string') return value;
 
     return (await this.media.uploadPublicFile(session, value)).cid;
-  }
-
-  private isLeaveAlreadyApplied(caught: unknown): boolean {
-    return (
-      caught instanceof HttpJsonError &&
-      (caught.code === 'CommunityMemberNotFoundError' ||
-        caught.code === 'CommunityNotFoundError')
-    );
   }
 
   public async list(session: Session): Promise<Community[]> {
@@ -311,29 +311,9 @@ export class PigeonCommunitiesApplication {
     session: Session,
     communityId: string,
   ): Promise<LeaveCommunityResult> {
-    let community: Community | null = null;
-
-    try {
-      community = await this.members.leaveCommunity(session, communityId);
-    } catch (caught) {
-      if (!this.isLeaveAlreadyApplied(caught)) throw caught;
-    }
-
-    const nextKeychain = ConversationKeychain.withoutCommunityEntry(
-      session.keychain,
-      communityId,
+    return await this.leaveCommunityUseCase.leave(
+      new LeaveCommunityMessage(session, communityId),
     );
-    const published = await this.keychain.publishKeychain(
-      session,
-      nextKeychain,
-    );
-
-    return {
-      community,
-      communityId,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
   }
 
   public async createInvitation(

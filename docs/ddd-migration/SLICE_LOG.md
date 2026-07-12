@@ -991,3 +991,52 @@
   - focused ESLint for the changed adapter/composition files
 - Next slice: `APPLICATION-011N`, make the remaining `PigeonApiGateway`
   community methods thin compatibility delegates and remove duplicated logic.
+
+## Slice APPLICATION-011N: Delegate legacy community methods
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: keep the old community methods on `PigeonApiGateway` as a compatibility
+  surface without retaining their cache, invitation, or transport logic.
+- Changed files:
+  - `app/composition/PigeonApiGateway.ts`
+  - `contexts/communities/infrastructure/http/PigeonCommunitiesGateway.ts`
+  - affected composition and gateway tests
+- Behavior changed/preserved: legacy community method names remain available,
+  but all community behavior now routes through the context-owned adapter.
+  Cache invalidation and membership invitation side effects have one owner.
+- Contracts changed: no REST, websocket, media, invitation, or keychain wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - compatibility gateway tests
+  - community gateway tests
+  - `yarn typecheck`
+  - focused ESLint for composition and community infrastructure
+- Next slice: `APPLICATION-011O`, complete the leave/keychain reconciliation
+  use case extraction and continue with the next large context.
+
+## Slice APPLICATION-011O: Extract leave/keychain reconciliation use case
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: move community leave reconciliation and keychain cleanup out of the
+  community facade into an explicit application use case and message.
+- Changed files:
+  - `contexts/communities/application/leave-community/*`
+  - `contexts/communities/application/PigeonCommunitiesApplication.ts`
+  - `src/test/contexts/communities/application/leave-community/*`
+- Behavior changed/preserved: leaving a community removes its keychain entry;
+  already-applied `CommunityMemberNotFoundError` and `CommunityNotFoundError`
+  cases still reconcile the local keychain instead of retrying forever.
+- Contracts changed: no community, keychain, or REST wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - leave use-case tests
+  - community application tests
+  - `yarn typecheck`
+  - focused ESLint for the leave slice
+- Next slice: `APPLICATION-011P`, audit the next large context boundary and
+  extract its highest-risk orchestration into explicit use cases.

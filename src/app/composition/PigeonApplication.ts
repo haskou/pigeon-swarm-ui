@@ -93,6 +93,7 @@ export class PigeonApplication {
       communityInviteLinkGetter: gateway.communityGateway,
       communityUpdater: gateway.communityGateway,
       keychain: gateway,
+      leaveCommunity: gateway.communityGateway,
       listCommunities: {
         list: async (message: ListCommunitiesMessage) =>
           await gateway.communityGateway.listCommunities(message.getSession()),
