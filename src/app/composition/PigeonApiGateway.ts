@@ -1,9 +1,4 @@
-import {
-  EncryptedPayload,
-  KeyPair,
-  StringValueObject,
-  SymmetricKey,
-} from '@haskou/value-objects';
+import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
@@ -77,14 +72,14 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import { IdentityId } from '../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
-import { loadLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
 import { clearLocalPasskeyUnlock } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
@@ -108,7 +103,6 @@ import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/h
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
-import { signSessionPayload } from '../../shared/infrastructure/crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
@@ -136,11 +130,11 @@ export class PigeonApiGateway {
 
   private readonly files: PigeonFilesGateway;
 
-  private readonly http: HttpJsonClient;
-
   private readonly ids: ConversationIdFactory;
 
-  private readonly identitySignatures: IdentitySignaturePayloadFactory;
+  private readonly identityCommands: PigeonIdentityCommandsApi;
+
+  private readonly identitySession: PigeonIdentitySessionApi;
 
   private readonly identities: PigeonIdentityGateway;
 
@@ -165,8 +159,6 @@ export class PigeonApiGateway {
   private readonly push: PigeonPushGateway;
 
   private readonly requestCache = new RequestCache();
-
-  private readonly signer: RequestSigner;
 
   private readonly stickers: PigeonStickersGateway;
 
@@ -212,11 +204,20 @@ export class PigeonApiGateway {
     this.files = new PigeonFilesGateway(
       new PigeonFilesApi(http, signer, attachmentCipher),
     );
-    this.http = http;
     this.ids = ids;
-    this.identitySignatures = new IdentitySignaturePayloadFactory();
     this.identities = new PigeonIdentityGateway(http);
     this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
+    this.identityCommands = new PigeonIdentityCommandsApi(
+      http,
+      signer,
+      this.identities,
+      new IdentitySignaturePayloadFactory(),
+      this.identityKeyProtection,
+    );
+    this.identitySession = new PigeonIdentitySessionApi(
+      this.identities,
+      this.identityKeyProtection,
+    );
     this.keychainApi = new PigeonKeychainApi(
       http,
       signer,
@@ -290,7 +291,6 @@ export class PigeonApiGateway {
     );
     this.polls = new PigeonPollsApi(http, signer);
     this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
-    this.signer = signer;
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
     );
@@ -437,49 +437,13 @@ export class PigeonApiGateway {
     keyPair: KeyPair;
     masterKey: SymmetricKey;
   }> {
-    const keyPair = await KeyPair.generate();
-    const masterKey = SymmetricKey.generate();
-    const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
-    const { encryptedKeyPair, encryptedMasterKey, masterKeyDerivation } =
-      await this.identityKeyProtection.protectNewIdentity({
-        displayName: name,
-        identityId,
-        keyPair,
-        masterKey,
-        options,
-        password,
-      });
-    const path = '/identities/';
-    const unsigned = this.identitySignatures.createInitial({
-      encryptedKeyPair,
-      encryptedMasterKey,
-      id: identityId,
-      masterKeyDerivation,
+    return await this.identityCommands.create(
+      name,
+      password,
       networks,
-      profile: { handle, name },
-      timestamp: Date.now(),
-    });
-    const signature = keyPair.sign(JSON.stringify(unsigned));
-    const body = {
-      ...unsigned,
-      signature: signature.toString(),
-    };
-    const signingSession = {
-      identity: {
-        ...body,
-      },
-      keychain: defaultKeychain,
-      keyPair,
-      masterKey,
-    } as Session;
-
-    const identity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(signingSession, 'POST', path, body),
-      method: 'POST',
-    });
-
-    return { identity, keyPair, masterKey };
+      handle,
+      options,
+    );
   }
 
   private async hydrateLoginSession(
@@ -1263,58 +1227,12 @@ export class PigeonApiGateway {
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {
-    const identityId = IdentityId.normalize(session.identity.id);
-    const currentIdentity = await this.getIdentity(identityId);
-    const previousIdentityExternalIdentifier =
-      currentIdentity.identityExternalIdentifier ??
-      currentIdentity.previousIdentityExternalIdentifier ??
-      session.identity.identityExternalIdentifier ??
-      session.identity.previousIdentityExternalIdentifier;
-
-    if (!previousIdentityExternalIdentifier) {
-      throw new Error(copy.profile.missingIdentityExternalIdentifier);
-    }
-
-    const masterKeyEncryption =
-      await this.identityKeyProtection.protectProfileMasterKey({
-        currentIdentity,
-        identityId,
-        newPassword,
-        options,
-        profile,
-        session,
-      });
-    const path = `/identities/${encodeURIComponent(identityId)}`;
-    const unsigned = this.identitySignatures.createUpdate({
-      encryptedMasterKey: masterKeyEncryption?.encryptedMasterKey,
-      identity: currentIdentity,
-      masterKeyDerivation: masterKeyEncryption?.masterKeyDerivation,
-      previousIdentityExternalIdentifier,
-      profile,
-      timestamp: Date.now(),
-    });
-    const signature = await signSessionPayload(
+    return await this.identityCommands.updateProfile(
       session,
-      JSON.stringify(unsigned),
+      profile,
+      newPassword,
+      options,
     );
-    const body = {
-      ...unsigned,
-      signature: signature.toString(),
-    };
-
-    const updatedIdentity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
-
-    this.identities.remember(updatedIdentity);
-
-    if (options.passkeyPrfEnabled === false) {
-      clearLocalPasskeyUnlock(identityId);
-    }
-
-    return updatedIdentity;
   }
 
   public async configureLocalPasskeyUnlock(
@@ -1633,45 +1551,12 @@ export class PigeonApiGateway {
     onProgress?: LoginIdentityProgressReporter,
     recoveryKey?: string,
   ): Promise<LoginResult> {
-    onProgress?.('resolving-identity');
-    const identity = await this.getIdentity(identityId.trim());
-    onProgress?.('decrypting-keys');
-    const loginPayload = new StringValueObject(
-      `pigeon-swarm:login:${identity.id}`,
-    );
-
-    if (
-      this.identityKeyProtection.shouldConfirmPasskey(identity, recoveryKey)
-    ) {
-      onProgress?.('confirming-passkey');
-    }
-
-    const masterKey = await this.identityKeyProtection.unlockLoginMasterKey({
-      identity,
+    const session = await this.identitySession.unlock(
+      identityId,
       password,
+      onProgress,
       recoveryKey,
-    });
-    let keyPair: KeyPair;
-
-    try {
-      keyPair = this.identityKeyProtection.unlockIdentityKeyPair(
-        identity,
-        masterKey,
-      );
-
-      if (!keyPair.isValidSignature(loginPayload, keyPair.sign(loginPayload))) {
-        throw new Error(copy.auth.invalidLogin);
-      }
-    } catch {
-      throw new Error(copy.auth.invalidLogin);
-    }
-
-    const session: Session = {
-      identity,
-      keychain: defaultKeychain,
-      keyPair,
-      masterKey,
-    };
+    );
 
     return await this.hydrateLoginSession(session, onProgress);
   }
@@ -1680,31 +1565,10 @@ export class PigeonApiGateway {
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
-    onProgress?.('resolving-identity');
-    const identity = await this.getIdentity(identityId.trim());
-    onProgress?.('decrypting-keys');
-
-    const localUnlock = await loadLocalDeviceUnlock(identity.id);
-
-    if (!localUnlock) {
-      throw new Error(copy.auth.invalidLogin);
-    }
-
-    const keyPair = KeyPair.fromPrimitives(localUnlock.keyPair);
-    const loginPayload = new StringValueObject(
-      `pigeon-swarm:login:${identity.id}`,
+    const session = await this.identitySession.restoreRemembered(
+      identityId,
+      onProgress,
     );
-
-    if (!keyPair.isValidSignature(loginPayload, keyPair.sign(loginPayload))) {
-      throw new Error(copy.auth.invalidLogin);
-    }
-
-    const session: Session = {
-      identity,
-      keychain: defaultKeychain,
-      keyPair,
-      masterKey: SymmetricKey.fromBase64(localUnlock.masterKey),
-    };
     onProgress?.('loading-keychain');
     const conversationsPromise = this.listConversations(session).catch(
       () => [],

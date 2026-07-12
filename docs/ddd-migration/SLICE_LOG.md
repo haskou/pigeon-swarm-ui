@@ -525,3 +525,30 @@
 - Risks: identity material creation remains the largest remaining private
   workflow in the compatibility gateway
 - Next slice: extract identity material creation and login orchestration
+
+## Slice INFRA-002G: Extract identity commands and key unlock
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: Move identity creation, signed profile updates, and login key-unlock
+  verification out of the compatibility gateway and into identity-owned
+  infrastructure.
+- Changed files:
+  - `contexts/identities/infrastructure/http/PigeonIdentityCommandsApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentitySessionApi.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and composition wiring
+- Behavior changed/preserved: identity key generation, master-key protection,
+  signed identity creation and profile updates, passkey cleanup, login progress,
+  recovery-key handling, remembered-session unlock, and identity signature
+  validation preserve their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - identity command and session infrastructure tests
+  - identity application and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: keychain hydration and registration orchestration still coordinate
+  identity, conversation, and message boundaries in the compatibility gateway
+- Next slice: extract session hydration and registration coordination
