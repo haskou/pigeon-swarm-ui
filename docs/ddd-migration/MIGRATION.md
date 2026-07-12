@@ -141,10 +141,12 @@ adapters into application services without containing context behavior.
   context-owned gateways and hardened unsupported thread state cleanup.
 - `APPLICATION-011W`: extracted realtime call event orchestration from the
   workspace component into a focused presentation hook.
+- `APPLICATION-011X`: extracted message history loading, scroll anchoring, and
+  pagination orchestration from the workspace component.
 
 ## Next slices
 
-1. `APPLICATION-011X`: extract message timeline loading and scroll
-   orchestration from `GlassWorkspace`.
+1. `APPLICATION-011Y`: extract remaining realtime/community routing from
+   `GlassWorkspace` only where it forms a cohesive responsibility.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

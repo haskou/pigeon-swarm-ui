@@ -1250,3 +1250,25 @@
   - focused ESLint for the extracted hook
 - Next slice: extract the message timeline loading/scroll orchestration from
   `GlassWorkspace`.
+
+## Slice APPLICATION-011X: Extract message history orchestration
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: move loading older messages, scroll anchoring, cursor progression, and
+  near-bottom detection out of the workspace component.
+- Changed files:
+  - `app/presentation/workspace/components/useWorkspaceMessageHistory.ts`
+  - `app/presentation/workspace/components/GlassWorkspace.tsx`
+- Behavior changed/preserved: older-message pagination preserves the previous
+  viewport anchor, prevents duplicate loads, merges only unknown messages, and
+  keeps unread/new-message behavior unchanged.
+- Contracts changed: no message or REST wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - full test suite
+  - `yarn typecheck`
+  - focused ESLint for the extracted history hook
+- Next slice: extract the remaining realtime/community routing from
+  `GlassWorkspace` only where it forms a cohesive responsibility.
