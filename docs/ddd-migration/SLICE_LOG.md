@@ -1204,3 +1204,26 @@
   - focused ESLint for the gateway and composition files
 - Next slice: inspect the remaining facade-only capabilities and decide which
   are true shared composition concerns versus context infrastructure.
+
+## Slice APPLICATION-011V: Unify compatibility delegates with context gateways
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: ensure the remaining legacy methods on `PigeonApiGateway` use the same
+  context-owned gateway instances that the application composition uses.
+- Changed files:
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/presentation/workspace/components/useConversationThread.ts`
+- Behavior changed/preserved: push, poll, attachment, sticker, and notification
+  compatibility methods preserve their behavior while avoiding a second
+  implementation path. Unsupported conversation thread state is cleared when
+  switching to a one-to-one conversation.
+- Contracts changed: no public REST or encrypted-payload contract changes.
+- Validation level: L2
+- Tests/checks:
+  - conversation thread capability tests
+  - `yarn typecheck`
+  - focused ESLint for the compatibility facade and thread hook
+- Next slice: extract a cohesive presentation orchestrator from
+  `GlassWorkspace` rather than adding more facade methods.

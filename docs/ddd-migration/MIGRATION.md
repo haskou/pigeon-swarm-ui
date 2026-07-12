@@ -137,10 +137,12 @@ adapters into application services without containing context behavior.
   keychain dependencies through their context-owned gateways.
 - `APPLICATION-011U`: routed attachment and poll use cases through their
   context-owned infrastructure gateways.
+- `APPLICATION-011V`: unified remaining compatibility methods with the same
+  context-owned gateways and hardened unsupported thread state cleanup.
 
 ## Next slices
 
-1. `APPLICATION-011V`: inspect the remaining facade-only capabilities and
-   separate shared composition concerns from context infrastructure.
+1. `APPLICATION-011W`: extract a cohesive presentation orchestrator from
+   `GlassWorkspace`.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

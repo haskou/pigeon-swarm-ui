@@ -475,21 +475,21 @@ export class PigeonApiGateway {
     enabled: boolean;
     publicKey?: string;
   }> {
-    return await this.push.getPushVapidPublicKey();
+    return await this.pushGateway.getPushVapidPublicKey();
   }
 
   public async registerPushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    await this.push.registerPushSubscription(session, subscription);
+    await this.pushGateway.registerPushSubscription(session, subscription);
   }
 
   public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    await this.push.deletePushSubscription(session, subscription);
+    await this.pushGateway.deletePushSubscription(session, subscription);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -1007,14 +1007,14 @@ export class PigeonApiGateway {
     session: Session,
     input: CreatePollInput,
   ): Promise<PollResource> {
-    return await this.polls.create(session, input);
+    return await this.pollsGateway.createPoll(session, input);
   }
 
   public async getPoll(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.polls.get(session, pollId);
+    return await this.pollsGateway.getPoll(session, pollId);
   }
 
   public async votePoll(
@@ -1022,29 +1022,29 @@ export class PigeonApiGateway {
     pollId: string,
     optionIds: string[],
   ): Promise<PollResource> {
-    return await this.polls.vote(session, pollId, optionIds);
+    return await this.pollsGateway.votePoll(session, pollId, optionIds);
   }
 
   public async removePollVote(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.polls.removeVote(session, pollId);
+    return await this.pollsGateway.removePollVote(session, pollId);
   }
 
   public async closePoll(
     session: Session,
     pollId: string,
   ): Promise<PollResource> {
-    return await this.polls.close(session, pollId);
+    return await this.pollsGateway.closePoll(session, pollId);
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    return await this.files.getPublicFile(cid);
+    return await this.filesGateway.getPublicFile(cid);
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    return await this.files.getPrivateFile(cid);
+    return await this.filesGateway.getPrivateFile(cid);
   }
 
   public async createConversation(
@@ -1253,14 +1253,14 @@ export class PigeonApiGateway {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.files.uploadPublicFile(session, file);
+    return await this.filesGateway.uploadPublicFile(session, file);
   }
 
   public async uploadStickerAsset(
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.stickers.uploadAsset(session, file);
+    return await this.stickersGateway.uploadAsset(session, file);
   }
 
   public async listStickerPacks(
@@ -1268,22 +1268,22 @@ export class PigeonApiGateway {
       ownerIdentityId?: string;
     } = {},
   ): Promise<StickerPackResource[]> {
-    return await this.stickers.listPacks(input);
+    return await this.stickersGateway.listPacks(input);
   }
 
   public async getStickerPack(packId: string): Promise<StickerPackResource> {
-    return await this.stickers.getPack(packId);
+    return await this.stickersGateway.getPack(packId);
   }
 
   public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    return await this.stickers.getMyStickers(session);
+    return await this.stickersGateway.getMyStickers(session);
   }
 
   public async createStickerPack(
     session: Session,
     input: StickerPackInput,
   ): Promise<StickerPackResource> {
-    return await this.stickers.createPack(session, input);
+    return await this.stickersGateway.createPack(session, input);
   }
 
   public async updateStickerPack(
@@ -1291,7 +1291,7 @@ export class PigeonApiGateway {
     packId: string,
     input: Partial<StickerPackInput>,
   ): Promise<StickerPackResource> {
-    return await this.stickers.updatePack(session, packId, input);
+    return await this.stickersGateway.updatePack(session, packId, input);
   }
 
   public async addStickerToPack(
@@ -1299,7 +1299,7 @@ export class PigeonApiGateway {
     packId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.stickers.addSticker(session, packId, input);
+    return await this.stickersGateway.addSticker(session, packId, input);
   }
 
   public async updateSticker(
@@ -1308,7 +1308,12 @@ export class PigeonApiGateway {
     stickerId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.stickers.updateSticker(session, packId, stickerId, input);
+    return await this.stickersGateway.updateSticker(
+      session,
+      packId,
+      stickerId,
+      input,
+    );
   }
 
   public async deleteSticker(
@@ -1316,21 +1321,21 @@ export class PigeonApiGateway {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.stickers.deleteSticker(session, packId, stickerId);
+    await this.stickersGateway.deleteSticker(session, packId, stickerId);
   }
 
   public async saveStickerPack(
     session: Session,
     packId: string,
   ): Promise<void> {
-    await this.stickers.savePack(session, packId);
+    await this.stickersGateway.savePack(session, packId);
   }
 
   public async unsaveStickerPack(
     session: Session,
     packId: string,
   ): Promise<void> {
-    await this.stickers.unsavePack(session, packId);
+    await this.stickersGateway.unsavePack(session, packId);
   }
 
   public async favoriteSticker(
@@ -1338,7 +1343,7 @@ export class PigeonApiGateway {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.stickers.favoriteSticker(session, packId, stickerId);
+    await this.stickersGateway.favoriteSticker(session, packId, stickerId);
   }
 
   public async unfavoriteSticker(
@@ -1346,7 +1351,7 @@ export class PigeonApiGateway {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.stickers.unfavoriteSticker(session, packId, stickerId);
+    await this.stickersGateway.unfavoriteSticker(session, packId, stickerId);
   }
 
   public async markStickerUsed(
@@ -1354,7 +1359,7 @@ export class PigeonApiGateway {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.stickers.markUsed(session, packId, stickerId);
+    await this.stickersGateway.markUsed(session, packId, stickerId);
   }
 
   public async uploadPrivateFile(
@@ -1362,14 +1367,18 @@ export class PigeonApiGateway {
     networkId: string,
     attachment: PendingMessageAttachment,
   ): Promise<PrivateFileUpload> {
-    return await this.files.uploadPrivateFile(session, networkId, attachment);
+    return await this.filesGateway.uploadPrivateFile(
+      session,
+      networkId,
+      attachment,
+    );
   }
 
   public async downloadAttachment(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    return await this.files.downloadAttachment(attachment, onProgress);
+    return await this.filesGateway.downloadAttachment(attachment, onProgress);
   }
 
   public async listConversations(
@@ -1393,27 +1402,30 @@ export class PigeonApiGateway {
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
-    return await this.notifications.listNotifications(session);
+    return await this.notificationsGateway.listNotifications(session);
   }
 
   public async listNotificationSettings(
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
-    return await this.notifications.listNotificationSettings(session);
+    return await this.notificationsGateway.listNotificationSettings(session);
   }
 
   public async saveNotificationSetting(
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
-    return await this.notifications.saveNotificationSetting(session, setting);
+    return await this.notificationsGateway.saveNotificationSetting(
+      session,
+      setting,
+    );
   }
 
   public async resetNotificationSetting(
     session: Session,
     scope: NotificationSettingScope,
   ): Promise<void> {
-    await this.notifications.resetNotificationSetting(session, scope);
+    await this.notificationsGateway.resetNotificationSetting(session, scope);
   }
 
   public async createLinkPreview(
@@ -1659,7 +1671,7 @@ export class PigeonApiGateway {
     notificationId: NotificationId,
     decision: NotificationDecision,
   ): Promise<NotificationResource> {
-    return await this.notifications.updateNotification(
+    return await this.notificationsGateway.updateNotification(
       session,
       notificationId,
       decision,
@@ -1706,7 +1718,7 @@ export class PigeonApiGateway {
     onProgress?: (progress: AttachmentProgress) => void,
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
-    return await this.files.publishMessageAttachments(
+    return await this.filesGateway.publishMessageAttachments(
       session,
       attachments,
       onProgress,
