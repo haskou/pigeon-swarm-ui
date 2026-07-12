@@ -115,10 +115,13 @@ adapters into application services without containing context behavior.
   update, and moderation-log capabilities by action.
 - `APPLICATION-011K`: split direct invitations, invite-link creation, lookup,
   and acceptance capabilities by action.
+- `APPLICATION-011L`: extracted community creation orchestration into an
+  explicit application use case with a boundary message and direct tests.
 
 ## Next slices
 
-1. `APPLICATION-011L`: replace remaining broad compatibility methods with
-   context-owned HTTP and crypto adapters.
+1. `APPLICATION-011M`: extract leave/keychain reconciliation and replace
+   remaining broad compatibility methods with context-owned HTTP and crypto
+   adapters.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

@@ -936,3 +936,29 @@
   - focused ESLint for the community context
 - Next slice: `APPLICATION-011L`, replace remaining compatibility gateway
   implementations with context-owned HTTP and crypto adapters.
+
+## Slice APPLICATION-011L: Extract community creation use case
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: move community creation orchestration out of the context facade into
+  an explicit application use case.
+- Changed files:
+  - `contexts/communities/application/create-community/CreateCommunity.ts`
+  - `contexts/communities/application/create-community/messages/*`
+  - `contexts/communities/application/PigeonCommunitiesApplication.ts`
+  - `src/test/contexts/communities/application/create-community/*`
+- Behavior changed/preserved: image upload, community creation, initial channel
+  creation, private community key publication, and public/private result
+  handling preserve their existing behavior.
+- Contracts changed: no community, keychain, media, or REST wire contract
+  changes.
+- Validation level: L2
+- Tests/checks:
+  - community creation use-case tests
+  - community application tests
+  - `yarn typecheck`
+  - focused ESLint for the community context
+- Next slice: `APPLICATION-011M`, extract leave/community-keychain reconciliation
+  and then replace remaining compatibility gateway implementations.

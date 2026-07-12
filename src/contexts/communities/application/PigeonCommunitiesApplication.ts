@@ -1,5 +1,3 @@
-import { SymmetricKey } from '@haskou/value-objects';
-
 import type {
   Community,
   CommunityChannel,
@@ -25,7 +23,6 @@ import type { AcceptCommunityInviteLinkWithKeyPort } from './accept-community-in
 import type { AcceptCommunityInviteLinkPort } from './accept-community-invite-link/AcceptCommunityInviteLinkPort';
 import type { CreateCommunityInvitationPort } from './create-community-invitation/CreateCommunityInvitationPort';
 import type { CreateCommunityInviteLinkPort } from './create-community-invite-link/CreateCommunityInviteLinkPort';
-import type { CommunityImageCids } from './create-community/CommunityImageCids';
 import type { CreateCommunityInput } from './create-community/CreateCommunityInput';
 import type { CreateCommunityPort } from './create-community/CreateCommunityPort';
 import type { CreateCommunityResult } from './create-community/CreateCommunityResult';
@@ -49,6 +46,8 @@ import type { CommunityMediaPort } from './upload-community-media/CommunityMedia
 
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../conversations/domain/ConversationKeychain';
+import { CreateCommunity } from './create-community/CreateCommunity';
+import { CreateCommunityMessage } from './create-community/messages/CreateCommunityMessage';
 import { ListCommunities } from './list-communities/ListCommunities';
 import { ListCommunitiesMessage } from './list-communities/messages/ListCommunitiesMessage';
 
@@ -63,7 +62,7 @@ export class PigeonCommunitiesApplication {
 
   private readonly channelReads: ReadCommunityChannelMessagesPort;
 
-  private readonly communityCreator: CreateCommunityPort;
+  private readonly createCommunityUseCase: CreateCommunity;
 
   private readonly communityDiscoverer: DiscoverCommunitiesPort;
 
@@ -123,7 +122,12 @@ export class PigeonCommunitiesApplication {
     this.channelPins = dependencies.channelPins;
     this.channels = dependencies.channels;
     this.channelReads = dependencies.channelReads;
-    this.communityCreator = dependencies.communityCreator;
+    this.createCommunityUseCase = new CreateCommunity(
+      dependencies.communityCreator,
+      dependencies.channels,
+      dependencies.keychain,
+      dependencies.media,
+    );
     this.communityDiscoverer = dependencies.communityDiscoverer;
     this.communityGetter = dependencies.communityGetter;
     this.communityUpdater = dependencies.communityUpdater;
@@ -143,111 +147,6 @@ export class PigeonCommunitiesApplication {
     });
   }
 
-  private async uploadCommunityImages(
-    session: Session,
-    input: CreateCommunityInput,
-  ): Promise<CommunityImageCids> {
-    const avatarCid = input.avatar
-      ? (await this.media.uploadPublicFile(session, input.avatar)).cid
-      : undefined;
-    const bannerCid = input.banner
-      ? (await this.media.uploadPublicFile(session, input.banner)).cid
-      : undefined;
-
-    return {
-      ...(avatarCid ? { avatarCid } : {}),
-      ...(bannerCid ? { bannerCid } : {}),
-    };
-  }
-
-  private async createCommunityResource(
-    session: Session,
-    input: CreateCommunityInput,
-    images: CommunityImageCids,
-  ): Promise<Community> {
-    return await this.communityCreator.createCommunity(session, {
-      autoJoinEnabled: input.autoJoinEnabled,
-      ...(images.avatarCid ? { avatar: images.avatarCid } : {}),
-      ...(images.bannerCid ? { banner: images.bannerCid } : {}),
-      description: input.description,
-      discoverable: input.discoverable,
-      name: input.name,
-      networkId: input.networkId,
-      visibility: input.visibility,
-    });
-  }
-
-  private async createPublicCommunityResult(
-    session: Session,
-    community: Community,
-    channels: CreateCommunityInput['channels'],
-  ): Promise<CreateCommunityResult> {
-    const initialChannels = await this.createInitialChannels(
-      session,
-      community.id,
-      channels ?? [],
-    );
-
-    return {
-      community: this.communityWithInitialChannels(community, initialChannels),
-      keychain: session.keychain,
-      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-    };
-  }
-
-  private async createPrivateCommunityResult(
-    session: Session,
-    community: Community,
-    channels: CreateCommunityInput['channels'],
-  ): Promise<CreateCommunityResult> {
-    const keyEntry = await this.createCommunityKeyEntry(community.id);
-    const published = await this.keychain.publishKeychain(session, {
-      ...session.keychain,
-      conversations: {
-        ...session.keychain.conversations,
-        [community.id]: keyEntry,
-      },
-    });
-    const initialChannels = await this.createInitialChannels(
-      {
-        ...session,
-        keychain: published.keychain,
-        keychainExternalIdentifier: published.keychainExternalIdentifier,
-      },
-      community.id,
-      channels ?? [],
-    );
-
-    return {
-      community: this.communityWithInitialChannels(community, initialChannels),
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-  }
-
-  private communityWithInitialChannels(
-    community: Community,
-    initialChannels: {
-      textChannels: CommunityTextChannel[];
-      voiceChannels: CommunityVoiceChannel[];
-    },
-  ): Community {
-    return {
-      ...community,
-      textChannels: [
-        ...community.textChannels,
-        ...initialChannels.textChannels,
-      ],
-      voiceChannels:
-        initialChannels.voiceChannels.length > 0
-          ? [
-              ...(community.voiceChannels ?? []),
-              ...initialChannels.voiceChannels,
-            ]
-          : community.voiceChannels,
-    };
-  }
-
   private async resolvePublicImageCid(
     session: Session,
     value: File | null | string | undefined,
@@ -259,50 +158,12 @@ export class PigeonCommunitiesApplication {
     return (await this.media.uploadPublicFile(session, value)).cid;
   }
 
-  private createCommunityKeyEntry(communityId: string): ConversationKeyEntry {
-    return {
-      algorithm: 'aes-256-gcm',
-      conversationId: communityId,
-      createdAt: Date.now(),
-      key: SymmetricKey.generate().valueOf(),
-      kind: 'community',
-      peerIdentityId: '',
-      version: 2,
-    };
-  }
-
   private isLeaveAlreadyApplied(caught: unknown): boolean {
     return (
       caught instanceof HttpJsonError &&
       (caught.code === 'CommunityMemberNotFoundError' ||
         caught.code === 'CommunityNotFoundError')
     );
-  }
-
-  private async createInitialChannels(
-    session: Session,
-    communityId: string,
-    channels: Array<{ name: string; type: 'text' | 'voice' }>,
-  ): Promise<{
-    textChannels: CommunityTextChannel[];
-    voiceChannels: CommunityVoiceChannel[];
-  }> {
-    const textChannels = [];
-    const voiceChannels = [];
-
-    for (const channel of channels) {
-      if (channel.type === 'voice') {
-        voiceChannels.push(
-          await this.createVoiceChannel(session, communityId, channel.name),
-        );
-      } else {
-        textChannels.push(
-          await this.createTextChannel(session, communityId, channel.name),
-        );
-      }
-    }
-
-    return { textChannels, voiceChannels };
   }
 
   public async list(session: Session): Promise<Community[]> {
@@ -338,25 +199,8 @@ export class PigeonCommunitiesApplication {
     session: Session,
     input: CreateCommunityInput,
   ): Promise<CreateCommunityResult> {
-    const images = await this.uploadCommunityImages(session, input);
-    const community = await this.createCommunityResource(
-      session,
-      input,
-      images,
-    );
-    const visibility = community.visibility ?? input.visibility ?? 'private';
-
-    if (visibility === 'public')
-      return await this.createPublicCommunityResult(
-        session,
-        community,
-        input.channels,
-      );
-
-    return await this.createPrivateCommunityResult(
-      session,
-      community,
-      input.channels,
+    return await this.createCommunityUseCase.create(
+      new CreateCommunityMessage(session, input),
     );
   }
 
