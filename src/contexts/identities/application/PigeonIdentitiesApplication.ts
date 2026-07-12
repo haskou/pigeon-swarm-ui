@@ -7,13 +7,13 @@ import type {
   SelectablePresenceStatus,
 } from '../../../shared/domain/pigeonResources.types';
 import type { IdentityUpdateProfileInput } from '../domain/IdentitySignaturePayloadFactory';
-import type { IdentityKeychainPort } from './ports/IdentityKeychainPort';
-import type { IdentityPresencePort } from './ports/IdentityPresencePort';
-import type { IdentityProfilePort } from './ports/IdentityProfilePort';
-import type { IdentityProtectionPort } from './ports/IdentityProtectionPort';
-import type { LoginIdentityPort } from './ports/LoginIdentityPort';
-import type { LoginIdentityProgressReporter } from './ports/LoginIdentityProgressReporter';
-import type { RegisterIdentityPort } from './ports/RegisterIdentityPort';
+import type { IdentityProtectionPort } from './configure-local-passkey-unlock/IdentityProtectionPort';
+import type { LoginIdentityPort } from './login-identity/LoginIdentityPort';
+import type { LoginIdentityProgressReporter } from './login-identity/LoginIdentityProgressReporter';
+import type { IdentityPresencePort } from './presence/IdentityPresencePort';
+import type { IdentityProfilePort } from './profile/IdentityProfilePort';
+import type { IdentityKeychainPort } from './publish-keychain/IdentityKeychainPort';
+import type { RegisterIdentityPort } from './register-identity/RegisterIdentityPort';
 
 import { LoginIdentity } from './login-identity/LoginIdentity';
 import { LoginIdentityMessage } from './login-identity/messages/LoginIdentityMessage';

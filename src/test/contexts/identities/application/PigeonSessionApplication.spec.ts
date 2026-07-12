@@ -1,4 +1,4 @@
-import type { SessionApplicationPort } from '../../../../contexts/identities/application/ports/SessionApplicationPort';
+import type { SessionApplicationPort } from '../../../../contexts/identities/application/session/SessionApplicationPort';
 import type {
   LoginResult,
   Session,

@@ -5,7 +5,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
-import type { LoginIdentityProgressStep } from '../../application/ports/LoginIdentityProgressStep';
+import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';

@@ -1,5 +1,5 @@
-import type { IdentityWorkspaceSessionPort } from '../../../../../contexts/identities/application/ports/IdentityWorkspaceSessionPort';
-import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/ports/LoginIdentityProgressReporter';
+import type { IdentityWorkspaceSessionPort } from '../../../../../contexts/identities/application/login-identity/IdentityWorkspaceSessionPort';
+import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
 import type {
   ConversationResource,
   KeychainResource,

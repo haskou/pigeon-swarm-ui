@@ -6,7 +6,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressStep } from '../../contexts/identities/application/ports/LoginIdentityProgressStep';
+import type { LoginIdentityProgressStep } from '../../contexts/identities/application/login-identity/LoginIdentityProgressStep';
 import type { PreloadedConversationMessages } from './workspace/PreloadedConversationMessages';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';

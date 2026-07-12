@@ -7,8 +7,6 @@ import type {
 
 export interface IdentityWorkspaceSessionPort {
   decryptKeychain(session: Session, keychain: KeychainResource): LocalKeychain;
-
   listConversations(session: Session): Promise<ConversationResource[]>;
-
   loadKeychain(session: Session): Promise<KeychainResource | undefined>;
 }

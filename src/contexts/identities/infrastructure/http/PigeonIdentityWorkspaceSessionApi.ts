@@ -5,8 +5,8 @@ import type {
   LoginResult,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { IdentityWorkspaceSessionPort } from '../../application/ports/IdentityWorkspaceSessionPort';
-import type { LoginIdentityProgressReporter } from '../../application/ports/LoginIdentityProgressReporter';
+import type { IdentityWorkspaceSessionPort } from '../../application/login-identity/IdentityWorkspaceSessionPort';
+import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},

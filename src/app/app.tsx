@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { LoginIdentityProgressStep } from '../contexts/identities/application/ports/LoginIdentityProgressStep';
+import type { LoginIdentityProgressStep } from '../contexts/identities/application/login-identity/LoginIdentityProgressStep';
 
 import { copy } from '../shared/presentation/i18n/copy';
 import { AppFrame, AppLoadingScreen } from './presentation/appFrame';

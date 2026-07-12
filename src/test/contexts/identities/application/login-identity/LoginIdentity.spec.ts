@@ -1,4 +1,4 @@
-import type { LoginIdentityPort } from '../../../../../contexts/identities/application/ports/LoginIdentityPort';
+import type { LoginIdentityPort } from '../../../../../contexts/identities/application/login-identity/LoginIdentityPort';
 import type { LoginResult } from '../../../../../shared/domain/pigeonResources.types';
 
 import { LoginIdentity } from '../../../../../contexts/identities/application/login-identity/LoginIdentity';

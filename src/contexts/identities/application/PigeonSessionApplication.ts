@@ -2,8 +2,8 @@ import type {
   LoginResult,
   Session,
 } from '../../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressReporter } from './ports/LoginIdentityProgressReporter';
-import type { SessionApplicationPort } from './ports/SessionApplicationPort';
+import type { LoginIdentityProgressReporter } from './login-identity/LoginIdentityProgressReporter';
+import type { SessionApplicationPort } from './session/SessionApplicationPort';
 
 import { ConversationTimeline } from '../../conversations/application/list-conversations/ConversationTimeline';
 

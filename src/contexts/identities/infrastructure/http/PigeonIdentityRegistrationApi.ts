@@ -2,7 +2,7 @@ import type {
   LocalKeychain,
   LoginResult,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { RegisterIdentityPort } from '../../application/ports/RegisterIdentityPort';
+import type { RegisterIdentityPort } from '../../application/register-identity/RegisterIdentityPort';
 import type { ProfileHandle } from '../../domain/profile/ProfileHandle';
 import type { ProfileName } from '../../domain/profile/ProfileName';
 import type { IdentityNetworkMemberships } from '../../domain/value-objects/IdentityNetworkMemberships';

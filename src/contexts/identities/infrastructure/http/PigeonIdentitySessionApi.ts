@@ -9,7 +9,7 @@ import type {
   LocalKeychain,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressReporter } from '../../application/ports/LoginIdentityProgressReporter';
+import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 

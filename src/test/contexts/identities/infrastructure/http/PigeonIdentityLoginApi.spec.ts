@@ -1,4 +1,4 @@
-import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/ports/LoginIdentityProgressReporter';
+import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
 import type {
   LoginResult,
   Session,

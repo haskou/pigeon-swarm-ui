@@ -2,7 +2,7 @@ import type {
   LoginResult,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressReporter } from '../../application/ports/LoginIdentityProgressReporter';
+import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 
 import { PigeonIdentitySessionApi } from './PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from './PigeonIdentityWorkspaceSessionApi';

@@ -1,5 +1,5 @@
 import type { LoginResult } from '../../../../shared/domain/pigeonResources.types';
-import type { RegisterIdentityPort } from '../ports/RegisterIdentityPort';
+import type { RegisterIdentityPort } from './RegisterIdentityPort';
 
 import { RegisterIdentityMessage } from './messages/RegisterIdentityMessage';
 

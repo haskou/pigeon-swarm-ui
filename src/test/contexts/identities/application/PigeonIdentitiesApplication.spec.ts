@@ -1,4 +1,4 @@
-import type { RegisterIdentityPort } from '../../../../contexts/identities/application/ports/RegisterIdentityPort';
+import type { RegisterIdentityPort } from '../../../../contexts/identities/application/register-identity/RegisterIdentityPort';
 import type {
   LocalKeychain,
   LoginResult,

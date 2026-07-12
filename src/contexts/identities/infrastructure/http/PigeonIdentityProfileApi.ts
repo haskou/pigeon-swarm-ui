@@ -2,7 +2,7 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { IdentityProfilePort } from '../../application/ports/IdentityProfilePort';
+import type { IdentityProfilePort } from '../../application/profile/IdentityProfilePort';
 import type { IdentityUpdateProfileInput } from '../../domain/IdentitySignaturePayloadFactory';
 
 import { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
