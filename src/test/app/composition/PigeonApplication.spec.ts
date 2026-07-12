@@ -19,6 +19,21 @@ function gatewayDouble(): {
   } as unknown as LoginResult);
   const listConversations = jest.fn();
   const loadMessages = jest.fn();
+  const stickersGateway = {
+    addSticker: jest.fn(),
+    createPack: jest.fn(),
+    deleteSticker: jest.fn(),
+    favoriteSticker: jest.fn(),
+    getMyStickers: jest.fn(),
+    getPack: jest.fn(),
+    listPacks: jest.fn(),
+    markUsed: jest.fn(),
+    savePack: jest.fn(),
+    unsavePack: jest.fn(),
+    updatePack: jest.fn(),
+    updateSticker: jest.fn(),
+    uploadAsset: jest.fn(),
+  };
 
   return {
     gateway: {
@@ -27,6 +42,9 @@ function gatewayDouble(): {
       identityGateway: { register },
       identityRegistration: { register },
       messagesGateway: { loadMessages },
+      notificationsGateway: {},
+      pushGateway: {},
+      stickersGateway,
     } as unknown as PigeonApiGateway,
     register,
   };

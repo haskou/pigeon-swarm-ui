@@ -1153,3 +1153,28 @@
   - focused ESLint for the gateway and composition files
 - Next slice: audit the remaining application composition and infrastructure
   adapters for duplicated notification/poll/sticker boundaries.
+
+## Slice APPLICATION-011T: Route notification and sticker contexts explicitly
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: stop wiring notification, push, and sticker use cases through the
+  monolithic application gateway when context-owned gateways already exist.
+- Changed files:
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - affected composition tests
+- Behavior changed/preserved: notification settings, notification decisions,
+  push subscription operations, sticker management, and invitation keychain
+  publication preserve their existing behavior while their dependencies now
+  point at the owning context boundaries.
+- Contracts changed: no notification, push, sticker, or invitation wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - composition tests
+  - `yarn typecheck`
+  - focused ESLint for composition files
+- Next slice: audit polls and remaining shared application gateway methods for
+  duplicated context boundaries.

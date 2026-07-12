@@ -133,10 +133,12 @@ adapters into application services without containing context behavior.
   use cases through it; centralized the one-to-one thread capability check.
 - `APPLICATION-011S`: added a context-owned conversations gateway and routed
   conversation use cases through it.
+- `APPLICATION-011T`: routed notification, push, sticker, and invitation
+  keychain dependencies through their context-owned gateways.
 
 ## Next slices
 
-1. `APPLICATION-011T`: audit the remaining application composition and
-   infrastructure adapters for duplicated notification/poll/sticker boundaries.
+1. `APPLICATION-011U`: audit polls and remaining shared application gateway
+   methods for duplicated context boundaries.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

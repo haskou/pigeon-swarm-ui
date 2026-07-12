@@ -181,6 +181,12 @@ export class PigeonApiGateway {
 
   public readonly messagesGateway: PigeonMessagesGateway;
 
+  public readonly notificationsGateway: PigeonNotificationsGateway;
+
+  public readonly pushGateway: PigeonPushGateway;
+
+  public readonly stickersGateway: PigeonStickersGateway;
+
   public readonly node: PigeonNodeGateway;
 
   public readonly presence: PigeonPresenceGateway;
@@ -351,6 +357,9 @@ export class PigeonApiGateway {
       this.presence,
       this.identityRegistration,
     );
+    this.notificationsGateway = this.notifications;
+    this.pushGateway = this.push;
+    this.stickersGateway = this.stickers;
   }
 
   private async decryptInvitationKey(

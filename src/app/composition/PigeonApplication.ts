@@ -182,16 +182,16 @@ export class PigeonApplication {
     });
     this.notifications = new PigeonNotificationsApplication({
       acceptInvitation: {
-        keychainPublisher: gateway,
+        keychainPublisher: gateway.identityGateway,
         keyDecryptor: new PigeonConversationInvitationKeyDecryptor(),
-        notifications: gateway,
+        notifications: gateway.notificationsGateway,
       },
-      listNotifications: gateway,
-      listNotificationSettings: gateway,
-      push: gateway,
-      resetNotificationSetting: gateway,
-      saveNotificationSetting: gateway,
-      updateNotification: gateway,
+      listNotifications: gateway.notificationsGateway,
+      listNotificationSettings: gateway.notificationsGateway,
+      push: gateway.pushGateway,
+      resetNotificationSetting: gateway.notificationsGateway,
+      saveNotificationSetting: gateway.notificationsGateway,
+      updateNotification: gateway.notificationsGateway,
     });
     this.polls = new PigeonPollsApplication({
       closePoll: gateway,
@@ -210,26 +210,58 @@ export class PigeonApplication {
     this.realtime = new PigeonRealtimeApplication(realtime);
     this.session = new PigeonSessionApplication(gateway.identityGateway);
     this.stickers = new PigeonStickersApplication({
-      addStickerToPack: gateway,
+      addStickerToPack: {
+        addStickerToPack: gateway.stickersGateway.addSticker.bind(
+          gateway.stickersGateway,
+        ),
+      },
       assetUrl: gateway,
-      createStickerPack: gateway,
-      deleteSticker: gateway,
-      favoriteSticker: gateway,
-      getMyStickers: gateway,
-      getStickerPack: gateway,
+      createStickerPack: {
+        createStickerPack: gateway.stickersGateway.createPack.bind(
+          gateway.stickersGateway,
+        ),
+      },
+      deleteSticker: gateway.stickersGateway,
+      favoriteSticker: gateway.stickersGateway,
+      getMyStickers: gateway.stickersGateway,
+      getStickerPack: {
+        getStickerPack: gateway.stickersGateway.getPack.bind(
+          gateway.stickersGateway,
+        ),
+      },
       listStickerPacks: {
         list: async (message: ListStickerPacksMessage) =>
-          await gateway.listStickerPacks({
+          await gateway.stickersGateway.listPacks({
             ownerIdentityId: message.getOwnerIdentityId(),
           }),
       },
-      markStickerUsed: gateway,
-      saveStickerPack: gateway,
-      unfavoriteSticker: gateway,
-      unsaveStickerPack: gateway,
-      updateSticker: gateway,
-      updateStickerPack: gateway,
-      uploadStickerAsset: gateway,
+      markStickerUsed: {
+        markStickerUsed: gateway.stickersGateway.markUsed.bind(
+          gateway.stickersGateway,
+        ),
+      },
+      saveStickerPack: {
+        saveStickerPack: gateway.stickersGateway.savePack.bind(
+          gateway.stickersGateway,
+        ),
+      },
+      unfavoriteSticker: gateway.stickersGateway,
+      unsaveStickerPack: {
+        unsaveStickerPack: gateway.stickersGateway.unsavePack.bind(
+          gateway.stickersGateway,
+        ),
+      },
+      updateSticker: gateway.stickersGateway,
+      updateStickerPack: {
+        updateStickerPack: gateway.stickersGateway.updatePack.bind(
+          gateway.stickersGateway,
+        ),
+      },
+      uploadStickerAsset: {
+        uploadStickerAsset: gateway.stickersGateway.uploadAsset.bind(
+          gateway.stickersGateway,
+        ),
+      },
     });
   }
 }
