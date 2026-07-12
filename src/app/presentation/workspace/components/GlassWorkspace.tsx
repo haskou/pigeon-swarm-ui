@@ -49,7 +49,6 @@ import { applicationContainer } from '../../../composition/applicationContainer'
 import { PendingMessageAttachments } from '../../../../contexts/attachments/domain/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
 import { CommunityAccessPolicy } from '../../../../contexts/communities/domain/CommunityAccessPolicy';
-import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
 import { ConversationKeychain } from '../../../../contexts/conversations/domain/ConversationKeychain';
 import { ConversationTimeline } from '../../../../contexts/conversations/application/list-conversations/ConversationTimeline';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
@@ -125,11 +124,10 @@ import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
 import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
+import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
 import { useConversationThread } from './useConversationThread';
 import { useConversationPins } from './useConversationPins';
 import {
-  communityAttribute,
-  communityChannelAttribute,
   eventAggregateId,
   recordAttribute,
   stringAttribute,
@@ -1964,6 +1962,13 @@ export function GlassWorkspace({
     },
     [setCommunities],
   );
+  const handleRealtimeCommunityEvent = useWorkspaceRealtimeCommunityEvents({
+    onCommunitiesReload,
+    refreshMembershipRequests,
+    session,
+    setCommunities,
+    updateCommunityState,
+  });
   const handleRealtimeEvent = useCallback(
     (event: RealtimeDomainEvent) => {
       // eslint-disable-next-line no-console
@@ -2093,15 +2098,7 @@ export function GlassWorkspace({
         return;
       }
 
-      if (event.type.startsWith('communities.v1.membership_request.')) {
-        void refreshMembershipRequests();
-
-        if (event.type === 'communities.v1.membership_request.was_accepted') {
-          void onCommunitiesReload();
-        }
-
-        return;
-      }
+      if (handleRealtimeCommunityEvent(event)) return;
 
       if (event.type === 'communities.v1.channel.message.was_sent') {
         const communityId =
@@ -2187,150 +2184,6 @@ export function GlassWorkspace({
         event.type === 'communities.v1.call.event.was_recorded'
       ) {
         setCommunityRealtimeEvent(event);
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.channel.was_created') {
-        const communityId =
-          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
-        const channel = communityChannelAttribute(event, 'channel');
-
-        if (communityId && channel) {
-          updateCommunityState(communityId, (community) => {
-            if (CommunityChannels.has(community, channel.id)) {
-              return community;
-            }
-
-            return channel.type === 'voice'
-              ? {
-                  ...community,
-                  voiceChannels: [...(community.voiceChannels ?? []), channel],
-                }
-              : {
-                  ...community,
-                  textChannels: [...community.textChannels, channel],
-                };
-          });
-        }
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.channel.was_renamed') {
-        const communityId =
-          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
-        const channelId = stringAttribute(event, 'channelId');
-        const name = stringAttribute(event, 'name');
-
-        if (communityId && channelId && name) {
-          updateCommunityState(communityId, (community) => ({
-            ...community,
-            textChannels: community.textChannels.map((channel) =>
-              channel.id === channelId ? { ...channel, name } : channel,
-            ),
-            voiceChannels: (community.voiceChannels ?? []).map((channel) =>
-              channel.id === channelId ? { ...channel, name } : channel,
-            ),
-          }));
-        }
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.channel.was_deleted') {
-        const communityId =
-          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
-        const channelId = stringAttribute(event, 'channelId');
-
-        if (communityId && channelId) {
-          updateCommunityState(communityId, (community) => ({
-            ...community,
-            textChannels: community.textChannels.filter(
-              (channel) => channel.id !== channelId,
-            ),
-            voiceChannels: (community.voiceChannels ?? []).filter(
-              (channel) => channel.id !== channelId,
-            ),
-          }));
-        }
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.community.was_updated') {
-        const community = communityAttribute(event, 'community');
-
-        if (community) {
-          setCommunities((current) =>
-            current.map((item) =>
-              item.id === community.id ? community : item,
-            ),
-          );
-        }
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.member.was_added') {
-        const community = communityAttribute(event, 'community');
-        const communityId =
-          community?.id ??
-          eventAggregateId(event) ??
-          stringAttribute(event, 'communityId');
-        const identityId = stringAttribute(event, 'identityId');
-
-        if (community) {
-          setCommunities((current) =>
-            current.map((item) =>
-              item.id === community.id ? community : item,
-            ),
-          );
-        } else if (communityId && identityId) {
-          updateCommunityState(communityId, (current) =>
-            current.memberIds.includes(identityId)
-              ? current
-              : { ...current, memberIds: [...current.memberIds, identityId] },
-          );
-        }
-
-        return;
-      }
-
-      if (event.type === 'communities.v1.member.was_left') {
-        const community = communityAttribute(event, 'community');
-        const communityId =
-          community?.id ??
-          eventAggregateId(event) ??
-          stringAttribute(event, 'communityId');
-        const identityId = stringAttribute(event, 'identityId');
-
-        if (identityId === session.identity.id && communityId) {
-          setCommunities((current) =>
-            current.filter((item) => item.id !== communityId),
-          );
-
-          return;
-        }
-
-        if (community) {
-          setCommunities((current) =>
-            current.map((item) =>
-              item.id === community.id ? community : item,
-            ),
-          );
-        } else if (communityId && identityId) {
-          updateCommunityState(communityId, (current) => ({
-            ...current,
-            memberIds: current.memberIds.filter((id) => id !== identityId),
-          }));
-        }
-
-        return;
-      }
-
-      if (event.type.startsWith('communities.')) {
-        void onCommunitiesReload().catch(() => undefined);
 
         return;
       }
@@ -2611,12 +2464,10 @@ export function GlassWorkspace({
       markCommunityChannelUnread,
       markUnreadMessage,
       mergePresence,
-      onCommunitiesReload,
       onNodeNetworksReload,
       onPeersReload,
       playNotificationSoundIfAllowed,
       refreshConversations,
-      refreshMembershipRequests,
       refreshNotifications,
       refreshSession,
       realtimeEventsOpen,
@@ -2625,7 +2476,6 @@ export function GlassWorkspace({
       setConversations,
       setCommunities,
       setSession,
-      updateCommunityState,
       workspaceMode,
     ],
   );
