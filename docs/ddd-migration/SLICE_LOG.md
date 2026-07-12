@@ -906,5 +906,33 @@
   - community application tests
   - `yarn typecheck`
   - focused ESLint for the community context
-- Next slice: `APPLICATION-011K`, split invitation capabilities and replace
-  remaining compatibility gateway implementations with context-owned adapters.
+- Next slice: `APPLICATION-011K`, replace remaining compatibility gateway
+  implementations with context-owned adapters.
+
+## Slice APPLICATION-011K: Split community invitation capabilities
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: keep direct invitations, invite-link creation, invite-link lookup, and
+  the two invite-link acceptance flows as separate application capabilities.
+- Changed files:
+  - `contexts/communities/application/accept-community-invite-link/*`
+  - `contexts/communities/application/accept-community-invite-link-with-key/*`
+  - `contexts/communities/application/create-community-invitation/*`
+  - `contexts/communities/application/create-community-invite-link/*`
+  - `contexts/communities/application/get-community-invite-link/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: direct invitations, invite links, link lookup,
+  and both acceptance flows preserve their public behavior; only capability
+  ownership changed.
+- Contracts changed: no invitation, community, keychain, or REST wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - community application tests
+  - `yarn typecheck`
+  - focused ESLint for the community context
+- Next slice: `APPLICATION-011L`, replace remaining compatibility gateway
+  implementations with context-owned HTTP and crypto adapters.

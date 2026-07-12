@@ -86,8 +86,12 @@ export class PigeonApplication {
       communityCreator: gateway,
       communityDiscoverer: gateway,
       communityGetter: gateway,
+      communityInvitationCreator: gateway,
+      communityInviteLinkAcceptor: gateway,
+      communityInviteLinkAcceptorWithKey: gateway,
+      communityInviteLinkCreator: gateway,
+      communityInviteLinkGetter: gateway,
       communityUpdater: gateway,
-      invitations: gateway,
       keychain: gateway,
       listCommunities: {
         list: async (message: ListCommunitiesMessage) =>

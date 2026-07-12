@@ -21,13 +21,17 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessageEditInput } from '../infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../infrastructure/http/CommunityChannelMessageInput';
-import type { CommunityInvitationPort } from './community-invitation/CommunityInvitationPort';
+import type { AcceptCommunityInviteLinkWithKeyPort } from './accept-community-invite-link-with-key/AcceptCommunityInviteLinkWithKeyPort';
+import type { AcceptCommunityInviteLinkPort } from './accept-community-invite-link/AcceptCommunityInviteLinkPort';
+import type { CreateCommunityInvitationPort } from './create-community-invitation/CreateCommunityInvitationPort';
+import type { CreateCommunityInviteLinkPort } from './create-community-invite-link/CreateCommunityInviteLinkPort';
 import type { CommunityImageCids } from './create-community/CommunityImageCids';
 import type { CreateCommunityInput } from './create-community/CreateCommunityInput';
 import type { CreateCommunityPort } from './create-community/CreateCommunityPort';
 import type { CreateCommunityResult } from './create-community/CreateCommunityResult';
 import type { LeaveCommunityResult } from './create-community/LeaveCommunityResult';
 import type { DiscoverCommunitiesPort } from './discover-communities/DiscoverCommunitiesPort';
+import type { GetCommunityInviteLinkPort } from './get-community-invite-link/GetCommunityInviteLinkPort';
 import type { GetCommunityPort } from './get-community/GetCommunityPort';
 import type { ListCommunitiesPort } from './list-communities/ListCommunitiesPort';
 import type { ListCommunityModerationLogsPort } from './list-community-moderation-logs/ListCommunityModerationLogsPort';
@@ -67,7 +71,15 @@ export class PigeonCommunitiesApplication {
 
   private readonly communityUpdater: UpdateCommunityPort;
 
-  private readonly invitations: CommunityInvitationPort;
+  private readonly communityInvitationCreator: CreateCommunityInvitationPort;
+
+  private readonly communityInviteLinkAcceptor: AcceptCommunityInviteLinkPort;
+
+  private readonly inviteWithKey: AcceptCommunityInviteLinkWithKeyPort;
+
+  private readonly communityInviteLinkCreator: CreateCommunityInviteLinkPort;
+
+  private readonly communityInviteLinkGetter: GetCommunityInviteLinkPort;
 
   private readonly keychain: CommunityKeychainPort;
 
@@ -93,7 +105,11 @@ export class PigeonCommunitiesApplication {
     communityDiscoverer: DiscoverCommunitiesPort;
     communityGetter: GetCommunityPort;
     communityUpdater: UpdateCommunityPort;
-    invitations: CommunityInvitationPort;
+    communityInvitationCreator: CreateCommunityInvitationPort;
+    communityInviteLinkAcceptor: AcceptCommunityInviteLinkPort;
+    communityInviteLinkAcceptorWithKey: AcceptCommunityInviteLinkWithKeyPort;
+    communityInviteLinkCreator: CreateCommunityInviteLinkPort;
+    communityInviteLinkGetter: GetCommunityInviteLinkPort;
     keychain: CommunityKeychainPort;
     listCommunities: ListCommunitiesPort;
     media: CommunityMediaPort;
@@ -111,7 +127,11 @@ export class PigeonCommunitiesApplication {
     this.communityDiscoverer = dependencies.communityDiscoverer;
     this.communityGetter = dependencies.communityGetter;
     this.communityUpdater = dependencies.communityUpdater;
-    this.invitations = dependencies.invitations;
+    this.communityInvitationCreator = dependencies.communityInvitationCreator;
+    this.communityInviteLinkAcceptor = dependencies.communityInviteLinkAcceptor;
+    this.inviteWithKey = dependencies.communityInviteLinkAcceptorWithKey;
+    this.communityInviteLinkCreator = dependencies.communityInviteLinkCreator;
+    this.communityInviteLinkGetter = dependencies.communityInviteLinkGetter;
     this.keychain = dependencies.keychain;
     this.media = dependencies.media;
     this.members = dependencies.members;
@@ -480,7 +500,7 @@ export class PigeonCommunitiesApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: null | string;
   }> {
-    return await this.invitations.createCommunityInvitation(
+    return await this.communityInvitationCreator.createCommunityInvitation(
       session,
       communityId,
       recipientIdentityId,
@@ -498,7 +518,7 @@ export class PigeonCommunitiesApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: null | string;
   }> {
-    return await this.invitations.createCommunityInviteLink(
+    return await this.communityInviteLinkCreator.createCommunityInviteLink(
       session,
       communityId,
       input,
@@ -508,14 +528,16 @@ export class PigeonCommunitiesApplication {
   public async getInviteLink(
     inviteToken: string,
   ): Promise<CommunityInviteLinkResource> {
-    return await this.invitations.getCommunityInviteLink(inviteToken);
+    return await this.communityInviteLinkGetter.getCommunityInviteLink(
+      inviteToken,
+    );
   }
 
   public async acceptInviteLink(
     session: Session,
     inviteToken: string,
   ): Promise<Community> {
-    return await this.invitations.acceptCommunityInviteLink(
+    return await this.communityInviteLinkAcceptor.acceptCommunityInviteLink(
       session,
       inviteToken,
     );
@@ -530,7 +552,7 @@ export class PigeonCommunitiesApplication {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.invitations.acceptCommunityInviteLinkWithKey(
+    return await this.inviteWithKey.acceptCommunityInviteLinkWithKey(
       session,
       inviteToken,
       keyEntry,

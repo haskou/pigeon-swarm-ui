@@ -37,9 +37,18 @@ function gatewayDouble(overrides: {
     communityDiscoverer:
       {} as CommunityApplicationDependencies['communityDiscoverer'],
     communityGetter: {} as CommunityApplicationDependencies['communityGetter'],
+    communityInvitationCreator:
+      {} as CommunityApplicationDependencies['communityInvitationCreator'],
+    communityInviteLinkAcceptor:
+      {} as CommunityApplicationDependencies['communityInviteLinkAcceptor'],
+    communityInviteLinkAcceptorWithKey:
+      {} as CommunityApplicationDependencies['communityInviteLinkAcceptorWithKey'],
+    communityInviteLinkCreator:
+      {} as CommunityApplicationDependencies['communityInviteLinkCreator'],
+    communityInviteLinkGetter:
+      {} as CommunityApplicationDependencies['communityInviteLinkGetter'],
     communityUpdater:
       {} as CommunityApplicationDependencies['communityUpdater'],
-    invitations: {} as CommunityApplicationDependencies['invitations'],
     keychain: {
       publishKeychain,
     },
