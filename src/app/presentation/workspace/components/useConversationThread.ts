@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
 import type {
   AttachmentUploadOptions,
@@ -8,13 +8,13 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
+import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   type ConversationThreadState,
   mergeConversationMessageIfTargetExists,
@@ -29,13 +29,44 @@ type UseConversationThreadInput = {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
 };
 
-export function useConversationThread(input: UseConversationThreadInput) {
+type UseConversationThreadResult = {
+  cancelEditing: () => void;
+  cancelReplying: () => void;
+  close: () => void;
+  edit: (content: string) => Promise<void>;
+  open: (message: ChatMessage) => Promise<void>;
+  remove: (message: ChatMessage) => Promise<void>;
+  send: (
+    content: string,
+    attachments: File[],
+    attachmentUpload: AttachmentUploadOptions,
+  ) => Promise<void>;
+  sendSticker: (sticker: StickerMessageReference) => Promise<void>;
+  setThread: Dispatch<SetStateAction<ConversationThreadState | null>>;
+  startEditing: (message: ChatMessage) => void;
+  startReplying: (message: ChatMessage) => void;
+  thread: ConversationThreadState | null;
+  updateDraft: (draft: string) => void;
+};
+
+export function useConversationThread(
+  input: UseConversationThreadInput,
+): UseConversationThreadResult {
   const { activeConversation, closeMessageContextMenu, session, setMessages } =
     input;
   const [thread, setThread] = useState<ConversationThreadState | null>(null);
 
+  useEffect(() => {
+    if (!conversationSupportsThreads(activeConversation)) {
+      setThread(null);
+    }
+  }, [activeConversation?.id, activeConversation?.type]);
+
   const open = async (message: ChatMessage) => {
-    if (!activeConversation || !conversationSupportsThreads(activeConversation)) {
+    if (
+      !activeConversation ||
+      !conversationSupportsThreads(activeConversation)
+    ) {
       return;
     }
 
@@ -117,6 +148,8 @@ export function useConversationThread(input: UseConversationThreadInput) {
   };
 
   const startReplying = (message: ChatMessage) => {
+    if (!conversationSupportsThreads(activeConversation)) return;
+
     closeMessageContextMenu();
     setThread((current) =>
       current
