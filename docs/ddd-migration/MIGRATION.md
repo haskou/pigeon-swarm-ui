@@ -100,11 +100,13 @@ adapters into application services without containing context behavior.
   calls, polls, and stickers with action-scoped contracts colocated with their
   application actions. The composition root now binds each capability
   explicitly instead of passing a complete context gateway.
+- `APPLICATION-011F`: colocated notification settings, notification listing,
+  push, reset, save, and update contracts with their application actions.
 
 ## Next slices
 
-1. `APPLICATION-011F`: replace remaining broad compatibility methods in
-   communities, identities, networks, and notifications with context-owned
-   application entrypoints.
+1. `APPLICATION-011G`: replace remaining broad compatibility methods in
+  communities, identities, networks, and notifications with context-owned
+  application entrypoints.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

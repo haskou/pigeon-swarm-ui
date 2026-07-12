@@ -773,5 +773,33 @@
   - `yarn build`
 - Notes: lint has no errors; it still reports pre-existing test-fixture and
   test-order warnings. All 146 suites and 564 tests pass.
-- Next slice: `APPLICATION-011F`, migrate communities, networks, identities,
-  and notifications.
+- Next slice: `APPLICATION-011F`, migrate notification contracts by action.
+
+## Slice APPLICATION-011F: Colocate notification contracts by action
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: remove the notification context's generic application `ports` bucket
+  and keep each outbound capability beside the action that owns it.
+- Changed files:
+  - `contexts/notifications/application/list-notification-settings/*`
+  - `contexts/notifications/application/list-notifications/*`
+  - `contexts/notifications/application/push-notifications/*`
+  - `contexts/notifications/application/reset-notification-setting/*`
+  - `contexts/notifications/application/save-notification-setting/*`
+  - `contexts/notifications/application/update-notification/*`
+  - `contexts/notifications/application/accept-conversation-invitation/*`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: notification listing, settings, push
+  registration, invitation acceptance, and state updates preserve their public
+  behavior; only contract ownership and imports changed.
+- Contracts changed: no push, REST, websocket, or encrypted-payload wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - notification application tests
+  - `yarn typecheck`
+  - focused ESLint for the notification context
+- Next slice: `APPLICATION-011G`, migrate networks and then review the larger
+  communities and identities application boundaries.
