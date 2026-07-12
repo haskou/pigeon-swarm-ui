@@ -96,10 +96,15 @@ adapters into application services without containing context behavior.
 - `APPLICATION-011D`: moved all colocated `*.spec.ts` files to `src/test`,
   preserving context/layer paths and keeping test imports outside production
   modules.
+- `APPLICATION-011E`: replaced the broad application contracts in attachments,
+  calls, polls, and stickers with action-scoped contracts colocated with their
+  application actions. The composition root now binds each capability
+  explicitly instead of passing a complete context gateway.
 
 ## Next slices
 
-1. `APPLICATION-011E`: replace remaining broad compatibility methods in
-   `PigeonApiGateway` with context-owned application entrypoints.
+1. `APPLICATION-011F`: replace remaining broad compatibility methods in
+   communities, identities, networks, and notifications with context-owned
+   application entrypoints.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

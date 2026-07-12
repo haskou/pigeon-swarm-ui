@@ -744,3 +744,34 @@
   - `yarn lint`
 - Notes: lint has no errors; it still reports pre-existing test-fixture and
   test-order warnings. All 146 suites and 564 tests pass.
+
+## Slice APPLICATION-011E: Split remaining application contracts by action
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: remove broad gateway-shaped application contracts from attachments,
+  calls, polls, and stickers while keeping the application facade as the
+  composition point for the existing UI API.
+- Changed files:
+  - `contexts/attachments/application/*`
+  - `contexts/calls/application/*`
+  - `contexts/polls/application/*`
+  - `contexts/stickers/application/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: attachment publication/downloads, call lifecycle
+  and signalling, poll commands, and sticker management preserve their public
+  behavior; only internal application dependencies were split by capability.
+- Contracts changed: no REST, websocket, media, encrypted-payload, or keychain
+  wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - `yarn typecheck`
+  - `yarn test --runInBand --no-cache`
+  - `yarn lint`
+  - `yarn build`
+- Notes: lint has no errors; it still reports pre-existing test-fixture and
+  test-order warnings. All 146 suites and 564 tests pass.
+- Next slice: `APPLICATION-011F`, migrate communities, networks, identities,
+  and notifications.
