@@ -1,4 +1,4 @@
-import type { ListCommunitiesPort } from '../../../../../contexts/communities/application/ports/ListCommunitiesPort';
+import type { ListCommunitiesPort } from '../../../../../contexts/communities/application/list-communities/ListCommunitiesPort';
 import type {
   Community,
   Session,

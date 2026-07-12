@@ -27,6 +27,10 @@ function gatewayDouble(overrides: {
     );
 
   return {
+    channelDrafts: {} as CommunityApplicationDependencies['channelDrafts'],
+    channelMessages: {} as CommunityApplicationDependencies['channelMessages'],
+    channelPins: {} as CommunityApplicationDependencies['channelPins'],
+    channelReads: {} as CommunityApplicationDependencies['channelReads'],
     channels: {} as CommunityApplicationDependencies['channels'],
     directory: {} as CommunityApplicationDependencies['directory'],
     invitations: {} as CommunityApplicationDependencies['invitations'],
@@ -34,8 +38,10 @@ function gatewayDouble(overrides: {
       publishKeychain,
     },
     media: {} as CommunityApplicationDependencies['media'],
-    membership:
-      overrides as unknown as CommunityApplicationDependencies['membership'],
+    members:
+      overrides as unknown as CommunityApplicationDependencies['members'],
+    membershipRequests:
+      {} as CommunityApplicationDependencies['membershipRequests'],
     roles: {} as CommunityApplicationDependencies['roles'],
   };
 }

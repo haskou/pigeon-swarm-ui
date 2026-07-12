@@ -5,7 +5,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-export interface CommunityRolePort {
+export interface ManageCommunityRolesPort {
   listCommunityRoles(
     session: Session,
     communityId: string,

@@ -21,17 +21,22 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessageEditInput } from '../infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../infrastructure/http/CommunityChannelMessageInput';
+import type { CommunityDirectoryPort } from './community-directory/CommunityDirectoryPort';
+import type { CommunityInvitationPort } from './community-invitation/CommunityInvitationPort';
 import type { CommunityImageCids } from './create-community/CommunityImageCids';
 import type { CreateCommunityInput } from './create-community/CreateCommunityInput';
 import type { CreateCommunityResult } from './create-community/CreateCommunityResult';
 import type { LeaveCommunityResult } from './create-community/LeaveCommunityResult';
-import type { CommunityChannelPort } from './ports/CommunityChannelPort';
-import type { CommunityDirectoryPort } from './ports/CommunityDirectoryPort';
-import type { CommunityInvitationPort } from './ports/CommunityInvitationPort';
-import type { CommunityKeychainPort } from './ports/CommunityKeychainPort';
-import type { CommunityMediaPort } from './ports/CommunityMediaPort';
-import type { CommunityMembershipPort } from './ports/CommunityMembershipPort';
-import type { CommunityRolePort } from './ports/CommunityRolePort';
+import type { ManageCommunityChannelDraftsPort } from './manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
+import type { ManageCommunityChannelMessagesPort } from './manage-community-channel-messages/ManageCommunityChannelMessagesPort';
+import type { ManageCommunityChannelPinsPort } from './manage-community-channel-pins/ManageCommunityChannelPinsPort';
+import type { ManageCommunityChannelsPort } from './manage-community-channels/ManageCommunityChannelsPort';
+import type { ManageCommunityMembersPort } from './manage-community-members/ManageCommunityMembersPort';
+import type { ManageCommunityMembershipRequestsPort } from './manage-community-membership-requests/ManageCommunityMembershipRequestsPort';
+import type { ManageCommunityRolesPort } from './manage-community-roles/ManageCommunityRolesPort';
+import type { CommunityKeychainPort } from './publish-community-keychain/CommunityKeychainPort';
+import type { ReadCommunityChannelMessagesPort } from './read-community-channel-messages/ReadCommunityChannelMessagesPort';
+import type { CommunityMediaPort } from './upload-community-media/CommunityMediaPort';
 
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../conversations/domain/ConversationKeychain';
@@ -39,7 +44,15 @@ import { ListCommunities } from './list-communities/ListCommunities';
 import { ListCommunitiesMessage } from './list-communities/messages/ListCommunitiesMessage';
 
 export class PigeonCommunitiesApplication {
-  private readonly channels: CommunityChannelPort;
+  private readonly channelDrafts: ManageCommunityChannelDraftsPort;
+
+  private readonly channelMessages: ManageCommunityChannelMessagesPort;
+
+  private readonly channelPins: ManageCommunityChannelPinsPort;
+
+  private readonly channels: ManageCommunityChannelsPort;
+
+  private readonly channelReads: ReadCommunityChannelMessagesPort;
 
   private readonly directory: CommunityDirectoryPort;
 
@@ -51,25 +64,37 @@ export class PigeonCommunitiesApplication {
 
   private readonly media: CommunityMediaPort;
 
-  private readonly membership: CommunityMembershipPort;
+  private readonly members: ManageCommunityMembersPort;
 
-  private readonly roles: CommunityRolePort;
+  private readonly membershipRequests: ManageCommunityMembershipRequestsPort;
+
+  private readonly roles: ManageCommunityRolesPort;
 
   public constructor(dependencies: {
-    channels: CommunityChannelPort;
+    channelDrafts: ManageCommunityChannelDraftsPort;
+    channelMessages: ManageCommunityChannelMessagesPort;
+    channelPins: ManageCommunityChannelPinsPort;
+    channels: ManageCommunityChannelsPort;
+    channelReads: ReadCommunityChannelMessagesPort;
     directory: CommunityDirectoryPort;
     invitations: CommunityInvitationPort;
     keychain: CommunityKeychainPort;
     media: CommunityMediaPort;
-    membership: CommunityMembershipPort;
-    roles: CommunityRolePort;
+    members: ManageCommunityMembersPort;
+    membershipRequests: ManageCommunityMembershipRequestsPort;
+    roles: ManageCommunityRolesPort;
   }) {
+    this.channelDrafts = dependencies.channelDrafts;
+    this.channelMessages = dependencies.channelMessages;
+    this.channelPins = dependencies.channelPins;
     this.channels = dependencies.channels;
+    this.channelReads = dependencies.channelReads;
     this.directory = dependencies.directory;
     this.invitations = dependencies.invitations;
     this.keychain = dependencies.keychain;
     this.media = dependencies.media;
-    this.membership = dependencies.membership;
+    this.members = dependencies.members;
+    this.membershipRequests = dependencies.membershipRequests;
     this.roles = dependencies.roles;
     this.listCommunitiesUseCase = new ListCommunities({
       list: async (message) =>
@@ -324,7 +349,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     identityId: string,
   ): Promise<CommunityMembershipRequest> {
-    return await this.membership.addCommunityMember(
+    return await this.members.addCommunityMember(
       session,
       communityId,
       identityId,
@@ -336,7 +361,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.membership.banCommunityMember(
+    return await this.members.banCommunityMember(
       session,
       communityId,
       identityId,
@@ -348,7 +373,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.membership.unbanCommunityMember(
+    return await this.members.unbanCommunityMember(
       session,
       communityId,
       identityId,
@@ -360,7 +385,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.membership.kickCommunityMember(
+    return await this.members.kickCommunityMember(
       session,
       communityId,
       identityId,
@@ -371,7 +396,7 @@ export class PigeonCommunitiesApplication {
     session: Session,
     communityId: string,
   ): Promise<CommunityMembershipRequest> {
-    return await this.membership.createCommunityJoinRequest(
+    return await this.membershipRequests.createCommunityJoinRequest(
       session,
       communityId,
     );
@@ -380,7 +405,9 @@ export class PigeonCommunitiesApplication {
   public async listMembershipRequests(
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
-    return await this.membership.listCommunityMembershipRequests(session);
+    return await this.membershipRequests.listCommunityMembershipRequests(
+      session,
+    );
   }
 
   public async updateMembershipRequest(
@@ -388,7 +415,7 @@ export class PigeonCommunitiesApplication {
     requestId: string,
     status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
   ): Promise<CommunityMembershipRequest> {
-    return await this.membership.updateCommunityMembershipRequest(
+    return await this.membershipRequests.updateCommunityMembershipRequest(
       session,
       requestId,
       status,
@@ -402,7 +429,7 @@ export class PigeonCommunitiesApplication {
     let community: Community | null = null;
 
     try {
-      community = await this.membership.leaveCommunity(session, communityId);
+      community = await this.members.leaveCommunity(session, communityId);
     } catch (caught) {
       if (!this.isLeaveAlreadyApplied(caught)) throw caught;
     }
@@ -493,7 +520,7 @@ export class PigeonCommunitiesApplication {
     session: Session,
     communityId: string,
   ): Promise<string[]> {
-    return await this.membership.listCommunityMembers(session, communityId);
+    return await this.members.listCommunityMembers(session, communityId);
   }
 
   public async listRoles(
@@ -624,7 +651,7 @@ export class PigeonCommunitiesApplication {
     channelId: string,
     input: CommunityChannelMessageInput,
   ): Promise<MessageResource> {
-    return await this.channels.createCommunityChannelMessage(
+    return await this.channelMessages.createCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -641,7 +668,7 @@ export class PigeonCommunitiesApplication {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.channels.listCommunityChannelMessages(
+    return await this.channelReads.listCommunityChannelMessages(
       session,
       communityId,
       channelId,
@@ -659,7 +686,7 @@ export class PigeonCommunitiesApplication {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.channels.listCommunityChannelMessageThread(
+    return await this.channelReads.listCommunityChannelMessageThread(
       session,
       communityId,
       channelId,
@@ -673,7 +700,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     channelId: string,
   ): Promise<CommunityChannelMessagePinsResource> {
-    return await this.channels.listCommunityChannelMessagePins(
+    return await this.channelReads.listCommunityChannelMessagePins(
       session,
       communityId,
       channelId,
@@ -686,7 +713,7 @@ export class PigeonCommunitiesApplication {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.channels.pinCommunityChannelMessage(
+    await this.channelPins.pinCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -700,7 +727,7 @@ export class PigeonCommunitiesApplication {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.channels.unpinCommunityChannelMessage(
+    await this.channelPins.unpinCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -709,7 +736,7 @@ export class PigeonCommunitiesApplication {
   }
 
   public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
-    return await this.channels.listCommunityDrafts(session);
+    return await this.channelReads.listCommunityDrafts(session);
   }
 
   public async saveChannelDraft(
@@ -719,7 +746,7 @@ export class PigeonCommunitiesApplication {
     content: string,
     updatedAt = Date.now(),
   ): Promise<CommunityChannelDraft> {
-    return await this.channels.saveCommunityChannelDraft(
+    return await this.channelDrafts.saveCommunityChannelDraft(
       session,
       communityId,
       channelId,
@@ -733,7 +760,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     channelId: string,
   ): Promise<void> {
-    await this.channels.deleteCommunityChannelDraft(
+    await this.channelDrafts.deleteCommunityChannelDraft(
       session,
       communityId,
       channelId,
@@ -750,7 +777,7 @@ export class PigeonCommunitiesApplication {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.channels.searchCommunityChannelMessages(
+    return await this.channelReads.searchCommunityChannelMessages(
       session,
       communityId,
       channelId,
@@ -767,7 +794,7 @@ export class PigeonCommunitiesApplication {
     messages: MessageResource[];
     nextBeforeMessageId?: null | string;
   }> {
-    return await this.channels.searchCommunityMessages(
+    return await this.channelReads.searchCommunityMessages(
       session,
       communityId,
       input,
@@ -780,7 +807,7 @@ export class PigeonCommunitiesApplication {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    await this.channels.deleteCommunityChannelMessage(
+    await this.channelMessages.deleteCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -795,7 +822,7 @@ export class PigeonCommunitiesApplication {
     messageId: string,
     input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
-    return await this.channels.editCommunityChannelMessage(
+    return await this.channelMessages.editCommunityChannelMessage(
       session,
       communityId,
       channelId,
@@ -811,7 +838,7 @@ export class PigeonCommunitiesApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.channels.addCommunityChannelMessageReaction(
+    await this.channelMessages.addCommunityChannelMessageReaction(
       session,
       communityId,
       channelId,
@@ -827,7 +854,7 @@ export class PigeonCommunitiesApplication {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.channels.removeCommunityChannelMessageReaction(
+    await this.channelMessages.removeCommunityChannelMessageReaction(
       session,
       communityId,
       channelId,

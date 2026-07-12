@@ -1,11 +1,10 @@
 import type {
   Community,
   CommunityMembershipRequest,
-  CommunityMembershipRequestStatus,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-export interface CommunityMembershipPort {
+export interface ManageCommunityMembersPort {
   addCommunityMember(
     session: Session,
     communityId: string,
@@ -26,21 +25,9 @@ export interface CommunityMembershipPort {
     communityId: string,
     identityId: string,
   ): Promise<Community>;
-  createCommunityJoinRequest(
-    session: Session,
-    communityId: string,
-  ): Promise<CommunityMembershipRequest>;
-  listCommunityMembershipRequests(
-    session: Session,
-  ): Promise<CommunityMembershipRequest[]>;
-  updateCommunityMembershipRequest(
-    session: Session,
-    requestId: string,
-    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
-  ): Promise<CommunityMembershipRequest>;
-  leaveCommunity(session: Session, communityId: string): Promise<Community>;
   listCommunityMembers(
     session: Session,
     communityId: string,
   ): Promise<string[]>;
+  leaveCommunity(session: Session, communityId: string): Promise<Community>;
 }

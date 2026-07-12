@@ -105,10 +105,16 @@ adapters into application services without containing context behavior.
 - `APPLICATION-011G`: replaced the broad node application contract with
   action-scoped capabilities for node claim, networks, peers, relay
   configuration, and replication status.
+- `APPLICATION-011H`: colocated identity login, registration, profile,
+  presence, session, keychain publication, and local protection contracts with
+  their owning actions.
+- `APPLICATION-011I`: removed the generic community application `ports`
+  bucket and split channel, message, pin, draft, member, membership-request,
+  and role capabilities by action.
 
 ## Next slices
 
-1. `APPLICATION-011H`: replace remaining broad compatibility methods in
-  communities and identities with context-owned application entrypoints.
+1. `APPLICATION-011J`: replace remaining broad compatibility methods with
+   context-owned HTTP and crypto adapters.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

@@ -828,3 +828,55 @@
   - focused ESLint for the network context
 - Next slice: `APPLICATION-011H`, migrate the larger community and identity
   application boundaries.
+
+## Slice APPLICATION-011H: Colocate identity capabilities by action
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: remove the identity context's generic application contract bucket and
+  keep login, registration, profile, presence, session, keychain publication,
+  and local protection capabilities beside their owning actions.
+- Changed files:
+  - `contexts/identities/application/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: identity login, registration, profile updates,
+  presence, session recovery, keychain publication, and local passkey unlock
+  preserve their public behavior; only application boundaries changed.
+- Contracts changed: no identity, keychain, WebAuthn, or encrypted-payload wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - identity application tests
+  - `yarn typecheck`
+  - focused ESLint for the identity context
+- Next slice: `APPLICATION-011I`, remove the remaining generic community
+  contract bucket and split its channel and membership capabilities.
+
+## Slice APPLICATION-011I: Split community capabilities by action
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: remove the generic community application `ports` bucket and make
+  channel management, channel message reads/commands, pins, drafts, members,
+  membership requests, roles, directory, invitation, keychain, and media
+  capabilities explicit in the composition root.
+- Changed files:
+  - `contexts/communities/application/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: community creation, discovery, membership,
+  roles, channels, messages, pins, drafts, invitations, keychain publication,
+  media upload, and leave reconciliation preserve their public behavior; only
+  application contract ownership changed.
+- Contracts changed: no community, message, invitation, keychain, or media
+  wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - community application tests
+  - `yarn typecheck`
+  - focused ESLint for the community context
+- Next slice: `APPLICATION-011J`, replace the remaining compatibility gateway
+  implementations with context-owned HTTP and crypto adapters.

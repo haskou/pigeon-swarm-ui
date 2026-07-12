@@ -77,12 +77,17 @@ export class PigeonApplication {
       startConversationCall: gateway.calls,
     });
     this.communities = new PigeonCommunitiesApplication({
+      channelDrafts: gateway,
+      channelMessages: gateway,
+      channelPins: gateway,
+      channelReads: gateway,
       channels: gateway,
       directory: gateway,
       invitations: gateway,
       keychain: gateway,
       media: gateway,
-      membership: gateway,
+      members: gateway,
+      membershipRequests: gateway,
       roles: gateway,
     });
     this.conversations = new PigeonConversationsApplication({
