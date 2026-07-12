@@ -2,9 +2,9 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { ListConversationsPort } from '../ports/ListConversationsPort';
+import type { ListConversationsPort } from './ListConversationsPort';
 
-import { ConversationTimeline } from '../../domain/ConversationTimeline';
+import { ConversationTimeline } from './ConversationTimeline';
 import { ListConversationsMessage } from './messages/ListConversationsMessage';
 
 export class ListConversations {

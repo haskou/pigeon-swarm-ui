@@ -8,6 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
@@ -107,7 +108,7 @@ export function UserProfileDialog({
     let active = true;
 
     void applicationContainer
-      .getPublicFile(bannerCid)
+      .attachments.getPublicFile(bannerCid)
       .then((content) => {
         if (active) setBannerUrl(publicFileObjectUrl(content));
       })
@@ -185,14 +186,10 @@ export function UserProfileDialog({
               />
             </button>
           )}
-          <button
-            type="button"
-            onClick={close}
+          <DialogCloseButton
             className="absolute right-3 top-3 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/35 text-lg font-black text-white/65 backdrop-blur transition hover:bg-black/55 hover:text-white/90"
-            aria-label={copy.dialog.close}
-          >
-            ×
-          </button>
+            onClick={close}
+          />
         </div>
 
         <div className="relative px-6 pb-6">

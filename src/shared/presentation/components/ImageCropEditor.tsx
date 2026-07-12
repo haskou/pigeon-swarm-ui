@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { copy } from '../i18n/copy';
+import { DialogCloseButton } from './DialogCloseButton';
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape';
 import { AnimatedWebpEncoder } from '../media/AnimatedWebpEncoder';
 
@@ -204,14 +205,10 @@ export function ImageCropEditor({
             <h2 className="text-xl font-black">{copy.imageEditor.title}</h2>
             <p className="mt-1 text-sm text-white/50">{preset.label}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <DialogCloseButton
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl font-black text-white/75"
-            aria-label={copy.dialog.close}
-          >
-            x
-          </button>
+            onClick={onClose}
+          />
         </header>
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto">

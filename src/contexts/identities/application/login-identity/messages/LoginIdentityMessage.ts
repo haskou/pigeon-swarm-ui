@@ -1,4 +1,4 @@
-import type { LoginIdentityProgressReporter } from '../../ports/LoginIdentityProgressReporter';
+import type { LoginIdentityProgressReporter } from '../LoginIdentityProgressReporter';
 
 export class LoginIdentityMessage {
   public constructor(

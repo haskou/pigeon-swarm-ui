@@ -1,0 +1,37 @@
+import type {
+  AttachmentProgress,
+  MessageAttachment,
+} from '../../../attachments/domain/attachmentResources.types';
+import type { CommunityMessageMention } from '../../../communities/domain/communityResources.types';
+import type { PollResource } from '../../../polls/domain/pollResources.types';
+import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
+import type { MessageLinkPreview } from '../../domain/MessageLinkPreview';
+import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
+import type { MessageReplyPreview } from '../../domain/MessageReplyPreview';
+import type { MessageResource } from '../../infrastructure/http/MessageResource';
+
+export type ChatMessage = {
+  attachmentProgress?: AttachmentProgress;
+  attachments: MessageAttachment[];
+  authorIdentityId: string;
+  content: string;
+  deliveryStatus?: 'failed' | 'pending';
+  edited?: boolean;
+  editedAt?: number;
+  editMessageId?: string;
+  encrypted: boolean;
+  id: string;
+  kind?: 'call-event' | 'message' | 'poll';
+  linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
+  mine: boolean;
+  originalContent?: string;
+  poll?: PollResource;
+  raw: MessageResource;
+  reactions: MessageReaction[];
+  replyPreview?: MessageReplyPreview;
+  replyToMessageId?: string;
+  sticker?: StickerMessageReference;
+  threadRootMessageId?: string;
+  timestamp: number;
+};

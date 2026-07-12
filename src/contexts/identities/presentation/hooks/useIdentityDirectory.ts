@@ -9,7 +9,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { saveRememberedIdentityPreview } from '../../infrastructure/storage/rememberedIdentityPreview';
 import {
@@ -302,8 +302,8 @@ async function resolveIdentity(
   try {
     const normalizedIdentityId = IdentityId.normalize(identityId);
     const identity = options.refresh
-      ? await applicationContainer.refreshIdentity(normalizedIdentityId)
-      : await applicationContainer.getIdentity(normalizedIdentityId);
+      ? await applicationContainer.identities.refresh(normalizedIdentityId)
+      : await applicationContainer.identities.get(normalizedIdentityId);
     const picture = await loadIdentityPicture(identity).catch(() => null);
 
     return [
@@ -328,7 +328,9 @@ async function loadIdentityPicture(
 
   if (!pictureCid) return null;
 
-  const content = await applicationContainer.getPublicFile(pictureCid);
+  const content = await applicationContainer.attachments.getPublicFile(
+    pictureCid,
+  );
 
   return publicFileObjectUrl(content);
 }
@@ -356,7 +358,9 @@ async function loadRememberedIdentityPicture(
 
   if (!pictureCid) return null;
 
-  const content = await applicationContainer.getPublicFile(pictureCid);
+  const content = await applicationContainer.attachments.getPublicFile(
+    pictureCid,
+  );
 
   return await blobToDataUrl(content.blob);
 }

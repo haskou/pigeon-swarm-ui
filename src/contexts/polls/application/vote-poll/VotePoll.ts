@@ -1,5 +1,5 @@
 import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
-import type { VotePollPort } from '../ports/VotePollPort';
+import type { VotePollPort } from './VotePollPort';
 
 import { VotePollMessage } from './messages/VotePollMessage';
 

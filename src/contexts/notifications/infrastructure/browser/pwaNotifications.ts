@@ -147,7 +147,7 @@ async function replaceBrowserSubscription(
 
   if (hasDeliverableSubscriptionJson(subscriptionJson)) {
     try {
-      await applicationContainer.deletePushSubscription(
+      await applicationContainer.notifications.deletePushSubscription(
         session,
         subscriptionJson,
       );
@@ -168,7 +168,8 @@ async function currentPushPermission(
 }
 
 async function enabledServerKey(): Promise<OptionalApplicationServerKey> {
-  const vapid = await applicationContainer.getPushVapidPublicKey();
+  const vapid =
+    await applicationContainer.notifications.getPushVapidPublicKey();
 
   if (!vapid.enabled || !vapid.publicKey) return null;
 
@@ -236,7 +237,7 @@ async function ensurePwaPushSubscriptionOnce(
     throw caught;
   }
 
-  await applicationContainer.registerPushSubscription(
+  await applicationContainer.notifications.registerPushSubscription(
     session,
     subscription.toJSON(),
   );
@@ -279,7 +280,7 @@ export async function deletePwaPushSubscription(
 
   if (!subscription) return;
 
-  await applicationContainer.deletePushSubscription(
+  await applicationContainer.notifications.deletePushSubscription(
     session,
     subscription.toJSON(),
   );

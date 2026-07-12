@@ -40,8 +40,9 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
+import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
@@ -328,7 +329,7 @@ export function ChatColumn({
   }) => {
     if (!activeConversation) return;
 
-    const poll = await applicationContainer.createPoll(session, {
+    const poll = await applicationContainer.polls.create(session, {
       allowsMultipleVotes: input.allowsMultipleVotes,
       conversationId: activeConversation.id,
       options: input.options,
@@ -340,14 +341,14 @@ export function ChatColumn({
   };
   const votePoll = async (poll: PollResource, optionIds: string[]) => {
     upsertPoll(
-      await applicationContainer.votePoll(session, poll.id, optionIds),
+      await applicationContainer.polls.vote(session, poll.id, optionIds),
     );
   };
   const removePollVote = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.removePollVote(session, poll.id));
+    upsertPoll(await applicationContainer.polls.removeVote(session, poll.id));
   };
   const closePoll = async (poll: PollResource) => {
-    upsertPoll(await applicationContainer.closePoll(session, poll.id));
+    upsertPoll(await applicationContainer.polls.close(session, poll.id));
   };
 
   useEffect(() => {
@@ -368,7 +369,7 @@ export function ChatColumn({
     if (!pollId) return;
 
     void applicationContainer
-      .getPoll(session, pollId)
+      .polls.get(session, pollId)
       .then((loadedPoll) => {
         if (loadedPoll.scope.type === 'group_conversation') {
           upsertPoll(loadedPoll);
@@ -383,11 +384,7 @@ export function ChatColumn({
     },
     [activeConversation?.id, onTypingActive],
   );
-  const isGroupConversation = !!(
-    activeConversation &&
-    (activeConversation.type === 'group' ||
-      activeConversation.id.startsWith('group:'))
-  );
+  const isGroupConversation = conversationSupportsThreads(activeConversation);
   useEffect(() => {
     if (!groupInviteRequest || !isGroupConversation) return;
 
@@ -618,7 +615,7 @@ export function ChatColumn({
     setGroupInviteLoading(true);
     setGroupInviteError(null);
     try {
-      await applicationContainer.createGroupConversationInvitation(
+      await applicationContainer.conversations.inviteToGroup(
         session,
         activeConversation.id,
         recipientIdentityId,
@@ -775,7 +772,9 @@ export function ChatColumn({
             }
             onJumpToLatest={onJumpToLatest}
             onMessageMenuOpen={onMessageMenuOpen}
-            onOpenThread={onOpenMessageThread}
+            onOpenThread={
+              isGroupConversation ? onOpenMessageThread : undefined
+            }
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}

@@ -6,7 +6,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressStep } from '../../contexts/identities/application/ports/LoginIdentityProgressStep';
+import type { LoginIdentityProgressStep } from '../../contexts/identities/application/login-identity/LoginIdentityProgressStep';
 import type { PreloadedConversationMessages } from './workspace/PreloadedConversationMessages';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
@@ -124,7 +124,7 @@ export function useAppBootstrap(): {
     void loadApplicationContainer()
       .then(async (applicationContainer) => {
         const [result] = await Promise.all([
-          applicationContainer.restoreRememberedSession(
+          applicationContainer.session.restoreRemembered(
             savedCredentials.identityId,
             setRestoreProgressStep,
           ),
@@ -218,7 +218,7 @@ async function preloadInitialConversationMessages(
   if (!conversationId) return null;
 
   try {
-    const result = await applicationContainer.loadMessages(
+    const result = await applicationContainer.messages.load(
       session,
       conversationId,
       null,

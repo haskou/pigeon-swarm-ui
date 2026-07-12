@@ -13,9 +13,6 @@ export type WorkspacePreference = {
   mode?: 'community' | 'messages';
 };
 export type CommunityUnreadCounts = Record<string, Record<string, number>>;
-type CallAudioPreference = {
-  noiseCancellationEnabled?: boolean;
-};
 
 export const lastConversationStorageKey = (identityId: string): string =>
   `pigeon:lastConversation:${identityId}`;
@@ -25,8 +22,6 @@ export const workspaceStorageKey = (identityId: string): string =>
   `pigeon:workspace:${identityId}`;
 export const communityUnreadStorageKey = (identityId: string): string =>
   `pigeon:communityUnread:${identityId}`;
-export const callAudioStorageKey = (identityId: string): string =>
-  `pigeon:callAudio:${identityId}`;
 
 export function initialConversationId(
   conversations: ConversationResource[],
@@ -91,15 +86,6 @@ export function loadCommunityUnreadCounts(
     communityUnreadStorageKey(identityId),
     {},
   );
-}
-
-export function loadCallNoiseCancellationEnabled(identityId: string): boolean {
-  const preference = readJsonObjectFromLocalStorage<CallAudioPreference>(
-    callAudioStorageKey(identityId),
-    {},
-  );
-
-  return preference.noiseCancellationEnabled ?? true;
 }
 
 function isEncryptedConversationDrafts(

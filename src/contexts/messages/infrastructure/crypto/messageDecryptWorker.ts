@@ -12,7 +12,7 @@ import type { MessageDecryptResponse } from './MessageDecryptResponse';
 import type { MessageReactionRecord } from './MessageReactionRecord';
 import type { PlainMessage } from './PlainMessage';
 
-import { PollMessageProjection } from '../../domain/PollMessageProjection';
+import { PollMessageProjection } from './PollMessageProjection';
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();

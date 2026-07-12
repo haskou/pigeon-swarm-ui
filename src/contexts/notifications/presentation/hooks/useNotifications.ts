@@ -108,7 +108,7 @@ export function useNotifications({
     try {
       setNotifications(
         mergeNotificationOverrides(
-          await applicationContainer.listNotifications(currentSession),
+          await applicationContainer.notifications.list(currentSession),
           notificationOverridesRef.current,
         ),
       );
@@ -149,7 +149,7 @@ export function useNotifications({
       setError(null);
 
       try {
-        const result = await applicationContainer.acceptConversationInvitation(
+        const result = await applicationContainer.notifications.acceptConversationInvitation(
           currentSession,
           notification,
         );
@@ -161,7 +161,7 @@ export function useNotifications({
         const conversations =
           notification.type === 'community_invitation'
             ? undefined
-            : await applicationContainer.listConversations(nextSession);
+            : await applicationContainer.conversations.list(nextSession);
         const communityId =
           notification.type === 'community_invitation'
             ? notification.payload.communityId
@@ -209,7 +209,7 @@ export function useNotifications({
 
       try {
         replaceNotification(
-          await applicationContainer.updateNotification(
+          await applicationContainer.notifications.update(
             currentSession,
             notificationId,
             'declined',
@@ -250,7 +250,7 @@ async function listCommunitiesAfterCommunityAccept(
   communityId?: string,
 ): Promise<Community[]> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const communities = await applicationContainer.listCommunities(session);
+    const communities = await applicationContainer.communities.list(session);
 
     if (
       !communityId ||
@@ -264,5 +264,5 @@ async function listCommunitiesAfterCommunityAccept(
     );
   }
 
-  return await applicationContainer.listCommunities(session);
+  return await applicationContainer.communities.list(session);
 }

@@ -1,4 +1,4 @@
-import type { CreatePublicNetworkPort } from '../ports/CreatePublicNetworkPort';
+import type { CreatePublicNetworkPort } from './CreatePublicNetworkPort';
 
 import { CreatePublicNetworkMessage } from './messages/CreatePublicNetworkMessage';
 

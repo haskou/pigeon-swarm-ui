@@ -1,5 +1,5 @@
 import type { CallResource } from '../../domain/callSession.types';
-import type { ListCallsPort } from '../ports/ListCallsPort';
+import type { ListCallsPort } from './ListCallsPort';
 
 import { ListCallsMessage } from './messages/ListCallsMessage';
 

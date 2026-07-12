@@ -1,4 +1,4 @@
-import type { RemoveMessageReactionPort } from '../ports/RemoveMessageReactionPort';
+import type { RemoveMessageReactionPort } from './RemoveMessageReactionPort';
 
 import { RemoveMessageReactionMessage } from './messages/RemoveMessageReactionMessage';
 

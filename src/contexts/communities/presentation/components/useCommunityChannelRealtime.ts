@@ -14,7 +14,7 @@ import type {
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { MessageReactions } from '../../../messages/domain/MessageReactions';
+import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
 import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import {
   mergeChatMessages,
@@ -94,7 +94,7 @@ export function useCommunityChannelRealtime({
 
       if (pollId) {
         void applicationContainer
-          .getPoll(session, pollId)
+          .polls.get(session, pollId)
           .then(upsertPoll)
           .catch(() => undefined);
       }
@@ -141,7 +141,7 @@ export function useCommunityChannelRealtime({
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId
-            ? MessageReactions.update(
+            ? MessageReactionUpdater.update(
                 message,
                 authorIdentityId,
                 emoji,

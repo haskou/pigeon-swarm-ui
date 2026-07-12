@@ -1,5 +1,5 @@
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
-import type { ListCommunitiesPort } from '../ports/ListCommunitiesPort';
+import type { ListCommunitiesPort } from './ListCommunitiesPort';
 
 import { ListCommunitiesMessage } from './messages/ListCommunitiesMessage';
 

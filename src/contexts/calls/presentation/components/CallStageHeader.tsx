@@ -1,6 +1,7 @@
 import type { CallSession } from '../../domain/callSession.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 import { callSessionTitle } from './callSessionDisplay';
 import { SpeakerIcon } from './callIcons';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
@@ -52,14 +53,10 @@ export function CallStageHeader({
         >
           {dataOpen ? copy.calls.hideCallData : copy.calls.viewCallData}
         </button>
-        <button
-          type="button"
-          onClick={onClose}
+        <DialogCloseButton
           className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white sm:h-10 sm:w-10 sm:rounded-2xl"
-          aria-label={copy.dialog.close}
-        >
-          x
-        </button>
+          onClick={onClose}
+        />
       </div>
       {!call.hasMicrophone && (
         <div className="mt-3">

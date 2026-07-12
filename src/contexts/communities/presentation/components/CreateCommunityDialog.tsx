@@ -179,7 +179,7 @@ export function CreateCommunityDialog({
     try {
       const effectiveAutoJoinEnabled =
         visibility === 'public' ? autoJoinEnabled : false;
-      const created = await applicationContainer.createCommunity(session, {
+      const created = await applicationContainer.communities.create(session, {
         autoJoinEnabled: effectiveAutoJoinEnabled,
         avatar,
         banner,

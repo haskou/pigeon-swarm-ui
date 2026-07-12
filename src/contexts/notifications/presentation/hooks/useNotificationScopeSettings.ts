@@ -35,7 +35,7 @@ export function useNotificationScopeSettings({
     let cancelled = false;
 
     void applicationContainer
-      .listNotificationSettings(session)
+      .notifications.listNotificationSettings(session)
       .then((settings) => {
         if (cancelled) return;
 
@@ -65,7 +65,7 @@ export function useNotificationScopeSettings({
       }));
 
       void applicationContainer
-        .saveNotificationSetting(session, setting)
+        .notifications.saveNotificationSetting(session, setting)
         .then((saved) => {
           setSettingsByScopeKey((current) => ({
             ...current,
@@ -94,7 +94,7 @@ export function useNotificationScopeSettings({
       });
 
       void applicationContainer
-        .resetNotificationSetting(session, scope)
+        .notifications.resetNotificationSetting(session, scope)
         .catch(() => {
           setError(copy.notifications.settingsError);
         });

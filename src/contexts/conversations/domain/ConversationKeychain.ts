@@ -23,6 +23,19 @@ export class ConversationKeychain {
     );
   }
 
+  public static withEntry(
+    keychain: LocalKeychain,
+    entry: ConversationKeyEntry,
+  ): LocalKeychain {
+    return {
+      conversations: {
+        ...keychain.conversations,
+        [entry.conversationId]: entry,
+      },
+      version: keychain.version + 1,
+    };
+  }
+
   public static hasEntry(
     keychain: LocalKeychain,
     conversationId: string,

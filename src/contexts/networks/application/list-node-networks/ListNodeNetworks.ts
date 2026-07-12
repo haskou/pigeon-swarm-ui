@@ -1,4 +1,4 @@
-import type { ListNodeNetworksPort } from '../ports/ListNodeNetworksPort';
+import type { ListNodeNetworksPort } from './ListNodeNetworksPort';
 import type { NodeNetwork } from './NodeNetwork';
 
 import { ListNodeNetworksMessage } from './messages/ListNodeNetworksMessage';

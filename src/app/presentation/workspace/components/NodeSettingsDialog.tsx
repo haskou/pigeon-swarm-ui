@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
@@ -27,6 +27,11 @@ import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/app
 import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import { NodeNetworksPanel } from './NodeNetworksPanel';
+import { PeerStatusPanel } from './PeerStatusPanel';
+import {
+  NetworkSynchronizationPanel,
+  ReplicationStatusPanel,
+} from './NodeSynchronizationPanels';
 
 interface NodeSettingsDialogProps {
   networkSynchronizationStatus: NetworkSynchronizationStatus | null;
@@ -103,7 +108,7 @@ export function NodeSettingsDialog({
       setReplicationLoading(true);
       try {
         const status =
-          await applicationContainer.getIpfsReplicationStatus(session);
+          await applicationContainer.networks.getReplicationStatus(session);
 
         if (!cancelled) setReplicationStatus(status);
       } catch (caught) {
@@ -141,7 +146,7 @@ export function NodeSettingsDialog({
       setRelayLoading(true);
       try {
         const configuration =
-          await applicationContainer.getNodeRelayConfiguration(session);
+          await applicationContainer.networks.getRelayConfiguration(session);
 
         if (!cancelled) {
           setRelayConfiguration(normalizeNodeRelayConfiguration(configuration));
@@ -170,7 +175,7 @@ export function NodeSettingsDialog({
     setNotice(null);
     setClaimLoading(true);
     try {
-      await applicationContainer.claimNode(session);
+      await applicationContainer.networks.claimNode(session);
       await onNetworksUpdated();
       setNotice(copy.nodeSettings.claimSuccess);
     } catch (caught) {
@@ -208,7 +213,7 @@ export function NodeSettingsDialog({
     setRelayError(null);
     setRelaySaving(true);
     try {
-      const saved = await applicationContainer.updateNodeRelayConfiguration(
+      const saved = await applicationContainer.networks.updateRelayConfiguration(
         relayConfiguration,
         session,
       );
@@ -516,151 +521,6 @@ function NodeDetailRow({
   );
 }
 
-function PeerStatusPanel({
-  copiedPeerId,
-  currentIdentity,
-  loading,
-  onCopyPeerId,
-  peers,
-}: {
-  copiedPeerId: string | null;
-  currentIdentity: IdentityResource;
-  loading: boolean;
-  onCopyPeerId: (peerId: string) => Promise<void>;
-  peers: Peer[];
-}) {
-  const sortedPeers = useMemo(() => sortedPeersByLastSeen(peers), [peers]);
-
-  return (
-    <section className="flex min-h-[28rem] flex-1 flex-col">
-      <div className="mb-4 shrink-0">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-          {copy.peers.title}
-        </div>
-        <p className="mt-1 text-sm text-white/50">{copy.peers.body}</p>
-      </div>
-      {loading ? (
-        <PeerSkeletonList />
-      ) : sortedPeers.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center py-8">
-          <div className="w-full max-w-md border-y border-dashed border-white/15 py-5 text-center">
-            <div className="text-sm font-black text-white/75">
-              {copy.peers.emptyTitle}
-            </div>
-            <p className="mt-1 text-sm leading-6 text-white/50">
-              {copy.peers.empty}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-          {sortedPeers.map((peer) => (
-            <PeerSummary
-              copied={copiedPeerId === peer.id}
-              currentIdentity={currentIdentity}
-              key={peer.id}
-              onCopyPeerId={onCopyPeerId}
-              peer={peer}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function PeerSkeletonList() {
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: 3 }, (_, index) => (
-        <div key={index} className="ui-list-block">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="h-4 w-40 rounded-full bg-white/10" />
-              <div className="mt-2 h-3 w-full rounded-full bg-white/6" />
-            </div>
-            <div className="h-6 w-24 rounded-full bg-white/10" />
-          </div>
-          <div className="mt-3 flex gap-2">
-            <div className="h-6 w-28 rounded-full bg-white/6" />
-            <div className="h-6 w-20 rounded-full bg-white/6" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PeerSummary({
-  copied,
-  currentIdentity,
-  onCopyPeerId,
-  peer,
-}: {
-  copied: boolean;
-  currentIdentity: IdentityResource;
-  onCopyPeerId: (peerId: string) => Promise<void>;
-  peer: Peer;
-}) {
-  return (
-    <article className="ui-list-block text-xs">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate font-black text-white">
-            {copy.peers.node} · {shortId(peer.id)}
-          </div>
-          <div className="mt-1 flex min-w-0 items-center gap-2">
-            <code
-              className="min-w-0 truncate text-[0.68rem] text-white/40"
-              title={peer.id}
-            >
-              {peer.id}
-            </code>
-            <button
-              type="button"
-              onClick={() => void onCopyPeerId(peer.id)}
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/8 text-white/65 transition hover:bg-white/12 hover:text-white"
-              aria-label={copy.peers.copyPeerId}
-              title={copied ? copy.profile.copied : copy.peers.copyPeerId}
-            >
-              <CopyIcon copied={copied} />
-            </button>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full bg-white/8 px-2 py-1 font-black text-white/65">
-          {formatPeerLastSeen(peer.lastSeenAt)}
-        </span>
-      </div>
-      <div className="mt-3 space-y-2">
-        <PeerBadges peer={peer} />
-        <PeerOwnerIdentity
-          currentIdentity={currentIdentity}
-          ownerIdentityId={peer.owner}
-        />
-        <div>
-          <div className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
-            {copy.peers.networks}
-          </div>
-          {peer.networks.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {peer.networks.map((network) => (
-                <span
-                  key={`${peer.id}:${network.id}`}
-                  className="max-w-full truncate rounded-full border border-cyan-200/15 bg-cyan-300/10 px-2 py-1 text-[0.68rem] font-black text-cyan-100/80"
-                  title={network.name}
-                >
-                  {network.name}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="text-white/45">{copy.peers.noNetworks}</div>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
 
 function NodeOwnerIdentity({
   currentIdentity,
@@ -689,124 +549,6 @@ function NodeOwnerIdentity({
   );
 }
 
-function PeerOwnerIdentity({
-  currentIdentity,
-  ownerIdentityId,
-}: {
-  currentIdentity: IdentityResource;
-  ownerIdentityId?: string;
-}) {
-  const owner = useIdentityPreview(ownerIdentityId, currentIdentity);
-
-  if (!ownerIdentityId) {
-    return (
-      <div className="truncate text-white/55">
-        {copy.peers.owner}:{' '}
-        <span className="text-white/75">{copy.peers.unclaimed}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white/35">
-        {copy.peers.owner}
-      </div>
-      <IdentityMemberRow
-        className="max-w-[20rem]"
-        interactive={false}
-        item={{
-          identity: owner.identity ?? undefined,
-          identityId: ownerIdentityId,
-          name:
-            owner.loaded && !owner.identity
-              ? shortId(ownerIdentityId)
-              : undefined,
-          pictureUrl: owner.pictureUrl,
-        }}
-      />
-    </div>
-  );
-}
-
-function PeerBadges({ peer }: { peer: Peer }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {peer.nodeType && peer.nodeType !== 'unknown' ? (
-        <PeerBadge value={nodeTypeLabel(peer.nodeType)} />
-      ) : null}
-      {peer.connectionSummary?.isSharedNetworkPeer ? (
-        <PeerBadge
-          value={copy.peers.sharedNetworks.replace(
-            '{count}',
-            String(peer.connectionSummary.sharedNetworkCount),
-          )}
-        />
-      ) : null}
-      {peer.capabilities?.gossipsub ? (
-        <PeerBadge value={copy.peers.capabilityGossipsub} />
-      ) : null}
-      {peer.capabilities?.publicIpfs ? (
-        <PeerBadge value={copy.peers.capabilityPublicIpfs} />
-      ) : null}
-      {peer.capabilities?.privateIpfs ? (
-        <PeerBadge value={copy.peers.capabilityPrivateIpfs} />
-      ) : null}
-      {peer.capabilities?.relay ? (
-        <PeerBadge value={copy.peers.capabilityRelay} />
-      ) : null}
-    </div>
-  );
-}
-
-function PeerBadge({ value }: { value: string }) {
-  return (
-    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em] text-white/50">
-      {value}
-    </span>
-  );
-}
-
-function sortedPeersByLastSeen(peers: Peer[]): Peer[] {
-  return [...peers].sort(
-    (left, right) => peerLastSeenRank(right) - peerLastSeenRank(left),
-  );
-}
-
-function peerLastSeenRank(peer: Peer): number {
-  return isValidLastSeenAt(peer.lastSeenAt) ? peer.lastSeenAt : -1;
-}
-
-function isValidLastSeenAt(lastSeenAt: number): boolean {
-  return Number.isFinite(lastSeenAt) && lastSeenAt > 0;
-}
-
-function formatPeerLastSeen(lastSeenAt: number): string {
-  if (!isValidLastSeenAt(lastSeenAt)) return copy.peers.neverSeen;
-
-  const elapsedMs = Math.max(0, Date.now() - lastSeenAt);
-  const elapsedMinutes = Math.floor(elapsedMs / 60000);
-
-  if (elapsedMinutes <= 0) return copy.peers.seenJustNow;
-  if (elapsedMinutes === 1) return copy.peers.seenMinuteAgo;
-
-  return copy.peers.seenMinutesAgo.replace('{count}', String(elapsedMinutes));
-}
-
-function nodeTypeLabel(
-  nodeType: 'leaf' | 'reachable' | 'relay' | 'unknown' | undefined,
-): string {
-  switch (nodeType) {
-    case 'leaf':
-      return copy.nodeSettings.nodeTypeLeaf;
-    case 'reachable':
-      return copy.nodeSettings.nodeTypeReachable;
-    case 'relay':
-      return copy.nodeSettings.nodeTypeRelay;
-    default:
-      return copy.nodeSettings.nodeTypeUnknown;
-  }
-}
 
 function relayStatusLabel(
   relay:
@@ -843,192 +585,4 @@ function nodeRelayStatusLabel(
   return relayConfiguration.privateRelay.enabled
     ? copy.nodeSettings.relayEnabled
     : copy.nodeSettings.relayDisabled;
-}
-
-function NetworkSynchronizationPanel({
-  status,
-}: {
-  status: NetworkSynchronizationStatus | null;
-}) {
-  return (
-    <section className="border-t border-white/10 pt-6">
-      <div className="mb-3">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-          {copy.nodeSettings.synchronizationTitle}
-        </div>
-        <p className="mt-1 text-sm leading-relaxed text-white/50">
-          {copy.nodeSettings.synchronizationBody}
-        </p>
-      </div>
-
-      {!status ? (
-        <div className="py-3 text-sm text-white/55">
-          {copy.nodeSettings.synchronizationAwaitingSnapshot}
-        </div>
-      ) : status.networks.length === 0 ? (
-        <div className="py-3 text-sm text-white/55">
-          {copy.nodeSettings.synchronizationEmpty}
-        </div>
-      ) : (
-        <div className="grid gap-2">
-          {status.networks.map((network) => (
-            <div
-              className="flex flex-col gap-1.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-              key={network.id}
-            >
-              <div className="min-w-0">
-                <div className="truncate text-sm font-black text-white/85">
-                  {network.name}
-                </div>
-                <div className="mt-1 text-xs text-white/45">
-                  {networkSynchronizationProgressLabel(network)}
-                  {' · '}
-                  {networkConnectionCountLabel(network.connectedPeerIds.length)}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 text-xs font-black">
-                <span
-                  className={cx(
-                    'h-2 w-2 rounded-full',
-                    network.state === 'converged'
-                      ? 'bg-emerald-300'
-                      : network.state === 'syncing'
-                        ? 'animate-pulse bg-amber-300'
-                        : 'bg-white/35',
-                  )}
-                />
-                <span className="text-white/65">
-                  {networkSynchronizationStateLabel(network.state)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {status ? (
-        <div className="mt-2 text-right text-xs text-white/35">
-          {copy.nodeSettings.synchronizationChangedAt.replace(
-            '{date}',
-            new Date(status.changedAt).toLocaleString(),
-          )}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function networkSynchronizationProgressLabel(
-  network: NetworkSynchronizationStatus['networks'][number],
-): string {
-  const total = network.totalStoreCount;
-  const percentage =
-    total <= 0 ? 0 : Math.round((network.convergedStoreCount / total) * 100);
-
-  return copy.nodeSettings.synchronizationProgress.replace(
-    '{percentage}',
-    String(percentage),
-  );
-}
-
-function networkSynchronizationStateLabel(
-  state: NetworkSynchronizationStatus['networks'][number]['state'],
-): string {
-  if (state === 'converged') return copy.nodeSettings.synchronizationConverged;
-  if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
-
-  return copy.nodeSettings.synchronizationWaitingForPeers;
-}
-
-function networkConnectionCountLabel(count: number): string {
-  return (
-    count === 1
-      ? copy.nodeSettings.synchronizationConnection
-      : copy.nodeSettings.synchronizationConnections
-  ).replace('{count}', String(count));
-}
-
-function ReplicationStatusPanel({
-  error,
-  loading,
-  status,
-}: {
-  error: string | null;
-  loading: boolean;
-  status: IpfsReplicationStatus | null;
-}) {
-  const summary = status?.summary;
-
-  return (
-    <section className="border-t border-white/10 pt-6">
-      <div className="mb-3">
-        <div>
-          <div className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
-            {copy.nodeSettings.replication}
-          </div>
-          <p className="mt-1 text-sm text-white/50">
-            {copy.nodeSettings.replicationBody}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-x-8 sm:grid-cols-2">
-        <NodeDetailRow
-          label={copy.nodeSettings.replicationContents}
-          value={String(summary?.contentCount ?? 0)}
-        />
-        <NodeDetailRow
-          label={copy.nodeSettings.replicationTotalSize}
-          value={formatBytes(summary?.totalSizeBytes ?? 0)}
-        />
-        <NodeDetailRow
-          label={copy.nodeSettings.replicationResponsible}
-          value={String(summary?.localResponsibleCount ?? 0)}
-        />
-        <NodeDetailRow
-          label={copy.nodeSettings.replicationReleasable}
-          value={String(summary?.releasableCount ?? 0)}
-        />
-      </div>
-
-      {error && (
-        <div className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100">
-          {error}
-        </div>
-      )}
-
-      {!error && !loading && status?.summary.contentCount === 0 && (
-        <div className="mt-3 py-3 text-sm text-white/55">
-          {copy.nodeSettings.replicationEmpty}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  return new Intl.NumberFormat('en', {
-    maximumFractionDigits: bytes >= 1024 * 1024 ? 1 : 0,
-    style: 'unit',
-    unit: byteUnit(bytes),
-    unitDisplay: 'short',
-  }).format(bytes / byteUnitDivisor(bytes));
-}
-
-function byteUnit(
-  bytes: number,
-): 'byte' | 'gigabyte' | 'kilobyte' | 'megabyte' {
-  if (bytes >= 1024 * 1024 * 1024) return 'gigabyte';
-  if (bytes >= 1024 * 1024) return 'megabyte';
-  if (bytes >= 1024) return 'kilobyte';
-
-  return 'byte';
-}
-
-function byteUnitDivisor(bytes: number): number {
-  if (bytes >= 1024 * 1024 * 1024) return 1024 * 1024 * 1024;
-  if (bytes >= 1024 * 1024) return 1024 * 1024;
-  if (bytes >= 1024) return 1024;
-
-  return 1;
 }

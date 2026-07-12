@@ -1,4 +1,4 @@
-import type { DeleteMessagePort } from '../ports/DeleteMessagePort';
+import type { DeleteMessagePort } from './DeleteMessagePort';
 
 import { DeleteMessageMessage } from './messages/DeleteMessageMessage';
 

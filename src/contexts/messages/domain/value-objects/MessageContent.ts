@@ -8,4 +8,8 @@ export class MessageContent extends StringValueObject {
   private constructor(value: string) {
     super(value);
   }
+
+  public isBlank(): boolean {
+    return this.toString().trim().length === 0;
+  }
 }

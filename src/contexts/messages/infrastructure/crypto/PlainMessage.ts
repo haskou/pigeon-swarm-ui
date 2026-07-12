@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 import type {
+  CommunityMessageMention,
   MessageAttachment,
   MessageLinkPreview,
   MessageReplyPreview,
@@ -12,6 +13,7 @@ export type PlainMessage = {
   authorIdentityId?: string;
   content?: string;
   linkPreview?: MessageLinkPreview;
+  mentions?: CommunityMessageMention[];
   reply?: MessageReplyPreview;
   sticker?: StickerMessageReference;
   threadRootMessageId?: string;

@@ -141,7 +141,7 @@ async function connectRealtime(
   connection: SharedRealtimeConnection,
 ): Promise<void> {
   try {
-    const nextSocket = await applicationContainer.connectRealtime(
+    const nextSocket = await applicationContainer.realtime.connect(
       connection.session,
       (message) => {
         if (message.type === 'connection_ack') {
@@ -236,7 +236,7 @@ export function sendRealtimeTyping(
 
   if (!socket) return;
 
-  applicationContainer.sendRealtimeTyping(socket, input);
+  applicationContainer.realtime.sendTyping(socket, input);
 }
 
 export function acknowledgeRealtimeCallSignal(
@@ -249,5 +249,5 @@ export function acknowledgeRealtimeCallSignal(
 
   if (!socket) return;
 
-  applicationContainer.acknowledgeRealtimeCallSignal(socket, signalId);
+  applicationContainer.realtime.acknowledgeCallSignal(socket, signalId);
 }

@@ -23,7 +23,7 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
-import { ConversationPeer } from '../../domain/ConversationPeer';
+import { ConversationPeer } from '../view-models/ConversationPeer';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState =
@@ -165,7 +165,7 @@ export function CreateConversationDialog({
     setLookupState('loading');
     const timeout = window.setTimeout(() => {
       void applicationContainer
-        .getIdentity(trimmed)
+        .identities.get(trimmed)
         .then((identity) => {
           if (cancelled) return;
 
@@ -211,7 +211,7 @@ export function CreateConversationDialog({
     setGroupIdentityLookupState('loading');
     const timeout = window.setTimeout(() => {
       void applicationContainer
-        .getIdentity(identityLookup)
+        .identities.get(identityLookup)
         .then((identity) => {
           if (cancelled) return;
 
@@ -252,7 +252,7 @@ export function CreateConversationDialog({
       setError(null);
 
       try {
-        const result = await applicationContainer.createGroupConversation(
+        const result = await applicationContainer.conversations.createGroup(
           session,
           {
             name: groupName.trim(),
@@ -308,7 +308,7 @@ export function CreateConversationDialog({
     setError(null);
 
     try {
-      const result = await applicationContainer.createConversation(
+      const result = await applicationContainer.conversations.create(
         session,
         identityLookup,
         selectedNetworkId,
@@ -749,7 +749,9 @@ async function loadDialogIdentityPicture(
   if (!pictureCid) return null;
 
   try {
-    const content = await applicationContainer.getPublicFile(pictureCid);
+    const content = await applicationContainer.attachments.getPublicFile(
+      pictureCid,
+    );
 
     return publicFileObjectUrl(content);
   } catch {

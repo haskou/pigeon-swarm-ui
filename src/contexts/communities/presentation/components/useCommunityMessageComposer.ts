@@ -29,7 +29,7 @@ import { applicationContainer } from '../../../../app/composition/applicationCon
 import { PendingMessageAttachments } from '../../../attachments/domain/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
-import { MessageReactions } from '../../../messages/domain/MessageReactions';
+import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -245,7 +245,7 @@ export function useCommunityMessageComposer({
             communityKey: session.keychain.conversations[community.id],
           }),
         };
-    const edited = await applicationContainer.editCommunityChannelMessage(
+    const edited = await applicationContainer.communities.editChannelMessage(
       session,
       community.id,
       channelId,
@@ -312,7 +312,7 @@ export function useCommunityMessageComposer({
     }
 
     setError(null);
-    await applicationContainer.deleteCommunityChannelMessage(
+    await applicationContainer.communities.deleteChannelMessage(
       session,
       community.id,
       channelId,
@@ -357,7 +357,7 @@ export function useCommunityMessageComposer({
     setMessages((current) =>
       current.map((item) =>
         item.id === message.id
-          ? MessageReactions.update(
+          ? MessageReactionUpdater.update(
               item,
               session.identity.id,
               emoji,
@@ -369,7 +369,7 @@ export function useCommunityMessageComposer({
 
     try {
       if (reacted) {
-        await applicationContainer.removeCommunityChannelMessageReaction(
+        await applicationContainer.communities.removeChannelMessageReaction(
           session,
           community.id,
           channelId,
@@ -377,7 +377,7 @@ export function useCommunityMessageComposer({
           emoji,
         );
       } else {
-        await applicationContainer.addCommunityChannelMessageReaction(
+        await applicationContainer.communities.addChannelMessageReaction(
           session,
           community.id,
           channelId,
@@ -390,7 +390,7 @@ export function useCommunityMessageComposer({
       setMessages((current) =>
         current.map((item) =>
           item.id === message.id
-            ? MessageReactions.update(
+            ? MessageReactionUpdater.update(
                 item,
                 session.identity.id,
                 emoji,
@@ -477,7 +477,7 @@ export function useCommunityMessageComposer({
     const delivery = sendQueueRef.current.then(async () => {
       try {
         const messageAttachments =
-          await applicationContainer.publishMessageAttachments(
+          await applicationContainer.attachments.publish(
             session,
             payload.attachments,
             (progress) => {
@@ -525,7 +525,7 @@ export function useCommunityMessageComposer({
               }),
             };
         const created =
-          await applicationContainer.createCommunityChannelMessage(
+          await applicationContainer.communities.createChannelMessage(
             session,
             community.id,
             payload.channelId,
@@ -542,7 +542,7 @@ export function useCommunityMessageComposer({
         );
 
         if (payload.sticker) {
-          void applicationContainer.markStickerUsed(session, payload.sticker);
+          void applicationContainer.stickers.markUsed(session, payload.sticker);
         }
 
         if (renderInChannel) {
@@ -711,6 +711,6 @@ async function createLinkPreviewForContent(session: Session, content: string) {
   if (!url) return undefined;
 
   return await applicationContainer
-    .createLinkPreview(session, url)
+    .messages.createLinkPreview(session, url)
     .catch(() => undefined);
 }

@@ -1,4 +1,4 @@
-import type { AddMessageReactionPort } from '../ports/AddMessageReactionPort';
+import type { AddMessageReactionPort } from './AddMessageReactionPort';
 
 import { AddMessageReactionMessage } from './messages/AddMessageReactionMessage';
 

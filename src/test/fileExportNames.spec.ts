@@ -16,6 +16,7 @@ function sourceFiles(directory: string = sourceRoot): string[] {
     const fullPath = path.join(directory, entry.name);
 
     if (entry.isDirectory()) return sourceFiles(fullPath);
+
     if (!sourceExtensions.has(path.extname(entry.name))) return [];
 
     return [fullPath];

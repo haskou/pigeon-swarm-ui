@@ -1,4 +1,4 @@
-import type { CreateNetworkPort } from '../ports/CreateNetworkPort';
+import type { CreateNetworkPort } from './CreateNetworkPort';
 
 import { CreateNetworkMessage } from './messages/CreateNetworkMessage';
 

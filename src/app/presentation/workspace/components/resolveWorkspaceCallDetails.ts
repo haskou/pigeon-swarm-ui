@@ -15,7 +15,7 @@ import type {
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
 import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
-import { ConversationPeer } from '../../../../contexts/conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { shortId } from '../../../../shared/presentation/formatting';
 
 export type WorkspaceCallDetails = {

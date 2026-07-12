@@ -189,16 +189,16 @@ export function StickerPicker({
 
   const savePack = async (packId: string, saved: boolean) => {
     if (saved) {
-      await applicationContainer.unsaveStickerPack(session, packId);
+      await applicationContainer.stickers.unsavePack(session, packId);
     } else {
-      await applicationContainer.saveStickerPack(session, packId);
+      await applicationContainer.stickers.savePack(session, packId);
     }
     invalidateStickerCaches();
     await loadLibrary();
   };
 
   const deleteSticker = async (packId: string, stickerId: string) => {
-    await applicationContainer.deleteSticker(session, packId, stickerId);
+    await applicationContainer.stickers.delete(session, packId, stickerId);
     invalidateStickerCaches();
     await loadLibrary();
   };
@@ -209,9 +209,13 @@ export function StickerPicker({
     favorite: boolean,
   ) => {
     if (favorite) {
-      await applicationContainer.unfavoriteSticker(session, packId, stickerId);
+      await applicationContainer.stickers.unfavorite(
+        session,
+        packId,
+        stickerId,
+      );
     } else {
-      await applicationContainer.favoriteSticker(session, packId, stickerId);
+      await applicationContainer.stickers.favorite(session, packId, stickerId);
     }
     invalidateStickerCaches();
     await loadLibrary();
@@ -465,7 +469,7 @@ export function StickerPicker({
               library={library}
               onClose={() => setManageOpen(false)}
               onCreatePack={async (input) => {
-                await applicationContainer.createStickerPack(session, input);
+                await applicationContainer.stickers.createPack(session, input);
                 invalidateStickerCaches();
                 await loadLibrary();
               }}

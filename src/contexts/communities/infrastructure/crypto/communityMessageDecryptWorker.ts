@@ -14,7 +14,7 @@ import type { CommunityMessageDecryptRequest } from './communityMessageDecryptWo
 import type { CommunityMessageDecryptResponse } from './communityMessageDecryptWorker/CommunityMessageDecryptResponse';
 import type { MessageReactionRecord } from './communityMessageDecryptWorker/MessageReactionRecord';
 
-import { PollMessageProjection } from '../../../messages/domain/PollMessageProjection';
+import { PollMessageProjection } from '../../../messages/infrastructure/crypto/PollMessageProjection';
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();

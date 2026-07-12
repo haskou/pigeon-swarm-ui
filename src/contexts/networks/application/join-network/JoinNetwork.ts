@@ -1,4 +1,4 @@
-import type { JoinNetworkPort } from '../ports/JoinNetworkPort';
+import type { JoinNetworkPort } from './JoinNetworkPort';
 
 import { JoinNetworkMessage } from './messages/JoinNetworkMessage';
 

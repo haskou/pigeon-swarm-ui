@@ -2,9 +2,9 @@ import type {
   ConversationResource,
   LoginResult,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { LoginIdentityPort } from '../ports/LoginIdentityPort';
+import type { LoginIdentityPort } from './LoginIdentityPort';
 
-import { ConversationTimeline } from '../../../conversations/domain/ConversationTimeline';
+import { ConversationTimeline } from '../../../conversations/application/list-conversations/ConversationTimeline';
 import { LoginIdentityMessage } from './messages/LoginIdentityMessage';
 
 export class LoginIdentity {

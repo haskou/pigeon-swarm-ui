@@ -43,23 +43,23 @@ export function NetworkCreationScreen({
 
     try {
       if (configureRelay && canConfigureRelay) {
-        await applicationContainer.updateNodeRelayConfiguration(
+        await applicationContainer.networks.updateRelayConfiguration(
           relayConfiguration,
         );
       }
 
       if (mode === 'create') {
-        await applicationContainer.createNetwork(name);
+        await applicationContainer.networks.create(name);
       } else if (mode === 'join') {
         const invite = NetworkInviteCode.decode(inviteCode);
 
-        await applicationContainer.joinNetwork(
+        await applicationContainer.networks.join(
           invite.id,
           invite.name,
           invite.key,
         );
       } else {
-        await applicationContainer.createPublicNodeNetwork();
+        await applicationContainer.networks.createPublic();
       }
 
       onNetworkCreated();

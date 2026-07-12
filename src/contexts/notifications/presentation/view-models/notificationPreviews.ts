@@ -9,7 +9,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityChannels } from '../../../communities/domain/CommunityChannels';
-import { ConversationPeer } from '../../../conversations/domain/ConversationPeer';
+import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 
 type NotificationMessagePreviewInput = {

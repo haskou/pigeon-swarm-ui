@@ -2,7 +2,7 @@ import type {
   ConversationResource,
   LocalKeychain,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { CreateConversationPort } from '../ports/CreateConversationPort';
+import type { CreateConversationPort } from './CreateConversationPort';
 
 import { CreateConversationMessage } from './messages/CreateConversationMessage';
 

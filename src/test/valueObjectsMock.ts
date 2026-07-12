@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/require-await, max-classes-per-file */
+
 import {
   createCipheriv,
   createDecipheriv,
@@ -126,11 +128,13 @@ class Timestamp {
   public constructor(value?: Date | number | string | Timestamp) {
     if (value instanceof Timestamp) {
       this.value = value.valueOf();
+
       return;
     }
 
     if (value instanceof Date) {
       this.value = value.getTime();
+
       return;
     }
 

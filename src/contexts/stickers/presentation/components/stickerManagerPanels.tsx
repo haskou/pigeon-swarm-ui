@@ -190,14 +190,14 @@ function ManagePackStickers({
         try {
           const preparedSticker = await prepareStickerFile(file);
           const [upload, dimensions] = await Promise.all([
-            applicationContainer.uploadStickerAsset(
+            applicationContainer.stickers.uploadAsset(
               session,
               preparedSticker.file,
             ),
             Promise.resolve(preparedSticker.dimensions),
           ]);
 
-          await applicationContainer.addStickerToPack(session, pack.id, {
+          await applicationContainer.stickers.addToPack(session, pack.id, {
             assetCid: upload.cid,
             contentType: upload.contentType,
             dimensions,

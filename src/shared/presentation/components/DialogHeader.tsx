@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 
-import { copy } from '../i18n/copy';
+import { DialogCloseButton } from './DialogCloseButton';
 
 export function DialogHeader({
   description,
@@ -22,14 +22,7 @@ export function DialogHeader({
           <div className="ui-dialog-description">{description}</div>
         ) : null}
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="ui-icon-button shrink-0"
-        aria-label={copy.dialog.close}
-      >
-        <span aria-hidden="true">×</span>
-      </button>
+      <DialogCloseButton className="shrink-0" onClick={onClose} />
     </header>
   );
 }

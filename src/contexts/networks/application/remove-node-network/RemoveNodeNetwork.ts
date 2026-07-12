@@ -1,5 +1,5 @@
 import type { NodeNetwork } from '../list-node-networks/NodeNetwork';
-import type { RemoveNodeNetworkPort } from '../ports/RemoveNodeNetworkPort';
+import type { RemoveNodeNetworkPort } from './RemoveNodeNetworkPort';
 
 import { RemoveNodeNetworkMessage } from './messages/RemoveNodeNetworkMessage';
 

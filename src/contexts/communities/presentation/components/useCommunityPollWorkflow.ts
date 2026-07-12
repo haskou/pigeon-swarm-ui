@@ -37,7 +37,7 @@ export function useCommunityPollWorkflow({
     async (input: CreateCommunityPollInput) => {
       if (!selectedChannelId) return;
 
-      const poll = await applicationContainer.createPoll(session, {
+      const poll = await applicationContainer.polls.create(session, {
         allowsMultipleVotes: input.allowsMultipleVotes,
         channelId: selectedChannelId,
         communityId,
@@ -55,7 +55,7 @@ export function useCommunityPollWorkflow({
   const votePoll = useCallback(
     async (poll: PollResource, optionIds: string[]) => {
       upsertPoll(
-        await applicationContainer.votePoll(session, poll.id, optionIds),
+        await applicationContainer.polls.vote(session, poll.id, optionIds),
       );
     },
     [session, upsertPoll],
@@ -63,14 +63,16 @@ export function useCommunityPollWorkflow({
 
   const removePollVote = useCallback(
     async (poll: PollResource) => {
-      upsertPoll(await applicationContainer.removePollVote(session, poll.id));
+      upsertPoll(
+        await applicationContainer.polls.removeVote(session, poll.id),
+      );
     },
     [session, upsertPoll],
   );
 
   const closePoll = useCallback(
     async (poll: PollResource) => {
-      upsertPoll(await applicationContainer.closePoll(session, poll.id));
+      upsertPoll(await applicationContainer.polls.close(session, poll.id));
     },
     [session, upsertPoll],
   );

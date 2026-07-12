@@ -39,7 +39,7 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
         if (session) {
           const applicationContainer = await loadApplicationContainer();
 
-          setNetworks(await applicationContainer.listNodeNetworks(session));
+          setNetworks(await applicationContainer.networks.list(session));
 
           return;
         }
