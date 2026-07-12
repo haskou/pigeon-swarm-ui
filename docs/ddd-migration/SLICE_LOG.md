@@ -603,6 +603,30 @@
   architectural milestone
 - Next slice: replace compatibility gateway consumers with context ports
 
+## Slice INFRA-002K: Extract identity login orchestration
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: Expose login, remembered-session restoration, and session refresh as a
+  single identity-owned capability instead of sequencing them in composition.
+- Changed files:
+  - `contexts/identities/infrastructure/http/PigeonIdentityLoginApi.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation
+- Behavior changed/preserved: password/passkey/recovery-key login, remembered
+  sessions, progress reporting, workspace hydration, and refresh behavior keep
+  their existing contracts
+- Contracts changed: none
+- Validation level: L1
+- Tests/checks:
+  - identity login, registration, and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: application composition still injects the compatibility facade into
+  several context application ports; replacing those consumers is the next
+  architectural milestone
+- Next slice: replace compatibility gateway consumers with context ports
+
 ## Slice INFRA-002I: Extract local passkey configuration
 
 - Date: 2026-07-12

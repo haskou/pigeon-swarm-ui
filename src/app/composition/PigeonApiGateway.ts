@@ -76,6 +76,7 @@ import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { PigeonIdentityLoginApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
 import { PigeonIdentityRegistrationApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
@@ -134,6 +135,8 @@ export class PigeonApiGateway {
   private readonly identityWorkspace: PigeonIdentityWorkspaceSessionApi;
 
   private readonly identityRegistration: PigeonIdentityRegistrationApi;
+
+  private readonly identityLogin: PigeonIdentityLoginApi;
 
   private readonly identities: PigeonIdentityGateway;
 
@@ -235,6 +238,10 @@ export class PigeonApiGateway {
       this.identityCommands,
       this.identityWorkspace,
       this.identityKeyProtection,
+    );
+    this.identityLogin = new PigeonIdentityLoginApi(
+      this.identitySession,
+      this.identityWorkspace,
     );
     this.conversationCommands = new PigeonConversationCommandsApi(
       http,
@@ -428,13 +435,6 @@ export class PigeonApiGateway {
     const payload = new EncryptedPayload(encryptedPayload);
 
     return session.keyPair.decrypt(payload);
-  }
-
-  private async hydrateLoginSession(
-    session: Session,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    return await this.identityWorkspace.hydrate(session, onProgress);
   }
 
   public apiUrl(path: string): string {
@@ -1497,30 +1497,23 @@ export class PigeonApiGateway {
     onProgress?: LoginIdentityProgressReporter,
     recoveryKey?: string,
   ): Promise<LoginResult> {
-    const session = await this.identitySession.unlock(
+    return await this.identityLogin.login(
       identityId,
       password,
       onProgress,
       recoveryKey,
     );
-
-    return await this.hydrateLoginSession(session, onProgress);
   }
 
   public async restoreRememberedSession(
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
-    const session = await this.identitySession.restoreRemembered(
-      identityId,
-      onProgress,
-    );
-
-    return await this.identityWorkspace.hydrate(session, onProgress);
+    return await this.identityLogin.restoreRemembered(identityId, onProgress);
   }
 
   public async refreshSession(session: Session): Promise<LoginResult> {
-    return await this.identityWorkspace.refresh(session);
+    return await this.identityLogin.refresh(session);
   }
 
   public async publishKeychain(
