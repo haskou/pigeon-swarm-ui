@@ -81,7 +81,6 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
-import { clearLocalPasskeyUnlock } from '../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
@@ -1217,24 +1216,12 @@ export class PigeonApiGateway {
     enabled: boolean,
     recoveryKey?: string,
   ): Promise<void> {
-    if (!enabled) {
-      clearLocalPasskeyUnlock(session.identity.id);
-
-      return;
-    }
-
-    await this.identityKeyProtection.verifyRemoteMasterKeyFactors({
-      identity: session.identity,
+    await this.identityKeyProtection.configureLocalPasskeyUnlock(
+      session,
       password,
+      enabled,
       recoveryKey,
-    });
-
-    await this.identityKeyProtection.saveLocalPasskeyMasterKeyUnlock({
-      displayName: session.identity.profile.name,
-      identityId: session.identity.id,
-      masterKey: session.masterKey,
-      password,
-    });
+    );
   }
 
   public async uploadPublicFile(

@@ -577,3 +577,26 @@
 - Risks: registration still coordinates identity material, workspace hydration,
   and optional local passkey setup in the compatibility gateway
 - Next slice: extract registration coordination
+
+## Slice INFRA-002I: Extract local passkey configuration
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: Keep local device-unlock configuration with the identity key-protection
+  infrastructure instead of exposing factor verification and local storage
+  mechanics through the composition gateway.
+- Changed files:
+  - `contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation
+- Behavior changed/preserved: enabling local passkey unlock still verifies the
+  remote factors before saving; disabling it still clears the local record.
+- Contracts changed: none
+- Validation level: L1
+- Tests/checks:
+  - identity protection and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: registration still coordinates identity material, workspace hydration,
+  and optional local passkey setup in the compatibility gateway
+- Next slice: extract registration coordination

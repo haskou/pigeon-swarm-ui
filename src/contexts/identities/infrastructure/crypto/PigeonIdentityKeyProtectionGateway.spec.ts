@@ -172,4 +172,40 @@ describe(PigeonIdentityKeyProtectionGateway.name, () => {
       }),
     ).rejects.toThrow(copy.auth.passkeyPrfUnlockFailed);
   });
+
+  it('verifies factors before creating a local passkey unlock', async () => {
+    const gateway = new PigeonIdentityKeyProtectionGateway(protectorDouble());
+    const session = {
+      identity: {
+        id: 'identity-1',
+        profile: { name: 'Ada' },
+      },
+      masterKey: SymmetricKey.generate(),
+    } as unknown as Session;
+    const verify = jest
+      .spyOn(gateway, 'verifyRemoteMasterKeyFactors')
+      .mockResolvedValue(undefined);
+    const save = jest
+      .spyOn(gateway, 'saveLocalPasskeyMasterKeyUnlock')
+      .mockResolvedValue(undefined);
+
+    await gateway.configureLocalPasskeyUnlock(
+      session,
+      'password',
+      true,
+      'recovery-key',
+    );
+
+    expect(verify).toHaveBeenCalledWith({
+      identity: session.identity,
+      password: 'password',
+      recoveryKey: 'recovery-key',
+    });
+    expect(save).toHaveBeenCalledWith({
+      displayName: 'Ada',
+      identityId: 'identity-1',
+      masterKey: session.masterKey,
+      password: 'password',
+    });
+  });
 });

@@ -38,7 +38,7 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `INFRA-002I`
+- Id: `INFRA-002J`
 - Title: Extract registration coordination
 - Size: L
 - Status: in progress
@@ -77,6 +77,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `INFRA-002I`: extract registration coordination.
+1. `INFRA-002J`: extract registration coordination.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

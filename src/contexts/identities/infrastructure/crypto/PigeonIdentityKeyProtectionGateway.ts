@@ -10,7 +10,10 @@ import type { UserRootKeyPasskeyPrfInput } from './UserRootKeyPasskeyPrfInput';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
-import { saveLocalPasskeyUnlock } from '../storage/localPasskeyUnlock';
+import {
+  clearLocalPasskeyUnlock,
+  saveLocalPasskeyUnlock,
+} from '../storage/localPasskeyUnlock';
 import { UserRootKeyProtector } from './UserRootKeyProtector';
 
 export class PigeonIdentityKeyProtectionGateway {
@@ -237,6 +240,32 @@ export class PigeonIdentityKeyProtectionGateway {
       encryptedMasterKey: protectedRoot.encryptedMasterKey,
       identityId,
       masterKeyDerivation: protectedRoot.masterKeyDerivation,
+    });
+  }
+
+  public async configureLocalPasskeyUnlock(
+    session: Session,
+    password: string,
+    enabled: boolean,
+    recoveryKey?: string,
+  ): Promise<void> {
+    if (!enabled) {
+      clearLocalPasskeyUnlock(session.identity.id);
+
+      return;
+    }
+
+    await this.verifyRemoteMasterKeyFactors({
+      identity: session.identity,
+      password,
+      recoveryKey,
+    });
+
+    await this.saveLocalPasskeyMasterKeyUnlock({
+      displayName: session.identity.profile.name,
+      identityId: session.identity.id,
+      masterKey: session.masterKey,
+      password,
     });
   }
 
