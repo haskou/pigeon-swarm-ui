@@ -1070,3 +1070,30 @@
   - focused ESLint for the identity adapter/composition files
 - Next slice: `APPLICATION-011Q`, make the remaining identity methods on
   `PigeonApiGateway` thin compatibility delegates and remove duplicated logic.
+
+## Slice APPLICATION-011Q: Delegate legacy identity methods
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: keep the old identity/session/keychain methods on
+  `PigeonApiGateway` as compatibility delegates while giving the context-owned
+  identity gateway the single implementation path.
+- Changed files:
+  - `app/composition/PigeonApiGateway.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentitiesGateway.ts`
+  - affected composition and identity tests
+- Behavior changed/preserved: identity creation/profile updates, login,
+  remembered-session restoration, session refresh, keychain load/decrypt/
+  publish, and local passkey configuration preserve their public behavior.
+- Contracts changed: no identity, WebAuthn, keychain, or encrypted-payload
+  wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - compatibility gateway tests
+  - identity gateway tests
+  - composition tests
+  - `yarn typecheck`
+  - focused ESLint for the identity adapter/composition files
+- Next slice: `APPLICATION-011R`, audit conversations and messages for the
+  next high-risk orchestration boundary.

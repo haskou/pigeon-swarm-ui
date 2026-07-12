@@ -1141,22 +1141,20 @@ export class PigeonApiGateway {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<IdentityResource> {
-    const { identity } = await this.identityCommands.create(
+    return await this.identityGateway.createIdentity(
       name,
       password,
       networks,
       handle,
       options,
     );
-
-    return identity;
   }
 
   public decryptKeychain(
     session: Session,
     keychain: KeychainResource,
   ): LocalKeychain {
-    return this.keychainApi.decrypt(session, keychain);
+    return this.identityGateway.decryptKeychain(session, keychain);
   }
 
   public async decryptMessage(
@@ -1180,11 +1178,11 @@ export class PigeonApiGateway {
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.identities.get(identityId);
+    return await this.identityGateway.getIdentity(identityId);
   }
 
   public async refreshIdentity(identityId: string): Promise<IdentityResource> {
-    return await this.identities.refresh(identityId);
+    return await this.identityGateway.refreshIdentity(identityId);
   }
 
   public async updateIdentityProfile(
@@ -1197,7 +1195,7 @@ export class PigeonApiGateway {
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {
-    return await this.identityCommands.updateProfile(
+    return await this.identityGateway.updateIdentityProfile(
       session,
       profile,
       newPassword,
@@ -1211,7 +1209,7 @@ export class PigeonApiGateway {
     enabled: boolean,
     recoveryKey?: string,
   ): Promise<void> {
-    await this.identityKeyProtection.configureLocalPasskeyUnlock(
+    await this.identityGateway.configureLocalPasskeyUnlock(
       session,
       password,
       enabled,
@@ -1500,7 +1498,7 @@ export class PigeonApiGateway {
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
-    return await this.keychainApi.load(session);
+    return await this.identityGateway.loadRemoteKeychain(session);
   }
 
   public async login(
@@ -1509,7 +1507,7 @@ export class PigeonApiGateway {
     onProgress?: LoginIdentityProgressReporter,
     recoveryKey?: string,
   ): Promise<LoginResult> {
-    return await this.identityLogin.login(
+    return await this.identityGateway.login(
       identityId,
       password,
       onProgress,
@@ -1521,21 +1519,21 @@ export class PigeonApiGateway {
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
-    return await this.identityLogin.restoreRememberedSession(
+    return await this.identityGateway.restoreRememberedSession(
       identityId,
       onProgress,
     );
   }
 
   public async refreshSession(session: Session): Promise<LoginResult> {
-    return await this.identityLogin.refreshSession(session);
+    return await this.identityGateway.refreshSession(session);
   }
 
   public async publishKeychain(
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.keychainApi.publishKeychain(session, nextKeychain);
+    return await this.identityGateway.publishKeychain(session, nextKeychain);
   }
 
   public async register(
@@ -1545,7 +1543,7 @@ export class PigeonApiGateway {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
-    return await this.identityRegistration.register(
+    return await this.identityGateway.register(
       ProfileName.fromString(name),
       password,
       IdentityNetworkMemberships.fromPrimitives(networks),
