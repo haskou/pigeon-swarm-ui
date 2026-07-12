@@ -1097,3 +1097,32 @@
   - focused ESLint for the identity adapter/composition files
 - Next slice: `APPLICATION-011R`, audit conversations and messages for the
   next high-risk orchestration boundary.
+
+## Slice APPLICATION-011R: Add the context-owned messages gateway
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: keep message HTTP, encryption projection, attachment publication, and
+  message command orchestration behind the messages context boundary.
+- Changed files:
+  - `contexts/messages/infrastructure/http/PigeonMessagesGateway.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `src/test/contexts/messages/infrastructure/http/PigeonMessagesGateway.spec.ts`
+  - `app/presentation/workspace/components/ChatColumn.tsx`
+- Behavior changed/preserved: message reads, threads, pins, drafts, reactions,
+  sends, edits, and deletes keep their existing behavior. One shared thread
+  capability predicate is now used by the conversation column and context menu;
+  one-to-one conversations do not expose thread actions.
+- Contracts changed: no message, thread, encryption, or REST wire contract
+  changes.
+- Validation level: L2
+- Tests/checks:
+  - messages gateway delegation tests
+  - conversation thread capability tests
+  - full test suite
+  - `yarn typecheck`
+  - focused ESLint for the gateway and composition files
+- Next slice: audit the remaining conversation facade and remove duplicated
+  application-facing orchestration where a context-owned boundary is justified.

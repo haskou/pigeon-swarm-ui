@@ -129,10 +129,12 @@ adapters into application services without containing context behavior.
   and wired identity/session application services through it.
 - `APPLICATION-011Q`: made the legacy identity/session/keychain methods on
   `PigeonApiGateway` thin delegates to the context-owned gateway.
+- `APPLICATION-011R`: added a context-owned messages gateway and routed message
+  use cases through it; centralized the one-to-one thread capability check.
 
 ## Next slices
 
-1. `APPLICATION-011R`: audit conversations and messages for the next
-   high-risk orchestration boundary.
+1. `APPLICATION-011S`: audit the remaining conversation facade and remove
+   duplicated application-facing orchestration where justified.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

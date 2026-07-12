@@ -95,6 +95,7 @@ import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/
 import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
@@ -174,6 +175,8 @@ export class PigeonApiGateway {
   public readonly calls: PigeonCallsGateway;
 
   public readonly communityGateway: PigeonCommunitiesGateway;
+
+  public readonly messagesGateway: PigeonMessagesGateway;
 
   public readonly node: PigeonNodeGateway;
 
@@ -301,6 +304,10 @@ export class PigeonApiGateway {
       projection,
       this.files,
       this.messageSignatures,
+    );
+    this.messagesGateway = new PigeonMessagesGateway(
+      this.messagesApi,
+      this.messageCommands,
     );
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsGateway(
@@ -1388,7 +1395,7 @@ export class PigeonApiGateway {
     session: Session,
     url: string,
   ): Promise<MessageLinkPreview> {
-    return await this.messagesApi.createLinkPreview(session, url);
+    return await this.messagesGateway.createLinkPreview(session, url);
   }
 
   public async loadMessages(
@@ -1397,7 +1404,7 @@ export class PigeonApiGateway {
     before?: null | string,
     limitOrOptions: MessageLoadOptions | number = 30,
   ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.messagesApi.loadMessages(
+    return await this.messagesGateway.loadMessages(
       session,
       conversationId,
       before,
@@ -1410,7 +1417,7 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<ChatMessage | null> {
-    return await this.messagesApi.loadMessage(
+    return await this.messagesGateway.loadMessage(
       session,
       conversationId,
       messageId,
@@ -1426,7 +1433,7 @@ export class PigeonApiGateway {
     nextCursor?: null | string;
     previousCursor?: null | string;
   }> {
-    return await this.messagesApi.loadMessagesAround(
+    return await this.messagesGateway.loadMessagesAround(
       session,
       conversationId,
       messageId,
@@ -1439,7 +1446,7 @@ export class PigeonApiGateway {
     messageId: string,
     options: { limit?: number } = {},
   ): Promise<{ messages: ChatMessage[]; nextBeforeMessageId?: null | string }> {
-    return await this.messagesApi.loadMessageThread(
+    return await this.messagesGateway.loadMessageThread(
       session,
       conversationId,
       messageId,
@@ -1451,7 +1458,7 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
   ): Promise<MessagePin[]> {
-    return await this.messagesApi.listMessagePins(session, conversationId);
+    return await this.messagesGateway.listMessagePins(session, conversationId);
   }
 
   public async pinMessage(
@@ -1459,7 +1466,7 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.messagesApi.pinMessage(session, conversationId, messageId);
+    await this.messagesGateway.pinMessage(session, conversationId, messageId);
   }
 
   public async unpinMessage(
@@ -1467,13 +1474,13 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.messagesApi.unpinMessage(session, conversationId, messageId);
+    await this.messagesGateway.unpinMessage(session, conversationId, messageId);
   }
 
   public async listConversationDrafts(
     session: Session,
   ): Promise<ConversationDraft[]> {
-    return await this.messagesApi.listConversationDrafts(session);
+    return await this.messagesGateway.listConversationDrafts(session);
   }
 
   public async saveConversationDraft(
@@ -1482,7 +1489,7 @@ export class PigeonApiGateway {
     content: string,
     updatedAt = Date.now(),
   ): Promise<ConversationDraft> {
-    return await this.messagesApi.saveConversationDraft(
+    return await this.messagesGateway.saveConversationDraft(
       session,
       conversationId,
       content,
@@ -1494,7 +1501,7 @@ export class PigeonApiGateway {
     session: Session,
     conversationId: string,
   ): Promise<void> {
-    await this.messagesApi.deleteConversationDraft(session, conversationId);
+    await this.messagesGateway.deleteConversationDraft(session, conversationId);
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {
@@ -1558,7 +1565,7 @@ export class PigeonApiGateway {
     content: string,
     options: SendMessageOptions = {},
   ): Promise<ChatMessage> {
-    return await this.messageCommands.send(
+    return await this.messagesGateway.sendMessage(
       session,
       conversationId,
       content,
@@ -1573,7 +1580,7 @@ export class PigeonApiGateway {
     content: string,
     options: EditMessageOptions = {},
   ): Promise<ChatMessage> {
-    return await this.messageCommands.edit(
+    return await this.messagesGateway.editMessage(
       session,
       conversationId,
       messageId,
@@ -1587,7 +1594,11 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.messageCommands.delete(session, conversationId, messageId);
+    await this.messagesGateway.deleteMessage(
+      session,
+      conversationId,
+      messageId,
+    );
   }
 
   public async addMessageReaction(
@@ -1596,7 +1607,7 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.messagesApi.addMessageReaction(
+    await this.messagesGateway.addMessageReaction(
       session,
       conversationId,
       messageId,
@@ -1610,7 +1621,7 @@ export class PigeonApiGateway {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.messagesApi.removeMessageReaction(
+    await this.messagesGateway.removeMessageReaction(
       session,
       conversationId,
       messageId,

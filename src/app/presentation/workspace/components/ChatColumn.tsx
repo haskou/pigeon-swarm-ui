@@ -40,8 +40,9 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
+import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
@@ -383,11 +384,7 @@ export function ChatColumn({
     },
     [activeConversation?.id, onTypingActive],
   );
-  const isGroupConversation = !!(
-    activeConversation &&
-    (activeConversation.type === 'group' ||
-      activeConversation.id.startsWith('group:'))
-  );
+  const isGroupConversation = conversationSupportsThreads(activeConversation);
   useEffect(() => {
     if (!groupInviteRequest || !isGroupConversation) return;
 
