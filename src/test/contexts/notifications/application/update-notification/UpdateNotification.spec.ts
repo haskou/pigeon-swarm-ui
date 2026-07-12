@@ -1,4 +1,4 @@
-import type { UpdateNotificationPort } from '../../../../../contexts/notifications/application/ports/UpdateNotificationPort';
+import type { UpdateNotificationPort } from '../../../../../contexts/notifications/application/update-notification/UpdateNotificationPort';
 import type {
   NotificationResource,
   Session,

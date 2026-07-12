@@ -1,4 +1,4 @@
-import type { ResetNotificationSettingPort } from '../ports/ResetNotificationSettingPort';
+import type { ResetNotificationSettingPort } from './ResetNotificationSettingPort';
 
 import { ResetNotificationSettingMessage } from './messages/ResetNotificationSettingMessage';
 

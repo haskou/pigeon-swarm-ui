@@ -1,5 +1,5 @@
 import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
-import type { ListNotificationSettingsPort } from '../ports/ListNotificationSettingsPort';
+import type { ListNotificationSettingsPort } from './ListNotificationSettingsPort';
 
 import { ListNotificationSettingsMessage } from './messages/ListNotificationSettingsMessage';
 

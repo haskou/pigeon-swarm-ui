@@ -8,12 +8,12 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 import type { ConversationInvitationKeychainPublisher } from './accept-conversation-invitation/ConversationInvitationKeychainPublisher';
 import type { ConversationInvitationKeyDecryptor } from './accept-conversation-invitation/ConversationInvitationKeyDecryptor';
-import type { ListNotificationSettingsPort } from './ports/ListNotificationSettingsPort';
-import type { ListNotificationsPort } from './ports/ListNotificationsPort';
-import type { PushNotificationPort } from './ports/PushNotificationPort';
-import type { ResetNotificationSettingPort } from './ports/ResetNotificationSettingPort';
-import type { SaveNotificationSettingPort } from './ports/SaveNotificationSettingPort';
-import type { UpdateNotificationPort } from './ports/UpdateNotificationPort';
+import type { ListNotificationSettingsPort } from './list-notification-settings/ListNotificationSettingsPort';
+import type { ListNotificationsPort } from './list-notifications/ListNotificationsPort';
+import type { PushNotificationPort } from './push-notifications/PushNotificationPort';
+import type { ResetNotificationSettingPort } from './reset-notification-setting/ResetNotificationSettingPort';
+import type { SaveNotificationSettingPort } from './save-notification-setting/SaveNotificationSettingPort';
+import type { UpdateNotificationPort } from './update-notification/UpdateNotificationPort';
 
 import { PushSubscriptionPayloadFactory } from '../infrastructure/http/PushSubscriptionPayloadFactory';
 import { AcceptConversationInvitation } from './accept-conversation-invitation/AcceptConversationInvitation';

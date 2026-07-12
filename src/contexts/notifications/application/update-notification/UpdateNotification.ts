@@ -1,5 +1,5 @@
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
-import type { UpdateNotificationPort } from '../ports/UpdateNotificationPort';
+import type { UpdateNotificationPort } from './UpdateNotificationPort';
 
 import { UpdateNotificationMessage } from './messages/UpdateNotificationMessage';
 

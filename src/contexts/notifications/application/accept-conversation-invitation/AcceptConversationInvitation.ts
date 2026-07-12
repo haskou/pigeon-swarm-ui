@@ -2,7 +2,7 @@ import type {
   LocalKeychain,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { UpdateNotificationPort } from '../ports/UpdateNotificationPort';
+import type { UpdateNotificationPort } from '../update-notification/UpdateNotificationPort';
 import type { ConversationInvitationKeychainPublisher } from './ConversationInvitationKeychainPublisher';
 import type { ConversationInvitationKeyDecryptor } from './ConversationInvitationKeyDecryptor';
 

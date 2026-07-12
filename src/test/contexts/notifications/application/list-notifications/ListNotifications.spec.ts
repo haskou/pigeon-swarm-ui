@@ -1,4 +1,4 @@
-import type { ListNotificationsPort } from '../../../../../contexts/notifications/application/ports/ListNotificationsPort';
+import type { ListNotificationsPort } from '../../../../../contexts/notifications/application/list-notifications/ListNotificationsPort';
 import type {
   NotificationResource,
   Session,
