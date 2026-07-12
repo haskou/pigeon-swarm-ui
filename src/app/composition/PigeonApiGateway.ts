@@ -1,4 +1,4 @@
-import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/value-objects';
 
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
@@ -76,6 +76,7 @@ import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { PigeonIdentityRegistrationApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
@@ -110,11 +111,6 @@ import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
 
-const defaultKeychain: LocalKeychain = {
-  conversations: {},
-  version: 0,
-};
-
 const messageDecryptBatchSize = 8;
 export class PigeonApiGateway {
   private readonly communities: PigeonCommunitiesApi;
@@ -136,6 +132,8 @@ export class PigeonApiGateway {
   private readonly identitySession: PigeonIdentitySessionApi;
 
   private readonly identityWorkspace: PigeonIdentityWorkspaceSessionApi;
+
+  private readonly identityRegistration: PigeonIdentityRegistrationApi;
 
   private readonly identities: PigeonIdentityGateway;
 
@@ -233,6 +231,11 @@ export class PigeonApiGateway {
       loadKeychain: async (session) =>
         await this.keychainApi.loadOptional(session),
     });
+    this.identityRegistration = new PigeonIdentityRegistrationApi(
+      this.identityCommands,
+      this.identityWorkspace,
+      this.identityKeyProtection,
+    );
     this.conversationCommands = new PigeonConversationCommandsApi(
       http,
       signer,
@@ -425,26 +428,6 @@ export class PigeonApiGateway {
     const payload = new EncryptedPayload(encryptedPayload);
 
     return session.keyPair.decrypt(payload);
-  }
-
-  private async createIdentityMaterial(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
-  ): Promise<{
-    identity: IdentityResource;
-    keyPair: KeyPair;
-    masterKey: SymmetricKey;
-  }> {
-    return await this.identityCommands.create(
-      name,
-      password,
-      networks,
-      handle,
-      options,
-    );
   }
 
   private async hydrateLoginSession(
@@ -1146,7 +1129,7 @@ export class PigeonApiGateway {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<IdentityResource> {
-    const { identity } = await this.createIdentityMaterial(
+    const { identity } = await this.identityCommands.create(
       name,
       password,
       networks,
@@ -1554,35 +1537,13 @@ export class PigeonApiGateway {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
-    const { identity, keyPair, masterKey } = await this.createIdentityMaterial(
+    return await this.identityRegistration.register(
       name,
       password,
       networks,
       handle,
       options,
     );
-    const result = await this.hydrateLoginSession({
-      identity,
-      keychain: defaultKeychain,
-      keyPair,
-      masterKey,
-    });
-
-    if (
-      options.passkeyPrfEnabled &&
-      !result.session.identity.masterKeyDerivation.passkeyPrf
-    ) {
-      await this.identityKeyProtection
-        .saveLocalPasskeyMasterKeyUnlock({
-          displayName: name,
-          identityId: result.session.identity.id,
-          masterKey: result.session.masterKey,
-          password,
-        })
-        .catch(() => undefined);
-    }
-
-    return result;
   }
 
   public async sendMessage(

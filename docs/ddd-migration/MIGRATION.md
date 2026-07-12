@@ -38,8 +38,8 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `INFRA-002J`
-- Title: Extract registration coordination
+- Id: `APPLICATION-011`
+- Title: Replace compatibility gateway consumers with context ports
 - Size: L
 - Status: in progress
 - Business capability: Context-owned application workflows and transport
@@ -77,6 +77,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `INFRA-002J`: extract registration coordination.
+1. `APPLICATION-011`: replace compatibility gateway consumers with context ports.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

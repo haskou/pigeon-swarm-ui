@@ -578,6 +578,31 @@
   and optional local passkey setup in the compatibility gateway
 - Next slice: extract registration coordination
 
+## Slice INFRA-002J: Extract identity registration coordination
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: Move identity registration, initial workspace hydration, and optional
+  local passkey setup out of the compatibility gateway.
+- Changed files:
+  - `contexts/identities/infrastructure/http/CreatedIdentityMaterial.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation
+- Behavior changed/preserved: identity creation, initial keychain and
+  conversation hydration, optional passkey setup, cancellation handling, and
+  PRF-protected registration preserve their existing contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - identity registration and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: application composition still injects the compatibility facade into
+  several context application ports; replacing those consumers is the next
+  architectural milestone
+- Next slice: replace compatibility gateway consumers with context ports
+
 ## Slice INFRA-002I: Extract local passkey configuration
 
 - Date: 2026-07-12

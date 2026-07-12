@@ -10,6 +10,7 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { IdentityUpdateProfileInput } from '../../domain/IdentitySignaturePayloadFactory';
 import type { IdentitySignaturePayloadFactory } from '../../domain/IdentitySignaturePayloadFactory';
 import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
+import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
@@ -37,11 +38,7 @@ export class PigeonIdentityCommandsApi {
     networks: string[],
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
-  ): Promise<{
-    identity: IdentityResource;
-    keyPair: KeyPair;
-    masterKey: SymmetricKey;
-  }> {
+  ): Promise<CreatedIdentityMaterial> {
     const keyPair = await KeyPair.generate();
     const masterKey = SymmetricKey.generate();
     const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
