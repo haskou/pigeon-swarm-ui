@@ -962,3 +962,32 @@
   - focused ESLint for the community context
 - Next slice: `APPLICATION-011M`, extract leave/community-keychain reconciliation
   and then replace remaining compatibility gateway implementations.
+
+## Slice APPLICATION-011M: Add the context-owned community gateway
+
+- Date: 2026-07-12
+- Size: L
+- Status: completed
+- Goal: move the application-facing community adapter out of
+  `app/composition/PigeonApiGateway` and wire the communities context through
+  its own infrastructure gateway.
+- Changed files:
+  - `contexts/communities/infrastructure/http/PigeonCommunitiesGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `src/test/contexts/communities/infrastructure/http/*`
+- Behavior changed/preserved: community HTTP delegation, membership-request
+  cache invalidation, membership invitation notification, channel pin cache
+  invalidation, draft invalidation, media upload, and invite workflows preserve
+  their public behavior. The old gateway methods remain as a compatibility
+  surface while callers migrate.
+- Contracts changed: no REST, websocket, media, invitation, or keychain wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - community gateway tests
+  - composition and compatibility gateway tests
+  - `yarn typecheck`
+  - focused ESLint for the changed adapter/composition files
+- Next slice: `APPLICATION-011N`, make the remaining `PigeonApiGateway`
+  community methods thin compatibility delegates and remove duplicated logic.

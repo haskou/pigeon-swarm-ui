@@ -117,11 +117,13 @@ adapters into application services without containing context behavior.
   and acceptance capabilities by action.
 - `APPLICATION-011L`: extracted community creation orchestration into an
   explicit application use case with a boundary message and direct tests.
+- `APPLICATION-011M`: added a context-owned community infrastructure gateway
+  and wired the application composition through it, leaving the old gateway
+  methods only as a compatibility surface.
 
 ## Next slices
 
-1. `APPLICATION-011M`: extract leave/keychain reconciliation and replace
-   remaining broad compatibility methods with context-owned HTTP and crypto
-   adapters.
+1. `APPLICATION-011N`: make the remaining community methods on
+   `PigeonApiGateway` thin compatibility delegates and remove duplicated logic.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

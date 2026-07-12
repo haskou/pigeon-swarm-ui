@@ -65,6 +65,7 @@ import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/ht
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
@@ -169,6 +170,8 @@ export class PigeonApiGateway {
 
   public readonly calls: PigeonCallsGateway;
 
+  public readonly communityGateway: PigeonCommunitiesGateway;
+
   public readonly node: PigeonNodeGateway;
 
   public readonly presence: PigeonPresenceGateway;
@@ -261,6 +264,12 @@ export class PigeonApiGateway {
       this.communities,
       this.identities,
       this.keychainApi,
+    );
+    this.communityGateway = new PigeonCommunitiesGateway(
+      this.communities,
+      this.communityInvitations,
+      this.requestCache,
+      this.files,
     );
     this.messageSignatures = new MessageSignaturePayloadFactory();
     this.messages = messages;

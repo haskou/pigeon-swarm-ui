@@ -20,6 +20,7 @@ function gatewayDouble(): {
 
   return {
     gateway: {
+      communityGateway: {},
       identityRegistration: { register },
     } as unknown as PigeonApiGateway,
     register,
