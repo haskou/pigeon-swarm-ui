@@ -40,10 +40,13 @@ export class MessageTimelineEntries {
     messages: ChatMessage[],
     polls: PollResource[],
     threadSummaries: MessageThreadSummary[] = [],
+    allowThreads = true,
   ): MessageTimelineEntry[] {
-    const visibleThreadSummaries = threadSummaries.filter((summary) =>
-      MessageTimelineEntries.isVisibleThreadSummary(summary),
-    );
+    const visibleThreadSummaries = allowThreads
+      ? threadSummaries.filter((summary) =>
+          MessageTimelineEntries.isVisibleThreadSummary(summary),
+        )
+      : [];
     const knownThreadMessageIds =
       MessageTimelineEntries.knownThreadMessageIds(visibleThreadSummaries);
     const threadSummariesByRootMessageId = new Map(
@@ -54,7 +57,7 @@ export class MessageTimelineEntries {
     );
     const rootMessages = messages.filter(
       (message) =>
-        !MessageTimelineEntries.threadRootMessageId(message) &&
+        (!allowThreads || !MessageTimelineEntries.threadRootMessageId(message)) &&
         !knownThreadMessageIds.has(message.id),
     );
     const items = messagePollTimelineItems(rootMessages, polls);

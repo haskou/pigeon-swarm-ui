@@ -24,6 +24,7 @@ import type {
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { MessageEditability } from '../../../../contexts/messages/presentation/view-models/MessageEditability';
+import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -324,7 +325,8 @@ function MessageActionDialogs(
         onOpenThread={
           contextMenuMessage &&
           contextMenuMessage.kind !== 'poll' &&
-          !contextMenuFromThread
+          !contextMenuFromThread &&
+          conversationSupportsThreads(props.activeConversation)
             ? () => props.onOpenMessageThread(contextMenuMessage)
             : undefined
         }

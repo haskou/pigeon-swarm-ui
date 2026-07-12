@@ -124,6 +124,34 @@ describe(MessageTimelineEntries.name, () => {
     });
   });
 
+  it('keeps marked messages visible when threads are disabled', () => {
+    const root = chatMessage({
+      content: 'Root',
+      id: 'root-message',
+      timestamp: 1,
+    });
+    const markedMessage = chatMessage({
+      content: 'Message in a one-to-one conversation',
+      id: 'marked-message',
+      rawReplyToMessageId: root.id,
+      threadRootMessageId: root.id,
+      timestamp: 2,
+    });
+
+    const entries = MessageTimelineEntries.build(
+      [root, markedMessage],
+      [],
+      [],
+      false,
+    );
+
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toMatchObject({
+      id: `message:${markedMessage.id}`,
+      replyMessage: root,
+    });
+  });
+
   it('hides messages that belong to explicit thread summaries', () => {
     const root = chatMessage({
       content: 'Root',

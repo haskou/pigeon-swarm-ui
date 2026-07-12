@@ -66,7 +66,7 @@ interface ChatMessageTimelineProps {
   ) => void;
   onJumpToLatest: () => void;
   onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
-  onOpenThread: (message: ChatMessage) => void;
+  onOpenThread?: (message: ChatMessage) => void;
   onReactionToggle: (
     message: ChatMessage,
     emoji: string,
@@ -193,8 +193,14 @@ function MessageTimelineContent({
   'newMessageCount' | 'onJumpToLatest' | 'onScroll' | 'scrollerRef'
 >) {
   const timelineEntries = useMemo(
-    () => MessageTimelineEntries.build(messages, polls),
-    [messages, polls],
+    () =>
+      MessageTimelineEntries.build(
+        messages,
+        polls,
+        [],
+        isGroupConversation,
+      ),
+    [isGroupConversation, messages, polls],
   );
 
   return (
@@ -294,7 +300,7 @@ function MessageTimelineItem({
   onAttachmentOpen: ChatMessageTimelineProps['onAttachmentOpen'];
   onAuthorProfileOpen: ChatMessageTimelineProps['onAuthorProfileOpen'];
   onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
-  onOpenThread: ChatMessageTimelineProps['onOpenThread'];
+  onOpenThread?: ChatMessageTimelineProps['onOpenThread'];
   onReactionToggle: ChatMessageTimelineProps['onReactionToggle'];
   onReplyReferenceClick: ChatMessageTimelineProps['onReplyReferenceClick'];
   onRetryMessage: ChatMessageTimelineProps['onRetryMessage'];

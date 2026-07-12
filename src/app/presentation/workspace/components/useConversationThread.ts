@@ -10,6 +10,7 @@ import type {
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -34,7 +35,9 @@ export function useConversationThread(input: UseConversationThreadInput) {
   const [thread, setThread] = useState<ConversationThreadState | null>(null);
 
   const open = async (message: ChatMessage) => {
-    if (!activeConversation) return;
+    if (!activeConversation || !conversationSupportsThreads(activeConversation)) {
+      return;
+    }
 
     closeMessageContextMenu();
     setThread({

@@ -775,7 +775,9 @@ export function ChatColumn({
             }
             onJumpToLatest={onJumpToLatest}
             onMessageMenuOpen={onMessageMenuOpen}
-            onOpenThread={onOpenMessageThread}
+            onOpenThread={
+              isGroupConversation ? onOpenMessageThread : undefined
+            }
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
