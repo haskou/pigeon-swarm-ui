@@ -1,3 +1,7 @@
+import type { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
+import type { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
+import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
+
 import { PigeonAttachmentsApplication } from '../../contexts/attachments/application/PigeonAttachmentsApplication';
 import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
@@ -43,8 +47,35 @@ export class PigeonApplication {
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
-    this.attachments = new PigeonAttachmentsApplication(gateway);
-    this.calls = new PigeonCallsApplication(gateway.calls);
+    this.attachments = new PigeonAttachmentsApplication({
+      downloadAttachment: gateway,
+      getPublicFile: gateway,
+      publishMessageAttachments: {
+        publish: async (message: PublishMessageAttachmentsMessage) =>
+          await gateway.publishMessageAttachments(
+            message.getSession(),
+            message.getAttachments(),
+            message.getProgressReporter(),
+            message.getOptions(),
+          ),
+      },
+      uploadPublicFile: gateway,
+    });
+    this.calls = new PigeonCallsApplication({
+      endCall: gateway.calls,
+      getCall: gateway.calls,
+      getIceServers: gateway.calls,
+      heartbeatParticipant: gateway.calls,
+      joinCall: gateway.calls,
+      leaveCall: gateway.calls,
+      listCalls: {
+        list: async (message: ListCallsMessage) =>
+          await gateway.calls.list(message.getSession()),
+      },
+      sendCallSignal: gateway.calls,
+      startCommunityChannelCall: gateway.calls,
+      startConversationCall: gateway.calls,
+    });
     this.communities = new PigeonCommunitiesApplication({
       channels: gateway,
       directory: gateway,
@@ -102,9 +133,43 @@ export class PigeonApplication {
       saveNotificationSetting: gateway,
       updateNotification: gateway,
     });
-    this.polls = new PigeonPollsApplication(gateway);
+    this.polls = new PigeonPollsApplication({
+      closePoll: gateway,
+      createPoll: gateway,
+      getPoll: gateway,
+      removePollVote: gateway,
+      votePoll: {
+        vote: async (message) =>
+          await gateway.votePoll(
+            message.getSession(),
+            message.getPollId().toString(),
+            message.getOptionIds().map((optionId) => optionId.toString()),
+          ),
+      },
+    });
     this.realtime = new PigeonRealtimeApplication(realtime);
     this.session = new PigeonSessionApplication(gateway);
-    this.stickers = new PigeonStickersApplication(gateway);
+    this.stickers = new PigeonStickersApplication({
+      addStickerToPack: gateway,
+      assetUrl: gateway,
+      createStickerPack: gateway,
+      deleteSticker: gateway,
+      favoriteSticker: gateway,
+      getMyStickers: gateway,
+      getStickerPack: gateway,
+      listStickerPacks: {
+        list: async (message: ListStickerPacksMessage) =>
+          await gateway.listStickerPacks({
+            ownerIdentityId: message.getOwnerIdentityId(),
+          }),
+      },
+      markStickerUsed: gateway,
+      saveStickerPack: gateway,
+      unfavoriteSticker: gateway,
+      unsaveStickerPack: gateway,
+      updateSticker: gateway,
+      updateStickerPack: gateway,
+      uploadStickerAsset: gateway,
+    });
   }
 }

@@ -8,7 +8,21 @@ import type {
   StickerPackResource,
   StickerResource,
 } from '../../../shared/domain/pigeonResources.types';
-import type { StickerApplicationPort } from './ports/StickerApplicationPort';
+import type { AddStickerToPackPort } from './add-sticker-to-pack/AddStickerToPackPort';
+import type { AssetUrlPort } from './asset-url/AssetUrlPort';
+import type { CreateStickerPackPort } from './create-sticker-pack/CreateStickerPackPort';
+import type { DeleteStickerPort } from './delete-sticker/DeleteStickerPort';
+import type { FavoriteStickerPort } from './favorite-sticker/FavoriteStickerPort';
+import type { GetMyStickersPort } from './get-my-stickers/GetMyStickersPort';
+import type { GetStickerPackPort } from './get-sticker-pack/GetStickerPackPort';
+import type { ListStickerPacksPort } from './list-sticker-packs/ListStickerPacksPort';
+import type { MarkStickerUsedPort } from './mark-sticker-used/MarkStickerUsedPort';
+import type { SaveStickerPackPort } from './save-sticker-pack/SaveStickerPackPort';
+import type { UnfavoriteStickerPort } from './unfavorite-sticker/UnfavoriteStickerPort';
+import type { UnsaveStickerPackPort } from './unsave-sticker-pack/UnsaveStickerPackPort';
+import type { UpdateStickerPackPort } from './update-sticker-pack/UpdateStickerPackPort';
+import type { UpdateStickerPort } from './update-sticker/UpdateStickerPort';
+import type { UploadStickerAssetPort } from './upload-sticker-asset/UploadStickerAssetPort';
 
 import { ListStickerPacks } from './list-sticker-packs/ListStickerPacks';
 import { ListStickerPacksMessage } from './list-sticker-packs/messages/ListStickerPacksMessage';
@@ -16,12 +30,28 @@ import { ListStickerPacksMessage } from './list-sticker-packs/messages/ListStick
 export class PigeonStickersApplication {
   private readonly listStickerPacks: ListStickerPacks;
 
-  public constructor(private readonly gateway: StickerApplicationPort) {
+  public constructor(
+    private readonly dependencies: {
+      addStickerToPack: AddStickerToPackPort;
+      assetUrl: AssetUrlPort;
+      createStickerPack: CreateStickerPackPort;
+      deleteSticker: DeleteStickerPort;
+      favoriteSticker: FavoriteStickerPort;
+      getMyStickers: GetMyStickersPort;
+      getStickerPack: GetStickerPackPort;
+      listStickerPacks: ListStickerPacksPort;
+      markStickerUsed: MarkStickerUsedPort;
+      saveStickerPack: SaveStickerPackPort;
+      unfavoriteSticker: UnfavoriteStickerPort;
+      unsaveStickerPack: UnsaveStickerPackPort;
+      updateSticker: UpdateStickerPort;
+      updateStickerPack: UpdateStickerPackPort;
+      uploadStickerAsset: UploadStickerAssetPort;
+    },
+  ) {
     this.listStickerPacks = new ListStickerPacks({
       list: async (message) =>
-        await gateway.listStickerPacks({
-          ownerIdentityId: message.getOwnerIdentityId(),
-        }),
+        await dependencies.listStickerPacks.list(message),
     });
   }
 
@@ -30,18 +60,27 @@ export class PigeonStickersApplication {
     packId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.gateway.addStickerToPack(session, packId, input);
+    return await this.dependencies.addStickerToPack.addStickerToPack(
+      session,
+      packId,
+      input,
+    );
   }
 
   public assetUrl(assetCid: string): string {
-    return this.gateway.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
+    return this.dependencies.assetUrl.apiUrl(
+      `/ipfs/${encodeURIComponent(assetCid)}`,
+    );
   }
 
   public async createPack(
     session: Session,
     input: StickerPackInput,
   ): Promise<StickerPackResource> {
-    return await this.gateway.createStickerPack(session, input);
+    return await this.dependencies.createStickerPack.createStickerPack(
+      session,
+      input,
+    );
   }
 
   public async delete(
@@ -49,7 +88,11 @@ export class PigeonStickersApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.deleteSticker(session, packId, stickerId);
+    await this.dependencies.deleteSticker.deleteSticker(
+      session,
+      packId,
+      stickerId,
+    );
   }
 
   public async favorite(
@@ -57,15 +100,19 @@ export class PigeonStickersApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.favoriteSticker(session, packId, stickerId);
+    await this.dependencies.favoriteSticker.favoriteSticker(
+      session,
+      packId,
+      stickerId,
+    );
   }
 
   public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    return await this.gateway.getMyStickers(session);
+    return await this.dependencies.getMyStickers.getMyStickers(session);
   }
 
   public async getPack(packId: string): Promise<StickerPackResource> {
-    return await this.gateway.getStickerPack(packId);
+    return await this.dependencies.getStickerPack.getStickerPack(packId);
   }
 
   public async list(
@@ -78,7 +125,7 @@ export class PigeonStickersApplication {
     session: Session,
     sticker: StickerMessageReference,
   ): Promise<void> {
-    await this.gateway.markStickerUsed(
+    await this.dependencies.markStickerUsed.markStickerUsed(
       session,
       sticker.packId,
       sticker.stickerId,
@@ -86,7 +133,7 @@ export class PigeonStickersApplication {
   }
 
   public async savePack(session: Session, packId: string): Promise<void> {
-    await this.gateway.saveStickerPack(session, packId);
+    await this.dependencies.saveStickerPack.saveStickerPack(session, packId);
   }
 
   public async unfavorite(
@@ -94,11 +141,18 @@ export class PigeonStickersApplication {
     packId: string,
     stickerId: string,
   ): Promise<void> {
-    await this.gateway.unfavoriteSticker(session, packId, stickerId);
+    await this.dependencies.unfavoriteSticker.unfavoriteSticker(
+      session,
+      packId,
+      stickerId,
+    );
   }
 
   public async unsavePack(session: Session, packId: string): Promise<void> {
-    await this.gateway.unsaveStickerPack(session, packId);
+    await this.dependencies.unsaveStickerPack.unsaveStickerPack(
+      session,
+      packId,
+    );
   }
 
   public async update(
@@ -107,7 +161,12 @@ export class PigeonStickersApplication {
     stickerId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    return await this.gateway.updateSticker(session, packId, stickerId, input);
+    return await this.dependencies.updateSticker.updateSticker(
+      session,
+      packId,
+      stickerId,
+      input,
+    );
   }
 
   public async updatePack(
@@ -115,13 +174,20 @@ export class PigeonStickersApplication {
     packId: string,
     input: Partial<StickerPackInput>,
   ): Promise<StickerPackResource> {
-    return await this.gateway.updateStickerPack(session, packId, input);
+    return await this.dependencies.updateStickerPack.updateStickerPack(
+      session,
+      packId,
+      input,
+    );
   }
 
   public async uploadAsset(
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.gateway.uploadStickerAsset(session, file);
+    return await this.dependencies.uploadStickerAsset.uploadStickerAsset(
+      session,
+      file,
+    );
   }
 }

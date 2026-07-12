@@ -1,4 +1,4 @@
-import type { PublishMessageAttachmentsPort } from '../../../../../contexts/attachments/application/ports/PublishMessageAttachmentsPort';
+import type { PublishMessageAttachmentsPort } from '../../../../../contexts/attachments/application/publish-message-attachments/PublishMessageAttachmentsPort';
 import type {
   MessageAttachment,
   Session,

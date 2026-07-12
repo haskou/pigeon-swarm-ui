@@ -1,4 +1,4 @@
-import type { VotePollPort } from '../../../../../contexts/polls/application/ports/VotePollPort';
+import type { VotePollPort } from '../../../../../contexts/polls/application/vote-poll/VotePollPort';
 import type {
   PollResource,
   Session,

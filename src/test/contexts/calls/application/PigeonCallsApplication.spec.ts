@@ -1,4 +1,3 @@
-import type { CallApplicationPort } from '../../../../contexts/calls/application/ports/CallApplicationPort';
 import type { CallResource } from '../../../../contexts/calls/domain/callSession.types';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
@@ -10,8 +9,9 @@ describe(PigeonCallsApplication.name, () => {
     const get = jest
       .fn<Promise<CallResource>, [Session, string]>()
       .mockResolvedValue(call);
-    const gateway = { get } as unknown as CallApplicationPort;
-    const application = new PigeonCallsApplication(gateway);
+    const application = new PigeonCallsApplication({
+      getCall: { get },
+    } as unknown as ConstructorParameters<typeof PigeonCallsApplication>[0]);
     const session = {} as Session;
 
     await expect(application.get(session, 'call-1')).resolves.toBe(call);

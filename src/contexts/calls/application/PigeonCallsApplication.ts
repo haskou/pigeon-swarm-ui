@@ -6,7 +6,16 @@ import type {
   CallSignalDelivery,
   CallSignalPayload,
 } from '../domain/callSession.types';
-import type { CallApplicationPort } from './ports/CallApplicationPort';
+import type { EndCallPort } from './end-call/EndCallPort';
+import type { GetCallPort } from './get-call/GetCallPort';
+import type { GetIceServersPort } from './get-ice-servers/GetIceServersPort';
+import type { HeartbeatParticipantPort } from './heartbeat-participant/HeartbeatParticipantPort';
+import type { JoinCallPort } from './join-call/JoinCallPort';
+import type { LeaveCallPort } from './leave-call/LeaveCallPort';
+import type { ListCallsPort } from './list-calls/ListCallsPort';
+import type { SendCallSignalPort } from './send-call-signal/SendCallSignalPort';
+import type { StartCommunityChannelCallPort } from './start-community-channel-call/StartCommunityChannelCallPort';
+import type { StartConversationCallPort } from './start-conversation-call/StartConversationCallPort';
 
 import { ListCalls } from './list-calls/ListCalls';
 import { ListCallsMessage } from './list-calls/messages/ListCallsMessage';
@@ -14,9 +23,22 @@ import { ListCallsMessage } from './list-calls/messages/ListCallsMessage';
 export class PigeonCallsApplication {
   private readonly listCallsUseCase: ListCalls;
 
-  public constructor(private readonly gateway: CallApplicationPort) {
+  public constructor(
+    private readonly dependencies: {
+      endCall: EndCallPort;
+      getCall: GetCallPort;
+      getIceServers: GetIceServersPort;
+      heartbeatParticipant: HeartbeatParticipantPort;
+      joinCall: JoinCallPort;
+      leaveCall: LeaveCallPort;
+      listCalls: ListCallsPort;
+      sendCallSignal: SendCallSignalPort;
+      startCommunityChannelCall: StartCommunityChannelCallPort;
+      startConversationCall: StartConversationCallPort;
+    },
+  ) {
     this.listCallsUseCase = new ListCalls({
-      list: async (message) => await gateway.list(message.getSession()),
+      list: async (message) => await dependencies.listCalls.list(message),
     });
   }
 
@@ -25,18 +47,21 @@ export class PigeonCallsApplication {
   }
 
   public async get(session: Session, callId: string): Promise<CallResource> {
-    return await this.gateway.get(session, callId);
+    return await this.dependencies.getCall.get(session, callId);
   }
 
   public async getIceServers(session: Session): Promise<CallIceServerConfig> {
-    return await this.gateway.getIceServers(session);
+    return await this.dependencies.getIceServers.getIceServers(session);
   }
 
   public async startConversation(
     session: Session,
     conversationId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startConversation(session, conversationId);
+    return await this.dependencies.startConversationCall.startConversation(
+      session,
+      conversationId,
+    );
   }
 
   public async startCommunityChannel(
@@ -44,7 +69,10 @@ export class PigeonCallsApplication {
     communityId: string,
     channelId: string,
   ): Promise<CallResource> {
-    return await this.gateway.startCommunityChannel(
+    const startCommunityChannelCall =
+      this.dependencies.startCommunityChannelCall;
+
+    return await startCommunityChannelCall.startCommunityChannel(
       session,
       communityId,
       channelId,
@@ -52,11 +80,11 @@ export class PigeonCallsApplication {
   }
 
   public async join(session: Session, callId: string): Promise<CallResource> {
-    return await this.gateway.join(session, callId);
+    return await this.dependencies.joinCall.join(session, callId);
   }
 
   public async leave(session: Session, callId: string): Promise<void> {
-    await this.gateway.leave(session, callId);
+    await this.dependencies.leaveCall.leave(session, callId);
   }
 
   public async heartbeatParticipant(
@@ -64,11 +92,15 @@ export class PigeonCallsApplication {
     callId: string,
     mediaConnections: CallParticipantMediaConnection[],
   ): Promise<CallResource> {
-    return await this.gateway.heartbeat(session, callId, mediaConnections);
+    return await this.dependencies.heartbeatParticipant.heartbeat(
+      session,
+      callId,
+      mediaConnections,
+    );
   }
 
   public async end(session: Session, callId: string): Promise<void> {
-    await this.gateway.end(session, callId);
+    await this.dependencies.endCall.end(session, callId);
   }
 
   public async sendSignal(
@@ -76,6 +108,10 @@ export class PigeonCallsApplication {
     callId: string,
     signal: CallSignalPayload,
   ): Promise<CallSignalDelivery> {
-    return await this.gateway.sendSignal(session, callId, signal);
+    return await this.dependencies.sendCallSignal.sendSignal(
+      session,
+      callId,
+      signal,
+    );
   }
 }

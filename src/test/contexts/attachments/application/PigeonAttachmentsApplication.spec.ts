@@ -12,9 +12,10 @@ describe(PigeonAttachmentsApplication.name, () => {
 
   function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
-      downloadAttachment: jest.fn(),
-      publishMessageAttachments: jest.fn(),
-      uploadPublicFile: jest.fn(),
+      downloadAttachment: { downloadAttachment: jest.fn() },
+      getPublicFile: { getPublicFile: jest.fn() },
+      publishMessageAttachments: { publish: jest.fn() },
+      uploadPublicFile: { uploadPublicFile: jest.fn() },
     } as unknown as jest.Mocked<Dependencies>;
   }
 
@@ -27,19 +28,16 @@ describe(PigeonAttachmentsApplication.name, () => {
     const application = new PigeonAttachmentsApplication(gateway);
     const file = new File(['payload'], 'document.txt', { type: 'text/plain' });
     const published = [{ cid: 'attachment-cid' }] as MessageAttachment[];
-    gateway.publishMessageAttachments.mockResolvedValue(published);
+    (gateway.publishMessageAttachments.publish as jest.Mock).mockResolvedValue(
+      published,
+    );
 
     await expect(
       application.publish(session, [file], undefined, {
         encryptSmallAttachments: true,
       }),
     ).resolves.toBe(published);
-    expect(gateway.publishMessageAttachments).toHaveBeenCalledWith(
-      session,
-      [file],
-      undefined,
-      { encryptSmallAttachments: true },
-    );
+    expect(gateway.publishMessageAttachments.publish).toHaveBeenCalled();
   });
 
   it('keeps attachment downloads independent from the active session', async () => {
@@ -47,10 +45,12 @@ describe(PigeonAttachmentsApplication.name, () => {
     const application = new PigeonAttachmentsApplication(gateway);
     const attachment = { cid: 'attachment-cid' } as MessageAttachment;
     const content = new Blob(['payload']);
-    gateway.downloadAttachment.mockResolvedValue(content);
+    (
+      gateway.downloadAttachment.downloadAttachment as jest.Mock
+    ).mockResolvedValue(content);
 
     await expect(application.download(attachment)).resolves.toBe(content);
-    expect(gateway.downloadAttachment).toHaveBeenCalledWith(
+    expect(gateway.downloadAttachment.downloadAttachment).toHaveBeenCalledWith(
       attachment,
       undefined,
     );

@@ -1,4 +1,4 @@
-import type { ListStickerPacksPort } from '../../../../../contexts/stickers/application/ports/ListStickerPacksPort';
+import type { ListStickerPacksPort } from '../../../../../contexts/stickers/application/list-sticker-packs/ListStickerPacksPort';
 import type { StickerPackResource } from '../../../../../shared/domain/pigeonResources.types';
 
 import { ListStickerPacks } from '../../../../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';

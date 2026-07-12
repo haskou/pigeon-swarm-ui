@@ -6,7 +6,10 @@ import type {
   PublicFileUpload,
   Session,
 } from '../../../shared/domain/pigeonResources.types';
-import type { AttachmentApplicationPort } from './ports/AttachmentApplicationPort';
+import type { DownloadAttachmentPort } from './download-attachment/DownloadAttachmentPort';
+import type { GetPublicFilePort } from './get-public-file/GetPublicFilePort';
+import type { PublishMessageAttachmentsPort } from './publish-message-attachments/PublishMessageAttachmentsPort';
+import type { UploadPublicFilePort } from './upload-public-file/UploadPublicFilePort';
 
 import { PublishMessageAttachmentsMessage } from './publish-message-attachments/messages/PublishMessageAttachmentsMessage';
 import { PublishMessageAttachments } from './publish-message-attachments/PublishMessageAttachments';
@@ -14,15 +17,17 @@ import { PublishMessageAttachments } from './publish-message-attachments/Publish
 export class PigeonAttachmentsApplication {
   private readonly publishMessageAttachments: PublishMessageAttachments;
 
-  public constructor(private readonly gateway: AttachmentApplicationPort) {
+  public constructor(
+    private readonly dependencies: {
+      downloadAttachment: DownloadAttachmentPort;
+      getPublicFile: GetPublicFilePort;
+      publishMessageAttachments: PublishMessageAttachmentsPort;
+      uploadPublicFile: UploadPublicFilePort;
+    },
+  ) {
     this.publishMessageAttachments = new PublishMessageAttachments({
       publish: async (message) =>
-        await gateway.publishMessageAttachments(
-          message.getSession(),
-          message.getAttachments(),
-          message.getProgressReporter(),
-          message.getOptions(),
-        ),
+        await dependencies.publishMessageAttachments.publish(message),
     });
   }
 
@@ -30,11 +35,14 @@ export class PigeonAttachmentsApplication {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    return await this.gateway.downloadAttachment(attachment, onProgress);
+    return await this.dependencies.downloadAttachment.downloadAttachment(
+      attachment,
+      onProgress,
+    );
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    return await this.gateway.getPublicFile(cid);
+    return await this.dependencies.getPublicFile.getPublicFile(cid);
   }
 
   public async publish(
@@ -57,6 +65,9 @@ export class PigeonAttachmentsApplication {
     session: Session,
     file: File,
   ): Promise<PublicFileUpload> {
-    return await this.gateway.uploadPublicFile(session, file);
+    return await this.dependencies.uploadPublicFile.uploadPublicFile(
+      session,
+      file,
+    );
   }
 }

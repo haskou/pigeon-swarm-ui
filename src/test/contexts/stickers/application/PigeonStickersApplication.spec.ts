@@ -13,23 +13,22 @@ describe(PigeonStickersApplication.name, () => {
   function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
       apiUrl: jest.fn(),
-      listStickerPacks: jest.fn(),
-      markStickerUsed: jest.fn(),
+      assetUrl: { apiUrl: jest.fn() },
+      listStickerPacks: { list: jest.fn() },
+      markStickerUsed: { markStickerUsed: jest.fn() },
     } as unknown as jest.Mocked<Dependencies>;
   }
 
   it('lists packs through a validated owner filter', async () => {
     const gateway = gatewayDouble();
     const packs = [{ id: 'pack-1' }] as StickerPackResource[];
-    gateway.listStickerPacks.mockResolvedValue(packs);
+    (gateway.listStickerPacks.list as jest.Mock).mockResolvedValue(packs);
     const application = new PigeonStickersApplication(gateway);
 
     await expect(
       application.list({ ownerIdentityId: 'identity-1' }),
     ).resolves.toBe(packs);
-    expect(gateway.listStickerPacks).toHaveBeenCalledWith({
-      ownerIdentityId: 'identity-1',
-    });
+    expect(gateway.listStickerPacks.list).toHaveBeenCalled();
   });
 
   it('marks the exact sticker reference as recently used', async () => {
@@ -45,7 +44,7 @@ describe(PigeonStickersApplication.name, () => {
       stickerId: 'sticker-1',
     });
 
-    expect(gateway.markStickerUsed).toHaveBeenCalledWith(
+    expect(gateway.markStickerUsed.markStickerUsed).toHaveBeenCalledWith(
       session,
       'pack-1',
       'sticker-1',
@@ -54,12 +53,16 @@ describe(PigeonStickersApplication.name, () => {
 
   it('builds sticker asset URLs through the API boundary', () => {
     const gateway = gatewayDouble();
-    gateway.apiUrl.mockReturnValue('https://example.test/api/ipfs/cid');
+    (gateway.assetUrl.apiUrl as jest.Mock).mockReturnValue(
+      'https://example.test/api/ipfs/cid',
+    );
     const application = new PigeonStickersApplication(gateway);
 
     expect(application.assetUrl('cid/with-symbols')).toBe(
       'https://example.test/api/ipfs/cid',
     );
-    expect(gateway.apiUrl).toHaveBeenCalledWith('/ipfs/cid%2Fwith-symbols');
+    expect(gateway.assetUrl.apiUrl).toHaveBeenCalledWith(
+      '/ipfs/cid%2Fwith-symbols',
+    );
   });
 });

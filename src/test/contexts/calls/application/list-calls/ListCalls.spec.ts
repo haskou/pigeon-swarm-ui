@@ -1,4 +1,4 @@
-import type { ListCallsPort } from '../../../../../contexts/calls/application/ports/ListCallsPort';
+import type { ListCallsPort } from '../../../../../contexts/calls/application/list-calls/ListCallsPort';
 import type { CallResource } from '../../../../../contexts/calls/domain/callSession.types';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
