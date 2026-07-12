@@ -1,4 +1,4 @@
-import type { ListNodeNetworksPort } from '../../../../../contexts/networks/application/ports/ListNodeNetworksPort';
+import type { ListNodeNetworksPort } from '../../../../../contexts/networks/application/list-node-networks/ListNodeNetworksPort';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { ListNodeNetworks } from '../../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';

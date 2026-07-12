@@ -2,12 +2,25 @@ import type {
   IpfsReplicationStatus,
   Session,
 } from '../../../shared/domain/pigeonResources.types';
+import type { CheckRelayPortsPort } from './check-relay-ports/CheckRelayPortsPort';
+import type { ClaimNodePort } from './claim-node/ClaimNodePort';
 import type { NodeRelayConfiguration } from './configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from './configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from './configure-node-relay/NodeRelayPortCheckTarget';
+import type { CreateNetworkForNodePort } from './create-network-for-node/CreateNetworkForNodePort';
+import type { CreateNetworkPort } from './create-network/CreateNetworkPort';
+import type { CreatePublicNetworkPort } from './create-public-network/CreatePublicNetworkPort';
+import type { GetNodeInfoPort } from './get-node-info/GetNodeInfoPort';
+import type { GetRelayConfigurationPort } from './get-relay-configuration/GetRelayConfigurationPort';
+import type { GetReplicationStatusPort } from './get-replication-status/GetReplicationStatusPort';
+import type { JoinNetworkForNodePort } from './join-network-for-node/JoinNetworkForNodePort';
+import type { JoinNetworkPort } from './join-network/JoinNetworkPort';
+import type { ListNodeNetworksPort } from './list-node-networks/ListNodeNetworksPort';
 import type { NodeNetwork } from './list-node-networks/NodeNetwork';
+import type { ListPeersPort } from './list-peers/ListPeersPort';
 import type { Peer } from './list-peers/Peer';
-import type { NodeApplicationPort } from './ports/NodeApplicationPort';
+import type { RemoveNodeNetworkPort } from './remove-node-network/RemoveNodeNetworkPort';
+import type { UpdateRelayConfigurationPort } from './update-relay-configuration/UpdateRelayConfigurationPort';
 
 import { CreateNetwork } from './create-network/CreateNetwork';
 import { CreateNetworkMessage } from './create-network/messages/CreateNetworkMessage';
@@ -35,31 +48,45 @@ export class PigeonNetworksApplication {
 
   private readonly removeNetwork: RemoveNodeNetwork;
 
-  public constructor(private readonly gateway: NodeApplicationPort) {
+  public constructor(
+    private readonly dependencies: {
+      checkRelayPorts: CheckRelayPortsPort;
+      claimNode: ClaimNodePort;
+      createNetwork: CreateNetworkPort;
+      createNetworkForNode: CreateNetworkForNodePort;
+      createPublicNetwork: CreatePublicNetworkPort;
+      getNodeInfo: GetNodeInfoPort;
+      getRelayConfiguration: GetRelayConfigurationPort;
+      getReplicationStatus: GetReplicationStatusPort;
+      joinNetwork: JoinNetworkPort;
+      joinNetworkForNode: JoinNetworkForNodePort;
+      listNodeNetworks: ListNodeNetworksPort;
+      listPeers: ListPeersPort;
+      removeNodeNetwork: RemoveNodeNetworkPort;
+      updateRelayConfiguration: UpdateRelayConfigurationPort;
+    },
+  ) {
     this.createNetwork = new CreateNetwork({
-      create: async (name) => await gateway.createNetwork(name.toString()),
+      create: async (name) => await dependencies.createNetwork.create(name),
     });
     this.createPublicNetwork = new CreatePublicNetwork({
       createPublic: async (session) =>
-        await gateway.createPublicNetwork(session),
+        await dependencies.createPublicNetwork.createPublic(session),
     });
     this.joinNetwork = new JoinNetwork({
       joinNetwork: async (id, name, key) =>
-        await gateway.joinNetwork(
-          id.toString(),
-          name.toString(),
-          key.toString(),
-        ),
+        await dependencies.joinNetwork.joinNetwork(id, name, key),
     });
     this.listNetworks = new ListNodeNetworks({
-      getNodeNetworks: async (session) => await gateway.getNetworks(session),
+      getNodeNetworks: async (session) =>
+        await dependencies.listNodeNetworks.getNodeNetworks(session),
     });
     this.listPeers = new ListPeers({
-      getPeers: async () => await gateway.getPeers(),
+      getPeers: async () => await dependencies.listPeers.getPeers(),
     });
     this.removeNetwork = new RemoveNodeNetwork({
       remove: async (networkId, session) =>
-        await gateway.removeNetwork(networkId.toString(), session),
+        await dependencies.removeNodeNetwork.remove(networkId, session),
     });
   }
 
@@ -68,11 +95,15 @@ export class PigeonNetworksApplication {
     checks: NodeRelayPortCheckTarget[],
     session: Session,
   ): Promise<NodeRelayPortCheckResource> {
-    return await this.gateway.checkRelayPorts(publicHost, checks, session);
+    return await this.dependencies.checkRelayPorts.checkRelayPorts(
+      publicHost,
+      checks,
+      session,
+    );
   }
 
   public async claimNode(session: Session): Promise<void> {
-    await this.gateway.claim(session);
+    await this.dependencies.claimNode.claim(session);
   }
 
   public async create(name: string): Promise<void> {
@@ -80,7 +111,7 @@ export class PigeonNetworksApplication {
   }
 
   public async createForNode(session: Session, name: string): Promise<void> {
-    await this.gateway.createNetwork(name, session);
+    await this.dependencies.createNetworkForNode.createNetwork(name, session);
   }
 
   public async createPublic(session?: Session): Promise<void> {
@@ -90,19 +121,23 @@ export class PigeonNetworksApplication {
   }
 
   public async getNodeInfo(): Promise<{ id: string; owner: string | null }> {
-    return await this.gateway.getInfo();
+    return await this.dependencies.getNodeInfo.getInfo();
   }
 
   public async getRelayConfiguration(
     session: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.getRelayConfiguration(session);
+    return await this.dependencies.getRelayConfiguration.getRelayConfiguration(
+      session,
+    );
   }
 
   public async getReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatus> {
-    return await this.gateway.getIpfsReplicationStatus(session);
+    const getReplicationStatus = this.dependencies.getReplicationStatus;
+
+    return await getReplicationStatus.getIpfsReplicationStatus(session);
   }
 
   public async join(id: string, name: string, key: string): Promise<void> {
@@ -115,7 +150,12 @@ export class PigeonNetworksApplication {
     name: string,
     key: string,
   ): Promise<void> {
-    await this.gateway.joinNetwork(id, name, key, session);
+    await this.dependencies.joinNetworkForNode.joinNetwork(
+      id,
+      name,
+      key,
+      session,
+    );
   }
 
   public async list(session?: Session): Promise<NodeNetwork[]> {
@@ -139,6 +179,11 @@ export class PigeonNetworksApplication {
     configuration: NodeRelayConfiguration,
     session?: Session,
   ): Promise<NodeRelayConfiguration> {
-    return await this.gateway.updateRelayConfiguration(configuration, session);
+    const updateRelayConfiguration = this.dependencies.updateRelayConfiguration;
+
+    return await updateRelayConfiguration.updateRelayConfiguration(
+      configuration,
+      session,
+    );
   }
 }

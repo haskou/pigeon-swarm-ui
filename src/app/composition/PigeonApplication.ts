@@ -119,7 +119,41 @@ export class PigeonApplication {
       sendMessage: gateway,
       unpinMessage: gateway,
     });
-    this.networks = new PigeonNetworksApplication(gateway.node);
+    this.networks = new PigeonNetworksApplication({
+      checkRelayPorts: gateway.node,
+      claimNode: gateway.node,
+      createNetwork: {
+        create: async (name) =>
+          await gateway.node.createNetwork(name.toString()),
+      },
+      createNetworkForNode: gateway.node,
+      createPublicNetwork: {
+        createPublic: async (session) =>
+          await gateway.node.createPublicNetwork(session),
+      },
+      getNodeInfo: gateway.node,
+      getRelayConfiguration: gateway.node,
+      getReplicationStatus: gateway.node,
+      joinNetwork: {
+        joinNetwork: async (id, name, key) =>
+          await gateway.node.joinNetwork(
+            id.toString(),
+            name.toString(),
+            key.toString(),
+          ),
+      },
+      joinNetworkForNode: gateway.node,
+      listNodeNetworks: {
+        getNodeNetworks: async (session) =>
+          await gateway.node.getNetworks(session),
+      },
+      listPeers: gateway.node,
+      removeNodeNetwork: {
+        remove: async (networkId, session) =>
+          await gateway.node.removeNetwork(networkId.toString(), session),
+      },
+      updateRelayConfiguration: gateway.node,
+    });
     this.notifications = new PigeonNotificationsApplication({
       acceptInvitation: {
         keychainPublisher: gateway,

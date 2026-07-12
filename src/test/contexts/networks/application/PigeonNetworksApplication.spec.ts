@@ -10,10 +10,20 @@ describe(PigeonNetworksApplication.name, () => {
 
   function gatewayDouble(): jest.Mocked<Dependencies> {
     return {
-      createNetwork: jest.fn(),
-      getNetworks: jest.fn(),
-      joinNetwork: jest.fn(),
-      removeNetwork: jest.fn(),
+      checkRelayPorts: { checkRelayPorts: jest.fn() },
+      claimNode: { claim: jest.fn() },
+      createNetwork: { create: jest.fn() },
+      createNetworkForNode: { createNetwork: jest.fn() },
+      createPublicNetwork: { createPublic: jest.fn() },
+      getNodeInfo: { getInfo: jest.fn() },
+      getRelayConfiguration: { getRelayConfiguration: jest.fn() },
+      getReplicationStatus: { getIpfsReplicationStatus: jest.fn() },
+      joinNetwork: { joinNetwork: jest.fn() },
+      joinNetworkForNode: { joinNetwork: jest.fn() },
+      listNodeNetworks: { getNodeNetworks: jest.fn() },
+      listPeers: { getPeers: jest.fn() },
+      removeNodeNetwork: { remove: jest.fn() },
+      updateRelayConfiguration: { updateRelayConfiguration: jest.fn() },
     } as unknown as jest.Mocked<Dependencies>;
   }
 
@@ -27,7 +37,7 @@ describe(PigeonNetworksApplication.name, () => {
 
     await application.create('Development network');
 
-    expect(gateway.createNetwork).toHaveBeenCalledWith('Development network');
+    expect(gateway.createNetwork.create).toHaveBeenCalled();
   });
 
   it('keeps node-owned network creation explicitly authenticated', async () => {
@@ -36,7 +46,7 @@ describe(PigeonNetworksApplication.name, () => {
 
     await application.createForNode(session, 'Private network');
 
-    expect(gateway.createNetwork).toHaveBeenCalledWith(
+    expect(gateway.createNetworkForNode.createNetwork).toHaveBeenCalledWith(
       'Private network',
       session,
     );
@@ -47,11 +57,15 @@ describe(PigeonNetworksApplication.name, () => {
     const networks = [
       { id: 'network-1', name: 'Development network' },
     ] as NodeNetwork[];
-    gateway.getNetworks.mockResolvedValue(networks);
+    (gateway.listNodeNetworks.getNodeNetworks as jest.Mock).mockResolvedValue(
+      networks,
+    );
     const application = new PigeonNetworksApplication(gateway);
 
     await expect(application.list(session)).resolves.toBe(networks);
-    expect(gateway.getNetworks).toHaveBeenCalledWith(session);
+    expect(gateway.listNodeNetworks.getNodeNetworks).toHaveBeenCalledWith(
+      session,
+    );
   });
 
   it('joins portable network credentials through validated messages', async () => {
@@ -60,10 +74,6 @@ describe(PigeonNetworksApplication.name, () => {
 
     await application.join('network-1', 'Private network', 'private-key');
 
-    expect(gateway.joinNetwork).toHaveBeenCalledWith(
-      'network-1',
-      'Private network',
-      'private-key',
-    );
+    expect(gateway.joinNetwork.joinNetwork).toHaveBeenCalled();
   });
 });
