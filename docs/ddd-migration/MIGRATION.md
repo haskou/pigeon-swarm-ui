@@ -13,6 +13,8 @@ context that owns them.
 - Replace shared resource-shaped domain types with domain models where behavior
   and invariants belong together.
 - Keep `src/app` limited to composition, bootstrap, and presentation assembly.
+- Keep automated tests under `src/test`, mirroring their bounded context and
+  layer.
 - Preserve public REST, websocket, encrypted payload, and keychain contracts.
 
 ## Non-goals
@@ -39,7 +41,7 @@ adapters into application services without containing context behavior.
 ## Active slice
 
 - Id: `APPLICATION-011`
-- Title: Replace compatibility gateway consumers with context ports
+- Title: Replace compatibility aggregators with explicit application use cases
 - Size: L
 - Status: in progress
 - Business capability: Context-owned application workflows and transport
@@ -77,21 +79,27 @@ adapters into application services without containing context behavior.
 
 ## Completed progress inside APPLICATION-011
 
-- `APPLICATION-011A`: the identity application is now composed from explicit
-  identity-owned ports. Identity profile, registration, session, keychain,
-  presence, and protection workflows no longer receive the whole composition
-  gateway.
+- `APPLICATION-011A`: identity composition no longer uses a generic
+  `IdentityContextPorts` aggregate. Identity profile, registration, session,
+  keychain, presence, and protection workflows receive explicit capabilities
+  from the composition root.
 - Identity infrastructure owns the translation from profile Value Objects and
   network memberships to the registration HTTP contract.
 - Conversation and community keychain publishers use the explicit
   `publishKeychain` capability instead of a generic `publish` method.
-- `APPLICATION-011B`: conversation and message application services now receive
-  context-owned infrastructure adapters instead of the full composition
-  gateway. Their command/read composition stays inside the owning context.
+- `APPLICATION-011B`: removed the pass-through conversation/message gateways.
+  Each action now owns its application dependency and its boundary message;
+  the composition root binds the required capabilities explicitly.
+- `APPLICATION-011C`: invitation acceptance is an application use case again.
+  Decryption, keychain publication, and notification update are explicit
+  outbound capabilities; infrastructure only adapts browser crypto and HTTP.
+- `APPLICATION-011D`: moved all colocated `*.spec.ts` files to `src/test`,
+  preserving context/layer paths and keeping test imports outside production
+  modules.
 
 ## Next slices
 
-1. `APPLICATION-011C`: replace the community and notification compatibility
-   gateway consumers with context-owned ports and adapters.
+1. `APPLICATION-011E`: replace remaining broad compatibility methods in
+   `PigeonApiGateway` with context-owned application entrypoints.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

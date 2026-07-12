@@ -16,17 +16,19 @@ export class PigeonNotificationsGateway {
     private readonly invalidateSettings: (session: Session) => void,
   ) {}
 
-  public async list(session: Session): Promise<NotificationResource[]> {
+  public async listNotifications(
+    session: Session,
+  ): Promise<NotificationResource[]> {
     return await this.notifications.list(session);
   }
 
-  public async listSettings(
+  public async listNotificationSettings(
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
     return await this.notifications.listSettings(session);
   }
 
-  public async saveSetting(
+  public async saveNotificationSetting(
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
@@ -37,7 +39,7 @@ export class PigeonNotificationsGateway {
     return saved;
   }
 
-  public async resetSetting(
+  public async resetNotificationSetting(
     session: Session,
     scope: NotificationSettingScope,
   ): Promise<void> {
@@ -45,7 +47,7 @@ export class PigeonNotificationsGateway {
     this.invalidateSettings(session);
   }
 
-  public async update(
+  public async updateNotification(
     session: Session,
     notificationId: NotificationId,
     decision: NotificationDecision,

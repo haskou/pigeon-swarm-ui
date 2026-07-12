@@ -3,7 +3,11 @@ import type {
   LocalKeychain,
   Session,
 } from '../../../shared/domain/pigeonResources.types';
-import type { ConversationsGateway } from './ports/ConversationsGateway';
+import type { CreateConversationPort } from './create-conversation/CreateConversationPort';
+import type { CreateGroupConversationPort } from './create-group-conversation/CreateGroupConversationPort';
+import type { InviteToGroupConversationPort } from './invite-to-group-conversation/InviteToGroupConversationPort';
+import type { ListConversationsPort } from './list-conversations/ListConversationsPort';
+import type { MarkConversationReadUntilPort } from './mark-conversation-read-until/MarkConversationReadUntilPort';
 
 import { CreateConversation } from './create-conversation/CreateConversation';
 import { CreateConversationMessage } from './create-conversation/messages/CreateConversationMessage';
@@ -12,8 +16,12 @@ import {
   type CreateGroupConversationInput,
 } from './create-group-conversation/CreateGroupConversation';
 import { CreateGroupConversationMessage } from './create-group-conversation/messages/CreateGroupConversationMessage';
+import { InviteToGroupConversation } from './invite-to-group-conversation/InviteToGroupConversation';
+import { InviteToGroupConversationMessage } from './invite-to-group-conversation/messages/InviteToGroupConversationMessage';
 import { ListConversations } from './list-conversations/ListConversations';
 import { ListConversationsMessage } from './list-conversations/messages/ListConversationsMessage';
+import { MarkConversationReadUntil } from './mark-conversation-read-until/MarkConversationReadUntil';
+import { MarkConversationReadUntilMessage } from './mark-conversation-read-until/messages/MarkConversationReadUntilMessage';
 
 export class PigeonConversationsApplication {
   private readonly createConversation: CreateConversation;
@@ -22,10 +30,32 @@ export class PigeonConversationsApplication {
 
   private readonly listConversations: ListConversations;
 
-  public constructor(private readonly gateway: ConversationsGateway) {
-    this.createConversation = new CreateConversation(gateway);
-    this.createGroupConversation = new CreateGroupConversation(gateway);
-    this.listConversations = new ListConversations(gateway);
+  private readonly inviteToGroupConversation: InviteToGroupConversation;
+
+  private readonly markConversationReadUntil: MarkConversationReadUntil;
+
+  public constructor(dependencies: {
+    createConversation: CreateConversationPort;
+    createGroupConversation: CreateGroupConversationPort;
+    inviteToGroupConversation: InviteToGroupConversationPort;
+    listConversations: ListConversationsPort;
+    markConversationReadUntil: MarkConversationReadUntilPort;
+  }) {
+    this.createConversation = new CreateConversation(
+      dependencies.createConversation,
+    );
+    this.createGroupConversation = new CreateGroupConversation(
+      dependencies.createGroupConversation,
+    );
+    this.inviteToGroupConversation = new InviteToGroupConversation(
+      dependencies.inviteToGroupConversation,
+    );
+    this.listConversations = new ListConversations(
+      dependencies.listConversations,
+    );
+    this.markConversationReadUntil = new MarkConversationReadUntil(
+      dependencies.markConversationReadUntil,
+    );
   }
 
   public async create(
@@ -60,10 +90,12 @@ export class PigeonConversationsApplication {
     conversationId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    await this.gateway.createGroupConversationInvitation(
-      session,
-      conversationId,
-      recipientIdentityId,
+    await this.inviteToGroupConversation.invite(
+      new InviteToGroupConversationMessage({
+        conversationId,
+        recipientIdentityId,
+        session,
+      }),
     );
   }
 
@@ -78,10 +110,12 @@ export class PigeonConversationsApplication {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.gateway.markConversationReadUntil(
-      session,
-      conversationId,
-      messageId,
+    await this.markConversationReadUntil.mark(
+      new MarkConversationReadUntilMessage({
+        conversationId,
+        messageId,
+        session,
+      }),
     );
   }
 }

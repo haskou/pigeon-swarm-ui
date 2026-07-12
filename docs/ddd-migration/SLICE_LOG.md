@@ -716,3 +716,31 @@
   context through an explicit infrastructure dependency until that query is
   extracted.
 - Next slice: `APPLICATION-011C`, migrate community and notification consumers.
+
+## Slice APPLICATION-011 corrective: restore explicit application boundaries
+
+- Date: 2026-07-12
+- Size: L
+- Status: completed
+- Goal: remove generic context-port aggregates and infrastructure gateways that
+  only forwarded large method bags; keep each application action explicit.
+- Changed files:
+  - `contexts/conversations/application/*`
+  - `contexts/messages/application/*`
+  - `contexts/notifications/application/accept-conversation-invitation/*`
+  - `contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `src/test/**`
+- Behavior changed/preserved: message, conversation, notification invitation,
+  registration, pagination, draft, pin, reaction, and keychain workflows keep
+  their public behavior; only internal composition boundaries changed.
+- Contracts changed: no REST, websocket, encrypted-payload, or keychain wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - `yarn typecheck`
+  - `yarn test --runInBand --no-cache`
+  - `yarn lint`
+- Notes: lint has no errors; it still reports pre-existing test-fixture and
+  test-order warnings. All 146 suites and 564 tests pass.

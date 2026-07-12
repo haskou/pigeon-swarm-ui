@@ -6,7 +6,8 @@ import type {
   NotificationSettingScope,
   Session,
 } from '../../../shared/domain/pigeonResources.types';
-import type { AcceptConversationInvitationPort } from './ports/AcceptConversationInvitationPort';
+import type { ConversationInvitationKeychainPublisher } from './accept-conversation-invitation/ConversationInvitationKeychainPublisher';
+import type { ConversationInvitationKeyDecryptor } from './accept-conversation-invitation/ConversationInvitationKeyDecryptor';
 import type { ListNotificationSettingsPort } from './ports/ListNotificationSettingsPort';
 import type { ListNotificationsPort } from './ports/ListNotificationsPort';
 import type { PushNotificationPort } from './ports/PushNotificationPort';
@@ -44,7 +45,11 @@ export class PigeonNotificationsApplication {
   private readonly push: PushNotificationPort;
 
   public constructor(dependencies: {
-    acceptInvitation: AcceptConversationInvitationPort;
+    acceptInvitation: {
+      keyDecryptor: ConversationInvitationKeyDecryptor;
+      keychainPublisher: ConversationInvitationKeychainPublisher;
+      notifications: UpdateNotificationPort;
+    };
     listNotificationSettings: ListNotificationSettingsPort;
     listNotifications: ListNotificationsPort;
     push: PushNotificationPort;
@@ -53,7 +58,9 @@ export class PigeonNotificationsApplication {
     updateNotification: UpdateNotificationPort;
   }) {
     this.acceptInvitation = new AcceptConversationInvitation(
-      dependencies.acceptInvitation,
+      dependencies.acceptInvitation.keyDecryptor,
+      dependencies.acceptInvitation.keychainPublisher,
+      dependencies.acceptInvitation.notifications,
     );
     this.listNotifications = new ListNotifications(
       dependencies.listNotifications,

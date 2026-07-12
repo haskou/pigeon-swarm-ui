@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
-import type { LoadMessagesAroundPort } from '../ports/LoadMessagesAroundPort';
+import type { LoadMessagesAroundPort } from './LoadMessagesAroundPort';
 
 import { LoadMessagesAroundMessage } from './messages/LoadMessagesAroundMessage';
 

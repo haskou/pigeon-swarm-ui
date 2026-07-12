@@ -7,6 +7,7 @@ import { PigeonSessionApplication } from '../../contexts/identities/application/
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
+import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
@@ -53,16 +54,47 @@ export class PigeonApplication {
       membership: gateway,
       roles: gateway,
     });
-    this.conversations = new PigeonConversationsApplication(
-      gateway.conversationsApplication,
-    );
-    this.identities = new PigeonIdentitiesApplication(
-      gateway.identityApplication,
-    );
-    this.messages = new PigeonMessagesApplication(gateway.messagesApplication);
+    this.conversations = new PigeonConversationsApplication({
+      createConversation: gateway,
+      createGroupConversation: gateway,
+      inviteToGroupConversation: gateway,
+      listConversations: gateway,
+      markConversationReadUntil: gateway,
+    });
+    this.identities = new PigeonIdentitiesApplication({
+      keychain: gateway,
+      login: gateway,
+      presence: gateway.presence,
+      profile: gateway,
+      protection: gateway,
+      register: gateway.identityRegistration,
+    });
+    this.messages = new PigeonMessagesApplication({
+      addMessageReaction: gateway,
+      createLinkPreview: gateway,
+      decryptMessage: gateway,
+      deleteConversationDraft: gateway,
+      deleteMessage: gateway,
+      editMessage: gateway,
+      listConversationDrafts: gateway,
+      listMessagePins: gateway,
+      loadMessage: gateway,
+      loadMessages: gateway,
+      loadMessagesAround: gateway,
+      loadMessageThread: gateway,
+      pinMessage: gateway,
+      removeMessageReaction: gateway,
+      saveConversationDraft: gateway,
+      sendMessage: gateway,
+      unpinMessage: gateway,
+    });
     this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication({
-      acceptInvitation: gateway,
+      acceptInvitation: {
+        keychainPublisher: gateway,
+        keyDecryptor: new PigeonConversationInvitationKeyDecryptor(),
+        notifications: gateway,
+      },
       listNotifications: gateway,
       listNotificationSettings: gateway,
       push: gateway,
@@ -72,9 +104,7 @@ export class PigeonApplication {
     });
     this.polls = new PigeonPollsApplication(gateway);
     this.realtime = new PigeonRealtimeApplication(realtime);
-    this.session = new PigeonSessionApplication(
-      gateway.identityApplication.session,
-    );
+    this.session = new PigeonSessionApplication(gateway);
     this.stickers = new PigeonStickersApplication(gateway);
   }
 }

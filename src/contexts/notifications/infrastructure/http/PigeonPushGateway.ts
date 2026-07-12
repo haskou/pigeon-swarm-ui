@@ -5,21 +5,21 @@ import { PigeonPushApi, type PushSubscriptionPayload } from './PigeonPushApi';
 export class PigeonPushGateway {
   public constructor(private readonly push: PigeonPushApi) {}
 
-  public async getVapidPublicKey(): Promise<{
+  public async getPushVapidPublicKey(): Promise<{
     enabled: boolean;
     publicKey?: string;
   }> {
     return await this.push.getVapidPublicKey();
   }
 
-  public async registerSubscription(
+  public async registerPushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
     await this.push.registerSubscription(session, subscription);
   }
 
-  public async deleteSubscription(
+  public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {

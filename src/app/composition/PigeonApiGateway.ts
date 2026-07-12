@@ -3,11 +3,8 @@ import { EncryptedPayload } from '@haskou/value-objects';
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
-import type { ConversationsGateway } from '../../contexts/conversations/application/ports/ConversationsGateway';
-import type { IdentityContextPorts } from '../../contexts/identities/application/IdentityContextPorts';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import type { MessagesGateway } from '../../contexts/messages/application/ports/MessagesGateway';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
 import type { MessageProjectionPort } from '../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
@@ -74,7 +71,6 @@ import { ConversationKeychain } from '../../contexts/conversations/domain/Conver
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
-import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { ProfileHandle } from '../../contexts/identities/domain/profile/ProfileHandle';
 import { ProfileName } from '../../contexts/identities/domain/profile/ProfileName';
@@ -84,7 +80,6 @@ import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/in
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentityLoginApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
-import { PigeonIdentityProfileApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityProfileApi';
 import { PigeonIdentityRegistrationApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
@@ -98,7 +93,6 @@ import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/
 import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
-import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
@@ -143,8 +137,6 @@ export class PigeonApiGateway {
 
   private readonly identityWorkspace: PigeonIdentityWorkspaceSessionApi;
 
-  private readonly identityRegistration: PigeonIdentityRegistrationApi;
-
   private readonly identityLogin: PigeonIdentityLoginApi;
 
   private readonly identities: PigeonIdentityGateway;
@@ -173,13 +165,9 @@ export class PigeonApiGateway {
 
   private readonly stickers: PigeonStickersGateway;
 
+  public readonly identityRegistration: PigeonIdentityRegistrationApi;
+
   public readonly calls: PigeonCallsGateway;
-
-  public readonly conversationsApplication: ConversationsGateway;
-
-  public readonly identityApplication: IdentityContextPorts;
-
-  public readonly messagesApplication: MessagesGateway;
 
   public readonly node: PigeonNodeGateway;
 
@@ -302,15 +290,6 @@ export class PigeonApiGateway {
       this.files,
       this.messageSignatures,
     );
-    this.conversationsApplication = new PigeonConversationsGateway(
-      this.conversationCommands,
-      this.conversationsApi,
-      this.messagesApi,
-    );
-    this.messagesApplication = new PigeonMessagesGateway(
-      this.messagesApi,
-      this.messageCommands,
-    );
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsGateway(
       new PigeonNotificationsApi(
@@ -328,27 +307,26 @@ export class PigeonApiGateway {
           session,
         ),
     );
+    this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
     this.presence = new PigeonPresenceGateway(
       new PigeonPresenceApi(http, signer),
       this.requestCache,
     );
-    this.identityApplication = {
-      keychain: this.keychainApi,
-      login: this.identityLogin,
-      presence: this.presence,
-      profile: new PigeonIdentityProfileApi(
-        this.identities,
-        this.identityCommands,
-      ),
-      protection: this.identityKeyProtection,
-      register: this.identityRegistration,
-      session: this.identityLogin,
-    };
     this.polls = new PigeonPollsApi(http, signer);
-    this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
     );
+  }
+
+  private async decryptInvitationKey(
+    session: Session,
+    encryptedKey: string,
+  ): Promise<ConversationKeyEntry> {
+    const decrypted = await session.keyPair.decrypt(
+      new EncryptedPayload(encryptedKey),
+    );
+
+    return JSON.parse(decrypted.toString()) as ConversationKeyEntry;
   }
 
   private async decryptMessages(
@@ -451,28 +429,6 @@ export class PigeonApiGateway {
     );
   }
 
-  private withConversationKey(
-    keychain: LocalKeychain,
-    keyEntry: ConversationKeyEntry,
-  ): LocalKeychain {
-    return {
-      conversations: {
-        ...keychain.conversations,
-        [keyEntry.conversationId]: keyEntry,
-      },
-      version: keychain.version + 1,
-    };
-  }
-
-  private decryptIdentityPayload(
-    session: Session,
-    encryptedPayload: string,
-  ): Buffer {
-    const payload = new EncryptedPayload(encryptedPayload);
-
-    return session.keyPair.decrypt(payload);
-  }
-
   public apiUrl(path: string): string {
     return new ApiUrlBuilder(API_SERVER_URL).build(path);
   }
@@ -481,21 +437,21 @@ export class PigeonApiGateway {
     enabled: boolean;
     publicKey?: string;
   }> {
-    return await this.push.getVapidPublicKey();
+    return await this.push.getPushVapidPublicKey();
   }
 
   public async registerPushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    await this.push.registerSubscription(session, subscription);
+    await this.push.registerPushSubscription(session, subscription);
   }
 
   public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionPayload,
   ): Promise<void> {
-    await this.push.deleteSubscription(session, subscription);
+    await this.push.deletePushSubscription(session, subscription);
   }
 
   public async listCommunities(session: Session): Promise<Community[]> {
@@ -1093,6 +1049,18 @@ export class PigeonApiGateway {
     );
   }
 
+  public async inviteToGroupConversation(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+  ): Promise<void> {
+    await this.createGroupConversationInvitation(
+      session,
+      conversationId,
+      recipientIdentityId,
+    );
+  }
+
   public async createCommunityInvitation(
     session: Session,
     communityId: string,
@@ -1387,27 +1355,27 @@ export class PigeonApiGateway {
   public async listNotifications(
     session: Session,
   ): Promise<NotificationResource[]> {
-    return await this.notifications.list(session);
+    return await this.notifications.listNotifications(session);
   }
 
   public async listNotificationSettings(
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
-    return await this.notifications.listSettings(session);
+    return await this.notifications.listNotificationSettings(session);
   }
 
   public async saveNotificationSetting(
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
-    return await this.notifications.saveSetting(session, setting);
+    return await this.notifications.saveNotificationSetting(session, setting);
   }
 
   public async resetNotificationSetting(
     session: Session,
     scope: NotificationSettingScope,
   ): Promise<void> {
-    await this.notifications.resetSetting(session, scope);
+    await this.notifications.resetNotificationSetting(session, scope);
   }
 
   public async createLinkPreview(
@@ -1649,7 +1617,11 @@ export class PigeonApiGateway {
     notificationId: NotificationId,
     decision: NotificationDecision,
   ): Promise<NotificationResource> {
-    return await this.notifications.update(session, notificationId, decision);
+    return await this.notifications.updateNotification(
+      session,
+      notificationId,
+      decision,
+    );
   }
 
   public async acceptConversationInvitation(
@@ -1668,10 +1640,11 @@ export class PigeonApiGateway {
       notification.type === 'community_invitation'
         ? notification.payload.encryptedCommunityKey
         : notification.payload.encryptedConversationKey;
-    const decrypted = await this.decryptIdentityPayload(session, encryptedKey);
-    const keyEntry = JSON.parse(decrypted.toString()) as ConversationKeyEntry;
-    const nextKeychain = this.withConversationKey(session.keychain, keyEntry);
-    const published = await this.publishKeychain(session, nextKeychain);
+    const keyEntry = await this.decryptInvitationKey(session, encryptedKey);
+    const published = await this.publishKeychain(
+      session,
+      ConversationKeychain.withEntry(session.keychain, keyEntry),
+    );
     const updated = await this.updateNotification(
       {
         ...session,
