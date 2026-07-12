@@ -56,7 +56,6 @@ import { ConversationPeer } from '../../../../contexts/conversations/presentatio
 import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
-import { MessageScrollAnchor } from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
@@ -125,6 +124,7 @@ import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
+import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
 import { useConversationThread } from './useConversationThread';
 import { useConversationPins } from './useConversationPins';
 import {
@@ -913,6 +913,27 @@ export function GlassWorkspace({
       )
     : undefined;
   const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
+  const { handleLoadOlder, handleScroll } = useWorkspaceMessageHistory({
+    activeConversation,
+    activeConversationKey,
+    isScrolledNearBottom,
+    keepMessageBottomUntilRef,
+    lastScrollTopRef,
+    messageCursorRef,
+    messageRequestRef,
+    messageScrollAnchorRef,
+    messageStateRef,
+    messagesRef,
+    scrollerRef,
+    sessionRef,
+    setMessageLoadState,
+    setMessages,
+    setNewMessageCount,
+    setSendError,
+    suppressMessageLoadsUntilRef,
+    updateMessageCursor,
+    workspaceMode,
+  });
   const activeConversationPeerIdentityId = activeConversation
     ? ConversationPeer.identityId(
         activeConversation,
@@ -1409,106 +1430,6 @@ export function GlassWorkspace({
     refreshConversations,
     workspaceMode,
   });
-
-  const handleLoadOlder = async () => {
-    keepMessageBottomUntilRef.current = 0;
-
-    if (
-      workspaceMode !== 'messages' ||
-      !activeConversation?.id ||
-      !activeConversationKey ||
-      !messageCursorRef.current ||
-      messageStateRef.current === 'loading' ||
-      Date.now() < suppressMessageLoadsUntilRef.current
-    )
-      return;
-
-    const requestedCursor = messageCursorRef.current;
-    const requestId = messageRequestRef.current + 1;
-
-    messageRequestRef.current = requestId;
-    const scroller = scrollerRef.current;
-    const anchor = scroller ? MessageScrollAnchor.capture(scroller) : null;
-    const previousHeight = scroller?.scrollHeight ?? 0;
-    const previousTop = scroller?.scrollTop ?? 0;
-    const restorePreviousViewport = () => {
-      if (!scroller || scrollerRef.current !== scroller) return;
-
-      const nextTop = MessageScrollAnchor.restoreOrPreserveOffset(
-        scroller,
-        anchor,
-        previousHeight,
-        previousTop,
-      );
-
-      lastScrollTopRef.current = nextTop;
-    };
-
-    messageScrollAnchorRef.current = anchor;
-    setMessageLoadState('loading');
-    requestAnimationFrame(restorePreviousViewport);
-    try {
-      const result = await applicationContainer.messages.load(
-        sessionRef.current,
-        activeConversation.id,
-        requestedCursor,
-      );
-
-      if (messageRequestRef.current !== requestId) return;
-
-      const hasNewMessages = MessageCollection.hasUnknownMessages(
-        messagesRef.current,
-        result.messages,
-      );
-      const nextCursor = result.nextCursor ?? null;
-
-      if (hasNewMessages) {
-        setMessages((current) =>
-          MessageCollection.merge(current, result.messages),
-        );
-      }
-
-      updateMessageCursor(
-        hasNewMessages && nextCursor !== requestedCursor ? nextCursor : null,
-      );
-      requestAnimationFrame(() => {
-        restorePreviousViewport();
-        messageScrollAnchorRef.current = null;
-      });
-    } catch (caught) {
-      messageScrollAnchorRef.current = null;
-      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
-    }
-
-    if (messageRequestRef.current !== requestId) return;
-
-    setMessageLoadState('idle');
-  };
-
-  const handleScroll = () => {
-    if (workspaceMode !== 'messages') return;
-
-    const scrollTop = scrollerRef.current?.scrollTop ?? 0;
-    const isScrollingUp = scrollTop < lastScrollTopRef.current;
-
-    lastScrollTopRef.current = scrollTop;
-
-    if (Date.now() < suppressMessageLoadsUntilRef.current) return;
-
-    if (isScrolledNearBottom()) {
-      setNewMessageCount(0);
-    } else {
-      keepMessageBottomUntilRef.current = 0;
-      messageScrollAnchorRef.current = null;
-    }
-
-    if (isScrollingUp) {
-      keepMessageBottomUntilRef.current = 0;
-      messageScrollAnchorRef.current = null;
-    }
-
-    if (isScrollingUp && scrollTop < 80) void handleLoadOlder();
-  };
 
   const sendPendingMessage = (payload: PendingSend) => {
     if (!activeConversation?.id) return;
