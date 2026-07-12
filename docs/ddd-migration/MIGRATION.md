@@ -135,10 +135,12 @@ adapters into application services without containing context behavior.
   conversation use cases through it.
 - `APPLICATION-011T`: routed notification, push, sticker, and invitation
   keychain dependencies through their context-owned gateways.
+- `APPLICATION-011U`: routed attachment and poll use cases through their
+  context-owned infrastructure gateways.
 
 ## Next slices
 
-1. `APPLICATION-011U`: audit polls and remaining shared application gateway
-   methods for duplicated context boundaries.
+1. `APPLICATION-011V`: inspect the remaining facade-only capabilities and
+   separate shared composition concerns from context infrastructure.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

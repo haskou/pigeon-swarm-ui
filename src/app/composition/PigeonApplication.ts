@@ -49,18 +49,18 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.attachments = new PigeonAttachmentsApplication({
-      downloadAttachment: gateway,
-      getPublicFile: gateway,
+      downloadAttachment: gateway.filesGateway,
+      getPublicFile: gateway.filesGateway,
       publishMessageAttachments: {
         publish: async (message: PublishMessageAttachmentsMessage) =>
-          await gateway.publishMessageAttachments(
+          await gateway.filesGateway.publishMessageAttachments(
             message.getSession(),
             message.getAttachments(),
             message.getProgressReporter(),
             message.getOptions(),
           ),
       },
-      uploadPublicFile: gateway,
+      uploadPublicFile: gateway.filesGateway,
     });
     this.calls = new PigeonCallsApplication({
       endCall: gateway.calls,
@@ -194,13 +194,13 @@ export class PigeonApplication {
       updateNotification: gateway.notificationsGateway,
     });
     this.polls = new PigeonPollsApplication({
-      closePoll: gateway,
-      createPoll: gateway,
-      getPoll: gateway,
-      removePollVote: gateway,
+      closePoll: gateway.pollsGateway,
+      createPoll: gateway.pollsGateway,
+      getPoll: gateway.pollsGateway,
+      removePollVote: gateway.pollsGateway,
       votePoll: {
         vote: async (message) =>
-          await gateway.votePoll(
+          await gateway.pollsGateway.votePoll(
             message.getSession(),
             message.getPollId().toString(),
             message.getOptionIds().map((optionId) => optionId.toString()),

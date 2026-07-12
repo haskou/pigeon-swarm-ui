@@ -1178,3 +1178,29 @@
   - focused ESLint for composition files
 - Next slice: audit polls and remaining shared application gateway methods for
   duplicated context boundaries.
+
+## Slice APPLICATION-011U: Route files and polls through context gateways
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: finish the explicit composition boundary for attachments and polls
+  without making the global API facade the application port.
+- Changed files:
+  - `contexts/polls/infrastructure/http/PigeonPollsGateway.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `src/test/contexts/polls/infrastructure/http/PigeonPollsGateway.spec.ts`
+  - affected composition tests
+- Behavior changed/preserved: attachment upload/download/public-file flows and
+  poll creation, reads, votes, removals, and closing preserve their existing
+  behavior while use cases receive context-owned gateways.
+- Contracts changed: no attachment, poll, or REST wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - poll gateway delegation tests
+  - composition tests
+  - `yarn typecheck`
+  - focused ESLint for the gateway and composition files
+- Next slice: inspect the remaining facade-only capabilities and decide which
+  are true shared composition concerns versus context infrastructure.

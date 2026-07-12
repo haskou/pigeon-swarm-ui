@@ -110,6 +110,7 @@ import {
 } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
+import { PigeonPollsGateway } from '../../contexts/polls/infrastructure/http/PigeonPollsGateway';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
@@ -181,6 +182,10 @@ export class PigeonApiGateway {
 
   public readonly messagesGateway: PigeonMessagesGateway;
 
+  public readonly filesGateway: PigeonFilesGateway;
+
+  public readonly pollsGateway: PigeonPollsGateway;
+
   public readonly notificationsGateway: PigeonNotificationsGateway;
 
   public readonly pushGateway: PigeonPushGateway;
@@ -227,6 +232,7 @@ export class PigeonApiGateway {
     this.files = new PigeonFilesGateway(
       new PigeonFilesApi(http, signer, attachmentCipher),
     );
+    this.filesGateway = this.files;
     this.ids = ids;
     this.identities = new PigeonIdentityGateway(http);
     this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
@@ -345,6 +351,7 @@ export class PigeonApiGateway {
       this.requestCache,
     );
     this.polls = new PigeonPollsApi(http, signer);
+    this.pollsGateway = new PigeonPollsGateway(this.polls);
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
     );

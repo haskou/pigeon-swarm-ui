@@ -39,10 +39,12 @@ function gatewayDouble(): {
     gateway: {
       communityGateway: {},
       conversationsGateway: { listConversations },
+      filesGateway: {},
       identityGateway: { register },
       identityRegistration: { register },
       messagesGateway: { loadMessages },
       notificationsGateway: {},
+      pollsGateway: {},
       pushGateway: {},
       stickersGateway,
     } as unknown as PigeonApiGateway,
