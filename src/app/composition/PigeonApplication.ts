@@ -53,11 +53,13 @@ export class PigeonApplication {
       membership: gateway,
       roles: gateway,
     });
-    this.conversations = new PigeonConversationsApplication(gateway);
+    this.conversations = new PigeonConversationsApplication(
+      gateway.conversationsApplication,
+    );
     this.identities = new PigeonIdentitiesApplication(
       gateway.identityApplication,
     );
-    this.messages = new PigeonMessagesApplication(gateway);
+    this.messages = new PigeonMessagesApplication(gateway.messagesApplication);
     this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication({
       acceptInvitation: gateway,

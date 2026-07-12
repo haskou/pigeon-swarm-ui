@@ -3,9 +3,11 @@ import { EncryptedPayload } from '@haskou/value-objects';
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
+import type { ConversationsGateway } from '../../contexts/conversations/application/ports/ConversationsGateway';
 import type { IdentityContextPorts } from '../../contexts/identities/application/IdentityContextPorts';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import type { MessagesGateway } from '../../contexts/messages/application/ports/MessagesGateway';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
 import type { MessageProjectionPort } from '../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
@@ -72,6 +74,7 @@ import { ConversationKeychain } from '../../contexts/conversations/domain/Conver
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
+import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { ProfileHandle } from '../../contexts/identities/domain/profile/ProfileHandle';
 import { ProfileName } from '../../contexts/identities/domain/profile/ProfileName';
@@ -95,6 +98,7 @@ import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/
 import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastructure/crypto/yieldAfterMessageDecryptBatch';
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
@@ -171,7 +175,11 @@ export class PigeonApiGateway {
 
   public readonly calls: PigeonCallsGateway;
 
+  public readonly conversationsApplication: ConversationsGateway;
+
   public readonly identityApplication: IdentityContextPorts;
+
+  public readonly messagesApplication: MessagesGateway;
 
   public readonly node: PigeonNodeGateway;
 
@@ -237,7 +245,7 @@ export class PigeonApiGateway {
       decryptKeychain: (session, keychain) =>
         this.keychainApi.decrypt(session, keychain),
       listConversations: async (session) =>
-        await this.listConversations(session),
+        await this.conversationsApi.list(session),
       loadKeychain: async (session) =>
         await this.keychainApi.loadOptional(session),
     });
@@ -293,6 +301,15 @@ export class PigeonApiGateway {
       projection,
       this.files,
       this.messageSignatures,
+    );
+    this.conversationsApplication = new PigeonConversationsGateway(
+      this.conversationCommands,
+      this.conversationsApi,
+      this.messagesApi,
+    );
+    this.messagesApplication = new PigeonMessagesGateway(
+      this.messagesApi,
+      this.messageCommands,
     );
     this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
     this.notifications = new PigeonNotificationsGateway(

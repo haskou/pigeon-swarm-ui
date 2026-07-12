@@ -85,12 +85,13 @@ adapters into application services without containing context behavior.
   network memberships to the registration HTTP contract.
 - Conversation and community keychain publishers use the explicit
   `publishKeychain` capability instead of a generic `publish` method.
+- `APPLICATION-011B`: conversation and message application services now receive
+  context-owned infrastructure adapters instead of the full composition
+  gateway. Their command/read composition stays inside the owning context.
 
 ## Next slices
 
-1. `APPLICATION-011B`: replace the conversation and message compatibility
+1. `APPLICATION-011C`: replace the community and notification compatibility
    gateway consumers with context-owned ports and adapters.
-2. `APPLICATION-011C`: replace the community and notification compatibility
-   gateway consumers with context-owned ports and adapters.
-3. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
-4. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
+2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
+3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

@@ -85,6 +85,14 @@ export class PigeonMessagesApi {
     return await this.linkPreviews.create(session, url);
   }
 
+  public async decryptMessage(
+    session: Session,
+    conversationId: string,
+    message: MessageResource,
+  ): Promise<ChatMessage> {
+    return await this.projection.decrypt(session, conversationId, message);
+  }
+
   public async loadMessages(
     session: Session,
     conversationId: string,

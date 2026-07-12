@@ -1,5 +1,7 @@
+import type { ConversationsGateway } from '../../contexts/conversations/application/ports/ConversationsGateway';
 import type { IdentityContextPorts } from '../../contexts/identities/application/IdentityContextPorts';
 import type { RegisterIdentityPort } from '../../contexts/identities/application/ports/RegisterIdentityPort';
+import type { MessagesGateway } from '../../contexts/messages/application/ports/MessagesGateway';
 import type { LoginResult } from '../../shared/domain/pigeonResources.types';
 
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
@@ -21,9 +23,11 @@ function gatewayDouble(): {
 
   return {
     gateway: {
+      conversationsApplication: {} as ConversationsGateway,
       identityApplication: {
         register: { register },
       } as unknown as IdentityContextPorts,
+      messagesApplication: {} as MessagesGateway,
     } as unknown as PigeonApiGateway,
     register,
   };

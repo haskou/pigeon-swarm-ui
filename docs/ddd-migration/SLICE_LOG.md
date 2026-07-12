@@ -682,3 +682,37 @@
   application consumers still receive compatibility capabilities from
   `PigeonApiGateway`.
 - Next slice: `APPLICATION-011B`, migrate conversation and message consumers.
+
+## Slice APPLICATION-011B: Compose conversation and message ports
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: Keep conversation and message application services independent from
+  the composition facade while preserving their existing read, command,
+  encryption, cache, and pagination behavior.
+- Changed files:
+  - `contexts/conversations/infrastructure/http/PigeonConversationsGateway.ts`
+  - `contexts/conversations/infrastructure/http/PigeonConversationsGateway.spec.ts`
+  - `contexts/messages/infrastructure/http/PigeonMessagesGateway.ts`
+  - `contexts/messages/infrastructure/http/PigeonMessagesGateway.spec.ts`
+  - `contexts/messages/infrastructure/http/PigeonMessagesApi.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+- Behavior changed/preserved: conversation creation, group invitations,
+  activity ordering fallback, read-until, message loading/decryption, drafts,
+  pins, reactions, edits, deletes, sends, attachments and link previews keep
+  their existing public behavior.
+- Contracts changed: none. Compatibility methods remain on
+  `PigeonApiGateway` while application composition uses context adapters.
+- Validation level: L2
+- Tests/checks:
+  - affected conversation, message, composition, and gateway suites
+  - `yarn typecheck`
+  - affected ESLint scope
+- Risks: community, notification, attachment, poll, and sticker application
+  services still receive compatibility capabilities from the composition
+  facade; the conversation listing fallback intentionally reads the message
+  context through an explicit infrastructure dependency until that query is
+  extracted.
+- Next slice: `APPLICATION-011C`, migrate community and notification consumers.
