@@ -1040,3 +1040,33 @@
   - focused ESLint for the leave slice
 - Next slice: `APPLICATION-011P`, audit the next large context boundary and
   extract its highest-risk orchestration into explicit use cases.
+
+## Slice APPLICATION-011P: Add the context-owned identity gateway
+
+- Date: 2026-07-12
+- Size: L
+- Status: completed
+- Goal: move identity, session, presence, protection, and keychain application
+  composition behind an identities-owned infrastructure adapter.
+- Changed files:
+  - `contexts/identities/infrastructure/http/PigeonIdentitiesGateway.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `src/test/contexts/identities/infrastructure/http/*`
+  - affected composition tests
+- Behavior changed/preserved: login, remembered-session restoration, identity
+  registration/profile updates, presence, local passkey protection, keychain
+  publication, and keychain decryption preserve their public behavior. The
+  application composition no longer passes the monolithic gateway to identity
+  use cases.
+- Contracts changed: no identity, WebAuthn, keychain, or encrypted-payload
+  wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - identity gateway tests
+  - identity application and infrastructure tests
+  - composition tests
+  - `yarn typecheck`
+  - focused ESLint for the identity adapter/composition files
+- Next slice: `APPLICATION-011Q`, make the remaining identity methods on
+  `PigeonApiGateway` thin compatibility delegates and remove duplicated logic.

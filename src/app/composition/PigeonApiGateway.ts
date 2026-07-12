@@ -78,6 +78,7 @@ import { ProfileName } from '../../contexts/identities/domain/profile/ProfileNam
 import { IdentityNetworkMemberships } from '../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentityLoginApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
@@ -167,6 +168,8 @@ export class PigeonApiGateway {
   private readonly stickers: PigeonStickersGateway;
 
   public readonly identityRegistration: PigeonIdentityRegistrationApi;
+
+  public readonly identityGateway: PigeonIdentitiesGateway;
 
   public readonly calls: PigeonCallsGateway;
 
@@ -324,6 +327,15 @@ export class PigeonApiGateway {
     this.polls = new PigeonPollsApi(http, signer);
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
+    );
+    this.identityGateway = new PigeonIdentitiesGateway(
+      this.identityCommands,
+      this.identityLogin,
+      this.identities,
+      this.identityKeyProtection,
+      this.keychainApi,
+      this.presence,
+      this.identityRegistration,
     );
   }
 

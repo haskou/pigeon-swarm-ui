@@ -112,12 +112,12 @@ export class PigeonApplication {
       markConversationReadUntil: gateway,
     });
     this.identities = new PigeonIdentitiesApplication({
-      keychain: gateway,
-      login: gateway,
-      presence: gateway.presence,
-      profile: gateway,
-      protection: gateway,
-      register: gateway.identityRegistration,
+      keychain: gateway.identityGateway,
+      login: gateway.identityGateway,
+      presence: gateway.identityGateway,
+      profile: gateway.identityGateway,
+      protection: gateway.identityGateway,
+      register: gateway.identityGateway,
     });
     this.messages = new PigeonMessagesApplication({
       addMessageReaction: gateway,
@@ -201,7 +201,7 @@ export class PigeonApplication {
       },
     });
     this.realtime = new PigeonRealtimeApplication(realtime);
-    this.session = new PigeonSessionApplication(gateway);
+    this.session = new PigeonSessionApplication(gateway.identityGateway);
     this.stickers = new PigeonStickersApplication({
       addStickerToPack: gateway,
       assetUrl: gateway,

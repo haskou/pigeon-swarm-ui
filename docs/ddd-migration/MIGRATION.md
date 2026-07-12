@@ -125,10 +125,12 @@ adapters into application services without containing context behavior.
   single owner.
 - `APPLICATION-011O`: extracted leave/keychain reconciliation into an explicit
   `LeaveCommunity` use case with a boundary message and direct tests.
+- `APPLICATION-011P`: added a context-owned identities infrastructure gateway
+  and wired identity/session application services through it.
 
 ## Next slices
 
-1. `APPLICATION-011P`: audit the next large context boundary and extract its
-   highest-risk orchestration into explicit use cases.
+1. `APPLICATION-011Q`: make the remaining identity methods on
+   `PigeonApiGateway` thin compatibility delegates and remove duplicated logic.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
