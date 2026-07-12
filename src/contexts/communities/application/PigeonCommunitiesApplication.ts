@@ -21,12 +21,16 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessageEditInput } from '../infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../infrastructure/http/CommunityChannelMessageInput';
-import type { CommunityDirectoryPort } from './community-directory/CommunityDirectoryPort';
 import type { CommunityInvitationPort } from './community-invitation/CommunityInvitationPort';
 import type { CommunityImageCids } from './create-community/CommunityImageCids';
 import type { CreateCommunityInput } from './create-community/CreateCommunityInput';
+import type { CreateCommunityPort } from './create-community/CreateCommunityPort';
 import type { CreateCommunityResult } from './create-community/CreateCommunityResult';
 import type { LeaveCommunityResult } from './create-community/LeaveCommunityResult';
+import type { DiscoverCommunitiesPort } from './discover-communities/DiscoverCommunitiesPort';
+import type { GetCommunityPort } from './get-community/GetCommunityPort';
+import type { ListCommunitiesPort } from './list-communities/ListCommunitiesPort';
+import type { ListCommunityModerationLogsPort } from './list-community-moderation-logs/ListCommunityModerationLogsPort';
 import type { ManageCommunityChannelDraftsPort } from './manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
 import type { ManageCommunityChannelMessagesPort } from './manage-community-channel-messages/ManageCommunityChannelMessagesPort';
 import type { ManageCommunityChannelPinsPort } from './manage-community-channel-pins/ManageCommunityChannelPinsPort';
@@ -36,6 +40,7 @@ import type { ManageCommunityMembershipRequestsPort } from './manage-community-m
 import type { ManageCommunityRolesPort } from './manage-community-roles/ManageCommunityRolesPort';
 import type { CommunityKeychainPort } from './publish-community-keychain/CommunityKeychainPort';
 import type { ReadCommunityChannelMessagesPort } from './read-community-channel-messages/ReadCommunityChannelMessagesPort';
+import type { UpdateCommunityPort } from './update-community/UpdateCommunityPort';
 import type { CommunityMediaPort } from './upload-community-media/CommunityMediaPort';
 
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
@@ -54,7 +59,13 @@ export class PigeonCommunitiesApplication {
 
   private readonly channelReads: ReadCommunityChannelMessagesPort;
 
-  private readonly directory: CommunityDirectoryPort;
+  private readonly communityCreator: CreateCommunityPort;
+
+  private readonly communityDiscoverer: DiscoverCommunitiesPort;
+
+  private readonly communityGetter: GetCommunityPort;
+
+  private readonly communityUpdater: UpdateCommunityPort;
 
   private readonly invitations: CommunityInvitationPort;
 
@@ -63,6 +74,8 @@ export class PigeonCommunitiesApplication {
   private readonly listCommunitiesUseCase: ListCommunities;
 
   private readonly media: CommunityMediaPort;
+
+  private readonly moderationLogs: ListCommunityModerationLogsPort;
 
   private readonly members: ManageCommunityMembersPort;
 
@@ -76,12 +89,17 @@ export class PigeonCommunitiesApplication {
     channelPins: ManageCommunityChannelPinsPort;
     channels: ManageCommunityChannelsPort;
     channelReads: ReadCommunityChannelMessagesPort;
-    directory: CommunityDirectoryPort;
+    communityCreator: CreateCommunityPort;
+    communityDiscoverer: DiscoverCommunitiesPort;
+    communityGetter: GetCommunityPort;
+    communityUpdater: UpdateCommunityPort;
     invitations: CommunityInvitationPort;
     keychain: CommunityKeychainPort;
+    listCommunities: ListCommunitiesPort;
     media: CommunityMediaPort;
     members: ManageCommunityMembersPort;
     membershipRequests: ManageCommunityMembershipRequestsPort;
+    moderationLogs: ListCommunityModerationLogsPort;
     roles: ManageCommunityRolesPort;
   }) {
     this.channelDrafts = dependencies.channelDrafts;
@@ -89,16 +107,19 @@ export class PigeonCommunitiesApplication {
     this.channelPins = dependencies.channelPins;
     this.channels = dependencies.channels;
     this.channelReads = dependencies.channelReads;
-    this.directory = dependencies.directory;
+    this.communityCreator = dependencies.communityCreator;
+    this.communityDiscoverer = dependencies.communityDiscoverer;
+    this.communityGetter = dependencies.communityGetter;
+    this.communityUpdater = dependencies.communityUpdater;
     this.invitations = dependencies.invitations;
     this.keychain = dependencies.keychain;
     this.media = dependencies.media;
     this.members = dependencies.members;
     this.membershipRequests = dependencies.membershipRequests;
+    this.moderationLogs = dependencies.moderationLogs;
     this.roles = dependencies.roles;
     this.listCommunitiesUseCase = new ListCommunities({
-      list: async (message) =>
-        await this.directory.listCommunities(message.getSession()),
+      list: async (message) => await dependencies.listCommunities.list(message),
     });
   }
 
@@ -124,7 +145,7 @@ export class PigeonCommunitiesApplication {
     input: CreateCommunityInput,
     images: CommunityImageCids,
   ): Promise<Community> {
-    return await this.directory.createCommunity(session, {
+    return await this.communityCreator.createCommunity(session, {
       autoJoinEnabled: input.autoJoinEnabled,
       ...(images.avatarCid ? { avatar: images.avatarCid } : {}),
       ...(images.bannerCid ? { banner: images.bannerCid } : {}),
@@ -271,7 +292,7 @@ export class PigeonCommunitiesApplication {
   }
 
   public async get(session: Session, communityId: string): Promise<Community> {
-    return await this.directory.getCommunity(session, communityId);
+    return await this.communityGetter.getCommunity(session, communityId);
   }
 
   public async listModerationLogs(
@@ -279,7 +300,7 @@ export class PigeonCommunitiesApplication {
     communityId: string,
     input?: { beforeLogId?: string; limit?: number },
   ): Promise<CommunityModerationLogPage> {
-    return await this.directory.listCommunityModerationLogs(
+    return await this.moderationLogs.listCommunityModerationLogs(
       session,
       communityId,
       input,
@@ -290,7 +311,7 @@ export class PigeonCommunitiesApplication {
     session: Session,
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
-    return await this.directory.discoverCommunities(session, input);
+    return await this.communityDiscoverer.discoverCommunities(session, input);
   }
 
   public async create(
@@ -334,7 +355,7 @@ export class PigeonCommunitiesApplication {
     const avatarCid = await this.resolvePublicImageCid(session, input.avatar);
     const bannerCid = await this.resolvePublicImageCid(session, input.banner);
 
-    return await this.directory.updateCommunity(session, communityId, {
+    return await this.communityUpdater.updateCommunity(session, communityId, {
       autoJoinEnabled: input.autoJoinEnabled,
       ...(avatarCid ? { avatar: avatarCid } : {}),
       ...(bannerCid ? { banner: bannerCid } : {}),

@@ -878,5 +878,33 @@
   - community application tests
   - `yarn typecheck`
   - focused ESLint for the community context
-- Next slice: `APPLICATION-011J`, replace the remaining compatibility gateway
-  implementations with context-owned HTTP and crypto adapters.
+- Next slice: `APPLICATION-011J`, split the remaining community directory and
+  invitation capabilities before replacing compatibility gateway adapters.
+
+## Slice APPLICATION-011J: Split community directory capabilities
+
+- Date: 2026-07-12
+- Size: S
+- Status: completed
+- Goal: keep community listing, discovery, lookup, creation, update, and
+  moderation-log reads as separate application capabilities.
+- Changed files:
+  - `contexts/communities/application/create-community/*`
+  - `contexts/communities/application/discover-communities/*`
+  - `contexts/communities/application/get-community/*`
+  - `contexts/communities/application/list-communities/*`
+  - `contexts/communities/application/list-community-moderation-logs/*`
+  - `contexts/communities/application/update-community/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: community listing, discovery, lookup, creation,
+  updates, and moderation-log reads preserve their public behavior; only
+  capability ownership changed.
+- Contracts changed: no community or REST wire contract changes.
+- Validation level: L2
+- Tests/checks:
+  - community application tests
+  - `yarn typecheck`
+  - focused ESLint for the community context
+- Next slice: `APPLICATION-011K`, split invitation capabilities and replace
+  remaining compatibility gateway implementations with context-owned adapters.

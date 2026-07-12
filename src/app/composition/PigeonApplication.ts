@@ -1,5 +1,6 @@
 import type { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
 import type { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
+import type { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 
 import { PigeonAttachmentsApplication } from '../../contexts/attachments/application/PigeonAttachmentsApplication';
@@ -82,12 +83,20 @@ export class PigeonApplication {
       channelPins: gateway,
       channelReads: gateway,
       channels: gateway,
-      directory: gateway,
+      communityCreator: gateway,
+      communityDiscoverer: gateway,
+      communityGetter: gateway,
+      communityUpdater: gateway,
       invitations: gateway,
       keychain: gateway,
+      listCommunities: {
+        list: async (message: ListCommunitiesMessage) =>
+          await gateway.listCommunities(message.getSession()),
+      },
       media: gateway,
       members: gateway,
       membershipRequests: gateway,
+      moderationLogs: gateway,
       roles: gateway,
     });
     this.conversations = new PigeonConversationsApplication({

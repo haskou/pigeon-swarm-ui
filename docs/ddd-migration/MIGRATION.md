@@ -111,10 +111,12 @@ adapters into application services without containing context behavior.
 - `APPLICATION-011I`: removed the generic community application `ports`
   bucket and split channel, message, pin, draft, member, membership-request,
   and role capabilities by action.
+- `APPLICATION-011J`: split community listing, discovery, lookup, creation,
+  update, and moderation-log capabilities by action.
 
 ## Next slices
 
-1. `APPLICATION-011J`: replace remaining broad compatibility methods with
-   context-owned HTTP and crypto adapters.
+1. `APPLICATION-011K`: split invitation capabilities and replace remaining
+   broad compatibility methods with context-owned HTTP and crypto adapters.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
