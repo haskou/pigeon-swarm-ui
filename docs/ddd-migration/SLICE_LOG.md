@@ -1227,3 +1227,26 @@
   - focused ESLint for the compatibility facade and thread hook
 - Next slice: extract a cohesive presentation orchestrator from
   `GlassWorkspace` rather than adding more facade methods.
+
+## Slice APPLICATION-011W: Extract realtime call event orchestration
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: move call signal delivery and call resource reconciliation out of the
+  workspace component into a cohesive presentation hook.
+- Changed files:
+  - `app/presentation/workspace/components/useWorkspaceRealtimeCallEvents.ts`
+  - `app/presentation/workspace/components/GlassWorkspace.tsx`
+- Behavior changed/preserved: incoming call signals are deduplicated,
+  acknowledged, and delivered through the existing call session; non-signal
+  call events still reload and reconcile their call resource. No WebSocket or
+  call payload contract changed.
+- Contracts changed: none.
+- Validation level: L2
+- Tests/checks:
+  - call and realtime test suites
+  - `yarn typecheck`
+  - focused ESLint for the extracted hook
+- Next slice: extract the message timeline loading/scroll orchestration from
+  `GlassWorkspace`.

@@ -70,7 +70,6 @@ import {
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
 import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
-import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import {
@@ -80,7 +79,6 @@ import {
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
-  acknowledgeRealtimeCallSignal,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
@@ -126,15 +124,13 @@ import { useWorkspaceTyping } from './useWorkspaceTyping';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
+import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
 import { useConversationThread } from './useConversationThread';
 import { useConversationPins } from './useConversationPins';
 import {
-  callIdFromRealtimeEvent,
-  callSignalTypeAttribute,
   communityAttribute,
   communityChannelAttribute,
   eventAggregateId,
-  numberAttribute,
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
@@ -339,7 +335,6 @@ export function GlassWorkspace({
   const activeCallRef = useRef<CallSession | null>(null);
   const callStartupSyncIdentityRef = useRef<string | null>(null);
   const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
-  const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -1035,6 +1030,12 @@ export function GlassWorkspace({
       reconcileCall,
       setCommunities,
     });
+  const handleRealtimeCallEvent = useWorkspaceRealtimeCallEvents({
+    activeCallRef,
+    receiveSignal,
+    reconcileCallResource,
+    sessionRef,
+  });
 
   useEffect(() => {
     reconcileCallResourceRef.current = reconcileCallResource;
@@ -2080,82 +2081,7 @@ export function GlassWorkspace({
       }
 
       if (event.type.startsWith('calls.')) {
-        const eventCallId = callIdFromRealtimeEvent(event);
-
-        logCallDebug('workspace:realtime-call-event', {
-          activeCallId: activeCallRef.current?.id,
-          callId: eventCallId,
-          eventType: event.type,
-        });
-
-        if (event.type === 'calls.v1.signal.sent') {
-          const callId = eventCallId;
-          const senderIdentityId = stringAttribute(event, 'senderIdentityId');
-          const recipientIdentityId = stringAttribute(
-            event,
-            'recipientIdentityId',
-          );
-          const signalType = callSignalTypeAttribute(event);
-          const payload = recordAttribute(event, 'payload');
-          const expiresAt = numberAttribute(event, 'expiresAt');
-          const signalId = stringAttribute(event, 'signalId');
-
-          if (
-            callId &&
-            senderIdentityId &&
-            recipientIdentityId === session.identity.id &&
-            signalType &&
-            payload &&
-            expiresAt !== undefined &&
-            signalId
-          ) {
-            void callSignalDeliveriesRef.current
-              .receive(
-                { expiresAt, signalId },
-                async () =>
-                  await receiveSignal({
-                    callId,
-                    payload,
-                    senderIdentityId,
-                    signalType,
-                  }),
-                () => acknowledgeRealtimeCallSignal(session, signalId),
-              )
-              .catch(() => undefined);
-          }
-
-          return;
-        }
-
-        const callId = eventCallId;
-
-        if (!callId) return;
-
-        void applicationContainer.calls
-          .get(sessionRef.current, callId)
-          .then((call) => {
-            logCallDebug('workspace:realtime-call-event:resource-loaded', {
-              activeCallId: activeCallRef.current?.id,
-              callId: call.id,
-              participantStatuses: call.participants.map((participant) => ({
-                connected: participant.connected,
-                identityId: participant.identityId,
-                status: participant.status,
-              })),
-              status: call.status,
-            });
-            reconcileCallResource(call);
-          })
-          .catch((caught) => {
-            logCallError(
-              'workspace:realtime-call-event:resource-load-failed',
-              caught,
-              {
-                callId,
-                eventType: event.type,
-              },
-            );
-          });
+        handleRealtimeCallEvent(event);
 
         return;
       }
@@ -2754,6 +2680,7 @@ export function GlassWorkspace({
       activeConversationKeyId,
       applyRealtimeConversationMessage,
       clearUnreadMessages,
+      handleRealtimeCallEvent,
       communities,
       conversations,
       fetchRealtimeMessage,
@@ -2772,9 +2699,7 @@ export function GlassWorkspace({
       refreshNotifications,
       refreshSession,
       realtimeEventsOpen,
-      receiveSignal,
       rememberIdentity,
-      reconcileCallResource,
       session,
       setConversations,
       setCommunities,

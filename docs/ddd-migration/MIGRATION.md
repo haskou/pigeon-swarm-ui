@@ -139,10 +139,12 @@ adapters into application services without containing context behavior.
   context-owned infrastructure gateways.
 - `APPLICATION-011V`: unified remaining compatibility methods with the same
   context-owned gateways and hardened unsupported thread state cleanup.
+- `APPLICATION-011W`: extracted realtime call event orchestration from the
+  workspace component into a focused presentation hook.
 
 ## Next slices
 
-1. `APPLICATION-011W`: extract a cohesive presentation orchestrator from
-   `GlassWorkspace`.
+1. `APPLICATION-011X`: extract message timeline loading and scroll
+   orchestration from `GlassWorkspace`.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
