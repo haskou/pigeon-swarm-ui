@@ -77,6 +77,7 @@ import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/in
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
+import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
@@ -105,7 +106,6 @@ import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/P
 import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
-import { HttpJsonError } from '../../shared/infrastructure/http/HttpJsonError';
 import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
@@ -135,6 +135,8 @@ export class PigeonApiGateway {
   private readonly identityCommands: PigeonIdentityCommandsApi;
 
   private readonly identitySession: PigeonIdentitySessionApi;
+
+  private readonly identityWorkspace: PigeonIdentityWorkspaceSessionApi;
 
   private readonly identities: PigeonIdentityGateway;
 
@@ -224,6 +226,14 @@ export class PigeonApiGateway {
       keychains,
       this.requestCache,
     );
+    this.identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
+      decryptKeychain: (session, keychain) =>
+        this.keychainApi.decrypt(session, keychain),
+      listConversations: async (session) =>
+        await this.listConversations(session),
+      loadKeychain: async (session) =>
+        await this.keychainApi.loadOptional(session),
+    });
     this.conversationCommands = new PigeonConversationCommandsApi(
       http,
       signer,
@@ -383,14 +393,6 @@ export class PigeonApiGateway {
     return this.messageDecryptWorker;
   }
 
-  private isMissingRemoteKeychain(caught: unknown): boolean {
-    return (
-      caught instanceof HttpJsonError &&
-      (caught.code === 'KeychainNotFoundError' ||
-        caught.code === 'IdentityNotFoundError')
-    );
-  }
-
   private invalidateCommunityChannelPinsCache(
     session: Session,
     communityId: string,
@@ -450,33 +452,7 @@ export class PigeonApiGateway {
     session: Session,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
-    onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session).catch(
-      () => [],
-    );
-    const keychainResource = await this.loadRemoteKeychain(session).catch(
-      (caught: unknown) => {
-        if (this.isMissingRemoteKeychain(caught)) return undefined;
-
-        throw caught;
-      },
-    );
-    const keychain = keychainResource
-      ? await this.decryptKeychain(session, keychainResource)
-      : defaultKeychain;
-    const hydratedSession = {
-      ...session,
-      keychain,
-      keychainExternalIdentifier:
-        keychainResource?.keychainExternalIdentifier ?? null,
-    };
-
-    onProgress?.('loading-workspace');
-
-    return {
-      conversations: await conversationsPromise,
-      session: hydratedSession,
-    };
+    return await this.identityWorkspace.hydrate(session, onProgress);
   }
 
   public apiUrl(path: string): string {
@@ -1569,54 +1545,12 @@ export class PigeonApiGateway {
       identityId,
       onProgress,
     );
-    onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session).catch(
-      () => [],
-    );
-    const keychainResource = await this.loadRemoteKeychain(session).catch(
-      (caught: unknown) => {
-        if (this.isMissingRemoteKeychain(caught)) return undefined;
 
-        throw caught;
-      },
-    );
-    const keychain = keychainResource
-      ? await this.decryptKeychain(session, keychainResource)
-      : defaultKeychain;
-    const hydratedSession = {
-      ...session,
-      keychain,
-      keychainExternalIdentifier:
-        keychainResource?.keychainExternalIdentifier ?? null,
-    };
-    onProgress?.('loading-workspace');
-    const conversations = await conversationsPromise;
-
-    return { conversations, session: hydratedSession };
+    return await this.identityWorkspace.hydrate(session, onProgress);
   }
 
   public async refreshSession(session: Session): Promise<LoginResult> {
-    const keychainResource = await this.loadRemoteKeychain(session).catch(
-      (caught: unknown) => {
-        if (this.isMissingRemoteKeychain(caught)) return undefined;
-
-        throw caught;
-      },
-    );
-    const keychain = keychainResource
-      ? await this.decryptKeychain(session, keychainResource)
-      : defaultKeychain;
-    const hydratedSession: Session = {
-      ...session,
-      keychain,
-      keychainExternalIdentifier:
-        keychainResource?.keychainExternalIdentifier ?? null,
-    };
-    const conversations = await this.listConversations(hydratedSession).catch(
-      () => [],
-    );
-
-    return { conversations, session: hydratedSession };
+    return await this.identityWorkspace.refresh(session);
   }
 
   public async publishKeychain(

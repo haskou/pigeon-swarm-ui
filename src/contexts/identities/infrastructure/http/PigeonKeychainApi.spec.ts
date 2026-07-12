@@ -8,6 +8,7 @@ import type { RequestCache } from '../../../../shared/infrastructure/http/Reques
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { KeychainCipher } from '../crypto/KeychainCipher';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { PigeonKeychainApi } from './PigeonKeychainApi';
 
 describe(PigeonKeychainApi.name, () => {
@@ -58,5 +59,35 @@ describe(PigeonKeychainApi.name, () => {
 
     expect(api.decrypt(session, resource)).toBe(keychain);
     expect(decrypt).toHaveBeenCalledWith(session, resource);
+  });
+
+  it('returns an empty result when the remote keychain does not exist', async () => {
+    const load = jest
+      .fn<
+        Promise<KeychainResource>,
+        [string, () => Promise<KeychainResource>, { ttlMs?: number }]
+      >()
+      .mockImplementation(async (_key, loader) => await loader());
+    const api = new PigeonKeychainApi(
+      {
+        request: jest
+          .fn()
+          .mockRejectedValue(
+            new HttpJsonError(
+              404,
+              'Not Found',
+              JSON.stringify({ code: 'KeychainNotFoundError' }),
+            ),
+          ),
+      } as unknown as HttpJsonClient,
+      { headers: jest.fn() } as unknown as RequestSigner,
+      {} as KeychainCipher,
+      {
+        keyForSession: jest.fn().mockReturnValue('cache-key'),
+        load,
+      } as unknown as RequestCache,
+    );
+
+    await expect(api.loadOptional(session)).resolves.toBeUndefined();
   });
 });

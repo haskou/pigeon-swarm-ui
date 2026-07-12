@@ -8,6 +8,8 @@ import type { RequestCache } from '../../../../shared/infrastructure/http/Reques
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { KeychainCipher } from '../crypto/KeychainCipher';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+
 const remoteKeychainCacheTtlMs = 1500;
 
 export class PigeonKeychainApi {
@@ -34,6 +36,24 @@ export class PigeonKeychainApi {
         }),
       { ttlMs: remoteKeychainCacheTtlMs },
     );
+  }
+
+  public async loadOptional(
+    session: Session,
+  ): Promise<KeychainResource | undefined> {
+    try {
+      return await this.load(session);
+    } catch (caught: unknown) {
+      if (
+        caught instanceof HttpJsonError &&
+        (caught.code === 'KeychainNotFoundError' ||
+          caught.code === 'IdentityNotFoundError')
+      ) {
+        return undefined;
+      }
+
+      throw caught;
+    }
   }
 
   public async publish(

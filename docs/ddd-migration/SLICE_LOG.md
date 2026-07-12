@@ -552,3 +552,28 @@
 - Risks: keychain hydration and registration orchestration still coordinate
   identity, conversation, and message boundaries in the compatibility gateway
 - Next slice: extract session hydration and registration coordination
+
+## Slice INFRA-002H: Extract identity workspace session hydration
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: Move keychain hydration, optional remote-keychain handling, conversation
+  bootstrap, and session refresh out of the compatibility gateway.
+- Changed files:
+  - `contexts/identities/application/ports/IdentityWorkspaceSessionPort.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonKeychainApi.ts`
+  - `app/composition/PigeonApiGateway.ts` delegation and composition wiring
+- Behavior changed/preserved: login and remembered-session progress, missing
+  keychain behavior, keychain external identifiers, conversation bootstrap,
+  refresh ordering, and cache-backed keychain reads preserve their contracts
+- Contracts changed: none
+- Validation level: L2
+- Tests/checks:
+  - workspace session, keychain, identity, and gateway suites
+  - `yarn typecheck`
+  - `yarn lint`
+- Risks: registration still coordinates identity material, workspace hydration,
+  and optional local passkey setup in the compatibility gateway
+- Next slice: extract registration coordination
