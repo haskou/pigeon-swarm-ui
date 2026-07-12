@@ -17,12 +17,16 @@ function gatewayDouble(): {
     conversations: [],
     session: { identity: { id: 'identity-1' } },
   } as unknown as LoginResult);
+  const listConversations = jest.fn();
+  const loadMessages = jest.fn();
 
   return {
     gateway: {
       communityGateway: {},
+      conversationsGateway: { listConversations },
       identityGateway: { register },
       identityRegistration: { register },
+      messagesGateway: { loadMessages },
     } as unknown as PigeonApiGateway,
     register,
   };

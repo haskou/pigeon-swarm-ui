@@ -105,11 +105,18 @@ export class PigeonApplication {
       roles: gateway.communityGateway,
     });
     this.conversations = new PigeonConversationsApplication({
-      createConversation: gateway,
-      createGroupConversation: gateway,
-      inviteToGroupConversation: gateway,
-      listConversations: gateway,
-      markConversationReadUntil: gateway,
+      createConversation: gateway.conversationsGateway,
+      createGroupConversation: gateway.conversationsGateway,
+      inviteToGroupConversation: gateway.conversationsGateway,
+      listConversations: {
+        listConversations: gateway.conversationsGateway.listConversations.bind(
+          gateway.conversationsGateway,
+        ),
+        loadMessages: gateway.messagesGateway.loadMessages.bind(
+          gateway.messagesGateway,
+        ),
+      },
+      markConversationReadUntil: gateway.conversationsGateway,
     });
     this.identities = new PigeonIdentitiesApplication({
       keychain: gateway.identityGateway,

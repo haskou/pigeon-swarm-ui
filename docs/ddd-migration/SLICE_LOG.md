@@ -1126,3 +1126,30 @@
   - focused ESLint for the gateway and composition files
 - Next slice: audit the remaining conversation facade and remove duplicated
   application-facing orchestration where a context-owned boundary is justified.
+
+## Slice APPLICATION-011S: Add the context-owned conversations gateway
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: keep conversation creation, group invitations, listing, and read
+  markers behind the conversations context boundary.
+- Changed files:
+  - `contexts/conversations/infrastructure/http/PigeonConversationsGateway.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+  - `src/test/contexts/conversations/infrastructure/http/PigeonConversationsGateway.spec.ts`
+  - affected composition tests
+- Behavior changed/preserved: one-to-one and group creation, group invitations,
+  conversation listing, and read-until updates preserve their existing
+  behavior. Legacy facade methods now delegate to the context-owned gateway.
+- Contracts changed: no conversation, invitation, keychain, or REST wire
+  contract changes.
+- Validation level: L2
+- Tests/checks:
+  - conversation gateway delegation tests
+  - composition tests
+  - `yarn typecheck`
+  - focused ESLint for the gateway and composition files
+- Next slice: audit the remaining application composition and infrastructure
+  adapters for duplicated notification/poll/sticker boundaries.

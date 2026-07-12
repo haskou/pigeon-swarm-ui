@@ -72,6 +72,7 @@ import { ConversationKeychain } from '../../contexts/conversations/domain/Conver
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
+import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { ProfileHandle } from '../../contexts/identities/domain/profile/ProfileHandle';
 import { ProfileName } from '../../contexts/identities/domain/profile/ProfileName';
@@ -176,6 +177,8 @@ export class PigeonApiGateway {
 
   public readonly communityGateway: PigeonCommunitiesGateway;
 
+  public readonly conversationsGateway: PigeonConversationsGateway;
+
   public readonly messagesGateway: PigeonMessagesGateway;
 
   public readonly node: PigeonNodeGateway;
@@ -263,6 +266,10 @@ export class PigeonApiGateway {
       this.identities,
       this.keychainApi,
       this.requestCache,
+    );
+    this.conversationsGateway = new PigeonConversationsGateway(
+      this.conversationsApi,
+      this.conversationCommands,
     );
     this.communityInvitations = new PigeonCommunityInvitationApi(
       http,
@@ -1033,7 +1040,7 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.conversationCommands.create(
+    return await this.conversationsGateway.createConversation(
       session,
       peerIdentityId,
       networkId,
@@ -1048,7 +1055,10 @@ export class PigeonApiGateway {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    return await this.conversationCommands.createGroup(session, input);
+    return await this.conversationsGateway.createGroupConversation(
+      session,
+      input,
+    );
   }
 
   public async createGroupConversationInvitation(
@@ -1056,11 +1066,10 @@ export class PigeonApiGateway {
     conversationId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    await this.conversationCommands.invite(
+    await this.conversationsGateway.inviteToGroupConversation(
       session,
       conversationId,
       recipientIdentityId,
-      'group_conversation_invitation',
     );
   }
 
@@ -1350,7 +1359,7 @@ export class PigeonApiGateway {
   public async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
-    return await this.conversationsApi.list(session);
+    return await this.conversationsGateway.listConversations(session);
   }
 
   public async markConversationReadUntil(
@@ -1358,7 +1367,7 @@ export class PigeonApiGateway {
     conversationId: string,
     messageId: string,
   ): Promise<void> {
-    await this.conversationsApi.markReadUntil(
+    await this.conversationsGateway.markConversationReadUntil(
       session,
       conversationId,
       messageId,
