@@ -29,11 +29,11 @@ export class PigeonIdentityLoginApi {
     return await this.workspace.hydrate(session, onProgress);
   }
 
-  public async refresh(session: Session): Promise<LoginResult> {
+  public async refreshSession(session: Session): Promise<LoginResult> {
     return await this.workspace.refresh(session);
   }
 
-  public async restoreRemembered(
+  public async restoreRememberedSession(
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {

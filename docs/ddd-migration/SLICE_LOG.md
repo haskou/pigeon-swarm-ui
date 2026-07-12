@@ -649,3 +649,36 @@
 - Risks: registration still coordinates identity material, workspace hydration,
   and optional local passkey setup in the compatibility gateway
 - Next slice: extract registration coordination
+
+## Slice APPLICATION-011A: Compose identity through context ports
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: Remove the identity application's dependency on the full composition
+  gateway and keep primitive API translation inside identity infrastructure.
+- Changed files:
+  - `contexts/identities/application/IdentityContextPorts.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentityProfileApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonIdentityLoginApi.ts`
+  - `contexts/identities/infrastructure/http/PigeonKeychainApi.ts`
+  - `contexts/conversations/infrastructure/http/ConversationKeychainPublisher.ts`
+  - `contexts/communities/infrastructure/http/PigeonCommunityInvitationApi.ts`
+  - `app/composition/PigeonApiGateway.ts`
+  - `app/composition/PigeonApplication.ts`
+- Behavior changed/preserved: identity registration, login, session refresh,
+  profile updates, local protection, presence, keychain publication, and
+  conversation/community keychain publication preserve their public behavior.
+- Contracts changed: no REST or encrypted-payload contract changes; internal
+  infrastructure capability renamed from generic `publish` to
+  `publishKeychain`.
+- Validation level: L2
+- Tests/checks:
+  - focused identity, conversation, community, composition, and gateway suites
+  - `yarn typecheck`
+  - focused ESLint for all changed TypeScript files
+- Risks: the remaining conversation, message, community, and notification
+  application consumers still receive compatibility capabilities from
+  `PigeonApiGateway`.
+- Next slice: `APPLICATION-011B`, migrate conversation and message consumers.

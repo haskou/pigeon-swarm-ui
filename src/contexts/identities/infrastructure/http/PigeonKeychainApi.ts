@@ -56,7 +56,7 @@ export class PigeonKeychainApi {
     }
   }
 
-  public async publish(
+  public async publishKeychain(
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {

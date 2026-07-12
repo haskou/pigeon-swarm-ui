@@ -1,43 +1,37 @@
+import type { IdentityContextPorts } from '../../contexts/identities/application/IdentityContextPorts';
+import type { RegisterIdentityPort } from '../../contexts/identities/application/ports/RegisterIdentityPort';
 import type { LoginResult } from '../../shared/domain/pigeonResources.types';
 
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonApplication } from './PigeonApplication';
 
-function gatewayDouble(): PigeonApiGateway & {
-  register: jest.Mock<
-    Promise<LoginResult>,
-    [
-      string,
-      string,
-      string[],
-      string | undefined,
-      { passkeyPrfEnabled?: boolean } | undefined,
-    ]
-  >;
+type IdentityRegistrationMock = jest.MockedFunction<
+  RegisterIdentityPort['register']
+>;
+
+function gatewayDouble(): {
+  gateway: PigeonApiGateway;
+  register: IdentityRegistrationMock;
 } {
+  const register: IdentityRegistrationMock = jest.fn().mockResolvedValue({
+    conversations: [],
+    session: { identity: { id: 'identity-1' } },
+  } as unknown as LoginResult);
+
   return {
-    register: jest.fn().mockResolvedValue({
-      conversations: [],
-      session: { identity: { id: 'identity-1' } },
-    } as unknown as LoginResult),
-  } as unknown as PigeonApiGateway & {
-    register: jest.Mock<
-      Promise<LoginResult>,
-      [
-        string,
-        string,
-        string[],
-        string | undefined,
-        { passkeyPrfEnabled?: boolean } | undefined,
-      ]
-    >;
+    gateway: {
+      identityApplication: {
+        register: { register },
+      } as unknown as IdentityContextPorts,
+    } as unknown as PigeonApiGateway,
+    register,
   };
 }
 
 describe(PigeonApplication.name, () => {
   it('passes passkey PRF registration options to the gateway', async () => {
-    const gateway = gatewayDouble();
+    const { gateway, register } = gatewayDouble();
     const application = new PigeonApplication(
       gateway,
       {} as unknown as RealtimeGateway,
@@ -53,12 +47,15 @@ describe(PigeonApplication.name, () => {
       },
     );
 
-    expect(gateway.register).toHaveBeenCalledWith(
-      'Ada Lovelace',
-      'secret-password',
-      ['network-1'],
-      'ada',
-      { passkeyPrfEnabled: true },
-    );
+    const [name, password, networks, handle, options] = register.mock.calls[0];
+
+    expect(name.toString()).toBe('Ada Lovelace');
+    expect(password).toBe('secret-password');
+    expect(networks.toPrimitives()).toEqual(['network-1']);
+    expect(handle?.toString()).toBe('ada');
+    expect(options).toEqual({
+      passkeyPrfEnabled: true,
+      recoveryKey: undefined,
+    });
   });
 });

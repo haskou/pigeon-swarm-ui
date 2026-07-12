@@ -15,7 +15,7 @@ describe(PigeonConversationCommandsApi.name, () => {
       new ConversationMapper(),
       new ConversationIdFactory(),
       { get: jest.fn() },
-      { publish: jest.fn() },
+      { publishKeychain: jest.fn() },
       {} as RequestCache,
     );
     const session = {

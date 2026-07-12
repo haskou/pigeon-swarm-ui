@@ -30,7 +30,7 @@ export class PigeonCommunityInvitationApi {
       'get' | 'inviteMember'
     >,
     private readonly identities: Pick<PigeonIdentityGateway, 'get'>,
-    private readonly keychains: Pick<PigeonKeychainApi, 'publish'>,
+    private readonly keychains: Pick<PigeonKeychainApi, 'publishKeychain'>,
   ) {}
 
   private createKeyEntry(communityId: string): ConversationKeyEntry {
@@ -89,7 +89,7 @@ export class PigeonCommunityInvitationApi {
       };
     }
 
-    const published = await this.keychains.publish(
+    const published = await this.keychains.publishKeychain(
       session,
       this.withConversationKey(session.keychain, keyEntry),
     );
@@ -321,7 +321,7 @@ export class PigeonCommunityInvitationApi {
     keychain: LocalKeychain;
     keychainExternalIdentifier: string;
   }> {
-    const published = await this.keychains.publish(
+    const published = await this.keychains.publishKeychain(
       session,
       this.withConversationKey(session.keychain, keyEntry),
     );

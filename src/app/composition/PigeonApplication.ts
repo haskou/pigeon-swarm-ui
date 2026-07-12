@@ -54,23 +54,9 @@ export class PigeonApplication {
       roles: gateway,
     });
     this.conversations = new PigeonConversationsApplication(gateway);
-    this.identities = new PigeonIdentitiesApplication({
-      keychain: gateway,
-      login: gateway,
-      presence: gateway.presence,
-      profile: gateway,
-      protection: gateway,
-      register: {
-        register: async (name, password, networks, handle, options) =>
-          await gateway.register(
-            name.toString(),
-            password,
-            networks.toPrimitives(),
-            handle?.toString(),
-            options,
-          ),
-      },
-    });
+    this.identities = new PigeonIdentitiesApplication(
+      gateway.identityApplication,
+    );
     this.messages = new PigeonMessagesApplication(gateway);
     this.networks = new PigeonNetworksApplication(gateway.node);
     this.notifications = new PigeonNotificationsApplication({
@@ -84,7 +70,9 @@ export class PigeonApplication {
     });
     this.polls = new PigeonPollsApplication(gateway);
     this.realtime = new PigeonRealtimeApplication(realtime);
-    this.session = new PigeonSessionApplication(gateway);
+    this.session = new PigeonSessionApplication(
+      gateway.identityApplication.session,
+    );
     this.stickers = new PigeonStickersApplication(gateway);
   }
 }

@@ -2,6 +2,10 @@ import type {
   LocalKeychain,
   LoginResult,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { RegisterIdentityPort } from '../../application/ports/RegisterIdentityPort';
+import type { ProfileHandle } from '../../domain/profile/ProfileHandle';
+import type { ProfileName } from '../../domain/profile/ProfileName';
+import type { IdentityNetworkMemberships } from '../../domain/value-objects/IdentityNetworkMemberships';
 import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
@@ -12,7 +16,7 @@ const emptyKeychain: LocalKeychain = {
   version: 0,
 };
 
-export class PigeonIdentityRegistrationApi {
+export class PigeonIdentityRegistrationApi implements RegisterIdentityPort {
   public constructor(
     private readonly commands: PigeonIdentityCommandsApi,
     private readonly workspace: PigeonIdentityWorkspaceSessionApi,
@@ -58,17 +62,17 @@ export class PigeonIdentityRegistrationApi {
   }
 
   public async register(
-    name: string,
+    name: ProfileName,
     password: string,
-    networks: string[],
-    handle?: string,
+    networks: IdentityNetworkMemberships,
+    handle?: ProfileHandle,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
     const material = await this.createMaterial(
-      name,
+      name.toString(),
       password,
-      networks,
-      handle,
+      networks.toPrimitives(),
+      handle?.toString(),
       options,
     );
     const result = await this.workspace.hydrate({

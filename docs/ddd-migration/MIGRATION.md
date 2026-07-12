@@ -75,8 +75,22 @@ adapters into application services without containing context behavior.
 - Known expensive commands: `yarn test`
 - Full-suite deferral policy: use only at coherent migration milestones
 
+## Completed progress inside APPLICATION-011
+
+- `APPLICATION-011A`: the identity application is now composed from explicit
+  identity-owned ports. Identity profile, registration, session, keychain,
+  presence, and protection workflows no longer receive the whole composition
+  gateway.
+- Identity infrastructure owns the translation from profile Value Objects and
+  network memberships to the registration HTTP contract.
+- Conversation and community keychain publishers use the explicit
+  `publishKeychain` capability instead of a generic `publish` method.
+
 ## Next slices
 
-1. `APPLICATION-011`: replace compatibility gateway consumers with context ports.
-2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
-3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
+1. `APPLICATION-011B`: replace the conversation and message compatibility
+   gateway consumers with context-owned ports and adapters.
+2. `APPLICATION-011C`: replace the community and notification compatibility
+   gateway consumers with context-owned ports and adapters.
+3. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
+4. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

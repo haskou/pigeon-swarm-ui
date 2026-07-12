@@ -5,6 +5,9 @@ import type {
   LoginResult,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { ProfileHandle } from '../../domain/profile/ProfileHandle';
+import { ProfileName } from '../../domain/profile/ProfileName';
+import { IdentityNetworkMemberships } from '../../domain/value-objects/IdentityNetworkMemberships';
 import { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
 import { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
 import { PigeonIdentityRegistrationApi } from './PigeonIdentityRegistrationApi';
@@ -68,9 +71,13 @@ describe(PigeonIdentityRegistrationApi.name, () => {
     );
 
     await expect(
-      registration.register('Ada', 'password', ['network-1'], 'ada', {
-        passkeyPrfEnabled: true,
-      }),
+      registration.register(
+        ProfileName.fromString('Ada'),
+        'password',
+        IdentityNetworkMemberships.fromPrimitives(['network-1']),
+        ProfileHandle.fromString('ada'),
+        { passkeyPrfEnabled: true },
+      ),
     ).resolves.toBe(result);
 
     expect(keyProtection.saveLocalPasskeyMasterKeyUnlock).toHaveBeenCalledWith({
@@ -107,9 +114,13 @@ describe(PigeonIdentityRegistrationApi.name, () => {
       keyProtection,
     );
 
-    await registration.register('Ada', 'password', ['network-1'], 'ada', {
-      passkeyPrfEnabled: true,
-    });
+    await registration.register(
+      ProfileName.fromString('Ada'),
+      'password',
+      IdentityNetworkMemberships.fromPrimitives(['network-1']),
+      ProfileHandle.fromString('ada'),
+      { passkeyPrfEnabled: true },
+    );
 
     expect(
       keyProtection.saveLocalPasskeyMasterKeyUnlock,

@@ -45,7 +45,7 @@ describe(PigeonIdentityLoginApi.name, () => {
       workspace,
     );
 
-    await expect(login.refresh(session)).resolves.toBe(result);
+    await expect(login.refreshSession(session)).resolves.toBe(result);
     expect(workspace.refresh).toHaveBeenCalledWith(session);
   });
 });

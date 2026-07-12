@@ -3,6 +3,7 @@ import { EncryptedPayload } from '@haskou/value-objects';
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
+import type { IdentityContextPorts } from '../../contexts/identities/application/IdentityContextPorts';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/ports/LoginIdentityProgressReporter';
 import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
@@ -72,11 +73,15 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import { ProfileHandle } from '../../contexts/identities/domain/profile/ProfileHandle';
+import { ProfileName } from '../../contexts/identities/domain/profile/ProfileName';
+import { IdentityNetworkMemberships } from '../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentityLoginApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
+import { PigeonIdentityProfileApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityProfileApi';
 import { PigeonIdentityRegistrationApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
@@ -165,6 +170,8 @@ export class PigeonApiGateway {
   private readonly stickers: PigeonStickersGateway;
 
   public readonly calls: PigeonCallsGateway;
+
+  public readonly identityApplication: IdentityContextPorts;
 
   public readonly node: PigeonNodeGateway;
 
@@ -308,6 +315,18 @@ export class PigeonApiGateway {
       new PigeonPresenceApi(http, signer),
       this.requestCache,
     );
+    this.identityApplication = {
+      keychain: this.keychainApi,
+      login: this.identityLogin,
+      presence: this.presence,
+      profile: new PigeonIdentityProfileApi(
+        this.identities,
+        this.identityCommands,
+      ),
+      protection: this.identityKeyProtection,
+      register: this.identityRegistration,
+      session: this.identityLogin,
+    };
     this.polls = new PigeonPollsApi(http, signer);
     this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
     this.stickers = new PigeonStickersGateway(
@@ -1509,18 +1528,21 @@ export class PigeonApiGateway {
     identityId: string,
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
-    return await this.identityLogin.restoreRemembered(identityId, onProgress);
+    return await this.identityLogin.restoreRememberedSession(
+      identityId,
+      onProgress,
+    );
   }
 
   public async refreshSession(session: Session): Promise<LoginResult> {
-    return await this.identityLogin.refresh(session);
+    return await this.identityLogin.refreshSession(session);
   }
 
   public async publishKeychain(
     session: Session,
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.keychainApi.publish(session, nextKeychain);
+    return await this.keychainApi.publishKeychain(session, nextKeychain);
   }
 
   public async register(
@@ -1531,10 +1553,10 @@ export class PigeonApiGateway {
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<LoginResult> {
     return await this.identityRegistration.register(
-      name,
+      ProfileName.fromString(name),
       password,
-      networks,
-      handle,
+      IdentityNetworkMemberships.fromPrimitives(networks),
+      handle ? ProfileHandle.fromString(handle) : undefined,
       options,
     );
   }
