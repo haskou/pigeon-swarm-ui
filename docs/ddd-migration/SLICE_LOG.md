@@ -803,3 +803,28 @@
   - focused ESLint for the notification context
 - Next slice: `APPLICATION-011G`, migrate networks and then review the larger
   communities and identities application boundaries.
+
+## Slice APPLICATION-011G: Split node capabilities by action
+
+- Date: 2026-07-12
+- Size: M
+- Status: completed
+- Goal: remove the broad node application contract and keep node management,
+  relay, replication, network, and peer capabilities explicit.
+- Changed files:
+  - `contexts/networks/application/*`
+  - `app/composition/PigeonApplication.ts`
+  - affected files under `src/test/**`
+- Behavior changed/preserved: node claiming, network creation/join/removal,
+  public-network setup, peer listing, relay configuration, port checks, and
+  replication reads preserve their public behavior; only composition contracts
+  changed.
+- Contracts changed: no node, network, relay, or replication wire contract
+  changes.
+- Validation level: L2
+- Tests/checks:
+  - network application tests
+  - `yarn typecheck`
+  - focused ESLint for the network context
+- Next slice: `APPLICATION-011H`, migrate the larger community and identity
+  application boundaries.

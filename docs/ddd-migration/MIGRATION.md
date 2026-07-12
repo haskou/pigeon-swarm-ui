@@ -102,11 +102,13 @@ adapters into application services without containing context behavior.
   explicitly instead of passing a complete context gateway.
 - `APPLICATION-011F`: colocated notification settings, notification listing,
   push, reset, save, and update contracts with their application actions.
+- `APPLICATION-011G`: replaced the broad node application contract with
+  action-scoped capabilities for node claim, networks, peers, relay
+  configuration, and replication status.
 
 ## Next slices
 
-1. `APPLICATION-011G`: replace remaining broad compatibility methods in
-  communities, identities, networks, and notifications with context-owned
-  application entrypoints.
+1. `APPLICATION-011H`: replace remaining broad compatibility methods in
+  communities and identities with context-owned application entrypoints.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
 3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.
