@@ -1,0 +1,4 @@
+interface:
+  display_name: "@haskou/flow"
+  short_description: "Use @haskou/flow for async coordination in TypeScript."
+  default_prompt: "Use @haskou/flow to add concurrency, timeout, retry, rate limiting, circuit breaker, fallback, or scheduling behavior to this TypeScript code."
