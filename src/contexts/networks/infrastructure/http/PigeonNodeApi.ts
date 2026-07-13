@@ -12,6 +12,7 @@ import type { NodeRelayPortCheckTarget } from '../../application/configure-node-
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
 import type { NodeInfo } from './NodeInfo';
+import type { NodePeersSnapshot } from './NodePeersSnapshot';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -117,9 +118,18 @@ export class PigeonNodeApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
+    return (await this.getPeerSnapshot()).peers;
+  }
 
-    return result.peers;
+  public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
+    const result =
+      await this.http.request<Partial<NodePeersSnapshot>>('/peers/');
+
+    return {
+      ipfsPeers: result.ipfsPeers ?? [],
+      networkSynchronization: result.networkSynchronization ?? null,
+      peers: result.peers ?? [],
+    };
   }
 
   public async createNetwork(name: string, session?: Session): Promise<void> {

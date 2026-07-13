@@ -1,24 +1,26 @@
 import type { ReactElement } from 'react';
 
+import type { NetworkSynchronizationStatus } from '../../../networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { IdentityMemberRow } from '../components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 
 export function NodeLoginSummary({
   availableNetworks,
   className,
+  ipfsPeerCount,
+  networkSynchronizationStatus,
   ownerIdentityId,
-  peerCount,
   peersLoading,
 }: {
   availableNetworks: NodeNetwork[];
   className?: string;
+  ipfsPeerCount: number;
+  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
   ownerIdentityId: string | null;
-  peerCount: number;
   peersLoading: boolean;
 }): ReactElement {
   const owner = useIdentityPreview(ownerIdentityId ?? undefined);
@@ -36,20 +38,10 @@ export function NodeLoginSummary({
       {ownerIdentityId ? (
         <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2">
           <div className="shrink-0 text-white/45">{copy.auth.nodeOwner}</div>
-          <div className="min-w-0 max-w-56 flex-1">
-            <IdentityMemberRow
-              className="!h-12 !min-h-12 !max-w-none !rounded-xl !p-2"
-              interactive={false}
-              item={{
-                identity: owner.identity ?? undefined,
-                identityId: ownerIdentityId,
-                name:
-                  owner.loaded && !owner.identity
-                    ? shortId(ownerIdentityId)
-                    : undefined,
-                pictureUrl: owner.pictureUrl,
-              }}
-            />
+          <div className="min-w-0 truncate text-right font-black text-white/75">
+            {owner.identity?.profile.handle?.trim()
+              ? `@${owner.identity.profile.handle.trim()}`
+              : shortId(ownerIdentityId)}
           </div>
         </div>
       ) : (
@@ -60,27 +52,32 @@ export function NodeLoginSummary({
       )}
       <NodeLoginSummaryRow
         label={copy.auth.networksLabel}
-        title={availableNetworks.map((network) => network.name).join(', ')}
-        value={availableNetworksLabel(availableNetworks)}
+        title={availableNetworksLabel(
+          availableNetworks,
+          networkSynchronizationStatus,
+          peersLoading,
+        )}
+        value={availableNetworksLabel(
+          availableNetworks,
+          networkSynchronizationStatus,
+          peersLoading,
+        )}
       />
       <NodeLoginSummaryRow
         label={copy.auth.nodePeers}
         value={
           peersLoading
             ? copy.auth.nodePeersLoading
-            : peerCount === 1
+            : ipfsPeerCount === 1
               ? copy.auth.nodePeersOne
-              : copy.auth.nodePeersCount.replace('{count}', String(peerCount))
+              : copy.auth.nodePeersCount.replace(
+                  '{count}',
+                  String(ipfsPeerCount),
+                )
         }
       />
     </div>
   );
-}
-
-function availableNetworksLabel(availableNetworks: NodeNetwork[]): string {
-  if (availableNetworks.length === 0) return copy.auth.nodeNetworksNone;
-
-  return availableNetworks.map((network) => network.name).join(', ');
 }
 
 function NodeLoginSummaryRow({
@@ -102,5 +99,45 @@ function NodeLoginSummaryRow({
         {value}
       </span>
     </div>
+  );
+}
+
+function availableNetworksLabel(
+  availableNetworks: NodeNetwork[],
+  status: NetworkSynchronizationStatus | null,
+  loading: boolean,
+): string {
+  if (availableNetworks.length === 0) return copy.auth.nodeNetworksNone;
+
+  return availableNetworks
+    .map(
+      (network) =>
+        `${network.name} · ${networkSynchronizationLabel(
+          network.id,
+          status,
+          loading,
+        )}`,
+    )
+    .join(' · ');
+}
+
+function networkSynchronizationLabel(
+  networkId: string,
+  status: NetworkSynchronizationStatus | null,
+  loading: boolean,
+): string {
+  if (loading) return copy.auth.nodeNetworkSyncLoading;
+
+  const network = status?.networks.find((item) => item.id === networkId);
+
+  if (!network || network.totalStoreCount <= 0) {
+    return copy.auth.nodeNetworkSyncUnavailable;
+  }
+
+  return copy.nodeSettings.synchronizationProgress.replace(
+    '{percentage}',
+    String(
+      Math.round((network.convergedStoreCount / network.totalStoreCount) * 100),
+    ),
   );
 }

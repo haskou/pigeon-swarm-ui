@@ -1,6 +1,7 @@
 import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
 import type { Peer } from '../../application/list-peers/ListPeers';
 import type { NodeInfo } from './NodeInfo';
+import type { NodePeersSnapshot } from './NodePeersSnapshot';
 
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
@@ -53,8 +54,17 @@ export class NodeBootstrapApi {
   }
 
   public async getPeers(): Promise<Peer[]> {
-    const result = await this.http.request<{ peers: Peer[] }>('/peers/');
+    return (await this.getPeerSnapshot()).peers;
+  }
 
-    return result.peers;
+  public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
+    const result =
+      await this.http.request<Partial<NodePeersSnapshot>>('/peers/');
+
+    return {
+      ipfsPeers: result.ipfsPeers ?? [],
+      networkSynchronization: result.networkSynchronization ?? null,
+      peers: result.peers ?? [],
+    };
   }
 }

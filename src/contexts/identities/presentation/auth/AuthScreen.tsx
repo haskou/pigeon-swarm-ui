@@ -4,6 +4,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NetworkSynchronizationStatus } from '../../../networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
 
@@ -52,20 +53,22 @@ type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
 
 interface AuthScreenProps {
   availableNetworks: NodeNetwork[];
+  ipfsPeerCount: number;
+  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
   nodeOwnerId: string | null;
   onAuthenticated: (
     session: Session,
     conversations: ConversationResource[],
   ) => void;
-  peerCount: number;
   peersLoading: boolean;
 }
 
 export function AuthScreen({
   availableNetworks,
+  ipfsPeerCount,
+  networkSynchronizationStatus,
   nodeOwnerId,
   onAuthenticated,
-  peerCount,
   peersLoading,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -299,8 +302,9 @@ export function AuthScreen({
             <NodeLoginSummary
               availableNetworks={availableNetworks}
               className="mt-4"
+              ipfsPeerCount={ipfsPeerCount}
+              networkSynchronizationStatus={networkSynchronizationStatus}
               ownerIdentityId={nodeOwnerId}
-              peerCount={peerCount}
               peersLoading={peersLoading}
             />
           </div>
@@ -552,8 +556,9 @@ export function AuthScreen({
           <NodeLoginSummary
             availableNetworks={availableNetworks}
             className="mt-5 lg:hidden"
+            ipfsPeerCount={ipfsPeerCount}
+            networkSynchronizationStatus={networkSynchronizationStatus}
             ownerIdentityId={nodeOwnerId}
-            peerCount={peerCount}
             peersLoading={peersLoading}
           />
         </form>

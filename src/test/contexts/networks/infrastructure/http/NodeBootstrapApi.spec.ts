@@ -71,4 +71,39 @@ describe(NodeBootstrapApi.name, () => {
     expect(request).toHaveBeenNthCalledWith(1, '/peers/');
     expect(request).toHaveBeenNthCalledWith(2, '/peers/');
   });
+
+  it('exposes live IPFS peers and network synchronization from the peers snapshot', async () => {
+    const request = jest.fn().mockResolvedValue({
+      ipfsPeers: [{ id: 'ipfs-peer-1', networks: [] }],
+      networkSynchronization: {
+        changedAt: 1780944300024,
+        networks: [
+          {
+            connectedPeerIds: ['ipfs-peer-1'],
+            convergedStoreCount: 16,
+            id: 'network-1',
+            name: 'Alpha network',
+            replicationPeerIds: ['ipfs-peer-1'],
+            state: 'syncing',
+            stores: [],
+            totalStoreCount: 17,
+            type: 'private',
+          },
+        ],
+      },
+      peers: [],
+    });
+    const api = new NodeBootstrapApi({
+      request,
+    } as unknown as HttpJsonClient);
+
+    await expect(api.getPeerSnapshot()).resolves.toEqual(
+      expect.objectContaining({
+        ipfsPeers: [{ id: 'ipfs-peer-1', networks: [] }],
+        networkSynchronization: expect.objectContaining({
+          networks: [expect.objectContaining({ convergedStoreCount: 16 })],
+        }),
+      }),
+    );
+  });
 });

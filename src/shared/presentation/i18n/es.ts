@@ -72,6 +72,8 @@ export const es = {
     nodePeersCount: '{count} pares',
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
+    nodeNetworkSyncLoading: 'Cargando...',
+    nodeNetworkSyncUnavailable: '—',
     nodeSummaryTitle: 'Nodo local',
     identityPreviewVersion: 'Identidad v{version}',
     passkeyPrf: 'Proteger con desbloqueo del dispositivo',

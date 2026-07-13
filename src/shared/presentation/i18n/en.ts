@@ -74,6 +74,8 @@ export const en = {
     nodePeersCount: '{count} peers',
     nodePeersLoading: 'Searching...',
     nodePeersOne: '1 peer',
+    nodeNetworkSyncLoading: 'Loading...',
+    nodeNetworkSyncUnavailable: '—',
     nodeSummaryTitle: 'Local node',
     identityPreviewVersion: 'Identity v{version}',
     passwordConfirmLabel: 'Repeat password',

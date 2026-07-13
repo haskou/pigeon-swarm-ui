@@ -187,9 +187,10 @@ function App(): ReactElement {
         {screen === 'auth' || !session ? (
           <AuthScreen
             availableNetworks={nodeNetworks.networks}
+            ipfsPeerCount={peers.ipfsPeerCount}
+            networkSynchronizationStatus={peers.networkSynchronizationStatus}
             nodeOwnerId={nodeNetworks.node?.owner ?? null}
             onAuthenticated={handleAuthenticated}
-            peerCount={peers.peers.length}
             peersLoading={peers.loading}
           />
         ) : (
