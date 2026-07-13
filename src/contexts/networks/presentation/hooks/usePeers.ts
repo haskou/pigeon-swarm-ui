@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Peer } from '../../application/list-peers/ListPeers';
+import type { NodePeersSnapshot } from '../../infrastructure/http/NodePeersSnapshot';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
@@ -11,7 +12,9 @@ const nodeBootstrapApi = new NodeBootstrapApi();
 
 type PeersState = {
   error: Error | null;
+  ipfsPeerCount: number;
   loading: boolean;
+  networkSynchronizationStatus: NodePeersSnapshot['networkSynchronization'];
   peers: Peer[];
   reload: () => Promise<void>;
 };
@@ -26,6 +29,9 @@ export function usePeers({
   deferAutoLoad = false,
 }: UsePeersInput = {}): PeersState {
   const [peers, setPeers] = useState<Peer[]>([]);
+  const [ipfsPeerCount, setIpfsPeerCount] = useState(0);
+  const [networkSynchronizationStatus, setNetworkSynchronizationStatus] =
+    useState<NodePeersSnapshot['networkSynchronization']>(null);
   const [loading, setLoading] = useState(autoLoad && !deferAutoLoad);
   const [error, setError] = useState<Error | null>(null);
 
@@ -34,7 +40,11 @@ export function usePeers({
     setError(null);
 
     try {
-      setPeers(await nodeBootstrapApi.getPeers());
+      const snapshot = await nodeBootstrapApi.getPeerSnapshot();
+
+      setIpfsPeerCount(snapshot.ipfsPeers.length);
+      setNetworkSynchronizationStatus(snapshot.networkSynchronization);
+      setPeers(snapshot.peers);
     } catch (caught) {
       setError(new Error(toUserErrorMessage(caught, copy.peers.error)));
     } finally {
@@ -54,5 +64,12 @@ export function usePeers({
     return runWhenBrowserIdle(() => void reload());
   }, [autoLoad, deferAutoLoad, reload]);
 
-  return { error, loading, peers, reload };
+  return {
+    error,
+    ipfsPeerCount,
+    loading,
+    networkSynchronizationStatus,
+    peers,
+    reload,
+  };
 }
