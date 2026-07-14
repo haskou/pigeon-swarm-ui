@@ -25,6 +25,7 @@ import { Composer } from './Composer';
 import { MessageBubble } from './MessageBubble';
 
 export function MessageThreadPanel({
+  attachmentEncryptionAvailable,
   currentIdentityId,
   disabled = false,
   draft,
@@ -51,6 +52,7 @@ export function MessageThreadPanel({
   session,
   title,
 }: {
+  attachmentEncryptionAvailable: boolean;
   currentIdentityId: string;
   disabled?: boolean;
   draft: string;
@@ -223,6 +225,7 @@ export function MessageThreadPanel({
       </div>
 
       <Composer
+        attachmentEncryptionAvailable={attachmentEncryptionAvailable}
         disabled={disabled}
         draft={draft}
         editingMessage={editingMessage}

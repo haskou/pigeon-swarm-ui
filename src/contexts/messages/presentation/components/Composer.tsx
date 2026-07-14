@@ -53,6 +53,7 @@ const StickerPicker = lazy(() =>
 );
 
 interface ComposerProps {
+  attachmentEncryptionAvailable: boolean;
   defaultEncryptAttachments?: boolean;
   disabled: boolean;
   error: string | null;
@@ -82,6 +83,7 @@ interface ComposerProps {
 }
 
 export function Composer({
+  attachmentEncryptionAvailable,
   defaultEncryptAttachments = true,
   disabled,
   draft,
@@ -153,8 +155,9 @@ export function Composer({
     (attachment) => attachment.file.size > LARGE_ATTACHMENT_BYTES,
   );
   const encryptAttachments =
-    attachmentEncryptionPreference ??
-    (defaultEncryptAttachments && !hasLargeAttachments);
+    attachmentEncryptionAvailable &&
+    (attachmentEncryptionPreference ??
+      (defaultEncryptAttachments && !hasLargeAttachments));
 
   useEffect(() => {
     setSelectedEmojiIndex(0);
@@ -545,14 +548,16 @@ export function Composer({
               disabled={disabled}
               onRemove={removeAttachment}
             />
-            <AttachmentEncryptionControl
-              disabled={disabled}
-              enabled={encryptAttachments}
-              encryptedDescription={copy.composer.attachmentsEncrypted}
-              onChange={setAttachmentEncryptionPreference}
-              publicDescription={copy.composer.publicAttachments}
-              title={copy.composer.encryptAttachments}
-            />
+            {attachmentEncryptionAvailable ? (
+              <AttachmentEncryptionControl
+                disabled={disabled}
+                enabled={encryptAttachments}
+                encryptedDescription={copy.composer.attachmentsEncrypted}
+                onChange={setAttachmentEncryptionPreference}
+                publicDescription={copy.composer.publicAttachments}
+                title={copy.composer.encryptAttachments}
+              />
+            ) : null}
           </>
         )}
         {progress && (

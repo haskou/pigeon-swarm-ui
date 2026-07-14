@@ -1736,6 +1736,9 @@ export function CommunityWorkspace({
 
         {threadPanel ? (
           <MessageThreadPanel
+            attachmentEncryptionAvailable={
+              !communityIsPublic && Boolean(communityKey)
+            }
             currentIdentityId={session.identity.id}
             disabled={
               threadPanel.state === 'loading' ||
@@ -1891,6 +1894,9 @@ export function CommunityWorkspace({
               />
             )}
             <Composer
+              attachmentEncryptionAvailable={
+                !communityIsPublic && Boolean(communityKey)
+              }
               disabled={
                 messageState === 'loading' ||
                 (!communityIsPublic && !communityKey) ||

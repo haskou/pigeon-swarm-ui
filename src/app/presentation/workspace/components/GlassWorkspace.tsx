@@ -2782,6 +2782,7 @@ export function GlassWorkspace({
 
             {conversationThread && activeConversation ? (
               <MessageThreadPanel
+                attachmentEncryptionAvailable={Boolean(activeConversationKey)}
                 currentIdentityId={session.identity.id}
                 disabled={!activeConversationKey}
                 draft={conversationThread.draft}
