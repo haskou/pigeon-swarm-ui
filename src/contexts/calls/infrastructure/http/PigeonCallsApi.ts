@@ -99,7 +99,6 @@ export class PigeonCallsApi {
 
     await this.http.request(path, {
       headers: await this.signer.headers(session, 'DELETE', path),
-      keepalive: true,
       method: 'DELETE',
     });
   }

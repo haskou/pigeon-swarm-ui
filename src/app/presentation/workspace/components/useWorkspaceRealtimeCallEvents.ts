@@ -15,7 +15,6 @@ import {
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { callResourceWithParticipantLeaseUpdate } from './callResourceWithParticipantLeaseUpdate';
 import { CallResourceRefreshScheduler } from './CallResourceRefreshScheduler';
 import {
   callIdFromRealtimeEvent,
@@ -167,37 +166,12 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
-      const projectedCall = callResourceWithParticipantLeaseUpdate(
-        activeCallRef.current?.call,
-        event,
-      );
-
-      if (projectedCall) {
-        const currentActiveCall = activeCallRef.current;
-
-        if (currentActiveCall?.id === projectedCall.id) {
-          activeCallRef.current = {
-            ...currentActiveCall,
-            call: projectedCall,
-          };
-        }
-
-        reconcileCallResource(projectedCall);
-        return;
-      }
-
       if (!callResourceRefreshIsRequired(event)) {
         return;
       }
 
       refreshCallResource(eventCallId, event.type);
     },
-    [
-      activeCallRef,
-      receiveSignal,
-      reconcileCallResource,
-      refreshCallResource,
-      sessionRef,
-    ],
+    [activeCallRef, receiveSignal, refreshCallResource, sessionRef],
   );
 }
