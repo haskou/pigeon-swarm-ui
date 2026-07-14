@@ -2,9 +2,11 @@ import type { CallSession } from '../../domain/callSession.types';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CallParticipantAudioControls } from './CallParticipantAudioControls';
 import { callParticipantHasActiveScreenShare } from './callParticipantHasActiveScreenShare';
 import { callParticipantDisplayName } from './callParticipantDisplayName';
+import { LockIcon } from './callIcons';
 import { CallParticipantMedia } from './CallParticipantMedia';
 import { CallParticipantMetrics } from './CallParticipantMetrics';
 
@@ -92,9 +94,26 @@ export function ParticipantTile({
         variant={variant}
       />
       <div className="mt-1.5 w-full shrink-0 sm:mt-2">
-        <h3 className="max-w-full truncate text-sm font-black text-white sm:text-base">
-          {participantName}
-        </h3>
+        <div className="flex max-w-full items-center justify-center gap-1.5">
+          <h3 className="min-w-0 truncate text-sm font-black text-white sm:text-base">
+            {participantName}
+          </h3>
+          <span
+            className={cx(
+              'shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5',
+              participant.mediaEncryptionActive
+                ? 'text-emerald-300'
+                : 'text-amber-300',
+            )}
+            title={
+              participant.mediaEncryptionActive
+                ? copy.calls.participantMediaEncrypted
+                : copy.calls.participantMediaNotEncrypted
+            }
+          >
+            <LockIcon active={participant.mediaEncryptionActive === true} />
+          </span>
+        </div>
         <p className="mt-0.5 max-w-full truncate text-[0.65rem] text-white/45 sm:text-xs">
           {participantSubtitle}
         </p>

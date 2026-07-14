@@ -186,6 +186,10 @@ export const es = {
     mediaEncryptionMissingKey: 'No hay clave para cifrar esta llamada.',
     mediaEncryptionOff: 'Desactivar E2EE de llamada',
     mediaEncryptionOn: 'Activar E2EE de llamada',
+    participantMediaEncrypted:
+      'El contenido con este participante esta cifrado de extremo a extremo.',
+    participantMediaNotEncrypted:
+      'El contenido con este participante no esta cifrado de extremo a extremo.',
     mediaEncryptionPublicCommunity:
       'Las llamadas de comunidades publicas no usan E2EE.',
     mediaEncryptionUnsupported:

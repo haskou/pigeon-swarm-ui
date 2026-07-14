@@ -184,6 +184,10 @@ export const en = {
     mediaEncryptionMissingKey: 'No key is available to encrypt this call.',
     mediaEncryptionOff: 'Turn off call E2EE',
     mediaEncryptionOn: 'Turn on call E2EE',
+    participantMediaEncrypted:
+      'Media with this participant is end-to-end encrypted.',
+    participantMediaNotEncrypted:
+      'Media with this participant is not end-to-end encrypted.',
     mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
     mediaEncryptionUnsupported:
       'This browser does not support media E2EE.',

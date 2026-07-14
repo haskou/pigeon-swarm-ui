@@ -635,6 +635,58 @@ describe(CallPeerConnectionManager.name, () => {
     );
   });
 
+  it('reports media encryption only when both peer directions are encrypted', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    await manager.ensurePeer('peer-identity-id', false, sendSignal);
+
+    await manager.handleSignal(
+      'peer-identity-id',
+      'offer',
+      {
+        mediaEncryption: {
+          acceptsEncrypted: true,
+          enabled: false,
+          version: 1,
+        },
+        sdp: 'unencrypted-offer',
+        type: 'offer',
+      },
+      sendSignal,
+      'current-identity-id',
+    );
+
+    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(false);
+
+    await manager.handleSignal(
+      'peer-identity-id',
+      'offer',
+      {
+        mediaEncryption: {
+          acceptsEncrypted: true,
+          enabled: true,
+          version: 1,
+        },
+        sdp: 'encrypted-offer',
+        type: 'offer',
+      },
+      sendSignal,
+      'current-identity-id',
+    );
+
+    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(true);
+  });
+
   it('does not throw when encoded streams are rejected by the browser', () => {
     const cipher = new EncodedCallMediaCipher(
       SymmetricKey.generate().valueOf(),

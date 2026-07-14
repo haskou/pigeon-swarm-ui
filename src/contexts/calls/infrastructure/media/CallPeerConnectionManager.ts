@@ -48,6 +48,8 @@ export class CallPeerConnectionManager {
 
   private readonly peerAcceptsEncryptedMedia = new Map<string, boolean>();
 
+  private readonly peerSendsEncryptedMedia = new Map<string, boolean>();
+
   private readonly peers = new Map<string, RTCPeerConnection>();
 
   private latestPeerStats: Record<string, PeerMediaStats> = {};
@@ -503,11 +505,15 @@ export class CallPeerConnectionManager {
     peerIdentityId: string,
     payload: DescriptionSignalPayload,
   ): void {
-    if (!payload.mediaEncryption) return;
+    const mediaEncryption = payload.mediaEncryption;
 
     this.peerAcceptsEncryptedMedia.set(
       peerIdentityId,
-      payload.mediaEncryption.acceptsEncrypted,
+      mediaEncryption?.acceptsEncrypted ?? false,
+    );
+    this.peerSendsEncryptedMedia.set(
+      peerIdentityId,
+      mediaEncryption?.enabled ?? false,
     );
     this.syncPeerMediaEncryption(peerIdentityId);
   }
@@ -1066,6 +1072,7 @@ export class CallPeerConnectionManager {
     this.peerRecoveryAttempts.delete(peerIdentityId);
     this.pendingIceCandidates.delete(peerIdentityId);
     this.peerAcceptsEncryptedMedia.delete(peerIdentityId);
+    this.peerSendsEncryptedMedia.delete(peerIdentityId);
     this.peerNegotiationStates.delete(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
@@ -1276,6 +1283,13 @@ export class CallPeerConnectionManager {
     });
   }
 
+  public isMediaEncryptionActiveWith(peerIdentityId: string): boolean {
+    return (
+      this.outboundMediaEncryptionEnabled(peerIdentityId) &&
+      (this.peerSendsEncryptedMedia.get(peerIdentityId) ?? false)
+    );
+  }
+
   public setLocalStream(stream: MediaStream | null): void {
     this.localStream = stream;
     logCallDebug('peer-manager:set-local-stream', {
@@ -1467,6 +1481,7 @@ export class CallPeerConnectionManager {
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
     this.peerAcceptsEncryptedMedia.clear();
+    this.peerSendsEncryptedMedia.clear();
     this.pendingPeerCreations.clear();
     this.pendingPeerRecoveries.forEach((timeout) => clearTimeout(timeout));
     this.pendingPeerRecoveries.clear();

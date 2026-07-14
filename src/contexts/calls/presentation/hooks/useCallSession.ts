@@ -142,6 +142,8 @@ export function useCallSession(): {
           remoteStreams,
           remoteScreenStreams,
           localAudioLevel,
+          (identityId) =>
+            peerManager.isMediaEncryptionActiveWith(identityId),
           screenStream,
         );
         const nextCameraEnabled = mediaManager.hasCamera();
@@ -964,6 +966,7 @@ function participantsWithMediaState(
   remoteStreams: Record<string, MediaStream>,
   remoteScreenStreams: Record<string, MediaStream>,
   localAudioLevel: number,
+  isMediaEncryptionActiveWith: (identityId: string) => boolean,
   screenStream?: MediaStream,
 ): CallParticipant[] {
   return call.participants.map((participant) =>
@@ -979,6 +982,7 @@ function participantsWithMediaState(
           stats,
           remoteStreams,
           remoteScreenStreams,
+          isMediaEncryptionActiveWith,
         ),
   );
 }
@@ -994,6 +998,7 @@ function localParticipantWithMediaState(
     audioLevel,
     deafened: call.deafened,
     mediaStream: call.localPreviewStream,
+    mediaEncryptionActive: call.mediaEncryption.active,
     muted: call.muted,
     screenSharing: call.screenSharing,
     screenStream,
@@ -1007,6 +1012,7 @@ function remoteParticipantWithMediaState(
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
   remoteScreenStreams: Record<string, MediaStream>,
+  isMediaEncryptionActiveWith: (identityId: string) => boolean,
 ): CallParticipant {
   const stat = stats[participant.identityId];
   const mediaStream = remoteStreams[participant.identityId];
@@ -1023,6 +1029,9 @@ function remoteParticipantWithMediaState(
     jitterMs: stat?.jitterMs,
     latencyMs: stat?.latencyMs,
     mediaStream,
+    mediaEncryptionActive: isMediaEncryptionActiveWith(
+      participant.identityId,
+    ),
     packetsLost: stat?.packetsLost,
     screenSharing: hasVideoTrack(screenStream),
     screenStream,
@@ -1089,6 +1098,8 @@ function callParticipantsMediaStateEqual(
       currentParticipant.jitterMs === nextParticipant.jitterMs &&
       currentParticipant.latencyMs === nextParticipant.latencyMs &&
       currentParticipant.mediaStream === nextParticipant.mediaStream &&
+      currentParticipant.mediaEncryptionActive ===
+        nextParticipant.mediaEncryptionActive &&
       currentParticipant.muted === nextParticipant.muted &&
       currentParticipant.packetsLost === nextParticipant.packetsLost &&
       currentParticipant.screenSharing === nextParticipant.screenSharing &&

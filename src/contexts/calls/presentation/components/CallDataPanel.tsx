@@ -1,7 +1,7 @@
 import type { CallSession } from '../../domain/callSession.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { JsonDataViewer } from '../../../../shared/presentation/components/JsonDataViewer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function CallDataPanel({ call }: { call: CallSession }) {
   const data = {
@@ -13,7 +13,6 @@ export function CallDataPanel({ call }: { call: CallSession }) {
       conversationId: call.conversationId,
       hasMicrophone: call.hasMicrophone,
       kind: call.kind,
-      mediaEncryption: call.mediaEncryption,
       screenSharing: call.screenSharing,
       screenShareQuality: call.screenShareQuality,
       status: call.status,
@@ -32,6 +31,7 @@ export function CallDataPanel({ call }: { call: CallSession }) {
       jitterMs: participant.jitterMs,
       lastHeartbeatAt: participant.lastHeartbeatAt,
       latencyMs: participant.latencyMs,
+      mediaEncryptionActive: participant.mediaEncryptionActive,
       muted: participant.muted,
       name: participant.name,
       packetsLost: participant.packetsLost,

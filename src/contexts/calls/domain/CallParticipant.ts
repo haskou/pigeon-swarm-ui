@@ -16,6 +16,7 @@ export type CallParticipant = {
   jitterMs?: number;
   lastHeartbeatAt?: number;
   latencyMs?: number;
+  mediaEncryptionActive?: boolean;
   mediaConnections?: CallParticipantMediaConnection[];
   mediaStream?: MediaStream;
   muted: boolean;
