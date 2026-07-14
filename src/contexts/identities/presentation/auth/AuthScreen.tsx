@@ -10,25 +10,25 @@ import type { LoginIdentityProgressStep } from '../../application/login-identity
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
+import { cx } from '../../../../shared/presentation/cx';
+import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
+import {
+  loadLastLoginIdentity,
+  saveLastLoginIdentity,
+} from '../../infrastructure/storage/lastLoginIdentity';
+import {
+  clearLocalDeviceUnlock,
+  saveLocalDeviceUnlock,
+} from '../../infrastructure/storage/localDeviceUnlock';
 import {
   clearSavedCredentials,
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
-import {
-  clearLocalDeviceUnlock,
-  saveLocalDeviceUnlock,
-} from '../../infrastructure/storage/localDeviceUnlock';
-import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
-import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
-import {
-  normalizeHandleInput,
-  passwordValidationChecks,
-} from './credentialsValidation';
-import { cx } from '../../../../shared/presentation/cx';
-import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -37,9 +37,6 @@ import {
   normalizeIdentityLogin,
   registrationNetworks,
 } from './authFormRules';
-import { Field } from './Field';
-import { LoginIdentityPreview } from './LoginIdentityPreview';
-import { NodeLoginSummary } from './NodeLoginSummary';
 import {
   AuthSwitch,
   createPasswordRequirementProgress,
@@ -47,6 +44,13 @@ import {
   PasswordRequirementProgress,
   RecoveryKeyPanel,
 } from './AuthSecurityControls';
+import {
+  normalizeHandleInput,
+  passwordValidationChecks,
+} from './credentialsValidation';
+import { Field } from './Field';
+import { LoginIdentityPreview } from './LoginIdentityPreview';
+import { NodeLoginSummary } from './NodeLoginSummary';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
@@ -72,7 +76,7 @@ export function AuthScreen({
   peersLoading,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
-  const [identityId, setIdentityId] = useState('');
+  const [identityId, setIdentityId] = useState(loadLastLoginIdentity);
   const [identityPreviewLookup, setIdentityPreviewLookup] = useState('');
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
@@ -230,6 +234,8 @@ export function AuthScreen({
                 recoveryKey,
               },
             );
+
+      saveLastLoginIdentity(result.session.identity.id);
 
       if (rememberMe) {
         await saveLocalDeviceUnlock(result.session).catch(() => undefined);
@@ -637,6 +643,7 @@ function loginProgressLabel(step: LoginIdentityProgressStep): string {
 
 function installFallbackHelp(): string {
   if (import.meta.env.DEV) return copy.auth.installAppDevHelp;
+
   if (isIosBrowser()) return copy.auth.installAppIosHelp;
 
   return copy.auth.installAppHelp;
