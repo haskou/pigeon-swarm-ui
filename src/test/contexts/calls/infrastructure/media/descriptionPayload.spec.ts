@@ -1,4 +1,4 @@
-import { descriptionPayload } from './descriptionPayload';
+import { descriptionPayload } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 
 describe(descriptionPayload.name, () => {
   it('includes call media encryption metadata when provided', () => {
