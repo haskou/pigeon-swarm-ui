@@ -5,6 +5,7 @@ import type {
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import {
+  booleanAttribute,
   numberAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
@@ -14,6 +15,10 @@ export function callResourceWithParticipantLeaseUpdate(
   event: RealtimeDomainEvent,
 ): CallResource | undefined {
   if (!call || event.type !== 'calls.v1.participant_lease.was_updated') {
+    return undefined;
+  }
+
+  if (booleanAttribute(event, 'participantsChanged') === true) {
     return undefined;
   }
 

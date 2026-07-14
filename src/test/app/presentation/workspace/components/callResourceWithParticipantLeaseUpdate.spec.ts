@@ -68,6 +68,18 @@ describe(callResourceWithParticipantLeaseUpdate.name, () => {
       ),
     ).toBeUndefined();
   });
+
+  it('requires a snapshot when the participant topology changes', () => {
+    expect(
+      callResourceWithParticipantLeaseUpdate(
+        callResource(),
+        leaseEvent({
+          participantIds: ['alice', 'bob', 'charlie'],
+          participantsChanged: true,
+        }),
+      ),
+    ).toBeUndefined();
+  });
 });
 
 function callResource(): CallResource {
