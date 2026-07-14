@@ -241,28 +241,44 @@ function projectCommunityVoicePresence(
   const scope = call.scope;
   const connectedIdentityIds =
     call.status === 'active'
-      ? [
-          ...new Set(
+      ? Array.from(
+          new Set(
             call.participants
               .filter((participant) => participant.connected)
               .map((participant) => participant.identityId),
           ),
-        ]
+        ).sort()
       : [];
 
   setCommunities((current) =>
-    current.map((community) =>
-      community.id !== scope.communityId
-        ? community
-        : {
-            ...community,
-            voiceChannels: (community.voiceChannels ?? []).map((channel) =>
-              channel.id === scope.channelId
-                ? { ...channel, connectedIdentityIds }
-                : channel,
-            ),
-          },
-    ),
+    current.map((community) => {
+      if (community.id !== scope.communityId) return community;
+
+      let changed = false;
+      const voiceChannels = (community.voiceChannels ?? []).map((channel) => {
+        if (channel.id !== scope.channelId) return channel;
+
+        const currentIdentityIds = [
+          ...(channel.connectedIdentityIds ?? []),
+        ].sort();
+
+        if (
+          currentIdentityIds.length === connectedIdentityIds.length &&
+          currentIdentityIds.every(
+            (identityId, index) =>
+              identityId === connectedIdentityIds[index],
+          )
+        ) {
+          return channel;
+        }
+
+        changed = true;
+
+        return { ...channel, connectedIdentityIds };
+      });
+
+      return changed ? { ...community, voiceChannels } : community;
+    }),
   );
 }
 

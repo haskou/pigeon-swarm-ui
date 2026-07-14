@@ -142,6 +142,7 @@ const VoiceParticipantButton = memo(function VoiceParticipantButton({
 
   return (
     <button
+      data-testid="voice-channel-participant"
       type="button"
       onClick={(event) => onClick(participant, event)}
       className={cx(

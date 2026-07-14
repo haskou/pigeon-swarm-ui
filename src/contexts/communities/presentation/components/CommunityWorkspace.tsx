@@ -15,6 +15,7 @@ import type { NodeNetwork } from '../../../networks/application/list-node-networ
 import type { CallSession } from '../../../calls/domain/callSession.types';
 import type {
   Community,
+  CommunityChannel,
   CommunityChannelThreadSummary,
   CommunityTextChannel,
   CommunityInvitationNotificationResource,
@@ -134,6 +135,10 @@ interface CommunityWorkspaceProps {
   onChannelSelected: (channelId: string) => void;
   onChannelViewed?: (channelId: string) => void;
   onCommunityLeft: (community: Community) => void;
+  onCommunityChannelsUpdated: (
+    communityId: string,
+    channels: CommunityChannel[],
+  ) => void;
   onCommunityUpdated: (community: Community) => void;
   onInvitationAccept?: (
     notification: CommunityInvitationNotificationResource,
@@ -335,6 +340,7 @@ export function CommunityWorkspace({
   onChannelSelected,
   onChannelViewed,
   onCommunityLeft,
+  onCommunityChannelsUpdated,
   onCommunityUpdated,
   onInvitationAccept,
   onJoinVoiceChannel,
@@ -359,11 +365,18 @@ export function CommunityWorkspace({
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
     () => CommunityChannels.text(community),
-    [community],
+    [community.channels, community.textChannels],
   );
   const voiceChannels = useMemo(
     () => CommunityChannels.voice(community),
-    [community],
+    [community.channels, community.voiceChannels],
+  );
+  const channelTopologyKey = useMemo(
+    () =>
+      CommunityChannels.all(community)
+        .map((channel) => `${channel.type}:${channel.id}`)
+        .join('|'),
+    [community.channels, community.textChannels, community.voiceChannels],
   );
   const currentPermissions = useMemo(
     () => CommunityAccessPolicy.permissionsFor(community, session.identity.id),
@@ -538,6 +551,7 @@ export function CommunityWorkspace({
         .then((channels) => {
           if (cancelled) return;
 
+          onCommunityChannelsUpdated(community.id, channels);
           const threadsByChannelId = threadSummariesByChannelId(
             channels.filter((channel) => channel.type === 'text'),
           );
@@ -555,7 +569,12 @@ export function CommunityWorkspace({
       cancelled = true;
       cancelIdleWork();
     };
-  }, [community.id, session, textChannels]);
+  }, [
+    channelTopologyKey,
+    community.id,
+    onCommunityChannelsUpdated,
+    session,
+  ]);
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
