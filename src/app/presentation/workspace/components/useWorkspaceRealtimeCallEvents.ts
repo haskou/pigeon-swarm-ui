@@ -167,10 +167,6 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
-      if (!callResourceRefreshIsRequired(event)) {
-        return;
-      }
-
       const projectedCall = callResourceWithParticipantLeaseUpdate(
         activeCallRef.current?.call,
         event,
@@ -178,6 +174,10 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (projectedCall) {
         reconcileCallResource(projectedCall);
+        return;
+      }
+
+      if (!callResourceRefreshIsRequired(event)) {
         return;
       }
 

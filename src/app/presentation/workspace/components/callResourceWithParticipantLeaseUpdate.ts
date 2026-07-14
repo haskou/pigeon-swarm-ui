@@ -15,18 +15,15 @@ export function callResourceWithParticipantLeaseUpdate(
   }
 
   const callId = stringAttribute(event, 'callId');
-  const participantIdentityId = stringAttribute(
-    event,
-    'participantIdentityId',
-  );
+  const participantIdentityId = stringAttribute(event, 'participantIdentityId');
   const connectionStatus = stringAttribute(event, 'status');
-  const lastHeartbeatAt = numberAttribute(event, 'lastHeartbeatAt');
+  const lastHeartbeatAt =
+    numberAttribute(event, 'lastHeartbeatAt') ?? event.occurred_on;
 
   if (
     call.id !== callId ||
     !participantIdentityId ||
-    (connectionStatus !== 'connected' && connectionStatus !== 'disconnected') ||
-    lastHeartbeatAt === undefined
+    (connectionStatus !== 'connected' && connectionStatus !== 'disconnected')
   ) {
     return undefined;
   }
@@ -36,8 +33,8 @@ export function callResourceWithParticipantLeaseUpdate(
     (participant) => participant.identityId === participantIdentityId,
   );
 
-  if (!currentParticipant && !participantIds?.includes(participantIdentityId)) {
-    return undefined;
+  if (!currentParticipant && connectionStatus === 'disconnected') {
+    return call;
   }
 
   const mediaConnections = mediaConnectionsAttribute(event);
@@ -56,7 +53,9 @@ export function callResourceWithParticipantLeaseUpdate(
 
   return {
     ...call,
-    participantIds: participantIds ?? call.participantIds,
+    participantIds:
+      participantIds ??
+      Array.from(new Set([...call.participantIds, participantIdentityId])),
     participants: currentParticipant
       ? call.participants.map((participant) =>
           participant.identityId === participantIdentityId
@@ -93,7 +92,9 @@ function mediaConnectionsAttribute(
     : undefined;
 }
 
-function mediaConnection(value: unknown): CallParticipantMediaConnection | null {
+function mediaConnection(
+  value: unknown,
+): CallParticipantMediaConnection | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
   const connection = value as Record<string, unknown>;

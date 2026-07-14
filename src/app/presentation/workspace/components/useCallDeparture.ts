@@ -1,4 +1,10 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/domain/callSession.types';
 import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
@@ -39,6 +45,37 @@ export function useCallDeparture({
   leaveCurrentCallForSwitch: () => Promise<void>;
   removeCurrentIdentityFromVoicePresence: () => void;
 } {
+  const pageDepartureRef = useRef({
+    callId: activeCall?.id,
+    session,
+  });
+  pageDepartureRef.current = { callId: activeCall?.id, session };
+
+  useEffect(() => {
+    let departureRequested = false;
+    const leaveCallOnPageDeparture = (): void => {
+      const { callId, session: currentSession } = pageDepartureRef.current;
+
+      if (!callId || departureRequested) return;
+
+      departureRequested = true;
+      void applicationContainer.calls
+        .leave(currentSession, callId)
+        .catch(() => undefined);
+    };
+
+    globalThis.addEventListener?.('beforeunload', leaveCallOnPageDeparture);
+    globalThis.addEventListener?.('pagehide', leaveCallOnPageDeparture);
+
+    return () => {
+      globalThis.removeEventListener?.(
+        'beforeunload',
+        leaveCallOnPageDeparture,
+      );
+      globalThis.removeEventListener?.('pagehide', leaveCallOnPageDeparture);
+    };
+  }, [activeCall?.id]);
+
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     setCommunities((current) =>
       current.map((community) => ({
@@ -106,7 +143,12 @@ export function useCallDeparture({
     if (activeCall.call) {
       await leaveCallResource(activeCall.call).catch(() => undefined);
     }
-  }, [activeCall, endCall, leaveCallResource, removeCurrentIdentityFromVoicePresence]);
+  }, [
+    activeCall,
+    endCall,
+    leaveCallResource,
+    removeCurrentIdentityFromVoicePresence,
+  ]);
 
   const leaveActiveCall = useCallback(() => {
     const callId = activeCall?.id;
@@ -127,8 +169,8 @@ export function useCallDeparture({
       .then(async () => {
         if (!isCommunityVoiceCall) return;
 
-        await applicationContainer
-          .calls.get(session, callId)
+        await applicationContainer.calls
+          .get(session, callId)
           .then(reconcileCallResource)
           .catch(() => onCommunitiesReload());
       })

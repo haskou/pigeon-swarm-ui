@@ -60,13 +60,30 @@ describe(callResourceWithParticipantLeaseUpdate.name, () => {
     });
   });
 
-  it('requires a snapshot when an unknown participant is missing from topology', () => {
+  it('projects a connected participant without optional topology metadata', () => {
     expect(
       callResourceWithParticipantLeaseUpdate(
         callResource(),
-        leaseEvent({ participantIdentityId: 'charlie' }),
+        leaseEvent({
+          lastHeartbeatAt: undefined,
+          participantIdentityId: 'charlie',
+          participantIds: undefined,
+          participantsChanged: undefined,
+          status: 'connected',
+        }),
       ),
-    ).toBeUndefined();
+    ).toMatchObject({
+      participantIds: ['alice', 'bob', 'charlie'],
+      participants: [
+        { identityId: 'bob' },
+        {
+          connected: true,
+          identityId: 'charlie',
+          lastHeartbeatAt: 200,
+          status: 'joined',
+        },
+      ],
+    });
   });
 
   it('projects a newly connected participant from the event topology', () => {
