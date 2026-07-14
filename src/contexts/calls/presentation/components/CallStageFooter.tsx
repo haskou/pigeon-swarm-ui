@@ -69,19 +69,10 @@ export function CallStageFooter({
       >
         <ScreenShareIcon active={call.screenSharing} />
       </CallButton>
-      <CallButton
-        active={call.mediaEncryption.active}
-        blocked={!call.mediaEncryption.available}
-        disabled={!call.mediaEncryption.available}
-        label={
-          call.mediaEncryption.active
-            ? copy.calls.mediaEncryptionOff
-            : copy.calls.mediaEncryptionOn
-        }
-        onClick={onToggleMediaEncryption}
-      >
-        <LockIcon active={call.mediaEncryption.active} />
-      </CallButton>
+      <MediaEncryptionButton
+        mediaEncryption={call.mediaEncryption}
+        onToggle={onToggleMediaEncryption}
+      />
       <CallButton
         active={call.noiseCancellationEnabled}
         badge={copy.calls.noiseCancellationBadge}
@@ -105,5 +96,29 @@ export function CallStageFooter({
         <HangUpIcon />
       </button>
     </footer>
+  );
+}
+
+function MediaEncryptionButton({
+  mediaEncryption,
+  onToggle,
+}: {
+  mediaEncryption: CallSession['mediaEncryption'];
+  onToggle: () => void;
+}) {
+  if (!mediaEncryption.available) return null;
+
+  return (
+    <CallButton
+      active={mediaEncryption.active}
+      label={
+        mediaEncryption.active
+          ? copy.calls.mediaEncryptionOff
+          : copy.calls.mediaEncryptionOn
+      }
+      onClick={onToggle}
+    >
+      <LockIcon active={mediaEncryption.active} />
+    </CallButton>
   );
 }
