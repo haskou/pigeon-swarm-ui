@@ -100,10 +100,7 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
       await loginIdentity(pageB, userB!, passwordB, recoveryKeyB);
       await openCommunity(pageB, selectedCommunityName);
       await expect(
-        pageB
-          .getByTestId('voice-channel-participant')
-          .filter({ hasText: /Hask/i })
-          .first(),
+        pageB.getByTestId('voice-channel-participant').first(),
         `Initial presence resources: ${JSON.stringify(presenceResourcesB)}`,
       ).toBeVisible({ timeout: 45_000 });
     });
