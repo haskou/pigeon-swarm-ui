@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
 import type {
   NotificationPreview,
@@ -5,14 +7,13 @@ import type {
 } from '../view-models/panelNotificationPreview.types';
 import type { NotificationAction } from './NotificationAction';
 
-import { useState } from 'react';
-
 import { cx } from '../../../../shared/presentation/cx';
 import {
   formatTime,
   shortId,
 } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 import { notificationPreview } from '../view-models/notificationPreview';
@@ -144,6 +145,7 @@ export function NotificationCard({
   previewContext,
 }: NotificationCardProps) {
   const [targetCopied, setTargetCopied] = useState(false);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const target = notificationTarget(notification);
   const preview = notificationPreview(notification, previewContext);
   const inviterIdentityId =
@@ -241,21 +243,23 @@ export function NotificationCard({
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <span>{target.label}</span>
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-semibold text-white/70">
-              {shortId(target.value)}
+        {technicalDetailsVisible ? (
+          <div className="flex items-center justify-between gap-3">
+            <span>{target.label}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-semibold text-white/70">
+                {shortId(target.value)}
+              </span>
+              <button
+                type="button"
+                onClick={() => void copyTarget()}
+                className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/60 transition hover:bg-white/15 hover:text-white"
+              >
+                {targetCopied ? copy.profile.copied : copy.profile.copy}
+              </button>
             </span>
-            <button
-              type="button"
-              onClick={() => void copyTarget()}
-              className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/60 transition hover:bg-white/15 hover:text-white"
-            >
-              {targetCopied ? copy.profile.copied : copy.profile.copy}
-            </button>
-          </span>
-        </div>
+          </div>
+        ) : null}
         <div className="mt-2 flex items-center justify-between gap-3">
           <span>{copy.notifications.createdAt}</span>
           <span className="font-semibold text-white/70">

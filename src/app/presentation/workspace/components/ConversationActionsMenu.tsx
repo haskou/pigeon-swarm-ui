@@ -7,9 +7,10 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 
 interface ConversationActionsMenuProps {
   activeConversation: ConversationResource;
@@ -48,14 +49,15 @@ export function ConversationActionsMenu({
   onClose,
   onConversationDataOpen,
   onConversationKeyOpen,
-  onNotificationSettingsOpen,
-  onNotificationMuteToggle,
   onGroupInviteOpen,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
   onOpenPins,
   onRealtimeEventsOpen,
   onStartCall,
 }: ConversationActionsMenuProps) {
   const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const openedAtRef = useRef(Date.now());
 
   useCloseOnEscape(close);
@@ -110,7 +112,7 @@ export function ConversationActionsMenu({
           }}
           className="sm:hidden"
         />
-        {onRealtimeEventsOpen ? (
+        {technicalDetailsVisible && onRealtimeEventsOpen ? (
           <ConversationHeaderMenuAction
             icon={<RealtimeEventsMenuIcon />}
             label={copy.chat.viewRealtimeEvents}
@@ -133,14 +135,16 @@ export function ConversationActionsMenu({
             close();
           }}
         />
-        <ConversationHeaderMenuAction
-          icon={<DataMenuIcon />}
-          label={copy.chat.viewData}
-          onClick={() => {
-            onConversationDataOpen();
-            close();
-          }}
-        />
+        {technicalDetailsVisible ? (
+          <ConversationHeaderMenuAction
+            icon={<DataMenuIcon />}
+            label={copy.chat.viewData}
+            onClick={() => {
+              onConversationDataOpen();
+              close();
+            }}
+          />
+        ) : null}
         {canShareConversationKey ? (
           <ConversationHeaderMenuAction
             icon={<KeyMenuIcon />}

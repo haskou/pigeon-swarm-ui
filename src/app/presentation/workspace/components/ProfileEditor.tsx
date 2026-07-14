@@ -19,25 +19,18 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   IDENTITY_PROFILE_BIOGRAPHY_MAX_LENGTH,
   IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
   IDENTITY_PROFILE_NAME_MAX_LENGTH,
 } from '../../../../contexts/identities/domain/profile/IdentityProfileConstraints';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
+import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
+import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
+import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
 import {
   isValidPassword,
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
-import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
-import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
-import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
-import {
-  conversationTitle,
-  shortId,
-} from '../../../../shared/presentation/formatting';
 import {
   isValidHandle,
   normalizeHandle,
@@ -45,12 +38,20 @@ import {
   publicFileObjectUrl,
   type IdentityNames,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
 import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
+import { cx } from '../../../../shared/presentation/cx';
+import {
+  conversationTitle,
+  shortId,
+} from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -63,7 +64,7 @@ const ImageCropEditor = lazy(() =>
 const profileEditorInputClass =
   'ui-field-control px-4 py-3 placeholder:text-white/30';
 
-type ProfileEditorSection = 'keychain' | 'networks' | 'profile' | 'security';
+type ProfileEditorSection = 'networks' | 'profile' | 'security';
 
 export function ProfileEditor({
   communities = [],
@@ -109,6 +110,8 @@ export function ProfileEditor({
   const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
   const [activeSection, setActiveSection] =
     useState<ProfileEditorSection>('profile');
+  const [technicalDetailsVisible, setTechnicalDetailsVisible] =
+    useTechnicalDetailsPreference();
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [identityNetworkIds, setIdentityNetworkIds] = useState(
     session.identity.networks,
@@ -270,8 +273,8 @@ export function ProfileEditor({
 
     let active = true;
 
-    void applicationContainer
-      .attachments.getPublicFile(banner)
+    void applicationContainer.attachments
+      .getPublicFile(banner)
       .then((content) => {
         if (active) setBannerPreview(publicFileObjectUrl(content));
       })
@@ -330,18 +333,20 @@ export function ProfileEditor({
 
       if (hasRemoteChanges) {
         const pictureCid = pictureFile
-          ? (await applicationContainer.attachments.uploadPublic(
-              session,
-              pictureFile,
-            ))
-              .cid
+          ? (
+              await applicationContainer.attachments.uploadPublic(
+                session,
+                pictureFile,
+              )
+            ).cid
           : session.identity.profile.picture?.trim() || undefined;
         const bannerCid = bannerFile
-          ? (await applicationContainer.attachments.uploadPublic(
-              session,
-              bannerFile,
-            ))
-              .cid
+          ? (
+              await applicationContainer.attachments.uploadPublic(
+                session,
+                bannerFile,
+              )
+            ).cid
           : session.identity.profile.banner?.trim() || undefined;
 
         identity = await applicationContainer.identities.updateProfile(
@@ -393,7 +398,6 @@ export function ProfileEditor({
     ['profile', copy.profile.profileTab],
     ['networks', copy.profile.networksTab],
     ['security', copy.profile.securityTab],
-    ['keychain', copy.profile.keychainTab],
   ];
 
   return createPortal(
@@ -578,144 +582,160 @@ export function ProfileEditor({
                   </section>
                 )}
                 {activeSection === 'security' && (
-                  <section className="ui-section">
-                    <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
-                      {copy.profile.security}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPasswordSectionOpen((isOpen) => !isOpen)
-                      }
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
-                      aria-expanded={passwordSectionOpen}
-                    >
-                      <span className="min-w-0">
-                        <span className="block">
-                          {copy.profile.changePassword}
-                        </span>
-                        <span className="mt-1 block text-xs font-bold text-white/40">
-                          {hasRecoveryKey
-                            ? copy.profile.passwordChangeRequiresRecoveryKey
-                            : copy.profile.passwordChangePreservesPasskey}
-                        </span>
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          'text-white/45 transition-transform',
-                          passwordSectionOpen && 'rotate-180',
-                        )}
+                  <>
+                    <section className="ui-section">
+                      <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
+                        {copy.profile.security}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPasswordSectionOpen((isOpen) => !isOpen)
+                        }
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-black text-white/75 transition hover:bg-white/5"
+                        aria-expanded={passwordSectionOpen}
                       >
-                        ⌄
-                      </span>
-                    </button>
-                    {passwordSectionOpen && (
-                      <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
-                        <p className="text-xs font-bold text-white/45">
-                          {copy.profile.newPasswordHelp}
-                        </p>
-                        <div className="mt-4 grid gap-3">
-                          <ProfileInput
-                            label={copy.profile.newPassword}
-                            value={newPassword}
-                            onChange={setNewPassword}
-                            placeholder="••••••••••••"
-                            type="password"
-                          />
-                          <ProfileInput
-                            label={copy.profile.newPasswordConfirm}
-                            value={newPasswordConfirmation}
-                            onChange={setNewPasswordConfirmation}
-                            placeholder="••••••••••••"
-                            type="password"
-                          />
-                          {hasRecoveryKey && (
-                            <div className="ui-inline-notice border-amber-300/40 bg-amber-300/10">
-                              <div className="text-xs font-black text-amber-50">
-                                {copy.profile.recoveryKeyRequiredTitle}
-                              </div>
-                              <p className="mt-1 text-xs leading-relaxed text-amber-50/70">
-                                {copy.profile.recoveryKeyRequiredHelp}
-                              </p>
-                              <div className="mt-3">
-                                <ProfileInput
-                                  label={copy.profile.recoveryKeyForPassword}
-                                  value={passwordRecoveryKey}
-                                  onChange={setPasswordRecoveryKey}
-                                  placeholder="psrk1..."
-                                  type="password"
-                                />
-                              </div>
-                            </div>
+                        <span className="min-w-0">
+                          <span className="block">
+                            {copy.profile.changePassword}
+                          </span>
+                          <span className="mt-1 block text-xs font-bold text-white/40">
+                            {hasRecoveryKey
+                              ? copy.profile.passwordChangeRequiresRecoveryKey
+                              : copy.profile.passwordChangePreservesPasskey}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            'text-white/45 transition-transform',
+                            passwordSectionOpen && 'rotate-180',
                           )}
-                        </div>
-                        <PasswordChecklist
-                          checks={{
-                            ...passwordChecks,
-                            match: passwordsMatch,
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="border-t border-white/[0.06] px-4 py-4">
-                      <div className="mb-3">
-                        <div className="text-sm font-black text-white/75">
-                          {copy.profile.localDeviceUnlockSection}
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-white/45">
-                          {copy.profile.localDeviceUnlockSectionHelp}
-                        </p>
-                      </div>
-                      <ProfileSwitchButton
-                        checked={deviceUnlockEnabled}
-                        disabled={
-                          !canEnableDeviceUnlock && !deviceUnlockEnabled
-                        }
-                        help={
-                          deviceUnlockEnabled
-                            ? copy.profile.localDeviceUnlockHelp
-                            : passkeyPrfAvailable
-                              ? copy.profile.localDeviceUnlockHelp
-                              : copy.profile.localDeviceUnlockUnavailable
-                        }
-                        label={copy.profile.localDeviceUnlock}
-                        onClick={toggleDeviceUnlock}
-                      />
-                      {needsCurrentPasswordForPasskey && (
-                        <div className="mt-4 grid gap-3">
-                          <ProfileInput
-                            label={copy.profile.currentPassword}
-                            value={currentPasswordForPasskey}
-                            onChange={setCurrentPasswordForPasskey}
-                            placeholder="••••••••••••"
-                            type="password"
-                          />
-                          {needsRecoveryKeyForPasskey && (
+                        >
+                          ⌄
+                        </span>
+                      </button>
+                      {passwordSectionOpen && (
+                        <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
+                          <p className="text-xs font-bold text-white/45">
+                            {copy.profile.newPasswordHelp}
+                          </p>
+                          <div className="mt-4 grid gap-3">
                             <ProfileInput
-                              label={copy.profile.recoveryKeyForPassword}
-                              value={passwordRecoveryKey}
-                              onChange={setPasswordRecoveryKey}
-                              placeholder="psrk1..."
+                              label={copy.profile.newPassword}
+                              value={newPassword}
+                              onChange={setNewPassword}
+                              placeholder="••••••••••••"
                               type="password"
                             />
-                          )}
-                          <p className="mt-2 text-xs leading-relaxed text-white/45">
-                            {copy.profile.currentPasswordForPasskeyHelp}
-                          </p>
+                            <ProfileInput
+                              label={copy.profile.newPasswordConfirm}
+                              value={newPasswordConfirmation}
+                              onChange={setNewPasswordConfirmation}
+                              placeholder="••••••••••••"
+                              type="password"
+                            />
+                            {hasRecoveryKey && (
+                              <div className="ui-inline-notice border-amber-300/40 bg-amber-300/10">
+                                <div className="text-xs font-black text-amber-50">
+                                  {copy.profile.recoveryKeyRequiredTitle}
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-amber-50/70">
+                                  {copy.profile.recoveryKeyRequiredHelp}
+                                </p>
+                                <div className="mt-3">
+                                  <ProfileInput
+                                    label={copy.profile.recoveryKeyForPassword}
+                                    value={passwordRecoveryKey}
+                                    onChange={setPasswordRecoveryKey}
+                                    placeholder="psrk1..."
+                                    type="password"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <PasswordChecklist
+                            checks={{
+                              ...passwordChecks,
+                              match: passwordsMatch,
+                            }}
+                          />
                         </div>
                       )}
-                    </div>
-                  </section>
-                )}
-                {activeSection === 'keychain' && (
-                  <KeychainSection
-                    communities={communities}
-                    conversations={conversations}
-                    identityNames={identityNames}
-                    identityProfiles={identityProfiles}
-                    session={session}
-                  />
+                      <div className="border-t border-white/[0.06] px-4 py-4">
+                        <div className="mb-3">
+                          <div className="text-sm font-black text-white/75">
+                            {copy.profile.localDeviceUnlockSection}
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-white/45">
+                            {copy.profile.localDeviceUnlockSectionHelp}
+                          </p>
+                        </div>
+                        <ProfileSwitchButton
+                          checked={deviceUnlockEnabled}
+                          disabled={
+                            !canEnableDeviceUnlock && !deviceUnlockEnabled
+                          }
+                          help={
+                            deviceUnlockEnabled
+                              ? copy.profile.localDeviceUnlockHelp
+                              : passkeyPrfAvailable
+                                ? copy.profile.localDeviceUnlockHelp
+                                : copy.profile.localDeviceUnlockUnavailable
+                          }
+                          label={copy.profile.localDeviceUnlock}
+                          onClick={toggleDeviceUnlock}
+                        />
+                        {needsCurrentPasswordForPasskey && (
+                          <div className="mt-4 grid gap-3">
+                            <ProfileInput
+                              label={copy.profile.currentPassword}
+                              value={currentPasswordForPasskey}
+                              onChange={setCurrentPasswordForPasskey}
+                              placeholder="••••••••••••"
+                              type="password"
+                            />
+                            {needsRecoveryKeyForPasskey && (
+                              <ProfileInput
+                                label={copy.profile.recoveryKeyForPassword}
+                                value={passwordRecoveryKey}
+                                onChange={setPasswordRecoveryKey}
+                                placeholder="psrk1..."
+                                type="password"
+                              />
+                            )}
+                            <p className="mt-2 text-xs leading-relaxed text-white/45">
+                              {copy.profile.currentPasswordForPasskeyHelp}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t border-white/[0.06] px-4 py-4">
+                        <ProfileSwitchButton
+                          checked={technicalDetailsVisible}
+                          disabled={false}
+                          help={copy.profile.technicalDetailsHelp}
+                          label={copy.profile.technicalDetails}
+                          onClick={() =>
+                            setTechnicalDetailsVisible(!technicalDetailsVisible)
+                          }
+                        />
+                        <p className="mt-2 text-xs font-semibold leading-relaxed text-amber-200/70">
+                          {copy.profile.technicalDetailsWarning}
+                        </p>
+                      </div>
+                    </section>
+                    {technicalDetailsVisible && (
+                      <KeychainSection
+                        communities={communities}
+                        conversations={conversations}
+                        identityNames={identityNames}
+                        identityProfiles={identityProfiles}
+                        session={session}
+                      />
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1081,7 +1101,9 @@ function readableIdentityName(
   const cachedName = identityNames[identityId]?.trim();
 
   if (profileName) return profileName;
+
   if (handle) return `@${handle}`;
+
   if (cachedName && cachedName !== identityId) {
     return cachedName.replace(/\s+\(@[^)]+\)$/, '');
   }

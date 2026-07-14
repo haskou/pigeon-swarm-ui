@@ -1,12 +1,13 @@
+import { useState } from 'react';
+
 import type {
   CallParticipant,
   CallSession,
 } from '../../domain/callSession.types';
 
-import { useState } from 'react';
-
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 
 export function CallParticipantMetrics({
   call,
@@ -16,6 +17,7 @@ export function CallParticipantMetrics({
   participant: CallParticipant;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const quality = callParticipantConnectionQuality(participant, call);
 
   return (
@@ -36,38 +38,42 @@ export function CallParticipantMetrics({
             label={copy.calls.callMetricLatency}
             value={formatMs(participant.latencyMs)}
           />
-          <Metric
-            label={copy.calls.callMetricPacketLoss}
-            value={formatNumber(participant.packetsLost)}
-          />
-          <Metric
-            label={copy.calls.callMetricJitter}
-            value={formatMs(participant.jitterMs)}
-          />
-          <Metric
-            label={copy.calls.callMetricCodec}
-            value={participant.codec ?? '-'}
-          />
-          <Metric
-            label={copy.calls.callMetricTransport}
-            value={participant.transport ?? '-'}
-          />
-          <Metric
-            label={copy.calls.callMetricPeerId}
-            value={participant.identityId}
-          />
-          <Metric
-            label={copy.calls.callMetricBitrate}
-            value={
-              participant.bitrateKbps === undefined
-                ? '-'
-                : `${participant.bitrateKbps} kbps`
-            }
-          />
-          <Metric
-            label={copy.calls.callMetricIceState}
-            value={participant.iceState ?? '-'}
-          />
+          {technicalDetailsVisible ? (
+            <>
+              <Metric
+                label={copy.calls.callMetricPacketLoss}
+                value={formatNumber(participant.packetsLost)}
+              />
+              <Metric
+                label={copy.calls.callMetricJitter}
+                value={formatMs(participant.jitterMs)}
+              />
+              <Metric
+                label={copy.calls.callMetricCodec}
+                value={participant.codec ?? '-'}
+              />
+              <Metric
+                label={copy.calls.callMetricTransport}
+                value={participant.transport ?? '-'}
+              />
+              <Metric
+                label={copy.calls.callMetricPeerId}
+                value={participant.identityId}
+              />
+              <Metric
+                label={copy.calls.callMetricBitrate}
+                value={
+                  participant.bitrateKbps === undefined
+                    ? '-'
+                    : `${participant.bitrateKbps} kbps`
+                }
+              />
+              <Metric
+                label={copy.calls.callMetricIceState}
+                value={participant.iceState ?? '-'}
+              />
+            </>
+          ) : null}
           <Metric
             label={copy.calls.callMetricPath}
             value={connectionPathLabel(participant.connectionPath)}
@@ -183,6 +189,7 @@ function callParticipantConnectionQuality(
 
 function connectionPathLabel(path?: 'direct' | 'relay' | 'unknown'): string {
   if (path === 'direct') return copy.calls.callMetricPathDirect;
+
   if (path === 'relay') return copy.calls.callMetricPathRelay;
 
   return '-';
@@ -192,7 +199,9 @@ function connectionQualityLabel(
   quality: 'connecting' | 'good' | 'poor' | 'weak',
 ): string {
   if (quality === 'good') return copy.calls.connectionQualityGood;
+
   if (quality === 'weak') return copy.calls.connectionQualityWeak;
+
   if (quality === 'poor') return copy.calls.connectionQualityPoor;
 
   return copy.calls.connectionQualityConnecting;

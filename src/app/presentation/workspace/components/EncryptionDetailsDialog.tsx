@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { cx } from '../../../../shared/presentation/cx';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { visibleEncryptionRows } from './visibleEncryptionRows';
 
 export type EncryptionDetailsSecret = {
   label: string;
@@ -15,6 +17,7 @@ export type EncryptionDetailsSecret = {
 
 export type EncryptionDetailsRow = {
   label: string;
+  technical?: boolean;
   value: string;
 };
 
@@ -35,6 +38,11 @@ export function EncryptionDetailsDialog({
   onClose: () => void;
 }) {
   const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
+  const visibleRows = visibleEncryptionRows(
+    details.rows,
+    technicalDetailsVisible,
+  );
 
   useCloseOnEscape(close);
 
@@ -57,7 +65,9 @@ export function EncryptionDetailsDialog({
         aria-label={details.title}
       >
         <DialogHeader
-          description={details.subtitle}
+          description={
+            technicalDetailsVisible ? details.subtitle : undefined
+          }
           title={details.title}
           onClose={close}
         />
@@ -84,7 +94,7 @@ export function EncryptionDetailsDialog({
           )}
 
           <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
-            {details.rows.map((row) => (
+            {visibleRows.map((row) => (
               <div
                 key={row.label}
                 className="flex min-w-0 items-center justify-between gap-3 py-3 text-sm"
@@ -97,7 +107,7 @@ export function EncryptionDetailsDialog({
             ))}
           </div>
 
-          {details.secrets.length > 0 && (
+          {technicalDetailsVisible && details.secrets.length > 0 && (
             <div className="mt-4">
               <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
                 {copy.encryption.keys}
@@ -122,6 +132,7 @@ function SecretRow({ secret }: { secret: EncryptionDetailsSecret }) {
 
   const copyValue = async () => {
     if (!value || !navigator.clipboard) return;
+
     if (
       secret.sensitive &&
       !window.confirm(copy.profile.copySensitiveKeyConfirm)
@@ -163,6 +174,7 @@ function maskedValue(value: string, sensitive?: boolean): string {
 
 function statusLabel(status: EncryptionDetails['status']): string {
   if (status === 'ready') return copy.encryption.ready;
+
   if (status === 'public') return copy.encryption.public;
 
   return copy.encryption.missing;

@@ -2,10 +2,11 @@ import { type ReactNode, useEffect, useRef } from 'react';
 
 import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
 
 type CommunityHeaderActionsMenuProps = {
   communityLeaving: boolean;
@@ -28,19 +29,20 @@ export function CommunityHeaderActionsMenu({
   communityLeaving,
   hasCommunityKey,
   notificationSetting,
-  open,
-  showCommunityKeyAction = true,
-  onClose,
   onAddMember,
+  onClose,
   onCommunityDataOpen,
   onCommunityKeyOpen,
   onLeaveCommunity,
-  onNotificationSettingsOpen,
   onNotificationMuteToggle,
+  onNotificationSettingsOpen,
   onOpenPins,
   onRealtimeEventsOpen,
+  open,
+  showCommunityKeyAction = true,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const openedAtRef = useRef(Date.now());
 
   useCloseOnEscape(close, open);
@@ -96,7 +98,7 @@ export function CommunityHeaderActionsMenu({
             className="sm:hidden"
           />
         ) : null}
-        {onRealtimeEventsOpen ? (
+        {technicalDetailsVisible && onRealtimeEventsOpen ? (
           <CommunityHeaderMenuAction
             icon={<RealtimeEventsMenuIcon />}
             label={copy.chat.viewRealtimeEvents}
@@ -119,11 +121,13 @@ export function CommunityHeaderActionsMenu({
             close();
           }}
         />
-        <CommunityHeaderMenuAction
-          icon={<DataMenuIcon />}
-          label={copy.chat.viewData}
-          onClick={onCommunityDataOpen}
-        />
+        {technicalDetailsVisible ? (
+          <CommunityHeaderMenuAction
+            icon={<DataMenuIcon />}
+            label={copy.chat.viewData}
+            onClick={onCommunityDataOpen}
+          />
+        ) : null}
         {showCommunityKeyAction ? (
           <CommunityHeaderMenuAction
             icon={<KeyMenuIcon />}

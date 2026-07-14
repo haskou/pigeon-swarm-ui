@@ -8,8 +8,8 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   Community,
   ConversationResource,
@@ -19,16 +19,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import {
-  getInitialLanguage,
-  languageOptions,
-  saveLanguage,
-  type AppLanguage,
-} from '../../../../shared/presentation/i18n/language';
-import { cx } from '../../../../shared/presentation/cx';
-import { shortId } from '../../../../shared/presentation/formatting';
+import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityDisplayName,
   identityPicture,
@@ -37,9 +28,19 @@ import {
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
-import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
+import { cx } from '../../../../shared/presentation/cx';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnOutsidePointerDown } from '../../../../shared/presentation/hooks/useCloseOnOutsidePointerDown';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import {
+  getInitialLanguage,
+  languageOptions,
+  saveLanguage,
+  type AppLanguage,
+} from '../../../../shared/presentation/i18n/language';
 import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { applicationContainer } from '../../../composition/applicationContainer';
 
 const GlobalCallBar = lazy(() =>
   import('../../../../contexts/calls/presentation/components/GlobalCallBar').then(
@@ -65,12 +66,12 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallRetryMicrophone,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
-  onCallRetryMicrophone,
   onCallToggleScreenShare,
   onLogout,
   onPresenceChange,
@@ -112,6 +113,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallToggleScreenShare?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [identityCopied, setIdentityCopied] = useState(false);
   const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
@@ -149,6 +151,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     const savedLanguage = saveLanguage(nextLanguage);
 
     setLanguage(savedLanguage);
+
     if (savedLanguage !== language) window.location.reload();
   };
 
@@ -166,13 +169,16 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     setPresenceError(null);
     onPresenceStatusSelected?.(status);
     try {
-      const nextPresence =
-        await applicationContainer.identities.updatePresence(session, status);
+      const nextPresence = await applicationContainer.identities.updatePresence(
+        session,
+        status,
+      );
 
       onPresenceChange?.(nextPresence);
     } catch {
       setPresenceError(copy.presence.error);
       setPresenceStatus(selectablePresenceStatus(presence));
+
       if (presence)
         onPresenceStatusSelected?.(selectablePresenceStatus(presence));
     } finally {
@@ -286,51 +292,59 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
               </p>
             )}
 
-            <div>
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.profile.identityId}
+            {technicalDetailsVisible ? (
+              <div>
+                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.profile.identityId}
+                </div>
+                <div className="ui-list-row py-2">
+                  <span className="min-w-0 flex-1 truncate text-white/70">
+                    {session.identity.id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyIdentityId}
+                    className="ui-button min-h-0 shrink-0 px-2.5 py-1.5 text-xs"
+                  >
+                    {identityCopied ? copy.profile.copied : copy.profile.copy}
+                  </button>
+                </div>
               </div>
-              <div className="ui-list-row py-2">
-                <span className="min-w-0 flex-1 truncate text-white/70">
-                  {session.identity.id}
-                </span>
-                <button
-                  type="button"
-                  onClick={copyIdentityId}
-                  className="ui-button min-h-0 shrink-0 px-2.5 py-1.5 text-xs"
-                >
-                  {identityCopied ? copy.profile.copied : copy.profile.copy}
-                </button>
-              </div>
-            </div>
+            ) : null}
 
-            <div>
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.profile.versions}
+            {technicalDetailsVisible ? (
+              <div>
+                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+                  {copy.profile.versions}
+                </div>
+                <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                  <ProfileVersionRow
+                    href={
+                      session.identity.identityExternalIdentifier
+                        ? ipfsUrl(session.identity.identityExternalIdentifier)
+                        : undefined
+                    }
+                    label={copy.profile.identityVersion}
+                    value={formatProfileVersion(session.identity.version)}
+                    detail={formatProfileVersionDate(
+                      session.identity.timestamp,
+                    )}
+                  />
+                  <ProfileVersionRow
+                    href={
+                      session.keychainExternalIdentifier
+                        ? ipfsUrl(session.keychainExternalIdentifier)
+                        : undefined
+                    }
+                    label={copy.profile.keychainVersion}
+                    value={formatProfileVersion(session.keychain.version)}
+                    detail={formatProfileVersionDate(
+                      session.keychain.timestamp,
+                    )}
+                  />
+                </div>
               </div>
-              <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
-                <ProfileVersionRow
-                  href={
-                    session.identity.identityExternalIdentifier
-                      ? ipfsUrl(session.identity.identityExternalIdentifier)
-                      : undefined
-                  }
-                  label={copy.profile.identityVersion}
-                  value={formatProfileVersion(session.identity.version)}
-                  detail={formatProfileVersionDate(session.identity.timestamp)}
-                />
-                <ProfileVersionRow
-                  href={
-                    session.keychainExternalIdentifier
-                      ? ipfsUrl(session.keychainExternalIdentifier)
-                      : undefined
-                  }
-                  label={copy.profile.keychainVersion}
-                  value={formatProfileVersion(session.keychain.version)}
-                  detail={formatProfileVersionDate(session.keychain.timestamp)}
-                />
-              </div>
-            </div>
+            ) : null}
 
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
@@ -377,6 +391,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
             onClose={() => setProfileEditorOpen(false)}
             onUpdated={(nextSession, change) => {
               setProfileEditorOpen(false);
+
               if (change.passwordChanged) {
                 onLogout();
 
