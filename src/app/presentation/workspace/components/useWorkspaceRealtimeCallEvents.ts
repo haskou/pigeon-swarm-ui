@@ -15,8 +15,10 @@ import {
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { CallResourceRefreshScheduler } from './CallResourceRefreshScheduler';
 import {
   callIdFromRealtimeEvent,
+  callResourceRefreshIsRequired,
   callSignalTypeAttribute,
   numberAttribute,
   recordAttribute,
@@ -75,6 +77,54 @@ export function useWorkspaceRealtimeCallEvents(
     input;
   const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
 
+  const loadCallResource = useCallback(
+    async (callId: string, eventType: string): Promise<void> => {
+      try {
+        const call = await applicationContainer.calls.get(
+          sessionRef.current,
+          callId,
+        );
+        logCallDebug('workspace:realtime-call-event:resource-loaded', {
+          activeCallId: activeCallRef.current?.id,
+          callId: call.id,
+          participantStatuses: call.participants.map((participant) => ({
+            connected: participant.connected,
+            identityId: participant.identityId,
+            status: participant.status,
+          })),
+          status: call.status,
+        });
+        reconcileCallResource(call);
+      } catch (caught) {
+        logCallError(
+          'workspace:realtime-call-event:resource-load-failed',
+          caught,
+          { callId, eventType },
+        );
+      }
+    },
+    [activeCallRef, reconcileCallResource, sessionRef],
+  );
+  const loadCallResourceRef = useRef(loadCallResource);
+  loadCallResourceRef.current = loadCallResource;
+  const callResourceRefreshSchedulerRef = useRef<
+    CallResourceRefreshScheduler | undefined
+  >(undefined);
+
+  if (!callResourceRefreshSchedulerRef.current) {
+    callResourceRefreshSchedulerRef.current = new CallResourceRefreshScheduler(
+      async (callId, eventType) =>
+        await loadCallResourceRef.current(callId, eventType),
+    );
+  }
+
+  const refreshCallResource = useCallback(
+    (callId: string, eventType: string): void => {
+      callResourceRefreshSchedulerRef.current?.request(callId, eventType);
+    },
+    [],
+  );
+
   return useCallback(
     (event: RealtimeDomainEvent): void => {
       const eventCallId = callIdFromRealtimeEvent(event);
@@ -116,32 +166,17 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
-      void applicationContainer.calls
-        .get(sessionRef.current, eventCallId)
-        .then((call) => {
-          logCallDebug('workspace:realtime-call-event:resource-loaded', {
-            activeCallId: activeCallRef.current?.id,
-            callId: call.id,
-            participantStatuses: call.participants.map((participant) => ({
-              connected: participant.connected,
-              identityId: participant.identityId,
-              status: participant.status,
-            })),
-            status: call.status,
-          });
-          reconcileCallResource(call);
-        })
-        .catch((caught) => {
-          logCallError(
-            'workspace:realtime-call-event:resource-load-failed',
-            caught,
-            {
-              callId: eventCallId,
-              eventType: event.type,
-            },
-          );
-        });
+      if (
+        !callResourceRefreshIsRequired(
+          event,
+          sessionRef.current.identity.id,
+        )
+      ) {
+        return;
+      }
+
+      refreshCallResource(eventCallId, event.type);
     },
-    [activeCallRef, receiveSignal, reconcileCallResource, sessionRef],
+    [activeCallRef, receiveSignal, refreshCallResource, sessionRef],
   );
 }

@@ -40,6 +40,33 @@ export function numberAttribute(
     : undefined;
 }
 
+export function booleanAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): boolean | undefined {
+  const value = event.attributes[key];
+
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+export function callResourceRefreshIsRequired(
+  event: RealtimeDomainEvent,
+  currentIdentityId: string,
+): boolean {
+  if (event.type !== 'calls.v1.participant_lease.was_updated') return true;
+
+  if (
+    stringAttribute(event, 'participantIdentityId') === currentIdentityId
+  ) {
+    return false;
+  }
+
+  return (
+    booleanAttribute(event, 'connectionChanged') === true ||
+    booleanAttribute(event, 'participantsChanged') === true
+  );
+}
+
 export function communityChannelAttribute(
   event: RealtimeDomainEvent,
   key: string,

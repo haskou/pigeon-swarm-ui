@@ -88,7 +88,9 @@ export function useCommunities(session?: null | Session): CommunitiesState {
       const nextCommunities =
         await applicationContainer.communities.list(session);
 
-      rememberCommunities(nextCommunities);
+      rememberCommunities((current) =>
+        CommunityList.preservingVoicePresence(nextCommunities, current),
+      );
       setLoadedIdentityId(identityId);
     } catch (caught) {
       if (!cached) {

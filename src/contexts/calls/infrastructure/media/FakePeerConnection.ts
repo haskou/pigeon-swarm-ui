@@ -6,6 +6,7 @@ export type FakePeerConnection = Pick<
   | 'close'
   | 'getSenders'
   | 'removeTrack'
+  | 'restartIce'
 > & {
   addIceCandidate: (
     candidate?: RTCIceCandidate | RTCIceCandidateInit | null,

@@ -30,6 +30,16 @@ export function signalingRemotePeerIdentityIds(
     .map((participant) => participant.identityId);
 }
 
+export function retainedRemotePeerIdentityIds(
+  call: CallResource,
+  currentIdentityId: string,
+): string[] {
+  return call.participants
+    .filter((participant) => participant.status === 'joined')
+    .filter((participant) => participant.identityId !== currentIdentityId)
+    .map((participant) => participant.identityId);
+}
+
 export function shouldCreateInitialOffer(
   currentIdentityId: string,
   peerIdentityId: string,

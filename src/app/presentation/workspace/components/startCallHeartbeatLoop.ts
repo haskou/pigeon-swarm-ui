@@ -9,25 +9,34 @@ export function startCallHeartbeatLoop({
   heartbeat,
   intervalMs = 2000,
 }: CallHeartbeatLoopInput): () => void {
-  let heartbeatInFlight = false;
+  let nextHeartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
 
-  const sendHeartbeat = () => {
-    if (stopped || heartbeatInFlight) return;
+  const scheduleHeartbeat = (delay: number): void => {
+    if (stopped) return;
 
-    heartbeatInFlight = true;
+    nextHeartbeatTimer = setTimeout(sendHeartbeat, delay);
+  };
+  const sendHeartbeat = (): void => {
+    if (stopped) return;
+
+    const startedAt = Date.now();
     void heartbeat(callId)
       .catch(() => undefined)
       .finally(() => {
-        heartbeatInFlight = false;
+        const elapsed = Date.now() - startedAt;
+
+        scheduleHeartbeat(Math.max(0, intervalMs - elapsed));
       });
   };
 
   sendHeartbeat();
-  const interval = setInterval(sendHeartbeat, intervalMs);
 
   return () => {
     stopped = true;
-    clearInterval(interval);
+
+    if (nextHeartbeatTimer !== undefined) {
+      clearTimeout(nextHeartbeatTimer);
+    }
   };
 }

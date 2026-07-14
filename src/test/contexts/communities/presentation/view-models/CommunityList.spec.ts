@@ -19,6 +19,43 @@ describe(CommunityList.name, () => {
 
     expect(CommunityList.withUniqueIds(communities)).toBe(communities);
   });
+
+  it('preserves runtime voice presence when community resources reload', () => {
+    const current = community({
+      voiceChannels: [
+        {
+          connectedIdentityIds: ['identity-2'],
+          createdAt: 1,
+          id: 'voice-1',
+          name: 'Hangout',
+          type: 'voice',
+        },
+      ],
+    });
+    const reloaded = community({
+      description: 'updated',
+      voiceChannels: [
+        {
+          connectedIdentityIds: [],
+          createdAt: 1,
+          id: 'voice-1',
+          name: 'Hangout',
+          type: 'voice',
+        },
+      ],
+    });
+
+    expect(
+      CommunityList.preservingVoicePresence([reloaded], [current]),
+    ).toEqual([
+      expect.objectContaining({
+        description: 'updated',
+        voiceChannels: [
+          expect.objectContaining({ connectedIdentityIds: ['identity-2'] }),
+        ],
+      }),
+    ]);
+  });
 });
 
 function community(overrides: Partial<Community> = {}): Community {

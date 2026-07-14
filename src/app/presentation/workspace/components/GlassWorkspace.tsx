@@ -26,6 +26,7 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
   Community,
+  CommunityChannel,
   CommunityMembershipRequest,
   ConversationKeyEntry,
   ConversationResource,
@@ -49,6 +50,8 @@ import { applicationContainer } from '../../../composition/applicationContainer'
 import { PendingMessageAttachments } from '../../../../contexts/attachments/domain/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
 import { CommunityAccessPolicy } from '../../../../contexts/communities/domain/CommunityAccessPolicy';
+import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 import { ConversationKeychain } from '../../../../contexts/conversations/domain/ConversationKeychain';
 import { ConversationTimeline } from '../../../../contexts/conversations/application/list-conversations/ConversationTimeline';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
@@ -1137,13 +1140,11 @@ export function GlassWorkspace({
       callId: string,
       mediaConnections: CallParticipantMediaConnection[],
     ) => {
-      const call = await applicationContainer.calls.heartbeatParticipant(
+      await applicationContainer.calls.heartbeatParticipant(
         sessionRef.current,
         callId,
         mediaConnections,
       );
-
-      reconcileCallResourceRef.current(call);
     },
     [],
   );
@@ -1957,6 +1958,20 @@ export function GlassWorkspace({
       setCommunities((current) =>
         current.map((community) =>
           community.id === communityId ? updater(community) : community,
+        ),
+      );
+    },
+    [setCommunities],
+  );
+  const updateCommunityChannels = useCallback(
+    (communityId: string, channels: CommunityChannel[]): void => {
+      const splitChannels = CommunityChannels.split(channels);
+
+      setCommunities((current) =>
+        current.map((community) =>
+          community.id === communityId
+            ? { ...community, ...splitChannels }
+            : community,
         ),
       );
     },
@@ -2955,10 +2970,16 @@ export function GlassWorkspace({
               onCommunityUpdated={(community) =>
                 setCommunities((current) =>
                   current.map((item) =>
-                    item.id === community.id ? community : item,
+                    item.id === community.id
+                      ? CommunityList.preservingCommunityVoicePresence(
+                          community,
+                          item,
+                        )
+                      : item,
                   ),
                 )
               }
+              onCommunityChannelsUpdated={updateCommunityChannels}
               onInvitationAccept={(notification) =>
                 void acceptNotification(notification)
               }

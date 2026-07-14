@@ -6,6 +6,26 @@ export type TestIdentity = {
   password: string;
 };
 
+export async function loginIdentity(
+  page: Page,
+  identity: string,
+  password: string,
+  recoveryKey?: string,
+): Promise<void> {
+  await page.goto('/');
+  await page.getByTestId('auth-identity-input').fill(identity);
+  await page.getByTestId('auth-password-input').fill(password);
+
+  if (recoveryKey) {
+    await page.getByTestId('auth-use-recovery-key-toggle').click();
+    await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
+  }
+
+  await page.getByTestId('auth-submit-button').click();
+  await waitForWorkspace(page);
+  await dismissPushPrompt(page);
+}
+
 export async function newIsolatedPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext();
 
