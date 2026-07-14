@@ -17,6 +17,7 @@ import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastruc
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   callIdFromRealtimeEvent,
+  callResourceRefreshIsRequired,
   callSignalTypeAttribute,
   numberAttribute,
   recordAttribute,
@@ -74,6 +75,42 @@ export function useWorkspaceRealtimeCallEvents(
   const { activeCallRef, receiveSignal, reconcileCallResource, sessionRef } =
     input;
   const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
+  const callResourceLoadsRef = useRef(new Map<string, Promise<void>>());
+
+  const refreshCallResource = useCallback(
+    (callId: string, eventType: string): void => {
+      if (callResourceLoadsRef.current.has(callId)) return;
+
+      const load = applicationContainer.calls
+        .get(sessionRef.current, callId)
+        .then((call) => {
+          logCallDebug('workspace:realtime-call-event:resource-loaded', {
+            activeCallId: activeCallRef.current?.id,
+            callId: call.id,
+            participantStatuses: call.participants.map((participant) => ({
+              connected: participant.connected,
+              identityId: participant.identityId,
+              status: participant.status,
+            })),
+            status: call.status,
+          });
+          reconcileCallResource(call);
+        })
+        .catch((caught) => {
+          logCallError(
+            'workspace:realtime-call-event:resource-load-failed',
+            caught,
+            { callId, eventType },
+          );
+        })
+        .finally(() => {
+          callResourceLoadsRef.current.delete(callId);
+        });
+
+      callResourceLoadsRef.current.set(callId, load);
+    },
+    [activeCallRef, reconcileCallResource, sessionRef],
+  );
 
   return useCallback(
     (event: RealtimeDomainEvent): void => {
@@ -116,32 +153,17 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
-      void applicationContainer.calls
-        .get(sessionRef.current, eventCallId)
-        .then((call) => {
-          logCallDebug('workspace:realtime-call-event:resource-loaded', {
-            activeCallId: activeCallRef.current?.id,
-            callId: call.id,
-            participantStatuses: call.participants.map((participant) => ({
-              connected: participant.connected,
-              identityId: participant.identityId,
-              status: participant.status,
-            })),
-            status: call.status,
-          });
-          reconcileCallResource(call);
-        })
-        .catch((caught) => {
-          logCallError(
-            'workspace:realtime-call-event:resource-load-failed',
-            caught,
-            {
-              callId: eventCallId,
-              eventType: event.type,
-            },
-          );
-        });
+      if (
+        !callResourceRefreshIsRequired(
+          event,
+          sessionRef.current.identity.id,
+        )
+      ) {
+        return;
+      }
+
+      refreshCallResource(eventCallId, event.type);
     },
-    [activeCallRef, receiveSignal, reconcileCallResource, sessionRef],
+    [activeCallRef, receiveSignal, refreshCallResource, sessionRef],
   );
 }

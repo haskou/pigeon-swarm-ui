@@ -21,7 +21,7 @@ describe(startCallHeartbeatLoop.name, () => {
     stop();
   });
 
-  it('does not overlap slow heartbeat requests', async () => {
+  it('sends the next heartbeat immediately after a slow request', async () => {
     let resolveHeartbeat: (() => void) | undefined;
     const heartbeat = jest.fn(
       () =>
@@ -39,9 +39,22 @@ describe(startCallHeartbeatLoop.name, () => {
 
     resolveHeartbeat?.();
     await flushPromises();
-    jest.advanceTimersByTime(2000);
+    jest.runOnlyPendingTimers();
     expect(heartbeat).toHaveBeenCalledTimes(2);
 
+    stop();
+  });
+
+  it('does not overlap slow heartbeat requests', () => {
+    const heartbeat = jest.fn(() => new Promise<void>(() => undefined));
+    const stop = startCallHeartbeatLoop({
+      callId: 'call-1',
+      heartbeat,
+    });
+
+    jest.advanceTimersByTime(20_000);
+
+    expect(heartbeat).toHaveBeenCalledTimes(1);
     stop();
   });
 

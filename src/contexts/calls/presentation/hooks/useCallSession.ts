@@ -20,6 +20,7 @@ import {
 import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
 import {
+  retainedRemotePeerIdentityIds,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from './callPeerConnectionPlan';
@@ -356,7 +357,7 @@ export function useCallSession(): {
 
       if (currentIdentityId) {
         peerManager.retainPeers(
-          new Set(signalingRemotePeerIdentityIds(call, currentIdentityId)),
+          new Set(retainedRemotePeerIdentityIds(call, currentIdentityId)),
         );
       }
 

@@ -186,6 +186,7 @@ function createFakePeerConnection(): FakePeerConnection {
 
       if (senderIndex >= 0) senders.splice(senderIndex, 1);
     }),
+    restartIce: jest.fn(),
     senders,
     setLocalDescription: jest.fn((description?: RTCSessionDescriptionInit) => {
       if (!description) return Promise.resolve();
@@ -214,6 +215,23 @@ function createFakePeerConnection(): FakePeerConnection {
   };
 
   return peer;
+}
+
+function registeredPeerEventListener(
+  peer: FakePeerConnection,
+  eventName: string,
+): EventListener {
+  const calls = (peer.addEventListener as jest.Mock).mock.calls as [
+    string,
+    EventListener,
+  ][];
+  const listener = calls.find(
+    ([registeredEventName]) => registeredEventName === eventName,
+  )?.[1];
+
+  if (!listener) throw new Error(`Missing ${eventName} listener.`);
+
+  return listener;
 }
 
 function installMediaStreamMock(): void {
@@ -277,6 +295,7 @@ function restoreGlobalProperty(
 
 describe(CallPeerConnectionManager.name, () => {
   afterEach(() => {
+    jest.useRealTimers();
     restoreGlobalProperty('MediaStream', originalMediaStream);
     restoreGlobalProperty('RTCPeerConnection', originalPeerConnection);
     restoreGlobalProperty('RTCSessionDescription', originalSessionDescription);
@@ -353,6 +372,61 @@ describe(CallPeerConnectionManager.name, () => {
 
     expect(rtcConfigurationProvider).toHaveBeenCalledTimes(2);
     expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
+  });
+
+  it('restarts ICE when an established peer connection fails', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    const [peer] = peers;
+    const connectionStateListener = registeredPeerEventListener(
+      peer,
+      'connectionstatechange',
+    );
+
+    peer.connectionState = 'failed';
+    peer.iceConnectionState = 'failed';
+    connectionStateListener(new Event('connectionstatechange'));
+    jest.runOnlyPendingTimers();
+
+    expect(peer.restartIce).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restart ICE when a transient disconnection recovers', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+
+    installPeerConnectionMock(peers);
+    const manager = new CallPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    const [peer] = peers;
+    const connectionStateListener = registeredPeerEventListener(
+      peer,
+      'connectionstatechange',
+    );
+
+    peer.connectionState = 'disconnected';
+    peer.iceConnectionState = 'disconnected';
+    connectionStateListener(new Event('connectionstatechange'));
+    peer.connectionState = 'connected';
+    peer.iceConnectionState = 'connected';
+    connectionStateListener(new Event('connectionstatechange'));
+    jest.runOnlyPendingTimers();
+
+    expect(peer.restartIce).not.toHaveBeenCalled();
   });
 
   it('drops TURN ICE servers without credentials before creating a peer connection', async () => {

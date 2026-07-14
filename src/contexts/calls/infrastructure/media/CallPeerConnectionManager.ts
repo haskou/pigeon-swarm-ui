@@ -37,6 +37,9 @@ import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
 
+const disconnectedPeerRecoveryDelayMs = 3_000;
+const maximumPeerRecoveryDelayMs = 15_000;
+
 export class CallPeerConnectionManager {
   private readonly peers = new Map<string, RTCPeerConnection>();
 
@@ -46,6 +49,13 @@ export class CallPeerConnectionManager {
     string,
     Promise<RTCPeerConnection>
   >();
+
+  private readonly pendingPeerRecoveries = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  private readonly peerRecoveryAttempts = new Map<string, number>();
 
   private readonly peerNegotiationStates = new Map<
     string,
@@ -336,12 +346,14 @@ export class CallPeerConnectionManager {
         connectionState: peer.connectionState,
         peerIdentityId,
       });
+      this.reconcilePeerConnectionHealth(peerIdentityId, peer);
     });
     peer.addEventListener('iceconnectionstatechange', () => {
       logCallDebug('peer-manager:ice-connection-state-change', {
         iceConnectionState: peer.iceConnectionState,
         peerIdentityId,
       });
+      this.reconcilePeerConnectionHealth(peerIdentityId, peer);
     });
     peer.addEventListener('signalingstatechange', () => {
       logCallDebug('peer-manager:signaling-state-change', {
@@ -931,8 +943,10 @@ export class CallPeerConnectionManager {
   }
 
   private removePeer(peerIdentityId: string): void {
+    this.cancelPeerRecovery(peerIdentityId);
     this.peers.get(peerIdentityId)?.close();
     this.peers.delete(peerIdentityId);
+    this.peerRecoveryAttempts.delete(peerIdentityId);
     this.pendingIceCandidates.delete(peerIdentityId);
     this.peerNegotiationStates.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
@@ -961,6 +975,103 @@ export class CallPeerConnectionManager {
     audio.srcObject = null;
     audio.remove();
     this.remoteAudio.delete(peerIdentityId);
+  }
+
+  private reconcilePeerConnectionHealth(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+  ): void {
+    if (this.peerConnectionIsHealthy(peer)) {
+      this.cancelPeerRecovery(peerIdentityId);
+      this.peerRecoveryAttempts.delete(peerIdentityId);
+
+      return;
+    }
+
+    const attempt = this.peerRecoveryAttempts.get(peerIdentityId) ?? 0;
+    const delay = this.peerRecoveryDelay(peer, attempt);
+
+    if (delay === undefined) return;
+
+    this.schedulePeerRecovery(peerIdentityId, peer, attempt, delay);
+  }
+
+  private peerRecoveryDelay(
+    peer: RTCPeerConnection,
+    attempt: number,
+  ): number | undefined {
+    if (
+      peer.connectionState === 'failed' ||
+      peer.iceConnectionState === 'failed'
+    ) {
+      return Math.min(
+        attempt === 0 ? 0 : 2 ** (attempt - 1) * 1_000,
+        maximumPeerRecoveryDelayMs,
+      );
+    }
+
+    if (
+      peer.connectionState === 'disconnected' ||
+      peer.iceConnectionState === 'disconnected'
+    ) {
+      return disconnectedPeerRecoveryDelayMs;
+    }
+
+    return undefined;
+  }
+
+  private peerConnectionIsHealthy(peer: RTCPeerConnection): boolean {
+    return (
+      peer.connectionState === 'connected' &&
+      (peer.iceConnectionState === 'connected' ||
+        peer.iceConnectionState === 'completed')
+    );
+  }
+
+  private schedulePeerRecovery(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    attempt: number,
+    delay: number,
+  ): void {
+    if (this.pendingPeerRecoveries.has(peerIdentityId)) return;
+
+    logCallWarning('peer-manager:ice-recovery:scheduled', {
+      attempt: attempt + 1,
+      connectionState: peer.connectionState,
+      delay,
+      iceConnectionState: peer.iceConnectionState,
+      peerIdentityId,
+    });
+    const timeout = setTimeout(() => {
+      this.pendingPeerRecoveries.delete(peerIdentityId);
+
+      if (
+        this.peers.get(peerIdentityId) !== peer ||
+        peer.connectionState === 'closed' ||
+        this.peerConnectionIsHealthy(peer)
+      ) {
+        return;
+      }
+
+      this.peerRecoveryAttempts.set(peerIdentityId, attempt + 1);
+      logCallWarning('peer-manager:ice-recovery:restart', {
+        attempt: attempt + 1,
+        peerIdentityId,
+      });
+      peer.restartIce();
+    }, delay);
+
+    this.pendingPeerRecoveries.set(peerIdentityId, timeout);
+  }
+
+  private cancelPeerRecovery(peerIdentityId: string): void {
+    const timeout = this.pendingPeerRecoveries.get(peerIdentityId);
+
+    if (timeout === undefined) return;
+
+    clearTimeout(timeout);
+    this.pendingPeerRecoveries.delete(peerIdentityId);
   }
 
   private async flushIceCandidates(
@@ -1190,6 +1301,9 @@ export class CallPeerConnectionManager {
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
     this.pendingPeerCreations.clear();
+    this.pendingPeerRecoveries.forEach((timeout) => clearTimeout(timeout));
+    this.pendingPeerRecoveries.clear();
+    this.peerRecoveryAttempts.clear();
     this.pendingIceCandidates.clear();
     this.peerNegotiationStates.clear();
 

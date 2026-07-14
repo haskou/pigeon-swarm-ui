@@ -1,6 +1,9 @@
 import type { RealtimeDomainEvent } from '../../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { callIdFromRealtimeEvent } from '../../../../../app/presentation/workspace/components/realtimeEventAttributes';
+import {
+  callIdFromRealtimeEvent,
+  callResourceRefreshIsRequired,
+} from '../../../../../app/presentation/workspace/components/realtimeEventAttributes';
 
 describe(callIdFromRealtimeEvent.name, () => {
   it('reads the call id from lease attributes instead of the lease aggregate', () => {
@@ -25,6 +28,74 @@ describe(callIdFromRealtimeEvent.name, () => {
         }),
       ),
     ).toBe('call-2');
+  });
+});
+
+describe(callResourceRefreshIsRequired.name, () => {
+  it('does not refetch a call for local lease updates', () => {
+    expect(
+      callResourceRefreshIsRequired(
+        event({
+          aggregateId: 'lease-1',
+          attributes: {
+            callId: 'call-1',
+            connectionChanged: true,
+            participantIdentityId: 'alice',
+          },
+          type: 'calls.v1.participant_lease.was_updated',
+        }),
+        'alice',
+      ),
+    ).toBe(false);
+  });
+
+  it('does not refetch a call when only remote media diagnostics change', () => {
+    expect(
+      callResourceRefreshIsRequired(
+        event({
+          aggregateId: 'lease-1',
+          attributes: {
+            callId: 'call-1',
+            connectionChanged: false,
+            mediaConnectionsChanged: true,
+            participantIdentityId: 'bob',
+            participantsChanged: false,
+          },
+          type: 'calls.v1.participant_lease.was_updated',
+        }),
+        'alice',
+      ),
+    ).toBe(false);
+  });
+
+  it('refetches a call when a remote lease connection changes', () => {
+    expect(
+      callResourceRefreshIsRequired(
+        event({
+          aggregateId: 'lease-1',
+          attributes: {
+            callId: 'call-1',
+            connectionChanged: true,
+            participantIdentityId: 'bob',
+          },
+          type: 'calls.v1.participant_lease.was_updated',
+        }),
+        'alice',
+      ),
+    ).toBe(true);
+  });
+
+  it('refetches lifecycle events', () => {
+    expect(
+      callResourceRefreshIsRequired(
+        event({
+          aggregateId: 'call-1',
+          attributes: {},
+          type: 'calls.v1.participant.joined',
+        }),
+        'alice',
+      ),
+    ).toBe(true);
   });
 });
 

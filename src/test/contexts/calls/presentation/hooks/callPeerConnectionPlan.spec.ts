@@ -3,6 +3,7 @@ import type { CallResource } from '../../../../../contexts/calls/domain/callSess
 import {
   joinedRemotePeerIdentityIds,
   participantJoinWasAccepted,
+  retainedRemotePeerIdentityIds,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from '../../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
@@ -92,6 +93,30 @@ describe('callPeerConnectionPlan', () => {
     );
 
     expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+  });
+
+  it('retains a joined peer while its backend lease reconnects', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[1].connected = false;
+
+    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+  });
+
+  it('releases peers that have left the call', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[1].connected = false;
+    call.participants[1].status = 'left';
+
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
   });
 
   it('chooses a stable initial offerer for both peers', () => {
