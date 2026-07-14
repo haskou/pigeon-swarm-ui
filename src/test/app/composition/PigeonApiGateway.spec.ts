@@ -782,6 +782,28 @@ describe(PigeonApiGateway.name, () => {
     );
   });
 
+  it('keeps the call departure request alive while the page closes', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'http-signature' }),
+    } as unknown as RequestSigner;
+    const session = {
+      identity: { id: 'identity-1' },
+      password: 'secret',
+    } as unknown as Session;
+    const gateway = new PigeonApiGateway(http, signer);
+
+    await gateway.calls.leave(session, 'call-1');
+
+    expect(http.request).toHaveBeenCalledWith('/calls/call-1/participants/me', {
+      headers: { 'X-Signature': 'http-signature' },
+      keepalive: true,
+      method: 'DELETE',
+    });
+  });
+
   it('returns retryable call signal delivery metadata', async () => {
     const delivery = { expiresAt: 200, signalId: 'signal-1' };
     const http = {
