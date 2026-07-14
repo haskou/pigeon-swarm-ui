@@ -19,3 +19,11 @@ export function saveLastLoginIdentity(identityId: string): void {
     // Remembering the identifier is optional and must not block login.
   }
 }
+
+export function clearLastLoginIdentity(): void {
+  try {
+    globalThis.localStorage?.removeItem(storageKey);
+  } catch {
+    // Forgetting the identifier is optional and must not block the login form.
+  }
+}

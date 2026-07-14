@@ -1,4 +1,5 @@
 import {
+  clearLastLoginIdentity,
   loadLastLoginIdentity,
   saveLastLoginIdentity,
 } from '../../../../../contexts/identities/infrastructure/storage/lastLoginIdentity';
@@ -12,6 +13,7 @@ describe('lastLoginIdentity', () => {
       configurable: true,
       value: {
         getItem: (key: string) => storage.get(key) ?? null,
+        removeItem: (key: string) => storage.delete(key),
         setItem: (key: string, value: string) => storage.set(key, value),
       },
     });
@@ -29,6 +31,14 @@ describe('lastLoginIdentity', () => {
 
   it('ignores empty identifiers', () => {
     saveLastLoginIdentity('   ');
+
+    expect(loadLastLoginIdentity()).toBe('');
+  });
+
+  it('forgets the remembered identity', () => {
+    saveLastLoginIdentity('identity-id');
+
+    clearLastLoginIdentity();
 
     expect(loadLastLoginIdentity()).toBe('');
   });

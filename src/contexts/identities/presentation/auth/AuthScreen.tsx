@@ -17,6 +17,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
 import {
+  clearLastLoginIdentity,
   loadLastLoginIdentity,
   saveLastLoginIdentity,
 } from '../../infrastructure/storage/lastLoginIdentity';
@@ -372,6 +373,8 @@ export function AuthScreen({
             {mode === 'login' && loginIdentityPreview.identity ? (
               <LoginIdentityPreview
                 onClear={() => {
+                  clearLastLoginIdentity();
+                  clearSavedCredentials();
                   setIdentityId('');
                   setIdentityPreviewLookup('');
                 }}
