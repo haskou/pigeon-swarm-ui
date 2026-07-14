@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
 import { PinIcon } from '../../../../contexts/messages/presentation/components/messageActionIcons';
+import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 
 export function WorkspaceHeader({
   avatar,
   children,
+  lock,
   menuContent,
   menuOpen,
   onMenuToggle,
@@ -14,10 +16,9 @@ export function WorkspaceHeader({
   onPinsOpen,
   onRealtimeEventsOpen,
   realtimeStatus,
+  subtitle,
   title,
   titleAction,
-  lock,
-  subtitle,
 }: {
   avatar: ReactNode;
   children?: ReactNode;
@@ -33,6 +34,8 @@ export function WorkspaceHeader({
   title: ReactNode;
   titleAction?: ReactNode;
 }) {
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
+
   return (
     <header className="shrink-0 touch-pan-x border-b border-white/10 p-4 sm:p-5">
       <div className="flex items-center gap-3">
@@ -57,10 +60,12 @@ export function WorkspaceHeader({
           </div>
           {subtitle}
         </div>
-        <RealtimeStatusButton
-          onRealtimeEventsOpen={onRealtimeEventsOpen}
-          realtimeStatus={realtimeStatus}
-        />
+        {technicalDetailsVisible ? (
+          <RealtimeStatusButton
+            onRealtimeEventsOpen={onRealtimeEventsOpen}
+            realtimeStatus={realtimeStatus}
+          />
+        ) : null}
         {onPinsOpen ? <PinnedMessagesButton onPinsOpen={onPinsOpen} /> : null}
         {onMenuToggle && (
           <div className="relative ml-auto flex shrink-0 items-center gap-1">

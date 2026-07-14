@@ -5,8 +5,9 @@ import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 
@@ -28,6 +29,7 @@ export function NodeNetworksPanel({
   onNetworksUpdated,
   session,
 }: NodeNetworksPanelProps) {
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
   const [copiedNetworkId, setCopiedNetworkId] = useState<string | null>(null);
   const [createName, setCreateName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export function NodeNetworksPanel({
 
   const handleJoin = async (event: FormEvent) => {
     event.preventDefault();
+
     if (!canJoinNetwork) return;
 
     beginMutation('join');
@@ -69,6 +72,7 @@ export function NodeNetworksPanel({
   const handleCreateNetwork = async (event: FormEvent) => {
     event.preventDefault();
     const name = createName.trim();
+
     if (!name) return;
 
     beginMutation('create');
@@ -110,6 +114,7 @@ export function NodeNetworksPanel({
         networkDisplayName(network),
       ),
     );
+
     if (!confirmed) return;
 
     beginMutation('remove');
@@ -193,6 +198,7 @@ export function NodeNetworksPanel({
         networks={networks}
         onCopyNetworkCode={copyNetworkCode}
         onRemoveNetwork={handleRemoveNetwork}
+        technicalDetailsVisible={technicalDetailsVisible}
       />
 
       {canCreatePublicNetwork && (
@@ -257,6 +263,7 @@ function NetworkList({
   networks,
   onCopyNetworkCode,
   onRemoveNetwork,
+  technicalDetailsVisible,
 }: {
   canRemoveNetworks: boolean;
   copiedNetworkId: string | null;
@@ -265,6 +272,7 @@ function NetworkList({
   networks: NodeNetwork[];
   onCopyNetworkCode: (network: NodeNetwork) => Promise<void>;
   onRemoveNetwork: (network: NodeNetwork) => Promise<void>;
+  technicalDetailsVisible: boolean;
 }) {
   return (
     <section>
@@ -297,6 +305,7 @@ function NetworkList({
               network={network}
               onCopy={onCopyNetworkCode}
               onRemove={onRemoveNetwork}
+              technicalDetailsVisible={technicalDetailsVisible}
             />
           ))
         )}
@@ -313,6 +322,7 @@ function NetworkRow({
   network,
   onCopy,
   onRemove,
+  technicalDetailsVisible,
 }: {
   canRemove: boolean;
   canShareKey: boolean;
@@ -321,6 +331,7 @@ function NetworkRow({
   network: NodeNetwork;
   onCopy: (network: NodeNetwork) => Promise<void>;
   onRemove: (network: NodeNetwork) => Promise<void>;
+  technicalDetailsVisible: boolean;
 }) {
   const publicNetwork = isPublicNodeNetwork(network);
 
@@ -344,31 +355,35 @@ function NetworkRow({
                 : copy.nodeSettings.privateNetwork}
             </span>
           </div>
-          <div className="truncate text-xs text-white/40" title={network.id}>
-            {network.id}
-          </div>
+          {technicalDetailsVisible ? (
+            <div className="truncate text-xs text-white/40" title={network.id}>
+              {network.id}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void onCopy(network)}
-          className="ui-icon-button"
-          aria-label={
-            canShareKey
-              ? copy.nodeSettings.copyCode
-              : copy.nodeSettings.copyNetworkId
-          }
-          title={
-            copied
-              ? copy.profile.copied
-              : canShareKey
+        {canShareKey || technicalDetailsVisible ? (
+          <button
+            type="button"
+            onClick={() => void onCopy(network)}
+            className="ui-icon-button"
+            aria-label={
+              canShareKey
                 ? copy.nodeSettings.copyCode
                 : copy.nodeSettings.copyNetworkId
-          }
-        >
-          <CopyIcon copied={copied} />
-        </button>
+            }
+            title={
+              copied
+                ? copy.profile.copied
+                : canShareKey
+                  ? copy.nodeSettings.copyCode
+                  : copy.nodeSettings.copyNetworkId
+            }
+          >
+            <CopyIcon copied={copied} />
+          </button>
+        ) : null}
         {canRemove && (
           <button
             type="button"
@@ -510,6 +525,7 @@ function isNetworkInviteCode(value: string): boolean {
 
   try {
     NetworkInviteCode.decode(value);
+
     return true;
   } catch {
     return false;

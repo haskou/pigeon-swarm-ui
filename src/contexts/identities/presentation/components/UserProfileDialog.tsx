@@ -1,26 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 import type {
   IdentityPresence,
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { LightboxImage } from '../../../messages/presentation/components/imageLightbox';
+import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { LazyImageLightbox } from '../../../messages/presentation/components/LazyImageLightbox';
 import {
   identityBanner,
   identityPicture,
   publicFileObjectUrl,
 } from '../view-models/identityDisplay';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import type { LightboxImage } from '../../../messages/presentation/components/imageLightbox';
-import { LazyImageLightbox } from '../../../messages/presentation/components/LazyImageLightbox';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { PresenceStatusDot } from './presenceStatusDot';
 
 type ProfilePopoverAnchor = {
@@ -58,6 +59,7 @@ export function UserProfileDialog({
   presence,
 }: UserProfileDialogProps) {
   const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
 
   useCloseOnEscape(close);
 
@@ -107,8 +109,8 @@ export function UserProfileDialog({
 
     let active = true;
 
-    void applicationContainer
-      .attachments.getPublicFile(bannerCid)
+    void applicationContainer.attachments
+      .getPublicFile(bannerCid)
       .then((content) => {
         if (active) setBannerUrl(publicFileObjectUrl(content));
       })
@@ -260,21 +262,23 @@ export function UserProfileDialog({
           </p>
 
           <div className="mt-3 grid gap-3 text-xs">
-            <div className="min-w-0">
-              <ProfileFieldLabel>{copy.profile.identityId}</ProfileFieldLabel>
-              <div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/5 bg-black/15 px-3 py-2">
-                <span className="block min-w-0 flex-1 truncate font-mono text-[0.7rem] text-white/60">
-                  {identityId}
-                </span>
-                <button
-                  type="button"
-                  onClick={copyIdentityId}
-                  className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/75 transition hover:bg-white/15 hover:text-white"
-                >
-                  {copied ? copy.profile.copied : copy.profile.copy}
-                </button>
+            {technicalDetailsVisible ? (
+              <div className="min-w-0">
+                <ProfileFieldLabel>{copy.profile.identityId}</ProfileFieldLabel>
+                <div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/5 bg-black/15 px-3 py-2">
+                  <span className="block min-w-0 flex-1 truncate font-mono text-[0.7rem] text-white/60">
+                    {identityId}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyIdentityId}
+                    className="shrink-0 rounded-lg bg-white/10 px-2 py-1 font-black text-white/75 transition hover:bg-white/15 hover:text-white"
+                  >
+                    {copied ? copy.profile.copied : copy.profile.copy}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
             <ProfilePillField
               label={copy.profile.networks}
               values={networkNames}

@@ -11,8 +11,7 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
-import type { CallSession } from '../../../calls/domain/callSession.types';
+import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type {
   Community,
   CommunityChannel,
@@ -33,54 +32,42 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
+import type { CallSession } from '../../../calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
+import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { CommunityChannels } from '../../domain/CommunityChannels';
-import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
-import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
-import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { shortId } from '../../../../shared/presentation/formatting';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { Composer } from '../../../messages/presentation/components/Composer';
-import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
-import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
-import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../identities/presentation/view-models/profilePopoverAnchor';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { CommunitySidebar } from './CommunitySidebar';
+import { Composer } from '../../../messages/presentation/components/Composer';
+import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
+import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
+import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
+import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { CommunityChannels } from '../../domain/CommunityChannels';
+import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
 import { loadPublicImage } from './communityImages';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
-import {
-  CommunityMembersPanel,
-  type CommunityMemberListItem,
-} from './communityMembersPanel';
-import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import { CommunityMembersPanel } from './communityMembersPanel';
+import { CommunityMentionPanel } from './communityMentionPanel';
+import { communityMessageIdentityIds } from './communityMessageIdentityIds';
 import {
   CommunityMessageSearchPanel,
   type CommunityMessageSearchResultItem,
 } from './CommunityMessageSearchPanel';
-import {
-  CommunityWorkspaceDialogs,
-  type CommunityProfileView,
-} from './CommunityWorkspaceDialogs';
-import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
-import {
-  CommunityMentionPanel,
-} from './communityMentionPanel';
-import {
-  mergeChatMessages,
-  resolveCommunityChannelId,
-} from './communityWorkspaceHelpers';
+import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import { CommunitySidebar } from './CommunitySidebar';
 import {
   type CommunityThreadState,
   hiddenCommunityThreadSummaryKeysFromMessages,
@@ -89,18 +76,25 @@ import {
   threadTitleFromMessage,
   visibleCommunityThreadSummaries,
 } from './communityThreadState';
-import { useCommunityMembers } from './useCommunityMembers';
+import {
+  CommunityWorkspaceDialogs,
+  type CommunityProfileView,
+} from './CommunityWorkspaceDialogs';
+import {
+  mergeChatMessages,
+  resolveCommunityChannelId,
+} from './communityWorkspaceHelpers';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
-import { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
-import { useCommunityThreadActions } from './useCommunityThreadActions';
-import { useCommunityThreadNavigation } from './useCommunityThreadNavigation';
+import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityMentions } from './useCommunityMentions';
+import { useCommunityMessageComposer } from './useCommunityMessageComposer';
+import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 import { useCommunityPinnedMessages } from './useCommunityPinnedMessages';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
-import { useCommunityMessageSearch } from './useCommunityMessageSearch';
-import { communityMessageIdentityIds } from './communityMessageIdentityIds';
+import { useCommunityThreadActions } from './useCommunityThreadActions';
+import { useCommunityThreadNavigation } from './useCommunityThreadNavigation';
 
 const CreatePollDialog = lazy(() =>
   import('../../../polls/presentation/components/CreatePollDialog').then(
@@ -254,16 +248,19 @@ function communityEncryptionDetails({
       },
       {
         label: copy.encryption.algorithm,
+        technical: true,
         value: communityIsPublic
           ? copy.encryption.plaintext
           : (communityKey?.algorithm ?? copy.encryption.unknown),
       },
       {
         label: copy.encryption.keyVersion,
+        technical: true,
         value: communityKey ? `v${communityKey.version}` : '-',
       },
       {
         label: copy.encryption.createdAt,
+        technical: true,
         value: communityKey
           ? new Intl.DateTimeFormat(undefined, {
               day: '2-digit',
@@ -321,7 +318,6 @@ export function CommunityWorkspace({
   invitationAccepting = false,
   invitationError,
   invitationInviterName,
-  timelineFocusKey,
   mobileMembersOpen,
   mobileRail,
   mobileSidebarOpen,
@@ -330,25 +326,25 @@ export function CommunityWorkspace({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
+  onCallRetryMicrophone,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
-  onCallRetryMicrophone,
   onCallToggleScreenShare,
   onChannelSelected,
   onChannelViewed,
-  onCommunityLeft,
   onCommunityChannelsUpdated,
+  onCommunityLeft,
   onCommunityUpdated,
   onInvitationAccept,
   onJoinVoiceChannel,
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
-  onNotificationSettingsOpen,
   onNotificationMuteToggle,
+  onNotificationSettingsOpen,
   onOpenConversationWithIdentity,
   onOpenMobileSidebar,
   onPresenceChange,
@@ -361,6 +357,7 @@ export function CommunityWorkspace({
   realtimeEvent,
   realtimeStatus = 'connected',
   session,
+  timelineFocusKey,
   typingIdentityIds = [],
 }: CommunityWorkspaceProps) {
   const textChannels = useMemo(
@@ -546,8 +543,8 @@ export function CommunityWorkspace({
     let cancelled = false;
 
     const cancelIdleWork = runWhenBrowserIdle(() => {
-      void applicationContainer
-        .communities.listChannels(session, community.id)
+      void applicationContainer.communities
+        .listChannels(session, community.id)
         .then((channels) => {
           if (cancelled) return;
 
@@ -569,12 +566,7 @@ export function CommunityWorkspace({
       cancelled = true;
       cancelIdleWork();
     };
-  }, [
-    channelTopologyKey,
-    community.id,
-    onCommunityChannelsUpdated,
-    session,
-  ]);
+  }, [channelTopologyKey, community.id, onCommunityChannelsUpdated, session]);
   const projectChannelMessages = useCallback(
     async (channelId: string, rawMessages: MessageResource[]) => {
       communityMessageDecryptWorkerRef.current ??=
@@ -642,8 +634,8 @@ export function CommunityWorkspace({
     scrollChannelToBottom,
     scrollerRef,
     selectedChannelId,
-    setSelectedChannelId,
     setMessages,
+    setSelectedChannelId,
     visibleMessages,
   } = useCommunityChannelMessages({
     loadChannelMessages,
@@ -683,15 +675,15 @@ export function CommunityWorkspace({
         draftSyncTimersRef.current.delete(channelId);
 
         if (value.trim()) {
-          void applicationContainer
-            .communities.saveChannelDraft(session, community.id, channelId, value)
+          void applicationContainer.communities
+            .saveChannelDraft(session, community.id, channelId, value)
             .catch(() => undefined);
 
           return;
         }
 
-        void applicationContainer
-          .communities.deleteChannelDraft(session, community.id, channelId)
+        void applicationContainer.communities
+          .deleteChannelDraft(session, community.id, channelId)
           .catch(() => undefined);
       }, 700);
 
@@ -972,6 +964,7 @@ export function CommunityWorkspace({
           if (Object.keys(labels).length > 0 && !cancelled) {
             setThreadRootLabels((current) => ({ ...current, ...labels }));
           }
+
           if (hiddenKeys.length > 0 && !cancelled) {
             setHiddenThreadRootLabelKeys((current) =>
               withThreadRootLabelKeys(current, hiddenKeys),
@@ -1170,8 +1163,8 @@ export function CommunityWorkspace({
   useEffect(() => {
     let cancelled = false;
 
-    void applicationContainer
-      .communities.listDrafts(session)
+    void applicationContainer.communities
+      .listDrafts(session)
       .then((remoteDrafts) => {
         if (cancelled) return;
 
@@ -1377,8 +1370,8 @@ export function CommunityWorkspace({
   useEffect(() => {
     let cancelled = false;
 
-    void applicationContainer
-      .communities.get(session, community.id)
+    void applicationContainer.communities
+      .get(session, community.id)
       .then((freshCommunity) => {
         if (!cancelled) onCommunityUpdatedRef.current(freshCommunity);
       })
@@ -1570,8 +1563,8 @@ export function CommunityWorkspace({
     scrollChannelToBottom,
     selectedChannelId,
     session,
-    shouldCountNewChannelMessage,
     setMessages,
+    shouldCountNewChannelMessage,
     upsertPoll,
   });
 
@@ -1693,9 +1686,7 @@ export function CommunityWorkspace({
                   title: community.name,
                 })
               }
-              onOpenPins={
-                selectedChannel ? showPinnedMessages : undefined
-              }
+              onOpenPins={selectedChannel ? showPinnedMessages : undefined}
               onRealtimeEventsOpen={onRealtimeEventsOpen}
               open={communityMenuOpen}
             />

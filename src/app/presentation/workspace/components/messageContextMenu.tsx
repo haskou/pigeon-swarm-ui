@@ -7,16 +7,6 @@ import type {
   MessageAttachment,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
-import {
-  type EmojiSuggestion,
-  searchEmojiSuggestions,
-} from '../../../../contexts/messages/presentation/emoji/emojiShortcodes';
-import {
-  loadRecentReactionEmojis,
-  saveRecentReactionEmoji,
-} from '../../../../contexts/messages/presentation/emoji/recentReactionEmojis';
 import {
   CopyIcon,
   DataIcon,
@@ -34,10 +24,21 @@ import {
   isPublicUnencryptedAttachment,
   isVideoAttachment,
 } from '../../../../contexts/messages/presentation/components/messageAttachments';
+import {
+  type EmojiSuggestion,
+  searchEmojiSuggestions,
+} from '../../../../contexts/messages/presentation/emoji/emojiShortcodes';
+import {
+  loadRecentReactionEmojis,
+  saveRecentReactionEmoji,
+} from '../../../../contexts/messages/presentation/emoji/recentReactionEmojis';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
+import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 
 export type MessageContextMenuState = {
   message: ChatMessage;
@@ -56,8 +57,8 @@ export function MessageContextMenu({
   onEdit,
   onOpenThread,
   onPin,
-  onReply,
   onReactionToggle,
+  onReply,
   onUnpin,
   onViewRaw,
   pinned = false,
@@ -82,6 +83,7 @@ export function MessageContextMenu({
   pinned?: boolean;
 }) {
   const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
 
   useCloseOnEscape(close);
 
@@ -232,9 +234,9 @@ export function MessageContextMenu({
           close();
         }}
         style={{
+          userSelect: 'none',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
-          userSelect: 'none',
         }}
         aria-label={copy.dialog.close}
       />
@@ -366,11 +368,13 @@ export function MessageContextMenu({
             onClick={() => runAction(onPin)}
           />
         ) : null}
-        <MessageMenuAction
-          icon={<DataIcon />}
-          label={copy.messages.viewRaw}
-          onClick={() => runAction(onViewRaw)}
-        />
+        {technicalDetailsVisible ? (
+          <MessageMenuAction
+            icon={<DataIcon />}
+            label={copy.messages.viewRaw}
+            onClick={() => runAction(onViewRaw)}
+          />
+        ) : null}
         {onDelete ? (
           <>
             <div className="my-1 h-px bg-white/10" />

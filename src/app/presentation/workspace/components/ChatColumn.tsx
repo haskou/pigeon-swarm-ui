@@ -14,8 +14,8 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -32,26 +32,26 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { shortId } from '../../../../shared/presentation/formatting';
+import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
+import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
 import {
   identityDisplayName,
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
-import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
-import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
-import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
-import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
 } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
-import { ChatEmptyState } from './ChatEmptyState';
+import { Composer } from '../../../../contexts/messages/presentation/components/Composer';
+import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
+import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
+import { shortId } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import { ChatConversationHeader } from './ChatConversationHeader';
+import { ChatEmptyState } from './ChatEmptyState';
 import { ChatMessageTimeline } from './ChatMessageTimeline';
 import { ChatTypingIndicator } from './ChatTypingIndicator';
 import { ConversationActionsMenu } from './ConversationActionsMenu';
@@ -200,51 +200,51 @@ export function ChatColumn({
   conversationKey,
   draft,
   editingMessage,
+  groupInviteRequest = 0,
   hasConversationKey,
   hasReachedMessageStart,
-  groupInviteRequest = 0,
   identityNames,
   identityPictures,
   identityProfiles,
   invitationAccepting = false,
   invitationError,
   invitationInviterName,
-  presenceByIdentityId = {},
   messages,
   messageState,
   newMessageCount,
   nodeNetworks,
   notificationSetting,
-  onCancelReply,
   onCancelEdit,
+  onCancelReply,
   onConversationKeyImported,
-  onInvitationAccept,
   onCreate,
   onDraftChange,
+  onEditMessage,
   onEscape,
+  onInvitationAccept,
   onJumpToLatest,
   onMessageMenuOpen,
-  onOpenMessageThread,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
   onOpenConversationWithIdentity,
+  onOpenMessageThread,
   onOpenPins,
   onOpenSidebar,
   onReactionToggle,
-  onNotificationSettingsOpen,
-  onNotificationMuteToggle,
   onRealtimeEventsOpen,
   onReplyReferenceClick,
   onRetryMessage,
   onScroll,
   onSend,
-  onEditMessage,
-  onStickerSend,
   onStartCall,
+  onStickerSend,
   onTypingActive,
   peerIdentity,
   peerIdentityId,
   peerPicture,
   pendingInvitation,
   pinnedMessageIds,
+  presenceByIdentityId = {},
   progress,
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -368,8 +368,8 @@ export function ChatColumn({
 
     if (!pollId) return;
 
-    void applicationContainer
-      .polls.get(session, pollId)
+    void applicationContainer.polls
+      .get(session, pollId)
       .then((loadedPoll) => {
         if (loadedPoll.scope.type === 'group_conversation') {
           upsertPoll(loadedPoll);
@@ -683,6 +683,7 @@ export function ChatColumn({
     onErrorChange: setAttachmentError,
     onProgressChange: setDownloadProgress,
   });
+
   return (
     <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <ChatConversationHeader
@@ -772,9 +773,7 @@ export function ChatColumn({
             }
             onJumpToLatest={onJumpToLatest}
             onMessageMenuOpen={onMessageMenuOpen}
-            onOpenThread={
-              isGroupConversation ? onOpenMessageThread : undefined
-            }
+            onOpenThread={isGroupConversation ? onOpenMessageThread : undefined}
             onReactionToggle={onReactionToggle}
             onReplyReferenceClick={onReplyReferenceClick}
             onRetryMessage={onRetryMessage}
@@ -993,14 +992,17 @@ function conversationEncryptionDetails({
       },
       {
         label: copy.encryption.algorithm,
+        technical: true,
         value: conversationKey?.algorithm ?? copy.encryption.unknown,
       },
       {
         label: copy.encryption.keyVersion,
+        technical: true,
         value: conversationKey ? `v${conversationKey.version}` : '-',
       },
       {
         label: copy.encryption.createdAt,
+        technical: true,
         value: conversationKey
           ? new Intl.DateTimeFormat(undefined, {
               day: '2-digit',

@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
+import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   IdentityResource,
@@ -12,26 +12,27 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
-import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
-import { shortId } from '../../../../shared/presentation/formatting';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
 import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
 import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
+import { cx } from '../../../../shared/presentation/cx';
+import { shortId } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import { NodeNetworksPanel } from './NodeNetworksPanel';
-import { PeerStatusPanel } from './PeerStatusPanel';
 import {
   NetworkSynchronizationPanel,
   ReplicationStatusPanel,
 } from './NodeSynchronizationPanels';
+import { PeerStatusPanel } from './PeerStatusPanel';
 
 interface NodeSettingsDialogProps {
   networkSynchronizationStatus: NetworkSynchronizationStatus | null;
@@ -47,16 +48,17 @@ interface NodeSettingsDialogProps {
 type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
 
 export function NodeSettingsDialog({
-  networkSynchronizationStatus,
   networks,
+  networkSynchronizationStatus,
   node,
   onClose,
   onNetworksUpdated,
-  peersLoading,
   peers,
+  peersLoading,
   session,
 }: NodeSettingsDialogProps) {
   const { close, state: transitionState } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
 
   useCloseOnEscape(close);
 
@@ -118,6 +120,7 @@ export function NodeSettingsDialog({
           );
         }
       }
+
       if (!cancelled) setReplicationLoading(false);
     };
 
@@ -160,6 +163,7 @@ export function NodeSettingsDialog({
           );
         }
       }
+
       if (!cancelled) setRelayLoading(false);
     };
 
@@ -206,6 +210,7 @@ export function NodeSettingsDialog({
 
   const handleSaveRelayConfiguration = async (event: FormEvent) => {
     event.preventDefault();
+
     if (!isOwner || relaySaving) return;
 
     setError(null);
@@ -213,10 +218,11 @@ export function NodeSettingsDialog({
     setRelayError(null);
     setRelaySaving(true);
     try {
-      const saved = await applicationContainer.networks.updateRelayConfiguration(
-        relayConfiguration,
-        session,
-      );
+      const saved =
+        await applicationContainer.networks.updateRelayConfiguration(
+          relayConfiguration,
+          session,
+        );
 
       setRelayConfiguration(normalizeNodeRelayConfiguration(saved));
       setRelayConfigurationLoaded(true);
@@ -311,33 +317,35 @@ export function NodeSettingsDialog({
                         )}
                       </div>
 
-                      <div className="py-3">
-                        <div className="mb-1.5 text-sm font-semibold text-white/55">
-                          {copy.nodeSettings.nodeId}
+                      {technicalDetailsVisible ? (
+                        <div className="py-3">
+                          <div className="mb-1.5 text-sm font-semibold text-white/55">
+                            {copy.nodeSettings.nodeId}
+                          </div>
+                          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
+                            <code
+                              className="min-w-0 truncate text-sm text-white/70"
+                              title={node?.id ?? undefined}
+                            >
+                              {node?.id ?? '--'}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => void copyNodeId()}
+                              disabled={!node?.id}
+                              className="ui-icon-button h-9 w-9 shrink-0"
+                              aria-label={copy.nodeSettings.copyNodeId}
+                              title={
+                                copiedNodeId
+                                  ? copy.profile.copied
+                                  : copy.nodeSettings.copyNodeId
+                              }
+                            >
+                              <CopyIcon copied={copiedNodeId} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
-                          <code
-                            className="min-w-0 truncate text-sm text-white/70"
-                            title={node?.id ?? undefined}
-                          >
-                            {node?.id ?? '--'}
-                          </code>
-                          <button
-                            type="button"
-                            onClick={() => void copyNodeId()}
-                            disabled={!node?.id}
-                            className="ui-icon-button h-9 w-9 shrink-0"
-                            aria-label={copy.nodeSettings.copyNodeId}
-                            title={
-                              copiedNodeId
-                                ? copy.profile.copied
-                                : copy.nodeSettings.copyNodeId
-                            }
-                          >
-                            <CopyIcon copied={copiedNodeId} />
-                          </button>
-                        </div>
-                      </div>
+                      ) : null}
 
                       <NodeRuntimeSummary
                         node={node}
@@ -521,7 +529,6 @@ function NodeDetailRow({
   );
 }
 
-
 function NodeOwnerIdentity({
   currentIdentity,
   ownerIdentityId,
@@ -549,7 +556,6 @@ function NodeOwnerIdentity({
   );
 }
 
-
 function relayStatusLabel(
   relay:
     | {
@@ -561,9 +567,12 @@ function relayStatusLabel(
     | undefined,
 ): string {
   if (!relay?.enabled) return copy.nodeSettings.relayDisabled;
+
   if (relay.running && relay.advertised)
     return copy.nodeSettings.relayAdvertised;
+
   if (relay.running) return copy.nodeSettings.relayRunning;
+
   if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
 
   return copy.nodeSettings.relayEnabled;
