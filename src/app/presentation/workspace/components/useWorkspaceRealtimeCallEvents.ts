@@ -173,6 +173,15 @@ export function useWorkspaceRealtimeCallEvents(
       );
 
       if (projectedCall) {
+        const currentActiveCall = activeCallRef.current;
+
+        if (currentActiveCall?.id === projectedCall.id) {
+          activeCallRef.current = {
+            ...currentActiveCall,
+            call: projectedCall,
+          };
+        }
+
         reconcileCallResource(projectedCall);
         return;
       }

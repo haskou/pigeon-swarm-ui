@@ -27,6 +27,7 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 import { showPwaNotification } from '../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
+import { reconciledCallResource } from './reconciledCallResource';
 
 type CallSessionController = ReturnType<typeof useCallSession>;
 
@@ -64,6 +65,7 @@ export function useCallResourceReconciliation({
   const participantStatusesRef = useRef<
     Record<string, Record<string, CallParticipantStatus>>
   >({});
+  const callResourcesRef = useRef(new Map<string, CallResource>());
   const notifiedIncomingCallIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -79,8 +81,19 @@ export function useCallResourceReconciliation({
   }, [incomingCall?.call.id]);
 
   const reconcileCallResource = useCallback(
-    (call: CallResource) => {
+    (incomingCallResource: CallResource) => {
       const currentActiveCall = activeCallRef.current;
+      const previousCallResource =
+        callResourcesRef.current.get(incomingCallResource.id) ??
+        (currentActiveCall?.id === incomingCallResource.id
+          ? currentActiveCall.call
+          : undefined);
+      const call = reconciledCallResource(
+        previousCallResource,
+        incomingCallResource,
+      );
+
+      callResourcesRef.current.set(call.id, call);
       const details = callDetailsForResource(call);
       const currentParticipant = call.participants.find(
         (participant) => participant.identityId === currentIdentityId,
@@ -265,8 +278,7 @@ function projectCommunityVoicePresence(
         if (
           currentIdentityIds.length === connectedIdentityIds.length &&
           currentIdentityIds.every(
-            (identityId, index) =>
-              identityId === connectedIdentityIds[index],
+            (identityId, index) => identityId === connectedIdentityIds[index],
           )
         ) {
           return channel;
