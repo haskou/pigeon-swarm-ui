@@ -18,7 +18,7 @@ const fallbackLabels = {
 };
 
 describe(resolveWorkspaceCallDetails.name, () => {
-  it('uses community and voice channel names for community calls', () => {
+  it('uses live lease presence for community call participants', () => {
     const call = callResource({
       participantIds: ['identity-1', 'identity-2'],
       participants: [
@@ -31,6 +31,12 @@ describe(resolveWorkspaceCallDetails.name, () => {
         {
           connected: false,
           identityId: 'identity-2',
+          mediaConnections: [],
+          status: 'joined',
+        },
+        {
+          connected: true,
+          identityId: 'identity-3',
           mediaConnections: [],
           status: 'left',
         },
@@ -64,6 +70,7 @@ describe(resolveWorkspaceCallDetails.name, () => {
           name: 'Hasko',
           status: 'joined',
         },
+        { identityId: 'identity-3', status: 'left' },
       ],
       subtitle: 'Schale',
       title: 'General voice',

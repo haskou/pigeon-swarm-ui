@@ -24,6 +24,7 @@ import {
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from './callPeerConnectionPlan';
+import { reconciledCallParticipants } from './reconciledCallParticipants';
 
 type SignalSender = (
   recipientIdentityId: string,
@@ -336,7 +337,11 @@ export function useCallSession(): {
 
   const reconcileCall = useCallback(
     (call: CallResource, input: ReconcileCallInput) => {
-      const participants = mergeParticipantStatuses(input.participants, call);
+      const participants = reconciledCallParticipants(
+        activeCallRef.current?.participants ?? [],
+        input.participants,
+        call,
+      );
 
       setActiveCall((current) => {
         if (!current || current.id !== call.id) return current;
@@ -345,7 +350,11 @@ export function useCallSession(): {
           ...current,
           ...input,
           call,
-          participants,
+          participants: reconciledCallParticipants(
+            current.participants,
+            input.participants,
+            call,
+          ),
           participantVolumes: current.participantVolumes,
           screenShareVolumes: current.screenShareVolumes,
           status: reconciledCallStatus(call, current),
@@ -814,32 +823,6 @@ export function useCallSession(): {
       signalType: signal.signalType,
     });
   }
-}
-
-function mergeParticipantStatuses(
-  participants: CallParticipant[],
-  call: CallResource,
-): CallParticipant[] {
-  const byIdentityId = new Map(
-    call.participants.map((participant) => [
-      participant.identityId,
-      participant,
-    ]),
-  );
-
-  return participants.map((participant) => {
-    const resourceParticipant = byIdentityId.get(participant.identityId);
-
-    return {
-      ...participant,
-      connected: resourceParticipant?.connected ?? participant.connected,
-      lastHeartbeatAt:
-        resourceParticipant?.lastHeartbeatAt ?? participant.lastHeartbeatAt,
-      mediaConnections:
-        resourceParticipant?.mediaConnections ?? participant.mediaConnections,
-      status: resourceParticipant?.status ?? participant.status,
-    };
-  });
 }
 
 function reconciledCallStatus(

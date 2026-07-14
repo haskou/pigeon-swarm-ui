@@ -35,7 +35,10 @@ export function retainedRemotePeerIdentityIds(
   currentIdentityId: string,
 ): string[] {
   return call.participants
-    .filter((participant) => participant.status === 'joined')
+    .filter(
+      (participant) =>
+        participant.connected || participant.status === 'joined',
+    )
     .filter((participant) => participant.identityId !== currentIdentityId)
     .map((participant) => participant.identityId);
 }

@@ -55,7 +55,7 @@ export function resolveWorkspaceCallDetails({
   identityProfiles,
   keychain,
 }: ResolveWorkspaceCallDetailsInput): WorkspaceCallDetails {
-  const participantIds = callParticipantIds(call);
+  const participantIds = callParticipantIds(call, currentIdentity.id);
   const participants = participantIds.map((identityId) => {
     const participant = callParticipantForIdentity({
       currentIdentity,
@@ -123,11 +123,18 @@ export function resolveWorkspaceCallDetails({
   };
 }
 
-function callParticipantIds(call: CallResource): string[] {
+function callParticipantIds(
+  call: CallResource,
+  currentIdentityId: string,
+): string[] {
   if (call.scope.type !== 'community_channel') return call.participantIds;
 
   return call.participants
-    .filter((participant) => participant.connected)
+    .filter(
+      (participant) =>
+        participant.connected ||
+        participant.identityId === currentIdentityId,
+    )
     .map((participant) => participant.identityId);
 }
 
