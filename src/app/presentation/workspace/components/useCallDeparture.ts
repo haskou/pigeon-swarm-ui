@@ -15,6 +15,7 @@ import type {
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { playEndedCallSound } from '../../../../shared/presentation/sounds';
+import { callDepartureAction } from './callDepartureAction';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 
 type CallSessionController = ReturnType<typeof useCallSession>;
@@ -47,21 +48,33 @@ export function useCallDeparture({
 } {
   const pageDepartureRef = useRef({
     callId: activeCall?.id,
+    kind: activeCall?.kind,
     session,
   });
-  pageDepartureRef.current = { callId: activeCall?.id, session };
+  pageDepartureRef.current = {
+    callId: activeCall?.id,
+    kind: activeCall?.kind,
+    session,
+  };
 
   useEffect(() => {
     let departureRequested = false;
     const leaveCallOnPageDeparture = (): void => {
-      const { callId, session: currentSession } = pageDepartureRef.current;
+      const {
+        callId,
+        kind,
+        session: currentSession,
+      } = pageDepartureRef.current;
 
       if (!callId || departureRequested) return;
 
       departureRequested = true;
-      void applicationContainer.calls
-        .leave(currentSession, callId)
-        .catch(() => undefined);
+      const request =
+        callDepartureAction(kind) === 'end'
+          ? applicationContainer.calls.end(currentSession, callId)
+          : applicationContainer.calls.leave(currentSession, callId);
+
+      void request.catch(() => undefined);
     };
 
     globalThis.addEventListener?.('beforeunload', leaveCallOnPageDeparture);
@@ -74,7 +87,7 @@ export function useCallDeparture({
       );
       globalThis.removeEventListener?.('pagehide', leaveCallOnPageDeparture);
     };
-  }, [activeCall?.id]);
+  }, [activeCall?.id, activeCall?.kind]);
 
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     setCommunities((current) =>
@@ -92,7 +105,7 @@ export function useCallDeparture({
 
   const leaveCallResource = useCallback(
     async (call: CallResource): Promise<void> => {
-      if (callDetailsForResource(call).kind === 'one-to-one') {
+      if (callDepartureAction(callDetailsForResource(call).kind) === 'end') {
         await applicationContainer.calls.end(session, call.id);
 
         return;
@@ -153,7 +166,6 @@ export function useCallDeparture({
   const leaveActiveCall = useCallback(() => {
     const callId = activeCall?.id;
     const isCommunityVoiceCall = activeCall?.kind === 'community-voice';
-    const shouldEndForEveryone = activeCall?.kind === 'one-to-one';
 
     endCall();
     removeCurrentIdentityFromVoicePresence();
@@ -161,7 +173,7 @@ export function useCallDeparture({
 
     if (!callId) return;
 
-    const request = shouldEndForEveryone
+    const request = callDepartureAction(activeCall?.kind) === 'end'
       ? applicationContainer.calls.end(session, callId)
       : applicationContainer.calls.leave(session, callId);
 
