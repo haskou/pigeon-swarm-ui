@@ -60,7 +60,7 @@ describe(callResourceWithParticipantLeaseUpdate.name, () => {
     });
   });
 
-  it('requires a snapshot for an unknown participant', () => {
+  it('requires a snapshot when an unknown participant is missing from topology', () => {
     expect(
       callResourceWithParticipantLeaseUpdate(
         callResource(),
@@ -69,16 +69,31 @@ describe(callResourceWithParticipantLeaseUpdate.name, () => {
     ).toBeUndefined();
   });
 
-  it('requires a snapshot when the participant topology changes', () => {
+  it('projects a newly connected participant from the event topology', () => {
     expect(
       callResourceWithParticipantLeaseUpdate(
         callResource(),
         leaseEvent({
+          lastHeartbeatAt: 400,
+          participantIdentityId: 'charlie',
           participantIds: ['alice', 'bob', 'charlie'],
           participantsChanged: true,
+          status: 'connected',
         }),
       ),
-    ).toBeUndefined();
+    ).toMatchObject({
+      participantIds: ['alice', 'bob', 'charlie'],
+      participants: [
+        { identityId: 'bob' },
+        {
+          connected: true,
+          identityId: 'charlie',
+          lastHeartbeatAt: 400,
+          mediaConnections: [],
+          status: 'joined',
+        },
+      ],
+    });
   });
 });
 

@@ -4,21 +4,13 @@ import type {
 } from '../../../../contexts/calls/domain/callSession.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import {
-  booleanAttribute,
-  numberAttribute,
-  stringAttribute,
-} from './realtimeEventAttributes';
+import { numberAttribute, stringAttribute } from './realtimeEventAttributes';
 
 export function callResourceWithParticipantLeaseUpdate(
   call: CallResource | undefined,
   event: RealtimeDomainEvent,
 ): CallResource | undefined {
   if (!call || event.type !== 'calls.v1.participant_lease.was_updated') {
-    return undefined;
-  }
-
-  if (booleanAttribute(event, 'participantsChanged') === true) {
     return undefined;
   }
 
@@ -39,33 +31,39 @@ export function callResourceWithParticipantLeaseUpdate(
     return undefined;
   }
 
-  if (
-    !call.participants.some(
-      (participant) => participant.identityId === participantIdentityId,
-    )
-  ) {
+  const participantIds = stringArrayAttribute(event, 'participantIds');
+  const currentParticipant = call.participants.find(
+    (participant) => participant.identityId === participantIdentityId,
+  );
+
+  if (!currentParticipant && !participantIds?.includes(participantIdentityId)) {
     return undefined;
   }
 
-  const participantIds = stringArrayAttribute(event, 'participantIds');
   const mediaConnections = mediaConnectionsAttribute(event);
+  const updatedParticipant: CallResource['participants'][number] = {
+    ...(currentParticipant ?? {
+      identityId: participantIdentityId,
+      status: 'joined',
+    }),
+    connected: connectionStatus === 'connected',
+    lastHeartbeatAt,
+    mediaConnections:
+      connectionStatus === 'disconnected'
+        ? []
+        : (mediaConnections ?? currentParticipant?.mediaConnections ?? []),
+  };
 
   return {
     ...call,
     participantIds: participantIds ?? call.participantIds,
-    participants: call.participants.map((participant) =>
-      participant.identityId === participantIdentityId
-        ? {
-            ...participant,
-            connected: connectionStatus === 'connected',
-            lastHeartbeatAt,
-            mediaConnections:
-              connectionStatus === 'disconnected'
-                ? []
-                : (mediaConnections ?? participant.mediaConnections),
-          }
-        : participant,
-    ),
+    participants: currentParticipant
+      ? call.participants.map((participant) =>
+          participant.identityId === participantIdentityId
+            ? updatedParticipant
+            : participant,
+        )
+      : [...call.participants, updatedParticipant],
   };
 }
 
