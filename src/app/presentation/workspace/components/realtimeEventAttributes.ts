@@ -51,15 +51,8 @@ export function booleanAttribute(
 
 export function callResourceRefreshIsRequired(
   event: RealtimeDomainEvent,
-  currentIdentityId: string,
 ): boolean {
   if (event.type !== 'calls.v1.participant_lease.was_updated') return true;
-
-  if (
-    stringAttribute(event, 'participantIdentityId') === currentIdentityId
-  ) {
-    return false;
-  }
 
   return (
     booleanAttribute(event, 'connectionChanged') === true ||
