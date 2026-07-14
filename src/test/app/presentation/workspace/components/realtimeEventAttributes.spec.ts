@@ -32,7 +32,24 @@ describe(callIdFromRealtimeEvent.name, () => {
 });
 
 describe(callResourceRefreshIsRequired.name, () => {
-  it('does not refetch a call for local lease updates', () => {
+  it('does not refetch a call for an unchanged local lease heartbeat', () => {
+    expect(
+      callResourceRefreshIsRequired(
+        event({
+          aggregateId: 'lease-1',
+          attributes: {
+            callId: 'call-1',
+            connectionChanged: false,
+            participantIdentityId: 'alice',
+            participantsChanged: false,
+          },
+          type: 'calls.v1.participant_lease.was_updated',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('refetches a call when the local lease disconnects', () => {
     expect(
       callResourceRefreshIsRequired(
         event({
@@ -41,12 +58,12 @@ describe(callResourceRefreshIsRequired.name, () => {
             callId: 'call-1',
             connectionChanged: true,
             participantIdentityId: 'alice',
+            status: 'disconnected',
           },
           type: 'calls.v1.participant_lease.was_updated',
         }),
-        'alice',
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('does not refetch a call when only remote media diagnostics change', () => {
@@ -63,7 +80,6 @@ describe(callResourceRefreshIsRequired.name, () => {
           },
           type: 'calls.v1.participant_lease.was_updated',
         }),
-        'alice',
       ),
     ).toBe(false);
   });
@@ -80,7 +96,6 @@ describe(callResourceRefreshIsRequired.name, () => {
           },
           type: 'calls.v1.participant_lease.was_updated',
         }),
-        'alice',
       ),
     ).toBe(true);
   });
@@ -93,7 +108,6 @@ describe(callResourceRefreshIsRequired.name, () => {
           attributes: {},
           type: 'calls.v1.participant.joined',
         }),
-        'alice',
       ),
     ).toBe(true);
   });

@@ -166,12 +166,7 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
-      if (
-        !callResourceRefreshIsRequired(
-          event,
-          sessionRef.current.identity.id,
-        )
-      ) {
+      if (!callResourceRefreshIsRequired(event)) {
         return;
       }
 
